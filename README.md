@@ -14,6 +14,7 @@ The open-source flag products keep a paid tier, and the features a real team nee
 - **Access**: roles and permissions per project, personal access tokens and project tokens with scopes, an audit log of every change, local sign-in with lockout and throttling, members and invitations.
 - **Delivery to SDKs**: server and client SDK keys per environment, with rotation and an overlap, revocation and allowed origins; the ruleset with conditional requests; the ruleset stream, which brings a change, a kill switch included, to a server SDK within 2 seconds; remote evaluation for client keys, which learn served values only; the events SDKs post; the attributes SDKs send that the project has not declared; and the SDKs seen using each environment.
 - **The Go SDK** and its OpenFeature provider: evaluation in the SDK, so a flag check costs no network call and the SDK keeps serving its last good ruleset if the server goes away.
+- **SDKs for JavaScript, Dart and Flutter, Ruby and Python**, listed below.
 - **Operations**: any number of identical replicas on one PostgreSQL, with no sticky sessions; Prometheus metrics; a console in English and Russian; a Docker image for `linux/amd64` and `linux/arm64` with provenance and an SBOM.
 
 ## Not there yet
@@ -25,8 +26,20 @@ Each arrives in a later release:
 - **Governance**: protected environments with change requests, scheduled changes, webhooks.
 - **Identity**: OIDC, SAML and SCIM.
 - **Export** of exposures and evaluation summaries to ClickHouse, object storage or a webhook.
-- **More SDKs**: JavaScript (server, browser, React), Dart and Flutter, Ruby and Python, each with an OpenFeature provider.
 - A Helm chart.
+
+## SDKs
+
+Each SDK is published under the name `flagnetic` on its own registry, and the OpenFeature providers beside it. All speak the same protocol and work with every server from 0.1.0 on; see [SDKs](docs/sdks/README.md) for modes, runtimes and how soon a change reaches each.
+
+| Language | Install |
+|---|---|
+| [Go](sdks/go/README.md) | `go get github.com/azverinus/flagnetic/sdks/go`, and `go get github.com/azverinus/flagnetic/sdks/go-openfeature` for OpenFeature |
+| [JavaScript and TypeScript](sdks/js/README.md): Node, browsers, React | `npm install flagnetic` |
+| [Dart](sdks/dart/README.md) | `dart pub add flagnetic` |
+| [Flutter](sdks/flutter/README.md) | `flutter pub add flagnetic_flutter` |
+| [Ruby](sdks/ruby/README.md) | `bundle add flagnetic`, and `bundle add flagnetic-openfeature` for OpenFeature |
+| [Python](sdks/python/README.md) | `pip install flagnetic`, and `pip install 'flagnetic[openfeature]'` for OpenFeature |
 
 ## Quick start
 
@@ -44,14 +57,14 @@ This runs PostgreSQL, applies the migrations and starts the server on http://loc
 docker compose exec flagnetic flagnetic admin bootstrap --email you@example.com
 ```
 
-Then create a project, add a server SDK key to one of its environments, and follow the [Go SDK](sdks/go/README.md).
+Then create a project, add an SDK key to one of its environments, and follow the [SDK](#sdks) for your language.
 
 ## Documentation
 
 - [Installing Flagnetic](docs/install.md): Docker Compose or the binary, TLS and a reverse proxy, PostgreSQL, upgrades.
 - [Operations](docs/operations.md) and the [configuration reference](docs/configuration.md).
 - [Flags](docs/flags.md), [segments](docs/segments.md), [targeting](docs/targeting.md) and [access](docs/access.md).
-- [SDK keys](docs/sdks/keys.md), the [ruleset stream](docs/sdks/stream.md) and [compatibility](docs/sdks/compatibility.md); [everything else](docs/README.md).
+- [SDKs](docs/sdks/README.md), [SDK keys](docs/sdks/keys.md), the [ruleset stream](docs/sdks/stream.md) and [compatibility](docs/sdks/compatibility.md); [everything else](docs/README.md).
 
 ## Principles
 

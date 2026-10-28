@@ -21,6 +21,7 @@ import {
   TagsIcon,
   UsersIcon,
   UsersRoundIcon,
+  WebhookIcon,
 } from "lucide-react";
 import { type ReactNode, useId } from "react";
 
@@ -120,6 +121,12 @@ const projectScreens = [
     permission: "project_token.manage",
   },
   {
+    to: "/projects/$project/webhooks",
+    label: msg`Webhooks`,
+    icon: WebhookIcon,
+    permission: "webhook.manage",
+  },
+  {
     to: "/projects/$project/audit",
     label: msg`Audit log`,
     icon: HistoryIcon,
@@ -140,7 +147,12 @@ const projectScreens = [
 ] satisfies ProjectScreen[];
 
 type InstanceScreen = Screen & {
-  to: "/admin/projects" | "/admin/members" | "/admin/auth-settings" | "/admin/audit";
+  to:
+    | "/admin/projects"
+    | "/admin/members"
+    | "/admin/auth-settings"
+    | "/admin/audit"
+    | "/admin/webhooks";
 };
 
 /** The screens of the instance, listed to instance admins. */
@@ -148,6 +160,7 @@ const instanceScreens: InstanceScreen[] = [
   { to: "/admin/projects", label: msg`Projects`, icon: LayersIcon },
   { to: "/admin/members", label: msg`Members`, icon: UsersIcon },
   { to: "/admin/auth-settings", label: msg`Auth settings`, icon: KeyRoundIcon },
+  { to: "/admin/webhooks", label: msg`Webhooks`, icon: WebhookIcon },
   { to: "/admin/audit", label: msg`Audit log`, icon: HistoryIcon },
 ];
 

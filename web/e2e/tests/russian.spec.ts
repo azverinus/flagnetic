@@ -1,4 +1,10 @@
-import { createChangeRequest, createExperiment, createGrant, getExperiment } from "@flagnetic/api";
+import {
+  createChangeRequest,
+  createExperiment,
+  createGrant,
+  createWebhook,
+  getExperiment,
+} from "@flagnetic/api";
 import { expect, test } from "@playwright/test";
 
 import { expectNoSeriousViolations } from "../support/axe";
@@ -14,6 +20,7 @@ import {
 } from "../support/console";
 import { choose, seedFlag, stringFlag, writeConfiguration } from "../support/flags";
 import { admin } from "../support/instance";
+import { runningExperimentInProduction } from "../support/experiments";
 import { sdkRequest, seedSdkKey } from "../support/sdk";
 
 /**
@@ -448,5 +455,96 @@ test.describe("the console in Russian", () => {
     await expect(page.getByRole("list", { name: "Легенда" })).toContainText("Сводки вычислений");
     await expect(page.getByText("За эти дни ни одно событие не потеряно.")).toBeVisible();
     await expectNoSeriousViolations(page, "the event volume in Russian");
+  });
+
+  test("proposes an experiment's stop and reads its change request in Russian", async ({
+    page,
+  }) => {
+    const stopping = await seedProject("tula-stop");
+    must(
+      `granting maintainer in ${stopping}`,
+      await createGrant({
+        client: managementClient(),
+        path: { project: stopping },
+        body: { member: anna.id, role: "maintainer" },
+      }),
+    );
+    await runningExperimentInProduction(stopping);
+
+    await signIn(page, anna, russian);
+    await page.goto(`/projects/${stopping}/experiments/cta_copy`);
+    await page.getByRole("button", { name: "Остановить", exact: true }).click();
+    const stop = page.getByRole("dialog", { name: "Остановить cta_copy" });
+    await stop.getByLabel(/Убрать: его правила удаляются/).check();
+    await stop.getByRole("button", { name: "Остановить эксперимент" }).click();
+    const dialog = page.getByRole("dialog", { name: "Предложить изменение" });
+    await expect(dialog.getByText(/защищено, поэтому изменить его напрямую нельзя/)).toBeVisible();
+    await expectNoSeriousViolations(page, "the propose dialog of an experiment in Russian");
+    await dialog.getByLabel("Заголовок").fill("Остановить эксперимент");
+    await dialog.getByRole("button", { name: "Предложить", exact: true }).click();
+
+    await expect(page).toHaveURL(/\/change-requests\/[0-9a-f-]{36}$/);
+    await expect(
+      page
+        .locator("[data-sonner-toast]")
+        .filter({ hasText: "Запрос на изменение открыт на проверку." }),
+    ).toHaveCSS("opacity", "1");
+    await expect(
+      page.getByText("Останавливает эксперимент и удаляет правила, которые его отдают."),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("list", { name: "Переписываемые правила" }).getByRole("listitem"),
+    ).toHaveText(["Production, правило эксперимента 1: удаляется"]);
+    await expectNoSeriousViolations(page, "an experiment change request in Russian");
+
+    await page.goto(`/projects/${stopping}/change-requests`);
+    await expect(page.getByRole("combobox", { name: "Расписание", exact: true })).toBeVisible();
+    await expectNoSeriousViolations(
+      page,
+      "the change requests with the schedule filter in Russian",
+    );
+  });
+
+  test("reads the webhooks, their form and their delivery log in Russian", async ({ page }) => {
+    const created = must(
+      "creating a webhook",
+      await createWebhook({
+        client: managementClient(),
+        path: { project },
+        body: {
+          name: "Чат релизов",
+          url: "https://hooks.example.com/flagnetic",
+          events: ["flag.kill_switch"],
+          enabled: false,
+        },
+      }),
+    );
+    await signIn(page, anna, russian);
+    await page.goto(`/projects/${project}/webhooks`);
+
+    await expect(page.getByRole("heading", { name: "Вебхуки", level: 1 })).toBeVisible();
+    const row = page
+      .getByRole("table", { name: "Вебхуки" })
+      .getByRole("row", { name: /Чат релизов/ });
+    await expect(row).toContainText("Отключён");
+    await expect(row).toContainText("1 тип событий");
+    await expectNoSeriousViolations(page, "the webhooks list in Russian");
+
+    await page.getByRole("button", { name: "Новый вебхук" }).click();
+    const dialog = page.getByRole("dialog", { name: "Новый вебхук" });
+    await expect(dialog.getByLabel("URL")).toBeVisible();
+    await expect(dialog.getByRole("checkbox", { name: /^Все события/ })).toBeVisible();
+    await expect(dialog.getByRole("checkbox", { name: /flag\.kill_switch/ })).toBeVisible();
+    await expectNoSeriousViolations(page, "the new webhook dialog in Russian");
+    await dialog.getByRole("button", { name: "Создать вебхук" }).click();
+    await expect(dialog.getByText("Выберите хотя бы один тип событий.")).toBeVisible();
+    await dialog.getByRole("button", { name: "Отмена" }).click();
+
+    await page.goto(`/projects/${project}/webhooks/${created.id}?tab=deliveries`);
+    await expect(page.getByRole("heading", { name: "Чат релизов", level: 1 })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Доставки", selected: true })).toBeVisible();
+    await expect(page.getByText("Этому вебхуку пока ничего не отправлялось.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Отправить тест" })).toBeDisabled();
+    await expectNoSeriousViolations(page, "a webhook's delivery log in Russian");
   });
 });

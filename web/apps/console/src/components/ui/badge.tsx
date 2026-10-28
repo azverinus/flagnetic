@@ -10,6 +10,8 @@ const badge = cva("rounded-sm border px-1.5 py-0.5 text-xs", {
       default: "border-primary/40 text-primary",
       /** A plain fact about a row, such as a standard attribute. */
       muted: "text-muted-foreground",
+      /** Something that went wrong, such as a delivery that was given up. */
+      destructive: "border-destructive/40 text-destructive",
     },
   },
   defaultVariants: { variant: "default" },

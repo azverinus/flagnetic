@@ -96,6 +96,22 @@ export async function unprotectProduction(project: string): Promise<void> {
   );
 }
 
+/** Protects a project's production again, after a spec wrote it directly. */
+export async function protectProduction(project: string): Promise<void> {
+  const client = managementClient();
+  const path = { project, environment: "production" };
+  const current = must(`reading production of ${project}`, await getEnvironment({ client, path }));
+  must(
+    `protecting production of ${project}`,
+    await setEnvironmentProtection({
+      client,
+      path,
+      headers: { "If-Match": `"${current.version}"` },
+      body: { protected: true },
+    }),
+  );
+}
+
 /**
  * Someone invited by the instance admin who has not accepted yet, with
  * the invitation's one-time link. The email carries the time and a random

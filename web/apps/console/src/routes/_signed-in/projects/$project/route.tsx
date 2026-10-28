@@ -7,6 +7,7 @@ import { projectNameCrumb } from "@/components/breadcrumb";
 import { QueryError } from "@/components/query-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AccessProvider } from "@/components/access-provider";
+import { ProjectWebhookBanner } from "@/components/webhook-disabled-banner";
 import { ApiError } from "@/lib/errors";
 import { rememberLastProject } from "@/lib/preferences";
 import { problemMessage } from "@/lib/problem-messages";
@@ -74,6 +75,7 @@ function ProjectLayout() {
   }
   return (
     <AccessProvider project={key}>
+      <ProjectWebhookBanner project={key} />
       <Outlet />
     </AccessProvider>
   );

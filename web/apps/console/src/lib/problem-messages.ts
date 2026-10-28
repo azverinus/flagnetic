@@ -165,6 +165,18 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       );
     case "sdk_key_not_active":
       return i18n._(msg`Only an active key can be rotated. This one was rotated or revoked.`);
+    case "webhook_disabled":
+      return i18n._(msg`This webhook is disabled. Enable it first; it is sent nothing until then.`);
+    case "insecure_url":
+      return i18n._(
+        msg`This instance accepts only https targets. Use an https URL, or ask the operator to allow plain http.`,
+      );
+    case "private_network_target":
+      return i18n._(
+        msg`This instance does not reach targets on its own network. Use a public address, or ask the operator to allow private networks.`,
+      );
+    case "unknown_event_type":
+      return i18n._(msg`One of the event types is not in the catalogue.`);
     case "invitation_gone":
       return i18n._(
         msg`This invitation link no longer works: it was used, replaced by a newer one, or it expired.`,
