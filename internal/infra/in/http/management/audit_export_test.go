@@ -138,6 +138,30 @@ func TestTheProjectAuditLogDownloadsAsCSV(t *testing.T) {
 	}
 }
 
+func TestACSVDownloadShowsAFormulaTypedAsANameAsText(t *testing.T) {
+	l := writeAuditLog(t)
+	ctx := t.Context()
+	const formula = `=HYPERLINK("https://evil.example","see logs")`
+	m := testkit.NewMember(t, l.pool, testkit.WithDisplayName(formula))
+	testkit.Grant(t, l.pool, projectIDOf(l.mobile), m.ID, access.RoleMaintainer)
+	created := do(signedIn(t, l.srv, m).CreateUnitTypeWithResponse(ctx, "mobile", management.UnitTypeCreate{Key: "account", Name: "Account"}))
+	if created.StatusCode() != http.StatusCreated {
+		t.Fatalf("create unit type: status = %d, body %s", created.StatusCode(), created.Body)
+	}
+
+	format := management.ExportProjectAuditEntriesParamsFormatCsv
+	res := do(l.admin.ExportProjectAuditEntriesWithResponse(ctx, "mobile", &management.ExportProjectAuditEntriesParams{
+		Format: &format, Q: ptr("account"),
+	}))
+	records, err := csv.NewReader(bytes.NewReader(res.Body)).ReadAll()
+	if err != nil || len(records) != 2 {
+		t.Fatalf("export: status = %d, body %s, err %v", res.StatusCode(), res.Body, err)
+	}
+	if got := records[1][slices.Index(governance.CSVHeader, "actor_name")]; got != "'"+formula {
+		t.Errorf("actor_name = %q, want the formula prefixed with a quote", got)
+	}
+}
+
 func TestADownloadOfAnUnknownFormatIsRefused(t *testing.T) {
 	l := writeAuditLog(t)
 	for _, path := range []string{"/api/v1/projects/mobile/audit/export?format=xml", "/api/v1/audit/export?format=xml"} {
