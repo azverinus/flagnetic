@@ -148,11 +148,13 @@ func TestAnUnchangedRulesetIsMaterializedOnceHoweverManyAskAtOnce(t *testing.T) 
 
 func TestAReplicaWhoseListenerIsDownMaterializesEveryRequest(t *testing.T) {
 	fault := &pglisten.Fault{}
-	// Once found deaf, the listener waits long before reconnecting, so it
-	// is still down while the requests below are answered.
+	// Once found deaf, the silenced listener stays down until the fault is
+	// restored, so it is still down while the requests below are answered.
+	// The backoff stays short: a ping late on a loaded machine may find the
+	// listener deaf before the test silences it, and it must come back up in
+	// time for the test to see it listening.
 	srv := testkit.StartServer(t, testkit.WithListenerOptions(pglisten.Options{
 		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: fault,
-		MinBackoff: time.Minute, MaxBackoff: time.Minute,
 	}))
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
@@ -169,7 +171,6 @@ func TestWhileTheListenerIsDownARequestDoesNotJoinALoadStartedBeforeIt(t *testin
 	listen, stall := &pglisten.Fault{}, &pgdelivery.RulesetLoadFault{}
 	srv := testkit.StartServer(t, testkit.WithRulesetLoadFault(stall), testkit.WithListenerOptions(pglisten.Options{
 		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: listen,
-		MinBackoff: time.Minute, MaxBackoff: time.Minute,
 	}))
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
