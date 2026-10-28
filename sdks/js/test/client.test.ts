@@ -998,3 +998,34 @@ describe("every public member is total", () => {
     expect(await c.ready(0)).toBe("fresh");
   });
 });
+
+// ------------------------------------------------------------ detail changes
+
+describe("detail changes", () => {
+  test("a document serving the same value for another reason fires the change listeners", async () => {
+    const h = harness();
+    const c = h.client({ store: false, pollInterval: 30_000 });
+    await h.serve("/sdk/v1/evaluate", values(1, { checkout: boolFlag(true), banner: boolFlag(false) }));
+    const changed: string[][] = [];
+    c.onChange((keys) => changed.push(keys));
+
+    // The same values again: nothing changed.
+    await h.advance(30_000);
+    await h.serve("/sdk/v1/evaluate", values(2, { checkout: boolFlag(true), banner: boolFlag(false) }));
+    expect(changed).toStrictEqual([]);
+
+    // An experiment starts serving the value checkout already served: the
+    // value is the same, the detail is not.
+    await h.advance(30_000);
+    await h.serve("/sdk/v1/evaluate", values(3, { checkout: experimentFlag(true, false), banner: boolFlag(false) }));
+    expect(c.stage).toBe("fresh");
+    expect(c.getBool("checkout", false)).toBe(true);
+    expect(c.getDetail("checkout", false).reason).toBe("experiment");
+    expect(changed).toStrictEqual([["checkout"]]);
+
+    // The experiment stops; the rule serves the value again.
+    await h.advance(30_000);
+    await h.serve("/sdk/v1/evaluate", values(4, { checkout: boolFlag(true), banner: boolFlag(false) }));
+    expect(changed).toStrictEqual([["checkout"], ["checkout"]]);
+  });
+});

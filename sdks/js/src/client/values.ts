@@ -127,8 +127,11 @@ export class ValuesDocument {
   }
 
   /**
-   * The keys whose served value differs between before and after, added and
-   * removed flags included, sorted.
+   * The keys whose served flag differs between before and after, added and
+   * removed flags included, sorted. The whole flag counts, not the value
+   * alone: a detail reports the reason, the variation and the experiment
+   * block too, and a reader of details must learn of an experiment starting
+   * to serve the value it already served.
    */
   static changedKeys(before: ValuesDocument | undefined, after: ValuesDocument): string[] {
     const old = before?.flags ?? new Map<string, ServedFlag>();
@@ -136,11 +139,24 @@ export class ValuesDocument {
     for (const key of new Set([...old.keys(), ...after.flags.keys()])) {
       const a = old.get(key);
       const b = after.flags.get(key);
-      const same = a !== undefined && b !== undefined && a.type === b.type && a.hasValue === b.hasValue && jsonEquals(a.value, b.value);
-      if (!same) changed.push(key);
+      if (a === undefined || b === undefined || !sameServedFlag(a, b)) changed.push(key);
     }
     return changed.sort();
   }
+}
+
+function sameServedFlag(a: ServedFlag, b: ServedFlag): boolean {
+  return (
+    a.type === b.type &&
+    a.reason === b.reason &&
+    a.hasValue === b.hasValue &&
+    jsonEquals(a.value, b.value) &&
+    a.variation === b.variation &&
+    a.errorCode === b.errorCode &&
+    a.overrideInfluenced === b.overrideInfluenced &&
+    a.automaticExposure === b.automaticExposure &&
+    jsonEquals(a.experiment as unknown as JsonValue | undefined, b.experiment as unknown as JsonValue | undefined)
+  );
 }
 
 function servedFlag(json: Record<string, unknown>): ServedFlag | undefined {
