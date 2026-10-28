@@ -166,8 +166,9 @@ func WithListenerOptions(o pglisten.Options) ServerOption {
 // may take a full second to come back: under the race detector on a busy CI
 // runner a round trip to PostgreSQL can exceed a tighter timeout, and a
 // listener found deaf by a slow pong before the test silenced it waits out
-// its backoff instead of being up when the test expects it to be. Set
-// MinBackoff and MaxBackoff on the result to keep it down once found deaf.
+// its backoff instead of being up when the test expects it to be. Once
+// found deaf while silenced, the listener stays down until the fault is
+// restored, so the default backoff serves.
 func SilenceableListener(f *pglisten.Fault) pglisten.Options {
 	return pglisten.Options{PingInterval: 50 * time.Millisecond, PingTimeout: time.Second, Fault: f}
 }

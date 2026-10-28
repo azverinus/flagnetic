@@ -65,13 +65,6 @@ func deafen(t *testing.T, srv *testkit.Server, fault *pglisten.Fault) {
 	}
 }
 
-// minuteBackoff keeps a listener found deaf down for a minute before it
-// reconnects, so it is still down while a test asks the replica.
-func minuteBackoff(o pglisten.Options) pglisten.Options {
-	o.MinBackoff, o.MaxBackoff = time.Minute, time.Minute
-	return o
-}
-
 func TestAWriteIsServedByTheReplicaThatTookItAtOnce(t *testing.T) {
 	srv := testkit.StartServer(t)
 	p := newProject(t, srv)
@@ -155,9 +148,12 @@ func TestAnUnchangedRulesetIsMaterializedOnceHoweverManyAskAtOnce(t *testing.T) 
 
 func TestAReplicaWhoseListenerIsDownMaterializesEveryRequest(t *testing.T) {
 	fault := &pglisten.Fault{}
-	// Once found deaf, the listener waits long before reconnecting, so it
-	// is still down while the requests below are answered.
-	srv := testkit.StartServer(t, testkit.WithListenerOptions(minuteBackoff(testkit.SilenceableListener(fault))))
+	// Once found deaf, the silenced listener stays down until the fault is
+	// restored, so it is still down while the requests below are answered.
+	// The backoff stays short: a pong late on a loaded machine may still
+	// find the listener deaf before the test silences it, and it must come
+	// back up in time for the test to see it listening.
+	srv := testkit.StartServer(t, testkit.WithListenerOptions(testkit.SilenceableListener(fault)))
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	deafen(t, srv, fault)
@@ -171,7 +167,7 @@ func TestAReplicaWhoseListenerIsDownMaterializesEveryRequest(t *testing.T) {
 
 func TestWhileTheListenerIsDownARequestDoesNotJoinALoadStartedBeforeIt(t *testing.T) {
 	listen, stall := &pglisten.Fault{}, &pgdelivery.RulesetLoadFault{}
-	srv := testkit.StartServer(t, testkit.WithRulesetLoadFault(stall), testkit.WithListenerOptions(minuteBackoff(testkit.SilenceableListener(listen))))
+	srv := testkit.StartServer(t, testkit.WithRulesetLoadFault(stall), testkit.WithListenerOptions(testkit.SilenceableListener(listen)))
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	deafen(t, srv, listen)
