@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { HistoryIcon } from "lucide-react";
 import { type ComponentType, type FormEvent, type ReactNode, useMemo, useState } from "react";
 
+import { DownloadAudit } from "@/components/download-audit";
 import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -157,6 +158,7 @@ export function AuditLog({ scope, search, onSearch, EntryLink, actors, place }: 
         actors={actorChoices}
         place={place}
       />
+      <DownloadAudit scope={scope} search={search} />
       {page.isError ? (
         <QueryError error={page.error} onRetry={() => void page.refetch()} />
       ) : page.data?.items.length === 0 && !search.cursor ? (

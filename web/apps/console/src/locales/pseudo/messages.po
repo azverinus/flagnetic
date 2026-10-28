@@ -1767,6 +1767,7 @@ msgstr ""
 msgid "Delete"
 msgstr ""
 
+#: src/components/delete-project.tsx
 #: src/components/experiment-transitions.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
@@ -1801,6 +1802,10 @@ msgstr ""
 msgid "Delete flag"
 msgstr ""
 
+#: src/components/delete-project.tsx
+msgid "Delete project"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Delete segment"
 msgstr ""
@@ -1811,6 +1816,10 @@ msgstr ""
 
 #: src/lib/access-names.ts
 msgid "delete the project"
+msgstr ""
+
+#: src/components/delete-project.tsx
+msgid "Delete this project"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
@@ -1824,6 +1833,10 @@ msgstr ""
 
 #: src/components/experiment-transitions.tsx
 msgid "deleted"
+msgstr ""
+
+#: src/components/delete-project.tsx
+msgid "Deleting removes the project with its flags, segments, experiments, environments and SDK keys at once, and its key becomes free. Its audit entries stay readable in the instance's audit log."
 msgstr ""
 
 #: src/components/webhook-deliveries.tsx
@@ -1932,8 +1945,24 @@ msgstr ""
 msgid "does not equal"
 msgstr ""
 
+#: src/components/download-audit.tsx
+msgid "Download CSV"
+msgstr ""
+
+#: src/components/download-audit.tsx
+msgid "Download JSON Lines"
+msgstr ""
+
 #: src/components/download-ruleset.tsx
 msgid "Download ruleset"
+msgstr ""
+
+#: src/components/download-audit.tsx
+msgid "Download the audit log"
+msgstr ""
+
+#: src/components/delete-project.tsx
+msgid "Download the audit log first if you want to keep it: it is kept on the instance, but only an instance admin can read it there."
 msgstr ""
 
 #: src/lib/change-requests.ts
@@ -2393,6 +2422,10 @@ msgstr ""
 
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Everyone who can sign in to this instance. What they may do in a project comes from their grants there."
+msgstr ""
+
+#: src/components/delete-project.tsx
+msgid "Everything in the project is deleted at once, its SDK keys stop working, and this cannot be undone."
 msgstr ""
 
 #: src/lib/webhooks.ts
@@ -5681,6 +5714,10 @@ msgstr ""
 msgid "The platform disabled this webhook after its receiver kept failing, and dropped the deliveries that were waiting. Enable it once the receiver is back; a dropped delivery can then be redelivered from the log."
 msgstr ""
 
+#: src/components/delete-project.tsx
+msgid "The project {key} is deleted."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "The project declares no such unit type."
 msgstr ""
@@ -6160,6 +6197,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "Too long."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Too many entries match these filters to download at once. Narrow them, for example with From and To, and try again."
 msgstr ""
 
 #: src/lib/problem-messages.ts

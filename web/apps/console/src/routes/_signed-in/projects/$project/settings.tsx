@@ -10,6 +10,7 @@ import { z } from "zod";
 
 import { PermissionGate } from "@/components/can";
 import { NamedConflictBanner } from "@/components/conflict-banner";
+import { DeleteProject } from "@/components/delete-project";
 import { Field } from "@/components/ui/field";
 import { FormPage } from "@/components/ui/form-page";
 import { Input } from "@/components/ui/input";
@@ -135,6 +136,7 @@ function SettingsForm() {
           <Textarea rows={4} {...form.register("description")} />
         </Field>
       </FormPage>
+      <DeleteProject project={project} />
       <UnsavedChangesBar dirty={isDirty} onDiscard={() => form.reset()} pending={save.isPending} />
     </div>
   );
