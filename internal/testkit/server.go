@@ -160,6 +160,18 @@ func WithListenerOptions(o pglisten.Options) ServerOption {
 	return func(so *serverOptions) { so.listen = o }
 }
 
+// SilenceableListener returns listener options whose fault lets a test
+// silence the listener and have it found deaf within about a second. Pings
+// go out every 50ms so the silence is noticed soon after it starts, but each
+// may take a full second to come back: under the race detector on a busy CI
+// runner a round trip to PostgreSQL can exceed a tighter timeout, and a
+// listener found deaf by a slow pong before the test silenced it waits out
+// its backoff instead of being up when the test expects it to be. Set
+// MinBackoff and MaxBackoff on the result to keep it down once found deaf.
+func SilenceableListener(f *pglisten.Fault) pglisten.Options {
+	return pglisten.Options{PingInterval: 50 * time.Millisecond, PingTimeout: time.Second, Fault: f}
+}
+
 // WithRulesetLoadFault lets f stall the replica's ruleset materializations.
 func WithRulesetLoadFault(f *pgdelivery.RulesetLoadFault) ServerOption {
 	return func(o *serverOptions) { o.fault = f }

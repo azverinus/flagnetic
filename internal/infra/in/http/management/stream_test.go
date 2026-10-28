@@ -294,9 +294,7 @@ func TestAMemberLosingTheirGrantHasTheStreamClosedAtTheNextHeartbeat(t *testing.
 	c := clock.NewFake(time.Now())
 	fault := &pglisten.Fault{}
 	a := testkit.StartServer(t)
-	b := testkit.StartServer(t, testkit.WithClock(c), testkit.WithListenerOptions(pglisten.Options{
-		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: fault,
-	}))
+	b := testkit.StartServer(t, testkit.WithClock(c), testkit.WithListenerOptions(testkit.SilenceableListener(fault)))
 	pool := testkit.Pool(t)
 	admin := testkit.Client(t, a, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
@@ -393,9 +391,7 @@ func TestChangeStreamsPerCallerAreBoundedAndCounted(t *testing.T) {
 func TestAChangeStreamRefetchesOnceItsReplicaListensAgain(t *testing.T) {
 	fault := &pglisten.Fault{}
 	a := testkit.StartServer(t)
-	b := testkit.StartServer(t, testkit.WithListenerOptions(pglisten.Options{
-		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: fault,
-	}))
+	b := testkit.StartServer(t, testkit.WithListenerOptions(testkit.SilenceableListener(fault)))
 	token := testkit.InstanceAdminToken(t)
 	admin := testkit.Client(t, a, token)
 	p := createProject(t, admin, projectKey())
