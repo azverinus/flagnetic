@@ -345,7 +345,7 @@ test.describe("the console in Russian", () => {
     ).toBeVisible();
     await expect(
       page.getByRole("list", { name: "Переписываемые правила" }).getByRole("listitem"),
-    ).toHaveText(["Production, правило 1: удаляется"]);
+    ).toHaveText(["Production, правило эксперимента 1: удаляется"]);
     await expectNoSeriousViolations(page, "an experiment change request in Russian");
 
     await page.goto(`/projects/${stopping}/change-requests`);

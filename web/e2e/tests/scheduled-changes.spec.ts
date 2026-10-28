@@ -152,6 +152,11 @@ test.describe("scheduled changes", () => {
     await expect(page.getByText("Applies at", { exact: true })).toBeVisible();
     await expect(page.getByText("once approved")).toBeVisible();
     await expect(page.getByRole("link", { name: "cta_copy" })).toBeVisible();
+    await expect(
+      page
+        .locator("[data-sonner-toast]")
+        .filter({ hasText: "The change request is open for review." }),
+    ).toHaveCSS("opacity", "1");
     await expectNoSeriousViolations(page, "a scheduled experiment change request");
     expect(await readExperimentStatus(project, "cta_copy")).toBe("draft");
 
