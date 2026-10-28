@@ -83,9 +83,7 @@ func TestDeletingAnEnvironmentEndsItsKeysOnEveryReplica(t *testing.T) {
 func TestAReplicaWhoseListenerIsSilentRefusesARevokedKeyAtOnce(t *testing.T) {
 	fault := &pglisten.Fault{}
 	a := testkit.StartServer(t)
-	b := testkit.StartServer(t, testkit.WithListenerOptions(pglisten.Options{
-		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: fault,
-	}))
+	b := testkit.StartServer(t, testkit.WithListenerOptions(testkit.SilenceableListener(fault)))
 	p := newProject(t, a)
 	k, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	if res := ruleset(t, b, value); res.StatusCode() != http.StatusOK {

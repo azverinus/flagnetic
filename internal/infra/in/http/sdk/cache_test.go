@@ -65,6 +65,13 @@ func deafen(t *testing.T, srv *testkit.Server, fault *pglisten.Fault) {
 	}
 }
 
+// minuteBackoff keeps a listener found deaf down for a minute before it
+// reconnects, so it is still down while a test asks the replica.
+func minuteBackoff(o pglisten.Options) pglisten.Options {
+	o.MinBackoff, o.MaxBackoff = time.Minute, time.Minute
+	return o
+}
+
 func TestAWriteIsServedByTheReplicaThatTookItAtOnce(t *testing.T) {
 	srv := testkit.StartServer(t)
 	p := newProject(t, srv)
@@ -150,10 +157,7 @@ func TestAReplicaWhoseListenerIsDownMaterializesEveryRequest(t *testing.T) {
 	fault := &pglisten.Fault{}
 	// Once found deaf, the listener waits long before reconnecting, so it
 	// is still down while the requests below are answered.
-	srv := testkit.StartServer(t, testkit.WithListenerOptions(pglisten.Options{
-		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: fault,
-		MinBackoff: time.Minute, MaxBackoff: time.Minute,
-	}))
+	srv := testkit.StartServer(t, testkit.WithListenerOptions(minuteBackoff(testkit.SilenceableListener(fault))))
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	deafen(t, srv, fault)
@@ -167,10 +171,7 @@ func TestAReplicaWhoseListenerIsDownMaterializesEveryRequest(t *testing.T) {
 
 func TestWhileTheListenerIsDownARequestDoesNotJoinALoadStartedBeforeIt(t *testing.T) {
 	listen, stall := &pglisten.Fault{}, &pgdelivery.RulesetLoadFault{}
-	srv := testkit.StartServer(t, testkit.WithRulesetLoadFault(stall), testkit.WithListenerOptions(pglisten.Options{
-		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: listen,
-		MinBackoff: time.Minute, MaxBackoff: time.Minute,
-	}))
+	srv := testkit.StartServer(t, testkit.WithRulesetLoadFault(stall), testkit.WithListenerOptions(minuteBackoff(testkit.SilenceableListener(listen))))
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	deafen(t, srv, listen)
@@ -295,9 +296,7 @@ func TestDeletingAnEnvironmentDropsItsPropagationSeries(t *testing.T) {
 func TestAnEnvironmentDeletedWhileAReplicaWasNotListeningLosesItsPropagationSeriesThere(t *testing.T) {
 	fault := &pglisten.Fault{}
 	a := testkit.StartServer(t)
-	b := testkit.StartServer(t, testkit.WithListenerOptions(pglisten.Options{
-		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: fault,
-	}))
+	b := testkit.StartServer(t, testkit.WithListenerOptions(testkit.SilenceableListener(fault)))
 	listening(t, b)
 	p := newProject(t, a)
 	if res := do(p.admin.CreateEnvironmentWithResponse(t.Context(), p.key, management.EnvironmentCreate{Key: "qa", Name: "QA"})); res.JSON201 == nil {
