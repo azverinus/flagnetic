@@ -32,6 +32,7 @@ import { changedFields, keySchema, nameSchema } from "@/lib/forms";
 import { ifMatch } from "@/lib/http";
 import { useListMutation } from "@/lib/mutations";
 import { environmentsQuery } from "@/lib/queries";
+import { useNewerVersionNotice } from "@/lib/change-stream";
 import { useFormConflict } from "@/lib/use-form-conflict";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/environments/")({
@@ -226,6 +227,11 @@ function RenameEnvironment({
     read: () => unwrap(getEnvironment({ path: { project, environment: environment.key } })),
   });
   const { base, conflict } = conflicts;
+  useNewerVersionNotice(
+    { kind: "environment", key: environment.key },
+    { dirty: form.formState.isDirty, version: conflicts.version },
+    conflicts.meetNewer,
+  );
   const list = environmentsQuery(project).queryKey;
   const rename = useListMutation(
     ({ values, at }: { values: Values; at: number }) =>

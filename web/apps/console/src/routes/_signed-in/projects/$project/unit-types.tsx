@@ -37,6 +37,7 @@ import { changedFields, descriptionSchema, keySchema, nameSchema } from "@/lib/f
 import { ifMatch } from "@/lib/http";
 import { useListMutation } from "@/lib/mutations";
 import { unitTypesQuery } from "@/lib/queries";
+import { useNewerVersionNotice } from "@/lib/change-stream";
 import { useFormConflict } from "@/lib/use-form-conflict";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/unit-types")({
@@ -206,6 +207,11 @@ function UnitTypeForm({
     read: () => unwrap(getUnitType({ path: { project, unit_type: unitType?.key ?? "" } })),
   });
   const { base, conflict } = conflicts;
+  useNewerVersionNotice(
+    { kind: "unit_type", key: unitType?.key ?? "" },
+    { dirty: form.formState.isDirty, version: conflicts.version ?? 0 },
+    conflicts.meetNewer,
+  );
   const list = unitTypesQuery(project).queryKey;
   const save = useListMutation(
     ({ values: { key, name, description }, at }: { values: Values; at?: number }) =>

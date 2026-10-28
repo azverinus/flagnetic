@@ -36,6 +36,7 @@ import { madeBy } from "@/lib/project-members";
 import { experimentQuery, experimentsQueryKey } from "@/lib/queries";
 import { diffExperiments } from "@/lib/structural-diff";
 import { useExperimentChoices } from "@/lib/use-experiment-choices";
+import { useNewerVersionNotice } from "@/lib/change-stream";
 import { useFormConflict } from "@/lib/use-form-conflict";
 import { useKnownMembers } from "@/lib/use-known-members";
 
@@ -190,6 +191,11 @@ function ExperimentPage({
     (values.flag === base.flag ? base.variations.map(({ variation }) => variation) : []);
   const issues = experimentIssues(i18n, values, { variations, base });
   const dirty = canEdit && Object.keys(experimentPatchOf(base, values)).length > 0;
+  useNewerVersionNotice(
+    { kind: "experiment", key: experiment.key },
+    { dirty, version: conflicts.version },
+    conflicts.meetNewer,
+  );
   const refusal = conflicts.refusal(save.error);
   const shownAtFields =
     refusal instanceof ApiError &&

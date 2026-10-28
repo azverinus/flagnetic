@@ -19,6 +19,7 @@ import { CircleAlertIcon } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { useNewerVersionNotice } from "@/lib/change-stream";
 import { ConflictBanner } from "@/components/conflict-banner";
 import { PrerequisitesSection } from "@/components/prerequisites-section";
 import { type Proposal, ProposeDialog } from "@/components/propose-dialog";
@@ -244,6 +245,14 @@ export function ConfigurationEditor({
     setConflict({ from, fresh, entry: entryOfVersion(entries, fresh.version) });
     answered(fresh);
   };
+
+  // Someone else saved this configuration while the draft has unsaved
+  // edits: the banner shows at once, not at the refusal of Save.
+  useNewerVersionNotice(
+    { kind: "flag", key: flag.key, environment: configuration.environment },
+    { dirty, version: state.base.version },
+    () => (conflict ? undefined : void meetConflict(state.base, () => {})),
+  );
 
   const save = useMutation({
     mutationFn: ({ sent }: { sent: EditorState }) =>

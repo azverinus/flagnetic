@@ -14,6 +14,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { useNewerVersionNotice } from "@/lib/change-stream";
 import { ConflictBanner } from "@/components/conflict-banner";
 import { type Proposal, ProposeDialog } from "@/components/propose-dialog";
 import { DefinitionDiff } from "@/components/structural-diff-view";
@@ -260,6 +261,33 @@ function DefinitionForm({
       setConflict({ current, entry });
     },
   });
+
+  // Someone else saved the definition while this one has unsaved edits:
+  // the banner shows at once, not at the refusal of Save.
+  useNewerVersionNotice(
+    { kind: "flag", key: flag.key },
+    { dirty: form.formState.isDirty, version },
+    async () => {
+      if (conflict) return;
+      try {
+        const current = await queryClient.fetchQuery({
+          ...flagQuery(project, flag.key),
+          staleTime: 0,
+        });
+        if (current.version <= version) return;
+        const entries = await queryClient
+          .fetchQuery({ ...flagEntriesQuery(project, flag.id, { limit: 20 }), staleTime: 0 })
+          .catch(() => []);
+        const entry = entryOfVersion(
+          entries.filter((candidate) => candidate.environment_id === null),
+          current.version,
+        );
+        setConflict({ current, entry });
+      } catch {
+        // Save meets the refusal itself.
+      }
+    },
+  );
 
   const submit = form.handleSubmit((values) => {
     if (Object.keys(patchOf(values)).length === 0) {
