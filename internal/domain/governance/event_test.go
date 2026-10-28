@@ -443,3 +443,29 @@ func TestARevertIsRevertedAndAlsoWhatItChanged(t *testing.T) {
 		t.Errorf("flag.reverted data %v, want reverted_to, before and after", data)
 	}
 }
+
+func TestAPrivateSegmentsChangeRequestEventsLeaveOutItsConditions(t *testing.T) {
+	conditionsOp := map[string]any{"op": "replace", "path": "/conditions/0/values", "value": []any{"ada@example.com"}}
+	for _, tc := range []struct {
+		name     string
+		proposed map[string]any
+		diff     []any
+		kept     []any
+	}{
+		{"private as proposed", map[string]any{"private": true, "conditions": []any{}}, []any{conditionsOp}, []any{}},
+		{"private before", map[string]any{"private": false, "conditions": []any{}},
+			[]any{map[string]any{"op": "replace", "path": "/private", "value": false}, conditionsOp},
+			[]any{map[string]any{"op": "replace", "path": "/private", "value": false}}},
+		{"public", map[string]any{"private": false, "conditions": []any{}}, []any{conditionsOp}, []any{conditionsOp}},
+	} {
+		cr := changeRequest("open", map[string]any{"kind": "definition", "segment": "beta", "proposed": tc.proposed, "diff": tc.diff})
+		delete(cr, "flag")
+		delete(cr, "environment")
+
+		events := governance.DeriveEvents(transitioned("change_request.opened", nil, cr))
+
+		if data := dataOf(t, events, "change_request.opened"); !reflect.DeepEqual(data["diff"], tc.kept) {
+			t.Errorf("%s: diff %v, want %v", tc.name, data["diff"], tc.kept)
+		}
+	}
+}

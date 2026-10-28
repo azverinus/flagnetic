@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -104,9 +105,47 @@ const EventChangeRequestApplied = "change_request.applied"
 // audit log records it. Approving with an apply time is also scheduling.
 func changeRequestEvents(action string, after any) []Derived {
 	data := without(mapOf(after), "proposed")
+	if privateSegmentDefinition(mapOf(after)) {
+		data["diff"] = withoutConditionOps(data["diff"])
+	}
 	out := []Derived{{action, data}}
 	if action == "change_request.approved" && data["apply_at"] != nil {
 		out = append(out, Derived{"change_request.scheduled", data})
+	}
+	return out
+}
+
+// privateSegmentDefinition reports whether cr, a change request as its
+// audit entry records it, proposes a segment's definition that is private
+// on either side: private as proposed, or private before when the diff
+// changes the switch. Its diff then names who is in the segment, which the
+// segment's own events keep from receivers too.
+func privateSegmentDefinition(cr map[string]any) bool {
+	if cr["segment"] == nil {
+		return false
+	}
+	if mapOf(cr["proposed"])["private"] == true {
+		return true
+	}
+	ops, _ := cr["diff"].([]any)
+	for _, op := range ops {
+		if mapOf(op)["path"] == "/private" {
+			return true
+		}
+	}
+	return false
+}
+
+// withoutConditionOps returns diff without the operations on a segment's
+// conditions.
+func withoutConditionOps(diff any) []any {
+	ops, _ := diff.([]any)
+	out := []any{}
+	for _, op := range ops {
+		path, _ := mapOf(op)["path"].(string)
+		if path != "/conditions" && !strings.HasPrefix(path, "/conditions/") {
+			out = append(out, op)
+		}
 	}
 	return out
 }
