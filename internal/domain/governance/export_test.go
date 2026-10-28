@@ -65,6 +65,26 @@ func TestACSVRowHoldsTheEntryInTheHeaderColumnsOrder(t *testing.T) {
 	}
 }
 
+func TestACSVRowRefusesABeforeOrAfterThatIsNotJSON(t *testing.T) {
+	for name, set := range map[string]func(*governance.Entry){
+		"before not encodable": func(e *governance.Entry) { e.Before = make(chan int) },
+		"after not encodable":  func(e *governance.Entry) { e.After = make(chan int) },
+		"before malformed":     func(e *governance.Entry) { e.Before = json.RawMessage("{") },
+		"after malformed":      func(e *governance.Entry) { e.After = json.RawMessage("{") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			e, err := governance.NewEntry(entryID(), now, system, governance.Record{Action: "member.created", Entity: created.Entity})
+			if err != nil {
+				t.Fatal(err)
+			}
+			set(&e)
+			if row, err := governance.CSVRow(e); err == nil {
+				t.Errorf("CSVRow = %q, want an error", row)
+			}
+		})
+	}
+}
+
 func TestACSVRowOfAnEntryWithoutValuesHasEmptyBeforeAndAfter(t *testing.T) {
 	e, err := governance.NewEntry(entryID(), now, system, governance.Record{Action: "member.created", Entity: created.Entity})
 	if err != nil {
