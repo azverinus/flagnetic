@@ -24,8 +24,11 @@ class Semver(NamedTuple):
         if not b:
             return -1
         for x, y in zip(a, b, strict=False):
-            if x != y:
-                return _compare_identifier(x, y)
+            # Identifiers that differ as strings may still compare equal, "01"
+            # and "1" say, so the comparison decides, not the strings.
+            c = _compare_identifier(x, y)
+            if c != 0:
+                return c
         if len(a) == len(b):
             return 0
         return -1 if len(a) < len(b) else 1
