@@ -30,6 +30,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.yaml.in/yaml/v3"
 
+	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
@@ -121,6 +122,10 @@ type Config struct {
 	// AuditExportMaxEntries is the most entries one download of the audit
 	// log may hold.
 	AuditExportMaxEntries int
+	// DigestWeekday and DigestHour, in UTC, are when the weekly stale-flag
+	// digest is sent.
+	DigestWeekday time.Weekday
+	DigestHour    int
 }
 
 // RateLimits are the limits of the SDK API, each counted by every replica on
@@ -583,6 +588,40 @@ func Settings() []Setting {
 				"`export_too_large` before anything is sent; narrowing it by time brings it under.",
 			Example: "100000",
 			apply:   wholeNumber(func(c *Config, n int) { c.AuditExportMaxEntries = n }),
+		},
+		{
+			Name:    "FLAGNETIC_DIGEST_WEEKDAY",
+			Key:     "digest_weekday",
+			Default: "monday",
+			Unit:    "weekday",
+			Description: "The weekday, in UTC, on which the stale-flag digest (`report.stale_flags`) is sent to each project's webhook subscribers, " +
+				"in English, in any case. A digest not sent within the hour of its slot because no replica was running is skipped, not sent late.",
+			Example: "friday",
+			apply: func(c *Config, v string) error {
+				d, ok := governance.ParseDigestWeekday(v)
+				if !ok {
+					return errors.New("not a weekday: sunday, monday, tuesday, wednesday, thursday, friday or saturday")
+				}
+				c.DigestWeekday = d
+				return nil
+			},
+		},
+		{
+			Name:    "FLAGNETIC_DIGEST_HOUR",
+			Key:     "digest_hour",
+			Default: "8",
+			Unit:    "hour, 0 to 23",
+			Description: "The hour of the day, in UTC, at which the stale-flag digest is sent on its weekday; " +
+				"it is sent at the first minute of that hour that a replica runs.",
+			Example: "14",
+			apply: func(c *Config, v string) error {
+				n, err := strconv.Atoi(v)
+				if err != nil || n < 0 || n > 23 {
+					return errors.New("not a whole number from 0 to 23")
+				}
+				c.DigestHour = n
+				return nil
+			},
 		},
 		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE", "120", "requests per minute",
 			"Remote evaluations a client key may ask of one replica per minute, counted per key and client IP.",

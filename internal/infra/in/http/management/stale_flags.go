@@ -4,11 +4,15 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"time"
 
+	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
+	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
+	"github.com/azverinus/flagnetic/internal/domain/governance"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 )
 
@@ -63,6 +67,35 @@ func staleFlagOut(f appflags.StaleFlag) StaleFlag {
 	}
 	if e := f.Experiment; e != nil {
 		out.Experiment = &StaleExperiment{Key: e.Key, ExpectedEndAt: openapi_types.Date{Time: e.ExpectedEndAt}}
+	}
+	return out
+}
+
+// SendStaleFlagDigest queues the project's digest for the caller and answers
+// the stale flags it lists.
+func (a *api) SendStaleFlagDigest(ctx context.Context, _ SendStaleFlagDigestRequestObject) (SendStaleFlagDigestResponseObject, error) {
+	items, err := a.h.SendStaleFlagDigest.Handle(ctx, appgovernance.SendStaleFlagDigestCommand{
+		Project: projectID(ctx), Request: requestOf(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return SendStaleFlagDigest202JSONResponse{Items: each(items, staleItemOut)}, nil
+}
+
+func staleItemOut(i governance.StaleFlagItem) StaleFlag {
+	owner, _ := uuid.Parse(i.Owner)
+	out := StaleFlag{
+		Key: i.Key, Name: i.Name, Owner: owner, Lifetime: Lifetime(i.Lifetime),
+		ExpectedRemovalAt: i.ExpectedRemovalAt,
+		Reasons:           each(i.Reasons, func(r string) StaleReason { return StaleReason(r) }),
+		LastEvaluated: each(i.LastEvaluated, func(e governance.LastEvaluated) FlagLastEvaluated {
+			return FlagLastEvaluated{Environment: e.Environment, LastEvaluatedAt: e.LastEvaluatedAt}
+		}),
+	}
+	if e := i.Experiment; e != nil {
+		day, _ := time.Parse(time.DateOnly, e.ExpectedEndAt)
+		out.Experiment = &StaleExperiment{Key: e.Key, ExpectedEndAt: openapi_types.Date{Time: day}}
 	}
 	return out
 }

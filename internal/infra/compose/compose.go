@@ -99,6 +99,8 @@ type Options struct {
 	// AuditExportMaxEntries is the most entries one download of the audit
 	// log may hold.
 	AuditExportMaxEntries int
+	// DigestSlot is when the weekly stale-flag digest is sent.
+	DigestSlot governance.DigestSlot
 	management.Options
 }
 
@@ -209,6 +211,16 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	owners := appaccess.NewOwnership(accessStore)
 	experimentStore := pgexperiments.NewStore(d.Pool)
 	experimentRec := appexperiments.NewRecorder(audit, d.Clock, d.IDs)
+	// Stale flags are judged from what the events context counts and the
+	// experiments context's running experiments.
+	listStaleFlags := appflags.NewListStaleFlags(appflags.StaleDeps{
+		Snapshots: tx, Store: flagStore, Evaluations: eventStore, Summaries: eventStore, Experiments: experimentStore,
+		Owners: owners, Clock: d.Clock,
+	})
+	digest := appgovernance.DigestDeps{
+		Tx: tx, Store: pggovernance.NewDigests(d.Pool), Report: staleFlagReport{listStaleFlags}, Outbox: outbox,
+		Clock: d.Clock, IDs: d.IDs,
+	}
 	updateFlag := appflags.NewUpdateFlag(appflags.UpdateFlagDeps{
 		Tx: tx, Projects: flagStore, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
 		Evaluations: eventStore,
@@ -354,14 +366,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		CreateFlag: appflags.NewCreateFlag(appflags.CreateFlagDeps{
 			Tx: tx, Projects: flagStore, Environments: ws, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
 		}),
-		GetFlag: appflags.NewGetFlag(tx, flagStore, eventStore),
-		// Stale flags are judged from what the events context counts and
-		// the experiments context's running experiments.
-		ListStaleFlags: appflags.NewListStaleFlags(appflags.StaleDeps{
-			Snapshots: tx, Store: flagStore, Evaluations: eventStore, Summaries: eventStore, Experiments: experimentStore,
-			Owners: owners, Clock: d.Clock,
-		}),
-		UpdateFlag: updateFlag,
+		GetFlag:             appflags.NewGetFlag(tx, flagStore, eventStore),
+		ListStaleFlags:      listStaleFlags,
+		SendStaleFlagDigest: appgovernance.NewSendStaleFlagDigest(digest),
+		UpdateFlag:          updateFlag,
 
 		ArchiveFlag: appflags.NewArchiveFlag(appflags.ArchiveFlagDeps{
 			Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec, Evaluations: eventStore,
@@ -545,6 +553,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 				Opener: o.Keyring, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, Audit: audit, Outbox: outbox,
 			}), o.WebhookTick, edge.Logger(), reg),
 			worker.WebhookRetention(appgovernance.NewRunWebhookRetention(tx, deliveryLog, d.Clock), reg),
+			worker.StaleFlagDigest(appgovernance.NewRunDigestRound(digest, o.DigestSlot).Handle),
 			worker.ProjectPurge(appworkspace.NewPurgeDeletedProjects(tx, ws)),
 			worker.ChangeRequestScheduler(o.Schedule.Tick,
 				appgovernance.NewRunScheduler(changeRequests, changeRequestStore, o.Schedule.MaxFailures).Handle),

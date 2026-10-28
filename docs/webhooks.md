@@ -140,11 +140,19 @@ The `audit_entry_id` of `change_request.applied` is the entry of the change the 
 | Type | Sent when |
 |---|---|
 | `webhook.disabled` | the platform disabled another subscription of the project, see [When a subscription keeps failing](#when-a-subscription-keeps-failing) |
-| `report.stale_flags` | the stale flags digest, weekly or on demand |
+| `report.stale_flags` | the stale flags digest, weekly or on demand, see [The stale-flag digest](#the-stale-flag-digest) |
 | `ping` | a member tested a subscription |
 | `audit.entry` | any audit entry at all, as `GET …/audit/{entry}` reads it; `*` does not match it |
 
 Every audit action not listed above, such as an environment protected or a member invited, reaches a receiver as `audit.entry` alone.
+
+### The stale-flag digest
+
+`report.stale_flags` reminds a project's subscribers of what to clean up. Its `data` is `{"items": [...]}`, every stale flag of the project in the shape `GET /stale-flags` reads it ([Stale flags](flags.md#stale-flags)): the `key`, `name`, `owner`, `lifetime`, `expected_removal_at`, `last_evaluated` in every environment, the `reasons` and, for an overdue experiment, the `experiment`. The envelope names the project; its environment, entity and audit entry are null, and its actor is the system for the weekly digest and the caller for one sent on demand.
+
+Every week, each project with a stale flag sends it to the subscriptions naming `report.stale_flags` (or `*`). The slot is `FLAGNETIC_DIGEST_WEEKDAY` at `FLAGNETIC_DIGEST_HOUR`, in UTC, Monday 08:00 unless set otherwise. A project with nothing stale sends nothing. Replicas check every minute, and each slot is sent once however many run. A slot is served only during its hour: when no replica ran in that hour, that week's digest is skipped and the next comes a week later, rather than a late digest arriving on a day nobody expects it. A subscription made after the slot's round has run waits for the next one.
+
+`POST /api/v1/projects/{project}/stale-flags/send` sends the digest now, even when nothing is stale, so a receiver can be tested. It needs `webhook.manage` and answers `202` with the stale flags the event lists. It is no part of the weekly rhythm: the weekly digest is still sent. With no subscription naming `report.stale_flags` in the project, nothing is queued.
 
 ## Deliveries
 

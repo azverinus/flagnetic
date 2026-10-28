@@ -2256,6 +2256,13 @@ export type StaleExperiment = {
   expected_end_at: string;
 };
 
+/**
+ * The stale flags a digest lists.
+ */
+export type StaleFlagDigest = {
+  items: Array<StaleFlag>;
+};
+
 export type StaleFlagList = {
   items: Array<StaleFlag>;
   /**
@@ -8058,6 +8065,58 @@ export type ListStaleFlagsResponses = {
 };
 
 export type ListStaleFlagsResponse = ListStaleFlagsResponses[keyof ListStaleFlagsResponses];
+
+export type SendStaleFlagDigestData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/stale-flags/send";
+};
+
+export type SendStaleFlagDigestErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type SendStaleFlagDigestError = SendStaleFlagDigestErrors[keyof SendStaleFlagDigestErrors];
+
+export type SendStaleFlagDigestResponses = {
+  /**
+   * The digest is queued; these are the stale flags it lists.
+   */
+  202: StaleFlagDigest;
+};
+
+export type SendStaleFlagDigestResponse =
+  SendStaleFlagDigestResponses[keyof SendStaleFlagDigestResponses];
 
 export type CheckHashUniformityData = {
   body: HashCheckRequest;

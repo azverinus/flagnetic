@@ -1462,6 +1462,13 @@ export const zStaleFlag = z.object({
   experiment: zStaleExperiment.optional(),
 });
 
+/**
+ * The stale flags a digest lists.
+ */
+export const zStaleFlagDigest = z.object({
+  items: z.array(zStaleFlag),
+});
+
 export const zStaleFlagList = z.object({
   items: z.array(zStaleFlag),
   next_cursor: z.string().nullable(),
@@ -3056,6 +3063,15 @@ export const zListStaleFlagsQuery = z.object({
  * One page of stale flags.
  */
 export const zListStaleFlagsResponse = zStaleFlagList;
+
+export const zSendStaleFlagDigestPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The digest is queued; these are the stale flags it lists.
+ */
+export const zSendStaleFlagDigestResponse = zStaleFlagDigest;
 
 export const zCheckHashUniformityBody = zHashCheckRequest;
 

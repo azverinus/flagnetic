@@ -27,7 +27,7 @@ Every operation of the management API declares the one thing it needs in the Ope
 | `experiment.delete` | deleting draft experiments | `experiments:write` | |
 | `change_request.propose` | proposing changes as change requests: creating them, editing, rebasing, opening, cancelling and applying one's own, copying any | `flags:write` | |
 | `change_request.approve` | deciding change requests: approving and rejecting another's, and cancelling or applying another's | `flags:write` | ✓ |
-| `webhook.manage` | creating, reading, editing, enabling and deleting a project's webhook subscriptions, rotating their secrets, testing them and reading and redelivering their deliveries | `project:admin` | |
+| `webhook.manage` | creating, reading, editing, enabling and deleting a project's webhook subscriptions, rotating their secrets, testing them, reading and redelivering their deliveries, and sending the stale-flag digest now | `project:admin` | |
 | `project.delete` | deleting a project with everything in it, from a signed-in session only | `project:admin` | ✓ |
 
 A permission marked members only changes who has access to a project or whose review a change needs, so no project token exercises it, whatever its role (see [Project tokens](#project-tokens)): a pipeline cannot unprotect an environment, write it and protect it again, nor approve the change it proposed. A project token whose role holds `change_request.approve` is refused deciding a change request with `403 token_cannot_approve`, which says why more plainly than the permission it lacks.
