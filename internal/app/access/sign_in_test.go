@@ -218,3 +218,60 @@ func TestARefusedAttemptCostsItsSourceNothing(t *testing.T) {
 			access.SourceFailureLimit, code)
 	}
 }
+
+// heldVerify verifies passwords as its hasher does, but holds the first
+// verification until released, so the test can change the password while
+// the sign-in has verified the old one and not yet opened its session.
+type heldVerify struct {
+	*password.Hasher
+	verified chan struct{}
+	release  chan struct{}
+	once     sync.Once
+}
+
+func (v *heldVerify) Verify(ctx context.Context, p secret.String, encoded string) (bool, bool, error) {
+	ok, outdated, err := v.Hasher.Verify(ctx, p, encoded)
+	v.once.Do(func() {
+		close(v.verified)
+		<-v.release
+	})
+	return ok, outdated, err
+}
+
+func TestAPasswordChangedAfterItWasVerifiedOpensNoSession(t *testing.T) {
+	pool := testkit.Pool(t)
+	m := testkit.NewMember(t, pool)
+	// A verifier whose parameters are not the ones the member's hash was made
+	// under, so the sign-in rehashes the password it verified.
+	outdated := password.DefaultParams
+	outdated.Time++
+	v := &heldVerify{Hasher: password.NewHasher(outdated), verified: make(chan struct{}), release: make(chan struct{})}
+	held := newSignIn(t, v)
+	result := make(chan error, 1)
+	go func() {
+		_, err := held.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New(m.Password), ClientIP: anAddress()})
+		result <- err
+	}()
+	<-v.verified
+	const changed = "harbor-maple-signal-4410"
+	testkit.RecordSecret(changed)
+	hash, err := password.NewHasher(password.DefaultParams).Hash(t.Context(), secret.New(changed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pgaccess.NewStore(pool).SetPasswordHash(t.Context(), m.ID, hash, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	close(v.release)
+	if err := <-result; codeOf(err) != "invalid_credentials" {
+		t.Errorf("the sign-in whose password changed after it was verified: %v, want invalid_credentials", err)
+	}
+	h := newSignIn(t, password.NewHasher(password.DefaultParams))
+	from := anAddress()
+	if _, err := h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New(m.Password), ClientIP: from}); codeOf(err) != "invalid_credentials" {
+		t.Errorf("the old password after the change: %v, want invalid_credentials", err)
+	}
+	if _, err := h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New(changed), ClientIP: from}); err != nil {
+		t.Errorf("the new password after the change: %v, want signed in: the rehash of the old password never replaced it", err)
+	}
+}

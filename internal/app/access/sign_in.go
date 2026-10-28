@@ -29,6 +29,11 @@ type PasswordVerifier interface {
 // SignInStore is what signing in needs of the stored members and sessions.
 type SignInStore interface {
 	passwordStore
+	// LockMemberPassword returns member with their password hash ("" for
+	// none), locked until the unit of work ends, so no password change
+	// commits between the check and the session it opens; ErrNotFound when
+	// there is none.
+	LockMemberPassword(ctx context.Context, member access.MemberID) (access.Member, string, error)
 	SetPasswordHash(ctx context.Context, member access.MemberID, hash string, at time.Time) error
 	RecordSignIn(ctx context.Context, member access.MemberID, at time.Time) error
 	CreateSession(ctx context.Context, s access.Session) error
@@ -132,7 +137,7 @@ func (h *SignIn) Handle(ctx context.Context, cmd SignInCommand) (SignInResult, e
 		return SignInResult{}, h.fail(ctx, cmd, member, reserved, string(member.Status))
 	}
 
-	res, err := h.succeed(ctx, cmd, member, reserved, a.outdated)
+	res, err := h.succeed(ctx, cmd, a)
 	if err != nil {
 		// The password proved right, so whatever failed after was no wrong
 		// guess: a member who knows their password is never locked by it.
@@ -226,15 +231,19 @@ func releaseAttempt(ctx context.Context, tx Transactor, store attemptReleaser, r
 	}))
 }
 
-// succeed opens a session for member, whose password proved right, rehashing
-// it when outdated, and clears the attempt reserved in the same unit of work.
-func (h *SignIn) succeed(ctx context.Context, cmd SignInCommand, member access.Member, reserved access.Reservation, outdated bool,
-) (SignInResult, error) {
+// succeed opens a session for the member whose password a proved right,
+// rehashing it when outdated, and clears the attempt reserved in the same
+// unit of work. The password is verified outside any unit of work, so a
+// change of it may commit before the session is opened: the member is
+// locked and read again, and a password or status no longer the one
+// verified refuses the sign-in, so the old password opens no session and
+// the rehash never writes it over the new one.
+func (h *SignIn) succeed(ctx context.Context, cmd SignInCommand, a passwordAttempt) (SignInResult, error) {
 	var (
 		rehash string
 		err    error
 	)
-	if outdated {
+	if a.outdated {
 		if rehash, err = h.d.Hasher.Hash(ctx, cmd.Password); err != nil {
 			return SignInResult{}, err
 		}
@@ -243,6 +252,7 @@ func (h *SignIn) succeed(ctx context.Context, cmd SignInCommand, member access.M
 	if err != nil {
 		return SignInResult{}, err
 	}
+	member := a.member
 	now := h.d.Clock.Now()
 	session, cookie := access.NewSession(id.New[access.Session](h.d.IDs), access.NewSessionInput{
 		Member: member.ID, Method: access.SignInLocal, ClientIP: cmd.ClientIP, UserAgent: cmd.UserAgent,
@@ -255,7 +265,10 @@ func (h *SignIn) succeed(ctx context.Context, cmd SignInCommand, member access.M
 		return SignInResult{}, err
 	}
 	if err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		if err := h.d.Store.ClearAttempt(ctx, reserved); err != nil {
+		if err := h.stillHolds(ctx, member, a.hash); err != nil {
+			return err
+		}
+		if err := h.d.Store.ClearAttempt(ctx, a.reserved); err != nil {
 			return err
 		}
 		return h.open(ctx, session, rehash, entry)
@@ -263,6 +276,23 @@ func (h *SignIn) succeed(ctx context.Context, cmd SignInCommand, member access.M
 		return SignInResult{}, err
 	}
 	return SignInResult{Caller: access.SessionCaller(session, member), Cookie: cookie}, nil
+}
+
+// stillHolds locks member and refuses, as invalid credentials, a sign-in
+// whose verified password hash is no longer the one stored, or whose member
+// is no longer active, in the unit of work ctx carries.
+func (h *SignIn) stillHolds(ctx context.Context, member access.Member, verified string) error {
+	current, hash, err := h.d.Store.LockMemberPassword(ctx, member.ID)
+	if errors.Is(err, ErrNotFound) {
+		return ErrInvalidCredentials
+	}
+	if err != nil {
+		return err
+	}
+	if hash != verified || current.Status != access.MemberActive {
+		return ErrInvalidCredentials
+	}
+	return nil
 }
 
 // open stores session, the rehashed password of its member when rehash is

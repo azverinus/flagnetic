@@ -94,6 +94,26 @@ func (s *Store) LockMemberByEmail(ctx context.Context, email string) (access.Mem
 	return member(), nil
 }
 
+// LockMemberPassword returns the member with the identifier and their
+// password hash ("" for none), locked until the transaction ends;
+// ErrNotFound when there is none.
+func (s *Store) LockMemberPassword(ctx context.Context, member access.MemberID) (access.Member, string, error) {
+	dest, m := scanMember()
+	var hash *string
+	err := s.db(ctx).QueryRow(ctx, `SELECT `+memberColumns+`, m.password_hash FROM members m WHERE m.id = $1 FOR UPDATE`,
+		member.Bytes()).Scan(append(dest, &hash)...)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return access.Member{}, "", appaccess.ErrNotFound
+	}
+	if err != nil {
+		return access.Member{}, "", fmt.Errorf("locking a member with their password: %w", err)
+	}
+	if hash == nil {
+		return m(), "", nil
+	}
+	return m(), *hash, nil
+}
+
 // SetInstanceAdmin makes member an instance admin or not.
 func (s *Store) SetInstanceAdmin(ctx context.Context, member access.MemberID, instanceAdmin bool, at time.Time) error {
 	_, err := s.db(ctx).Exec(ctx, `UPDATE members SET instance_admin = $2, updated_at = $3 WHERE id = $1`, member.Bytes(), instanceAdmin, at)
