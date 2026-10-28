@@ -101,3 +101,24 @@ func TestOneReplicaHoldsTheDigestLock(t *testing.T) {
 }
 
 var _ appgovernance.DigestStore = (*pggovernance.Digests)(nil)
+
+// A store that cannot reach the database says so rather than answering as if
+// no slot were handled, which would send a digest twice.
+func TestTheDigestStoreFailsWhenTheDatabaseDoes(t *testing.T) {
+	s := pggovernance.NewDigests(testkit.FreshPool(t))
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	slot := testkit.Start
+	if _, err := s.TryLockDigest(ctx); err == nil {
+		t.Error("TryLockDigest succeeded without a database")
+	}
+	if err := s.PruneDigestSlots(ctx, slot); err == nil {
+		t.Error("PruneDigestSlots succeeded without a database")
+	}
+	if _, err := s.ProjectsAwaitingDigest(ctx, slot); err == nil {
+		t.Error("ProjectsAwaitingDigest succeeded without a database")
+	}
+	if _, err := s.RecordDigestSlot(ctx, workspace.ProjectID{}, slot); err == nil {
+		t.Error("RecordDigestSlot succeeded without a database")
+	}
+}
