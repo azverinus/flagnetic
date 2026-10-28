@@ -1,4 +1,4 @@
-import { createChangeRequest, createGrant } from "@flagnetic/api";
+import { createChangeRequest, createExperiment, createGrant, getExperiment } from "@flagnetic/api";
 import { expect, test } from "@playwright/test";
 
 import { expectNoSeriousViolations } from "../support/axe";
@@ -13,6 +13,7 @@ import {
   submitSignIn,
 } from "../support/console";
 import { choose, seedFlag, stringFlag, writeConfiguration } from "../support/flags";
+import { admin } from "../support/instance";
 import { sdkRequest, seedSdkKey } from "../support/sdk";
 
 /**
@@ -306,5 +307,146 @@ test.describe("the console in Russian", () => {
     await expectNoSeriousViolations(page, "the propose dialog in Russian");
     await dialog.getByRole("button", { name: "Предложить", exact: true }).click();
     await expect(dialog.getByText("Введите заголовок.")).toBeVisible();
+  });
+
+  test("reads the experiments, an experiment's page and its start and stop dialogs in Russian", async ({
+    page,
+  }) => {
+    const own = await seedProject("tula-exp");
+    must(
+      `granting viewer in ${own}`,
+      await createGrant({
+        client: managementClient(),
+        path: { project: own },
+        body: { member: olga.id, role: "viewer" },
+      }),
+    );
+    await seedFlag(own, stringFlag("checkout_cta"));
+    must(
+      "creating cta_copy",
+      await createExperiment({
+        client: managementClient(),
+        path: { project: own },
+        body: {
+          key: "cta_copy",
+          name: "Текст кнопки",
+          hypothesis: "Короткий текст повышает конверсию.",
+          flag: "checkout_cta",
+          unit_type: "user",
+          variations: [
+            { variation: "control", weight: 5000 },
+            { variation: "treatment", weight: 5000 },
+          ],
+          expected_end_at: "2027-01-31",
+        },
+      }),
+    );
+    await writeConfiguration(own, "checkout_cta", "development", () => ({
+      rules: [
+        {
+          description: "Бета-тестеры",
+          conditions: [],
+          serve: { kind: "experiment", experiment: "cta_copy" },
+        },
+      ],
+    }));
+
+    // A viewer is told in Russian which roles may create experiments.
+    await signIn(page, olga, russian);
+    await page.goto(`/projects/${own}/experiments`);
+    await expect(page.getByRole("heading", { name: "Эксперименты", level: 1 })).toBeVisible();
+    await expect(
+      page.getByRole("row").filter({ has: page.getByText("cta_copy", { exact: true }) }),
+    ).toContainText("Черновик");
+    await expect(page.getByRole("link", { name: "Новый эксперимент" }).first()).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    await expectNoSeriousViolations(page, "the experiments in Russian");
+
+    // The admin starts and stops it through dialogs that name what changes.
+    await page.context().clearCookies();
+    await signIn(page, admin, russian);
+    await page.goto(`/projects/${own}/experiments/cta_copy`);
+    await expect(page.getByRole("heading", { name: "Текст кнопки", level: 1 })).toBeVisible();
+    await expect(page.getByLabel("Гипотеза")).toBeVisible();
+    await expectNoSeriousViolations(page, "a draft experiment in Russian");
+
+    await page.getByRole("button", { name: "Запустить", exact: true }).click();
+    const start = page.getByRole("dialog", { name: "Запустить cta_copy" });
+    await expect(start.getByRole("list", { name: "Изменяемые окружения" })).toContainText(
+      "Development",
+    );
+    await expectNoSeriousViolations(page, "the start dialog in Russian");
+    await start.getByRole("button", { name: "Запустить эксперимент" }).click();
+    // A toast is checked once it has faded in: halfway, its text is paler.
+    const started = page.locator("[data-sonner-toast]").filter({ hasText: "запущен." });
+    await expect(started).toHaveCSS("opacity", "1");
+    await expect(page.locator("span").filter({ hasText: /^Запущен$/ })).toBeVisible();
+
+    await page.getByRole("button", { name: "Остановить", exact: true }).click();
+    const stop = page.getByRole("dialog", { name: "Остановить cta_copy" });
+    await choose(page, "Победивший вариант", "treatment");
+    await expect(stop.getByRole("list", { name: "Переписываемые правила" })).toContainText(
+      "treatment",
+    );
+    await expectNoSeriousViolations(page, "the stop dialog in Russian");
+    await stop.getByRole("button", { name: "Остановить эксперимент" }).click();
+    await expect(
+      page.locator("[data-sonner-toast]").filter({ hasText: "Эксперимент cta_copy остановлен." }),
+    ).toBeVisible();
+    expect(
+      must(
+        "reading cta_copy",
+        await getExperiment({
+          client: managementClient(),
+          path: { project: own, experiment: "cta_copy" },
+        }),
+      ).status,
+    ).toBe("stopped");
+  });
+
+  test("reads the stale flags, a flag's evaluations and the event volume in Russian", async ({
+    page,
+  }) => {
+    const own = await seedProject("tula-stale");
+    await seedFlag(
+      own,
+      stringFlag("old_cleanup", {
+        lifetime: "temporary",
+        expected_removal_at: `${new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10)}T00:00:00Z`,
+      }),
+    );
+    await signIn(page, admin, russian);
+
+    await page.goto(`/projects/${own}/stale-flags`);
+    await expect(page.getByRole("heading", { name: "Устаревшие флаги", level: 1 })).toBeVisible();
+    const row = page
+      .getByRole("row")
+      .filter({ has: page.getByText("old_cleanup", { exact: true }) });
+    await expect(row).toContainText("Пора удалить");
+    const filter = page.getByRole("group", { name: "Причины устаревания" });
+    await filter.getByRole("button", { name: "Раскатка завершена" }).click();
+    await expect(page.getByText("Флагов, устаревших по этим причинам, нет.")).toBeVisible();
+    // The pressed toggle fades to its colour; axe reads it once it has.
+    await page.waitForFunction(() => document.getAnimations().length === 0);
+    await expectNoSeriousViolations(page, "the stale flags in Russian");
+
+    await page.goto(`/projects/${own}/flags/old_cleanup?environment=staging`);
+    const evaluations = page.getByRole("region", { name: "Вычисления" });
+    await expect(evaluations.getByText(/^Последнее вычисление в SDK:/)).toContainText("Никогда");
+    await expect(
+      evaluations.getByText(
+        "За эти дни ни один SDK не сообщил о вычислении флага в этом окружении.",
+      ),
+    ).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Период" })).toBeVisible();
+    await expectNoSeriousViolations(page, "a flag's evaluations in Russian");
+
+    await page.goto(`/projects/${own}/event-volume`);
+    await expect(page.getByRole("heading", { name: "Объём событий", level: 1 })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Легенда" })).toContainText("Сводки вычислений");
+    await expect(page.getByText("За эти дни ни одно событие не потеряно.")).toBeVisible();
+    await expectNoSeriousViolations(page, "the event volume in Russian");
   });
 });

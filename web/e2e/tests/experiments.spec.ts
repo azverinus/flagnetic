@@ -230,6 +230,7 @@ test.describe("experiments", () => {
     await expect(dialog.getByRole("list", { name: "Environments changed" })).toHaveText(
       /Development\s*Staging/,
     );
+    await expectNoSeriousViolations(page, "the start dialog");
     await dialog.getByRole("button", { name: "Start experiment" }).click();
     await expect(page.getByText("The experiment cta_copy is running.")).toBeVisible();
     await expect(page.getByText("Running", { exact: true })).toBeVisible();
