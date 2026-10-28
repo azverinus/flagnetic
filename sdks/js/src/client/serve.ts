@@ -43,7 +43,9 @@ export function serveDetail<T extends JsonValue>(
   };
   if (local) {
     if (local.type !== type) return mismatch(local.type);
-    return { ...base, value: local.value as T, reason: "local_override" };
+    // A JSON value is the caller's to mutate, so the override serves a copy
+    // too: what one getter's caller changes never reaches the next.
+    return { ...base, value: (type === "json" ? copyJson(local.value) : local.value) as T, reason: "local_override" };
   }
   if (!values) return fallback("no_values");
   const flag = values.flags.get(key);

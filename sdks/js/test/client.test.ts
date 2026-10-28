@@ -987,6 +987,20 @@ describe("every public member is total", () => {
     expect(c.getJson("theme", { mode: "system" })).toStrictEqual({ mode: "dark" });
   });
 
+  test("a JSON getter serves a local override the caller may keep and mutate", async () => {
+    const h = harness();
+    const c = h.client({ store: false, pollInterval: 3_600_000, allowOverrides: true });
+    await h.serve("/sdk/v1/evaluate", values(1, { theme: { type: "json", value: { mode: "dark" }, variation: "dark", reason: "targeting_match" } }));
+    const changed: string[][] = [];
+    c.onChange((keys) => changed.push(keys));
+    c.overrides.set("theme", { mode: "high-contrast" });
+    const theme = c.getJson("theme", { mode: "system" }) as { mode: string };
+    theme.mode = "light";
+    expect(c.getJson("theme", { mode: "system" })).toStrictEqual({ mode: "high-contrast" });
+    expect(c.getDetail("theme", { mode: "system" })).toMatchObject({ value: { mode: "high-contrast" }, reason: "local_override" });
+    expect(changed).toStrictEqual([["theme"]]);
+  });
+
   test("close stops the timers and leaves the values serving", async () => {
     const h = harness();
     const c = h.client({ store: false, pollInterval: 30_000 });
