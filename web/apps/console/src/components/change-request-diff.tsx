@@ -170,11 +170,12 @@ function RuleRewriteItem({ rewrite, environment }: { rewrite: RuleRewrite; envir
   const { position, variation } = rewrite;
   return variation === undefined ? (
     <Trans>
-      {environment}, rule {position}: deleted
+      {environment}, experiment rule {position}: deleted
     </Trans>
   ) : (
     <Trans>
-      {environment}, rule {position}: serves <Value>{variation}</Value>, its conditions kept
+      {environment}, experiment rule {position}: serves <Value>{variation}</Value>, its conditions
+      kept
     </Trans>
   );
 }

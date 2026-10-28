@@ -396,8 +396,10 @@ function ChangeRequestsTable({
         id: "apply_at",
         header: t`Applies at`,
         cell: ({ row }) => {
-          const { apply_at, schedule_failure } = row.original;
-          if (apply_at === null || row.original.applied_at !== null) return null;
+          const { apply_at, schedule_failure, state } = row.original;
+          // Only a change request that can still apply has a time ahead of it.
+          if (apply_at === null || (state !== "draft" && state !== "open" && state !== "approved"))
+            return null;
           return (
             <span className="flex flex-col whitespace-nowrap">
               <time dateTime={apply_at}>{formatDateTime(i18n, apply_at)}</time>

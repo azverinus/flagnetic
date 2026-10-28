@@ -83,20 +83,20 @@ msgstr ""
 msgid "{entry} is not a number."
 msgstr ""
 
+#: src/components/change-request-diff.tsx
+msgid "{environment}, experiment rule {position}: deleted"
+msgstr ""
+
+#: src/components/change-request-diff.tsx
+msgid "{environment}, experiment rule {position}: serves <0>{variation}</0>, its conditions kept"
+msgstr ""
+
 #: src/components/experiment-transitions.tsx
 msgid "{environment}, rule {position}"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
 msgid "{environment}, rule {position} “{description}”"
-msgstr ""
-
-#: src/components/change-request-diff.tsx
-msgid "{environment}, rule {position}: deleted"
-msgstr ""
-
-#: src/components/change-request-diff.tsx
-msgid "{environment}, rule {position}: serves <0>{variation}</0>, its conditions kept"
 msgstr ""
 
 #: src/components/experiment-exposures.tsx

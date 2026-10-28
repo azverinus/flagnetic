@@ -83,6 +83,14 @@ msgstr "{entry} is not a full semantic version, such as 1.41.0."
 msgid "{entry} is not a number."
 msgstr "{entry} is not a number."
 
+#: src/components/change-request-diff.tsx
+msgid "{environment}, experiment rule {position}: deleted"
+msgstr "{environment}, experiment rule {position}: deleted"
+
+#: src/components/change-request-diff.tsx
+msgid "{environment}, experiment rule {position}: serves <0>{variation}</0>, its conditions kept"
+msgstr "{environment}, experiment rule {position}: serves <0>{variation}</0>, its conditions kept"
+
 #: src/components/experiment-transitions.tsx
 msgid "{environment}, rule {position}"
 msgstr "{environment}, rule {position}"
@@ -90,14 +98,6 @@ msgstr "{environment}, rule {position}"
 #: src/components/experiment-transitions.tsx
 msgid "{environment}, rule {position} “{description}”"
 msgstr "{environment}, rule {position} “{description}”"
-
-#: src/components/change-request-diff.tsx
-msgid "{environment}, rule {position}: deleted"
-msgstr "{environment}, rule {position}: deleted"
-
-#: src/components/change-request-diff.tsx
-msgid "{environment}, rule {position}: serves <0>{variation}</0>, its conditions kept"
-msgstr "{environment}, rule {position}: serves <0>{variation}</0>, its conditions kept"
 
 #: src/components/experiment-exposures.tsx
 msgid "{exposures, plural, one {# exposure, {overridden} overridden} other {# exposures, {overridden} overridden}}"

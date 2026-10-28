@@ -260,7 +260,7 @@ describe("an experiment change request's diff", () => {
     );
     expect(screen.getByText("Clear lift.")).toBeInTheDocument();
     expect(changes("Rules rewritten")).toEqual([
-      "Production, rule 1: serves long, its conditions kept",
+      "Production, experiment rule 1: serves long, its conditions kept",
     ]);
   });
 
@@ -276,6 +276,6 @@ describe("an experiment change request's diff", () => {
     expect(
       screen.getByText("Stops the experiment and removes the rules serving it."),
     ).toBeInTheDocument();
-    expect(changes("Rules rewritten")).toEqual(["staging, rule 1: deleted"]);
+    expect(changes("Rules rewritten")).toEqual(["staging, experiment rule 1: deleted"]);
   });
 });

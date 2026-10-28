@@ -228,7 +228,8 @@ function ChangeRequestPage({
         <Fact term={<Trans>Created</Trans>}>
           <Moment at={changeRequest.created_at} />
         </Fact>
-        {changeRequest.apply_at !== null && applied_at === null ? (
+        {/* Only a change request that can still apply has a time ahead of it. */}
+        {changeRequest.apply_at !== null && waiting ? (
           <Fact term={<Trans>Applies at</Trans>}>
             <Moment at={changeRequest.apply_at} />
             {state === "open" || state === "draft" ? (

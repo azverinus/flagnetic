@@ -83,6 +83,14 @@ msgstr "{entry} — не полная семантическая версия, �
 msgid "{entry} is not a number."
 msgstr "{entry} — не число."
 
+#: src/components/change-request-diff.tsx
+msgid "{environment}, experiment rule {position}: deleted"
+msgstr "{environment}, правило эксперимента {position}: удаляется"
+
+#: src/components/change-request-diff.tsx
+msgid "{environment}, experiment rule {position}: serves <0>{variation}</0>, its conditions kept"
+msgstr "{environment}, правило эксперимента {position}: отдаёт <0>{variation}</0>, условия сохраняются"
+
 #: src/components/experiment-transitions.tsx
 msgid "{environment}, rule {position}"
 msgstr "{environment}, правило {position}"
@@ -90,14 +98,6 @@ msgstr "{environment}, правило {position}"
 #: src/components/experiment-transitions.tsx
 msgid "{environment}, rule {position} “{description}”"
 msgstr "{environment}, правило {position} «{description}»"
-
-#: src/components/change-request-diff.tsx
-msgid "{environment}, rule {position}: deleted"
-msgstr "{environment}, правило {position}: удаляется"
-
-#: src/components/change-request-diff.tsx
-msgid "{environment}, rule {position}: serves <0>{variation}</0>, its conditions kept"
-msgstr "{environment}, правило {position}: отдаёт <0>{variation}</0>, условия сохраняются"
 
 #: src/components/experiment-exposures.tsx
 msgid "{exposures, plural, one {# exposure, {overridden} overridden} other {# exposures, {overridden} overridden}}"

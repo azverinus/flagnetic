@@ -19,7 +19,14 @@ import {
   signIn,
   unprotectProduction,
 } from "../support/console";
-import { choose, readFlag, seedFlag, stringFlag, writeConfiguration } from "../support/flags";
+import {
+  choose,
+  readConfiguration,
+  readFlag,
+  seedFlag,
+  stringFlag,
+  writeConfiguration,
+} from "../support/flags";
 import { runningExperimentInProduction } from "../support/experiments";
 import { advanceClock } from "../support/instance";
 
@@ -202,7 +209,7 @@ test.describe("scheduled changes", () => {
     await expect(page.getByText("Treatment won clearly.")).toBeVisible();
     await expect(
       page.getByRole("list", { name: "Rules rewritten" }).getByRole("listitem"),
-    ).toHaveText(["Production, rule 1: serves treatment, its conditions kept"]);
+    ).toHaveText(["Production, experiment rule 1: serves treatment, its conditions kept"]);
     await expectNoSeriousViolations(page, "an experiment stop change request");
     expect(await readExperimentStatus(project, "cta_copy")).toBe("running");
   });
@@ -278,6 +285,58 @@ test.describe("scheduled changes", () => {
       .click();
     await expect(rosa.getByText("Cancelled", { exact: true }).first()).toBeVisible();
     await expect(failure).toHaveCount(0);
+    await expect(rosa.getByText("Applies at", { exact: true })).toHaveCount(0);
+  });
+
+  test("a scheduled change cancelled before its time is never applied", async ({ browser }) => {
+    test.setTimeout(90_000);
+    const project = await seedProject("scheduled-cancel");
+    await seedFlag(project, stringFlag("checkout_copy"));
+    await seedFlag(project, stringFlag("banner"));
+    const client = managementClient();
+    const schedule = async (flag: string, title: string) =>
+      must(
+        `scheduling ${title}`,
+        await createChangeRequest({
+          client,
+          path: { project },
+          body: {
+            kind: "flag_configuration",
+            flag,
+            environment: "production",
+            title,
+            proposed: { on: true, off_variation: "control", fallthrough: "treatment" },
+            apply_at: new Date(Date.now() + 30 * 60_000).toISOString(),
+            open: true,
+          },
+        }),
+      );
+    const cancelled = await schedule("checkout_copy", "Serve the new copy at night");
+    // A second change request due at the same time shows the scheduler has
+    // passed that time, so the first one not applying is not just a delay.
+    const sentinel = await schedule("banner", "Show the banner at night");
+    const rosa = await reviewer(browser, project);
+    await approve(rosa, project, cancelled.id);
+    await approve(rosa, project, sentinel.id);
+
+    await rosa.goto(`/projects/${project}/change-requests/${cancelled.id}`);
+    await expect(rosa.getByText("Applies at", { exact: true })).toBeVisible();
+    await rosa.getByRole("button", { name: "Cancel change request", exact: true }).click();
+    await rosa
+      .getByRole("dialog", { name: "Cancel the change request" })
+      .getByRole("button", { name: "Cancel change request" })
+      .click();
+    await expect(rosa.getByText("Cancelled", { exact: true }).first()).toBeVisible();
+    await expect(rosa.getByText("Applies at", { exact: true })).toHaveCount(0);
+
+    advanceClock("1h");
+    await untilChangeRequest(
+      project,
+      sentinel.id,
+      (changeRequest) => changeRequest.state === "applied",
+    );
+    expect((await readChangeRequest(project, cancelled.id)).state).toBe("cancelled");
+    expect((await readConfiguration(project, "checkout_copy", "production")).on).toBe(false);
   });
 });
 

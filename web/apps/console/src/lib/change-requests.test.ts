@@ -327,6 +327,24 @@ describe("the rules an experiment's patch rewrites", () => {
       { environment: "stag/ing", position: 1 },
     ]);
     expect(ruleRewrites([{ op: "replace", path: "/status", value: "running" }])).toEqual([]);
+  });
+
+  it("names each removed rule by where it stood before the earlier removals", () => {
+    expect(
+      ruleRewrites([
+        { op: "remove", path: "/rules/production/0" },
+        { op: "remove", path: "/rules/production/0" },
+        { op: "add", path: "/rules/staging/1/serve/variation", value: "long" },
+        { op: "remove", path: "/rules/staging/0" },
+        { op: "add", path: "/rules/staging/0/serve/variation", value: "long" },
+      ]),
+    ).toEqual([
+      { environment: "production", position: 1 },
+      { environment: "production", position: 2 },
+      { environment: "staging", position: 2, variation: "long" },
+      { environment: "staging", position: 1 },
+      { environment: "staging", position: 2, variation: "long" },
+    ]);
     expect(ruleRewrites([{ op: "replace", path: "/traffic_allocation", value: 5000 }])).toEqual([]);
   });
 });
