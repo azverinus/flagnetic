@@ -91,7 +91,7 @@ export function WebhookDeliverySheet({
             </h3>
             {delivery.attempts.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                <Trans>No call has been made yet.</Trans>
+                <Trans>No attempt has been made yet.</Trans>
               </p>
             ) : (
               <ol className="flex flex-col gap-3">

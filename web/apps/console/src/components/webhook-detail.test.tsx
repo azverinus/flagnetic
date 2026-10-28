@@ -79,6 +79,26 @@ describe("a webhook's screen", () => {
     expect(server.requests.some((r) => r.url.endsWith("/test"))).toBe(true);
   });
 
+  it("opens the list after deleting, without reading the deleted subscription again", async () => {
+    const server = fakeServer({
+      ...common,
+      [`GET ${base}`]: { status: 200, body: webhook },
+      [`DELETE ${base}`]: { status: 204 },
+    });
+    const { router } = await renderScreen();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    const confirm = await screen.findByRole("dialog", { name: "Delete Release bot" });
+    await user.click(within(confirm).getByRole("button", { name: "Delete webhook" }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/projects/checkout/webhooks"));
+    expect(screen.queryByText("Webhook not found")).not.toBeInTheDocument();
+    expect(server.requests.filter((r) => r.method === "GET" && r.url.endsWith(base))).toHaveLength(
+      1,
+    );
+  });
+
   it("rotates the secret after confirming and shows the new one once", async () => {
     const secret = "n3w-s3cret-zz99";
     fakeServer({

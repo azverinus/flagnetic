@@ -31,7 +31,7 @@ import {
   zWebhookDeliveryStatus,
 } from "@flagnetic/api";
 import type { I18n } from "@lingui/core";
-import { msg } from "@lingui/core/macro";
+import { msg, plural } from "@lingui/core/macro";
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
 import { unwrap } from "./errors";
@@ -330,7 +330,7 @@ export function describeEvents(i18n: I18n, events: readonly string[]): string {
   if (every) return i18n._(msg`Every event`);
   if (audit && events.length === 1) return i18n._(msg`Every audit entry`);
   const count = events.length;
-  return count === 1 ? i18n._(msg`1 event type`) : i18n._(msg`${count} event types`);
+  return i18n._(msg`${plural(count, { one: "# event type", other: "# event types" })}`);
 }
 
 /**

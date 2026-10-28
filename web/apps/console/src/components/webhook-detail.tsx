@@ -144,11 +144,16 @@ function WebhookPage({
     () => undefined,
     { secret: true },
   );
-  const remove = useListMutation(
-    () => api.remove(webhook.id),
-    webhooksKey(scope),
-    () => navigation.list(),
-  );
+  const remove = useMutation({
+    mutationFn: () => api.remove(webhook.id),
+    meta: { toast: false },
+    onSuccess: async () => {
+      // Only the list is read again: reading the deleted subscription or its
+      // log would answer 404 and show "not found" before the list opens.
+      await queryClient.invalidateQueries({ queryKey: webhooksKey(scope), exact: true });
+      navigation.list();
+    },
+  });
 
   const disabledByPlatform = isPlatformDisabled(webhook);
   const name = webhook.name;
@@ -201,7 +206,7 @@ function WebhookPage({
             <Trans>
               The platform disabled this webhook after its receiver kept failing, and dropped the
               deliveries that were waiting. Enable it once the receiver is back; a dropped delivery
-              can be redelivered from the log.
+              can then be redelivered from the log.
             </Trans>
           </p>
         </div>

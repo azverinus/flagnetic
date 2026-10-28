@@ -166,9 +166,7 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
     case "sdk_key_not_active":
       return i18n._(msg`Only an active key can be rotated. This one was rotated or revoked.`);
     case "webhook_disabled":
-      return i18n._(
-        msg`The platform disabled this webhook for failing. Enable it first; it is sent nothing until then.`,
-      );
+      return i18n._(msg`This webhook is disabled. Enable it first; it is sent nothing until then.`);
     case "insecure_url":
       return i18n._(
         msg`This instance accepts only https targets. Use an https URL, or ask the operator to allow plain http.`,
