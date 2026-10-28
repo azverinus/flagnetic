@@ -96,6 +96,9 @@ type Options struct {
 	// Schedule is how change requests are scheduled and applied at their
 	// time.
 	Schedule Schedule
+	// AuditExportMaxEntries is the most entries one download of the audit
+	// log may hold.
+	AuditExportMaxEntries int
 	management.Options
 }
 
@@ -487,9 +490,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		}),
 		ListSegmentUsages: appflags.NewListSegmentUsages(tx, flagStore),
 
-		ListAuditEntries: appgovernance.NewListAuditEntries(auditLog),
-		GetAuditEntry:    appgovernance.NewGetAuditEntry(auditLog),
-		StreamChanges:    appgovernance.NewStreamChanges(changeHub, auditLog),
+		ListAuditEntries:   appgovernance.NewListAuditEntries(auditLog),
+		GetAuditEntry:      appgovernance.NewGetAuditEntry(auditLog),
+		ExportAuditEntries: appgovernance.NewExportAuditEntries(tx, auditLog, o.AuditExportMaxEntries),
+		StreamChanges:      appgovernance.NewStreamChanges(changeHub, auditLog),
 	}, reg, managementOptions)
 	// Every replica keeps the SDK keys it authenticated, dropped on a
 	// notification of each change, and writes their uses in rounds.

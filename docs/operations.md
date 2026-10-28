@@ -264,6 +264,14 @@ End it with `SELECT pg_terminate_backend(<pid>)`, or `COMMIT PREPARED` or `ROLLB
 
 A transaction held open for longer than the retention turns the lag into a [gap](#raw-events): retention drops partitions holding rows the rollups have not read yet, records a gap for them, and they are never counted. The rollup's cursor still never passes the oldest transaction open, so whatever that transaction commits is read once it ends.
 
+## Downloading the audit log
+
+Anyone who can read a project downloads its audit entries with `GET /api/v1/projects/{project}/audit/export`; an instance admin downloads the instance log, of every project and of none, with `GET /api/v1/audit/export`, narrowed to one project's identifier with `project`. Both take the filters of the list (`actor`, `actor_kind`, `action`, `entity_kind`, `entity_id`, `environment`, `from`, `to`, `q`, `kill_switch`, `change_request`) and answer every matching entry in one response, newest first, as an attachment named `audit-{project key|instance}-{UTC time}.{ext}`.
+
+`format=jsonl` (the default) writes one entry per line, each exactly the entry as `GET /api/v1/projects/{project}/audit/{entry}` answers. `format=csv` writes a header row, then a row per entry: `id`, `occurred_at`, `project_id`, `environment_id`, `actor_kind`, `actor_id`, `actor_name`, `actor_member_id`, `request_id`, `change_request_id`, `kill_switch`, `action`, `entity_kind`, `entity_id`, `entity_key`, `before` and `after`, the last two as compact JSON. A cell that begins with `=`, `+`, `-`, `@`, a tab or a carriage return is prefixed with `'`, so a spreadsheet shows it as text instead of running it.
+
+The entries are counted first. A filter matching more than `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 by default) is answered `422 export_too_large` before anything is sent: narrow it with `from` and `to` and download the log in periods. Within the cap, the entries are streamed from one snapshot of the log, so an entry written meanwhile appears in no half of the download. If the connection breaks while streaming, the download ends incomplete rather than cleanly, and has to be asked for again.
+
 ## Deleting a project
 
 An owner of a project, or an instance admin, deletes it with `DELETE /api/v1/projects/{project}` under `If-Match` on the project's version, from a signed-in session: every API token is refused `403 session_required`, and a project token never holds `project.delete`. There is no restore, so download what you want to keep first (the console offers the audit log's download before asking you to type the project's key).

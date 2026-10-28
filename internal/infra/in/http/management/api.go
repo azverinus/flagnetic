@@ -179,9 +179,10 @@ type Handlers struct {
 	DeleteSegment     *appflags.DeleteSegment
 	ListSegmentUsages *appflags.ListSegmentUsages
 
-	ListAuditEntries *appgovernance.ListAuditEntries
-	GetAuditEntry    *appgovernance.GetAuditEntry
-	StreamChanges    *appgovernance.StreamChanges
+	ListAuditEntries   *appgovernance.ListAuditEntries
+	GetAuditEntry      *appgovernance.GetAuditEntry
+	ExportAuditEntries *appgovernance.ExportAuditEntries
+	StreamChanges      *appgovernance.StreamChanges
 }
 
 // api serves every operation of the document.

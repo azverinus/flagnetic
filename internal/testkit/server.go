@@ -2,6 +2,7 @@ package testkit
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -125,6 +126,9 @@ type serverOptions struct {
 	targets governance.TargetPolicy
 	fault   *pgdelivery.RulesetLoadFault
 	limits  []func(*config.RateLimits)
+	// auditExportMax is the most entries a download of the audit log holds,
+	// 0 for the configuration's default.
+	auditExportMax int
 }
 
 type route struct {
@@ -182,6 +186,12 @@ func WithRulesetLoadFault(f *pgdelivery.RulesetLoadFault) ServerOption {
 // defaults of the configuration.
 func WithRateLimits(change func(*config.RateLimits)) ServerOption {
 	return func(o *serverOptions) { o.limits = append(o.limits, change) }
+}
+
+// WithAuditExportMaxEntries serves with n as the most entries one download of
+// the audit log may hold, instead of the configuration's default.
+func WithAuditExportMaxEntries(n int) ServerOption {
+	return func(o *serverOptions) { o.auditExportMax = n }
 }
 
 // WithWebhookTargets serves allowing webhook targets as p does, such as a
@@ -274,6 +284,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		WebhookTargets:        o.targets,
 		WebhookTick:           cfg.WebhookTick,
 		WebhookSecretOverlap:  cfg.WebhookSecretOverlap,
+		AuditExportMaxEntries: cmp.Or(o.auditExportMax, cfg.AuditExportMaxEntries),
 		Schedule: compose.Schedule{
 			MinLead: cfg.ScheduleMinLead, Tick: cfg.ScheduleTick, MaxFailures: cfg.ScheduleMaxFailures,
 		},

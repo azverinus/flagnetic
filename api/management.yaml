@@ -4144,6 +4144,68 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /projects/{project}/audit/export:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: exportProjectAuditEntries
+      summary: Download the project's audit log
+      description: |
+        Downloads the entries the list would return for the same filters, in
+        one response and not a page at a time: `format=jsonl` (the default)
+        writes one entry per line, each equal to the entry as the list reads
+        it; `format=csv` writes a header row and one row per entry, with
+        `before` and `after` as compact JSON and every cell that begins with
+        `=`, `+`, `-`, `@`, a tab or a carriage return prefixed with `'`, so
+        that a spreadsheet shows it as text.
+
+        The entries are counted first: a filter matching more than
+        `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
+        `export_too_large` before anything is sent; narrow it with `from` and
+        `to`. The entries are then streamed from one snapshot of the log.
+      x-permission: project.read
+      tags: [audit]
+      parameters:
+        - $ref: "#/components/parameters/AuditActor"
+        - $ref: "#/components/parameters/AuditActorKind"
+        - $ref: "#/components/parameters/AuditAction"
+        - $ref: "#/components/parameters/AuditEntityKind"
+        - $ref: "#/components/parameters/AuditEntityID"
+        - $ref: "#/components/parameters/AuditEnvironment"
+        - $ref: "#/components/parameters/AuditFrom"
+        - $ref: "#/components/parameters/AuditTo"
+        - $ref: "#/components/parameters/AuditQ"
+        - $ref: "#/components/parameters/AuditKillSwitch"
+        - $ref: "#/components/parameters/AuditChangeRequest"
+        - $ref: "#/components/parameters/AuditExportFormat"
+      responses:
+        "200":
+          description: |
+            Every matching entry, newest first, as an attachment named
+            `audit-{project key|instance}-{UTC time}.{jsonl|csv}`.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            application/x-ndjson:
+              schema:
+                type: string
+                description: One `AuditEntry` document per line, each equal to the entry as `GET /projects/{project}/audit/{entry}` reads it.
+            text/csv:
+              schema:
+                type: string
+                description: A header row, then one row per entry.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /projects/{project}/audit/{entry}:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -4633,6 +4695,74 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /audit/export:
+    get:
+      operationId: exportAuditEntries
+      summary: Download the instance's audit log
+      description: |
+        Downloads the entries the list would return for the same filters, in
+        one response and not a page at a time: `format=jsonl` (the default)
+        writes one entry per line, each equal to the entry as the list reads
+        it; `format=csv` writes a header row and one row per entry, with
+        `before` and `after` as compact JSON and every cell that begins with
+        `=`, `+`, `-`, `@`, a tab or a carriage return prefixed with `'`, so
+        that a spreadsheet shows it as text.
+
+        The entries are counted first: a filter matching more than
+        `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
+        `export_too_large` before anything is sent; narrow it with `from` and
+        `to`. The entries are then streamed from one snapshot of the log.
+
+        `project` narrows it to one project's entries.
+      x-permission: instance_admin
+      tags: [audit]
+      parameters:
+        - name: project
+          in: query
+          description: The identifier of the project whose entries to download, kept by its entries after the project is gone.
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/AuditActor"
+        - $ref: "#/components/parameters/AuditActorKind"
+        - $ref: "#/components/parameters/AuditAction"
+        - $ref: "#/components/parameters/AuditEntityKind"
+        - $ref: "#/components/parameters/AuditEntityID"
+        - $ref: "#/components/parameters/AuditEnvironment"
+        - $ref: "#/components/parameters/AuditFrom"
+        - $ref: "#/components/parameters/AuditTo"
+        - $ref: "#/components/parameters/AuditQ"
+        - $ref: "#/components/parameters/AuditKillSwitch"
+        - $ref: "#/components/parameters/AuditChangeRequest"
+        - $ref: "#/components/parameters/AuditExportFormat"
+      responses:
+        "200":
+          description: |
+            Every matching entry, newest first, as an attachment named
+            `audit-{project key|instance}-{UTC time}.{jsonl|csv}`.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            application/x-ndjson:
+              schema:
+                type: string
+                description: One `AuditEntry` document per line, each equal to the entry as `GET /projects/{project}/audit/{entry}` reads it.
+            text/csv:
+              schema:
+                type: string
+                description: A header row, then one row per entry.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /webhook-event-types:
     get:
       operationId: listWebhookEventTypes
@@ -5427,6 +5557,14 @@ components:
       schema:
         type: string
         format: uuid
+    AuditExportFormat:
+      name: format
+      in: query
+      description: The download's format, JSON Lines unless `csv` is asked for.
+      schema:
+        type: string
+        enum: [jsonl, csv]
+        default: jsonl
     AuditQ:
       name: q
       in: query
