@@ -10,6 +10,8 @@ The production environment of a project created from this release on starts prot
 
 SDKs read the protection from their ruleset and evaluate answers (`environment.protected`), and a server SDK ignores local overrides in a protected environment. Protecting or unprotecting an environment moves its ruleset version, so SDKs learn it at once.
 
+In the console, an environment's page has a **Protected** switch, which asks for confirmation naming what changes; members without `environment.protect` see it disabled with what it takes. A protected environment is marked wherever the console shows it, and a list to choose an environment from names it "Production (protected)".
+
 ### What protection refuses
 
 A write that would change what a protected environment's SDKs receive is refused `403 change_request_required`, whatever it touches and whichever endpoint it goes through: a flag's configuration there (replacing it, an override, a rollout's salt, a revert, a copy into it), a flag's variations or automatic exposure, a segment's conditions or private switch when a flag uses the segment there, archiving a flag switched on there or restoring one that was, and an experiment's start, stop or traffic allocation growth when the environment holds a rule serving it. The refusal's `detail` names the protected environments the write would change. Nothing of the write is kept: a write that would change a protected environment and others too, such as editing a segment that staging and production both use, changes none of them.
@@ -29,7 +31,7 @@ A request is checked in order: its permission first, then whether it is valid, t
 
 ### The kill switch
 
-The kill switch is the one direct write to a protected environment: `POST /flags/{flag}/environments/{environment}/kill` switches the flag off there with the permission it always needs (`flag_configuration.kill`, developer and above), so whoever is on call stops an incident without waiting for an approval. It is audited as every kill switch is, marked `kill_switch`. Switching the flag back on is an ordinary configuration write, which a protected environment takes only through a change request.
+The kill switch is the one direct write to a protected environment: `POST /flags/{flag}/environments/{environment}/kill` switches the flag off there with the permission it always needs (`flag_configuration.kill`, developer and above), so whoever is on call stops an incident without waiting for an approval. It is audited as every kill switch is, marked `kill_switch`. Switching the flag back on is an ordinary configuration write, which a protected environment takes only through a change request. The console asks for the flag's key to be typed out before a kill switch in a protected environment, so production is not switched off by accident.
 
 ### What protection costs
 

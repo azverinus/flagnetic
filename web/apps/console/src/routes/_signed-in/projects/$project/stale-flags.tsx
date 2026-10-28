@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { formatDateTime, formatDay } from "@/i18n/format";
+import { environmentLabel } from "@/lib/environments";
 import { madeBy } from "@/lib/project-members";
 import { environmentsQuery, staleFlagsQuery } from "@/lib/queries";
 import {
@@ -258,8 +259,14 @@ function StaleFlagsTable({
   const { names } = useKnownMembers(project);
   const environments = useQuery(environmentsQuery(project));
   const nameOf = useMemo(
-    () => new Map(environments.data?.map((environment) => [environment.key, environment.name])),
-    [environments.data],
+    () =>
+      new Map(
+        environments.data?.map((environment) => [
+          environment.key,
+          environmentLabel(i18n, environment),
+        ]),
+      ),
+    [environments.data, i18n],
   );
   const columns = useMemo<TableColumn<StaleFlag>[]>(
     () => [

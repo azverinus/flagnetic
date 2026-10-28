@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { ChangeRequestActions } from "@/components/change-request-actions";
 import { ChangeRequestDiff } from "@/components/change-request-diff";
 import { ChangeRequestStateBadge } from "@/components/change-request-state-badge";
+import { ProtectedMark } from "@/components/protected-mark";
 import { QueryError } from "@/components/query-error";
 import { ScheduleFailureNotice } from "@/components/schedule-failure-notice";
 import { Button } from "@/components/ui/button";
@@ -114,6 +115,8 @@ function ChangeRequestPage({
   const environments = useQuery(environmentsQuery(project));
   const environmentName = (key: string) =>
     environments.data?.find((environment) => environment.key === key)?.name ?? key;
+  const environmentProtected = (key: string) =>
+    environments.data?.find((environment) => environment.key === key)?.protected === true;
   // What the change request would change as it is now: the segment of a
   // segment's definition, the flag of a flag's, otherwise the
   // environment's configuration.
@@ -217,6 +220,12 @@ function ChangeRequestPage({
             >
               {environmentName(changeRequest.environment)}
             </Link>
+            {environmentProtected(changeRequest.environment) ? (
+              <>
+                {" "}
+                <ProtectedMark />
+              </>
+            ) : null}
           </Fact>
         ) : null}
         <Fact term={<Trans>Based on</Trans>}>

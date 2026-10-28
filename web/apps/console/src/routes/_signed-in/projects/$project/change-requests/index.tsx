@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { ChangeRequestStateBadge } from "@/components/change-request-state-badge";
 import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
+import { EnvironmentName } from "@/components/protected-mark";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
@@ -372,8 +373,10 @@ function ChangeRequestsTable({
   const { i18n, t } = useLingui();
   const environments = useQuery(environmentsQuery(project));
   const columns = useMemo<TableColumn<ChangeRequest>[]>(() => {
-    const environmentName = (key: string) =>
-      environments.data?.find((environment) => environment.key === key)?.name ?? key;
+    const environmentName = (key: string) => {
+      const environment = environments.data?.find((candidate) => candidate.key === key);
+      return environment ? <EnvironmentName environment={environment} /> : key;
+    };
     return [
       {
         id: "title",
