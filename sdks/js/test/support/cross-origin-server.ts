@@ -32,7 +32,9 @@ export class CrossOriginServer {
   async start(): Promise<string> {
     if (!this.server) {
       const server = createServer((req, res) => {
-        void this.handle(req, res);
+        // A page that unloads mid-request, or stop closing every
+        // connection, aborts the body being read; nobody is left to answer.
+        this.handle(req, res).catch(() => res.destroy());
       });
       await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
       this.server = server;
