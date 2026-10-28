@@ -129,6 +129,9 @@ type serverOptions struct {
 	// auditExportMax is the most entries a download of the audit log holds,
 	// 0 for the configuration's default.
 	auditExportMax int
+	// digest is when the weekly stale-flag digest is due, the
+	// configuration's default when nil.
+	digest *governance.DigestSlot
 }
 
 type route struct {
@@ -192,6 +195,12 @@ func WithRateLimits(change func(*config.RateLimits)) ServerOption {
 // the audit log may hold, instead of the configuration's default.
 func WithAuditExportMaxEntries(n int) ServerOption {
 	return func(o *serverOptions) { o.auditExportMax = n }
+}
+
+// WithDigestSlot serves with the weekly stale-flag digest due at slot instead
+// of the configuration's default.
+func WithDigestSlot(slot governance.DigestSlot) ServerOption {
+	return func(o *serverOptions) { o.digest = &slot }
 }
 
 // WithWebhookTargets serves allowing webhook targets as p does, such as a
@@ -270,6 +279,10 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		}
 	}
 	h := flaghttp.New(edge)
+	digest := governance.DigestSlot{Weekday: cfg.DigestWeekday, Hour: cfg.DigestHour}
+	if o.digest != nil {
+		digest = *o.digest
+	}
 	c := o.clock
 	if c == nil {
 		c = clock.System{}
@@ -288,6 +301,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		Schedule: compose.Schedule{
 			MinLead: cfg.ScheduleMinLead, Tick: cfg.ScheduleTick, MaxFailures: cfg.ScheduleMaxFailures,
 		},
+		DigestSlot: digest,
 	})
 	// Registered first, so it runs once the server below has stopped.
 	t.Cleanup(background.Close)

@@ -171,6 +171,7 @@ type Handlers struct {
 	RedeliverWebhook      *appgovernance.Redeliver
 	EnableWebhook         *appgovernance.EnableWebhook
 	RotateWebhookSecret   *appgovernance.RotateWebhookSecret
+	SendStaleFlagDigest   *appgovernance.SendStaleFlagDigest
 
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment

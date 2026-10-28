@@ -3096,6 +3096,11 @@ type StaleFlag struct {
 	Reasons []StaleReason `json:"reasons"`
 }
 
+// StaleFlagDigest The stale flags a digest lists.
+type StaleFlagDigest struct {
+	Items []StaleFlag `json:"items"`
+}
+
 // StaleFlagList defines model for StaleFlagList.
 type StaleFlagList struct {
 	Items []StaleFlag `json:"items"`
@@ -6861,6 +6866,21 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/stale-flags (the `ListStaleFlags` operationId).
 	ListStaleFlags(ctx context.Context, project ProjectKey, params *ListStaleFlagsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SendStaleFlagDigest Send the stale-flag digest now
+	//
+	// Queues the project's `report.stale_flags` event now, attributed to
+	// the caller, and answers the stale flags it lists, as
+	// `GET /projects/{project}/stale-flags` reads them. The event is sent
+	// even when nothing is stale, so a maintainer can test a receiver;
+	// it carries `items`, the same stale flags. It is no weekly digest:
+	// it records no slot, so it neither replaces nor suppresses the one
+	// sent at `FLAGNETIC_DIGEST_WEEKDAY` and `FLAGNETIC_DIGEST_HOUR`.
+	// Delivery follows the subscriptions naming `report.stale_flags` (or
+	// `*`); with none, the event is not kept.
+	//
+	// Corresponds with POST /projects/{project}/stale-flags/send (the `SendStaleFlagDigest` operationId).
+	SendStaleFlagDigest(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// StreamProjectChanges The project's change stream
 	//
@@ -10958,6 +10978,31 @@ func (c *Client) ListSegmentUsages(ctx context.Context, project ProjectKey, segm
 // Corresponds with GET /projects/{project}/stale-flags (the `ListStaleFlags` operationId).
 func (c *Client) ListStaleFlags(ctx context.Context, project ProjectKey, params *ListStaleFlagsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListStaleFlagsRequest(c.Server, project, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SendStaleFlagDigest Send the stale-flag digest now
+//
+// Queues the project's `report.stale_flags` event now, attributed to
+// the caller, and answers the stale flags it lists, as
+// `GET /projects/{project}/stale-flags` reads them. The event is sent
+// even when nothing is stale, so a maintainer can test a receiver;
+// it carries `items`, the same stale flags. It is no weekly digest:
+// it records no slot, so it neither replaces nor suppresses the one
+// sent at `FLAGNETIC_DIGEST_WEEKDAY` and `FLAGNETIC_DIGEST_HOUR`.
+// Delivery follows the subscriptions naming `report.stale_flags` (or
+// `*`); with none, the event is not kept.
+//
+// Corresponds with POST /projects/{project}/stale-flags/send (the `SendStaleFlagDigest` operationId).
+func (c *Client) SendStaleFlagDigest(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSendStaleFlagDigestRequest(c.Server, project)
 	if err != nil {
 		return nil, err
 	}
@@ -18634,6 +18679,40 @@ func NewListStaleFlagsRequest(server string, project ProjectKey, params *ListSta
 	return req, nil
 }
 
+// NewSendStaleFlagDigestRequest constructs an http.Request for the SendStaleFlagDigest method
+func NewSendStaleFlagDigestRequest(server string, project ProjectKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/stale-flags/send", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewStreamProjectChangesRequest constructs an http.Request for the StreamProjectChanges method
 func NewStreamProjectChangesRequest(server string, project ProjectKey, params *StreamProjectChangesParams) (*http.Request, error) {
 	var err error
@@ -22495,6 +22574,23 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/stale-flags (the `ListStaleFlags` operationId).
 	ListStaleFlagsWithResponse(ctx context.Context, project ProjectKey, params *ListStaleFlagsParams, reqEditors ...RequestEditorFn) (*ListStaleFlagsResponse, error)
+
+	// SendStaleFlagDigestWithResponse Send the stale-flag digest now
+	//
+	// Queues the project's `report.stale_flags` event now, attributed to
+	// the caller, and answers the stale flags it lists, as
+	// `GET /projects/{project}/stale-flags` reads them. The event is sent
+	// even when nothing is stale, so a maintainer can test a receiver;
+	// it carries `items`, the same stale flags. It is no weekly digest:
+	// it records no slot, so it neither replaces nor suppresses the one
+	// sent at `FLAGNETIC_DIGEST_WEEKDAY` and `FLAGNETIC_DIGEST_HOUR`.
+	// Delivery follows the subscriptions naming `report.stale_flags` (or
+	// `*`); with none, the event is not kept.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/stale-flags/send (the `SendStaleFlagDigest` operationId).
+	SendStaleFlagDigestWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*SendStaleFlagDigestResponse, error)
 
 	// StreamProjectChangesWithResponse The project's change stream
 	//
@@ -32755,6 +32851,75 @@ func (r ListStaleFlagsResponse) ContentType() string {
 	return ""
 }
 
+// SendStaleFlagDigestResponse401Headers the declared response headers of an HTTP 401 response for SendStaleFlagDigest
+type SendStaleFlagDigestResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type SendStaleFlagDigestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *StaleFlagDigest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *SendStaleFlagDigestResponse401Headers
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r SendStaleFlagDigestResponse) GetJSON202() *StaleFlagDigest {
+	return r.JSON202
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SendStaleFlagDigestResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SendStaleFlagDigestResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SendStaleFlagDigestResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r SendStaleFlagDigestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SendStaleFlagDigestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SendStaleFlagDigestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SendStaleFlagDigestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // StreamProjectChangesResponse200Headers the declared response headers of an HTTP 200 response for StreamProjectChanges
 type StreamProjectChangesResponse200Headers struct {
 	CacheControl    *string
@@ -38504,6 +38669,29 @@ func (c *ClientWithResponses) ListStaleFlagsWithResponse(ctx context.Context, pr
 		return nil, err
 	}
 	return ParseListStaleFlagsResponse(rsp)
+}
+
+// SendStaleFlagDigestWithResponse Send the stale-flag digest now
+//
+// Queues the project's `report.stale_flags` event now, attributed to
+// the caller, and answers the stale flags it lists, as
+// `GET /projects/{project}/stale-flags` reads them. The event is sent
+// even when nothing is stale, so a maintainer can test a receiver;
+// it carries `items`, the same stale flags. It is no weekly digest:
+// it records no slot, so it neither replaces nor suppresses the one
+// sent at `FLAGNETIC_DIGEST_WEEKDAY` and `FLAGNETIC_DIGEST_HOUR`.
+// Delivery follows the subscriptions naming `report.stale_flags` (or
+// `*`); with none, the event is not kept.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/stale-flags/send (the `SendStaleFlagDigest` operationId).
+func (c *ClientWithResponses) SendStaleFlagDigestWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*SendStaleFlagDigestResponse, error) {
+	rsp, err := c.SendStaleFlagDigest(ctx, project, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSendStaleFlagDigestResponse(rsp)
 }
 
 // StreamProjectChangesWithResponse The project's change stream
@@ -48176,6 +48364,66 @@ func ParseListStaleFlagsResponse(rsp *http.Response) (*ListStaleFlagsResponse, e
 	return response, nil
 }
 
+// ParseSendStaleFlagDigestResponse parses an HTTP response from a SendStaleFlagDigestWithResponse call
+func ParseSendStaleFlagDigestResponse(rsp *http.Response) (*SendStaleFlagDigestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SendStaleFlagDigestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest StaleFlagDigest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers SendStaleFlagDigestResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseStreamProjectChangesResponse parses an HTTP response from a StreamProjectChangesWithResponse call
 func ParseStreamProjectChangesResponse(rsp *http.Response) (*StreamProjectChangesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -50839,6 +51087,9 @@ type ServerInterface interface {
 	// ListStaleFlags The project's stale flags
 	// (GET /projects/{project}/stale-flags)
 	ListStaleFlags(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListStaleFlagsParams)
+	// SendStaleFlagDigest Send the stale-flag digest now
+	// (POST /projects/{project}/stale-flags/send)
+	SendStaleFlagDigest(w http.ResponseWriter, r *http.Request, project ProjectKey)
 	// StreamProjectChanges The project's change stream
 	// (GET /projects/{project}/stream)
 	StreamProjectChanges(w http.ResponseWriter, r *http.Request, project ProjectKey, params StreamProjectChangesParams)
@@ -56602,6 +56853,32 @@ func (siw *ServerInterfaceWrapper) ListStaleFlags(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// SendStaleFlagDigest operation middleware
+func (siw *ServerInterfaceWrapper) SendStaleFlagDigest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SendStaleFlagDigest(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // StreamProjectChanges operation middleware
 func (siw *ServerInterfaceWrapper) StreamProjectChanges(w http.ResponseWriter, r *http.Request) {
 
@@ -58045,6 +58322,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/clone", wrapper.CloneExperiment)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/assignment", wrapper.GetExperimentAssignment)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/stale-flags", wrapper.ListStaleFlags)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/stale-flags/send", wrapper.SendStaleFlagDigest)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/hash-check", wrapper.CheckHashUniformity)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/exposures", wrapper.GetExperimentExposures)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/exposures/timeline", wrapper.GetExperimentExposureTimeline)
@@ -70591,6 +70869,79 @@ func (response ListStaleFlags404ApplicationProblemPlusJSONResponse) VisitListSta
 	return err
 }
 
+type SendStaleFlagDigestRequestObject struct {
+	Project ProjectKey `json:"project"`
+}
+
+type SendStaleFlagDigestResponseObject interface {
+	VisitSendStaleFlagDigestResponse(w http.ResponseWriter) error
+}
+
+type SendStaleFlagDigest202JSONResponse StaleFlagDigest
+
+func (response SendStaleFlagDigest202JSONResponse) VisitSendStaleFlagDigestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendStaleFlagDigest401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response SendStaleFlagDigest401ApplicationProblemPlusJSONResponse) VisitSendStaleFlagDigestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendStaleFlagDigest403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SendStaleFlagDigest403ApplicationProblemPlusJSONResponse) VisitSendStaleFlagDigestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendStaleFlagDigest404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SendStaleFlagDigest404ApplicationProblemPlusJSONResponse) VisitSendStaleFlagDigestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type StreamProjectChangesRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Params  StreamProjectChangesParams
@@ -73983,6 +74334,9 @@ type StrictServerInterface interface {
 	// ListStaleFlags The project's stale flags
 	// (GET /projects/{project}/stale-flags)
 	ListStaleFlags(ctx context.Context, request ListStaleFlagsRequestObject) (ListStaleFlagsResponseObject, error)
+	// SendStaleFlagDigest Send the stale-flag digest now
+	// (POST /projects/{project}/stale-flags/send)
+	SendStaleFlagDigest(ctx context.Context, request SendStaleFlagDigestRequestObject) (SendStaleFlagDigestResponseObject, error)
 	// StreamProjectChanges The project's change stream
 	// (GET /projects/{project}/stream)
 	StreamProjectChanges(ctx context.Context, request StreamProjectChangesRequestObject) (StreamProjectChangesResponseObject, error)
@@ -77540,6 +77894,32 @@ func (sh *strictHandler) ListStaleFlags(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListStaleFlagsResponseObject); ok {
 		if err := validResponse.VisitListStaleFlagsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SendStaleFlagDigest operation middleware
+func (sh *strictHandler) SendStaleFlagDigest(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request SendStaleFlagDigestRequestObject
+
+	request.Project = project
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SendStaleFlagDigest(ctx, request.(SendStaleFlagDigestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SendStaleFlagDigest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SendStaleFlagDigestResponseObject); ok {
+		if err := validResponse.VisitSendStaleFlagDigestResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

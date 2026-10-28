@@ -105,6 +105,7 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		Schedule: compose.Schedule{
 			MinLead: cfg.ScheduleMinLead, Tick: cfg.ScheduleTick, MaxFailures: cfg.ScheduleMaxFailures,
 		},
+		DigestSlot: governance.DigestSlot{Weekday: cfg.DigestWeekday, Hour: cfg.DigestHour},
 		WebhookTargets: governance.TargetPolicy{
 			AllowHTTP: cfg.WebhookAllowHTTP, AllowPrivateNetworks: cfg.WebhookAllowPrivateNetworks,
 		},

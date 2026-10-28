@@ -391,6 +391,9 @@ import type {
   RotateWebhookSecretData,
   RotateWebhookSecretErrors,
   RotateWebhookSecretResponses,
+  SendStaleFlagDigestData,
+  SendStaleFlagDigestErrors,
+  SendStaleFlagDigestResponses,
   SetEnvironmentProtectionData,
   SetEnvironmentProtectionErrors,
   SetEnvironmentProtectionResponses,
@@ -2667,6 +2670,40 @@ export const listStaleFlags = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/stale-flags",
+    ...options,
+  });
+
+/**
+ * Send the stale-flag digest now
+ *
+ * Queues the project's `report.stale_flags` event now, attributed to
+ * the caller, and answers the stale flags it lists, as
+ * `GET /projects/{project}/stale-flags` reads them. The event is sent
+ * even when nothing is stale, so a maintainer can test a receiver;
+ * it carries `items`, the same stale flags. It is no weekly digest:
+ * it records no slot, so it neither replaces nor suppresses the one
+ * sent at `FLAGNETIC_DIGEST_WEEKDAY` and `FLAGNETIC_DIGEST_HOUR`.
+ * Delivery follows the subscriptions naming `report.stale_flags` (or
+ * `*`); with none, the event is not kept.
+ *
+ */
+export const sendStaleFlagDigest = <ThrowOnError extends boolean = false>(
+  options: Options<SendStaleFlagDigestData, ThrowOnError>,
+): RequestResult<SendStaleFlagDigestResponses, SendStaleFlagDigestErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    SendStaleFlagDigestResponses,
+    SendStaleFlagDigestErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/stale-flags/send",
     ...options,
   });
 

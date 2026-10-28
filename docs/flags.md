@@ -176,7 +176,7 @@ In the console, each environment's tab of a flag shows, under the configuration,
 | `finished_rollout` | Every environment is on and serves the same variation to everyone, with no prerequisite and no override: through no rule at all, or through a first rule without conditions serving a rollout at 100 %. An environment switched off never counts, so a flag never switched on is not a finished rollout. The code can keep that one variation's branch. |
 | `experiment_overdue` | A running experiment on the flag is past its expected end, from the UTC day after it. The item's `experiment` names it with its `expected_end_at`; when several are, the one due earliest. |
 
-`reason` (repeatable) lists only the flags stale for one of the reasons given. Archived flags are never listed. The report reads `last_evaluated_at`, so it lags the SDKs as evaluations do.
+`reason` (repeatable) lists only the flags stale for one of the reasons given. Archived flags are never listed. The report reads `last_evaluated_at`, so it lags the SDKs as evaluations do. Webhook subscribers receive the same report every week as [the stale-flag digest](webhooks.md#the-stale-flag-digest).
 
 In the console, **Stale flags** in the project navigation, also linked from the flags list, shows the report 50 flags a page with **Previous** and **Next**: each flag links to its page, with its reasons (an overdue experiment linked, with its expected end), owner, lifetime and when it was last evaluated in each environment. One toggle per reason narrows the list to the flags stale for any of the reasons pressed; the reasons and the page are kept in the address.
 

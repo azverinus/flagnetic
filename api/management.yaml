@@ -2932,6 +2932,37 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /projects/{project}/stale-flags/send:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    post:
+      operationId: sendStaleFlagDigest
+      summary: Send the stale-flag digest now
+      description: |
+        Queues the project's `report.stale_flags` event now, attributed to
+        the caller, and answers the stale flags it lists, as
+        `GET /projects/{project}/stale-flags` reads them. The event is sent
+        even when nothing is stale, so a maintainer can test a receiver;
+        it carries `items`, the same stale flags. It is no weekly digest:
+        it records no slot, so it neither replaces nor suppresses the one
+        sent at `FLAGNETIC_DIGEST_WEEKDAY` and `FLAGNETIC_DIGEST_HOUR`.
+        Delivery follows the subscriptions naming `report.stale_flags` (or
+        `*`); with none, the event is not kept.
+      x-permission: webhook.manage
+      tags: [flags, webhooks]
+      responses:
+        "202":
+          description: The digest is queued; these are the stale flags it lists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaleFlagDigest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /projects/{project}/hash-check:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -8671,6 +8702,15 @@ components:
         expected_end_at:
           type: string
           format: date
+    StaleFlagDigest:
+      type: object
+      description: The stale flags a digest lists.
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/StaleFlag"
     StaleFlagList:
       type: object
       required: [items, next_cursor]
