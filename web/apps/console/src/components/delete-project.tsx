@@ -35,8 +35,10 @@ export function DeleteProject({ project }: { project: Project }) {
       setAsking(false);
       toast.success(t`The project ${key} is deleted.`);
       // The whole list is asked for: the last project would otherwise be
-      // reopened from the cached list, which still holds this one.
-      await navigate({ to: "/", search: { all: true } });
+      // reopened from the cached list, which still holds this one. Unsaved
+      // edits of the settings are not asked about: the project is gone, so
+      // staying could save them nowhere.
+      await navigate({ to: "/", search: { all: true }, ignoreBlocker: true });
       queryClient.removeQueries({ queryKey: projectQuery(key).queryKey });
       await queryClient.invalidateQueries({ queryKey: projectsQuery.queryKey, exact: true });
     },

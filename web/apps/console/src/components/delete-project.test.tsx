@@ -3,6 +3,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { UnsavedChangesBar } from "@/components/ui/unsaved-changes-bar";
 import { type Access, AccessContext } from "@/lib/access";
 import { fakeServer, problem } from "@/test/fake-server";
 import { activateForTests, renderWithRouter } from "@/test/render";
@@ -56,6 +57,28 @@ describe("deleting a project", () => {
     expect(router.state.location.search).toEqual({ all: true });
     const deletion = server.requests.find((request) => request.method === "DELETE");
     expect(deletion?.headers.get("If-Match")).toBe('"4"');
+  });
+
+  it("leaves the settings without asking about unsaved edits once the project is gone", async () => {
+    fakeServer({
+      "DELETE /projects/checkout": { status: 204 },
+      "GET /projects": { status: 200, body: { items: [] } },
+    });
+    const { router } = await renderWithRouter(() => (
+      <AccessContext.Provider value={owner}>
+        <DeleteProject project={project} />
+        <UnsavedChangesBar dirty onDiscard={() => {}} />
+      </AccessContext.Provider>
+    ));
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Delete project" }));
+    const dialog = await screen.findByRole("dialog", { name: "Delete checkout" });
+    await user.type(within(dialog).getByLabelText("Type checkout to confirm"), "checkout");
+    await user.click(within(dialog).getByRole("button", { name: "Delete project" }));
+
+    await waitFor(() => expect(router.state.location.search).toEqual({ all: true }));
+    expect(screen.queryByRole("dialog", { name: "Leave without saving?" })).toBeNull();
   });
 
   it("keeps the dialog open and says why when the server refuses", async () => {
