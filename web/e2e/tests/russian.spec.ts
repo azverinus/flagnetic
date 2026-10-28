@@ -1,4 +1,4 @@
-import { createChangeRequest, createGrant } from "@flagnetic/api";
+import { createChangeRequest, createGrant, createWebhook } from "@flagnetic/api";
 import { expect, test } from "@playwright/test";
 
 import { expectNoSeriousViolations } from "../support/axe";
@@ -308,6 +308,7 @@ test.describe("the console in Russian", () => {
     await dialog.getByRole("button", { name: "Предложить", exact: true }).click();
     await expect(dialog.getByText("Введите заголовок.")).toBeVisible();
   });
+
   test("proposes an experiment's stop and reads its change request in Russian", async ({
     page,
   }) => {
@@ -354,5 +355,48 @@ test.describe("the console in Russian", () => {
       page,
       "the change requests with the schedule filter in Russian",
     );
+  });
+
+  test("reads the webhooks, their form and their delivery log in Russian", async ({ page }) => {
+    const created = must(
+      "creating a webhook",
+      await createWebhook({
+        client: managementClient(),
+        path: { project },
+        body: {
+          name: "Чат релизов",
+          url: "https://hooks.example.com/flagnetic",
+          events: ["flag.kill_switch"],
+          enabled: false,
+        },
+      }),
+    );
+    await signIn(page, anna, russian);
+    await page.goto(`/projects/${project}/webhooks`);
+
+    await expect(page.getByRole("heading", { name: "Вебхуки", level: 1 })).toBeVisible();
+    const row = page
+      .getByRole("table", { name: "Вебхуки" })
+      .getByRole("row", { name: /Чат релизов/ });
+    await expect(row).toContainText("Отключён");
+    await expect(row).toContainText("1 тип событий");
+    await expectNoSeriousViolations(page, "the webhooks list in Russian");
+
+    await page.getByRole("button", { name: "Новый вебхук" }).click();
+    const dialog = page.getByRole("dialog", { name: "Новый вебхук" });
+    await expect(dialog.getByLabel("URL")).toBeVisible();
+    await expect(dialog.getByRole("checkbox", { name: /^Все события/ })).toBeVisible();
+    await expect(dialog.getByRole("checkbox", { name: /flag\.kill_switch/ })).toBeVisible();
+    await expectNoSeriousViolations(page, "the new webhook dialog in Russian");
+    await dialog.getByRole("button", { name: "Создать вебхук" }).click();
+    await expect(dialog.getByText("Выберите хотя бы один тип событий.")).toBeVisible();
+    await dialog.getByRole("button", { name: "Отмена" }).click();
+
+    await page.goto(`/projects/${project}/webhooks/${created.id}?tab=deliveries`);
+    await expect(page.getByRole("heading", { name: "Чат релизов", level: 1 })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Доставки", selected: true })).toBeVisible();
+    await expect(page.getByText("Этому вебхуку пока ничего не отправлялось.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Отправить тест" })).toBeDisabled();
+    await expectNoSeriousViolations(page, "a webhook's delivery log in Russian");
   });
 });

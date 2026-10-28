@@ -3,6 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 import { RefusedScreen } from "@/components/can";
+import { WebhookDisabledBanner } from "@/components/webhook-disabled-banner";
 import { meQuery } from "@/lib/queries";
 
 /**
@@ -25,5 +26,10 @@ function Instance() {
       />
     );
   }
-  return <Outlet />;
+  return (
+    <>
+      <WebhookDisabledBanner scope="instance" />
+      <Outlet />
+    </>
+  );
 }

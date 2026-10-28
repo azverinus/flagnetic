@@ -62,6 +62,12 @@ An instance admin subscribes an archive to every audit entry that names no proje
 
 `events` is exactly `audit.entry`: any other type, `*` included, is refused `unknown_event_type`. An instance has no environments to filter on, so `environments` must be empty or absent, else `invalid_webhook`. Each event's `project` is null, and `data` carries the entry as `GET /api/v1/audit` lists it. A project's entries never reach an instance subscription; a project's own subscriptions receive them. The writes to an instance subscription are audited as entries of the instance, so the subscription receives them too, its own creation first.
 
+## In the console
+
+Those who hold `webhook.manage` find **Webhooks** in the project navigation, and instance admins **Webhooks** in the instance navigation. The list shows each subscription's target, what it is sent, whether it is enabled and its last success. Creating one asks for a name, the target and the event types, chosen from the catalogue and grouped by what they are about (with the environments to limit them to, for a project); the secret is then shown once, in a dialog that stays until the member says they stored it.
+
+A subscription's screen holds its settings, **Send test**, **Rotate secret** (the new secret is shown once; the old one keeps signing for the overlap), **Enable** and **Delete**, and its delivery log. The log filters by status, event type and day, pages back through older deliveries, opens every attempt of a delivery with what the receiver answered, and sends a delivery's event again. When the platform disables a subscription, a banner on every screen of the project, or of the instance area, names it to those who manage webhooks, with a button to enable it, until it is enabled again.
+
 ## The event catalogue
 
 `GET /api/v1/webhook-event-types` lists every type a subscription may name, with what emits it; any member may read it. The list and the `events` enum of the API description are one and the same.
