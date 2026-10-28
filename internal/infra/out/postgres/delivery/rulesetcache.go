@@ -265,16 +265,24 @@ func (c *RulesetCache) ruleset(ctx context.Context, environment workspace.Enviro
 			}
 			return appdelivery.Ruleset{}, appdelivery.ErrRulesetUnavailable
 		}
+		// A newer version announced while the load was under way, before
+		// or after the request began waiting, makes what was loaded old:
+		// load again rather than answer what is known to be old. The
+		// versions known are read again under the lock, since the load
+		// began after they were last read.
+		c.mu.Lock()
+		e, known := c.entries[environment]
+		if known {
+			want = max(want, e.latest)
+		}
 		if l.rs.Version >= want {
-			c.mu.Lock()
-			if e, ok := c.entries[environment]; ok && measured {
+			if known && measured {
 				c.served(environment, e, l.rs.Version)
 			}
 			c.mu.Unlock()
 			return l.rs, nil
 		}
-		// A newer version was announced while the load was under way:
-		// load again rather than answer what is known to be old.
+		c.mu.Unlock()
 	}
 }
 
