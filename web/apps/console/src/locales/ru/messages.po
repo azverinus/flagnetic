@@ -197,6 +197,10 @@ msgstr "{live, plural, one {Отозвать # сеанс} few {Отозвать
 msgid "{name} ({email})"
 msgstr "{name} ({email})"
 
+#: src/lib/environments.ts
+msgid "{name} (protected)"
+msgstr "{name} (защищено)"
+
 #: src/components/condition-row.tsx
 msgid "{name} (unit ID)"
 msgstr "{name} (ID единицы)"
@@ -233,6 +237,10 @@ msgstr "Участник {name} приглашён снова"
 msgid "{name} is no longer an instance admin."
 msgstr "Участник {name} больше не администратор экземпляра."
 
+#: src/components/environment-protection.tsx
+msgid "{name} is no longer protected."
+msgstr "Окружение {name} больше не защищено."
+
 #: src/components/member-credentials.tsx
 msgid "{name} is not signed in anywhere."
 msgstr "Участник {name} нигде не вошёл."
@@ -248,6 +256,14 @@ msgstr "Окружение {name} защищено: выключение {key} �
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "{name} is protected: switching {key} on there goes through a change request."
 msgstr "Окружение {name} защищено: включение {key} в нём проходит через запрос на изменение."
+
+#: src/components/environment-protection.tsx
+msgid "{name} is protected."
+msgstr "Окружение {name} защищено."
+
+#: src/components/kill-switch-dialog.tsx
+msgid "{name} is protected. The kill switch skips the change request it would need."
+msgstr "Окружение {name} защищено. Аварийный выключатель обходит запрос на изменение, который иначе понадобился бы."
 
 #: src/components/member-actions.tsx
 msgid "{name} is reactivated."
@@ -373,6 +389,10 @@ msgstr "Запрос на изменение предлагает изменен
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "A change to a protected environment is proposed as a change request from the flag's configuration."
 msgstr "Изменение защищённого окружения предлагается запросом на изменение из конфигурации флага."
+
+#: src/components/environment-protection.tsx
+msgid "A change to what SDKs receive from a protected environment goes through a change request that someone else approves. The kill switch and import skip it."
+msgstr "Изменение того, что получают SDK из защищённого окружения, проходит через запрос на изменение, который одобряет кто-то другой. Аварийный выключатель и импорт этого не требуют."
 
 #: src/components/rule-editor.tsx
 msgid "A configuration has at most {maxRulesText} rules."
@@ -852,6 +872,10 @@ msgstr "Любой статус"
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any type"
 msgstr "Любой тип"
+
+#: src/components/environment-protection.tsx
+msgid "Anyone allowed to edit flags can change what SDKs receive from {name} directly, with no review. SDKs honour local overrides there again."
+msgstr "Любой, кому разрешено править флаги, сможет менять то, что SDK получают из окружения {name}, напрямую, без проверки. SDK снова учитывают там локальные переопределения."
 
 #. A kind of actor in the audit log.
 #. A kind of entity in the audit log.
@@ -4280,9 +4304,26 @@ msgstr "предлагать изменения через запросы на �
 msgid "Propose the change"
 msgstr "Предложить изменение"
 
+#: src/components/environment-protection.tsx
+msgid "Protect {name}"
+msgstr "Защитить {name}"
+
+#: src/components/environment-protection.tsx
+msgid "Protect environment"
+msgstr "Защитить окружение"
+
 #: src/lib/access-names.ts
 msgid "protect environments"
 msgstr "защищать окружения"
+
+#: src/components/environment-protection.tsx
+#: src/components/protected-mark.tsx
+msgid "Protected"
+msgstr "Защищено"
+
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
+msgid "Protection"
+msgstr "Защита"
 
 #: src/components/sdk-keys.tsx
 msgid "Put it in the client SDK’s configuration. It ships inside the browser or the app, so anyone can read it: it learns only the values served to a context, never the ruleset."
@@ -5185,6 +5226,14 @@ msgstr "Остановить {key}"
 #: src/components/experiment-transitions.tsx
 msgid "Stop experiment"
 msgstr "Остановить эксперимент"
+
+#: src/components/environment-protection.tsx
+msgid "Stop protecting"
+msgstr "Снять защиту"
+
+#: src/components/environment-protection.tsx
+msgid "Stop protecting {name}"
+msgstr "Снять защиту с {name}"
 
 #: src/components/experiment-transitions.tsx
 #: src/lib/experiments.ts
@@ -6264,6 +6313,10 @@ msgstr "Попробовать ещё раз"
 msgid "Type"
 msgstr "Тип"
 
+#: src/components/kill-switch-dialog.tsx
+msgid "Type {flagKey} to confirm"
+msgstr "Введите {flagKey} для подтверждения"
+
 #: src/components/ui/confirm-dialog.tsx
 msgid "Type {typeToConfirm} to confirm"
 msgstr "Введите {typeToConfirm} для подтверждения"
@@ -6671,6 +6724,10 @@ msgstr "С"
 #: src/lib/experiments.ts
 msgid "Write the hypothesis: an experiment starts only with one."
 msgstr "Напишите гипотезу: без неё эксперимент не запустится."
+
+#: src/components/environment-protection.tsx
+msgid "Writes that would change what SDKs receive from {name} are refused until they come through an approved change request. SDKs ignore local overrides there."
+msgstr "Записи, меняющие то, что SDK получают из окружения {name}, будут отклоняться, пока не пройдут через одобренный запрос на изменение. SDK игнорируют там локальные переопределения."
 
 #: src/components/experiment-exposures.tsx
 msgid "X²"

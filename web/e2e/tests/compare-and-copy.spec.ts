@@ -31,11 +31,15 @@ async function seed(project: string) {
 
 const sheet = (page: Page) => page.getByRole("dialog", { name: "Compare environments" });
 
-async function compareStagingWithProduction(page: Page, project: string) {
+async function compareStagingWithProduction(
+  page: Page,
+  project: string,
+  production = "Production (protected)",
+) {
   await openFlag(page, project, flagKey, { environment: "staging" });
   await page.getByRole("button", { name: "Compare environments" }).click();
   await expect(sheet(page).getByRole("combobox", { name: "Compare" })).toHaveText("Staging");
-  await choose(page, "With", "Production");
+  await choose(page, "With", production);
 }
 
 test.describe("comparing environments", () => {
@@ -68,7 +72,7 @@ test.describe("comparing environments", () => {
     const project = await seedProject("copy");
     await unprotectProduction(project);
     const staging = await seed(project);
-    await compareStagingWithProduction(page, project);
+    await compareStagingWithProduction(page, project, "Production");
 
     await sheet(page).getByRole("button", { name: "Copy Staging here" }).click();
     const confirm = page.getByRole("dialog", { name: "Copy Staging into Production" });

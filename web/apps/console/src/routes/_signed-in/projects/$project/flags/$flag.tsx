@@ -21,6 +21,7 @@ import { ConfigurationEditor } from "@/components/configuration-editor";
 import { FlagDefinitionSheet } from "@/components/flag-definition-sheet";
 import { FlagEvaluations } from "@/components/flag-evaluations";
 import { FlagHistory } from "@/components/flag-history";
+import { EnvironmentName } from "@/components/protected-mark";
 import { KillSwitchDialog } from "@/components/kill-switch-dialog";
 import { OverridesSection } from "@/components/overrides-section";
 import { type Proposal, ProposeDialog } from "@/components/propose-dialog";
@@ -200,7 +201,7 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
       const known = environments.data?.find((env) => env.key === configuration.environment);
       return {
         value: configuration.environment,
-        label: known?.name ?? configuration.environment,
+        label: known ? <EnvironmentName environment={known} /> : configuration.environment,
         content: (
           <EnvironmentPanel
             project={project}

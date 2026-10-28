@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { formatDay } from "@/i18n/format";
+import { environmentLabel } from "@/lib/environments";
 import { awaitingAcknowledgement, isOverdue } from "@/lib/experiment-alerts";
 import {
   experimentStatuses,
@@ -328,7 +329,7 @@ function ExperimentsPages({
  * shares the one read.
  */
 function HoldingEnvironments({ project, experiment }: { project: string; experiment: Experiment }) {
-  const { t } = useLingui();
+  const { i18n, t } = useLingui();
   const flag = useQuery(flagQuery(project, experiment.flag));
   const environments = useQuery(environmentsQuery(project));
   if (flag.isError || environments.isError) {
@@ -342,7 +343,7 @@ function HoldingEnvironments({ project, experiment }: { project: string; experim
     return <span className="text-muted-foreground">{t`No rule serves it`}</span>;
   }
   const nameOf = new Map(
-    environments.data.map((environment) => [environment.key, environment.name]),
+    environments.data.map((environment) => [environment.key, environmentLabel(i18n, environment)]),
   );
   return (
     <ul aria-label={t`Holding environments`} className="flex flex-wrap gap-1">

@@ -18,6 +18,7 @@ import { Field } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { Select, SelectItem } from "@/components/ui/select";
 import { Sheet } from "@/components/ui/sheet";
+import { environmentLabel } from "@/lib/environments";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/cn";
 import { type ComparisonRow, comparisonRows, sameRuleset } from "@/lib/compare";
@@ -65,7 +66,7 @@ export function CompareEnvironments(props: CompareEnvironmentsProps) {
 }
 
 function Comparison({ project, flag, environments, initial }: CompareEnvironmentsProps) {
-  const { t } = useLingui();
+  const { i18n, t } = useLingui();
   const keys = flag.environments.map((configuration) => configuration.environment);
   const [left, setLeft] = useState(() => initial ?? keys[0] ?? "");
   const [right, setRight] = useState(() => keys.find((key) => key !== left) ?? left);
@@ -73,6 +74,10 @@ function Comparison({ project, flag, environments, initial }: CompareEnvironment
   const configurationOf = (key: string) =>
     flag.environments.find((configuration) => configuration.environment === key);
   const nameOf = (key: string) => environments.find((env) => env.key === key)?.name ?? key;
+  const labelOf = (key: string) => {
+    const environment = environments.find((env) => env.key === key);
+    return environment ? environmentLabel(i18n, environment) : key;
+  };
   const a = configurationOf(left);
   const b = configurationOf(right);
 
@@ -81,7 +86,7 @@ function Comparison({ project, flag, environments, initial }: CompareEnvironment
       <Select value={value} onValueChange={onChange}>
         {keys.map((key) => (
           <SelectItem key={key} value={key}>
-            {nameOf(key)}
+            {labelOf(key)}
           </SelectItem>
         ))}
       </Select>

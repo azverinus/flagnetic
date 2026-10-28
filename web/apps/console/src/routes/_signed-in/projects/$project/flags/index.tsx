@@ -40,6 +40,7 @@ import {
   resolveEnvironment,
   validateFlagsSearch,
 } from "@/lib/flags";
+import { environmentLabel } from "@/lib/environments";
 import { lastEnvironment, rememberLastEnvironment } from "@/lib/preferences";
 import { madeBy } from "@/lib/project-members";
 import { environmentsQuery, flagsQuery } from "@/lib/queries";
@@ -220,7 +221,7 @@ function FlagFilters({
         >
           {environments.map((environment) => (
             <SelectItem key={environment.key} value={environment.key}>
-              {environment.name}
+              {environmentLabel(i18n, environment)}
             </SelectItem>
           ))}
         </Select>
@@ -510,7 +511,7 @@ function FlagsTable({
       { id: "type", header: t`Type`, cell: ({ row }) => flagTypeName(i18n, row.original.type) },
       ...environments.map((env): TableColumn<FlagListItem> => ({
         id: `state-${env.key}`,
-        header: env.name,
+        header: environmentLabel(i18n, env),
         cell: ({ row }) => (
           <StateCell state={row.original.states.find((state) => state.environment === env.key)} />
         ),

@@ -16,6 +16,7 @@ import { z } from "zod";
 
 import { Can } from "@/components/can";
 import { NamedConflictBanner } from "@/components/conflict-banner";
+import { ProtectedMark } from "@/components/protected-mark";
 import { QueryError } from "@/components/query-error";
 import { DeleteRowDialog, RowAction, RowDialog, withRowActions } from "@/components/row-dialogs";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,11 @@ function Environments() {
         ),
       },
       { id: "name", header: t`Name`, cell: ({ row }) => row.original.name },
+      {
+        id: "protected",
+        header: t`Protection`,
+        cell: ({ row }) => (row.original.protected ? <ProtectedMark /> : null),
+      },
     ];
     return withRowActions(columns, canManage, (row) => {
       const { key } = row;

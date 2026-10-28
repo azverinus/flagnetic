@@ -7,6 +7,7 @@ import { useCallback, useMemo } from "react";
 import { AuditLog, type AuditLogProps } from "@/components/audit-log";
 import { ProjectAuditEntryLink, useEnvironmentPlace } from "@/components/project-audit";
 import { PageHeader } from "@/components/ui/page-header";
+import { environmentLabel } from "@/lib/environments";
 import { type AuditSearch, validateProjectAuditSearch } from "@/lib/audit";
 import { environmentsQuery, meQuery, membersQuery, projectMembersQuery } from "@/lib/queries";
 
@@ -18,7 +19,7 @@ export const Route = createFileRoute("/_signed-in/projects/$project/audit")({
 
 /** Every change made in the project, by whom and when. */
 function ProjectAudit() {
-  const { t } = useLingui();
+  const { i18n, t } = useLingui();
   const { project } = Route.useParams();
   const address = Route.useSearch();
   // A route's search also carries what its children read, such as an
@@ -58,10 +59,10 @@ function ProjectAudit() {
       filter: "environment",
       options: (environments.data ?? []).map((environment) => ({
         value: environment.id,
-        label: environment.name,
+        label: environmentLabel(i18n, environment),
       })),
     }),
-    [environmentPlace, environments.data],
+    [environmentPlace, environments.data, i18n],
   );
 
   return (
