@@ -177,6 +177,10 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       );
     case "unknown_event_type":
       return i18n._(msg`One of the event types is not in the catalogue.`);
+    case "export_too_large":
+      return i18n._(
+        msg`Too many entries match these filters to download at once. Narrow them, for example with From and To, and try again.`,
+      );
     case "invitation_gone":
       return i18n._(
         msg`This invitation link no longer works: it was used, replaced by a newer one, or it expired.`,

@@ -1767,6 +1767,7 @@ msgstr "Definition"
 msgid "Delete"
 msgstr "Delete"
 
+#: src/components/delete-project.tsx
 #: src/components/experiment-transitions.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
@@ -1801,6 +1802,10 @@ msgstr "Delete experiment"
 msgid "Delete flag"
 msgstr "Delete flag"
 
+#: src/components/delete-project.tsx
+msgid "Delete project"
+msgstr "Delete project"
+
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Delete segment"
 msgstr "Delete segment"
@@ -1812,6 +1817,10 @@ msgstr "delete segments"
 #: src/lib/access-names.ts
 msgid "delete the project"
 msgstr "delete the project"
+
+#: src/components/delete-project.tsx
+msgid "Delete this project"
+msgstr "Delete this project"
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Delete unit type"
@@ -1825,6 +1834,10 @@ msgstr "Delete webhook"
 #: src/components/experiment-transitions.tsx
 msgid "deleted"
 msgstr "deleted"
+
+#: src/components/delete-project.tsx
+msgid "Deleting removes the project with its flags, segments, experiments, environments and SDK keys at once, and its key becomes free. Its audit entries stay readable in the instance's audit log."
+msgstr "Deleting removes the project with its flags, segments, experiments, environments and SDK keys at once, and its key becomes free. Its audit entries stay readable in the instance's audit log."
 
 #: src/components/webhook-deliveries.tsx
 #: src/components/webhook-detail.tsx
@@ -1932,9 +1945,25 @@ msgstr "does not contain"
 msgid "does not equal"
 msgstr "does not equal"
 
+#: src/components/download-audit.tsx
+msgid "Download CSV"
+msgstr "Download CSV"
+
+#: src/components/download-audit.tsx
+msgid "Download JSON Lines"
+msgstr "Download JSON Lines"
+
 #: src/components/download-ruleset.tsx
 msgid "Download ruleset"
 msgstr "Download ruleset"
+
+#: src/components/download-audit.tsx
+msgid "Download the audit log"
+msgstr "Download the audit log"
+
+#: src/components/delete-project.tsx
+msgid "Download the audit log first if you want to keep it: it is kept on the instance, but only an instance admin can read it there."
+msgstr "Download the audit log first if you want to keep it: it is kept on the instance, but only an instance admin can read it there."
 
 #: src/lib/change-requests.ts
 #: src/lib/experiments.ts
@@ -2394,6 +2423,10 @@ msgstr "Everyone receives the off variation in {name}, whatever the rules and ov
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Everyone who can sign in to this instance. What they may do in a project comes from their grants there."
 msgstr "Everyone who can sign in to this instance. What they may do in a project comes from their grants there."
+
+#: src/components/delete-project.tsx
+msgid "Everything in the project is deleted at once, its SDK keys stop working, and this cannot be undone."
+msgstr "Everything in the project is deleted at once, its SDK keys stop working, and this cannot be undone."
 
 #: src/lib/webhooks.ts
 msgid "Exhausted"
@@ -5681,6 +5714,10 @@ msgstr "The passwords do not match."
 msgid "The platform disabled this webhook after its receiver kept failing, and dropped the deliveries that were waiting. Enable it once the receiver is back; a dropped delivery can then be redelivered from the log."
 msgstr "The platform disabled this webhook after its receiver kept failing, and dropped the deliveries that were waiting. Enable it once the receiver is back; a dropped delivery can then be redelivered from the log."
 
+#: src/components/delete-project.tsx
+msgid "The project {key} is deleted."
+msgstr "The project {key} is deleted."
+
 #: src/lib/problem-messages.ts
 msgid "The project declares no such unit type."
 msgstr "The project declares no such unit type."
@@ -6161,6 +6198,10 @@ msgstr "Token expiry required"
 #: src/lib/problem-messages.ts
 msgid "Too long."
 msgstr "Too long."
+
+#: src/lib/problem-messages.ts
+msgid "Too many entries match these filters to download at once. Narrow them, for example with From and To, and try again."
+msgstr "Too many entries match these filters to download at once. Narrow them, for example with From and To, and try again."
 
 #: src/lib/problem-messages.ts
 msgid "Too many failed attempts for this email. Try again in {retry}."

@@ -547,4 +547,21 @@ test.describe("the console in Russian", () => {
     await expect(page.getByRole("button", { name: "Отправить тест" })).toBeDisabled();
     await expectNoSeriousViolations(page, "a webhook's delivery log in Russian");
   });
+  test("reads the audit download and the project deletion in Russian", async ({ page }) => {
+    const doomed = await seedProject("tver");
+    await signIn(page, admin, russian);
+    await page.goto(`/projects/${doomed}/audit`);
+    const download = page.getByRole("group", { name: "Скачать журнал аудита" });
+    await expect(download.getByRole("button", { name: "Скачать JSON Lines" })).toBeVisible();
+    await expect(download.getByRole("button", { name: "Скачать CSV" })).toBeVisible();
+    await expectNoSeriousViolations(page, "the audit log with its download in Russian");
+
+    await page.goto(`/projects/${doomed}/settings`);
+    await expect(page.getByRole("heading", { name: "Удалить этот проект" })).toBeVisible();
+    await page.getByRole("button", { name: "Удалить проект" }).click();
+    const dialog = page.getByRole("dialog", { name: `Удалить ${doomed}` });
+    await expect(dialog.getByRole("button", { name: "Скачать CSV" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Удалить проект" })).toBeDisabled();
+    await expectNoSeriousViolations(page, "the project deletion dialog in Russian");
+  });
 });

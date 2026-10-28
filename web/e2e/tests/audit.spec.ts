@@ -4,6 +4,8 @@ import {
   deleteEnvironment,
   updateEnvironment,
 } from "@flagnetic/api";
+import { readFile } from "node:fs/promises";
+
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations } from "../support/axe";
@@ -291,4 +293,86 @@ test("the instance audit log is closed to a member who is not an instance admin"
 
   await expect(page.getByText("You cannot open this screen")).toBeVisible();
   await expect(page.getByRole("table")).toHaveCount(0);
+});
+
+/** The documented header row of the CSV audit download (`api/management.yaml`). */
+const csvHeader =
+  "id,occurred_at,project_id,environment_id,actor_kind,actor_id,actor_name,actor_member_id,request_id,change_request_id,kill_switch,action,entity_kind,entity_id,entity_key,before,after";
+
+async function saveDownload(page: Page, name: string) {
+  const downloading = page.waitForEvent("download");
+  await page.getByRole("button", { name }).click();
+  const download = await downloading;
+  return { download, text: await readFile((await download.path())!, "utf8") };
+}
+
+test("project audit log: downloads the entries the filters match, in the format chosen", async ({
+  page,
+}) => {
+  const project = await seedHistory();
+  await signIn(page);
+  await page.goto(`/projects/${project}/audit?action=environment.updated`);
+  await expect(entries(page)).toHaveCount(2);
+  await expectNoSeriousViolations(page, "the audit log with its download buttons");
+
+  // CSV: the documented header, then the filtered entries only.
+  const csv = await saveDownload(page, "Download CSV");
+  expect(csv.download.suggestedFilename()).toMatch(new RegExp(`^audit-${project}-.*\\.csv$`));
+  const rows = csv.text.trimEnd().split(/\r?\n/);
+  expect(rows[0]).toBe(csvHeader);
+  expect(rows).toHaveLength(2);
+  expect(rows[1]).toContain("environment.updated");
+
+  // JSON Lines: one entry per line, all of the filter and not only the page.
+  const jsonl = await saveDownload(page, "Download JSON Lines");
+  expect(jsonl.download.suggestedFilename()).toMatch(new RegExp(`^audit-${project}-.*\\.jsonl$`));
+  const lines = jsonl.text.trimEnd().split("\n");
+  expect(lines).toHaveLength(1);
+  expect(JSON.parse(lines[0]!)).toMatchObject({ action: "environment.updated" });
+
+  // Without the filter the download holds more than the page of 50 shows.
+  await page.goto(`/projects/${project}/audit`);
+  await expect(entries(page)).toHaveCount(51);
+  const all = await saveDownload(page, "Download JSON Lines");
+  expect(all.text.trimEnd().split("\n").length).toBeGreaterThan(50);
+});
+
+test("project audit log: explains a download the server refuses as too large", async ({ page }) => {
+  const project = await seedHistory();
+  await page.route(`**/api/v1/projects/${project}/audit/export*`, (route) =>
+    route.fulfill({
+      status: 422,
+      contentType: "application/problem+json",
+      body: JSON.stringify({
+        type: "about:blank",
+        title: "Unprocessable Entity",
+        status: 422,
+        code: "export_too_large",
+        request_id: "req-e2e-4",
+      }),
+    }),
+  );
+  await signIn(page);
+  await page.goto(`/projects/${project}/audit`);
+
+  await page.getByRole("button", { name: "Download CSV" }).click();
+
+  await expect(
+    page.locator("[data-sonner-toast]").filter({ hasText: "Too many entries match these filters" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Download CSV" })).toBeEnabled();
+});
+
+test("instance audit log: downloads the entries of one project", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/admin/audit");
+  await choose(page, "Project", seededProject.name);
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page).toHaveURL(/project=/);
+
+  const csv = await saveDownload(page, "Download CSV");
+  expect(csv.download.suggestedFilename()).toMatch(/^audit-instance-.*\.csv$/);
+  const rows = csv.text.trimEnd().split(/\r?\n/);
+  expect(rows[0]).toBe(csvHeader);
+  expect(rows.length).toBeGreaterThan(1);
 });

@@ -1767,6 +1767,7 @@ msgstr "Описание"
 msgid "Delete"
 msgstr "Удалить"
 
+#: src/components/delete-project.tsx
 #: src/components/experiment-transitions.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
@@ -1801,6 +1802,10 @@ msgstr "Удалить эксперимент"
 msgid "Delete flag"
 msgstr "Удалить флаг"
 
+#: src/components/delete-project.tsx
+msgid "Delete project"
+msgstr "Удалить проект"
+
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Delete segment"
 msgstr "Удалить сегмент"
@@ -1812,6 +1817,10 @@ msgstr "удалять сегменты"
 #: src/lib/access-names.ts
 msgid "delete the project"
 msgstr "удалять проект"
+
+#: src/components/delete-project.tsx
+msgid "Delete this project"
+msgstr "Удалить этот проект"
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Delete unit type"
@@ -1825,6 +1834,10 @@ msgstr "Удалить вебхук"
 #: src/components/experiment-transitions.tsx
 msgid "deleted"
 msgstr "удаляется"
+
+#: src/components/delete-project.tsx
+msgid "Deleting removes the project with its flags, segments, experiments, environments and SDK keys at once, and its key becomes free. Its audit entries stay readable in the instance's audit log."
+msgstr "Удаление разом убирает проект вместе с флагами, сегментами, экспериментами, окружениями и SDK-ключами, а его ключ освобождается. Записи его журнала аудита остаются доступны в журнале аудита экземпляра."
 
 #: src/components/webhook-deliveries.tsx
 #: src/components/webhook-detail.tsx
@@ -1932,9 +1945,25 @@ msgstr "не содержит"
 msgid "does not equal"
 msgstr "не равно"
 
+#: src/components/download-audit.tsx
+msgid "Download CSV"
+msgstr "Скачать CSV"
+
+#: src/components/download-audit.tsx
+msgid "Download JSON Lines"
+msgstr "Скачать JSON Lines"
+
 #: src/components/download-ruleset.tsx
 msgid "Download ruleset"
 msgstr "Скачать набор правил"
+
+#: src/components/download-audit.tsx
+msgid "Download the audit log"
+msgstr "Скачать журнал аудита"
+
+#: src/components/delete-project.tsx
+msgid "Download the audit log first if you want to keep it: it is kept on the instance, but only an instance admin can read it there."
+msgstr "Если журнал аудита нужен, сначала скачайте его: он остаётся на экземпляре, но читать его там сможет только администратор экземпляра."
 
 #: src/lib/change-requests.ts
 #: src/lib/experiments.ts
@@ -2394,6 +2423,10 @@ msgstr "Все в окружении {name} получат вариант при
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Everyone who can sign in to this instance. What they may do in a project comes from their grants there."
 msgstr "Все, кто может входить в этот экземпляр. Что участник может делать в проекте, определяют выданные ему там роли."
+
+#: src/components/delete-project.tsx
+msgid "Everything in the project is deleted at once, its SDK keys stop working, and this cannot be undone."
+msgstr "Всё в проекте удаляется разом, его SDK-ключи перестают работать, и отменить это нельзя."
 
 #: src/lib/webhooks.ts
 msgid "Exhausted"
@@ -5681,6 +5714,10 @@ msgstr "Пароли не совпадают."
 msgid "The platform disabled this webhook after its receiver kept failing, and dropped the deliveries that were waiting. Enable it once the receiver is back; a dropped delivery can then be redelivered from the log."
 msgstr "Платформа отключила этот вебхук, потому что его получатель продолжал отвечать ошибками, и отбросила ожидавшие доставки. Включите его, когда получатель снова заработает; после этого отброшенную доставку можно отправить снова из журнала."
 
+#: src/components/delete-project.tsx
+msgid "The project {key} is deleted."
+msgstr "Проект {key} удалён."
+
 #: src/lib/problem-messages.ts
 msgid "The project declares no such unit type."
 msgstr "В проекте нет такого типа единицы."
@@ -6161,6 +6198,10 @@ msgstr "Срок действия токена обязателен"
 #: src/lib/problem-messages.ts
 msgid "Too long."
 msgstr "Слишком длинно."
+
+#: src/lib/problem-messages.ts
+msgid "Too many entries match these filters to download at once. Narrow them, for example with From and To, and try again."
+msgstr "Под эти фильтры подходит слишком много записей, чтобы скачать их разом. Сузьте фильтры, например полями «С» и «По», и повторите."
 
 #: src/lib/problem-messages.ts
 msgid "Too many failed attempts for this email. Try again in {retry}."
