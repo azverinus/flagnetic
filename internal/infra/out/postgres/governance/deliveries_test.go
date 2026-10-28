@@ -130,4 +130,13 @@ func TestADeliveryStoreThatCannotReachPostgreSQLFails(t *testing.T) {
 	if err := s.CountAttempt(ctx, d.Webhook, true, now); err == nil {
 		t.Error("count succeeded")
 	}
+	if _, err := s.TryLockWebhookRetention(ctx); err == nil {
+		t.Error("retention lock succeeded")
+	}
+	if _, err := s.PruneDeliveries(ctx, now, 1); err == nil {
+		t.Error("prune succeeded")
+	}
+	if _, err := s.ForgetExpiredSecrets(ctx, now); err == nil {
+		t.Error("forgetting expired secrets succeeded")
+	}
 }

@@ -413,9 +413,7 @@ func TestARevokedKeysStreamIsClosedOnItsNextHeartbeat(t *testing.T) {
 func TestAVersionMissedWhileTheListenerWasDeafIsStreamedOnceItListensAgain(t *testing.T) {
 	fault := &pglisten.Fault{}
 	a := testkit.StartServer(t)
-	b := testkit.StartServer(t, testkit.WithListenerOptions(pglisten.Options{
-		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: fault,
-	}))
+	b := testkit.StartServer(t, testkit.WithListenerOptions(testkit.SilenceableListener(fault)))
 	p := newProject(t, a)
 	p.flag(t, "checkout.new-flow")
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
@@ -436,9 +434,7 @@ func TestAVersionMissedWhileTheListenerWasDeafIsCaughtUpByAHeartbeatWhenItsReloa
 	deaf := &pglisten.Fault{}
 	load := &pgdelivery.RulesetLoadFault{}
 	a := testkit.StartServer(t)
-	b := testkit.StartServer(t, testkit.WithClock(c), testkit.WithRulesetLoadFault(load), testkit.WithListenerOptions(pglisten.Options{
-		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: deaf,
-	}))
+	b := testkit.StartServer(t, testkit.WithClock(c), testkit.WithRulesetLoadFault(load), testkit.WithListenerOptions(testkit.SilenceableListener(deaf)))
 	p := newProject(t, a)
 	p.flag(t, "checkout.new-flow")
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)

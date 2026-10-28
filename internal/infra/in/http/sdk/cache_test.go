@@ -150,12 +150,10 @@ func TestAReplicaWhoseListenerIsDownMaterializesEveryRequest(t *testing.T) {
 	fault := &pglisten.Fault{}
 	// Once found deaf, the silenced listener stays down until the fault is
 	// restored, so it is still down while the requests below are answered.
-	// The backoff stays short: a ping late on a loaded machine may find the
-	// listener deaf before the test silences it, and it must come back up in
-	// time for the test to see it listening.
-	srv := testkit.StartServer(t, testkit.WithListenerOptions(pglisten.Options{
-		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: fault,
-	}))
+	// The backoff stays short: a pong late on a loaded machine may still
+	// find the listener deaf before the test silences it, and it must come
+	// back up in time for the test to see it listening.
+	srv := testkit.StartServer(t, testkit.WithListenerOptions(testkit.SilenceableListener(fault)))
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	deafen(t, srv, fault)
@@ -169,9 +167,7 @@ func TestAReplicaWhoseListenerIsDownMaterializesEveryRequest(t *testing.T) {
 
 func TestWhileTheListenerIsDownARequestDoesNotJoinALoadStartedBeforeIt(t *testing.T) {
 	listen, stall := &pglisten.Fault{}, &pgdelivery.RulesetLoadFault{}
-	srv := testkit.StartServer(t, testkit.WithRulesetLoadFault(stall), testkit.WithListenerOptions(pglisten.Options{
-		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: listen,
-	}))
+	srv := testkit.StartServer(t, testkit.WithRulesetLoadFault(stall), testkit.WithListenerOptions(testkit.SilenceableListener(listen)))
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	deafen(t, srv, listen)
@@ -296,9 +292,7 @@ func TestDeletingAnEnvironmentDropsItsPropagationSeries(t *testing.T) {
 func TestAnEnvironmentDeletedWhileAReplicaWasNotListeningLosesItsPropagationSeriesThere(t *testing.T) {
 	fault := &pglisten.Fault{}
 	a := testkit.StartServer(t)
-	b := testkit.StartServer(t, testkit.WithListenerOptions(pglisten.Options{
-		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: fault,
-	}))
+	b := testkit.StartServer(t, testkit.WithListenerOptions(testkit.SilenceableListener(fault)))
 	listening(t, b)
 	p := newProject(t, a)
 	if res := do(p.admin.CreateEnvironmentWithResponse(t.Context(), p.key, management.EnvironmentCreate{Key: "qa", Name: "QA"})); res.JSON201 == nil {
