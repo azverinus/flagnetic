@@ -190,6 +190,20 @@ function ChangeRequestFilters({
           ))}
         </Select>
       </Field>
+      <Field label={<Trans>Schedule</Trans>} className="w-48">
+        <Select
+          value={
+            search.scheduled === undefined ? any : search.scheduled ? "scheduled" : "unscheduled"
+          }
+          onValueChange={(value) =>
+            onFilter({ scheduled: value === any ? undefined : value === "scheduled" })
+          }
+        >
+          <SelectItem value={any}>{t`Any schedule`}</SelectItem>
+          <SelectItem value="scheduled">{t`Scheduled`}</SelectItem>
+          <SelectItem value="unscheduled">{t`Not scheduled`}</SelectItem>
+        </Select>
+      </Field>
       {search.tab === "mine" ? null : (
         <Field label={<Trans>Author</Trans>} className="w-56">
           <Select
@@ -377,6 +391,24 @@ function ChangeRequestsTable({
         id: "state",
         header: t`State`,
         cell: ({ row }) => <ChangeRequestStateBadge state={row.original.state} />,
+      },
+      {
+        id: "apply_at",
+        header: t`Applies at`,
+        cell: ({ row }) => {
+          const { apply_at, schedule_failure } = row.original;
+          if (apply_at === null || row.original.applied_at !== null) return null;
+          return (
+            <span className="flex flex-col whitespace-nowrap">
+              <time dateTime={apply_at}>{formatDateTime(i18n, apply_at)}</time>
+              {schedule_failure !== null ? (
+                <span className="text-xs text-destructive">
+                  {schedule_failure.stopped ? t`Failed, stopped` : t`Failed`}
+                </span>
+              ) : null}
+            </span>
+          );
+        },
       },
       {
         id: "flag",

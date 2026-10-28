@@ -10,6 +10,7 @@ import { ChangeRequestActions } from "@/components/change-request-actions";
 import { ChangeRequestDiff } from "@/components/change-request-diff";
 import { ChangeRequestStateBadge } from "@/components/change-request-state-badge";
 import { QueryError } from "@/components/query-error";
+import { ScheduleFailureNotice } from "@/components/schedule-failure-notice";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -196,6 +197,17 @@ function ChangeRequestPage({
             </Link>
           </Fact>
         ) : null}
+        {changeRequest.experiment ? (
+          <Fact term={<Trans>Experiment</Trans>}>
+            <Link
+              to="/projects/$project/experiments/$experiment"
+              params={{ project, experiment: changeRequest.experiment }}
+              className="font-mono text-xs hover:underline"
+            >
+              {changeRequest.experiment}
+            </Link>
+          </Fact>
+        ) : null}
         {changeRequest.environment ? (
           <Fact term={<Trans>Environment</Trans>}>
             <Link
@@ -216,6 +228,17 @@ function ChangeRequestPage({
         <Fact term={<Trans>Created</Trans>}>
           <Moment at={changeRequest.created_at} />
         </Fact>
+        {changeRequest.apply_at !== null && applied_at === null ? (
+          <Fact term={<Trans>Applies at</Trans>}>
+            <Moment at={changeRequest.apply_at} />
+            {state === "open" || state === "draft" ? (
+              <>
+                {" · "}
+                <Trans>once approved</Trans>
+              </>
+            ) : null}
+          </Fact>
+        ) : null}
         {applied_at !== null ? (
           <Fact term={<Trans>Applied</Trans>}>
             <Moment at={applied_at} />
@@ -237,6 +260,10 @@ function ChangeRequestPage({
         ) : null}
       </dl>
 
+      {changeRequest.schedule_failure !== null ? (
+        <ScheduleFailureNotice failure={changeRequest.schedule_failure} state={state} />
+      ) : null}
+
       {approval || rejection ? (
         <section aria-labelledby="decisions" className="flex flex-col gap-2">
           <h2 id="decisions" className="text-base font-semibold">
@@ -251,7 +278,13 @@ function ChangeRequestPage({
         <h2 id="changes" className="text-base font-semibold">
           <Trans>Changes</Trans>
         </h2>
-        {subject.isError ? (
+        {changeRequest.kind === "experiment" ? (
+          <ChangeRequestDiff
+            changeRequest={changeRequest}
+            current={undefined}
+            environmentName={environmentName}
+          />
+        ) : subject.isError ? (
           <QueryError error={subject.error} onRetry={() => void subject.refetch()} />
         ) : subject.isPending && subject.fetchStatus !== "idle" ? (
           <Skeleton className="h-16 w-full" />

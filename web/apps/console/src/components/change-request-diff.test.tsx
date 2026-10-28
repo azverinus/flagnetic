@@ -212,3 +212,70 @@ describe("a definition change request's diff", () => {
     expect(changes("Changes to the segment")).toEqual(["Made private.", "Removed — Condition 1"]);
   });
 });
+
+describe("an experiment change request's diff", () => {
+  const experiment = (proposed: object, diff: ChangeRequest["diff"]) =>
+    ({ kind: "experiment", state: "open", base_version: 2, proposed, diff }) as ChangeRequest;
+  const names: Record<string, string> = { production: "Production" };
+
+  it("says a start and a growth by the transition", () => {
+    const { unmount } = renderWithProviders(
+      <ChangeRequestDiff
+        changeRequest={experiment({ action: "start" }, [
+          { op: "replace", path: "/status", value: "running" },
+        ])}
+        current={undefined}
+      />,
+    );
+    expect(screen.getByText(/Starts the experiment/)).toBeInTheDocument();
+    unmount();
+    renderWithProviders(
+      <ChangeRequestDiff
+        changeRequest={experiment({ action: "set_traffic_allocation", traffic_allocation: 5000 }, [
+          { op: "replace", path: "/traffic_allocation", value: 5000 },
+        ])}
+        current={undefined}
+      />,
+    );
+    expect(screen.getByText("Grows the traffic allocation to 50.00 %.")).toBeInTheDocument();
+  });
+
+  it("lists each rule a stop rewrites to the winner, with the environment's name", () => {
+    renderWithProviders(
+      <ChangeRequestDiff
+        changeRequest={experiment(
+          {
+            action: "stop",
+            decision: { outcome: "winner", winner_variation: "long", note: "Clear lift." },
+          },
+          [
+            { op: "replace", path: "/status", value: "stopped" },
+            { op: "replace", path: "/rules/production/0/serve/kind", value: "variation" },
+            { op: "add", path: "/rules/production/0/serve/variation", value: "long" },
+          ],
+        )}
+        current={undefined}
+        environmentName={(key) => names[key] ?? key}
+      />,
+    );
+    expect(screen.getByText("Clear lift.")).toBeInTheDocument();
+    expect(changes("Rules rewritten")).toEqual([
+      "Production, rule 1: serves long, its conditions kept",
+    ]);
+  });
+
+  it("lists each rule a removal deletes", () => {
+    renderWithProviders(
+      <ChangeRequestDiff
+        changeRequest={experiment({ action: "stop", decision: { outcome: "removed" } }, [
+          { op: "remove", path: "/rules/staging/0" },
+        ])}
+        current={undefined}
+      />,
+    );
+    expect(
+      screen.getByText("Stops the experiment and removes the rules serving it."),
+    ).toBeInTheDocument();
+    expect(changes("Rules rewritten")).toEqual(["staging, rule 1: deleted"]);
+  });
+});

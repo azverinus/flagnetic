@@ -91,6 +91,14 @@ msgstr "{environment}, rule {position}"
 msgid "{environment}, rule {position} “{description}”"
 msgstr "{environment}, rule {position} “{description}”"
 
+#: src/components/change-request-diff.tsx
+msgid "{environment}, rule {position}: deleted"
+msgstr "{environment}, rule {position}: deleted"
+
+#: src/components/change-request-diff.tsx
+msgid "{environment}, rule {position}: serves <0>{variation}</0>, its conditions kept"
+msgstr "{environment}, rule {position}: serves <0>{variation}</0>, its conditions kept"
+
 #: src/components/experiment-exposures.tsx
 msgid "{exposures, plural, one {# exposure, {overridden} overridden} other {# exposures, {overridden} overridden}}"
 msgstr "{exposures, plural, one {# exposure, {overridden} overridden} other {# exposures, {overridden} overridden}}"
@@ -683,6 +691,10 @@ msgstr "Allowed origins"
 msgid "An attribute's type is fixed once it is declared."
 msgstr "An attribute's type is fixed once it is declared."
 
+#: src/components/experiment-transitions.tsx
+msgid "An environment holding {key} is protected, so it cannot be changed directly. Propose the same change for review instead."
+msgstr "An environment holding {key} is protected, so it cannot be changed directly. Propose the same change for review instead."
+
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "An environment is protected, so the conditions and whether the segment is private are proposed for review; they apply to every environment once approved. Its name and description, when edited, are saved at once."
 msgstr "An environment is protected, so the conditions and whether the segment is private are proposed for review; they apply to every environment once approved. Its name and description, when edited, are saved at once."
@@ -771,6 +783,10 @@ msgid "Any owner"
 msgstr "Any owner"
 
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Any schedule"
+msgstr "Any schedule"
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any state"
 msgstr "Any state"
@@ -815,6 +831,11 @@ msgstr "Appearance"
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 msgid "Applied"
 msgstr "Applied"
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Applies at"
+msgstr "Applies at"
 
 #: src/components/flag-definition-sheet.tsx
 msgid "Applies to the flag in every environment."
@@ -929,6 +950,10 @@ msgstr "At most {maxAllowedOrigins} origins."
 #: src/lib/experiment-transitions.ts
 msgid "At most {maxNoteLength} characters."
 msgstr "At most {maxNoteLength} characters."
+
+#: src/components/schedule-failure-notice.tsx
+msgid "Attempts failed in a row"
+msgstr "Attempts failed in a row"
 
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
@@ -1383,6 +1408,10 @@ msgstr "Close"
 #: src/components/tester-panel.tsx
 msgid "Close the tester"
 msgstr "Close the tester"
+
+#: src/components/schedule-failure-notice.tsx
+msgid "Code"
+msgstr "Code"
 
 #: src/components/app-shell.tsx
 msgid "Collapse the sidebar"
@@ -2225,6 +2254,7 @@ msgstr "Expected to end on {day}. Stop it with a decision, or move its expected 
 
 #: src/components/rule-editor.tsx
 #: src/lib/change-requests.ts
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Experiment"
 msgstr "Experiment"
@@ -2290,6 +2320,14 @@ msgstr "Exposure conflicts"
 #: src/lib/event-volume.ts
 msgid "Exposures"
 msgstr "Exposures"
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Failed"
+msgstr "Failed"
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Failed, stopped"
+msgstr "Failed, stopped"
 
 #: src/components/tester-panel.tsx
 msgid "Fallthrough"
@@ -2525,6 +2563,10 @@ msgstr "Grow the traffic allocation of {key}"
 msgid "Grow traffic allocation"
 msgstr "Grow traffic allocation"
 
+#: src/components/change-request-diff.tsx
+msgid "Grows the traffic allocation to {allocation} %."
+msgstr "Grows the traffic allocation to {allocation} %."
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Has a rollout"
 msgstr "Has a rollout"
@@ -2747,6 +2789,10 @@ msgstr "It is still in use by {references}."
 msgid "It is still in use."
 msgstr "It is still in use."
 
+#: src/components/schedule-failure-notice.tsx
+msgid "It was superseded afterwards, so it is not applied. Copy it to propose it again."
+msgstr "It was superseded afterwards, so it is not applied. Copy it to propose it again."
+
 #: src/components/segment-fields.tsx
 msgid "Its conditions never leave the server: only server-side evaluation uses it, and a client SDK key never receives it."
 msgstr "Its conditions never leave the server: only server-side evaluation uses it, and a client SDK key never receives it."
@@ -2830,6 +2876,10 @@ msgstr "Kind"
 #: src/components/profile-form.tsx
 msgid "Language"
 msgstr "Language"
+
+#: src/components/schedule-failure-notice.tsx
+msgid "Last attempt"
+msgstr "Last attempt"
 
 #: src/components/experiment-exposures.tsx
 msgid "Last checked <0/>, while the experiment ran; the stop took no check here, as the environment no longer held its rule."
@@ -3357,6 +3407,7 @@ msgstr "No rule serves it"
 msgid "No rule serves it yet: it starts, but no SDK receives it until a rule of its flag serves it in an environment."
 msgstr "No rule serves it yet: it starts, but no SDK receives it until a rule of its flag serves it in an environment."
 
+#: src/components/change-request-diff.tsx
 #: src/components/experiment-transitions.tsx
 msgid "No rule serves it: no configuration or ruleset changes."
 msgstr "No rule serves it: no configuration or ruleset changes."
@@ -3465,6 +3516,10 @@ msgstr "Not private"
 msgid "Not recorded"
 msgstr "Not recorded"
 
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Not scheduled"
+msgstr "Not scheduled"
+
 #: src/components/experiment-transitions.tsx
 #: src/components/overrides-section.tsx
 msgid "Note"
@@ -3551,6 +3606,10 @@ msgstr "On"
 #: src/components/compare-environments.tsx
 msgid "On or off"
 msgstr "On or off"
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "once approved"
+msgstr "once approved"
 
 #: src/components/discovered-attributes.tsx
 msgid "One of the types SDKs sent it with."
@@ -3970,6 +4029,7 @@ msgstr "Reapplied after a conflict: saves as a new rule"
 
 #: src/components/flag-evaluations.tsx
 #: src/components/kill-switch-dialog.tsx
+#: src/components/schedule-failure-notice.tsx
 msgid "Reason"
 msgstr "Reason"
 
@@ -4337,6 +4397,7 @@ msgstr "Rules"
 msgid "Rules of these flags use the segment and evaluate by what it holds once saved:"
 msgstr "Rules of these flags use the segment and evaluate by what it holds once saved:"
 
+#: src/components/change-request-diff.tsx
 #: src/components/experiment-transitions.tsx
 msgid "Rules rewritten"
 msgstr "Rules rewritten"
@@ -4405,6 +4466,14 @@ msgstr "Save with usages?"
 #: src/components/change-request-actions.tsx
 msgid "Say why, so the author knows what to change."
 msgstr "Say why, so the author knows what to change."
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Schedule"
+msgstr "Schedule"
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Scheduled"
+msgstr "Scheduled"
 
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
@@ -4724,6 +4793,10 @@ msgstr "Started"
 msgid "Starting puts it into the ruleset of each of these environments at once, and its flag, unit type and weights stay as they are while it runs:"
 msgstr "Starting puts it into the ruleset of each of these environments at once, and its flag, unit type and weights stay as they are while it runs:"
 
+#: src/components/change-request-diff.tsx
+msgid "Starts the experiment: it is put into the ruleset of each environment holding it."
+msgstr "Starts the experiment: it is put into the ruleset of each environment holding it."
+
 #: src/lib/conditions.ts
 msgid "starts with"
 msgstr "starts with"
@@ -4761,6 +4834,14 @@ msgstr "Stop experiment"
 #: src/lib/experiments.ts
 msgid "Stopped"
 msgstr "Stopped"
+
+#: src/components/change-request-diff.tsx
+msgid "Stops the experiment and removes the rules serving it."
+msgstr "Stops the experiment and removes the rules serving it."
+
+#: src/components/change-request-diff.tsx
+msgid "Stops the experiment and ships the winner <0>{winner}</0>."
+msgstr "Stops the experiment and ships the winner <0>{winner}</0>."
 
 #. An attribute type.
 #: src/lib/attribute-types.ts
@@ -5376,6 +5457,18 @@ msgstr "The rollout has a new salt."
 #: src/components/experiment-transitions.tsx
 msgid "The ruleset of each of these environments changes at once:"
 msgstr "The ruleset of each of these environments changes at once:"
+
+#: src/components/schedule-failure-notice.tsx
+msgid "The scheduled application failed"
+msgstr "The scheduled application failed"
+
+#: src/components/schedule-failure-notice.tsx
+msgid "The scheduler stopped after {attempts} failed attempts and will not try again. Cancel this change request and copy it to propose it again."
+msgstr "The scheduler stopped after {attempts} failed attempts and will not try again. Cancel this change request and copy it to propose it again."
+
+#: src/components/schedule-failure-notice.tsx
+msgid "The scheduler tries again at its next round and stops after repeated failures. To propose it again, cancel this change request and copy it."
+msgstr "The scheduler tries again at its next round and stops after repeated failures. To propose it again, cancel this change request and copy it."
 
 #: src/components/sdk-inventory.tsx
 msgid "The SDKs that have asked this environment for its ruleset or for values, most recently seen first. A row appears within a minute of an SDK’s request; whether an SDK is connected right now is not shown."

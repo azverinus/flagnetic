@@ -13,6 +13,7 @@ import {
   submitSignIn,
 } from "../support/console";
 import { choose, seedFlag, stringFlag, writeConfiguration } from "../support/flags";
+import { runningExperimentInProduction } from "../support/experiments";
 import { sdkRequest, seedSdkKey } from "../support/sdk";
 
 /**
@@ -306,5 +307,52 @@ test.describe("the console in Russian", () => {
     await expectNoSeriousViolations(page, "the propose dialog in Russian");
     await dialog.getByRole("button", { name: "Предложить", exact: true }).click();
     await expect(dialog.getByText("Введите заголовок.")).toBeVisible();
+  });
+  test("proposes an experiment's stop and reads its change request in Russian", async ({
+    page,
+  }) => {
+    const stopping = await seedProject("tula-stop");
+    must(
+      `granting maintainer in ${stopping}`,
+      await createGrant({
+        client: managementClient(),
+        path: { project: stopping },
+        body: { member: anna.id, role: "maintainer" },
+      }),
+    );
+    await runningExperimentInProduction(stopping);
+
+    await signIn(page, anna, russian);
+    await page.goto(`/projects/${stopping}/experiments/cta_copy`);
+    await page.getByRole("button", { name: "Остановить", exact: true }).click();
+    const stop = page.getByRole("dialog", { name: "Остановить cta_copy" });
+    await stop.getByLabel(/Убрать: его правила удаляются/).check();
+    await stop.getByRole("button", { name: "Остановить эксперимент" }).click();
+    const dialog = page.getByRole("dialog", { name: "Предложить изменение" });
+    await expect(dialog.getByText(/защищено, поэтому изменить его напрямую нельзя/)).toBeVisible();
+    await expectNoSeriousViolations(page, "the propose dialog of an experiment in Russian");
+    await dialog.getByLabel("Заголовок").fill("Остановить эксперимент");
+    await dialog.getByRole("button", { name: "Предложить", exact: true }).click();
+
+    await expect(page).toHaveURL(/\/change-requests\/[0-9a-f-]{36}$/);
+    await expect(
+      page
+        .locator("[data-sonner-toast]")
+        .filter({ hasText: "Запрос на изменение открыт на проверку." }),
+    ).toHaveCSS("opacity", "1");
+    await expect(
+      page.getByText("Останавливает эксперимент и удаляет правила, которые его отдают."),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("list", { name: "Переписываемые правила" }).getByRole("listitem"),
+    ).toHaveText(["Production, правило 1: удаляется"]);
+    await expectNoSeriousViolations(page, "an experiment change request in Russian");
+
+    await page.goto(`/projects/${stopping}/change-requests`);
+    await expect(page.getByRole("combobox", { name: "Расписание", exact: true })).toBeVisible();
+    await expectNoSeriousViolations(
+      page,
+      "the change requests with the schedule filter in Russian",
+    );
   });
 });
