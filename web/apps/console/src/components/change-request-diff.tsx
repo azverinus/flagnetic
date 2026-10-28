@@ -4,6 +4,7 @@ import type {
   FlagConfiguration,
   PatchOperation,
   ProposedConfiguration,
+  ProposedExperimentTransition,
   ProposedFlagDefinition,
   ProposedSegmentDefinition,
   Segment,
@@ -12,7 +13,14 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type { ReactNode } from "react";
 
 import { ConfigurationDiff, DefinitionDiff, SegmentDiff } from "@/components/structural-diff-view";
-import { diffBasis, type PatchChange, patchChanges } from "@/lib/change-requests";
+import {
+  diffBasis,
+  type PatchChange,
+  patchChanges,
+  type RuleRewrite,
+  ruleRewrites,
+} from "@/lib/change-requests";
+import { percentText } from "@/lib/experiments";
 import { diffConfigurations, diffDefinitions, diffSegments } from "@/lib/structural-diff";
 
 /** What a change request proposes for: a configuration, a flag's definition or a segment's. */
@@ -33,6 +41,7 @@ function subjectOf(changeRequest: ChangeRequest): Subject {
 export function ChangeRequestDiff({
   changeRequest,
   current,
+  environmentName = asIs,
 }: {
   changeRequest: ChangeRequest;
   /**
@@ -40,6 +49,8 @@ export function ChangeRequestDiff({
    * configuration, the flag of a flag's definition, or the segment.
    */
   current: FlagConfiguration | Flag | Segment | undefined;
+  /** Names an environment by its key, as the project names it; the key itself by default. */
+  environmentName?: (key: string) => string;
 }) {
   const revertTo = changeRequest.revert_to;
   return (
@@ -49,7 +60,11 @@ export function ChangeRequestDiff({
           <Trans>Reverts the configuration to version {revertTo}.</Trans>
         </p>
       ) : null}
-      <Changes changeRequest={changeRequest} current={current} />
+      {changeRequest.kind === "experiment" ? (
+        <ExperimentTransitionDiff changeRequest={changeRequest} environmentName={environmentName} />
+      ) : (
+        <Changes changeRequest={changeRequest} current={current} />
+      )}
     </div>
   );
 }
@@ -90,6 +105,79 @@ function Changes({
       return <SegmentDiff changes={diffSegments(segment, { ...segment, ...proposed })} />;
     }
   }
+}
+
+/**
+ * What an experiment transition does: the transition itself, then each
+ * rule serving the experiment that a stop rewrites to serve the winner or
+ * deletes, by environment. The patch holds those rules by environment, so
+ * it is read whether or not what the change request was based on moved.
+ */
+function ExperimentTransitionDiff({
+  changeRequest,
+  environmentName,
+}: {
+  changeRequest: ChangeRequest;
+  environmentName: (key: string) => string;
+}) {
+  const { i18n, t } = useLingui();
+  const proposed = changeRequest.proposed as ProposedExperimentTransition;
+  const rewrites = ruleRewrites(changeRequest.diff);
+  const allocation = percentText(i18n, proposed.traffic_allocation ?? 0);
+  const winner = proposed.decision?.winner_variation;
+  const note = proposed.decision?.note;
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      <p>
+        {proposed.action === "start" ? (
+          <Trans>
+            Starts the experiment: it is put into the ruleset of each environment holding it.
+          </Trans>
+        ) : proposed.action === "set_traffic_allocation" ? (
+          <Trans>Grows the traffic allocation to {allocation} %.</Trans>
+        ) : winner ? (
+          <Trans>
+            Stops the experiment and ships the winner <Value>{winner}</Value>.
+          </Trans>
+        ) : (
+          <Trans>Stops the experiment and removes the rules serving it.</Trans>
+        )}
+      </p>
+      {note ? <p className="whitespace-pre-wrap text-muted-foreground">{note}</p> : null}
+      {proposed.action === "stop" ? (
+        rewrites.length === 0 ? (
+          <p className="text-muted-foreground">
+            <Trans>No rule serves it: no configuration or ruleset changes.</Trans>
+          </p>
+        ) : (
+          <ul aria-label={t`Rules rewritten`} className="flex list-disc flex-col gap-1.5 pl-5">
+            {rewrites.map((rewrite) => (
+              <li key={`${rewrite.environment}/${rewrite.position}`}>
+                <RuleRewriteItem
+                  rewrite={rewrite}
+                  environment={environmentName(rewrite.environment)}
+                />
+              </li>
+            ))}
+          </ul>
+        )
+      ) : null}
+    </div>
+  );
+}
+
+function RuleRewriteItem({ rewrite, environment }: { rewrite: RuleRewrite; environment: string }) {
+  const { position, variation } = rewrite;
+  return variation === undefined ? (
+    <Trans>
+      {environment}, experiment rule {position}: deleted
+    </Trans>
+  ) : (
+    <Trans>
+      {environment}, experiment rule {position}: serves <Value>{variation}</Value>, its conditions
+      kept
+    </Trans>
+  );
 }
 
 function Value({ children }: { children: ReactNode }) {

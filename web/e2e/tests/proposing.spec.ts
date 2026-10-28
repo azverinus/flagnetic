@@ -1,10 +1,11 @@
-import { createGrant, getEnvironment, setEnvironmentProtection } from "@flagnetic/api";
+import { createGrant } from "@flagnetic/api";
 import { type Browser, expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations } from "../support/axe";
 import {
   managementClient,
   must,
+  protectProduction,
   seedMember,
   seedProject,
   signIn,
@@ -41,22 +42,6 @@ async function memberWith(
   const page = await (await browser.newContext()).newPage();
   await signIn(page, who);
   return page;
-}
-
-/** Protects a project's production again, after a spec wrote it directly. */
-async function protectProduction(project: string): Promise<void> {
-  const client = managementClient();
-  const path = { project, environment: "production" };
-  const current = must(`reading production of ${project}`, await getEnvironment({ client, path }));
-  must(
-    `protecting production of ${project}`,
-    await setEnvironmentProtection({
-      client,
-      path,
-      headers: { "If-Match": `"${current.version}"` },
-      body: { protected: true },
-    }),
-  );
 }
 
 /** Fills and sends the propose dialog, and waits for the change request it opens. */

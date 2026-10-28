@@ -8,6 +8,7 @@ import {
   diffBasis,
   listChangeRequestsQueryOf,
   patchChanges,
+  ruleRewrites,
   validateChangeRequestsSearch,
   waitingByEnvironment,
 } from "./change-requests";
@@ -191,6 +192,15 @@ describe("the change requests list's search", () => {
     ).toEqual({});
   });
 
+  it("keeps the scheduled filter as a boolean, from the address or from text", () => {
+    expect(validateChangeRequestsSearch({ scheduled: true })).toEqual({ scheduled: true });
+    expect(validateChangeRequestsSearch({ scheduled: "true" })).toEqual({ scheduled: true });
+    expect(validateChangeRequestsSearch({ scheduled: false })).toEqual({ scheduled: false });
+    expect(validateChangeRequestsSearch({ scheduled: "false" })).toEqual({ scheduled: false });
+    expect(validateChangeRequestsSearch({ scheduled: "soon" })).toEqual({});
+    expect(listChangeRequestsQueryOf({ scheduled: true }, me)).toEqual({ scheduled: true });
+  });
+
   it("asks for the caller's decisions, the caller's own or all", () => {
     expect(listChangeRequestsQueryOf({ tab: "awaiting", state: "open" }, me)).toEqual({
       state: "open",
@@ -286,6 +296,56 @@ describe("a definition's patch in words", () => {
       { op: "replace", target: { kind: "private" }, value: true },
       { op: "remove", target: { kind: "condition", position: 1, field: "" }, value: undefined },
     ]);
+  });
+});
+
+describe("the rules an experiment's patch rewrites", () => {
+  it("lists each rule that serves the winner from then on", () => {
+    expect(
+      ruleRewrites([
+        { op: "remove", path: "/rules/production/0/serve/experiment" },
+        { op: "replace", path: "/rules/production/0/serve/kind", value: "variation" },
+        { op: "add", path: "/rules/production/0/serve/variation", value: "long" },
+        { op: "add", path: "/rules/staging/1/serve/variation", value: "long" },
+        { op: "replace", path: "/status", value: "stopped" },
+      ]),
+    ).toEqual([
+      { environment: "production", position: 1, variation: "long" },
+      { environment: "staging", position: 2, variation: "long" },
+    ]);
+  });
+
+  it("lists each rule a removal deletes, and nothing for a start or a growth", () => {
+    expect(
+      ruleRewrites([
+        { op: "remove", path: "/rules/production/0" },
+        { op: "remove", path: "/rules/stag~1ing/0" },
+        { op: "add", path: "/decision", value: { outcome: "removed" } },
+      ]),
+    ).toEqual([
+      { environment: "production", position: 1 },
+      { environment: "stag/ing", position: 1 },
+    ]);
+    expect(ruleRewrites([{ op: "replace", path: "/status", value: "running" }])).toEqual([]);
+  });
+
+  it("names each removed rule by where it stood before the earlier removals", () => {
+    expect(
+      ruleRewrites([
+        { op: "remove", path: "/rules/production/0" },
+        { op: "remove", path: "/rules/production/0" },
+        { op: "add", path: "/rules/staging/1/serve/variation", value: "long" },
+        { op: "remove", path: "/rules/staging/0" },
+        { op: "add", path: "/rules/staging/0/serve/variation", value: "long" },
+      ]),
+    ).toEqual([
+      { environment: "production", position: 1 },
+      { environment: "production", position: 2 },
+      { environment: "staging", position: 2, variation: "long" },
+      { environment: "staging", position: 1 },
+      { environment: "staging", position: 2, variation: "long" },
+    ]);
+    expect(ruleRewrites([{ op: "replace", path: "/traffic_allocation", value: 5000 }])).toEqual([]);
   });
 });
 

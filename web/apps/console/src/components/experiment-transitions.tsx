@@ -20,6 +20,7 @@ import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/can";
+import { type Proposal, ProposeDialog } from "@/components/propose-dialog";
 import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -65,6 +66,32 @@ type ExperimentWrite =
   | { action: "note"; note: string }
   | { action: "archive" }
   | { action: "delete" };
+
+/**
+ * The change request that proposes a write refused because an
+ * environment holding the experiment is protected, the same transition
+ * with the same decision or allocation; the other writes are not guarded.
+ */
+function proposalOf(experiment: string, write: ExperimentWrite): Proposal | undefined {
+  switch (write.action) {
+    case "start":
+      return { kind: "experiment", experiment, proposed: { action: "start" } };
+    case "grow":
+      return {
+        kind: "experiment",
+        experiment,
+        proposed: { action: "set_traffic_allocation", traffic_allocation: write.allocation },
+      };
+    case "stop":
+      return {
+        kind: "experiment",
+        experiment,
+        proposed: { action: "stop", decision: write.body },
+      };
+    default:
+      return undefined;
+  }
+}
 
 /**
  * Sends one write of an experiment under the version the page shows and
@@ -226,7 +253,23 @@ export function ExperimentTransitions({
     onOpenChange: (open: boolean) => !open && setAsking(undefined),
   });
   const close = () => setAsking(undefined);
-  const send = (next: ExperimentWrite) => write.mutate(next, { onSuccess: close });
+  const [proposing, setProposing] = useState<Proposal>();
+  const send = (next: ExperimentWrite) =>
+    write.mutate(next, {
+      onSuccess: close,
+      // A protected environment holding the experiment refuses the
+      // transition; the member proposes it as it was filled in instead.
+      onError: (error) => {
+        const proposal =
+          error instanceof ApiError && error.code === "change_request_required"
+            ? proposalOf(key, next)
+            : undefined;
+        if (proposal === undefined) return;
+        write.reset();
+        close();
+        setProposing(proposal);
+      },
+    });
   const holders = flag.data ? holdingEnvironments(flag.data, key).map(environmentName) : undefined;
   const flagFailure: FlagFailure | undefined = flag.isError
     ? { error: flag.error, retry: () => void flag.refetch() }
@@ -334,6 +377,25 @@ export function ExperimentTransitions({
         </p>
       </ConfirmDialog>
       <CloneDialog {...dialog("clone")} project={project} experiment={experiment} />
+      <ProposeDialog
+        project={project}
+        proposal={proposing}
+        onOpenChange={(open) => !open && setProposing(undefined)}
+        // The transition is not written, so nothing is left to discard.
+        onProposed={() => setProposing(undefined)}
+      >
+        <p className="text-sm text-muted-foreground">
+          <Trans>
+            An environment holding {key} is protected, so it cannot be changed directly. Propose the
+            same change for review instead.
+          </Trans>
+        </p>
+        <ul aria-label={t`Environments changed`} className="list-disc pl-5 text-sm">
+          {(holders ?? []).map((name) => (
+            <li key={name}>{name}</li>
+          ))}
+        </ul>
+      </ProposeDialog>
     </>
   );
 }

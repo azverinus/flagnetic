@@ -63,6 +63,8 @@ export type ChangeRequestsSearch = {
   environment?: string;
   kind?: ChangeRequestKind;
   state?: ChangeRequestState;
+  /** Only those with an apply time (true) or only those without one (false). */
+  scheduled?: boolean;
   /** The member or project token who wrote them. */
   author?: string;
   cursor?: string;
@@ -85,6 +87,9 @@ export function validateChangeRequestsSearch(
   if (kind.success) out.kind = kind.data;
   const state = zChangeRequestState.safeParse(search.state);
   if (state.success) out.state = state.data;
+  // The router reads a boolean in the address as one, a pasted text as text.
+  if (search.scheduled === true || search.scheduled === "true") out.scheduled = true;
+  if (search.scheduled === false || search.scheduled === "false") out.scheduled = false;
   return out;
 }
 
@@ -263,6 +268,59 @@ export function patchChanges(diff: readonly PatchOperation[]): PatchChange[] {
     target: targetOf(operation.path),
     value: operation.op === "remove" ? undefined : operation.value,
   }));
+}
+
+/** What an experiment transition does to one rule serving the experiment. */
+export type RuleRewrite = {
+  environment: string;
+  /**
+   * 1-based, among the environment's rules serving the experiment before
+   * the transition, not among all of its rules: the patch holds only those.
+   */
+  position: number;
+  /** The variation the rule serves from then on; none when the rule is deleted. */
+  variation?: string;
+};
+
+/**
+ * The rules an `experiment` change request's patch rewrites to serve the
+ * winner or deletes, in the patch's order. The patch holds the rules
+ * serving the experiment by environment key (`/rules/<environment>/<i>`),
+ * and each operation's index counts the rules as earlier removals left
+ * them, so the removals are replayed to name every rule by where it stood
+ * before the transition: two removals of `/rules/production/0` are its
+ * first and second rule, not the first twice.
+ */
+export function ruleRewrites(diff: readonly PatchOperation[]): RuleRewrite[] {
+  const out: RuleRewrite[] = [];
+  // Per environment, the original positions (0-based) already removed: the
+  // rule at index i now is the i-th original position not among them.
+  const removed = new Map<string, Set<number>>();
+  const originalOf = (environment: string, index: number): number => {
+    const gone = removed.get(environment) ?? new Set<number>();
+    let original = -1;
+    for (let left = index; left >= 0; left--) {
+      do original++;
+      while (gone.has(original));
+    }
+    return original;
+  };
+  for (const operation of diff) {
+    const [, head, environment, index, ...rest] = operation.path.split("/").map(unescape);
+    if (head !== "rules" || environment === undefined || !/^\d+$/.test(index ?? "")) continue;
+    const original = originalOf(environment, Number(index));
+    if (operation.op === "remove" && rest.length === 0) {
+      removed.set(environment, (removed.get(environment) ?? new Set<number>()).add(original));
+      out.push({ environment, position: original + 1 });
+    } else if (
+      operation.op !== "remove" &&
+      rest.join("/") === "serve/variation" &&
+      typeof operation.value === "string"
+    ) {
+      out.push({ environment, position: original + 1, variation: operation.value });
+    }
+  }
+  return out;
 }
 
 /** The change requests waiting on one environment's configuration. */

@@ -83,6 +83,14 @@ msgstr "{entry} — не полная семантическая версия, �
 msgid "{entry} is not a number."
 msgstr "{entry} — не число."
 
+#: src/components/change-request-diff.tsx
+msgid "{environment}, experiment rule {position}: deleted"
+msgstr "{environment}, правило эксперимента {position}: удаляется"
+
+#: src/components/change-request-diff.tsx
+msgid "{environment}, experiment rule {position}: serves <0>{variation}</0>, its conditions kept"
+msgstr "{environment}, правило эксперимента {position}: отдаёт <0>{variation}</0>, условия сохраняются"
+
 #: src/components/experiment-transitions.tsx
 msgid "{environment}, rule {position}"
 msgstr "{environment}, правило {position}"
@@ -683,6 +691,10 @@ msgstr "Разрешённые источники"
 msgid "An attribute's type is fixed once it is declared."
 msgstr "Тип атрибута после объявления не меняется."
 
+#: src/components/experiment-transitions.tsx
+msgid "An environment holding {key} is protected, so it cannot be changed directly. Propose the same change for review instead."
+msgstr "Окружение, в котором есть {key}, защищено, поэтому изменить его напрямую нельзя. Предложите то же изменение на рассмотрение."
+
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "An environment is protected, so the conditions and whether the segment is private are proposed for review; they apply to every environment once approved. Its name and description, when edited, are saved at once."
 msgstr "Одно из окружений защищено, поэтому условия и приватность сегмента предлагаются на проверку; после одобрения они действуют во всех окружениях. Изменённые название и описание сохраняются сразу."
@@ -771,6 +783,10 @@ msgid "Any owner"
 msgstr "Любой владелец"
 
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Any schedule"
+msgstr "Любое расписание"
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any state"
 msgstr "Любое состояние"
@@ -815,6 +831,11 @@ msgstr "Оформление"
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 msgid "Applied"
 msgstr "Применён"
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Applies at"
+msgstr "Применится в"
 
 #: src/components/flag-definition-sheet.tsx
 msgid "Applies to the flag in every environment."
@@ -929,6 +950,10 @@ msgstr "Не больше {maxAllowedOrigins} источников."
 #: src/lib/experiment-transitions.ts
 msgid "At most {maxNoteLength} characters."
 msgstr "Не более {maxNoteLength} символов."
+
+#: src/components/schedule-failure-notice.tsx
+msgid "Attempts failed in a row"
+msgstr "Неудачных попыток подряд"
 
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
@@ -1383,6 +1408,10 @@ msgstr "Закрыть"
 #: src/components/tester-panel.tsx
 msgid "Close the tester"
 msgstr "Закрыть тестер"
+
+#: src/components/schedule-failure-notice.tsx
+msgid "Code"
+msgstr "Код"
 
 #: src/components/app-shell.tsx
 msgid "Collapse the sidebar"
@@ -2225,6 +2254,7 @@ msgstr "Ожидаемое окончание — {day}. Остановите е
 
 #: src/components/rule-editor.tsx
 #: src/lib/change-requests.ts
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Experiment"
 msgstr "Эксперимент"
@@ -2290,6 +2320,14 @@ msgstr "Конфликты экспозиций"
 #: src/lib/event-volume.ts
 msgid "Exposures"
 msgstr "Экспозиции"
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Failed"
+msgstr "Сбой"
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Failed, stopped"
+msgstr "Сбой, остановлен"
 
 #: src/components/tester-panel.tsx
 msgid "Fallthrough"
@@ -2525,6 +2563,10 @@ msgstr "Увеличить охват {key}"
 msgid "Grow traffic allocation"
 msgstr "Увеличить охват"
 
+#: src/components/change-request-diff.tsx
+msgid "Grows the traffic allocation to {allocation} %."
+msgstr "Увеличивает долю трафика до {allocation} %."
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Has a rollout"
 msgstr "Есть раскатка"
@@ -2747,6 +2789,10 @@ msgstr "Это всё ещё используют: {references}."
 msgid "It is still in use."
 msgstr "Это всё ещё используется."
 
+#: src/components/schedule-failure-notice.tsx
+msgid "It was superseded afterwards, so it is not applied. Copy it to propose it again."
+msgstr "Позже он был вытеснен, поэтому не применяется. Скопируйте его, чтобы предложить снова."
+
 #: src/components/segment-fields.tsx
 msgid "Its conditions never leave the server: only server-side evaluation uses it, and a client SDK key never receives it."
 msgstr "Его условия не покидают сервер: его использует только вычисление на сервере, а клиентский ключ SDK никогда его не получает."
@@ -2830,6 +2876,10 @@ msgstr "Вид"
 #: src/components/profile-form.tsx
 msgid "Language"
 msgstr "Язык"
+
+#: src/components/schedule-failure-notice.tsx
+msgid "Last attempt"
+msgstr "Последняя попытка"
 
 #: src/components/experiment-exposures.tsx
 msgid "Last checked <0/>, while the experiment ran; the stop took no check here, as the environment no longer held its rule."
@@ -3357,6 +3407,7 @@ msgstr "Ни одно правило его не отдаёт"
 msgid "No rule serves it yet: it starts, but no SDK receives it until a rule of its flag serves it in an environment."
 msgstr "Ни одно правило его пока не отдаёт: эксперимент запустится, но SDK не получат его, пока правило его флага не начнёт отдавать его в каком-либо окружении."
 
+#: src/components/change-request-diff.tsx
 #: src/components/experiment-transitions.tsx
 msgid "No rule serves it: no configuration or ruleset changes."
 msgstr "Ни одно правило его не отдаёт: ни конфигурации, ни наборы правил не изменятся."
@@ -3465,6 +3516,10 @@ msgstr "Не приватные"
 msgid "Not recorded"
 msgstr "Не записано"
 
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Not scheduled"
+msgstr "Без расписания"
+
 #: src/components/experiment-transitions.tsx
 #: src/components/overrides-section.tsx
 msgid "Note"
@@ -3551,6 +3606,10 @@ msgstr "Включён"
 #: src/components/compare-environments.tsx
 msgid "On or off"
 msgstr "Включён или выключен"
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "once approved"
+msgstr "после одобрения"
 
 #: src/components/discovered-attributes.tsx
 msgid "One of the types SDKs sent it with."
@@ -3970,6 +4029,7 @@ msgstr "Перенесено после конфликта: сохранится
 
 #: src/components/flag-evaluations.tsx
 #: src/components/kill-switch-dialog.tsx
+#: src/components/schedule-failure-notice.tsx
 msgid "Reason"
 msgstr "Причина"
 
@@ -4337,6 +4397,7 @@ msgstr "Правила"
 msgid "Rules of these flags use the segment and evaluate by what it holds once saved:"
 msgstr "Правила этих флагов используют сегмент и после сохранения вычисляются по его новому содержимому:"
 
+#: src/components/change-request-diff.tsx
 #: src/components/experiment-transitions.tsx
 msgid "Rules rewritten"
 msgstr "Переписываемые правила"
@@ -4405,6 +4466,14 @@ msgstr "Сохранить сегмент, который используетс
 #: src/components/change-request-actions.tsx
 msgid "Say why, so the author knows what to change."
 msgstr "Объясните причину, чтобы автор знал, что исправить."
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Schedule"
+msgstr "Расписание"
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Scheduled"
+msgstr "По расписанию"
 
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
@@ -4724,6 +4793,10 @@ msgstr "Запущен"
 msgid "Starting puts it into the ruleset of each of these environments at once, and its flag, unit type and weights stay as they are while it runs:"
 msgstr "Запуск сразу добавит его в набор правил каждого из этих окружений, а флаг, тип единицы и веса останутся неизменными, пока он запущен:"
 
+#: src/components/change-request-diff.tsx
+msgid "Starts the experiment: it is put into the ruleset of each environment holding it."
+msgstr "Запускает эксперимент: он попадает в набор правил каждого окружения, где он есть."
+
 #: src/lib/conditions.ts
 msgid "starts with"
 msgstr "начинается с"
@@ -4761,6 +4834,14 @@ msgstr "Остановить эксперимент"
 #: src/lib/experiments.ts
 msgid "Stopped"
 msgstr "Остановлен"
+
+#: src/components/change-request-diff.tsx
+msgid "Stops the experiment and removes the rules serving it."
+msgstr "Останавливает эксперимент и удаляет правила, которые его отдают."
+
+#: src/components/change-request-diff.tsx
+msgid "Stops the experiment and ships the winner <0>{winner}</0>."
+msgstr "Останавливает эксперимент и выкатывает победителя <0>{winner}</0>."
 
 #. An attribute type.
 #: src/lib/attribute-types.ts
@@ -5376,6 +5457,18 @@ msgstr "У раскатки новая соль."
 #: src/components/experiment-transitions.tsx
 msgid "The ruleset of each of these environments changes at once:"
 msgstr "Набор правил каждого из этих окружений изменится сразу:"
+
+#: src/components/schedule-failure-notice.tsx
+msgid "The scheduled application failed"
+msgstr "Применение по расписанию не удалось"
+
+#: src/components/schedule-failure-notice.tsx
+msgid "The scheduler stopped after {attempts} failed attempts and will not try again. Cancel this change request and copy it to propose it again."
+msgstr "Планировщик остановился после {attempts} неудачных попыток и больше не пробует. Отмените этот запрос на изменение и скопируйте его, чтобы предложить снова."
+
+#: src/components/schedule-failure-notice.tsx
+msgid "The scheduler tries again at its next round and stops after repeated failures. To propose it again, cancel this change request and copy it."
+msgstr "Планировщик повторит попытку в следующем проходе и остановится после нескольких сбоев. Чтобы предложить заново, отмените этот запрос на изменение и скопируйте его."
 
 #: src/components/sdk-inventory.tsx
 msgid "The SDKs that have asked this environment for its ruleset or for values, most recently seen first. A row appears within a minute of an SDK’s request; whether an SDK is connected right now is not shown."
