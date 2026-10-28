@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs";
 import {
   createChangeRequest,
   createExperiment,
+  createInstanceWebhook,
   createSegment,
+  createWebhook,
   listProjectAuditEntries,
 } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
@@ -37,6 +39,8 @@ type Seeded = {
   invitation: string;
   auditEntry: string;
   changeRequest: string;
+  webhook: string;
+  instanceWebhook: string;
 };
 
 /** The key of the flag the sweep creates in its project. */
@@ -91,6 +95,12 @@ const signedIn: Route[] = [
     path: () => "/admin/auth-settings",
   },
   { name: "instance audit log", route: "/admin/audit", path: () => "/admin/audit" },
+  { name: "instance webhooks", route: "/admin/webhooks", path: () => "/admin/webhooks" },
+  ...["settings", "deliveries"].map((tab) => ({
+    name: `instance webhook: ${tab}`,
+    route: "/admin/webhooks/$webhook",
+    path: (s: Seeded) => `/admin/webhooks/${s.instanceWebhook}?tab=${tab}`,
+  })),
   {
     name: "instance audit entry",
     route: "/admin/audit/$entry",
@@ -112,6 +122,7 @@ const signedIn: Route[] = [
     "members",
     "tokens",
     "settings",
+    "webhooks",
     "audit",
     "event-volume",
   ].map((screen) => ({
@@ -159,6 +170,11 @@ const signedIn: Route[] = [
     route: "/projects/$project/segments/$segment",
     path: (s) => `/projects/${s.project}/segments/${sweepSegment}`,
   },
+  ...["settings", "deliveries"].map((tab) => ({
+    name: `project webhook: ${tab}`,
+    route: "/projects/$project/webhooks/$webhook",
+    path: (s: Seeded) => `/projects/${s.project}/webhooks/${s.webhook}?tab=${tab}`,
+  })),
   {
     name: "project audit entry",
     route: "/projects/$project/audit/$entry",
@@ -241,6 +257,32 @@ async function seed(): Promise<Seeded> {
       },
     }),
   );
+  // Disabled, so nothing is ever posted to them and no delivery fails.
+  const webhook = must(
+    `creating a webhook in ${project}`,
+    await createWebhook({
+      client: managementClient(),
+      path: { project },
+      body: {
+        name: "Sweep webhook",
+        url: "https://hooks.example.com/flagnetic",
+        events: ["flag.kill_switch"],
+        enabled: false,
+      },
+    }),
+  );
+  const instanceWebhook = must(
+    "creating an instance webhook",
+    await createInstanceWebhook({
+      client: managementClient(),
+      body: {
+        name: "Sweep instance webhook",
+        url: "https://hooks.example.com/flagnetic",
+        events: ["audit.entry"],
+        enabled: false,
+      },
+    }),
+  );
   const audit = must(
     `listing the audit log of ${project}`,
     await listProjectAuditEntries({ client: managementClient(), path: { project } }),
@@ -253,6 +295,8 @@ async function seed(): Promise<Seeded> {
     invitation: pathOf(invited.link),
     auditEntry,
     changeRequest: changeRequest.id,
+    webhook: webhook.id,
+    instanceWebhook: instanceWebhook.id,
   };
 }
 

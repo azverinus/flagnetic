@@ -160,6 +160,11 @@ export async function serve(binary: string): Promise<{ baseURL: string; child: C
       FLAGNETIC_BASE_URL: baseURL,
       // No metrics listener: its fixed port would clash with another run.
       FLAGNETIC_METRICS_LISTEN_ADDR: "",
+      // The webhook specs post to a receiver on loopback over plain http,
+      // and want a delivery within a moment of its event.
+      FLAGNETIC_WEBHOOK_ALLOW_HTTP: "true",
+      FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS: "true",
+      FLAGNETIC_WEBHOOK_TICK: "1s",
       ...clockSettings,
     }),
     cwd: repoRoot,

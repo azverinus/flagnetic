@@ -17,6 +17,11 @@ msgstr ""
 msgid "{0, plural, one {# conflicting exposure} other {# conflicting exposures}} {1, plural, one {from # unit} other {from # units}} reached the threshold, {threshold}; units first exposed: {units}."
 msgstr ""
 
+#. placeholder {0}: disabled.length
+#: src/components/webhook-disabled-banner.tsx
+msgid "{0, plural, one {The platform disabled # webhook after its receiver kept failing. It is sent nothing until it is enabled again.} other {The platform disabled # webhooks after their receivers kept failing. They are sent nothing until they are enabled again.}}"
+msgstr ""
+
 #: src/components/rule-editor.tsx
 msgid "{allocation}% of {unitType} units included"
 msgstr ""
@@ -39,6 +44,10 @@ msgstr ""
 
 #: src/components/navigation.tsx
 msgid "{count, plural, one {# change request awaits your decision} other {# change requests await your decision}}"
+msgstr ""
+
+#: src/lib/webhooks.ts
+msgid "{count, plural, one {# event type} other {# event types}}"
 msgstr ""
 
 #: src/components/duration-input.tsx
@@ -168,6 +177,10 @@ msgstr ""
 msgid "{label}: {total} {dayCount, plural, one {over # day} other {over # days}}; the table below lists every day."
 msgstr ""
 
+#: src/components/webhook-delivery-sheet.tsx
+msgid "{latency} ms"
+msgstr ""
+
 #: src/components/compare-environments.tsx
 msgid "{left} and {right} side by side"
 msgstr ""
@@ -202,6 +215,10 @@ msgstr ""
 
 #: src/components/member-actions.tsx
 msgid "{name} is deactivated."
+msgstr ""
+
+#: src/components/webhook-list.tsx
+msgid "{name} is enabled."
 msgstr ""
 
 #: src/components/invitation-link-dialog.tsx
@@ -251,6 +268,10 @@ msgstr ""
 #: src/components/member-credentials.tsx
 #: src/components/session-list.tsx
 msgid "{revoked, plural, one {Revoked # session.} other {Revoked # sessions.}}"
+msgstr ""
+
+#: src/components/webhook-detail.tsx
+msgid "{savedName} is saved."
 msgstr ""
 
 #: src/components/compare-environments.tsx
@@ -357,6 +378,18 @@ msgstr ""
 msgid "A configuration has at most {maxRulesText} rules."
 msgstr ""
 
+#: src/components/webhook-editor.tsx
+msgid "A copy of every audit entry of the project, so each change is sent twice when it is chosen with the types above."
+msgstr ""
+
+#: src/components/webhook-editor.tsx
+msgid "A disabled subscription is sent nothing until it is enabled again."
+msgstr ""
+
+#: src/components/webhook-detail.tsx
+msgid "A disabled webhook is sent nothing."
+msgstr ""
+
 #: src/lib/conditions.ts
 #: src/lib/configuration-draft.ts
 msgid "A flag cannot require itself."
@@ -406,6 +439,10 @@ msgstr ""
 
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "A new project starts with the environments development, staging and production, the unit types user and anonymous, and the standard attributes."
+msgstr ""
+
+#: src/components/webhook-detail.tsx
+msgid "A new secret signs from now on. The one it replaces keeps signing beside it for a day, so the receiver can switch to the new secret without refusing an event."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/route.tsx
@@ -537,6 +574,10 @@ msgstr ""
 
 #: src/components/overrides-section.tsx
 msgid "A variation pinned for one unit, checked before any rule. An override is saved as soon as it is added or removed."
+msgstr ""
+
+#: src/components/webhook-list.tsx
+msgid "A webhook posts the events you choose to a URL, signed with its secret, retried when the receiver fails, and logged."
 msgstr ""
 
 #: src/components/token-create-form.tsx
@@ -719,6 +760,14 @@ msgstr ""
 msgid "An instance admin administers every project, every member and the instance's settings."
 msgstr ""
 
+#: src/components/webhook-list.tsx
+msgid "An instance webhook is sent every audit entry that names no project, signed with its secret."
+msgstr ""
+
+#: src/components/webhook-editor.tsx
+msgid "An instance webhook is sent one event for every audit entry that names no project: instance settings, members, sign-ins and project deletions."
+msgstr ""
+
 #: src/components/invitation-acceptance.tsx
 msgid "An invitation link works once, for seven days, and only until a newer one replaces it. Ask an instance admin for a new link, or sign in if you have already joined."
 msgstr ""
@@ -764,6 +813,10 @@ msgstr ""
 msgid "Any environments"
 msgstr ""
 
+#: src/components/webhook-deliveries.tsx
+msgid "Any event type"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Any flag"
@@ -791,6 +844,7 @@ msgstr ""
 msgid "Any state"
 msgstr ""
 
+#: src/components/webhook-deliveries.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Any status"
 msgstr ""
@@ -949,6 +1003,15 @@ msgstr ""
 
 #: src/lib/experiment-transitions.ts
 msgid "At most {maxNoteLength} characters."
+msgstr ""
+
+#: src/components/webhook-delivery-sheet.tsx
+msgid "Attempt {number}"
+msgstr ""
+
+#: src/components/webhook-deliveries.tsx
+#: src/components/webhook-delivery-sheet.tsx
+msgid "Attempts"
 msgstr ""
 
 #: src/components/schedule-failure-notice.tsx
@@ -1155,6 +1218,7 @@ msgid "Change request rebased"
 msgstr ""
 
 #: src/components/navigation.tsx
+#: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/route.tsx
 msgid "Change requests"
@@ -1325,6 +1389,10 @@ msgstr ""
 msgid "Choose an experiment."
 msgstr ""
 
+#: src/components/webhook-editor.tsx
+msgid "Choose at least one event type."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered languages."
 msgstr ""
@@ -1347,6 +1415,10 @@ msgstr ""
 
 #: src/lib/experiments.ts
 msgid "Choose the day the experiment is expected to end: it starts only with one."
+msgstr ""
+
+#: src/components/webhook-editor.tsx
+msgid "Choose the event types this subscription is sent."
 msgstr ""
 
 #: src/lib/experiment-transitions.ts
@@ -1373,6 +1445,10 @@ msgstr ""
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Clear filters"
+msgstr ""
+
+#: src/components/webhook-deliveries.tsx
+msgid "Clear the filters"
 msgstr ""
 
 #: src/components/experiment-alerts.tsx
@@ -1567,6 +1643,10 @@ msgstr ""
 msgid "Create key"
 msgstr ""
 
+#: src/components/webhook-list.tsx
+msgid "Create one to have events posted to a chat channel, an archive or a deployment tool."
+msgstr ""
+
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "Create project"
 msgstr ""
@@ -1585,6 +1665,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Create unit type"
+msgstr ""
+
+#: src/components/webhook-editor.tsx
+msgid "Create webhook"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
@@ -1677,6 +1761,7 @@ msgid "Definition"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
+#: src/components/webhook-detail.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Delete"
@@ -1689,6 +1774,11 @@ msgstr ""
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Delete {key}"
+msgstr ""
+
+#: src/components/webhook-detail.tsx
+#: src/components/webhook-list.tsx
+msgid "Delete {name}"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -1727,8 +1817,26 @@ msgstr ""
 msgid "Delete unit type"
 msgstr ""
 
+#: src/components/webhook-detail.tsx
+#: src/components/webhook-list.tsx
+msgid "Delete webhook"
+msgstr ""
+
 #: src/components/experiment-transitions.tsx
 msgid "deleted"
+msgstr ""
+
+#: src/components/webhook-deliveries.tsx
+#: src/components/webhook-detail.tsx
+msgid "Deliveries"
+msgstr ""
+
+#: src/components/webhook-delivery-sheet.tsx
+msgid "Delivery"
+msgstr ""
+
+#: src/components/webhook-delivery-sheet.tsx
+msgid "Delivery ID"
 msgstr ""
 
 #: src/components/change-request-actions.tsx
@@ -1773,6 +1881,14 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Differs between"
+msgstr ""
+
+#: src/components/webhook-status.tsx
+msgid "Disabled"
+msgstr ""
+
+#: src/components/webhook-status.tsx
+msgid "Disabled after persistent failure"
 msgstr ""
 
 #: src/components/ui/unsaved-changes-bar.tsx
@@ -1830,6 +1946,7 @@ msgid "Drag rule {position}"
 msgstr ""
 
 #: src/components/event-volume.tsx
+#: src/lib/webhooks.ts
 msgid "Dropped"
 msgstr ""
 
@@ -1908,6 +2025,20 @@ msgstr ""
 
 #: src/components/tester-panel.tsx
 msgid "Empty context"
+msgstr ""
+
+#: src/components/webhook-detail.tsx
+msgid "Enable"
+msgstr ""
+
+#: src/components/webhook-disabled-banner.tsx
+#: src/components/webhook-list.tsx
+msgid "Enable {name}"
+msgstr ""
+
+#: src/components/webhook-editor.tsx
+#: src/components/webhook-status.tsx
+msgid "Enabled"
 msgstr ""
 
 #: src/components/session-list.tsx
@@ -1997,6 +2128,10 @@ msgstr ""
 msgid "Enter a whole number."
 msgstr ""
 
+#: src/components/webhook-editor.tsx
+msgid "Enter an absolute URL, such as https://example.com/flagnetic."
+msgstr ""
+
 #: src/components/member-form.tsx
 msgid "Enter an email address."
 msgstr ""
@@ -2015,6 +2150,10 @@ msgstr ""
 
 #: src/lib/flag-detail.ts
 msgid "Enter the unit's ID."
+msgstr ""
+
+#: src/components/webhook-editor.tsx
+msgid "Enter the URL the events are posted to."
 msgstr ""
 
 #: src/components/password-form.tsx
@@ -2072,6 +2211,7 @@ msgstr ""
 
 #: src/components/experiment-exposures.tsx
 #: src/components/navigation.tsx
+#: src/components/webhook-editor.tsx
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/environments/route.tsx
 #: src/routes/_signed-in/projects/$project/index.tsx
@@ -2130,12 +2270,26 @@ msgstr ""
 msgid "Evaluations per day"
 msgstr ""
 
+#: src/components/webhook-deliveries.tsx
+msgid "Event"
+msgstr ""
+
+#: src/components/webhook-delivery-sheet.tsx
+msgid "Event ID"
+msgstr ""
+
+#: src/components/webhook-deliveries.tsx
+msgid "Event type"
+msgstr ""
+
 #: src/components/navigation.tsx
 #: src/routes/_signed-in/projects/$project/event-volume.tsx
 msgid "Event volume"
 msgstr ""
 
 #: src/components/event-volume.tsx
+#: src/components/webhook-editor.tsx
+#: src/components/webhook-list.tsx
 msgid "Events"
 msgstr ""
 
@@ -2150,6 +2304,14 @@ msgstr ""
 
 #: src/components/event-volume.tsx
 msgid "Events retention dropped before a rollup had read them: they are missing from the counts above and from everything read from them, such as evaluations and exposures. A rollup reads every project's events, so a gap counts the events of every project of the instance."
+msgstr ""
+
+#: src/lib/webhooks.ts
+msgid "Every audit entry"
+msgstr ""
+
+#: src/components/webhook-secret-dialog.tsx
+msgid "Every call carries a signature made with this secret, which the receiver checks to know the event came from here."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/audit.tsx
@@ -2188,6 +2350,15 @@ msgstr ""
 msgid "Every environment is on and serves the same variation to everyone: the code can keep that variation alone."
 msgstr ""
 
+#: src/components/webhook-editor.tsx
+#: src/lib/webhooks.ts
+msgid "Every event"
+msgstr ""
+
+#: src/lib/webhooks.ts
+msgid "Every event and every audit entry"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Every flag exists in every environment of the project, each environment serving it by its own configuration."
 msgstr ""
@@ -2208,6 +2379,10 @@ msgstr ""
 msgid "Every status"
 msgstr ""
 
+#: src/components/webhook-editor.tsx
+msgid "Every type below, and any added later. Audit entries are chosen apart."
+msgstr ""
+
 #: src/components/configuration-editor.tsx
 msgid "Every unit is bucketed afresh: units now in the rollout may fall out of it and others come in. The new salt is saved at once, apart from the rest of the draft."
 msgstr ""
@@ -2218,6 +2393,10 @@ msgstr ""
 
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Everyone who can sign in to this instance. What they may do in a project comes from their grants there."
+msgstr ""
+
+#: src/lib/webhooks.ts
+msgid "Exhausted"
 msgstr ""
 
 #: src/components/app-shell.tsx
@@ -2296,6 +2475,7 @@ msgid "Experiment updated"
 msgstr ""
 
 #: src/components/navigation.tsx
+#: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/route.tsx
 msgid "Experiments"
@@ -2321,12 +2501,18 @@ msgstr ""
 msgid "Exposures"
 msgstr ""
 
+#: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Failed"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Failed, stopped"
+msgstr ""
+
+#: src/components/webhook-detail.tsx
+#: src/components/webhook-list.tsx
+msgid "Failures in a row"
 msgstr ""
 
 #: src/components/tester-panel.tsx
@@ -2353,6 +2539,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Filter the change requests"
+msgstr ""
+
+#: src/components/webhook-deliveries.tsx
+msgid "Filter the deliveries"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -2456,6 +2646,7 @@ msgid "Flag restored"
 msgstr ""
 
 #: src/components/navigation.tsx
+#: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/route.tsx
 msgid "Flags"
@@ -2487,6 +2678,7 @@ msgid "Found"
 msgstr ""
 
 #: src/components/audit-log.tsx
+#: src/components/webhook-deliveries.tsx
 msgid "From"
 msgstr ""
 
@@ -2526,6 +2718,10 @@ msgstr ""
 msgid "Go to the start page"
 msgstr ""
 
+#: src/components/webhook-detail.tsx
+msgid "Go to the webhooks"
+msgstr ""
+
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
 msgid "Grant"
@@ -2551,6 +2747,7 @@ msgstr ""
 msgid "Grant role"
 msgstr ""
 
+#: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Grants"
 msgstr ""
@@ -2669,6 +2866,10 @@ msgstr ""
 msgid "Instance administration"
 msgstr ""
 
+#: src/components/webhook-list.tsx
+msgid "Instance webhooks"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Invitation accepted"
 msgstr ""
@@ -2763,6 +2964,10 @@ msgstr ""
 
 #: src/components/experiment-transitions.tsx
 msgid "It cannot start until these are fixed:"
+msgstr ""
+
+#: src/components/webhook-detail.tsx
+msgid "It does not exist here, or it was deleted."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -2908,6 +3113,11 @@ msgstr ""
 msgid "Last sign-in"
 msgstr ""
 
+#: src/components/webhook-detail.tsx
+#: src/components/webhook-list.tsx
+msgid "Last success"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Last updated"
 msgstr ""
@@ -2923,6 +3133,10 @@ msgstr ""
 
 #: src/components/kill-switch-dialog.tsx
 msgid "Last used by {who} on {when}: “{lastReason}”"
+msgstr ""
+
+#: src/components/webhook-deliveries.tsx
+msgid "Latest response"
 msgstr ""
 
 #: src/components/ui/unsaved-changes-bar.tsx
@@ -2977,6 +3191,10 @@ msgstr ""
 #. An attribute type.
 #: src/lib/attribute-types.ts
 msgid "List"
+msgstr ""
+
+#: src/components/webhook-deliveries.tsx
+msgid "Load older deliveries"
 msgstr ""
 
 #: src/components/ui/table.tsx
@@ -3171,6 +3389,8 @@ msgstr ""
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 #: src/components/variations-editor.tsx
+#: src/components/webhook-editor.tsx
+#: src/components/webhook-list.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
@@ -3269,6 +3489,10 @@ msgstr ""
 msgid "New unit type"
 msgstr ""
 
+#: src/components/webhook-list.tsx
+msgid "New webhook"
+msgstr ""
+
 #: src/components/audit-log.tsx
 msgid "Newest entries"
 msgstr ""
@@ -3281,12 +3505,21 @@ msgstr ""
 msgid "Next"
 msgstr ""
 
+#: src/components/webhook-deliveries.tsx
+#: src/components/webhook-delivery-sheet.tsx
+msgid "Next attempt"
+msgstr ""
+
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "No"
 msgstr ""
 
 #: src/components/experiment-alerts.tsx
 msgid "No alert has been raised."
+msgstr ""
+
+#: src/components/webhook-delivery-sheet.tsx
+msgid "No attempt has been made yet."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
@@ -3299,6 +3532,10 @@ msgstr ""
 
 #: src/components/rule-editor.tsx
 msgid "No conditions: matches every context."
+msgstr ""
+
+#: src/components/webhook-deliveries.tsx
+msgid "No delivery matches the filters."
 msgstr ""
 
 #: src/components/audit-log.tsx
@@ -3395,6 +3632,11 @@ msgstr ""
 msgid "No projects yet"
 msgstr ""
 
+#: src/components/webhook-delivery-sheet.tsx
+#: src/lib/webhooks.ts
+msgid "No response"
+msgstr ""
+
 #: src/components/tester-panel.tsx
 msgid "No rule matched: the fallthrough variation is served."
 msgstr ""
@@ -3460,6 +3702,10 @@ msgstr ""
 msgid "No way to sign in is enabled on this instance. Ask its operator."
 msgstr ""
 
+#: src/components/webhook-list.tsx
+msgid "No webhook yet."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Nobody holds a role in this project yet."
 msgstr ""
@@ -3471,6 +3717,7 @@ msgid "none"
 msgstr ""
 
 #: src/components/compare-environments.tsx
+#: src/components/webhook-detail.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "None"
 msgstr ""
@@ -3541,6 +3788,10 @@ msgstr ""
 msgid "Nothing has been recorded yet."
 msgstr ""
 
+#: src/components/webhook-deliveries.tsx
+msgid "Nothing has been sent to this webhook yet."
+msgstr ""
+
 #: src/components/project-audit.tsx
 msgid "Nothing has changed in this project yet."
 msgstr ""
@@ -3551,6 +3802,11 @@ msgstr ""
 
 #: src/components/ui/table.tsx
 msgid "Nothing here yet."
+msgstr ""
+
+#: src/components/webhook-detail.tsx
+#: src/components/webhook-list.tsx
+msgid "Nothing more is sent under it. This cannot be undone."
 msgstr ""
 
 #: src/components/structural-diff-view.tsx
@@ -3611,6 +3867,10 @@ msgstr ""
 msgid "once approved"
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "One of the event types is not in the catalogue."
+msgstr ""
+
 #: src/components/discovered-attributes.tsx
 msgid "One of the types SDKs sent it with."
 msgstr ""
@@ -3669,6 +3929,10 @@ msgstr ""
 
 #: src/components/change-request-actions.tsx
 msgid "Open for review"
+msgstr ""
+
+#: src/components/webhook-deliveries.tsx
+msgid "Open the {type} delivery"
 msgstr ""
 
 #: src/components/change-request-actions.tsx
@@ -3824,6 +4088,10 @@ msgstr ""
 msgid "Past expected removal"
 msgstr ""
 
+#: src/lib/webhooks.ts
+msgid "Pending"
+msgstr ""
+
 #: src/components/experiment-exposures.tsx
 msgid "Per day"
 msgstr ""
@@ -3902,6 +4170,10 @@ msgstr ""
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Previous"
+msgstr ""
+
+#: src/components/webhook-detail.tsx
+msgid "Previous secret"
 msgstr ""
 
 #: src/components/change-request-diff.tsx
@@ -3987,6 +4259,11 @@ msgstr ""
 msgid "Put it in the server SDK’s configuration, where only the service that uses it can read it. Never ship it in a browser or an app."
 msgstr ""
 
+#: src/components/webhook-deliveries.tsx
+#: src/components/webhook-delivery-sheet.tsx
+msgid "Queued"
+msgstr ""
+
 #: src/components/experiment-alerts.tsx
 msgid "Raised"
 msgstr ""
@@ -3997,6 +4274,10 @@ msgstr ""
 
 #: src/components/daily-chart.tsx
 msgid "Range"
+msgstr ""
+
+#: src/components/webhook-list.tsx
+msgid "Re-enable {name}"
 msgstr ""
 
 #: src/components/member-actions.tsx
@@ -4063,6 +4344,14 @@ msgstr ""
 
 #: src/components/kill-switch-dialog.tsx
 msgid "Recorded in the audit log. Characters still needed: {missing}."
+msgstr ""
+
+#: src/components/webhook-delivery-sheet.tsx
+msgid "Redeliver"
+msgstr ""
+
+#: src/components/webhook-deliveries.tsx
+msgid "Redeliver the {type} delivery"
 msgstr ""
 
 #: src/components/experiment-exposures.tsx
@@ -4180,6 +4469,10 @@ msgstr ""
 
 #: src/components/flag-evaluations.tsx
 msgid "Reported by SDKs"
+msgstr ""
+
+#: src/lib/webhooks.ts
+msgid "Reports"
 msgstr ""
 
 #: src/components/audit-entry-sheet.tsx
@@ -4338,6 +4631,14 @@ msgstr ""
 msgid "Rotate key {name}"
 msgstr ""
 
+#: src/components/webhook-detail.tsx
+msgid "Rotate secret"
+msgstr ""
+
+#: src/components/webhook-detail.tsx
+msgid "Rotate the secret of {name}"
+msgstr ""
+
 #: src/lib/sdk-keys.ts
 msgid "Rotating"
 msgstr ""
@@ -4436,6 +4737,7 @@ msgstr ""
 #: src/components/profile-form.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/ui/unsaved-changes-bar.tsx
+#: src/components/webhook-editor.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
@@ -4485,6 +4787,7 @@ msgid "SDK"
 msgstr ""
 
 #: src/components/sdk-keys.tsx
+#: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/environments/$environment.tsx
 msgid "SDK keys"
 msgstr ""
@@ -4543,6 +4846,7 @@ msgid "Segment updated"
 msgstr ""
 
 #: src/components/navigation.tsx
+#: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 #: src/routes/_signed-in/projects/$project/segments/route.tsx
 msgid "Segments"
@@ -4559,6 +4863,18 @@ msgstr ""
 
 #: src/components/token-list.tsx
 msgid "Send it as a bearer token in the Authorization header. Keep it where only what uses it can read it."
+msgstr ""
+
+#: src/components/webhook-editor.tsx
+msgid "Send only the events of the environments you tick; tick none for every environment. An event of no environment is always sent."
+msgstr ""
+
+#: src/components/webhook-detail.tsx
+msgid "Send test"
+msgstr ""
+
+#: src/components/webhook-detail.tsx
+msgid "Sent"
 msgstr ""
 
 #: src/components/configuration-editor.tsx
@@ -4621,6 +4937,7 @@ msgid "Sessions"
 msgstr ""
 
 #: src/components/navigation.tsx
+#: src/components/webhook-detail.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "Settings"
 msgstr ""
@@ -4687,6 +5004,10 @@ msgstr ""
 
 #: src/components/sign-in-form.tsx
 msgid "Signing in…"
+msgstr ""
+
+#: src/components/webhook-detail.tsx
+msgid "Signs until <0/>"
 msgstr ""
 
 #: src/components/app-shell.tsx
@@ -4808,6 +5129,8 @@ msgid "State"
 msgstr ""
 
 #: src/components/sdk-keys.tsx
+#: src/components/webhook-deliveries.tsx
+#: src/components/webhook-delivery-sheet.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -4847,6 +5170,10 @@ msgstr ""
 #: src/lib/attribute-types.ts
 #: src/lib/flags.ts
 msgid "String"
+msgstr ""
+
+#: src/lib/webhooks.ts
+msgid "Succeeded"
 msgstr ""
 
 #: src/lib/change-requests.ts
@@ -5128,6 +5455,10 @@ msgstr ""
 msgid "The environments serve differently where marked."
 msgstr ""
 
+#: src/components/webhook-deliveries.tsx
+msgid "The event is queued to be sent again."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/event-volume.tsx
 msgid "The events SDKs posted to the project per UTC day they were received, as the rollups counted them. The counts stay after retention drops the events themselves."
 msgstr ""
@@ -5346,6 +5677,10 @@ msgstr ""
 msgid "The passwords do not match."
 msgstr ""
 
+#: src/components/webhook-detail.tsx
+msgid "The platform disabled this webhook after its receiver kept failing, and dropped the deliveries that were waiting. Enable it once the receiver is back; a dropped delivery can then be redelivered from the log."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "The project declares no such unit type."
 msgstr ""
@@ -5474,6 +5809,10 @@ msgstr ""
 msgid "The SDKs that have asked this environment for its ruleset or for values, most recently seen first. A row appears within a minute of an SDK’s request; whether an SDK is connected right now is not shown."
 msgstr ""
 
+#: src/components/webhook-secret-dialog.tsx
+msgid "The secret it replaces keeps signing beside this one for a day, so the receiver can take the new one without refusing an event."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "the segment {key}"
 msgstr ""
@@ -5566,6 +5905,15 @@ msgstr ""
 msgid "The values the flag can serve. A key names a variation in rules and results; a name defaults to the key."
 msgstr ""
 
+#: src/components/webhook-detail.tsx
+#: src/components/webhook-disabled-banner.tsx
+msgid "The webhook is enabled."
+msgstr ""
+
+#: src/components/webhook-secret-dialog.tsx
+msgid "The webhook's signing secret"
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "The weights must sum to 100.00 %."
 msgstr ""
@@ -5636,6 +5984,10 @@ msgstr ""
 msgid "This flag is archived; restore it or choose another."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "This instance accepts only https targets. Use an https URL, or ask the operator to allow plain http."
+msgstr ""
+
 #: src/components/token-create-form.tsx
 msgid "This instance allows a token at most {lifetime} ahead, and every token must expire."
 msgstr ""
@@ -5647,6 +5999,10 @@ msgstr ""
 
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "This instance already has a project with that key."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "This instance does not reach targets on its own network. Use a public address, or ask the operator to allow private networks."
 msgstr ""
 
 #: src/components/token-create-form.tsx
@@ -5771,6 +6127,10 @@ msgstr ""
 msgid "This value is not valid here."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "This webhook is disabled. Enable it first; it is sent nothing until then."
+msgstr ""
+
 #: src/components/audit-entry-sheet.tsx
 #: src/components/audit-log.tsx
 msgid "Time"
@@ -5786,6 +6146,7 @@ msgid "Title"
 msgstr ""
 
 #: src/components/audit-log.tsx
+#: src/components/webhook-deliveries.tsx
 msgid "To"
 msgstr ""
 
@@ -5977,6 +6338,11 @@ msgstr ""
 msgid "Updated"
 msgstr ""
 
+#: src/components/webhook-editor.tsx
+#: src/components/webhook-list.tsx
+msgid "URL"
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "Use {min} to {max} characters."
 msgstr ""
@@ -6105,6 +6471,16 @@ msgstr ""
 msgid "Waiting change requests"
 msgstr ""
 
+#: src/components/webhook-detail.tsx
+#: src/routes/_signed-in/admin/webhooks/$webhook.tsx
+#: src/routes/_signed-in/projects/$project/webhooks/$webhook.tsx
+msgid "Webhook"
+msgstr ""
+
+#: src/components/webhook-detail.tsx
+msgid "Webhook not found"
+msgstr ""
+
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
 msgid "Webhook subscription"
@@ -6120,6 +6496,14 @@ msgstr ""
 
 #: src/lib/audit.ts
 msgid "Webhook subscription updated"
+msgstr ""
+
+#: src/components/navigation.tsx
+#: src/components/webhook-list.tsx
+#: src/lib/webhooks.ts
+#: src/routes/_signed-in/admin/webhooks/route.tsx
+#: src/routes/_signed-in/projects/$project/webhooks/route.tsx
+msgid "Webhooks"
 msgstr ""
 
 #: src/components/weights-input.tsx
@@ -6144,6 +6528,10 @@ msgstr ""
 
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "What {name} holds"
+msgstr ""
+
+#: src/components/webhook-editor.tsx
+msgid "What receives the events, to tell the subscriptions apart."
 msgstr ""
 
 #: src/components/flag-evaluations.tsx
@@ -6184,6 +6572,10 @@ msgstr ""
 
 #: src/components/token-list.tsx
 msgid "Whatever uses the token is refused from now on. This cannot be undone."
+msgstr ""
+
+#: src/components/webhook-editor.tsx
+msgid "Where every event is posted, signed with the subscription's secret."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/environments/index.tsx

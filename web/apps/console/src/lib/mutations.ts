@@ -15,12 +15,14 @@ export const forgetsSecret = { gcTime: 0 } as const;
  * was made, not toasted, and once it succeeds the list is read again
  * before `onDone`, so a closing dialog already shows the change. One
  * whose variables or answer carry a secret says so with `secret`, and is
- * then kept as {@link forgetsSecret} says.
+ * then kept as {@link forgetsSecret} says. `onDone` is given the answer
+ * and, unlike a callback of `mutate`, runs even when reading the list
+ * again replaced the screen that made the change.
  */
 export function useListMutation<Variables, Data = unknown>(
   mutationFn: (variables: Variables) => Promise<Data>,
   list: QueryKey,
-  onDone: () => void,
+  onDone: (data: Data) => void,
   { secret = false }: { secret?: boolean } = {},
 ) {
   const queryClient = useQueryClient();
@@ -28,9 +30,9 @@ export function useListMutation<Variables, Data = unknown>(
     mutationFn,
     ...(secret ? forgetsSecret : {}),
     meta: { toast: false },
-    onSuccess: async () => {
+    onSuccess: async (data: Data) => {
       await queryClient.invalidateQueries({ queryKey: list });
-      onDone();
+      onDone(data);
     },
   });
 }
