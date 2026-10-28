@@ -5,6 +5,7 @@ package governance
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
@@ -56,6 +57,54 @@ type AuditReader interface {
 	Entries(ctx context.Context, f AuditFilter, after governance.EntryID, limit int) ([]governance.Entry, error)
 	// Entry returns the entry of project with entryID, or ErrNotFound.
 	Entry(ctx context.Context, project workspace.ProjectID, entryID governance.EntryID) (governance.Entry, error)
+}
+
+// AuditExporter reads the audit log whole, for a download.
+type AuditExporter interface {
+	// CountEntries returns how many entries match f, or limit when more do.
+	CountEntries(ctx context.Context, f AuditFilter, limit int) (int, error)
+	// EachEntry calls fn with every entry matching f, newest first, as it is
+	// read, and stops at the first error fn returns.
+	EachEntry(ctx context.Context, f AuditFilter, fn func(governance.Entry) error) error
+}
+
+// Snapshotter runs a read in one consistent view of the database.
+type Snapshotter interface {
+	Snapshot(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+// ExportAuditEntries reads the entries of a download.
+type ExportAuditEntries struct {
+	snapshots Snapshotter
+	store     AuditExporter
+	max       int
+}
+
+// NewExportAuditEntries returns the handler, which refuses a download of
+// more than limit entries.
+func NewExportAuditEntries(snapshots Snapshotter, store AuditExporter, limit int) *ExportAuditEntries {
+	return &ExportAuditEntries{snapshots: snapshots, store: store, max: limit}
+}
+
+// Handle counts the entries matching f and refuses ErrExportTooLarge above
+// the cap. Otherwise it calls begin once, so the caller can start its
+// answer, then each with every entry newest first. The count and the entries
+// are read from one snapshot, so the entries streamed are the ones counted.
+func (h *ExportAuditEntries) Handle(ctx context.Context, f AuditFilter, begin func() error, each func(governance.Entry) error) error {
+	return h.snapshots.Snapshot(ctx, func(ctx context.Context) error {
+		n, err := h.store.CountEntries(ctx, f, h.max+1)
+		if err != nil {
+			return err
+		}
+		if n > h.max {
+			return apperrors.Invalid("export_too_large", fmt.Sprintf(
+				"the filters match more than %d entries, the most one download holds; narrow them with from and to", h.max))
+		}
+		if err := begin(); err != nil {
+			return err
+		}
+		return h.store.EachEntry(ctx, f, each)
+	})
 }
 
 // ListAuditEntries reads the audit log a page at a time.

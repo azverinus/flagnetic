@@ -2796,6 +2796,11 @@ export type AuditKillSwitch = boolean;
 export type AuditChangeRequest = string;
 
 /**
+ * The download's format, JSON Lines unless `csv` is asked for.
+ */
+export type AuditExportFormat = "jsonl" | "csv";
+
+/**
  * Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
  */
 export type AuditQ = string;
@@ -10188,6 +10193,113 @@ export type ListProjectAuditEntriesResponses = {
 export type ListProjectAuditEntriesResponse =
   ListProjectAuditEntriesResponses[keyof ListProjectAuditEntriesResponses];
 
+export type ExportProjectAuditEntriesData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: {
+    /**
+     * A member's identifier; their own changes and those of their personal access tokens.
+     */
+    actor?: string;
+    actor_kind?: ActorKind;
+    /**
+     * An action, such as `environment.updated`.
+     */
+    action?: string;
+    /**
+     * A kind of entity, such as `environment`.
+     */
+    entity_kind?: string;
+    /**
+     * An entity's identifier, which follows the entity whatever key it had.
+     */
+    entity_id?: string;
+    /**
+     * An environment's identifier; entries addressing no environment are left out.
+     */
+    environment?: string;
+    /**
+     * The earliest time of an entry, included.
+     */
+    from?: string;
+    /**
+     * The latest time of an entry, included.
+     */
+    to?: string;
+    /**
+     * Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
+     */
+    q?: string;
+    /**
+     * Lists only the entries of kill switches when true, only the others when false.
+     */
+    kill_switch?: boolean;
+    /**
+     * A change request's identifier; lists the entries its application wrote.
+     */
+    change_request?: string;
+    /**
+     * The download's format, JSON Lines unless `csv` is asked for.
+     */
+    format?: "jsonl" | "csv";
+  };
+  url: "/projects/{project}/audit/export";
+};
+
+export type ExportProjectAuditEntriesErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type ExportProjectAuditEntriesError =
+  ExportProjectAuditEntriesErrors[keyof ExportProjectAuditEntriesErrors];
+
+export type ExportProjectAuditEntriesResponses = {
+  /**
+   * One `AuditEntry` document per line, each equal to the entry as `GET /projects/{project}/audit/{entry}` reads it.
+   */
+  200: string;
+};
+
+export type ExportProjectAuditEntriesResponse =
+  ExportProjectAuditEntriesResponses[keyof ExportProjectAuditEntriesResponses];
+
 export type GetProjectAuditEntryData = {
   body?: never;
   path: {
@@ -11089,6 +11201,111 @@ export type ListAuditEntriesResponses = {
 };
 
 export type ListAuditEntriesResponse = ListAuditEntriesResponses[keyof ListAuditEntriesResponses];
+
+export type ExportAuditEntriesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * The identifier of the project whose entries to download, kept by its entries after the project is gone.
+     */
+    project?: string;
+    /**
+     * A member's identifier; their own changes and those of their personal access tokens.
+     */
+    actor?: string;
+    actor_kind?: ActorKind;
+    /**
+     * An action, such as `environment.updated`.
+     */
+    action?: string;
+    /**
+     * A kind of entity, such as `environment`.
+     */
+    entity_kind?: string;
+    /**
+     * An entity's identifier, which follows the entity whatever key it had.
+     */
+    entity_id?: string;
+    /**
+     * An environment's identifier; entries addressing no environment are left out.
+     */
+    environment?: string;
+    /**
+     * The earliest time of an entry, included.
+     */
+    from?: string;
+    /**
+     * The latest time of an entry, included.
+     */
+    to?: string;
+    /**
+     * Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
+     */
+    q?: string;
+    /**
+     * Lists only the entries of kill switches when true, only the others when false.
+     */
+    kill_switch?: boolean;
+    /**
+     * A change request's identifier; lists the entries its application wrote.
+     */
+    change_request?: string;
+    /**
+     * The download's format, JSON Lines unless `csv` is asked for.
+     */
+    format?: "jsonl" | "csv";
+  };
+  url: "/audit/export";
+};
+
+export type ExportAuditEntriesErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type ExportAuditEntriesError = ExportAuditEntriesErrors[keyof ExportAuditEntriesErrors];
+
+export type ExportAuditEntriesResponses = {
+  /**
+   * One `AuditEntry` document per line, each equal to the entry as `GET /projects/{project}/audit/{entry}` reads it.
+   */
+  200: string;
+};
+
+export type ExportAuditEntriesResponse =
+  ExportAuditEntriesResponses[keyof ExportAuditEntriesResponses];
 
 export type ListWebhookEventTypesData = {
   body?: never;

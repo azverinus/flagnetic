@@ -108,9 +108,10 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		WebhookTargets: governance.TargetPolicy{
 			AllowHTTP: cfg.WebhookAllowHTTP, AllowPrivateNetworks: cfg.WebhookAllowPrivateNetworks,
 		},
-		WebhookTick:          cfg.WebhookTick,
-		WebhookSecretOverlap: cfg.WebhookSecretOverlap,
-		Options:              management.Options{BaseURL: cfg.BaseURL, InsecureCookies: cfg.InsecureCookies},
+		AuditExportMaxEntries: cfg.AuditExportMaxEntries,
+		WebhookTick:           cfg.WebhookTick,
+		WebhookSecretOverlap:  cfg.WebhookSecretOverlap,
+		Options:               management.Options{BaseURL: cfg.BaseURL, InsecureCookies: cfg.InsecureCookies},
 	})
 	// Run on every way out, after the requests are done.
 	defer background.Close()

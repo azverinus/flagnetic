@@ -139,6 +139,12 @@ import type {
   EvaluateData,
   EvaluateErrors,
   EvaluateResponses,
+  ExportAuditEntriesData,
+  ExportAuditEntriesErrors,
+  ExportAuditEntriesResponses,
+  ExportProjectAuditEntriesData,
+  ExportProjectAuditEntriesErrors,
+  ExportProjectAuditEntriesResponses,
   GetAttributeData,
   GetAttributeErrors,
   GetAttributeResponses,
@@ -3669,6 +3675,47 @@ export const listProjectAuditEntries = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Download the project's audit log
+ *
+ * Downloads the entries the list would return for the same filters, in
+ * one response and not a page at a time: `format=jsonl` (the default)
+ * writes one entry per line, each equal to the entry as the list reads
+ * it; `format=csv` writes a header row and one row per entry, with
+ * `before` and `after` as compact JSON and every cell that begins with
+ * `=`, `+`, `-`, `@`, a tab or a carriage return prefixed with `'`, so
+ * that a spreadsheet shows it as text.
+ *
+ * The entries are counted first: a filter matching more than
+ * `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
+ * `export_too_large` before anything is sent; narrow it with `from` and
+ * `to`. The entries are then streamed from one snapshot of the log.
+ *
+ */
+export const exportProjectAuditEntries = <ThrowOnError extends boolean = false>(
+  options: Options<ExportProjectAuditEntriesData, ThrowOnError>,
+): RequestResult<
+  ExportProjectAuditEntriesResponses,
+  ExportProjectAuditEntriesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ExportProjectAuditEntriesResponses,
+    ExportProjectAuditEntriesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/audit/export",
+    ...options,
+  });
+
+/**
  * One audit entry of the project
  *
  * An entry of another project, or of none, is not found here.
@@ -4101,6 +4148,45 @@ export const listAuditEntries = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/audit",
+    ...options,
+  });
+
+/**
+ * Download the instance's audit log
+ *
+ * Downloads the entries the list would return for the same filters, in
+ * one response and not a page at a time: `format=jsonl` (the default)
+ * writes one entry per line, each equal to the entry as the list reads
+ * it; `format=csv` writes a header row and one row per entry, with
+ * `before` and `after` as compact JSON and every cell that begins with
+ * `=`, `+`, `-`, `@`, a tab or a carriage return prefixed with `'`, so
+ * that a spreadsheet shows it as text.
+ *
+ * The entries are counted first: a filter matching more than
+ * `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
+ * `export_too_large` before anything is sent; narrow it with `from` and
+ * `to`. The entries are then streamed from one snapshot of the log.
+ *
+ * `project` narrows it to one project's entries.
+ *
+ */
+export const exportAuditEntries = <ThrowOnError extends boolean = false>(
+  options?: Options<ExportAuditEntriesData, ThrowOnError>,
+): RequestResult<ExportAuditEntriesResponses, ExportAuditEntriesErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ExportAuditEntriesResponses,
+    ExportAuditEntriesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/audit/export",
     ...options,
   });
 

@@ -65,9 +65,9 @@ func (a *api) GetProjectAuditEntry(ctx context.Context, req GetProjectAuditEntry
 	return GetProjectAuditEntry200JSONResponse(auditEntryOut(e)), nil
 }
 
-// auditPage answers the page of the log of project (zero for the whole
-// instance) that q asks for.
-func (a *api) auditPage(ctx context.Context, project workspace.ProjectID, q ListProjectAuditEntriesParams) (AuditEntryList, error) {
+// auditFilter returns the filter that q asks for, over project's entries
+// (zero for the whole instance).
+func auditFilter(project workspace.ProjectID, q ListProjectAuditEntriesParams) appgovernance.AuditFilter {
 	f := appgovernance.AuditFilter{
 		Project: project, Action: valueOf(q.Action), EntityKind: valueOf(q.EntityKind), EntityID: valueOf(q.EntityId), Q: valueOf(q.Q),
 		KillSwitch: q.KillSwitch,
@@ -90,6 +90,13 @@ func (a *api) auditPage(ctx context.Context, project workspace.ProjectID, q List
 	if q.To != nil {
 		f.To = *q.To
 	}
+	return f
+}
+
+// auditPage answers the page of the log of project (zero for the whole
+// instance) that q asks for.
+func (a *api) auditPage(ctx context.Context, project workspace.ProjectID, q ListProjectAuditEntriesParams) (AuditEntryList, error) {
+	f := auditFilter(project, q)
 	page := appgovernance.AuditPage{Limit: defaultAuditLimit}
 	if q.Limit != nil {
 		if *q.Limit < 1 || *q.Limit > maxAuditLimit {

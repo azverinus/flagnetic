@@ -685,6 +685,60 @@ func (e WebhookDisabledReason) Valid() bool {
 	}
 }
 
+// Defines values for AuditExportFormat.
+const (
+	AuditExportFormatCsv   AuditExportFormat = "csv"
+	AuditExportFormatJsonl AuditExportFormat = "jsonl"
+)
+
+// Valid indicates whether the value is a known member of the AuditExportFormat enum.
+func (e AuditExportFormat) Valid() bool {
+	switch e {
+	case AuditExportFormatCsv:
+		return true
+	case AuditExportFormatJsonl:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ExportAuditEntriesParamsFormat.
+const (
+	ExportAuditEntriesParamsFormatCsv   ExportAuditEntriesParamsFormat = "csv"
+	ExportAuditEntriesParamsFormatJsonl ExportAuditEntriesParamsFormat = "jsonl"
+)
+
+// Valid indicates whether the value is a known member of the ExportAuditEntriesParamsFormat enum.
+func (e ExportAuditEntriesParamsFormat) Valid() bool {
+	switch e {
+	case ExportAuditEntriesParamsFormatCsv:
+		return true
+	case ExportAuditEntriesParamsFormatJsonl:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ExportProjectAuditEntriesParamsFormat.
+const (
+	ExportProjectAuditEntriesParamsFormatCsv   ExportProjectAuditEntriesParamsFormat = "csv"
+	ExportProjectAuditEntriesParamsFormatJsonl ExportProjectAuditEntriesParamsFormat = "jsonl"
+)
+
+// Valid indicates whether the value is a known member of the ExportProjectAuditEntriesParamsFormat enum.
+func (e ExportProjectAuditEntriesParamsFormat) Valid() bool {
+	switch e {
+	case ExportProjectAuditEntriesParamsFormatCsv:
+		return true
+	case ExportProjectAuditEntriesParamsFormatJsonl:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListFlagsParamsState.
 const (
 	ListFlagsParamsStateExperiment ListFlagsParamsState = "experiment"
@@ -3389,6 +3443,9 @@ type AuditEntityKind = string
 // AuditEnvironment defines model for AuditEnvironment.
 type AuditEnvironment = openapi_types.UUID
 
+// AuditExportFormat defines model for AuditExportFormat.
+type AuditExportFormat string
+
 // AuditFrom defines model for AuditFrom.
 type AuditFrom = time.Time
 
@@ -3534,6 +3591,49 @@ type ListAuditEntriesParams struct {
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ExportAuditEntriesParams defines parameters for ExportAuditEntries.
+type ExportAuditEntriesParams struct {
+	// Project The identifier of the project whose entries to download, kept by its entries after the project is gone.
+	Project *openapi_types.UUID `form:"project,omitempty" json:"project,omitempty"`
+
+	// Actor A member's identifier; their own changes and those of their personal access tokens.
+	Actor     *AuditActor     `form:"actor,omitempty" json:"actor,omitempty"`
+	ActorKind *AuditActorKind `form:"actor_kind,omitempty" json:"actor_kind,omitempty"`
+
+	// Action An action, such as `environment.updated`.
+	Action *AuditAction `form:"action,omitempty" json:"action,omitempty"`
+
+	// EntityKind A kind of entity, such as `environment`.
+	EntityKind *AuditEntityKind `form:"entity_kind,omitempty" json:"entity_kind,omitempty"`
+
+	// EntityId An entity's identifier, which follows the entity whatever key it had.
+	EntityId *AuditEntityID `form:"entity_id,omitempty" json:"entity_id,omitempty"`
+
+	// Environment An environment's identifier; entries addressing no environment are left out.
+	Environment *AuditEnvironment `form:"environment,omitempty" json:"environment,omitempty"`
+
+	// From The earliest time of an entry, included.
+	From *AuditFrom `form:"from,omitempty" json:"from,omitempty"`
+
+	// To The latest time of an entry, included.
+	To *AuditTo `form:"to,omitempty" json:"to,omitempty"`
+
+	// Q Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
+	Q *AuditQ `form:"q,omitempty" json:"q,omitempty"`
+
+	// KillSwitch Lists only the entries of kill switches when true, only the others when false.
+	KillSwitch *AuditKillSwitch `form:"kill_switch,omitempty" json:"kill_switch,omitempty"`
+
+	// ChangeRequest A change request's identifier; lists the entries its application wrote.
+	ChangeRequest *AuditChangeRequest `form:"change_request,omitempty" json:"change_request,omitempty"`
+
+	// Format The download's format, JSON Lines unless `csv` is asked for.
+	Format *ExportAuditEntriesParamsFormat `form:"format,omitempty" json:"format,omitempty"`
+}
+
+// ExportAuditEntriesParamsFormat defines parameters for ExportAuditEntries.
+type ExportAuditEntriesParamsFormat string
+
 // RevokeMySessionsParams defines parameters for RevokeMySessions.
 type RevokeMySessionsParams struct {
 	// IncludeCurrent Revoke the session this request is signed in to as well.
@@ -3628,6 +3728,46 @@ type ListProjectAuditEntriesParams struct {
 	// Limit How many entries a page holds at most.
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
+
+// ExportProjectAuditEntriesParams defines parameters for ExportProjectAuditEntries.
+type ExportProjectAuditEntriesParams struct {
+	// Actor A member's identifier; their own changes and those of their personal access tokens.
+	Actor     *AuditActor     `form:"actor,omitempty" json:"actor,omitempty"`
+	ActorKind *AuditActorKind `form:"actor_kind,omitempty" json:"actor_kind,omitempty"`
+
+	// Action An action, such as `environment.updated`.
+	Action *AuditAction `form:"action,omitempty" json:"action,omitempty"`
+
+	// EntityKind A kind of entity, such as `environment`.
+	EntityKind *AuditEntityKind `form:"entity_kind,omitempty" json:"entity_kind,omitempty"`
+
+	// EntityId An entity's identifier, which follows the entity whatever key it had.
+	EntityId *AuditEntityID `form:"entity_id,omitempty" json:"entity_id,omitempty"`
+
+	// Environment An environment's identifier; entries addressing no environment are left out.
+	Environment *AuditEnvironment `form:"environment,omitempty" json:"environment,omitempty"`
+
+	// From The earliest time of an entry, included.
+	From *AuditFrom `form:"from,omitempty" json:"from,omitempty"`
+
+	// To The latest time of an entry, included.
+	To *AuditTo `form:"to,omitempty" json:"to,omitempty"`
+
+	// Q Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
+	Q *AuditQ `form:"q,omitempty" json:"q,omitempty"`
+
+	// KillSwitch Lists only the entries of kill switches when true, only the others when false.
+	KillSwitch *AuditKillSwitch `form:"kill_switch,omitempty" json:"kill_switch,omitempty"`
+
+	// ChangeRequest A change request's identifier; lists the entries its application wrote.
+	ChangeRequest *AuditChangeRequest `form:"change_request,omitempty" json:"change_request,omitempty"`
+
+	// Format The download's format, JSON Lines unless `csv` is asked for.
+	Format *ExportProjectAuditEntriesParamsFormat `form:"format,omitempty" json:"format,omitempty"`
+}
+
+// ExportProjectAuditEntriesParamsFormat defines parameters for ExportProjectAuditEntries.
+type ExportProjectAuditEntriesParamsFormat string
 
 // ListChangeRequestsParams defines parameters for ListChangeRequests.
 type ListChangeRequestsParams struct {
@@ -4626,6 +4766,26 @@ type ClientInterface interface {
 	// Corresponds with GET /audit (the `ListAuditEntries` operationId).
 	ListAuditEntries(ctx context.Context, params *ListAuditEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ExportAuditEntries Download the instance's audit log
+	//
+	// Downloads the entries the list would return for the same filters, in
+	// one response and not a page at a time: `format=jsonl` (the default)
+	// writes one entry per line, each equal to the entry as the list reads
+	// it; `format=csv` writes a header row and one row per entry, with
+	// `before` and `after` as compact JSON and every cell that begins with
+	// `=`, `+`, `-`, `@`, a tab or a carriage return prefixed with `'`, so
+	// that a spreadsheet shows it as text.
+	//
+	// The entries are counted first: a filter matching more than
+	// `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
+	// `export_too_large` before anything is sent; narrow it with `from` and
+	// `to`. The entries are then streamed from one snapshot of the log.
+	//
+	// `project` narrows it to one project's entries.
+	//
+	// Corresponds with GET /audit/export (the `ExportAuditEntries` operationId).
+	ExportAuditEntries(ctx context.Context, params *ExportAuditEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetInvitation What an invitation's link opens
 	//
 	// Read before anyone is signed in, to show the invited person whose
@@ -5209,6 +5369,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/audit (the `ListProjectAuditEntries` operationId).
 	ListProjectAuditEntries(ctx context.Context, project ProjectKey, params *ListProjectAuditEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExportProjectAuditEntries Download the project's audit log
+	//
+	// Downloads the entries the list would return for the same filters, in
+	// one response and not a page at a time: `format=jsonl` (the default)
+	// writes one entry per line, each equal to the entry as the list reads
+	// it; `format=csv` writes a header row and one row per entry, with
+	// `before` and `after` as compact JSON and every cell that begins with
+	// `=`, `+`, `-`, `@`, a tab or a carriage return prefixed with `'`, so
+	// that a spreadsheet shows it as text.
+	//
+	// The entries are counted first: a filter matching more than
+	// `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
+	// `export_too_large` before anything is sent; narrow it with `from` and
+	// `to`. The entries are then streamed from one snapshot of the log.
+	//
+	// Corresponds with GET /projects/{project}/audit/export (the `ExportProjectAuditEntries` operationId).
+	ExportProjectAuditEntries(ctx context.Context, project ProjectKey, params *ExportProjectAuditEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetProjectAuditEntry One audit entry of the project
 	//
@@ -7134,6 +7312,36 @@ func (c *Client) ListAuditEntries(ctx context.Context, params *ListAuditEntriesP
 	return c.Client.Do(req)
 }
 
+// ExportAuditEntries Download the instance's audit log
+//
+// Downloads the entries the list would return for the same filters, in
+// one response and not a page at a time: `format=jsonl` (the default)
+// writes one entry per line, each equal to the entry as the list reads
+// it; `format=csv` writes a header row and one row per entry, with
+// `before` and `after` as compact JSON and every cell that begins with
+// `=`, `+`, `-`, `@`, a tab or a carriage return prefixed with `'`, so
+// that a spreadsheet shows it as text.
+//
+// The entries are counted first: a filter matching more than
+// `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
+// `export_too_large` before anything is sent; narrow it with `from` and
+// `to`. The entries are then streamed from one snapshot of the log.
+//
+// `project` narrows it to one project's entries.
+//
+// Corresponds with GET /audit/export (the `ExportAuditEntries` operationId).
+func (c *Client) ExportAuditEntries(ctx context.Context, params *ExportAuditEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportAuditEntriesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetInvitation What an invitation's link opens
 //
 // Read before anyone is signed in, to show the invited person whose
@@ -8248,6 +8456,34 @@ func (c *Client) UpdateAttribute(ctx context.Context, project ProjectKey, attrib
 // Corresponds with GET /projects/{project}/audit (the `ListProjectAuditEntries` operationId).
 func (c *Client) ListProjectAuditEntries(ctx context.Context, project ProjectKey, params *ListProjectAuditEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListProjectAuditEntriesRequest(c.Server, project, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ExportProjectAuditEntries Download the project's audit log
+//
+// Downloads the entries the list would return for the same filters, in
+// one response and not a page at a time: `format=jsonl` (the default)
+// writes one entry per line, each equal to the entry as the list reads
+// it; `format=csv` writes a header row and one row per entry, with
+// `before` and `after` as compact JSON and every cell that begins with
+// `=`, `+`, `-`, `@`, a tab or a carriage return prefixed with `'`, so
+// that a spreadsheet shows it as text.
+//
+// The entries are counted first: a filter matching more than
+// `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
+// `export_too_large` before anything is sent; narrow it with `from` and
+// `to`. The entries are then streamed from one snapshot of the log.
+//
+// Corresponds with GET /projects/{project}/audit/export (the `ExportProjectAuditEntries` operationId).
+func (c *Client) ExportProjectAuditEntries(ctx context.Context, project ProjectKey, params *ExportProjectAuditEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportProjectAuditEntriesRequest(c.Server, project, params)
 	if err != nil {
 		return nil, err
 	}
@@ -11772,6 +12008,204 @@ func NewListAuditEntriesRequest(server string, params *ListAuditEntriesParams) (
 	return req, nil
 }
 
+// NewExportAuditEntriesRequest constructs an http.Request for the ExportAuditEntries method
+func NewExportAuditEntriesRequest(server string, params *ExportAuditEntriesParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/audit/export")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Project != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "project", *params.Project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Actor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "actor", *params.Actor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ActorKind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "actor_kind", *params.ActorKind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Action != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "action", *params.Action, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.EntityKind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "entity_kind", *params.EntityKind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.EntityId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "entity_id", *params.EntityId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Environment != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "environment", *params.Environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.From != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", *params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.To != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", *params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Q != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.KillSwitch != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "kill_switch", *params.KillSwitch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ChangeRequest != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "change_request", *params.ChangeRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Format != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "format", *params.Format, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetInvitationRequest constructs an http.Request for the GetInvitation method
 func NewGetInvitationRequest(server string, secret string) (*http.Request, error) {
 	var err error
@@ -13539,6 +13973,199 @@ func NewListProjectAuditEntriesRequest(server string, project ProjectKey, params
 		if params.Limit != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewExportProjectAuditEntriesRequest constructs an http.Request for the ExportProjectAuditEntries method
+func NewExportProjectAuditEntriesRequest(server string, project ProjectKey, params *ExportProjectAuditEntriesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/audit/export", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Actor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "actor", *params.Actor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ActorKind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "actor_kind", *params.ActorKind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Action != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "action", *params.Action, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.EntityKind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "entity_kind", *params.EntityKind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.EntityId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "entity_id", *params.EntityId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Environment != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "environment", *params.Environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.From != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", *params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.To != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", *params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Q != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.KillSwitch != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "kill_switch", *params.KillSwitch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ChangeRequest != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "change_request", *params.ChangeRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Format != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "format", *params.Format, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -19615,6 +20242,28 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /audit (the `ListAuditEntries` operationId).
 	ListAuditEntriesWithResponse(ctx context.Context, params *ListAuditEntriesParams, reqEditors ...RequestEditorFn) (*ListAuditEntriesResponse, error)
 
+	// ExportAuditEntriesWithResponse Download the instance's audit log
+	//
+	// Downloads the entries the list would return for the same filters, in
+	// one response and not a page at a time: `format=jsonl` (the default)
+	// writes one entry per line, each equal to the entry as the list reads
+	// it; `format=csv` writes a header row and one row per entry, with
+	// `before` and `after` as compact JSON and every cell that begins with
+	// `=`, `+`, `-`, `@`, a tab or a carriage return prefixed with `'`, so
+	// that a spreadsheet shows it as text.
+	//
+	// The entries are counted first: a filter matching more than
+	// `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
+	// `export_too_large` before anything is sent; narrow it with `from` and
+	// `to`. The entries are then streamed from one snapshot of the log.
+	//
+	// `project` narrows it to one project's entries.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /audit/export (the `ExportAuditEntries` operationId).
+	ExportAuditEntriesWithResponse(ctx context.Context, params *ExportAuditEntriesParams, reqEditors ...RequestEditorFn) (*ExportAuditEntriesResponse, error)
+
 	// GetInvitationWithResponse What an invitation's link opens
 	//
 	// Read before anyone is signed in, to show the invited person whose
@@ -20256,6 +20905,26 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/audit (the `ListProjectAuditEntries` operationId).
 	ListProjectAuditEntriesWithResponse(ctx context.Context, project ProjectKey, params *ListProjectAuditEntriesParams, reqEditors ...RequestEditorFn) (*ListProjectAuditEntriesResponse, error)
+
+	// ExportProjectAuditEntriesWithResponse Download the project's audit log
+	//
+	// Downloads the entries the list would return for the same filters, in
+	// one response and not a page at a time: `format=jsonl` (the default)
+	// writes one entry per line, each equal to the entry as the list reads
+	// it; `format=csv` writes a header row and one row per entry, with
+	// `before` and `after` as compact JSON and every cell that begins with
+	// `=`, `+`, `-`, `@`, a tab or a carriage return prefixed with `'`, so
+	// that a spreadsheet shows it as text.
+	//
+	// The entries are counted first: a filter matching more than
+	// `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
+	// `export_too_large` before anything is sent; narrow it with `from` and
+	// `to`. The entries are then streamed from one snapshot of the log.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/audit/export (the `ExportProjectAuditEntries` operationId).
+	ExportProjectAuditEntriesWithResponse(ctx context.Context, project ProjectKey, params *ExportProjectAuditEntriesParams, reqEditors ...RequestEditorFn) (*ExportProjectAuditEntriesResponse, error)
 
 	// GetProjectAuditEntryWithResponse One audit entry of the project
 	//
@@ -22382,6 +23051,89 @@ func (r ListAuditEntriesResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListAuditEntriesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ExportAuditEntriesResponse200Headers the declared response headers of an HTTP 200 response for ExportAuditEntries
+type ExportAuditEntriesResponse200Headers struct {
+	ContentDisposition *string
+}
+
+// ExportAuditEntriesResponse401Headers the declared response headers of an HTTP 401 response for ExportAuditEntries
+type ExportAuditEntriesResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ExportAuditEntriesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ExportAuditEntriesResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ExportAuditEntriesResponse401Headers
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ExportAuditEntriesResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ExportAuditEntriesResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ExportAuditEntriesResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ExportAuditEntriesResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ExportAuditEntriesResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r ExportAuditEntriesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ExportAuditEntriesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExportAuditEntriesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ExportAuditEntriesResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -25491,6 +26243,89 @@ func (r ListProjectAuditEntriesResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListProjectAuditEntriesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ExportProjectAuditEntriesResponse200Headers the declared response headers of an HTTP 200 response for ExportProjectAuditEntries
+type ExportProjectAuditEntriesResponse200Headers struct {
+	ContentDisposition *string
+}
+
+// ExportProjectAuditEntriesResponse401Headers the declared response headers of an HTTP 401 response for ExportProjectAuditEntries
+type ExportProjectAuditEntriesResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ExportProjectAuditEntriesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ExportProjectAuditEntriesResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ExportProjectAuditEntriesResponse401Headers
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ExportProjectAuditEntriesResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ExportProjectAuditEntriesResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ExportProjectAuditEntriesResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ExportProjectAuditEntriesResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ExportProjectAuditEntriesResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r ExportProjectAuditEntriesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ExportProjectAuditEntriesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExportProjectAuditEntriesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ExportProjectAuditEntriesResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -34481,6 +35316,34 @@ func (c *ClientWithResponses) ListAuditEntriesWithResponse(ctx context.Context, 
 	return ParseListAuditEntriesResponse(rsp)
 }
 
+// ExportAuditEntriesWithResponse Download the instance's audit log
+//
+// Downloads the entries the list would return for the same filters, in
+// one response and not a page at a time: `format=jsonl` (the default)
+// writes one entry per line, each equal to the entry as the list reads
+// it; `format=csv` writes a header row and one row per entry, with
+// `before` and `after` as compact JSON and every cell that begins with
+// `=`, `+`, `-`, `@`, a tab or a carriage return prefixed with `'`, so
+// that a spreadsheet shows it as text.
+//
+// The entries are counted first: a filter matching more than
+// `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
+// `export_too_large` before anything is sent; narrow it with `from` and
+// `to`. The entries are then streamed from one snapshot of the log.
+//
+// `project` narrows it to one project's entries.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /audit/export (the `ExportAuditEntries` operationId).
+func (c *ClientWithResponses) ExportAuditEntriesWithResponse(ctx context.Context, params *ExportAuditEntriesParams, reqEditors ...RequestEditorFn) (*ExportAuditEntriesResponse, error) {
+	rsp, err := c.ExportAuditEntries(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExportAuditEntriesResponse(rsp)
+}
+
 // GetInvitationWithResponse What an invitation's link opens
 //
 // Read before anyone is signed in, to show the invited person whose
@@ -35445,6 +36308,32 @@ func (c *ClientWithResponses) ListProjectAuditEntriesWithResponse(ctx context.Co
 		return nil, err
 	}
 	return ParseListProjectAuditEntriesResponse(rsp)
+}
+
+// ExportProjectAuditEntriesWithResponse Download the project's audit log
+//
+// Downloads the entries the list would return for the same filters, in
+// one response and not a page at a time: `format=jsonl` (the default)
+// writes one entry per line, each equal to the entry as the list reads
+// it; `format=csv` writes a header row and one row per entry, with
+// `before` and `after` as compact JSON and every cell that begins with
+// `=`, `+`, `-`, `@`, a tab or a carriage return prefixed with `'`, so
+// that a spreadsheet shows it as text.
+//
+// The entries are counted first: a filter matching more than
+// `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
+// `export_too_large` before anything is sent; narrow it with `from` and
+// `to`. The entries are then streamed from one snapshot of the log.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/audit/export (the `ExportProjectAuditEntries` operationId).
+func (c *ClientWithResponses) ExportProjectAuditEntriesWithResponse(ctx context.Context, project ProjectKey, params *ExportProjectAuditEntriesParams, reqEditors ...RequestEditorFn) (*ExportProjectAuditEntriesResponse, error) {
+	rsp, err := c.ExportProjectAuditEntries(ctx, project, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExportProjectAuditEntriesResponse(rsp)
 }
 
 // GetProjectAuditEntryWithResponse One audit entry of the project
@@ -38408,6 +39297,83 @@ func ParseListAuditEntriesResponse(rsp *http.Response) (*ListAuditEntriesRespons
 	return response, nil
 }
 
+// ParseExportAuditEntriesResponse parses an HTTP response from a ExportAuditEntriesWithResponse call
+func ParseExportAuditEntriesResponse(rsp *http.Response) (*ExportAuditEntriesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExportAuditEntriesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ExportAuditEntriesResponse200Headers
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers ExportAuditEntriesResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseGetInvitationResponse parses an HTTP response from a GetInvitationWithResponse call
 func ParseGetInvitationResponse(rsp *http.Response) (*GetInvitationResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -41216,6 +42182,83 @@ func ParseListProjectAuditEntriesResponse(rsp *http.Response) (*ListProjectAudit
 	switch {
 	case rsp.StatusCode == 401:
 		var headers ListProjectAuditEntriesResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseExportProjectAuditEntriesResponse parses an HTTP response from a ExportProjectAuditEntriesWithResponse call
+func ParseExportProjectAuditEntriesResponse(rsp *http.Response) (*ExportProjectAuditEntriesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExportProjectAuditEntriesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ExportProjectAuditEntriesResponse200Headers
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers ExportProjectAuditEntriesResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -49448,6 +50491,9 @@ type ServerInterface interface {
 	// ListAuditEntries The instance's audit log
 	// (GET /audit)
 	ListAuditEntries(w http.ResponseWriter, r *http.Request, params ListAuditEntriesParams)
+	// ExportAuditEntries Download the instance's audit log
+	// (GET /audit/export)
+	ExportAuditEntries(w http.ResponseWriter, r *http.Request, params ExportAuditEntriesParams)
 	// GetInvitation What an invitation's link opens
 	// (GET /auth/invitations/{secret})
 	GetInvitation(w http.ResponseWriter, r *http.Request, secret string)
@@ -49571,6 +50617,9 @@ type ServerInterface interface {
 	// ListProjectAuditEntries The project's audit log
 	// (GET /projects/{project}/audit)
 	ListProjectAuditEntries(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListProjectAuditEntriesParams)
+	// ExportProjectAuditEntries Download the project's audit log
+	// (GET /projects/{project}/audit/export)
+	ExportProjectAuditEntries(w http.ResponseWriter, r *http.Request, project ProjectKey, params ExportProjectAuditEntriesParams)
 	// GetProjectAuditEntry One audit entry of the project
 	// (GET /projects/{project}/audit/{entry})
 	GetProjectAuditEntry(w http.ResponseWriter, r *http.Request, project ProjectKey, entry string)
@@ -50093,6 +51142,195 @@ func (siw *ServerInterfaceWrapper) ListAuditEntries(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAuditEntries(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExportAuditEntries operation middleware
+func (siw *ServerInterfaceWrapper) ExportAuditEntries(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExportAuditEntriesParams
+
+	// ------------- Optional query parameter "project" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "project", r.URL.Query(), &params.Project, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "project"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "actor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "actor", r.URL.Query(), &params.Actor, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "actor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "actor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "actor_kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "actor_kind", r.URL.Query(), &params.ActorKind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "actor_kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "actor_kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "action" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "action", r.URL.Query(), &params.Action, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "action"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "action", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "entity_kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "entity_kind", r.URL.Query(), &params.EntityKind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "entity_kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "entity_kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "entity_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "entity_id", r.URL.Query(), &params.EntityId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "entity_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "entity_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "kill_switch" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kill_switch", r.URL.Query(), &params.KillSwitch, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kill_switch"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kill_switch", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "change_request" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "change_request", r.URL.Query(), &params.ChangeRequest, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "change_request"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "change_request", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "format" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "format", r.URL.Query(), &params.Format, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "format"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "format", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExportAuditEntries(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -51340,6 +52578,191 @@ func (siw *ServerInterfaceWrapper) ListProjectAuditEntries(w http.ResponseWriter
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListProjectAuditEntries(w, r, project, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExportProjectAuditEntries operation middleware
+func (siw *ServerInterfaceWrapper) ExportProjectAuditEntries(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExportProjectAuditEntriesParams
+
+	// ------------- Optional query parameter "actor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "actor", r.URL.Query(), &params.Actor, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "actor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "actor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "actor_kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "actor_kind", r.URL.Query(), &params.ActorKind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "actor_kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "actor_kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "action" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "action", r.URL.Query(), &params.Action, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "action"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "action", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "entity_kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "entity_kind", r.URL.Query(), &params.EntityKind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "entity_kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "entity_kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "entity_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "entity_id", r.URL.Query(), &params.EntityId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "entity_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "entity_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "kill_switch" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kill_switch", r.URL.Query(), &params.KillSwitch, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kill_switch"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kill_switch", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "change_request" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "change_request", r.URL.Query(), &params.ChangeRequest, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "change_request"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "change_request", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "format" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "format", r.URL.Query(), &params.Format, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "format"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "format", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExportProjectAuditEntries(w, r, project, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -56653,6 +58076,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/tokens", wrapper.CreateProjectToken)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/tokens/{token}", wrapper.RevokeProjectToken)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/audit", wrapper.ListProjectAuditEntries)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/audit/export", wrapper.ExportProjectAuditEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/audit/{entry}", wrapper.GetProjectAuditEntry)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/stream", wrapper.StreamProjectChanges)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members", wrapper.ListMembers)
@@ -56669,6 +58093,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-settings", wrapper.GetAuthSettings)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/auth-settings", wrapper.UpdateAuthSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit", wrapper.ListAuditEntries)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/export", wrapper.ExportAuditEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/webhook-event-types", wrapper.ListWebhookEventTypes)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/webhooks", wrapper.ListWebhooks)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/webhooks", wrapper.CreateWebhook)
@@ -56828,6 +58253,172 @@ func (response ListAuditEntries404ApplicationProblemPlusJSONResponse) VisitListA
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportAuditEntriesRequestObject struct {
+	Params ExportAuditEntriesParams
+}
+
+type ExportAuditEntriesResponseObject interface {
+	VisitExportAuditEntriesResponse(w http.ResponseWriter) error
+}
+
+type ExportAuditEntries200ResponseHeaders struct {
+	ContentDisposition *string
+}
+
+type ExportAuditEntries200ApplicationxNdjsonResponse struct {
+	Body          io.Reader
+	Headers       ExportAuditEntries200ResponseHeaders
+	ContentLength int64
+}
+
+func (response ExportAuditEntries200ApplicationxNdjsonResponse) VisitExportAuditEntriesResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	if response.Headers.ContentDisposition != nil {
+		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		// If w doesn't support flushing, fall back to io.Copy.
+		_, err := io.Copy(w, response.Body)
+		return err
+	}
+	// text/event-stream messages are typically small; use a
+	// modest buffer and flush after each chunk so clients see
+	// events immediately instead of waiting on OS buffering.
+	buf := make([]byte, 4096)
+	for {
+		n, err := response.Body.Read(buf)
+		if n > 0 {
+			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+				return writeErr
+			}
+			flusher.Flush()
+		}
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+	}
+}
+
+type ExportAuditEntries200TextcsvResponse struct {
+	Body          io.Reader
+	Headers       ExportAuditEntries200ResponseHeaders
+	ContentLength int64
+}
+
+func (response ExportAuditEntries200TextcsvResponse) VisitExportAuditEntriesResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "text/csv")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	if response.Headers.ContentDisposition != nil {
+		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type ExportAuditEntries400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ExportAuditEntries400ApplicationProblemPlusJSONResponse) VisitExportAuditEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportAuditEntries401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ExportAuditEntries401ApplicationProblemPlusJSONResponse) VisitExportAuditEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportAuditEntries403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ExportAuditEntries403ApplicationProblemPlusJSONResponse) VisitExportAuditEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportAuditEntries404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ExportAuditEntries404ApplicationProblemPlusJSONResponse) VisitExportAuditEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportAuditEntries422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response ExportAuditEntries422ApplicationProblemPlusJSONResponse) VisitExportAuditEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -60391,6 +61982,173 @@ func (response ListProjectAuditEntries404ApplicationProblemPlusJSONResponse) Vis
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportProjectAuditEntriesRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Params  ExportProjectAuditEntriesParams
+}
+
+type ExportProjectAuditEntriesResponseObject interface {
+	VisitExportProjectAuditEntriesResponse(w http.ResponseWriter) error
+}
+
+type ExportProjectAuditEntries200ResponseHeaders struct {
+	ContentDisposition *string
+}
+
+type ExportProjectAuditEntries200ApplicationxNdjsonResponse struct {
+	Body          io.Reader
+	Headers       ExportProjectAuditEntries200ResponseHeaders
+	ContentLength int64
+}
+
+func (response ExportProjectAuditEntries200ApplicationxNdjsonResponse) VisitExportProjectAuditEntriesResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	if response.Headers.ContentDisposition != nil {
+		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		// If w doesn't support flushing, fall back to io.Copy.
+		_, err := io.Copy(w, response.Body)
+		return err
+	}
+	// text/event-stream messages are typically small; use a
+	// modest buffer and flush after each chunk so clients see
+	// events immediately instead of waiting on OS buffering.
+	buf := make([]byte, 4096)
+	for {
+		n, err := response.Body.Read(buf)
+		if n > 0 {
+			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+				return writeErr
+			}
+			flusher.Flush()
+		}
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+	}
+}
+
+type ExportProjectAuditEntries200TextcsvResponse struct {
+	Body          io.Reader
+	Headers       ExportProjectAuditEntries200ResponseHeaders
+	ContentLength int64
+}
+
+func (response ExportProjectAuditEntries200TextcsvResponse) VisitExportProjectAuditEntriesResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "text/csv")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	if response.Headers.ContentDisposition != nil {
+		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type ExportProjectAuditEntries400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ExportProjectAuditEntries400ApplicationProblemPlusJSONResponse) VisitExportProjectAuditEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportProjectAuditEntries401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ExportProjectAuditEntries401ApplicationProblemPlusJSONResponse) VisitExportProjectAuditEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportProjectAuditEntries403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ExportProjectAuditEntries403ApplicationProblemPlusJSONResponse) VisitExportProjectAuditEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportProjectAuditEntries404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ExportProjectAuditEntries404ApplicationProblemPlusJSONResponse) VisitExportProjectAuditEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportProjectAuditEntries422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response ExportProjectAuditEntries422ApplicationProblemPlusJSONResponse) VisitExportProjectAuditEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -71877,6 +73635,9 @@ type StrictServerInterface interface {
 	// ListAuditEntries The instance's audit log
 	// (GET /audit)
 	ListAuditEntries(ctx context.Context, request ListAuditEntriesRequestObject) (ListAuditEntriesResponseObject, error)
+	// ExportAuditEntries Download the instance's audit log
+	// (GET /audit/export)
+	ExportAuditEntries(ctx context.Context, request ExportAuditEntriesRequestObject) (ExportAuditEntriesResponseObject, error)
 	// GetInvitation What an invitation's link opens
 	// (GET /auth/invitations/{secret})
 	GetInvitation(ctx context.Context, request GetInvitationRequestObject) (GetInvitationResponseObject, error)
@@ -72000,6 +73761,9 @@ type StrictServerInterface interface {
 	// ListProjectAuditEntries The project's audit log
 	// (GET /projects/{project}/audit)
 	ListProjectAuditEntries(ctx context.Context, request ListProjectAuditEntriesRequestObject) (ListProjectAuditEntriesResponseObject, error)
+	// ExportProjectAuditEntries Download the project's audit log
+	// (GET /projects/{project}/audit/export)
+	ExportProjectAuditEntries(ctx context.Context, request ExportProjectAuditEntriesRequestObject) (ExportProjectAuditEntriesResponseObject, error)
 	// GetProjectAuditEntry One audit entry of the project
 	// (GET /projects/{project}/audit/{entry})
 	GetProjectAuditEntry(ctx context.Context, request GetProjectAuditEntryRequestObject) (GetProjectAuditEntryResponseObject, error)
@@ -72378,6 +74142,32 @@ func (sh *strictHandler) ListAuditEntries(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListAuditEntriesResponseObject); ok {
 		if err := validResponse.VisitListAuditEntriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ExportAuditEntries operation middleware
+func (sh *strictHandler) ExportAuditEntries(w http.ResponseWriter, r *http.Request, params ExportAuditEntriesParams) {
+	var request ExportAuditEntriesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ExportAuditEntries(ctx, request.(ExportAuditEntriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ExportAuditEntries")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ExportAuditEntriesResponseObject); ok {
+		if err := validResponse.VisitExportAuditEntriesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -73518,6 +75308,33 @@ func (sh *strictHandler) ListProjectAuditEntries(w http.ResponseWriter, r *http.
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListProjectAuditEntriesResponseObject); ok {
 		if err := validResponse.VisitListProjectAuditEntriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ExportProjectAuditEntries operation middleware
+func (sh *strictHandler) ExportProjectAuditEntries(w http.ResponseWriter, r *http.Request, project ProjectKey, params ExportProjectAuditEntriesParams) {
+	var request ExportProjectAuditEntriesRequestObject
+
+	request.Project = project
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ExportProjectAuditEntries(ctx, request.(ExportProjectAuditEntriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ExportProjectAuditEntries")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ExportProjectAuditEntriesResponseObject); ok {
+		if err := validResponse.VisitExportProjectAuditEntriesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

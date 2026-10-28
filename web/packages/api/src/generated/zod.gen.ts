@@ -2034,6 +2034,11 @@ export const zAuditKillSwitch = z.boolean();
 export const zAuditChangeRequest = z.uuid();
 
 /**
+ * The download's format, JSON Lines unless `csv` is asked for.
+ */
+export const zAuditExportFormat = z.enum(["jsonl", "csv"]).default("jsonl");
+
+/**
  * Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
  */
 export const zAuditQ = z.string();
@@ -3454,6 +3459,30 @@ export const zListProjectAuditEntriesQuery = z.object({
  */
 export const zListProjectAuditEntriesResponse = zAuditEntryList;
 
+export const zExportProjectAuditEntriesPath = z.object({
+  project: z.string(),
+});
+
+export const zExportProjectAuditEntriesQuery = z.object({
+  actor: z.uuid().optional(),
+  actor_kind: zActorKind.optional(),
+  action: z.string().optional(),
+  entity_kind: z.string().optional(),
+  entity_id: z.string().optional(),
+  environment: z.uuid().optional(),
+  from: z.iso.datetime().optional(),
+  to: z.iso.datetime().optional(),
+  q: z.string().optional(),
+  kill_switch: z.boolean().optional(),
+  change_request: z.uuid().optional(),
+  format: z.enum(["jsonl", "csv"]).optional().default("jsonl"),
+});
+
+/**
+ * One `AuditEntry` document per line, each equal to the entry as `GET /projects/{project}/audit/{entry}` reads it.
+ */
+export const zExportProjectAuditEntriesResponse = z.string();
+
 export const zGetProjectAuditEntryPath = z.object({
   project: z.string(),
   entry: z.string(),
@@ -3611,6 +3640,27 @@ export const zListAuditEntriesQuery = z.object({
  * One page of entries, newest first.
  */
 export const zListAuditEntriesResponse = zAuditEntryList;
+
+export const zExportAuditEntriesQuery = z.object({
+  project: z.uuid().optional(),
+  actor: z.uuid().optional(),
+  actor_kind: zActorKind.optional(),
+  action: z.string().optional(),
+  entity_kind: z.string().optional(),
+  entity_id: z.string().optional(),
+  environment: z.uuid().optional(),
+  from: z.iso.datetime().optional(),
+  to: z.iso.datetime().optional(),
+  q: z.string().optional(),
+  kill_switch: z.boolean().optional(),
+  change_request: z.uuid().optional(),
+  format: z.enum(["jsonl", "csv"]).optional().default("jsonl"),
+});
+
+/**
+ * One `AuditEntry` document per line, each equal to the entry as `GET /projects/{project}/audit/{entry}` reads it.
+ */
+export const zExportAuditEntriesResponse = z.string();
 
 /**
  * The catalogue.

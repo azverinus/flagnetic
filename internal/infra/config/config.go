@@ -118,6 +118,9 @@ type Config struct {
 	// ScheduleMaxFailures is how many failed scheduled applications in a
 	// row stop the scheduler trying a change request.
 	ScheduleMaxFailures int
+	// AuditExportMaxEntries is the most entries one download of the audit
+	// log may hold.
+	AuditExportMaxEntries int
 }
 
 // RateLimits are the limits of the SDK API, each counted by every replica on
@@ -570,6 +573,16 @@ func Settings() []Setting {
 				"and records `change_request.schedule_failed`.",
 			Example: "5",
 			apply:   wholeNumber(func(c *Config, n int) { c.ScheduleMaxFailures = n }),
+		},
+		{
+			Name:    "FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES",
+			Key:     "audit_export_max_entries",
+			Default: "100000",
+			Unit:    "entries",
+			Description: "The most entries one download of the audit log may hold. A download whose filters match more is refused " +
+				"`export_too_large` before anything is sent; narrowing it by time brings it under.",
+			Example: "100000",
+			apply:   wholeNumber(func(c *Config, n int) { c.AuditExportMaxEntries = n }),
 		},
 		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE", "120", "requests per minute",
 			"Remote evaluations a client key may ask of one replica per minute, counted per key and client IP.",

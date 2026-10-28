@@ -109,9 +109,9 @@ const entryColumns = `id, occurred_at, project_id, environment_id, actor_kind, a
 	coalesce(actor_member_id::text, ''), action, entity_kind, entity_id, entity_key,
 	before, after, kill_switch, coalesce(request_id, ''), change_request_id`
 
-// Entries returns at most limit entries matching f, older than after unless
-// it is zero, newest first.
-func (l *AuditLog) Entries(ctx context.Context, f appgovernance.AuditFilter, after governance.EntryID, limit int) ([]governance.Entry, error) {
+// auditWhere returns the WHERE clause (or "") selecting the entries matching
+// f and older than after unless it is zero, and the arguments it binds.
+func auditWhere(f appgovernance.AuditFilter, after governance.EntryID) (string, []any) {
 	var (
 		conds []string
 		args  []any
@@ -163,13 +163,19 @@ func (l *AuditLog) Entries(ctx context.Context, f appgovernance.AuditFilter, aft
 	if !after.IsZero() {
 		where("id < $?", after.Bytes())
 	}
-	sql := `SELECT ` + entryColumns + ` FROM audit_entries`
-	if len(conds) > 0 {
-		sql += ` WHERE ` + strings.Join(conds, ` AND `)
+	if len(conds) == 0 {
+		return "", args
 	}
+	return ` WHERE ` + strings.Join(conds, ` AND `), args
+}
+
+// Entries returns at most limit entries matching f, older than after unless
+// it is zero, newest first.
+func (l *AuditLog) Entries(ctx context.Context, f appgovernance.AuditFilter, after governance.EntryID, limit int) ([]governance.Entry, error) {
+	where, args := auditWhere(f, after)
 	args = append(args, limit)
-	sql += ` ORDER BY id DESC LIMIT $` + strconv.Itoa(len(args))
-	rows, err := pgxtx.Querier(ctx, l.pool).Query(ctx, sql, args...)
+	rows, err := pgxtx.Querier(ctx, l.pool).Query(ctx,
+		`SELECT `+entryColumns+` FROM audit_entries`+where+` ORDER BY id DESC LIMIT $`+strconv.Itoa(len(args)), args...)
 	if err != nil {
 		return nil, fmt.Errorf("listing audit entries: %w", err)
 	}
@@ -183,6 +189,41 @@ func (l *AuditLog) Entries(ctx context.Context, f appgovernance.AuditFilter, aft
 		out = append(out, e)
 	}
 	return out, rows.Err()
+}
+
+// CountEntries returns how many entries match f, or limit when more do, so
+// the count never reads more than limit entries.
+func (l *AuditLog) CountEntries(ctx context.Context, f appgovernance.AuditFilter, limit int) (int, error) {
+	where, args := auditWhere(f, governance.EntryID{})
+	args = append(args, limit)
+	var n int
+	err := pgxtx.Querier(ctx, l.pool).QueryRow(ctx,
+		`SELECT count(*) FROM (SELECT 1 FROM audit_entries`+where+` LIMIT $`+strconv.Itoa(len(args))+`) AS matching`, args...).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("counting audit entries: %w", err)
+	}
+	return n, nil
+}
+
+// EachEntry calls fn with every entry matching f, newest first, as the
+// database sends it: no page is held in memory.
+func (l *AuditLog) EachEntry(ctx context.Context, f appgovernance.AuditFilter, fn func(governance.Entry) error) error {
+	where, args := auditWhere(f, governance.EntryID{})
+	rows, err := pgxtx.Querier(ctx, l.pool).Query(ctx, `SELECT `+entryColumns+` FROM audit_entries`+where+` ORDER BY id DESC`, args...)
+	if err != nil {
+		return fmt.Errorf("reading audit entries: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		e, err := scanEntry(rows)
+		if err != nil {
+			return err
+		}
+		if err := fn(e); err != nil {
+			return err
+		}
+	}
+	return rows.Err()
 }
 
 // escapeLike makes every character of s match itself in a LIKE pattern
