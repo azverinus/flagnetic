@@ -80,9 +80,12 @@ export function useFormConflict<
   /**
    * Reads the entity after a notice of a change by someone else, and shows
    * the banner when it is newer than the version the form names. A read
-   * that fails shows nothing: Save meets the refusal itself.
+   * that fails shows nothing: Save meets the refusal itself. A form that
+   * moved on while reading (saved, reloaded) shows nothing either.
    */
-  const meetNewer = async () => {
+  const meetNewer = async (
+    stillNewer: (version: number) => boolean = (newer) => version === undefined || newer > version,
+  ) => {
     if (conflict) return;
     const at = generation.current;
     let current: Entity;
@@ -91,11 +94,13 @@ export function useFormConflict<
     } catch {
       return;
     }
-    if (version !== undefined && current.version <= version) return;
+    if (!stillNewer(current.version)) return;
     const entries = await queryClient
       .fetchQuery({ ...entityEntriesQuery(project, kind, current.id, 1), staleTime: 0 })
       .catch(() => [] as AuditEntry[]);
-    if (at === generation.current) setConflict({ current, entry: entries[0] });
+    if (at === generation.current && stillNewer(current.version)) {
+      setConflict({ current, entry: entries[0] });
+    }
   };
 
   /** Starts the form over from an entity: one just saved, or the newer version. */

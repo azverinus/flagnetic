@@ -85,10 +85,36 @@ describe("applyNotice", () => {
     });
     expect(stale(queryClient, keys.flags)).toBe(true);
     expect(stale(queryClient, keys.audit)).toBe(true);
-    expect(stale(queryClient, keys.segments)).toBe(false);
     expect(stale(queryClient, keys.other)).toBe(false);
     expect(stale(queryClient, keys.otherAudit)).toBe(false);
     expect(stale(queryClient, keys.instanceAudit)).toBe(false);
+  });
+
+  it("refreshes the segments for a flag notice: they count the flags whose rules name them", () => {
+    const { queryClient, keys } = seeded();
+    applyNotice(queryClient, "shop", {
+      id: "e",
+      kind: "flag",
+      key: "checkout",
+      environment: null,
+      version: 2,
+    });
+    expect(stale(queryClient, keys.segments)).toBe(true);
+  });
+
+  it("refreshes the project list for a project notice, and nothing of another project", () => {
+    const { queryClient, keys } = seeded();
+    queryClient.setQueryData(["projects"], []);
+    applyNotice(queryClient, "shop", {
+      id: "e",
+      kind: "project",
+      key: "shop",
+      environment: null,
+      version: 3,
+    });
+    expect(stale(queryClient, ["projects"])).toBe(true);
+    expect(stale(queryClient, keys.flags)).toBe(true);
+    expect(stale(queryClient, keys.other)).toBe(false);
   });
 
   it("refreshes everything of the project on a refetch", () => {

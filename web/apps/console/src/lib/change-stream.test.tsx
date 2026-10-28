@@ -1,19 +1,21 @@
 import { act, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { NamedConflictBanner } from "@/components/conflict-banner";
 import { activateForTests, renderWithProviders, testQueryClient } from "@/test/render";
 
-import { ChangeStream, useNewerVersionNotice } from "./change-stream";
+import { ChangeStream, noticeNames, useNewerVersionNotice } from "./change-stream";
 import { useFormConflict } from "./use-form-conflict";
 
 beforeAll(() => activateForTests("en"));
 
 class FakeSource extends EventTarget {
   closed = false;
+  readyState = 1;
   close() {
     this.closed = true;
+    this.readyState = 2;
   }
   send(type: string, data: unknown, id = "") {
     this.dispatchEvent(new MessageEvent(type, { data: JSON.stringify(data), lastEventId: id }));
@@ -28,13 +30,21 @@ function stream() {
 type Thing = { id: string; key: string; name: string; version: number };
 
 /** A form of one thing with the conflict banner, as the console's forms are. */
-function Form({ dirty, read }: { dirty: boolean; read: () => Promise<Thing> }) {
+function Form({
+  dirty,
+  saving = false,
+  read,
+}: {
+  dirty: boolean;
+  saving?: boolean;
+  read: () => Promise<Thing>;
+}) {
   const initial: Thing = { id: "t1", key: "web", name: "Web", version: 1 };
   const conflicts = useFormConflict({ project: "shop", kind: "thing", initial, read });
   const [pending] = useState(false);
   useNewerVersionNotice(
     { kind: "thing", key: "web" },
-    { dirty, version: conflicts.version },
+    { dirty, version: conflicts.version, saving },
     conflicts.meetNewer,
   );
   return conflicts.conflict ? (
@@ -97,6 +107,58 @@ describe("the change stream", () => {
   });
 });
 
+describe("a stream the browser gave up on", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("is opened again, and the project read again in full once it is", () => {
+    vi.useFakeTimers();
+    const queryClient = testQueryClient();
+    queryClient.setQueryData(["projects", "shop", "tokens"], []);
+    const sources: FakeSource[] = [];
+    const open = () => {
+      const source = new FakeSource();
+      sources.push(source);
+      return source as unknown as EventSource;
+    };
+    renderWithProviders(
+      <ChangeStream project="shop" open={open}>
+        <p>page</p>
+      </ChangeStream>,
+      queryClient,
+    );
+    const [first] = sources;
+    // A dropped connection the browser retries itself is left to it.
+    act(() => first!.dispatchEvent(new Event("error")));
+    act(() => vi.advanceTimersByTime(120_000));
+    expect(sources).toHaveLength(1);
+
+    first!.readyState = 2;
+    act(() => first!.dispatchEvent(new Event("error")));
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(sources).toHaveLength(2);
+    expect(queryClient.getQueryState(["projects", "shop", "tokens"])?.isInvalidated).toBe(false);
+
+    act(() => sources[1]!.dispatchEvent(new Event("open")));
+    expect(queryClient.getQueryState(["projects", "shop", "tokens"])?.isInvalidated).toBe(true);
+  });
+});
+
+describe("noticeNames", () => {
+  const notice = { id: "e", kind: "flag", key: "checkout", environment: "prod", version: 2 };
+
+  it("names an entity of no environment only by a notice of none", () => {
+    expect(noticeNames(notice, { kind: "flag", key: "checkout", environment: null })).toBe(false);
+    expect(
+      noticeNames(
+        { ...notice, environment: null },
+        { kind: "flag", key: "checkout", environment: null },
+      ),
+    ).toBe(true);
+    expect(noticeNames(notice, { kind: "flag", key: "checkout", environment: "prod" })).toBe(true);
+    expect(noticeNames(notice, { kind: "flag", key: "checkout" })).toBe(true);
+  });
+});
+
 describe("the conflict banner on a notice", () => {
   const newer: Thing = { id: "t1", key: "web", name: "Web shop", version: 2 };
   const notice = { kind: "thing", key: "web", environment: null, version: 2 };
@@ -138,4 +200,51 @@ describe("the conflict banner on a notice", () => {
   it("stays quiet for the form's own save", () => quiet(true, [{ ...notice, version: 1 }]));
 
   it("stays quiet for another entity", () => quiet(true, [{ ...notice, key: "mobile" }]));
+
+  it("stays quiet while the form is saving: the notice may be of its own save", async () => {
+    const { source, open } = stream();
+    let reads = 0;
+    renderWithProviders(
+      <ChangeStream project="shop" open={open}>
+        <Form
+          dirty
+          saving
+          read={async () => {
+            reads += 1;
+            return newer;
+          }}
+        />
+      </ChangeStream>,
+    );
+    act(() => source.send("change", notice, "e1"));
+    await waitFor(() => expect(screen.getByText("editing")).toBeVisible());
+    expect(reads).toBe(0);
+  });
+
+  it("stays quiet when the form moved on while the newer version was read", async () => {
+    const { source, open } = stream();
+    let answer: (thing: Thing) => void = () => {};
+    const read = () => new Promise<Thing>((resolve) => (answer = resolve));
+    function Saving() {
+      const [dirty, setDirty] = useState(true);
+      return (
+        <>
+          <button type="button" onClick={() => setDirty(false)}>
+            Saved
+          </button>
+          <Form dirty={dirty} read={read} />
+        </>
+      );
+    }
+    renderWithProviders(
+      <ChangeStream project="shop" open={open}>
+        <Saving />
+      </ChangeStream>,
+    );
+    act(() => source.send("change", notice, "e1"));
+    act(() => screen.getByRole("button", { name: "Saved" }).click());
+    await act(async () => answer(newer));
+    expect(screen.getByText("editing")).toBeVisible();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });

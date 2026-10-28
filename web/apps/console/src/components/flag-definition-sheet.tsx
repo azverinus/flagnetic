@@ -265,19 +265,20 @@ function DefinitionForm({
   // Someone else saved the definition while this one has unsaved edits:
   // the banner shows at once, not at the refusal of Save.
   useNewerVersionNotice(
-    { kind: "flag", key: flag.key },
-    { dirty: form.formState.isDirty, version },
-    async () => {
+    { kind: "flag", key: flag.key, environment: null },
+    { dirty: form.formState.isDirty, version, saving: save.isPending },
+    async (stillNewer) => {
       if (conflict) return;
       try {
         const current = await queryClient.fetchQuery({
           ...flagQuery(project, flag.key),
           staleTime: 0,
         });
-        if (current.version <= version) return;
+        if (!stillNewer(current.version)) return;
         const entries = await queryClient
           .fetchQuery({ ...flagEntriesQuery(project, flag.id, { limit: 20 }), staleTime: 0 })
           .catch(() => []);
+        if (!stillNewer(current.version)) return;
         const entry = entryOfVersion(
           entries.filter((candidate) => candidate.environment_id === null),
           current.version,

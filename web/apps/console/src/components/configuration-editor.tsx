@@ -246,14 +246,6 @@ export function ConfigurationEditor({
     answered(fresh);
   };
 
-  // Someone else saved this configuration while the draft has unsaved
-  // edits: the banner shows at once, not at the refusal of Save.
-  useNewerVersionNotice(
-    { kind: "flag", key: flag.key, environment: configuration.environment },
-    { dirty, version: state.base.version },
-    () => (conflict ? undefined : void meetConflict(state.base, () => {})),
-  );
-
   const save = useMutation({
     mutationFn: ({ sent }: { sent: EditorState }) =>
       unwrap(
@@ -291,6 +283,44 @@ export function ConfigurationEditor({
       setRefusal({ at: new Map(), rest: [problemMessage(i18n, error)] });
     },
   });
+
+  // Someone else saved this configuration while the draft has unsaved
+  // edits: the banner shows at once, not at the refusal of Save. A change
+  // to nothing the draft owns (on and off, an override) becomes its base
+  // quietly, as `arrive` says, and a read that fails shows nothing: Save
+  // meets the refusal itself.
+  useNewerVersionNotice(
+    { kind: "flag", key: flag.key, environment: configuration.environment },
+    { dirty, version: state.base.version, saving: save.isPending },
+    async (stillNewer) => {
+      if (conflict) return;
+      const from = state.base;
+      let fresh: FlagConfiguration;
+      try {
+        fresh = await unwrap(
+          getFlagConfiguration({
+            path: { project, flag: flag.key, environment: configuration.environment },
+          }),
+        );
+      } catch {
+        return;
+      }
+      if (!stillNewer(fresh.version)) return;
+      if (arrive(state, fresh, types).base === fresh) {
+        answered(fresh);
+        return;
+      }
+      const entries = await queryClient
+        .fetchQuery({
+          ...flagEntriesQuery(project, flag.id, { environment: environment.id, limit: 20 }),
+          staleTime: 0,
+        })
+        .catch(() => [] as AuditEntry[]);
+      if (!stillNewer(fresh.version)) return;
+      setConflict({ from, fresh, entry: entryOfVersion(entries, fresh.version) });
+      answered(fresh);
+    },
+  );
 
   const submit = () => {
     setChecked(true);

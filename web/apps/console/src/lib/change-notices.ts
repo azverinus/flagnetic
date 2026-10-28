@@ -51,7 +51,8 @@ export function noticeKeys(project: string, notice: Pick<ChangeNotice, "kind">):
   switch (notice.kind) {
     case "flag":
     case "flag_configuration":
-      return [at("flags"), at("change-requests"), at("experiments")];
+      // A segment's list and usages count the flags whose rules name it.
+      return [at("flags"), at("segments"), at("change-requests"), at("experiments")];
     case "experiment":
       return [at("experiments"), at("flags"), at("change-requests")];
     case "segment":
@@ -82,7 +83,9 @@ export function applyNotice(queryClient: QueryClient, project: string, notice: C
   const refresh = (queryKey: QueryKey) => void queryClient.invalidateQueries({ queryKey });
   for (const queryKey of noticeKeys(project, notice)) refresh(queryKey);
   // A project's own change touches the caller's project list too.
-  if (notice.kind === "project") refresh(["projects"]);
+  if (notice.kind === "project") {
+    void queryClient.invalidateQueries({ queryKey: ["projects"], exact: true });
+  }
   refreshAudit(queryClient, project);
 }
 
