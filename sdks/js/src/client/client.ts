@@ -390,8 +390,10 @@ export class FlagneticClient {
   }
 
   /**
-   * Registers listener, called with the sorted keys whose served value
-   * changed: on every accepted document and on every local override change.
+   * Registers listener, called with the sorted keys whose served flag
+   * changed, its value or what {@link getDetail} reports about it, the
+   * reason, the variation or the experiment block: on every accepted
+   * document and on every local override change.
    * Returns a function that unregisters it.
    */
   onChange(listener: (keys: string[]) => void): () => void {
