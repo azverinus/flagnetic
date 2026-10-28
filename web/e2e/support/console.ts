@@ -3,13 +3,14 @@ import {
   type Client,
   createClient,
   createConfig,
+  createGrant,
   createProject,
   getEnvironment,
   inviteMember,
   setEnvironmentProtection,
   signOut,
 } from "@flagnetic/api";
-import type { Page } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
 
 import { admin, readState } from "./instance";
 
@@ -162,4 +163,28 @@ export async function seedMember(
     await signOut({ client: anonymous, headers: { Cookie: cookie } }),
   );
   return { id, email, password, name };
+}
+
+/**
+ * A second member of the project, a developer with a browser of their
+ * own: what they save while the first member's page is open is the change
+ * that page meets, made through the console as a colleague would make it.
+ */
+export async function colleague(
+  browser: Browser,
+  project: string,
+  prefix: string,
+  name: string,
+): Promise<{ page: Page; who: Credentials }> {
+  const who = await seedMember(prefix, name, "harness-quill-lantern-2291");
+  must(
+    `granting developer in ${project}`,
+    await createGrant({
+      client: managementClient(),
+      path: { project },
+      body: { member: who.id, role: "developer" },
+    }),
+  );
+  const context = await browser.newContext();
+  return { page: await context.newPage(), who };
 }

@@ -129,6 +129,9 @@ test.describe("a flag's history", () => {
   }) => {
     const project = await seedProject("revert-stale");
     await seed(project);
+    // Without the project's change stream the page keeps what it read, as
+    // a page does whose stream is down, so the change is met at the action.
+    await page.route("**/projects/*/stream", (route) => route.abort());
     await openFlag(page, project, flagKey);
     await openHistory(page);
     await history(page).getByRole("row").nth(2).getByRole("link").click();

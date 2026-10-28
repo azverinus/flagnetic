@@ -15,6 +15,7 @@ import { flushSync } from "react-dom";
 import { toast } from "sonner";
 
 import { Can } from "@/components/can";
+import { useNewerVersionNotice } from "@/lib/change-stream";
 import { ConflictBanner } from "@/components/conflict-banner";
 import { type Proposal, ProposeDialog } from "@/components/propose-dialog";
 import { QueryError } from "@/components/query-error";
@@ -265,6 +266,30 @@ function SegmentPage({
       setRefusal({ at: new Map(), rest: [problemMessage(i18n, error)] });
     },
   });
+
+  // Someone else saved the segment while this form has unsaved edits: the
+  // banner shows at once, not at the refusal of Save.
+  useNewerVersionNotice(
+    { kind: "segment", key: segment.key },
+    { dirty, version, saving: save.isPending },
+    async (stillNewer) => {
+      if (conflict) return;
+      try {
+        const current = await queryClient.fetchQuery({
+          ...segmentQuery(project, segment.key),
+          staleTime: 0,
+        });
+        if (!stillNewer(current.version)) return;
+        const entries = await queryClient
+          .fetchQuery({ ...entityEntriesQuery(project, "segment", segment.id, 20), staleTime: 0 })
+          .catch(() => [] as AuditEntry[]);
+        if (!stillNewer(current.version)) return;
+        setConflict({ current, entry: entryOfVersion(entries, current.version) });
+      } catch {
+        // Save meets the refusal itself.
+      }
+    },
+  );
 
   const send = (at: number) => {
     setConfirming(false);

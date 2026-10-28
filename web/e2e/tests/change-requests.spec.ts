@@ -169,6 +169,9 @@ test.describe("change requests", () => {
     await seedFlag(project, stringFlag("checkout_copy"));
     const proposed = await propose(project, "checkout_copy", "Serve the new copy", switchedOn);
     const rosa = await reviewer(browser, project);
+    // Without the project's change stream the page keeps what it read, as
+    // a page does whose stream is down, so the edit is met at the decision.
+    await rosa.page.route("**/projects/*/stream", (route) => route.abort());
     await rosa.page.goto(`/projects/${project}/change-requests/${proposed.id}`);
     await expect(
       rosa.page.getByRole("heading", { name: "Serve the new copy", level: 1 }),

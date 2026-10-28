@@ -1,42 +1,9 @@
-import { createGrant, createSegment, getSegment } from "@flagnetic/api";
-import { type Browser, expect, type Page, test } from "@playwright/test";
+import { createSegment, getSegment } from "@flagnetic/api";
+import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations } from "../support/axe";
-import {
-  type Credentials,
-  managementClient,
-  must,
-  seedMember,
-  seedProject,
-  signIn,
-} from "../support/console";
+import { colleague, managementClient, must, seedProject, signIn } from "../support/console";
 import { choose, openFlag, readConfiguration, seedFlag, stringFlag } from "../support/flags";
-
-const password = "harness-quill-lantern-2291";
-
-/**
- * A second member of the project, with a browser of their own: what they
- * save while the first member's page is open is the change that page
- * meets, made through the console as a colleague would make it.
- */
-async function colleague(
-  browser: Browser,
-  project: string,
-  prefix: string,
-  name: string,
-): Promise<{ page: Page; who: Credentials }> {
-  const who = await seedMember(prefix, name, password);
-  must(
-    `granting developer in ${project}`,
-    await createGrant({
-      client: managementClient(),
-      path: { project },
-      body: { member: who.id, role: "developer" },
-    }),
-  );
-  const context = await browser.newContext();
-  return { page: await context.newPage(), who };
-}
 
 const unsavedBar = (page: Page) => page.getByRole("region", { name: "Unsaved changes" });
 
@@ -55,11 +22,14 @@ test.describe("two members saving the same thing", () => {
       who: other.who,
     });
 
+    // The draft has unsaved edits before the colleague saves: a page with
+    // none follows the colleague's save on its own.
+    await choose(page, "Off variation", "treatment");
+
     await choose(other.page, "Fallthrough variation", "treatment");
     await unsavedBar(other.page).getByRole("button", { name: "Save" }).click();
     await expect(unsavedBar(other.page)).toHaveCount(0);
 
-    await choose(page, "Off variation", "treatment");
     await unsavedBar(page).getByRole("button", { name: "Save" }).click();
     const banner = page.getByRole("alert").filter({ hasText: "saved this configuration" });
     await expect(banner).toContainText("Nadia Petrova saved this configuration on");
