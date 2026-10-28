@@ -100,7 +100,9 @@ export function WebhookEditor({ scope, webhook, layout, onCancel, onSaved }: Web
     (values: WebhookForm) =>
       webhook ? api.update(webhook, patchOf(webhook, values)) : api.create(bodyOf(values)),
     webhooksKey(scope),
-    () => undefined,
+    // A save makes a new version, which starts the form over: the screen
+    // that is told must not be the one the answer replaces.
+    onSaved,
     // Creating answers the secret.
     { secret: webhook === undefined },
   );
@@ -108,9 +110,7 @@ export function WebhookEditor({ scope, webhook, layout, onCancel, onSaved }: Web
   const refusedField = save.error instanceof ApiError ? fieldOfRefusal(save.error.code) : undefined;
   const refusalHere = refusedField ? problemMessage(i18n, save.error as ApiError) : undefined;
 
-  const submit = form.handleSubmit((values) =>
-    save.mutate(values, { onSuccess: (saved) => onSaved(saved) }),
-  );
+  const submit = form.handleSubmit((values) => save.mutate(values));
   // The platform's disable is undone by enabling, not by this switch, which
   // the server refuses for such a subscription.
   const platformDisabled = webhook !== undefined && isPlatformDisabled(webhook);

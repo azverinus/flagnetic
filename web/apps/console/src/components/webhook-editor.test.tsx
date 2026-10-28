@@ -1,7 +1,7 @@
 import type { Webhook, WebhookEventTypeInfo } from "@flagnetic/api";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { fakeServer, problem } from "@/test/fake-server";
 import { renderWithProviders } from "@/test/render";
@@ -171,12 +171,13 @@ describe("the webhook editor", () => {
       },
     });
     const { secret: _secret, ...webhook } = created;
+    const saved = vi.fn();
     renderWithProviders(
       <WebhookEditor
         scope={{ project: "checkout" }}
         webhook={webhook}
         layout="page"
-        onSaved={() => undefined}
+        onSaved={saved}
       />,
     );
     const user = userEvent.setup();
@@ -189,6 +190,11 @@ describe("the webhook editor", () => {
     const request = server.requests.find((r) => r.method === "PATCH")!;
     expect(request.headers.get("If-Match")).toBe('"1"');
     expect(await request.json()).toEqual({ name: "Deploy bot" });
+    await waitFor(() =>
+      expect(saved).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Deploy bot", version: 2 }),
+      ),
+    );
   });
 
   it("leaves enabling a subscription the platform disabled to the enable action", async () => {

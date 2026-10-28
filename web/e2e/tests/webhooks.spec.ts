@@ -271,6 +271,6 @@ test.describe("webhooks", () => {
       .getByRole("dialog", { name: "Delete Audit archive" })
       .getByRole("button", { name: "Delete webhook" })
       .click();
-    await expect(page.getByText("No webhook yet.")).toBeVisible();
+    await expect(webhookRow(page, "Audit archive")).toHaveCount(0);
   });
 });
