@@ -197,6 +197,10 @@ msgstr "{live, plural, one {Revoke # session} other {Revoke # sessions}}"
 msgid "{name} ({email})"
 msgstr "{name} ({email})"
 
+#: src/lib/environments.ts
+msgid "{name} (protected)"
+msgstr "{name} (protected)"
+
 #: src/components/condition-row.tsx
 msgid "{name} (unit ID)"
 msgstr "{name} (unit ID)"
@@ -233,6 +237,10 @@ msgstr "{name} is invited again"
 msgid "{name} is no longer an instance admin."
 msgstr "{name} is no longer an instance admin."
 
+#: src/components/environment-protection.tsx
+msgid "{name} is no longer protected."
+msgstr "{name} is no longer protected."
+
 #: src/components/member-credentials.tsx
 msgid "{name} is not signed in anywhere."
 msgstr "{name} is not signed in anywhere."
@@ -248,6 +256,14 @@ msgstr "{name} is protected: switching {key} off there goes through a change req
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "{name} is protected: switching {key} on there goes through a change request."
 msgstr "{name} is protected: switching {key} on there goes through a change request."
+
+#: src/components/environment-protection.tsx
+msgid "{name} is protected."
+msgstr "{name} is protected."
+
+#: src/components/kill-switch-dialog.tsx
+msgid "{name} is protected. The kill switch skips the change request it would need."
+msgstr "{name} is protected. The kill switch skips the change request it would need."
 
 #: src/components/member-actions.tsx
 msgid "{name} is reactivated."
@@ -373,6 +389,10 @@ msgstr "A change request proposes a change for review; once a member who did not
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "A change to a protected environment is proposed as a change request from the flag's configuration."
 msgstr "A change to a protected environment is proposed as a change request from the flag's configuration."
+
+#: src/components/environment-protection.tsx
+msgid "A change to what SDKs receive from a protected environment goes through a change request that someone else approves. The kill switch and import skip it."
+msgstr "A change to what SDKs receive from a protected environment goes through a change request that someone else approves. The kill switch and import skip it."
 
 #: src/components/rule-editor.tsx
 msgid "A configuration has at most {maxRulesText} rules."
@@ -852,6 +872,10 @@ msgstr "Any status"
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any type"
 msgstr "Any type"
+
+#: src/components/environment-protection.tsx
+msgid "Anyone allowed to edit flags can change what SDKs receive from {name} directly, with no review. SDKs honour local overrides there again."
+msgstr "Anyone allowed to edit flags can change what SDKs receive from {name} directly, with no review. SDKs honour local overrides there again."
 
 #. A kind of actor in the audit log.
 #. A kind of entity in the audit log.
@@ -4247,9 +4271,26 @@ msgstr "propose changes as change requests"
 msgid "Propose the change"
 msgstr "Propose the change"
 
+#: src/components/environment-protection.tsx
+msgid "Protect {name}"
+msgstr "Protect {name}"
+
+#: src/components/environment-protection.tsx
+msgid "Protect environment"
+msgstr "Protect environment"
+
 #: src/lib/access-names.ts
 msgid "protect environments"
 msgstr "protect environments"
+
+#: src/components/environment-protection.tsx
+#: src/components/protected-mark.tsx
+msgid "Protected"
+msgstr "Protected"
+
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
+msgid "Protection"
+msgstr "Protection"
 
 #: src/components/sdk-keys.tsx
 msgid "Put it in the client SDK’s configuration. It ships inside the browser or the app, so anyone can read it: it learns only the values served to a context, never the ruleset."
@@ -5152,6 +5193,14 @@ msgstr "Stop {key}"
 #: src/components/experiment-transitions.tsx
 msgid "Stop experiment"
 msgstr "Stop experiment"
+
+#: src/components/environment-protection.tsx
+msgid "Stop protecting"
+msgstr "Stop protecting"
+
+#: src/components/environment-protection.tsx
+msgid "Stop protecting {name}"
+msgstr "Stop protecting {name}"
 
 #: src/components/experiment-transitions.tsx
 #: src/lib/experiments.ts
@@ -6223,6 +6272,10 @@ msgstr "Try again"
 msgid "Type"
 msgstr "Type"
 
+#: src/components/kill-switch-dialog.tsx
+msgid "Type {flagKey} to confirm"
+msgstr "Type {flagKey} to confirm"
+
 #: src/components/ui/confirm-dialog.tsx
 msgid "Type {typeToConfirm} to confirm"
 msgstr "Type {typeToConfirm} to confirm"
@@ -6630,6 +6683,10 @@ msgstr "With"
 #: src/lib/experiments.ts
 msgid "Write the hypothesis: an experiment starts only with one."
 msgstr "Write the hypothesis: an experiment starts only with one."
+
+#: src/components/environment-protection.tsx
+msgid "Writes that would change what SDKs receive from {name} are refused until they come through an approved change request. SDKs ignore local overrides there."
+msgstr "Writes that would change what SDKs receive from {name} are refused until they come through an approved change request. SDKs ignore local overrides there."
 
 #: src/components/experiment-exposures.tsx
 msgid "X²"

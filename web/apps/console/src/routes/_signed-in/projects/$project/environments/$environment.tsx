@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { DownloadRuleset } from "@/components/download-ruleset";
+import { EnvironmentProtection } from "@/components/environment-protection";
+import { ProtectedMark } from "@/components/protected-mark";
 import { QueryError } from "@/components/query-error";
 import { SdkInventory } from "@/components/sdk-inventory";
 import { SdkKeys } from "@/components/sdk-keys";
@@ -49,9 +51,15 @@ function EnvironmentPage() {
     <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
       <PageHeader
         title={environment.data.name}
-        description={<code className="font-mono text-xs">{environment.data.key}</code>}
+        description={
+          <span className="flex flex-wrap items-center gap-2">
+            <code className="font-mono text-xs">{environment.data.key}</code>
+            {environment.data.protected ? <ProtectedMark /> : null}
+          </span>
+        }
         actions={<DownloadRuleset project={project} environment={key} />}
       />
+      <EnvironmentProtection project={project} environment={environment.data} />
       <Tabs
         label={t`About ${key}`}
         tabs={[

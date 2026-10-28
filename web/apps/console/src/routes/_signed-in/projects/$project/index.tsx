@@ -5,6 +5,7 @@ import { useId } from "react";
 
 import { RecentActivity } from "@/components/project-audit";
 import { QueryError } from "@/components/query-error";
+import { EnvironmentName } from "@/components/protected-mark";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { environmentsQuery, projectQuery } from "@/lib/queries";
@@ -60,7 +61,9 @@ function Overview() {
                 key={environment.id}
                 className="flex min-w-40 flex-col gap-0.5 rounded-md border bg-card px-4 py-3"
               >
-                <span className="font-medium">{environment.name}</span>
+                <span className="font-medium">
+                  <EnvironmentName environment={environment} />
+                </span>
                 <code className="font-mono text-xs text-muted-foreground">{environment.key}</code>
               </li>
             ))}

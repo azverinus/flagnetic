@@ -15,6 +15,7 @@ import { type ReactNode, useId, useMemo } from "react";
 
 import { Moment } from "@/components/moment";
 import { QueryError } from "@/components/query-error";
+import { EnvironmentName } from "@/components/protected-mark";
 import { Swatch, swatchOf } from "@/components/swatch";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -98,7 +99,7 @@ export function ExperimentExposuresSection({
           onValueChange={(next) => onEnvironment(next === first ? undefined : next)}
           tabs={environments.data.map((environment) => ({
             value: environment.key,
-            label: environment.name,
+            label: <EnvironmentName environment={environment} />,
             content: (
               <EnvironmentExposures
                 project={project}

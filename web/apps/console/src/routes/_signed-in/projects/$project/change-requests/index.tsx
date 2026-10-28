@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select, SelectItem } from "@/components/ui/select";
+import { environmentLabel } from "@/lib/environments";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { Tabs } from "@/components/ui/tabs";
 import { formatDateTime } from "@/i18n/format";
@@ -185,7 +186,7 @@ function ChangeRequestFilters({
           <SelectItem value={any}>{t`Any environment`}</SelectItem>
           {(environments.data ?? []).map((environment) => (
             <SelectItem key={environment.key} value={environment.key}>
-              {environment.name}
+              {environmentLabel(i18n, environment)}
             </SelectItem>
           ))}
         </Select>

@@ -7,6 +7,7 @@ import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { QueryError } from "@/components/query-error";
+import { EnvironmentName } from "@/components/protected-mark";
 import { DialogForm } from "@/components/ui/dialog-form";
 import { Field } from "@/components/ui/field";
 import { FormPage } from "@/components/ui/form-page";
@@ -189,7 +190,7 @@ export function WebhookEditor({ scope, webhook, layout, onCancel, onSaved }: Web
                     }
                     className="size-4 accent-primary"
                   />
-                  {environment.name}
+                  <EnvironmentName environment={environment} />
                 </label>
               ))}
             </fieldset>

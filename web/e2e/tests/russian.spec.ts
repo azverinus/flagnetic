@@ -12,11 +12,13 @@ import {
   type Credentials,
   managementClient,
   must,
+  protectProduction,
   seedMember,
   seedProject,
   signIn,
   type SignInWords,
   submitSignIn,
+  unprotectProduction,
 } from "../support/console";
 import { choose, seedFlag, stringFlag, writeConfiguration } from "../support/flags";
 import { admin } from "../support/instance";
@@ -204,6 +206,41 @@ test.describe("the console in Russian", () => {
       page.getByText("Пока ни один SDK не обращался к этому окружению.", { exact: false }),
     ).toBeVisible();
     await expectNoSeriousViolations(page, "the SDKs tab in Russian");
+  });
+
+  test("reads the protection switch in Russian, disabled for a viewer with the reason", async ({
+    page,
+  }) => {
+    await signIn(page, olga, russian);
+    await page.goto(`/projects/${project}/environments/production`);
+
+    await expect(page.getByRole("switch", { name: "Защищено" })).toBeDisabled();
+    await expect(page.getByText(/Нужно право защищать окружения/)).toBeVisible();
+    await expectNoSeriousViolations(page, "the protection switch in Russian");
+  });
+
+  test("reads the kill switch of a protected environment in Russian, asking for the key", async ({
+    page,
+  }) => {
+    const flag = "oplata_v2";
+    await seedFlag(project, stringFlag(flag));
+    await unprotectProduction(project);
+    await writeConfiguration(project, flag, "production", () => ({ on: true }));
+    await protectProduction(project);
+
+    await signIn(page, anna, russian);
+    await page.goto(`/projects/${project}/flags/${flag}?environment=production`);
+    await expect(page.getByRole("tab", { name: /Production\s+Защищено/ })).toBeVisible();
+    await page.getByRole("button", { name: "Аварийный выключатель" }).click();
+    const dialog = page.getByRole("dialog", {
+      name: `Аварийный выключатель: ${flag} в окружении Production`,
+    });
+    await dialog.getByLabel("Причина").fill("Платежи не проходят у провайдера");
+    const confirm = dialog.getByRole("button", { name: "Выключить" });
+    await expect(confirm).toBeDisabled();
+    await dialog.getByLabel(`Введите ${flag} для подтверждения`).fill(flag);
+    await expect(confirm).toBeEnabled();
+    await expectNoSeriousViolations(page, "the kill switch of a protected environment in Russian");
   });
 
   test("reads the keys dialogs in Russian", async ({ page }) => {

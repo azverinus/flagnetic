@@ -1,4 +1,4 @@
-import { type Flag, killFlag } from "@flagnetic/api";
+import { type Environment, type Flag, killFlag } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogActions } from "@/components/ui/dialog";
 import { FormRefusal } from "@/components/ui/form-page";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDateTime } from "@/i18n/format";
@@ -18,7 +19,7 @@ import { useConfigurationAnswer } from "@/lib/use-configuration-answer";
 export type KillSwitchDialogProps = {
   project: string;
   flag: Flag;
-  environment: { id: string; key: string; name: string };
+  environment: Pick<Environment, "id" | "key" | "name" | "protected">;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
@@ -27,7 +28,9 @@ export type KillSwitchDialogProps = {
  * The kill switch of a flag in one environment: it switches the flag off
  * there with a reason, whatever version the page holds. It is never shown
  * as done before the server says so, since an on-call engineer must know
- * the flag is off rather than hope it is.
+ * the flag is off rather than hope it is. In a protected environment the
+ * flag's key is typed out first, since switching production off by accident
+ * costs more than one more keystroke.
  */
 export function KillSwitchDialog({
   open,
@@ -62,13 +65,17 @@ function KillSwitch({
   const { i18n, t } = useLingui();
   const queryClient = useQueryClient();
   const field = useId();
+  const keyField = useId();
   const [reason, setReason] = useState("");
+  const [typed, setTyped] = useState("");
   const answered = useConfigurationAnswer(project, flag.key);
   const lastUse = useQuery(
     flagEntriesQuery(project, flag.id, { environment: environment.id, killSwitch: true, limit: 1 }),
   );
   const last = lastKillOf(lastUse.data?.[0]);
   const missing = Math.max(0, killReasonMinimum - reason.trim().length);
+  const keyTyped = !environment.protected || typed.trim() === flag.key;
+  const flagKey = flag.key;
   const name = environment.name;
   const who = last?.who;
   const when = last ? formatDateTime(i18n, last.at) : "";
@@ -137,6 +144,25 @@ function KillSwitch({
           )}
         </p>
       </div>
+      {environment.protected ? (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={keyField}>
+            <Trans>Type {flagKey} to confirm</Trans>
+          </Label>
+          <Input
+            id={keyField}
+            autoComplete="off"
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            aria-describedby={`${keyField}-hint`}
+          />
+          <p id={`${keyField}-hint`} className="text-sm text-muted-foreground">
+            <Trans>
+              {name} is protected. The kill switch skips the change request it would need.
+            </Trans>
+          </p>
+        </div>
+      ) : null}
       <FormRefusal refusal={kill.error} />
       <DialogActions>
         <Button variant="outline" onClick={onDone}>
@@ -144,7 +170,7 @@ function KillSwitch({
         </Button>
         <Button
           variant="destructive"
-          disabled={!killReasonReady(reason) || kill.isPending}
+          disabled={!killReasonReady(reason) || !keyTyped || kill.isPending}
           onClick={() => kill.mutate()}
         >
           {kill.isPending ? <Trans>Switching off…</Trans> : <Trans>Switch off</Trans>}
