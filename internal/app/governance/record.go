@@ -35,6 +35,10 @@ type Outbox interface {
 	// ScopeKeys returns the keys of project and of environment, "" for a
 	// zero identifier or one that no longer exists.
 	ScopeKeys(ctx context.Context, project workspace.ProjectID, environment workspace.EnvironmentID) (string, string, error)
+	// ApplicationEntry returns the first entry written, other than the
+	// change request's own, while the change request was applied: the entry
+	// of the change itself; false when it wrote none.
+	ApplicationEntry(ctx context.Context, project workspace.ProjectID, changeRequest governance.ChangeRequestID) (governance.EntryID, bool, error)
 	// Enqueue writes events to the outbox in the unit of work ctx carries.
 	Enqueue(ctx context.Context, events []governance.QueuedEvent) error
 }
@@ -194,6 +198,17 @@ func (r *Record) emit(ctx context.Context, e governance.Entry) error {
 	queued := make([]governance.QueuedEvent, len(derived))
 	for i, d := range derived {
 		event := governance.EntryEvent(id.New[governance.Event](r.ids), e, d, projectKey, environmentKey)
+		if d.Type == governance.EventChangeRequestApplied {
+			// The application's event names the entry of the change it
+			// wrote, which that change's own events name too.
+			applied, found, lookup := r.outbox.ApplicationEntry(ctx, e.Project, entryChangeRequest(e))
+			if lookup != nil {
+				return lookup
+			}
+			if found {
+				event.AuditEntry = applied
+			}
+		}
 		if queued[i], err = event.Queue(); err != nil {
 			return err
 		}
@@ -207,4 +222,10 @@ type applyingKey struct{}
 // is being applied in it.
 func applying(ctx context.Context, changeRequest governance.ChangeRequestID) context.Context {
 	return context.WithValue(ctx, applyingKey{}, changeRequest)
+}
+
+// entryChangeRequest returns the identifier of the change request e is about.
+func entryChangeRequest(e governance.Entry) governance.ChangeRequestID {
+	cr, _ := id.Parse[governance.ChangeRequest](e.Entity.ID)
+	return cr
 }

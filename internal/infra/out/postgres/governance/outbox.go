@@ -62,6 +62,24 @@ func (o *Outbox) ScopeKeys(ctx context.Context, project workspace.ProjectID, env
 	return projectKey, environmentKey, nil
 }
 
+// ApplicationEntry returns the first entry recorded under changeRequest
+// that is not about a change request: the change its application wrote.
+func (o *Outbox) ApplicationEntry(ctx context.Context, project workspace.ProjectID, changeRequest governance.ChangeRequestID,
+) (governance.EntryID, bool, error) {
+	var entry [16]byte
+	err := o.db(ctx).QueryRow(ctx, `
+		SELECT id FROM audit_entries
+		WHERE project_id = $1 AND change_request_id = $2 AND entity_kind <> 'change_request'
+		ORDER BY id LIMIT 1`, optional(project), changeRequest.Bytes()).Scan(&entry)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return governance.EntryID{}, false, nil
+	}
+	if err != nil {
+		return governance.EntryID{}, false, fmt.Errorf("finding the entry a change request wrote: %w", err)
+	}
+	return id.FromBytes[governance.Entry](entry), true, nil
+}
+
 // Enqueue writes events to the outbox.
 func (o *Outbox) Enqueue(ctx context.Context, events []governance.QueuedEvent) error {
 	b := &pgx.Batch{}

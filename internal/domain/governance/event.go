@@ -47,10 +47,68 @@ func DeriveEvents(e Entry) []Derived {
 		out = append(out, configurationEvents(before, after)...)
 	case "segment.created", "segment.updated", "segment.deleted":
 		out = append(out, Derived{e.Action, withoutPrivateConditions(before, after)})
+	case "flag.reverted":
+		// A revert is a write of the configuration as any other, so a
+		// receiver watching rules or the switch sees it too; it also says
+		// which version the configuration returned to.
+		reverted := map[string]any{"reverted_to": mapOf(after)["reverted_to"], "before": before, "after": after}
+		out = append(append(out, Derived{"flag.reverted", reverted}), configurationEvents(before, after)...)
 	case "grant.created", "grant.deleted", "sdk_key.created", "sdk_key.revoked":
 		out = append(out, Derived{e.Action, beforeAfter})
+	case "experiment.started", "experiment.stopped", "experiment.archived", "experiment.traffic_allocation_changed":
+		out = append(out, Derived{e.Action, beforeAfter})
+	case "experiment.alert_raised", "experiment.alert_cleared":
+		if typ, ok := alertEventType(e.Action, before, after); ok {
+			out = append(out, Derived{typ, beforeAfter})
+		}
+	case "change_request.opened", "change_request.approved", "change_request.rejected", "change_request.applied",
+		"change_request.cancelled", "change_request.superseded", "change_request.schedule_failed":
+		out = append(out, changeRequestEvents(e.Action, after)...)
 	}
 	return append(out, Derived{EventAuditEntry, EntryDocument(e)})
+}
+
+// alertEventTypes are the catalogue types of the alerts the checks raise,
+// by the alert's kind. Only the sample ratio check has an event for its
+// alert clearing.
+var (
+	alertRaisedTypes = map[string]string{
+		"srm": "experiment.srm_detected", "no_exposures": "experiment.no_exposures",
+		"exposure_conflicts": "experiment.exposure_conflicts", "past_expected_end": "experiment.past_expected_end",
+	}
+	alertClearedTypes = map[string]string{"srm": "experiment.srm_cleared"}
+)
+
+// alertEventType returns the catalogue type of an alert raised or cleared,
+// from the alert's kind, which both sides of the entry record.
+func alertEventType(action string, before, after any) (string, bool) {
+	kind, _ := mapOf(after)["kind"].(string)
+	if kind == "" {
+		kind, _ = mapOf(before)["kind"].(string)
+	}
+	types := alertRaisedTypes
+	if action == "experiment.alert_cleared" {
+		types = alertClearedTypes
+	}
+	typ, ok := types[kind]
+	return typ, ok
+}
+
+// EventChangeRequestApplied is the event of a change request applied. The
+// audit entry it names is the first the application wrote beside the
+// change request's own, so a receiver ties the two together.
+const EventChangeRequestApplied = "change_request.applied"
+
+// changeRequestEvents are the events of a change request's transition to
+// the change request after, which they carry without its proposal, as the
+// audit log records it. Approving with an apply time is also scheduling.
+func changeRequestEvents(action string, after any) []Derived {
+	data := without(mapOf(after), "proposed")
+	out := []Derived{{action, data}}
+	if action == "change_request.approved" && data["apply_at"] != nil {
+		out = append(out, Derived{"change_request.scheduled", data})
+	}
+	return out
 }
 
 // servedFields are the fields of a configuration that decide what it
@@ -271,3 +329,61 @@ func optionalString(s string) any {
 	}
 	return s
 }
+
+// entryOnlyActions are the audit actions that cause no catalogue event of
+// their own: a receiver learns of them as `audit.entry` alone.
+var entryOnlyActions = []string{
+	"api_token.created",
+	"api_token.revoked",
+	"attribute.created",
+	"attribute.deleted",
+	"attribute.updated",
+	"auth.locked_out",
+	"auth.sign_in_failed",
+	"auth.signed_in",
+	"auth.signed_out",
+	"auth_settings.updated",
+	"change_request.copied",
+	"change_request.drafted",
+	"change_request.rebased",
+	"change_request.updated",
+	"environment.created",
+	"environment.deleted",
+	"environment.protected",
+	"environment.unprotected",
+	"environment.updated",
+	"experiment.alert_acknowledged",
+	"experiment.cloned",
+	"experiment.created",
+	"experiment.deleted",
+	"experiment.salts_regenerated",
+	"experiment.updated",
+	"member.created",
+	"member.deactivated",
+	"member.demoted",
+	"member.invitation_accepted",
+	"member.invitation_reissued",
+	"member.invited",
+	"member.promoted",
+	"member.reactivated",
+	"member.updated",
+	"password.changed",
+	"project.created",
+	"project.deleted",
+	"project.updated",
+	"sdk_key.rotated",
+	"sdk_key.updated",
+	"session.revoked",
+	"unit_type.created",
+	"unit_type.deleted",
+	"unit_type.updated",
+	"webhook.created",
+	"webhook.deleted",
+	"webhook.enabled",
+	"webhook.secret_rotated",
+	"webhook.updated",
+}
+
+// EntryOnlyActions returns the audit actions whose entry is the only event
+// they cause.
+func EntryOnlyActions() []string { return slices.Clone(entryOnlyActions) }

@@ -64,7 +64,81 @@ An instance admin subscribes an archive to every audit entry that names no proje
 
 ## The event catalogue
 
-`GET /api/v1/webhook-event-types` lists every type a subscription may name, with what emits it; any member may read it.
+`GET /api/v1/webhook-event-types` lists every type a subscription may name, with what emits it; any member may read it. The list and the `events` enum of the API description are one and the same.
+
+Every event is the [envelope](#deliveries) below, whose `data` depends on the type. Unless a row says otherwise, an event's `data` is `{"before": …, "after": …}`: the entity as the [audit entry](access.md#the-audit-log) records it before and after the change, `null` where there was none. The envelope's `entity` names what changed, and `environment` the environment, when there is one.
+
+### Flags
+
+| Type | Sent when | `data` besides `before` and `after` |
+|---|---|---|
+| `flag.created` | a flag was created | |
+| `flag.updated` | a flag's definition changed, or it was restored | |
+| `flag.deleted` | a flag was archived or deleted | |
+| `flag.switched_on` | a flag was switched on in an environment | |
+| `flag.switched_off` | a flag was switched off in an environment, other than by the kill switch | |
+| `flag.kill_switch` | the kill switch was used; no `flag.switched_off` follows | `reason` |
+| `flag.rules_changed` | what a configuration serves changed: rules, rollouts, overrides, prerequisites, fallthrough or off variation | `diff`, the JSON Patch (RFC 6902) from the rules before to those after |
+| `flag.reverted` | a configuration was reverted to an earlier version, directly or by an applied change request | `reverted_to`, the version returned to |
+
+One write can cause several of these: it shares one `audit_entry_id`. A revert is `flag.reverted` and also `flag.switched_on` or `flag.switched_off` when it moved the switch, and `flag.rules_changed` when it moved what the configuration serves, so a receiver watching rules misses no revert.
+
+### Segments
+
+`segment.created`, `segment.updated` and `segment.deleted`. A private segment's conditions name who is in it and are left out of `before` and `after`.
+
+### Experiments
+
+| Type | Sent when |
+|---|---|
+| `experiment.started` | an experiment started |
+| `experiment.stopped` | an experiment stopped |
+| `experiment.archived` | an experiment was archived |
+| `experiment.traffic_allocation_changed` | a running experiment's traffic allocation changed |
+| `experiment.srm_detected` | the [sample ratio check](sample-ratio-check.md) raised an alert for the experiment in an environment |
+| `experiment.srm_cleared` | the sample ratio check cleared its alert |
+| `experiment.no_exposures` | a running experiment saw no exposures in an environment for a day |
+| `experiment.exposure_conflicts` | units were exposed to more than one variation of the experiment |
+| `experiment.past_expected_end` | a running experiment passed its expected end |
+
+The lifecycle events carry the experiment before and after. An alert event carries the alert: `before` is `null` when it was raised, and `after` is the alert with its `kind`, `raised_at`, `cleared_at` and `details` (the counts and thresholds the check found). Only the sample ratio check sends an event when its alert clears; the clearing of the others is an `audit.entry`.
+
+### Change requests
+
+| Type | Sent when |
+|---|---|
+| `change_request.opened` | a change request was opened for review |
+| `change_request.approved` | a change request was approved |
+| `change_request.rejected` | a change request was rejected |
+| `change_request.applied` | a change request was applied, now or by the scheduler |
+| `change_request.cancelled` | a change request was cancelled |
+| `change_request.superseded` | what a change request was based on moved, so it can never be applied |
+| `change_request.scheduled` | a change request was approved with a time to apply it at; sent with `change_request.approved` |
+| `change_request.schedule_failed` | the scheduler gave up applying a scheduled change request after its attempts; it stays approved |
+
+`data` is the change request as it is after the transition, as [change requests](change-requests.md) read it, without `proposed`: its `kind`, `state`, `title`, `description`, `base_version`, `diff`, `author`, `version`, the `flag`, `segment`, `experiment` and `environment` it is about, `apply_at` when it is scheduled, `superseded_by` once superseded and `schedule_failure` after a failed application. Drafting, editing, rebasing and copying a change request send no event of their own.
+
+The `audit_entry_id` of `change_request.applied` is the entry of the change the application wrote, the one the flag's or segment's own events name, so a receiver ties the two together; the other change request events name the change request's own entry.
+
+### Access and keys
+
+| Type | Sent when | `data` |
+|---|---|---|
+| `grant.created` | a member was granted a role in the project | `before`, `after` |
+| `grant.deleted` | a member's grant was removed | `before`, `after` |
+| `sdk_key.created` | an SDK key was created; its value is never sent | `before`, `after` |
+| `sdk_key.revoked` | an SDK key was revoked | `before`, `after` |
+
+### Platform
+
+| Type | Sent when |
+|---|---|
+| `webhook.disabled` | the platform disabled another subscription of the project, see [When a subscription keeps failing](#when-a-subscription-keeps-failing) |
+| `report.stale_flags` | the stale flags digest, weekly or on demand |
+| `ping` | a member tested a subscription |
+| `audit.entry` | any audit entry at all, as `GET …/audit/{entry}` reads it; `*` does not match it |
+
+Every audit action not listed above, such as an environment protected or a member invited, reaches a receiver as `audit.entry` alone.
 
 ## Deliveries
 
