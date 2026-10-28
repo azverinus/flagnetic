@@ -127,6 +127,9 @@ test.describe("the kill switch", () => {
     const project = await seedProject("kill-noop");
     await seedFlag(project, stringFlag("payments_v2"));
     await writeConfiguration(project, "payments_v2", "development", () => ({ on: true }));
+    // Without the project's change stream the page keeps what it read, as
+    // a page does whose stream is down, so the change is met at the action.
+    await page.route("**/projects/*/stream", (route) => route.abort());
     await openFlag(page, project, "payments_v2", { environment: "development" });
 
     await page.getByRole("button", { name: "Kill switch" }).click();
