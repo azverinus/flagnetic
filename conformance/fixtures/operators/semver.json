@@ -393,6 +393,80 @@
             }
           }
         ]
+      },
+      {
+        "key": "semver_prerelease_eq",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "v",
+                "op": "eq",
+                "value": "1.0.0-1.b"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "semver_prerelease_lt",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "v",
+                "op": "lt",
+                "value": "1.0.0-1.b"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
       }
     ]
   },
@@ -1691,6 +1765,109 @@
         "variation": "true",
         "reason": "rule",
         "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "eq: numeric identifiers equal in value, then the next is compared: \"1.0.0-01.b\" eq \"1.0.0-1.b\"",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.0.0-01.b"
+        }
+      },
+      "flag": "semver_prerelease_eq",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "eq: numeric identifiers equal in value, then the next differs: \"1.0.0-01.a\" is not \"1.0.0-1.b\"",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.0.0-01.a"
+        }
+      },
+      "flag": "semver_prerelease_eq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lt: numeric identifiers equal in value, then the next is compared: \"1.0.0-01.a\" lt \"1.0.0-1.b\"",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.0.0-01.a"
+        }
+      },
+      "flag": "semver_prerelease_lt",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lt: numeric identifiers equal in value, then fewer identifiers: \"1.0.0-01\" lt \"1.0.0-1.b\"",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.0.0-01"
+        }
+      },
+      "flag": "semver_prerelease_lt",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lt: numeric identifiers equal in value, then more identifiers: \"1.0.0-01.b.c\" is not lt \"1.0.0-1.b\"",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.0.0-01.b.c"
+        }
+      },
+      "flag": "semver_prerelease_lt",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
         "automatic_exposure": false,
         "override_influenced": false
       }
