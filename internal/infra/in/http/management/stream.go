@@ -115,7 +115,7 @@ func (a *api) StreamProjectChanges(ctx context.Context, req StreamProjectChanges
 	if req.Params.LastEventID != nil {
 		lastEventID = strings.TrimSpace(*req.Params.LastEventID)
 	}
-	return &changeStream{ctx: ctx, a: a, caller: callerOf(ctx), project: projectOf(ctx).project, lastEventID: lastEventID}, nil
+	return &changeStream{ctx: ctx, a: a, caller: callerOf(ctx), credential: credentialFrom(ctx), project: projectOf(ctx).project, lastEventID: lastEventID}, nil
 }
 
 // changeStream writes one change stream, from its caller's slot to its
@@ -124,6 +124,7 @@ type changeStream struct {
 	ctx         context.Context
 	a           *api
 	caller      access.Caller
+	credential  credential
 	project     workspace.Project
 	lastEventID string
 }
@@ -180,22 +181,38 @@ func (c *changeStream) VisitStreamProjectChangesResponse(w http.ResponseWriter) 
 	return nil
 }
 
-// stillReads judges the caller again as the seam judged them, against the
-// project as it is now: a stream outlives the request that resolved its
-// caller's access, so a member who lost it, or a project deleted (its key
-// perhaps taken by another), ends the stream at its next notice or
-// heartbeat. The credential itself is not judged again. Access that cannot
-// be resolved for now keeps the stream.
+// stillReads judges the caller again as the seam judged them, from the
+// credential they presented and against the project as it is now: a stream
+// outlives the request that resolved its caller, so a session signed out, a
+// token revoked or expired, a member deactivated, a member who lost their
+// grant, or a project deleted (its key perhaps taken by another), ends the
+// stream at its next notice or heartbeat. A credential or access that
+// cannot be resolved for now, the store being unreachable say, keeps the
+// stream; a refusal ends it.
 func (c *changeStream) stillReads() bool {
-	in, err := c.a.address(c.ctx, c.caller, c.project.Key)
+	caller, err := c.a.authenticate(c.ctx, c.credential, streamOperation)
+	if err != nil {
+		return c.ctx.Err() == nil && !refused(err)
+	}
+	if holder(caller) != holder(c.caller) {
+		return false
+	}
+	in, err := c.a.address(c.ctx, caller, c.project.Key)
 	if err != nil {
 		return c.ctx.Err() == nil
 	}
 	if in.project.ID != c.project.ID {
 		return false
 	}
-	return access.Authorize(c.caller, streamOperation,
+	return access.Authorize(caller, streamOperation,
 		&access.ProjectAccess{Project: in.project.ID, Permissions: in.permissions}) == nil
+}
+
+// refused reports whether err is a refusal of the credential, which the
+// seam would answer with a problem, rather than a failure to judge it.
+func refused(err error) bool {
+	_, ok := apperrors.From(err)
+	return ok
 }
 
 // notice is the data of a change notice's frame.

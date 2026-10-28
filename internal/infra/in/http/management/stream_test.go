@@ -9,6 +9,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
+	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
@@ -432,5 +433,45 @@ func TestADeletedProjectsStreamsCloseAtTheirNextHeartbeat(t *testing.T) {
 	c.Advance(15 * time.Second)
 	if !s.Ended(2 * time.Second) {
 		t.Error("the stream of a deleted project is open after its next heartbeat")
+	}
+}
+
+func TestASignedOutSessionHasItsStreamClosedAtTheNextNotice(t *testing.T) {
+	srv := testkit.StartServer(t)
+	pool := testkit.Pool(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	viewer := testkit.NewMember(t, pool)
+	testkit.Grant(t, pool, projectIDOf(p), viewer.ID, access.RoleViewer)
+	browser := signedIn(t, srv, viewer)
+	s := testkit.OpenEventStream(t, &http.Client{Jar: browser.HTTP.Jar}, changesRequest(t, srv, p.Key, ""))
+	s.Started(t)
+
+	if res, err := browser.SignOutWithResponse(t.Context()); err != nil || res.StatusCode() != http.StatusNoContent {
+		t.Fatalf("sign-out = %v %v", res, err)
+	}
+	createFlag(t, admin, p.Key, management.FlagCreate{Key: "checkout", Name: "Checkout", Type: "boolean"})
+	if !s.Ended(2 * time.Second) {
+		t.Error("the stream of a session signed out is open after the next notice: it still learns of changes")
+	}
+}
+
+func TestARevokedTokenHasItsStreamClosedAtTheNextHeartbeat(t *testing.T) {
+	c := clock.NewFake(time.Now())
+	srv := testkit.StartServer(t, testkit.WithClock(c))
+	pool := testkit.Pool(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	viewer := testkit.NewMember(t, pool)
+	testkit.Grant(t, pool, projectIDOf(p), viewer.ID, access.RoleViewer)
+	s := openChanges(t, srv, testkit.PersonalToken(t, pool, viewer.ID, "viewer", access.ScopeRead), p.Key, "")
+	s.Started(t)
+
+	if _, err := pgaccess.NewStore(pool).RevokePersonalTokens(t.Context(), viewer.ID, c.Now()); err != nil {
+		t.Fatal(err)
+	}
+	c.Advance(15 * time.Second)
+	if !s.Ended(2 * time.Second) {
+		t.Error("the stream of a revoked token is open after the heartbeat")
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/netip"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -288,9 +289,17 @@ func (rt router) HandleFunc(pattern string, h func(http.ResponseWriter, *http.Re
 func (rt router) ServeHTTP(w http.ResponseWriter, r *http.Request) { rt.a.edge.ServeHTTP(w, r) }
 
 type (
-	callerKey  struct{}
-	projectKey struct{}
+	callerKey     struct{}
+	credentialKey struct{}
+	projectKey    struct{}
 )
+
+// credentialFrom returns the credential the seam authenticated for the
+// request ctx belongs to.
+func credentialFrom(ctx context.Context) credential {
+	c, _ := ctx.Value(credentialKey{}).(credential)
+	return c
+}
 
 // callerOf returns the caller the seam authenticated for the request ctx
 // belongs to.
@@ -336,7 +345,8 @@ func (a *api) seam(op operations.Entry, next http.Handler) http.Handler {
 			console:       a.opts.console(scheme, r.Host),
 		})
 		r = r.WithContext(ctx)
-		caller, err := a.authenticate(r, op.Operation)
+		cred := credentialOf(r)
+		caller, err := a.authenticate(ctx, cred, op.Operation)
 		var in *addressed
 		switch {
 		case err == nil && caller.Method == access.MethodSession && a.crossOrigin(r):
@@ -359,6 +369,7 @@ func (a *api) seam(op operations.Entry, next http.Handler) http.Handler {
 			return
 		}
 		ctx = context.WithValue(ctx, callerKey{}, caller)
+		ctx = context.WithValue(ctx, credentialKey{}, cred)
 		if in != nil {
 			ctx = context.WithValue(ctx, projectKey{}, *in)
 		}
@@ -399,6 +410,30 @@ func (a *api) address(ctx context.Context, caller access.Caller, key string) (*a
 var errUnauthenticated = apperrors.Unauthenticated("unauthenticated",
 	"authentication is required: an API token in the Authorization header as Bearer, or a signed-in session")
 
+// credential is what a request presents to be authenticated: the
+// Authorization header when present, else the session cookie when present,
+// and the address it comes from. It is kept apart from the request so a
+// stream, which outlives the request that opened it, can present it again.
+type credential struct {
+	authorization *string
+	cookie        *string
+	ip            netip.Addr
+}
+
+// credentialOf reads the credential r presents.
+func credentialOf(r *http.Request) credential {
+	c := credential{ip: flaghttp.ClientOf(r.Context()).IP}
+	if _, present := r.Header["Authorization"]; present {
+		v := r.Header.Get("Authorization")
+		c.authorization = &v
+	}
+	if cookie, err := r.Cookie(SessionCookie); err == nil {
+		v := cookie.Value
+		c.cookie = &v
+	}
+	return c
+}
+
 // authenticate resolves the request's credential. Any Authorization header
 // is an attempt at an API token presented as Bearer, so a malformed one is
 // refused rather than ignored, and it is judged instead of any session
@@ -407,20 +442,19 @@ var errUnauthenticated = apperrors.Unauthenticated("unauthenticated",
 // cookie is the credential, except for a public operation: an ended session
 // must not stand between a member and signing in again. A cookie the server
 // did not issue is no credential at all.
-func (a *api) authenticate(r *http.Request, op access.Operation) (access.Caller, error) {
-	if _, present := r.Header["Authorization"]; present {
-		scheme, value, _ := strings.Cut(r.Header.Get("Authorization"), " ")
+func (a *api) authenticate(ctx context.Context, c credential, op access.Operation) (access.Caller, error) {
+	if c.authorization != nil {
+		scheme, value, _ := strings.Cut(*c.authorization, " ")
 		value = strings.TrimSpace(value)
 		if !strings.EqualFold(scheme, "Bearer") || value == "" {
 			return access.Caller{}, access.ErrInvalidToken
 		}
-		return a.h.AuthenticateToken.Handle(r.Context(), value, flaghttp.ClientOf(r.Context()).IP)
+		return a.h.AuthenticateToken.Handle(ctx, value, c.ip)
 	}
-	cookie, err := r.Cookie(SessionCookie)
-	if err != nil || op.Requirement == access.RequirePublic {
+	if c.cookie == nil || op.Requirement == access.RequirePublic {
 		return access.Caller{}, errUnauthenticated
 	}
-	caller, err := a.h.AuthenticateSession.Handle(r.Context(), cookie.Value)
+	caller, err := a.h.AuthenticateSession.Handle(ctx, *c.cookie)
 	if errors.Is(err, appaccess.ErrNoSession) {
 		return access.Caller{}, errUnauthenticated
 	}
