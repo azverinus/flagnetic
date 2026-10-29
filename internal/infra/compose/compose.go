@@ -7,8 +7,10 @@ package compose
 import (
 	"context"
 	"crypto/rand"
+	"crypto/x509"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -34,6 +36,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
+	"github.com/azverinus/flagnetic/internal/infra/out/mail"
 	"github.com/azverinus/flagnetic/internal/infra/out/oidc"
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
@@ -107,6 +110,13 @@ type Options struct {
 	AuditExportMaxEntries int
 	// DigestSlot is when the weekly stale-flag digest is sent.
 	DigestSlot governance.DigestSlot
+	// DefaultLocale is the language of a mail whose recipient has not chosen
+	// one.
+	DefaultLocale string
+	// MailRootCAs are the roots an SMTP server's certificate is verified
+	// against; the system's when nil. The test kit sets it for the servers
+	// it starts.
+	MailRootCAs *x509.CertPool
 	management.Options
 }
 
@@ -292,6 +302,22 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// Every request judging a session reads the settings: the replica keeps
 	// a copy, which a notification of each change drops.
 	settings := pgaccess.NewAuthSettingsCache(d.Pool)
+	// Mail goes out after the commit of the change causing it, in the
+	// background, through the SMTP server the instance configured.
+	smtpSettings := pgaccess.NewSMTPSettingsCache(d.Pool)
+	renderer, err := mail.NewRenderer()
+	if err != nil {
+		panic(fmt.Sprintf("compose: the mail templates: %v", err)) // the templates are embedded, so only a broken build fails
+	}
+	postman := appaccess.NewPostman(appaccess.PostmanDeps{
+		Settings: smtpSettings, Opener: o.Keyring, Mailer: mail.NewSender(renderer, o.MailRootCAs),
+		Counter: mail.NewMetrics(reg), After: postgres.AfterCommit{}, Clock: d.Clock, Logger: edge.Logger(),
+		DefaultLocale: o.DefaultLocale,
+	})
+	publicURL := ""
+	if o.BaseURL != nil {
+		publicURL = strings.TrimSuffix(o.BaseURL.String(), "/")
+	}
 	// One hasher serves every use case of the replica, so its bound is the
 	// replica's.
 	hasher := password.NewBoundedHasher(password.DefaultParams,
@@ -333,10 +359,17 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		RevokeSessions:     appaccess.NewRevokeSessions(tx, accessStore, settings, audit, d.Clock, d.IDs),
 		GetAuthSettings:    appaccess.NewGetAuthSettings(settings),
 		UpdateAuthSettings: appaccess.NewUpdateAuthSettings(tx, accessStore, settings, audit, d.Clock, d.IDs),
-		ListMembers:        appaccess.NewListMembers(accessStore),
-		GetMember:          appaccess.NewGetMember(accessStore),
-		UpdateMember:       appaccess.NewUpdateMember(tx, accessStore, audit, d.Clock, d.IDs),
-		UpdateMe:           appaccess.NewUpdateMe(tx, accessStore, audit, d.Clock, d.IDs, config.ConsoleLocales),
+		GetSMTP:            appaccess.NewGetSMTP(smtpSettings),
+		ConfigureSMTP: appaccess.NewConfigureSMTP(appaccess.ConfigureSMTPDeps{
+			Tx: tx, Store: accessStore, Cache: smtpSettings, Sealer: o.Keyring, Audit: audit, Clock: d.Clock, IDs: d.IDs,
+			BaseURLSet: o.BaseURL != nil,
+		}),
+		RemoveSMTP:   appaccess.NewRemoveSMTP(tx, accessStore, smtpSettings, audit, d.Clock, d.IDs),
+		SendTestMail: appaccess.NewSendTestMail(postman, publicURL),
+		ListMembers:  appaccess.NewListMembers(accessStore),
+		GetMember:    appaccess.NewGetMember(accessStore),
+		UpdateMember: appaccess.NewUpdateMember(tx, accessStore, audit, d.Clock, d.IDs),
+		UpdateMe:     appaccess.NewUpdateMe(tx, accessStore, audit, d.Clock, d.IDs, config.ConsoleLocales),
 		ChangeMyPassword: appaccess.NewChangeMyPassword(appaccess.ChangeMyPasswordDeps{
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 		}),
@@ -608,6 +641,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		},
 		Listeners: []Listener{
 			{Channel: pgaccess.AuthSettingsChannel, Handler: settings},
+			{Channel: pgaccess.SMTPSettingsChannel, Handler: smtpSettings},
 			{Channel: pgdelivery.SDKKeysChannel, Handler: sdkKeyCache},
 			{Channel: pgdelivery.RulesetsChannel, Handler: rulesetStream},
 			{Channel: pggovernance.ChangesChannel, Handler: changeHub},
@@ -617,6 +651,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			changeHub.Close()
 			rulesetCache.Close()
 			guardPool.Close()
+			// The mails the requests caused leave with the replica.
+			mailCtx, stopWaiting := context.WithTimeout(context.Background(), appaccess.MailBound)
+			defer stopWaiting()
+			postman.Wait(mailCtx)
 			// The requests are done: what they counted since the last round
 			// is written now rather than lost with the replica.
 			ctx, cancel := context.WithTimeout(context.Background(), finalFlushBound)

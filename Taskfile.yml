@@ -196,7 +196,7 @@ tasks:
       # a profile, counting every server package any test exercises.
       - for: { var: MODULES, split: "\n" }
         cmd: >-
-          cd '{{.ITEM}}' && {{.GOTESTSUM}} --format pkgname -- -race
+          cd '{{.ITEM}}' && {{.GOTESTSUM}} --format pkgname -- -race -timeout 20m
           {{if eq .ITEM .ROOT_DIR}}-coverpkg=./internal/... -coverprofile='{{.ROOT_DIR}}/coverage.out'{{end}} ./...
 
   cover:

@@ -32,6 +32,7 @@ var Start = time.Date(2026, time.January, 1, 9, 0, 0, 0, time.UTC)
 // tests recorded, and drops the schema. It returns the exit code for os.Exit.
 func Main(m *testing.M) int {
 	defer stopDex()
+	defer stopMailpits()
 	return pgtest.Main(m, func(ctx context.Context, pool *pgxpool.Pool) error {
 		_, err := postgres.Migrate(ctx, pool, postgres.Migrations())
 		return err

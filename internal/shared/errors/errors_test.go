@@ -26,6 +26,7 @@ func TestEveryConstructorGivesItsKindAndCode(t *testing.T) {
 		{errors.RateLimited("too_many_requests", "slow down", time.Second), errors.KindRateLimited, "rate_limited"},
 		{errors.Unavailable("database_unavailable", "try again"), errors.KindUnavailable, "unavailable"},
 		{errors.BadGateway("provider_unreachable", "no answer"), errors.KindBadGateway, "bad_gateway"},
+		{errors.BadGateway("smtp_failed", "the relay refused"), errors.KindBadGateway, "bad_gateway"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

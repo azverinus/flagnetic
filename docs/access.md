@@ -138,6 +138,14 @@ The console's personal settings do all of this, list the devices the member is s
 
 The console reads what the member may do in a project from `GET /projects/{project}/me` and which roles hold each permission from `GET /roles`, and never infers anything from a role's name. The project navigation shows only the screens the member can obtain something from. An action they lack the permission for is either left out or shown disabled with the reason, such as "Needs the permission to manage environments, held by Owner and Maintainer.": a tooltip by pointer and by keyboard focus, and the action's description for a screen reader, so the member knows whom to ask. This only spares a member a refusal; the server judges every request the same way whatever the console showed.
 
+## Instance admin operations
+
+Besides the members, sessions and tokens of every member, an instance admin holds the instance's settings:
+
+- `GET` and `PUT /instance/auth-settings`: session timeouts, the longest an API token may live and the password policy (see [Signing in to the console](operations.md#signing-in-to-the-console)). Recorded as `auth_settings.updated`.
+- `GET`, `PUT` and `DELETE /instance/smtp`, and `POST /instance/smtp/test`: the SMTP server the instance mails through and a test mail to the caller (see [Mail](mail.md)). Recorded as `smtp.updated` and `smtp.deleted`, never with the password.
+- `GET /audit` and its export, the instance's [audit log](#the-audit-log).
+
 ## The audit log
 
 Every change is recorded as an audit entry inside the transaction that makes it, so a change that is rolled back leaves no entry and a committed one always has one. An entry holds when it happened, the project it belongs to (none for a change to the instance, such as a sign-in or an auth settings change), the environment it addressed if any, the actor, the action (`entity.verb`, such as `environment.updated`), the entity with its kind, identifier and key as they were, the values before and after, and the ID of the request that made the change. The actor is a member, an API token (with the member a personal access token acts for), the CLI or the system, named as they were called when the change was made. Secrets never reach an entry: they are written `[redacted]`, and a token appears by its hint. Entries keep no link to their project that would delete them with it, so they outlive what they record. Nothing writes to the log through the API.

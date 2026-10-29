@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"cmp"
 	"context"
+	"crypto/x509"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -132,6 +133,12 @@ type serverOptions struct {
 	// digest is when the weekly stale-flag digest is due, the
 	// configuration's default when nil.
 	digest *governance.DigestSlot
+	// mailRoots are the roots SMTP servers' certificates are verified
+	// against, the system's when nil.
+	mailRoots *x509.CertPool
+	// defaultLocale is the language of a mail whose recipient chose none,
+	// the configuration's default when "".
+	defaultLocale string
 }
 
 type route struct {
@@ -201,6 +208,17 @@ func WithAuditExportMaxEntries(n int) ServerOption {
 // of the configuration's default.
 func WithDigestSlot(slot governance.DigestSlot) ServerOption {
 	return func(o *serverOptions) { o.digest = &slot }
+}
+
+// WithMailRoots serves verifying SMTP servers' certificates against roots,
+// such as MailpitRoots, instead of the system's.
+func WithMailRoots(roots *x509.CertPool) ServerOption {
+	return func(o *serverOptions) { o.mailRoots = roots }
+}
+
+// WithDefaultLocale serves as FLAGNETIC_DEFAULT_LOCALE does.
+func WithDefaultLocale(locale string) ServerOption {
+	return func(o *serverOptions) { o.defaultLocale = locale }
 }
 
 // WithWebhookTargets serves allowing webhook targets as p does, such as a
@@ -301,7 +319,9 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		Schedule: compose.Schedule{
 			MinLead: cfg.ScheduleMinLead, Tick: cfg.ScheduleTick, MaxFailures: cfg.ScheduleMaxFailures,
 		},
-		DigestSlot: digest,
+		DigestSlot:    digest,
+		DefaultLocale: cmp.Or(o.defaultLocale, cfg.DefaultLocale),
+		MailRootCAs:   o.mailRoots,
 	})
 	// Registered first, so it runs once the server below has stopped.
 	t.Cleanup(background.Close)

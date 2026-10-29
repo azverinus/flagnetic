@@ -3,7 +3,6 @@ package access
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -66,68 +65,21 @@ func (s *Store) SaveAuthSettings(ctx context.Context, settings access.AuthSettin
 }
 
 // AuthSettingsCache holds a replica's copy of the auth settings, which
-// every request judging a session reads. It trusts its copy only while its
-// listener on AuthSettingsChannel is up: a change announced while it is
-// down may be missed, so until it is listening again every read goes to
-// PostgreSQL.
+// every request judging a session reads, trusted only while its listener on
+// AuthSettingsChannel is up.
 type AuthSettingsCache struct {
-	store *Store
-
-	mu        sync.Mutex
-	listening bool
-	// generation counts what may have made a read stale: a notification, or
-	// the listener going up or down. A read is kept only when no such event
-	// happened while it was under way.
-	generation uint64
-	cached     *access.AuthSettings
+	*listenedCache[access.AuthSettings]
 }
 
 // NewAuthSettingsCache returns a cache of the settings on pool, which reads
 // through until its listener reports itself up.
 func NewAuthSettingsCache(pool *pgxpool.Pool) *AuthSettingsCache {
-	return &AuthSettingsCache{store: NewStore(pool)}
+	store := NewStore(pool)
+	return &AuthSettingsCache{newListenedCache(store.AuthSettings)}
 }
 
 // AuthSettings returns the auth settings, from the copy while it can be
 // trusted.
 func (c *AuthSettingsCache) AuthSettings(ctx context.Context) (access.AuthSettings, error) {
-	c.mu.Lock()
-	if c.cached != nil {
-		v := *c.cached
-		c.mu.Unlock()
-		return v, nil
-	}
-	generation := c.generation
-	c.mu.Unlock()
-	v, err := c.store.AuthSettings(ctx)
-	if err != nil {
-		return access.AuthSettings{}, err
-	}
-	c.mu.Lock()
-	if c.listening && c.generation == generation {
-		c.cached = &v
-	}
-	c.mu.Unlock()
-	return v, nil
-}
-
-// Forget drops the copy, as a change made by this replica does once it is
-// committed, so the replica's next read sees it without waiting for the
-// notification.
-func (c *AuthSettingsCache) Forget() { c.invalidate(nil) }
-
-// Listening is told when the listener starts or stops listening.
-func (c *AuthSettingsCache) Listening(up bool) { c.invalidate(&up) }
-
-// Received is told of each change announced.
-func (c *AuthSettingsCache) Received(string) { c.invalidate(nil) }
-
-func (c *AuthSettingsCache) invalidate(listening *bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if listening != nil {
-		c.listening = *listening
-	}
-	c.generation++
-	c.cached = nil
+	return c.get(ctx)
 }

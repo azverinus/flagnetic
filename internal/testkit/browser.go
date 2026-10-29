@@ -42,6 +42,9 @@ func WithStatus(s access.MemberStatus) MemberOption { return func(m *access.Memb
 // WithEmail gives the member email instead of a random one.
 func WithEmail(email string) MemberOption { return func(m *access.Member) { m.Email = email } }
 
+// WithLocale gives the member the console language locale.
+func WithLocale(locale string) MemberOption { return func(m *access.Member) { m.Locale = locale } }
+
 // WithDisplayName gives the member name instead of "Test Member".
 func WithDisplayName(name string) MemberOption {
 	return func(m *access.Member) { m.DisplayName = name }

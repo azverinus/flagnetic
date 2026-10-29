@@ -222,7 +222,7 @@ func Settings() []Setting {
 			Key:  "base_url",
 			Description: "The public URL the console is reached at, such as the address of the reverse proxy in front. " +
 				"Its scheme decides whether the session cookie is `Secure`, and its origin is trusted for requests signed in through the console " +
-				"even when the proxy rewrites `Host`. Invitation links start with it. When unset, the scheme and origin of each request are used. Auth providers need it: a provider's redirect URI, which the identity provider is told, is built from it, so creating, editing or enabling one is refused with `base_url_required` while it is unset.",
+				"even when the proxy rewrites `Host`. Invitation links start with it. When unset, the scheme and origin of each request are used. Auth providers need it: a provider's redirect URI, which the identity provider is told, is built from it, so creating, editing or enabling one is refused with `base_url_required` while it is unset, and so is configuring an [SMTP server](mail.md#configuring-the-smtp-server), since every mailed link is built from it.",
 			Example: "https://flags.example.com",
 			apply: func(cfg *Config, v string) error {
 				u, err := url.Parse(v)

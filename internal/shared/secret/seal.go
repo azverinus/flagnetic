@@ -31,6 +31,9 @@ const (
 	PurposeSinkWebhookSecret Purpose = "sink_webhook_secret" //nolint:gosec // a label, not a credential
 	// PurposeOIDCClientSecret seals the client secrets of OIDC auth providers.
 	PurposeOIDCClientSecret Purpose = "oidc client secret" //nolint:gosec // a label, not a credential
+	// PurposeSMTPPassword seals the password the instance authenticates to
+	// its SMTP server with.
+	PurposeSMTPPassword Purpose = "smtp password"
 )
 
 // Use names a key derived from the secret key for something other than

@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en">
+<body>
+<p>Hello {{.Recipient.Name}},</p>
+<p>Your Flagnetic instance{{with .Data.Instance}} at {{.}}{{end}} can send mail: this test mail reached {{.Recipient.Email}}.</p>
+<p>Nothing else is needed. You can ignore this mail.</p>
+</body>
+</html>
