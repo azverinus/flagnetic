@@ -49,6 +49,9 @@ import type {
   CreateAttributeData,
   CreateAttributeErrors,
   CreateAttributeResponses,
+  CreateAuthProviderData,
+  CreateAuthProviderErrors,
+  CreateAuthProviderResponses,
   CreateChangeRequestData,
   CreateChangeRequestErrors,
   CreateChangeRequestResponses,
@@ -100,6 +103,9 @@ import type {
   DeleteAttributeData,
   DeleteAttributeErrors,
   DeleteAttributeResponses,
+  DeleteAuthProviderData,
+  DeleteAuthProviderErrors,
+  DeleteAuthProviderResponses,
   DeleteEnvironmentData,
   DeleteEnvironmentErrors,
   DeleteEnvironmentResponses,
@@ -133,9 +139,15 @@ import type {
   DeleteWebhookData,
   DeleteWebhookErrors,
   DeleteWebhookResponses,
+  DisableAuthProviderData,
+  DisableAuthProviderErrors,
+  DisableAuthProviderResponses,
   DismissDiscoveredAttributeData,
   DismissDiscoveredAttributeErrors,
   DismissDiscoveredAttributeResponses,
+  EnableAuthProviderData,
+  EnableAuthProviderErrors,
+  EnableAuthProviderResponses,
   EnableInstanceWebhookData,
   EnableInstanceWebhookErrors,
   EnableInstanceWebhookResponses,
@@ -157,6 +169,9 @@ import type {
   GetAuthMethodsData,
   GetAuthMethodsErrors,
   GetAuthMethodsResponses,
+  GetAuthProviderData,
+  GetAuthProviderErrors,
+  GetAuthProviderResponses,
   GetAuthSettingsData,
   GetAuthSettingsErrors,
   GetAuthSettingsResponses,
@@ -247,6 +262,9 @@ import type {
   ListAuditEntriesData,
   ListAuditEntriesErrors,
   ListAuditEntriesResponses,
+  ListAuthProvidersData,
+  ListAuthProvidersErrors,
+  ListAuthProvidersResponses,
   ListChangeRequestsData,
   ListChangeRequestsErrors,
   ListChangeRequestsResponses,
@@ -431,6 +449,9 @@ import type {
   StreamProjectChangesErrors,
   StreamProjectChangesResponse,
   StreamProjectChangesResponses,
+  TestAuthProviderData,
+  TestAuthProviderErrors,
+  TestAuthProviderResponses,
   TestInstanceWebhookData,
   TestInstanceWebhookErrors,
   TestInstanceWebhookResponses,
@@ -440,6 +461,9 @@ import type {
   UpdateAttributeData,
   UpdateAttributeErrors,
   UpdateAttributeResponses,
+  UpdateAuthProviderData,
+  UpdateAuthProviderErrors,
+  UpdateAuthProviderResponses,
   UpdateAuthSettingsData,
   UpdateAuthSettingsErrors,
   UpdateAuthSettingsResponses,
@@ -4190,6 +4214,233 @@ export const updateAuthSettings = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * The instance's auth providers
+ *
+ * Ordered by display name. A client secret is never listed:
+ * `client_secret_set` says whether there is one.
+ *
+ */
+export const listAuthProviders = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAuthProvidersData, ThrowOnError>,
+): RequestResult<ListAuthProvidersResponses, ListAuthProvidersErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListAuthProvidersResponses,
+    ListAuthProvidersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers",
+    ...options,
+  });
+
+/**
+ * Add an auth provider
+ *
+ * Adds an identity provider members can sign in through. It vouches only
+ * for the email domains it names (`domains`, at least one, lowercased).
+ * The client secret is sealed and never read back. The answer carries the
+ * `redirect_uri` to register at the identity provider. Refused 422
+ * `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+ * `insecure_url` for an `http` issuer other than on a loopback address;
+ * private networks are allowed. A slug already in use is 409
+ * `already_exists`. Audited `auth_provider.created`.
+ *
+ */
+export const createAuthProvider = <ThrowOnError extends boolean = false>(
+  options: Options<CreateAuthProviderData, ThrowOnError>,
+): RequestResult<CreateAuthProviderResponses, CreateAuthProviderErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateAuthProviderResponses,
+    CreateAuthProviderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete an auth provider
+ *
+ * Refused 409 `provider_in_use` while something depends on the provider;
+ * `references` names what. Disable it instead: that stops its sign-ins
+ * and leaves its members, identities and grants as they are. Audited
+ * `auth_provider.deleted`.
+ *
+ */
+export const deleteAuthProvider = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteAuthProviderData, ThrowOnError>,
+): RequestResult<DeleteAuthProviderResponses, DeleteAuthProviderErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteAuthProviderResponses,
+    DeleteAuthProviderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}",
+    ...options,
+  });
+
+/**
+ * An auth provider
+ */
+export const getAuthProvider = <ThrowOnError extends boolean = false>(
+  options: Options<GetAuthProviderData, ThrowOnError>,
+): RequestResult<GetAuthProviderResponses, GetAuthProviderErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetAuthProviderResponses, GetAuthProviderErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}",
+    ...options,
+  });
+
+/**
+ * Edit an auth provider
+ *
+ * Changes any property but `slug` and `kind`; each absent one is left as
+ * it is, a sent `client_secret` replaces the stored one, and a `claims`
+ * member names only the claims to rename. Whether the provider is enabled
+ * is changed with `enable` and `disable`. Refused as a creation is.
+ * Audited `auth_provider.updated`; an edit that changes nothing is not.
+ *
+ */
+export const updateAuthProvider = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateAuthProviderData, ThrowOnError>,
+): RequestResult<UpdateAuthProviderResponses, UpdateAuthProviderErrors, ThrowOnError> =>
+  (options.client ?? client).patch<
+    UpdateAuthProviderResponses,
+    UpdateAuthProviderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Enable an auth provider
+ *
+ * Offers the provider on the sign-in page. Refused 422
+ * `base_url_required` as a creation is. An enabled provider is answered
+ * as it is. Audited `auth_provider.enabled`.
+ *
+ */
+export const enableAuthProvider = <ThrowOnError extends boolean = false>(
+  options: Options<EnableAuthProviderData, ThrowOnError>,
+): RequestResult<EnableAuthProviderResponses, EnableAuthProviderErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    EnableAuthProviderResponses,
+    EnableAuthProviderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}/enable",
+    ...options,
+  });
+
+/**
+ * Disable an auth provider
+ *
+ * Stops the provider's sign-ins and its SCIM tokens and leaves its
+ * members, identities and grants as they are. A disabled provider is
+ * answered as it is. Audited `auth_provider.disabled`.
+ *
+ */
+export const disableAuthProvider = <ThrowOnError extends boolean = false>(
+  options: Options<DisableAuthProviderData, ThrowOnError>,
+): RequestResult<DisableAuthProviderResponses, DisableAuthProviderErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    DisableAuthProviderResponses,
+    DisableAuthProviderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}/disable",
+    ...options,
+  });
+
+/**
+ * Test that an auth provider can be reached
+ *
+ * Fetches the provider's discovery document now, enabled or not, and
+ * answers what it found. Refused 502 `provider_unreachable` with the
+ * `failure` when the provider does not answer, answers anything but a
+ * document, or names another issuer. Nothing is stored.
+ *
+ */
+export const testAuthProvider = <ThrowOnError extends boolean = false>(
+  options: Options<TestAuthProviderData, ThrowOnError>,
+): RequestResult<TestAuthProviderResponses, TestAuthProviderErrors, ThrowOnError> =>
+  (options.client ?? client).post<TestAuthProviderResponses, TestAuthProviderErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}/test",
+    ...options,
   });
 
 /**

@@ -14,9 +14,113 @@ export const zSignInRequest = z.object({
   password: z.string(),
 });
 
+/**
+ * The protocol the provider speaks.
+ */
+export const zAuthProviderKind = z.enum(["oidc"]);
+
+/**
+ * The claims of the provider's tokens that carry what the instance reads of a person.
+ */
+export const zAuthProviderClaims = z.object({
+  email: z.string(),
+  name: z.string(),
+  groups: z.string(),
+});
+
+/**
+ * The claims to rename; each absent one is left as it is.
+ */
+export const zAuthProviderClaimsPatch = z.object({
+  email: z.string().optional(),
+  name: z.string().optional(),
+  groups: z.string().optional(),
+});
+
+export const zAuthProvider = z.object({
+  id: z.uuid(),
+  slug: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
+  kind: zAuthProviderKind,
+  display_name: z.string(),
+  enabled: z.boolean(),
+  domains: z.array(z.string()),
+  link_by_email: z.boolean(),
+  auto_provision: z.boolean(),
+  issuer: z.string().optional(),
+  client_id: z.string().optional(),
+  client_secret_set: z.boolean().optional(),
+  scopes: z.array(z.string()).optional(),
+  claims: zAuthProviderClaims.optional(),
+  require_verified_email: z.boolean().optional(),
+  redirect_uri: z.string().optional(),
+  created_at: z.iso.datetime(),
+  updated_at: z.iso.datetime(),
+  version: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+});
+
+export const zAuthProviderList = z.object({
+  items: z.array(zAuthProvider),
+});
+
+export const zAuthProviderCreate = z.object({
+  slug: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
+  kind: zAuthProviderKind,
+  display_name: z.string(),
+  enabled: z.boolean().optional(),
+  domains: z.array(z.string()),
+  link_by_email: z.boolean().optional(),
+  auto_provision: z.boolean().optional(),
+  issuer: z.string(),
+  client_id: z.string(),
+  scopes: z.array(z.string()).optional(),
+  claims: zAuthProviderClaimsPatch.optional(),
+  require_verified_email: z.boolean().optional(),
+});
+
+/**
+ * The properties to change; each absent one is left as it is.
+ */
+export const zAuthProviderPatch = z.object({
+  display_name: z.string().optional(),
+  domains: z.array(z.string()).optional(),
+  link_by_email: z.boolean().optional(),
+  auto_provision: z.boolean().optional(),
+  issuer: z.string().optional(),
+  client_id: z.string().optional(),
+  scopes: z.array(z.string()).optional(),
+  claims: zAuthProviderClaimsPatch.optional(),
+  require_verified_email: z.boolean().optional(),
+});
+
+/**
+ * What the provider's discovery document says.
+ */
+export const zAuthProviderTest = z.object({
+  issuer: z.string(),
+  authorization_endpoint: z.string(),
+  token_endpoint: z.string(),
+  jwks_uri: z.string(),
+  userinfo_endpoint: z.string().optional(),
+  scopes_supported: z.array(z.string()).optional(),
+  code_challenge_methods_supported: z.array(z.string()).optional(),
+});
+
+export const zAuthMethodProvider = z.object({
+  slug: z.string(),
+  display_name: z.string(),
+  kind: zAuthProviderKind,
+});
+
 export const zAuthMethods = z.object({
   local_login_enabled: z.boolean(),
-  providers: z.array(z.record(z.string(), z.unknown())),
+  providers: z.array(zAuthMethodProvider),
 });
 
 export const zMemberStatus = z.enum(["invited", "active", "deactivated"]);
@@ -585,6 +689,8 @@ export const zProblem = z.object({
     })
     .optional(),
   references: z.array(zReference).optional(),
+  used_by: z.array(z.string()).optional(),
+  failure: z.string().optional(),
   errors: z.array(zViolation).optional(),
 });
 
@@ -2214,6 +2320,38 @@ export const zWebhookDeliveryList = z.object({
   next_cursor: z.string().nullable(),
 });
 
+export const zAuthProviderCreateWritable = z.object({
+  slug: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
+  kind: zAuthProviderKind,
+  display_name: z.string(),
+  enabled: z.boolean().optional(),
+  domains: z.array(z.string()),
+  link_by_email: z.boolean().optional(),
+  auto_provision: z.boolean().optional(),
+  issuer: z.string(),
+  client_id: z.string(),
+  client_secret: z.string(),
+  scopes: z.array(z.string()).optional(),
+  claims: zAuthProviderClaimsPatch.optional(),
+  require_verified_email: z.boolean().optional(),
+});
+
+/**
+ * The properties to change; each absent one is left as it is.
+ */
+export const zAuthProviderPatchWritable = z.object({
+  display_name: z.string().optional(),
+  domains: z.array(z.string()).optional(),
+  link_by_email: z.boolean().optional(),
+  auto_provision: z.boolean().optional(),
+  issuer: z.string().optional(),
+  client_id: z.string().optional(),
+  client_secret: z.string().optional(),
+  scopes: z.array(z.string()).optional(),
+  claims: zAuthProviderClaimsPatch.optional(),
+  require_verified_email: z.boolean().optional(),
+});
+
 /**
  * A member's identifier; their own changes and those of their personal access tokens.
  */
@@ -2290,6 +2428,11 @@ export const zFlagKey = z.string();
  * The change request's identifier.
  */
 export const zChangeRequestId = z.uuid();
+
+/**
+ * The auth provider's slug.
+ */
+export const zAuthProviderSlug = z.string();
 
 /**
  * The webhook subscription's identifier.
@@ -3860,6 +4003,78 @@ export const zUpdateAuthSettingsBody = zAuthSettings;
  * The settings as changed.
  */
 export const zUpdateAuthSettingsResponse = zAuthSettings;
+
+/**
+ * The auth providers.
+ */
+export const zListAuthProvidersResponse = zAuthProviderList;
+
+export const zCreateAuthProviderBody = zAuthProviderCreateWritable;
+
+/**
+ * The new auth provider.
+ */
+export const zCreateAuthProviderResponse = zAuthProvider;
+
+export const zDeleteAuthProviderPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * Deleted.
+ */
+export const zDeleteAuthProviderResponse = z.void();
+
+export const zGetAuthProviderPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * The auth provider; its `ETag` is its version.
+ */
+export const zGetAuthProviderResponse = zAuthProvider;
+
+export const zUpdateAuthProviderBody = zAuthProviderPatchWritable;
+
+export const zUpdateAuthProviderHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zUpdateAuthProviderPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * The auth provider as it is now.
+ */
+export const zUpdateAuthProviderResponse = zAuthProvider;
+
+export const zEnableAuthProviderPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * The auth provider, enabled.
+ */
+export const zEnableAuthProviderResponse = zAuthProvider;
+
+export const zDisableAuthProviderPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * The auth provider, disabled.
+ */
+export const zDisableAuthProviderResponse = zAuthProvider;
+
+export const zTestAuthProviderPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * What the discovery document says.
+ */
+export const zTestAuthProviderResponse = zAuthProviderTest;
 
 export const zListAuditEntriesQuery = z.object({
   project: z.uuid().optional(),
