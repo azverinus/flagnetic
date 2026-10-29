@@ -228,6 +228,25 @@ func (s *Store) Experiments(ctx context.Context, project workspace.ProjectID, fi
 	return out, rows.Err()
 }
 
+// ProjectExperiments returns every experiment of project, whatever its
+// status, by key in byte order.
+func (s *Store) ProjectExperiments(ctx context.Context, project workspace.ProjectID) ([]experiments.Experiment, error) {
+	rows, err := s.db(ctx).Query(ctx, `SELECT `+columns+from+` WHERE e.project_id = $1 ORDER BY e.key COLLATE "C"`, project.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("listing the experiments of a project: %w", err)
+	}
+	defer rows.Close()
+	out := []experiments.Experiment{}
+	for rows.Next() {
+		e, err := scan(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
 // UpdateExperiment stores the changed definition e, which keeps its key,
 // project and creation.
 func (s *Store) UpdateExperiment(ctx context.Context, e experiments.Experiment) error {

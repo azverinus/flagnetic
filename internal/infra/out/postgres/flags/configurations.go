@@ -185,6 +185,28 @@ func (s *Store) Configurations(ctx context.Context, flag flags.FlagID) ([]flags.
 	return out, rows.Err()
 }
 
+// ProjectConfigurations returns the configuration of every flag of project
+// in every environment, by flag, each flag's by the environments' order, all
+// in one query.
+func (s *Store) ProjectConfigurations(ctx context.Context, project workspace.ProjectID) (map[flags.FlagID][]flags.EnvironmentConfiguration, error) {
+	rows, err := s.db(ctx).Query(ctx, configurationSelect+`
+		WHERE e.project_id = $1
+		ORDER BY e.sort_order, e.key COLLATE "C"`, project.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("reading the configurations of a project: %w", err)
+	}
+	defer rows.Close()
+	out := map[flags.FlagID][]flags.EnvironmentConfiguration{}
+	for rows.Next() {
+		ec, err := scanConfiguration(rows)
+		if err != nil {
+			return nil, err
+		}
+		out[ec.Configuration.Flag] = append(out[ec.Configuration.Flag], ec)
+	}
+	return out, rows.Err()
+}
+
 // EnvironmentConfigurations returns the configuration of every flag of
 // environment's project there, archived flags included.
 func (s *Store) EnvironmentConfigurations(ctx context.Context, environment workspace.EnvironmentID) ([]flags.Configuration, error) {

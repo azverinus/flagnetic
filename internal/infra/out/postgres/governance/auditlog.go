@@ -243,6 +243,22 @@ func (l *AuditLog) Entry(ctx context.Context, project workspace.ProjectID, entry
 	return e, err
 }
 
+// LatestProjectEntry returns the identifier of the newest entry of project,
+// which a change to anything in the project moves on; the zero identifier
+// when the project has none.
+func (l *AuditLog) LatestProjectEntry(ctx context.Context, project workspace.ProjectID) (governance.EntryID, error) {
+	var entryID [16]byte
+	err := pgxtx.Querier(ctx, l.pool).QueryRow(ctx,
+		`SELECT id FROM audit_entries WHERE project_id = $1 ORDER BY id DESC LIMIT 1`, project.Bytes()).Scan(&entryID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return governance.EntryID{}, nil
+	}
+	if err != nil {
+		return governance.EntryID{}, fmt.Errorf("reading the latest audit entry of a project: %w", err)
+	}
+	return id.FromBytes[governance.Entry](entryID), nil
+}
+
 // RecordedVersion returns the values the newest entry of project recording
 // entity in environment holds for the entity at version, its before or its
 // after, whichever carries that version, and whether an entry does. Every

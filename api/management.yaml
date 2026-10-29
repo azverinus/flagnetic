@@ -678,6 +678,67 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /projects/{project}/export:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: exportProject
+      summary: Download the project's configuration as a project document
+      description: |
+        Writes the project's whole configuration as a project document, in
+        JSON (the default, and the canonical encoding) or YAML (derived from
+        it field for field): its environments in their order, unit types,
+        declared attributes, segments, flags with their configuration in every
+        environment, and experiments. A list whose order means something keeps
+        it (a configuration's rules, a flag's variations, an experiment's
+        weights, tags); every other list and map is by key, overrides by unit
+        type then unit identifier and prerequisites by flag, so that two
+        exports of an unchanged project are the same bytes. Rule identifiers and rollout
+        salts are in it, which keep every unit in its bucket in a copy; owners
+        are email addresses, and an override's note is in it and its author is
+        not.
+
+        Members, grants, tokens, SDK keys, webhook subscriptions, change
+        requests, audit entries, events, the standard attributes and the
+        discovered attributes are never in it.
+
+        The `ETag` is the identifier of the project's latest audit entry,
+        quoted: a later change to the project, whatever it touches, moves it.
+        Reading the project is all it takes, so nothing is audited.
+      x-permission: project.read
+      tags: [transfer]
+      parameters:
+        - $ref: "#/components/parameters/DocumentFormat"
+      responses:
+        "200":
+          description: |
+            The project document, as an attachment named
+            `{project key}-{UTC time, yyyymmddThhmmssZ}.{json|yaml}`.
+          headers:
+            ETag:
+              schema:
+                type: string
+              description: The identifier of the project's latest audit entry, quoted.
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDocument"
+            application/yaml:
+              schema:
+                type: string
+                format: binary
+                description: The same document as YAML.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /projects/{project}/environments:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -6061,6 +6122,14 @@ components:
       schema:
         type: string
         format: uuid
+    DocumentFormat:
+      name: format
+      in: query
+      description: The document's encoding, JSON unless `yaml` is asked for.
+      schema:
+        type: string
+        enum: [json, yaml]
+        default: json
     AuditExportFormat:
       name: format
       in: query
@@ -10406,3 +10475,349 @@ components:
           type: string
           nullable: true
           description: Pass as `cursor` for the next page; null on the last.
+    ProjectDocument:
+      type: object
+      description: |
+        A project's whole configuration, versioned apart from this API: it
+        has its own `schema_version`, a server imports every version it ever
+        exported, and within a version a document changes only additively
+        (a new optional field or section). A field it does not define is
+        refused naming its JSON Pointer. Identity is the key: no entity
+        identifier travels, except rule ids and rollout salts.
+      required: [schema_version, project, environments, unit_types, attributes, segments, flags, experiments]
+      properties:
+        schema_version:
+          type: integer
+          enum: [1]
+        project:
+          $ref: "#/components/schemas/DocumentProject"
+        environments:
+          type: array
+          description: In their sort order, which the array's order is.
+          items:
+            $ref: "#/components/schemas/DocumentEnvironment"
+        unit_types:
+          type: array
+          description: By key.
+          items:
+            $ref: "#/components/schemas/DocumentUnitType"
+        attributes:
+          type: array
+          description: By key. The standard attributes are never listed.
+          items:
+            $ref: "#/components/schemas/DocumentAttribute"
+        segments:
+          type: array
+          description: By key.
+          items:
+            $ref: "#/components/schemas/DocumentSegment"
+        flags:
+          type: array
+          description: By key.
+          items:
+            $ref: "#/components/schemas/DocumentFlag"
+        experiments:
+          type: array
+          description: By key, whatever their status.
+          items:
+            $ref: "#/components/schemas/DocumentExperiment"
+    DocumentProject:
+      type: object
+      required: [key, name]
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+    DocumentEnvironment:
+      type: object
+      required: [key, name, protected]
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        protected:
+          type: boolean
+    DocumentUnitType:
+      type: object
+      required: [key, name]
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+    DocumentAttribute:
+      type: object
+      required: [key, type, name]
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          description: "`string`, `number`, `boolean`, `semver` or `date`."
+        name:
+          type: string
+        description:
+          type: string
+    DocumentSegment:
+      type: object
+      required: [key, name, private, conditions]
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        private:
+          type: boolean
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentCondition"
+    DocumentCondition:
+      type: object
+      description: |
+        One comparison inside a rule or a segment. An `attribute` condition
+        names an `attribute`, an operator (`op`) and a `value` (none for
+        `exists`, `not_exists` and `is_empty`); `in_segment` and
+        `not_in_segment` name a `segment`; `prerequisite` names a `flag` and
+        one of its `variation`s.
+      required: [kind]
+      properties:
+        kind:
+          type: string
+        attribute:
+          type: string
+        op:
+          type: string
+        value:
+          description: A string, number, boolean or list, as the operator needs.
+          nullable: true
+        segment:
+          type: string
+        flag:
+          type: string
+        variation:
+          type: string
+    DocumentFlag:
+      type: object
+      required: [key, type, name, lifetime, variations, configurations]
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          description: "`boolean`, `string`, `number` or `json`; never changes."
+        name:
+          type: string
+        description:
+          type: string
+        owner:
+          type: string
+          description: The email address of the flag's owner.
+        tags:
+          type: array
+          items:
+            type: string
+        lifetime:
+          type: string
+          description: "`temporary` or `permanent`."
+        expected_removal_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When a temporary flag is expected to be removed; null for a permanent one.
+        automatic_exposure:
+          type: boolean
+        archived:
+          type: boolean
+        variations:
+          type: array
+          description: In the order the flag lists them, the first being the default of a flag that is not boolean.
+          items:
+            $ref: "#/components/schemas/DocumentVariation"
+        configurations:
+          type: object
+          description: The flag's configuration in each environment, keyed by environment key.
+          additionalProperties:
+            $ref: "#/components/schemas/DocumentConfiguration"
+    DocumentVariation:
+      type: object
+      required: [key, value]
+      properties:
+        key:
+          type: string
+        value:
+          description: JSON of the flag's type.
+        name:
+          type: string
+        description:
+          type: string
+    DocumentConfiguration:
+      type: object
+      required: ["on", off_variation, fallthrough, rules]
+      properties:
+        "on":
+          type: boolean
+        off_variation:
+          type: string
+        fallthrough:
+          type: string
+        prerequisites:
+          type: array
+          description: By flag.
+          items:
+            $ref: "#/components/schemas/DocumentPrerequisite"
+        overrides:
+          type: array
+          description: By unit type, then unit ID.
+          items:
+            $ref: "#/components/schemas/DocumentOverride"
+        rules:
+          type: array
+          description: In the order they are checked.
+          items:
+            $ref: "#/components/schemas/DocumentRule"
+    DocumentPrerequisite:
+      type: object
+      required: [flag, variation]
+      properties:
+        flag:
+          type: string
+        variation:
+          type: string
+    DocumentOverride:
+      type: object
+      required: [unit_type, unit_id, variation]
+      properties:
+        unit_type:
+          type: string
+        unit_id:
+          type: string
+        variation:
+          type: string
+        note:
+          type: string
+          description: Why the unit is pinned. Who pinned it does not travel.
+    DocumentRule:
+      type: object
+      required: [conditions, serve]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Kept across instances so that an SDK's rule id stays stable; minted on import when absent.
+        description:
+          type: string
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentCondition"
+        serve:
+          $ref: "#/components/schemas/DocumentServe"
+    DocumentServe:
+      type: object
+      description: |
+        What a matching rule serves. `variation` serves `variation`; `rollout`
+        serves `variation` to `percentage` (basis points, 0 to 10,000) of the
+        units of `unit_type`, bucketed by `salt`; `experiment` serves the
+        experiment `experiment` of the flag.
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          description: "`variation`, `rollout` or `experiment`."
+        variation:
+          type: string
+        experiment:
+          type: string
+        unit_type:
+          type: string
+        percentage:
+          type: integer
+        salt:
+          type: string
+          description: A rollout's salt, 16 lower-case letters and digits; it decides which units fall in the share, so it travels. Minted on import when absent.
+    DocumentExperiment:
+      type: object
+      required: [key, name, flag, unit_type, variations, traffic_allocation, status]
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        hypothesis:
+          type: string
+        owner:
+          type: string
+          description: The email address of the experiment's owner.
+        tags:
+          type: array
+          items:
+            type: string
+        flag:
+          type: string
+          description: The key of the flag whose variations are compared.
+        unit_type:
+          type: string
+        variations:
+          type: array
+          description: In the order that fixes the cumulative bucket ranges.
+          items:
+            $ref: "#/components/schemas/DocumentExperimentVariation"
+        traffic_allocation:
+          type: integer
+          description: The share of units included, in basis points.
+        inclusion_salt:
+          type: string
+        variation_salt:
+          type: string
+        status:
+          type: string
+          description: "`draft`, `running`, `stopped` or `archived`."
+        expected_end_at:
+          type: string
+          format: date
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        stopped_at:
+          type: string
+          format: date-time
+          nullable: true
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+        decision:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/DocumentDecision"
+    DocumentExperimentVariation:
+      type: object
+      required: [variation, weight]
+      properties:
+        variation:
+          type: string
+        weight:
+          type: integer
+          description: The share of the allocated traffic, in basis points.
+    DocumentDecision:
+      type: object
+      required: [outcome]
+      properties:
+        outcome:
+          type: string
+          description: "`winner` or `removed`."
+        winner_variation:
+          type: string
+        note:
+          type: string

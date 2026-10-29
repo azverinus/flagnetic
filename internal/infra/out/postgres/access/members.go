@@ -67,6 +67,32 @@ func (s *Store) MemberByID(ctx context.Context, member access.MemberID) (access.
 	return m(), nil
 }
 
+// MemberEmails returns the email address of each of members that exists,
+// as the member signs in with it.
+func (s *Store) MemberEmails(ctx context.Context, members []access.MemberID) (map[access.MemberID]string, error) {
+	ids := make([][16]byte, len(members))
+	for i, m := range members {
+		ids[i] = m.Bytes()
+	}
+	rows, err := s.db(ctx).Query(ctx, `SELECT id, email FROM members WHERE id = ANY ($1)`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("reading the emails of members: %w", err)
+	}
+	defer rows.Close()
+	out := make(map[access.MemberID]string, len(members))
+	for rows.Next() {
+		var (
+			memberID [16]byte
+			email    string
+		)
+		if err := rows.Scan(&memberID, &email); err != nil {
+			return nil, fmt.Errorf("reading the emails of members: %w", err)
+		}
+		out[id.FromBytes[access.Member](memberID)] = email
+	}
+	return out, rows.Err()
+}
+
 // SetPasswordHash replaces the password hash of member.
 func (s *Store) SetPasswordHash(ctx context.Context, member access.MemberID, hash string, at time.Time) error {
 	_, err := s.db(ctx).Exec(ctx, `UPDATE members SET password_hash = $2, updated_at = $3 WHERE id = $1`, member.Bytes(), hash, at)

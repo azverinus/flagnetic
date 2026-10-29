@@ -23,6 +23,7 @@ import (
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
 	appsinks "github.com/azverinus/flagnetic/internal/app/sinks"
+	apptransfer "github.com/azverinus/flagnetic/internal/app/transfer"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -536,6 +537,14 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		GetAuditEntry:      appgovernance.NewGetAuditEntry(auditLog),
 		ExportAuditEntries: appgovernance.NewExportAuditEntries(tx, auditLog, o.AuditExportMaxEntries),
 		StreamChanges:      appgovernance.NewStreamChanges(changeHub, auditLog),
+
+		// A document holds what the workspace, flags and experiments
+		// contexts keep, its owners' addresses from the access context and
+		// the state it was read in from the audit log.
+		ExportProject: apptransfer.NewExportProject(apptransfer.ExportProjectDeps{
+			Snapshots: tx, Projects: ws, Workspace: ws, Flags: flagStore, Experiments: experimentStore,
+			Members: accessStore, History: auditLog,
+		}),
 	}, reg, managementOptions)
 	// Every replica keeps the SDK keys it authenticated, dropped on a
 	// notification of each change, and writes their uses in rounds.
