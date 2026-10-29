@@ -30,6 +30,7 @@ var kinds = map[apperrors.Kind]struct {
 	apperrors.KindGone:               {http.StatusGone, "Gone"},
 	apperrors.KindRateLimited:        {http.StatusTooManyRequests, "Too many requests"},
 	apperrors.KindUnavailable:        {http.StatusServiceUnavailable, "Unavailable"},
+	apperrors.KindBadGateway:         {http.StatusBadGateway, "Bad Gateway"},
 }
 
 // problem is a problem document before it is written.

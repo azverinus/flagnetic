@@ -14,9 +14,113 @@ export const zSignInRequest = z.object({
   password: z.string(),
 });
 
+/**
+ * The protocol the provider speaks.
+ */
+export const zAuthProviderKind = z.enum(["oidc"]);
+
+/**
+ * The claims of the provider's tokens that carry what the instance reads of a person.
+ */
+export const zAuthProviderClaims = z.object({
+  email: z.string(),
+  name: z.string(),
+  groups: z.string(),
+});
+
+/**
+ * The claims to rename; each absent one is left as it is.
+ */
+export const zAuthProviderClaimsPatch = z.object({
+  email: z.string().optional(),
+  name: z.string().optional(),
+  groups: z.string().optional(),
+});
+
+export const zAuthProvider = z.object({
+  id: z.uuid(),
+  slug: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
+  kind: zAuthProviderKind,
+  display_name: z.string(),
+  enabled: z.boolean(),
+  domains: z.array(z.string()),
+  link_by_email: z.boolean(),
+  auto_provision: z.boolean(),
+  issuer: z.string().optional(),
+  client_id: z.string().optional(),
+  client_secret_set: z.boolean().optional(),
+  scopes: z.array(z.string()).optional(),
+  claims: zAuthProviderClaims.optional(),
+  require_verified_email: z.boolean().optional(),
+  redirect_uri: z.string().optional(),
+  created_at: z.iso.datetime(),
+  updated_at: z.iso.datetime(),
+  version: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+});
+
+export const zAuthProviderList = z.object({
+  items: z.array(zAuthProvider),
+});
+
+export const zAuthProviderCreate = z.object({
+  slug: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
+  kind: zAuthProviderKind,
+  display_name: z.string(),
+  enabled: z.boolean().optional(),
+  domains: z.array(z.string()),
+  link_by_email: z.boolean().optional(),
+  auto_provision: z.boolean().optional(),
+  issuer: z.string(),
+  client_id: z.string(),
+  scopes: z.array(z.string()).optional(),
+  claims: zAuthProviderClaimsPatch.optional(),
+  require_verified_email: z.boolean().optional(),
+});
+
+/**
+ * The properties to change; each absent one is left as it is.
+ */
+export const zAuthProviderPatch = z.object({
+  display_name: z.string().optional(),
+  domains: z.array(z.string()).optional(),
+  link_by_email: z.boolean().optional(),
+  auto_provision: z.boolean().optional(),
+  issuer: z.string().optional(),
+  client_id: z.string().optional(),
+  scopes: z.array(z.string()).optional(),
+  claims: zAuthProviderClaimsPatch.optional(),
+  require_verified_email: z.boolean().optional(),
+});
+
+/**
+ * What the provider's discovery document says.
+ */
+export const zAuthProviderTest = z.object({
+  issuer: z.string(),
+  authorization_endpoint: z.string(),
+  token_endpoint: z.string(),
+  jwks_uri: z.string(),
+  userinfo_endpoint: z.string().optional(),
+  scopes_supported: z.array(z.string()).optional(),
+  code_challenge_methods_supported: z.array(z.string()).optional(),
+});
+
+export const zAuthMethodProvider = z.object({
+  slug: z.string(),
+  display_name: z.string(),
+  kind: zAuthProviderKind,
+});
+
 export const zAuthMethods = z.object({
   local_login_enabled: z.boolean(),
-  providers: z.array(z.record(z.string(), z.unknown())),
+  providers: z.array(zAuthMethodProvider),
 });
 
 export const zMemberStatus = z.enum(["invited", "active", "deactivated"]);
@@ -585,6 +689,8 @@ export const zProblem = z.object({
     })
     .optional(),
   references: z.array(zReference).optional(),
+  used_by: z.array(z.string()).optional(),
+  failure: z.string().optional(),
   errors: z.array(zViolation).optional(),
 });
 
@@ -1943,6 +2049,226 @@ export const zWebhookList = z.object({
 });
 
 /**
+ * Which target a sink delivers to; fixed when the sink is created.
+ */
+export const zSinkKind = z.enum(["clickhouse", "object_storage", "webhook"]);
+
+/**
+ * A kind of raw event a sink exports, each delivered through a stream of its own.
+ */
+export const zSinkEventKind = z.enum(["exposure", "alias", "evaluation_summary"]);
+
+/**
+ * The first that holds: `disabled` by a member; `stopped` after the
+ * target kept rejecting batches, until resumed; `failing` while a
+ * stream cannot reach its target; `degraded` while a dead letter waits;
+ * `lagging` while the oldest undelivered event is older than the
+ * operator's `FLAGNETIC_SINK_LAG_WARNING`; otherwise `healthy`.
+ *
+ */
+export const zSinkHealth = z.enum([
+  "disabled",
+  "stopped",
+  "failing",
+  "degraded",
+  "lagging",
+  "healthy",
+]);
+
+/**
+ * Why a call to a target failed, from a closed list; a target's own
+ * words are never kept or answered.
+ *
+ */
+export const zSinkFailureClass = z.enum([
+  "dns",
+  "connect",
+  "tls",
+  "timeout",
+  "refused_target",
+  "redirect",
+  "status",
+  "rejected",
+]);
+
+/**
+ * The last failed call of a stream.
+ */
+export const zSinkFailure = z.object({
+  class: zSinkFailureClass,
+  status: z.int().nullable(),
+  code: z.string().nullable(),
+  at: z.iso.datetime(),
+});
+
+/**
+ * One event kind's delivery. Cursors are never exposed.
+ */
+export const zSinkStream = z.object({
+  event_kind: zSinkEventKind,
+  last_delivered_at: z.iso.datetime().nullable(),
+  last_failure: zSinkFailure.nullable(),
+});
+
+/**
+ * A ClickHouse sink's configuration, written to its HTTP interface. The
+ * platform creates `{table_prefix}_exposures`, `_aliases` and
+ * `_evaluation_summaries` when it enables the sink and `create_tables`
+ * is true.
+ *
+ */
+export const zSinkClickHouse = z.object({
+  url: z.string(),
+  database: z.string(),
+  table_prefix: z.string(),
+  username: z.string(),
+  password: z.string(),
+  tls_skip_verify: z.boolean(),
+  create_tables: z.boolean(),
+  settings: z.record(z.string(), z.string()),
+});
+
+/**
+ * An object storage sink's configuration, for any S3-compatible service.
+ */
+export const zSinkObjectStorage = z.object({
+  endpoint: z.string(),
+  region: z.string(),
+  bucket: z.string(),
+  prefix: z.string(),
+  access_key_id: z.string(),
+  secret_access_key: z.string(),
+  path_style: z.boolean(),
+  format: z.enum(["jsonl", "parquet"]),
+  compression: z.enum(["gzip", "zstd", "none"]),
+});
+
+/**
+ * A webhook sink's configuration. Its secret is the sink's, drawn by the server.
+ */
+export const zSinkWebhook = z.object({
+  url: z.string(),
+  headers: z.record(z.string(), z.string()),
+});
+
+export const zSink = z.intersection(
+  z.unknown(),
+  z.object({
+    id: z.uuid(),
+    name: zName,
+    kind: zSinkKind,
+    clickhouse: zSinkClickHouse.optional(),
+    object_storage: zSinkObjectStorage.optional(),
+    webhook: zSinkWebhook.optional(),
+    event_kinds: z.array(zSinkEventKind),
+    environments: z.array(z.string()),
+    batch_size: z.int(),
+    flush_interval: z.int(),
+    enabled: z.boolean(),
+    health: zSinkHealth,
+    at_risk: z.boolean(),
+    lag_seconds: z.coerce
+      .bigint()
+      .min(BigInt("-9223372036854775808"), {
+        error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+      })
+      .max(BigInt("9223372036854775807"), {
+        error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+      })
+      .nullable(),
+    dead_letters: z.int(),
+    gaps: z.int(),
+    stopped_at: z.iso.datetime().nullable(),
+    warnings: z.array(z.string()),
+    streams: z.array(zSinkStream),
+    created_at: z.iso.datetime(),
+    updated_at: z.iso.datetime(),
+    version: zVersion,
+  }),
+);
+
+export const zSinkWithSecret = zSink.and(
+  z.object({
+    secret: z.string().optional(),
+  }),
+);
+
+/**
+ * A ClickHouse sink's configuration as it is written. Required, and
+ * refused `invalid_sink` when absent: `url`, `database`, `username`
+ * and, when creating, `password`.
+ *
+ */
+export const zSinkClickHouseInput = z.object({
+  url: z.string().optional(),
+  database: z.string().optional(),
+  table_prefix: z.string().optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
+  tls_skip_verify: z.boolean().optional(),
+  create_tables: z.boolean().optional(),
+  settings: z.record(z.string(), z.string()).optional(),
+});
+
+/**
+ * An object storage sink's configuration as it is written. Required,
+ * and refused `invalid_sink` when absent: `bucket`, `access_key_id` and,
+ * when creating, `secret_access_key`.
+ *
+ */
+export const zSinkObjectStorageInput = z.object({
+  endpoint: z.string().optional(),
+  region: z.string().optional(),
+  bucket: z.string().optional(),
+  prefix: z.string().optional(),
+  access_key_id: z.string().optional(),
+  secret_access_key: z.string().optional(),
+  path_style: z.boolean().optional(),
+  format: z.string().optional(),
+  compression: z.string().optional(),
+});
+
+/**
+ * A webhook sink's configuration as it is written. `url` is required.
+ */
+export const zSinkWebhookInput = z.object({
+  url: z.string().optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+});
+
+export const zSinkCreate = z.object({
+  name: z.string(),
+  kind: z.string(),
+  clickhouse: zSinkClickHouseInput.optional(),
+  object_storage: zSinkObjectStorageInput.optional(),
+  webhook: zSinkWebhookInput.optional(),
+  event_kinds: z.array(z.string()).optional(),
+  environments: z.array(z.string()).optional(),
+  batch_size: z.int().optional(),
+  flush_interval: z.int().optional(),
+});
+
+/**
+ * The properties to change; each absent one is left as it is.
+ */
+export const zSinkPatch = z.object({
+  name: z.string().optional(),
+  kind: z.string().optional(),
+  clickhouse: zSinkClickHouseInput.optional(),
+  object_storage: zSinkObjectStorageInput.optional(),
+  webhook: zSinkWebhookInput.optional(),
+  event_kinds: z.array(z.string()).optional(),
+  environments: z.array(z.string()).optional(),
+  batch_size: z.int().optional(),
+  flush_interval: z.int().optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const zSinkList = z.object({
+  items: z.array(zSink),
+});
+
+/**
  * `pending` waits for its next attempt; `succeeded` was accepted by the
  * receiver; `failed` was refused in a way a retry would not change;
  * `exhausted` ran out of attempts; `dropped` was left unsent because
@@ -2162,6 +2488,38 @@ export const zProjectDocument = z.object({
   experiments: z.array(zDocumentExperiment),
 });
 
+export const zAuthProviderCreateWritable = z.object({
+  slug: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
+  kind: zAuthProviderKind,
+  display_name: z.string(),
+  enabled: z.boolean().optional(),
+  domains: z.array(z.string()),
+  link_by_email: z.boolean().optional(),
+  auto_provision: z.boolean().optional(),
+  issuer: z.string(),
+  client_id: z.string(),
+  client_secret: z.string(),
+  scopes: z.array(z.string()).optional(),
+  claims: zAuthProviderClaimsPatch.optional(),
+  require_verified_email: z.boolean().optional(),
+});
+
+/**
+ * The properties to change; each absent one is left as it is.
+ */
+export const zAuthProviderPatchWritable = z.object({
+  display_name: z.string().optional(),
+  domains: z.array(z.string()).optional(),
+  link_by_email: z.boolean().optional(),
+  auto_provision: z.boolean().optional(),
+  issuer: z.string().optional(),
+  client_id: z.string().optional(),
+  client_secret: z.string().optional(),
+  scopes: z.array(z.string()).optional(),
+  claims: zAuthProviderClaimsPatch.optional(),
+  require_verified_email: z.boolean().optional(),
+});
+
 /**
  * A member's identifier; their own changes and those of their personal access tokens.
  */
@@ -2245,9 +2603,19 @@ export const zFlagKey = z.string();
 export const zChangeRequestId = z.uuid();
 
 /**
+ * The auth provider's slug.
+ */
+export const zAuthProviderSlug = z.string();
+
+/**
  * The webhook subscription's identifier.
  */
 export const zWebhookId = z.uuid();
+
+/**
+ * The sink's identifier.
+ */
+export const zSinkId = z.uuid();
 
 /**
  * The experiment's key.
@@ -3824,6 +4192,78 @@ export const zUpdateAuthSettingsBody = zAuthSettings;
  */
 export const zUpdateAuthSettingsResponse = zAuthSettings;
 
+/**
+ * The auth providers.
+ */
+export const zListAuthProvidersResponse = zAuthProviderList;
+
+export const zCreateAuthProviderBody = zAuthProviderCreateWritable;
+
+/**
+ * The new auth provider.
+ */
+export const zCreateAuthProviderResponse = zAuthProvider;
+
+export const zDeleteAuthProviderPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * Deleted.
+ */
+export const zDeleteAuthProviderResponse = z.void();
+
+export const zGetAuthProviderPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * The auth provider; its `ETag` is its version.
+ */
+export const zGetAuthProviderResponse = zAuthProvider;
+
+export const zUpdateAuthProviderBody = zAuthProviderPatchWritable;
+
+export const zUpdateAuthProviderHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zUpdateAuthProviderPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * The auth provider as it is now.
+ */
+export const zUpdateAuthProviderResponse = zAuthProvider;
+
+export const zEnableAuthProviderPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * The auth provider, enabled.
+ */
+export const zEnableAuthProviderResponse = zAuthProvider;
+
+export const zDisableAuthProviderPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * The auth provider, disabled.
+ */
+export const zDisableAuthProviderResponse = zAuthProvider;
+
+export const zTestAuthProviderPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * What the discovery document says.
+ */
+export const zTestAuthProviderResponse = zAuthProviderTest;
+
 export const zListAuditEntriesQuery = z.object({
   project: z.uuid().optional(),
   actor: z.uuid().optional(),
@@ -3998,6 +4438,76 @@ export const zRedeliverWebhookDeliveryPath = z.object({
  * The new delivery, pending.
  */
 export const zRedeliverWebhookDeliveryResponse = zWebhookDelivery;
+
+export const zListSinksPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The project's sinks.
+ */
+export const zListSinksResponse = zSinkList;
+
+export const zCreateSinkBody = zSinkCreate;
+
+export const zCreateSinkPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The new sink, with its secret when it is a webhook sink, shown this once.
+ */
+export const zCreateSinkResponse = zSinkWithSecret;
+
+export const zDeleteSinkHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zDeleteSinkPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+});
+
+/**
+ * Deleted.
+ */
+export const zDeleteSinkResponse = z.void();
+
+export const zGetSinkPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+});
+
+/**
+ * The sink; its `ETag` is its version.
+ */
+export const zGetSinkResponse = zSink;
+
+export const zUpdateSinkBody = zSinkPatch;
+
+export const zUpdateSinkHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zUpdateSinkPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+});
+
+/**
+ * The sink as it is now.
+ */
+export const zUpdateSinkResponse = zSink;
+
+export const zRotateSinkSecretPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+});
+
+/**
+ * The sink with its new secret.
+ */
+export const zRotateSinkSecretResponse = zSinkWithSecret;
 
 /**
  * The instance's webhook subscriptions.

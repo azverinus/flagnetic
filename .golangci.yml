@@ -88,6 +88,21 @@ linters:
               desc: persistence belongs in infra/out/postgres
             - pkg: net/http
               desc: transport belongs in infra
+        # The identity context reaches the access context only through the
+        # ports it declares, which composition satisfies.
+        identity:
+          files:
+            - "**/internal/domain/identity/**"
+            - "**/internal/app/identity/**"
+            - "**/internal/infra/out/postgres/identity/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/azverinus/flagnetic/internal/domain/access
+              desc: identity reaches access through an application port
+            - pkg: github.com/azverinus/flagnetic/internal/app/access
+              desc: identity reaches access through an application port
+            - pkg: github.com/azverinus/flagnetic/internal/infra/out/postgres/access
+              desc: identity reaches access through an application port
         # The kernel every layer imports, the domain included, so it may use
         # the standard library and itself only.
         shared:

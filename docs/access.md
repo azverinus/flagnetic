@@ -28,6 +28,7 @@ Every operation of the management API declares the one thing it needs in the Ope
 | `change_request.propose` | proposing changes as change requests: creating them, editing, rebasing, opening, cancelling and applying one's own, copying any | `flags:write` | |
 | `change_request.approve` | deciding change requests: approving and rejecting another's, and cancelling or applying another's | `flags:write` | ✓ |
 | `webhook.manage` | creating, reading, editing, enabling and deleting a project's webhook subscriptions, rotating their secrets, testing them, reading and redelivering their deliveries, and sending the stale-flag digest now | `project:admin` | |
+| `sink.manage` | creating, reading, editing and deleting a project's sinks, and rotating a webhook sink's secret; reading needs it too, since a sink's configuration names internal hosts, buckets and URLs that may carry tokens | `project:admin` | |
 | `project.delete` | deleting a project with everything in it, from a signed-in session only | `project:admin` | ✓ |
 
 A permission marked members only changes who has access to a project or whose review a change needs, so no project token exercises it, whatever its role (see [Project tokens](#project-tokens)): a pipeline cannot unprotect an environment, write it and protect it again, nor approve the change it proposed. A project token whose role holds `change_request.approve` is refused deciding a change request with `403 token_cannot_approve`, which says why more plainly than the permission it lacks.
@@ -75,6 +76,7 @@ A role is a fixed list of permissions. The four built-in roles are the same on e
 | `change_request.propose` | | ✓ | ✓ | ✓ |
 | `change_request.approve` | | | ✓ | ✓ |
 | `webhook.manage` | | | ✓ | ✓ |
+| `sink.manage` | | | ✓ | ✓ |
 | `project.delete` | | | | ✓ |
 
 `GET /roles` lists every role with its permissions, so a client can explain which roles hold a permission a caller lacks. Later releases add permissions as features arrive and write them into the built-in roles.
@@ -107,6 +109,22 @@ A project token (`fn_prj_…`) belongs to a project rather than to a person, for
 ### Only a session creates a credential
 
 Creating a personal access token or a project token, deleting a project, and every write to a member's own account (their name, password, sessions and tokens), needs a signed-in session: any API token is refused `403 session_required`, however wide its scopes. A leaked token therefore can neither mint another one that outlives its expiry or its revocation, nor sign its owner out or hide its siblings, nor erase a project. The cost is that a script cannot rotate its own token: a person does it, signed in, which is when someone should look at what the script holds. `flagnetic admin bootstrap` is the one other way to a token, since it runs with the database's own credentials.
+
+## Auth providers
+
+An instance admin lets members sign in through an identity provider by adding an auth provider under `/instance/auth-providers` (`instance_admin`). Only OpenID Connect providers exist so far; sign-in through them follows.
+
+- `POST /instance/auth-providers` adds one: a `slug` (a lowercase letter, then lowercase letters, digits, hyphens and underscores, up to 64; it names the provider in the sign-in button and in its URLs, and never changes), the `kind` (`oidc`), a `display_name`, the `issuer`, the `client_id` and the `client_secret`. Optional: `scopes` (default `openid email profile`), `claims` (the names of the email, name and groups claims, default `email`, `name` and `groups`), `require_verified_email` (default true), `enabled` (default true), `link_by_email` (default false) and `auto_provision` (default false). The slug names the provider in every other path: `GET`, `PATCH` and `DELETE /instance/auth-providers/{provider}`.
+- **Domains.** `domains`, at least one and lowercased, are the email domains the provider vouches for. Only an email in one of them may be linked to an existing member by email or provisioned on first sign-in; a person whose identity is already linked signs in whatever their email says.
+- **The client secret** is sealed under the instance's secret key and never read back: the provider answers `client_secret_set`. An edit that sends no `client_secret` keeps the stored one.
+- **The issuer** must be `https`, except on a loopback address (`localhost`, `127.0.0.0/8`, `::1`): an `http` issuer elsewhere is refused `422 insecure_url`, since its discovery document, which says where tokens are signed and sent, could be altered on the way. Private networks are allowed. Issuer, client ID and every other field are checked as they are written, each violation naming its field under `422 invalid_auth_provider`.
+- **The redirect URI** to register at the identity provider is answered as `redirect_uri`, built from `FLAGNETIC_BASE_URL`: `<base URL>/sso/<slug>/callback`. Without the base URL a provider cannot be created, edited or enabled (`422 base_url_required`).
+- **Edits** (`PATCH`) need `If-Match` with the provider's version, as every versioned entity does, and change any field but `slug` and `kind`; an absent field is left as it is, and `claims` names only the claims to rename. Whether the provider is enabled is changed with `POST …/enable` and `POST …/disable`: a disabled provider is not offered at sign-in and keeps its members, identities and grants.
+- **Testing.** `POST …/{provider}/test` fetches the provider's discovery document now, enabled or not, and answers what it found: the issuer, the authorization, token, JWKS and user info endpoints, and the scopes and PKCE methods it lists. A provider that cannot be reached, answers anything but a discovery document of its own issuer, or answers more than a megabyte is `502 provider_unreachable`, with the `failure`. Nothing is stored.
+- **Deleting** a provider that something refers to is refused `409 provider_in_use`, with what refers to it in `used_by`: disable it instead.
+- `GET /auth/methods` (public) lists the enabled providers as `{slug, display_name, kind}`, which is what the sign-in page offers.
+
+Creating, editing, enabling, disabling and deleting are audited as `auth_provider.created`, `.updated`, `.enabled`, `.disabled` and `.deleted`, with the client secret written `[redacted]`.
 
 ## Your own account
 

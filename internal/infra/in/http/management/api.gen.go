@@ -78,6 +78,21 @@ func (e AttributeType) Valid() bool {
 	}
 }
 
+// Defines values for AuthProviderKind.
+const (
+	AuthProviderKindOidc AuthProviderKind = "oidc"
+)
+
+// Valid indicates whether the value is a known member of the AuthProviderKind enum.
+func (e AuthProviderKind) Valid() bool {
+	switch e {
+	case AuthProviderKindOidc:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ChangeRequestApplierKind.
 const (
 	ChangeRequestApplierKindMember ChangeRequestApplierKind = "member"
@@ -615,6 +630,153 @@ func (e SessionMethod) Valid() bool {
 	}
 }
 
+// Defines values for SinkEventKind.
+const (
+	SinkEventKindAlias             SinkEventKind = "alias"
+	SinkEventKindEvaluationSummary SinkEventKind = "evaluation_summary"
+	SinkEventKindExposure          SinkEventKind = "exposure"
+)
+
+// Valid indicates whether the value is a known member of the SinkEventKind enum.
+func (e SinkEventKind) Valid() bool {
+	switch e {
+	case SinkEventKindAlias:
+		return true
+	case SinkEventKindEvaluationSummary:
+		return true
+	case SinkEventKindExposure:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SinkFailureClass.
+const (
+	SinkFailureClassConnect       SinkFailureClass = "connect"
+	SinkFailureClassDns           SinkFailureClass = "dns"
+	SinkFailureClassRedirect      SinkFailureClass = "redirect"
+	SinkFailureClassRefusedTarget SinkFailureClass = "refused_target"
+	SinkFailureClassRejected      SinkFailureClass = "rejected"
+	SinkFailureClassStatus        SinkFailureClass = "status"
+	SinkFailureClassTimeout       SinkFailureClass = "timeout"
+	SinkFailureClassTls           SinkFailureClass = "tls"
+)
+
+// Valid indicates whether the value is a known member of the SinkFailureClass enum.
+func (e SinkFailureClass) Valid() bool {
+	switch e {
+	case SinkFailureClassConnect:
+		return true
+	case SinkFailureClassDns:
+		return true
+	case SinkFailureClassRedirect:
+		return true
+	case SinkFailureClassRefusedTarget:
+		return true
+	case SinkFailureClassRejected:
+		return true
+	case SinkFailureClassStatus:
+		return true
+	case SinkFailureClassTimeout:
+		return true
+	case SinkFailureClassTls:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SinkHealth.
+const (
+	SinkHealthDegraded SinkHealth = "degraded"
+	SinkHealthDisabled SinkHealth = "disabled"
+	SinkHealthFailing  SinkHealth = "failing"
+	SinkHealthHealthy  SinkHealth = "healthy"
+	SinkHealthLagging  SinkHealth = "lagging"
+	SinkHealthStopped  SinkHealth = "stopped"
+)
+
+// Valid indicates whether the value is a known member of the SinkHealth enum.
+func (e SinkHealth) Valid() bool {
+	switch e {
+	case SinkHealthDegraded:
+		return true
+	case SinkHealthDisabled:
+		return true
+	case SinkHealthFailing:
+		return true
+	case SinkHealthHealthy:
+		return true
+	case SinkHealthLagging:
+		return true
+	case SinkHealthStopped:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SinkKind.
+const (
+	SinkKindClickhouse    SinkKind = "clickhouse"
+	SinkKindObjectStorage SinkKind = "object_storage"
+	SinkKindWebhook       SinkKind = "webhook"
+)
+
+// Valid indicates whether the value is a known member of the SinkKind enum.
+func (e SinkKind) Valid() bool {
+	switch e {
+	case SinkKindClickhouse:
+		return true
+	case SinkKindObjectStorage:
+		return true
+	case SinkKindWebhook:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SinkObjectStorageCompression.
+const (
+	SinkObjectStorageCompressionGzip SinkObjectStorageCompression = "gzip"
+	SinkObjectStorageCompressionNone SinkObjectStorageCompression = "none"
+	SinkObjectStorageCompressionZstd SinkObjectStorageCompression = "zstd"
+)
+
+// Valid indicates whether the value is a known member of the SinkObjectStorageCompression enum.
+func (e SinkObjectStorageCompression) Valid() bool {
+	switch e {
+	case SinkObjectStorageCompressionGzip:
+		return true
+	case SinkObjectStorageCompressionNone:
+		return true
+	case SinkObjectStorageCompressionZstd:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SinkObjectStorageFormat.
+const (
+	SinkObjectStorageFormatJsonl   SinkObjectStorageFormat = "jsonl"
+	SinkObjectStorageFormatParquet SinkObjectStorageFormat = "parquet"
+)
+
+// Valid indicates whether the value is a known member of the SinkObjectStorageFormat enum.
+func (e SinkObjectStorageFormat) Valid() bool {
+	switch e {
+	case SinkObjectStorageFormatJsonl:
+		return true
+	case SinkObjectStorageFormatParquet:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for StaleReason.
 const (
 	StaleReasonExperimentOverdue StaleReason = "experiment_overdue"
@@ -1020,13 +1182,158 @@ type AuditEntryList struct {
 	NextCursor *string `json:"next_cursor"`
 }
 
+// AuthMethodProvider defines model for AuthMethodProvider.
+type AuthMethodProvider struct {
+	DisplayName string `json:"display_name"`
+
+	// Kind The protocol the provider speaks.
+	Kind AuthProviderKind `json:"kind"`
+	Slug string           `json:"slug"`
+}
+
 // AuthMethods defines model for AuthMethods.
 type AuthMethods struct {
 	// LocalLoginEnabled Whether a member signs in with their email and password.
 	LocalLoginEnabled bool `json:"local_login_enabled"`
 
-	// Providers The identity providers a member signs in through; none yet.
-	Providers []map[string]interface{} `json:"providers"`
+	// Providers The enabled auth providers a member signs in through, ordered by display name.
+	Providers []AuthMethodProvider `json:"providers"`
+}
+
+// AuthProvider defines model for AuthProvider.
+type AuthProvider struct {
+	// AutoProvision Whether a sign-in whose email is in `domains` creates its member.
+	AutoProvision bool `json:"auto_provision"`
+
+	// Claims The claims of the provider's tokens that carry what the instance reads of a person.
+	Claims   *AuthProviderClaims `json:"claims,omitempty"`
+	ClientId *string             `json:"client_id,omitempty"`
+
+	// ClientSecretSet Whether a client secret is stored; the secret itself is never answered.
+	ClientSecretSet *bool     `json:"client_secret_set,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+
+	// DisplayName What the sign-in button says, 1 to 200 characters.
+	DisplayName string `json:"display_name"`
+
+	// Domains The email domains the provider vouches for, lowercase.
+	Domains []string           `json:"domains"`
+	Enabled bool               `json:"enabled"`
+	Id      openapi_types.UUID `json:"id"`
+
+	// Issuer The OIDC provider's issuer URL.
+	Issuer *string `json:"issuer,omitempty"`
+
+	// Kind The protocol the provider speaks.
+	Kind AuthProviderKind `json:"kind"`
+
+	// LinkByEmail Whether a sign-in whose email is in `domains` is linked to the existing member with that email.
+	LinkByEmail bool `json:"link_by_email"`
+
+	// RedirectUri The redirect URI to register at the identity provider, built from
+	// `FLAGNETIC_BASE_URL`; absent while the instance has none.
+	RedirectUri *string `json:"redirect_uri,omitempty"`
+
+	// RequireVerifiedEmail Whether a sign-in whose token does not say the email is verified is refused.
+	RequireVerifiedEmail *bool     `json:"require_verified_email,omitempty"`
+	Scopes               *[]string `json:"scopes,omitempty"`
+
+	// Slug Names the provider in sign-in buttons and URLs; never changes.
+	Slug      string    `json:"slug"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Version   int64     `json:"version"`
+}
+
+// AuthProviderClaims The claims of the provider's tokens that carry what the instance reads of a person.
+type AuthProviderClaims struct {
+	// Email Default `email`.
+	Email string `json:"email"`
+
+	// Groups Default `groups`.
+	Groups string `json:"groups"`
+
+	// Name Default `name`.
+	Name string `json:"name"`
+}
+
+// AuthProviderClaimsPatch The claims to rename; each absent one is left as it is.
+type AuthProviderClaimsPatch struct {
+	Email  *string `json:"email,omitempty"`
+	Groups *string `json:"groups,omitempty"`
+	Name   *string `json:"name,omitempty"`
+}
+
+// AuthProviderCreate defines model for AuthProviderCreate.
+type AuthProviderCreate struct {
+	// AutoProvision Default false.
+	AutoProvision *bool `json:"auto_provision,omitempty"`
+
+	// Claims The claims to rename; each absent one is left as it is.
+	Claims       *AuthProviderClaimsPatch `json:"claims,omitempty"`
+	ClientId     string                   `json:"client_id"`
+	ClientSecret *string                  `json:"client_secret,omitempty"`
+	DisplayName  string                   `json:"display_name"`
+	Domains      []string                 `json:"domains"`
+
+	// Enabled Default true.
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Issuer `https`, or `http` on a loopback address.
+	Issuer string `json:"issuer"`
+
+	// Kind The protocol the provider speaks.
+	Kind AuthProviderKind `json:"kind"`
+
+	// LinkByEmail Default false.
+	LinkByEmail *bool `json:"link_by_email,omitempty"`
+
+	// RequireVerifiedEmail Default true.
+	RequireVerifiedEmail *bool `json:"require_verified_email,omitempty"`
+
+	// Scopes Default `openid`, `email` and `profile`.
+	Scopes *[]string `json:"scopes,omitempty"`
+	Slug   string    `json:"slug"`
+}
+
+// AuthProviderKind The protocol the provider speaks.
+type AuthProviderKind string
+
+// AuthProviderList defines model for AuthProviderList.
+type AuthProviderList struct {
+	Items []AuthProvider `json:"items"`
+}
+
+// AuthProviderPatch The properties to change; each absent one is left as it is.
+type AuthProviderPatch struct {
+	AutoProvision *bool `json:"auto_provision,omitempty"`
+
+	// Claims The claims to rename; each absent one is left as it is.
+	Claims               *AuthProviderClaimsPatch `json:"claims,omitempty"`
+	ClientId             *string                  `json:"client_id,omitempty"`
+	ClientSecret         *string                  `json:"client_secret,omitempty"`
+	DisplayName          *string                  `json:"display_name,omitempty"`
+	Domains              *[]string                `json:"domains,omitempty"`
+	Issuer               *string                  `json:"issuer,omitempty"`
+	LinkByEmail          *bool                    `json:"link_by_email,omitempty"`
+	RequireVerifiedEmail *bool                    `json:"require_verified_email,omitempty"`
+	Scopes               *[]string                `json:"scopes,omitempty"`
+}
+
+// AuthProviderTest What the provider's discovery document says.
+type AuthProviderTest struct {
+	AuthorizationEndpoint string `json:"authorization_endpoint"`
+
+	// CodeChallengeMethodsSupported Absent when the document does not list them; sign-in needs `S256`.
+	CodeChallengeMethodsSupported *[]string `json:"code_challenge_methods_supported,omitempty"`
+	Issuer                        string    `json:"issuer"`
+	JwksUri                       string    `json:"jwks_uri"`
+
+	// ScopesSupported Absent when the document does not list them.
+	ScopesSupported *[]string `json:"scopes_supported,omitempty"`
+	TokenEndpoint   string    `json:"token_endpoint"`
+
+	// UserinfoEndpoint Absent when the provider offers none.
+	UserinfoEndpoint *string `json:"userinfo_endpoint,omitempty"`
 }
 
 // AuthSettings The instance's rules for sessions, API tokens and passwords.
@@ -2729,6 +3036,9 @@ type Problem struct {
 	Detail *string      `json:"detail,omitempty"`
 	Errors *[]Violation `json:"errors,omitempty"`
 
+	// Failure Why a system the server asked did not answer as needed, for `provider_unreachable`.
+	Failure *string `json:"failure,omitempty"`
+
 	// Permission The permission the caller lacks, for `forbidden`, or the role's permission the caller lacks, for `role_not_allowed`.
 	Permission *string `json:"permission,omitempty"`
 
@@ -2741,6 +3051,9 @@ type Problem struct {
 	Status     int    `json:"status"`
 	Title      string `json:"title"`
 	Type       string `json:"type"`
+
+	// UsedBy What refers to an auth provider that cannot be deleted, such as `identities`, for `provider_in_use`.
+	UsedBy *[]string `json:"used_by,omitempty"`
 }
 
 // Project defines model for Project.
@@ -3358,6 +3671,374 @@ type SignInRequest struct {
 	Password string `json:"password"`
 }
 
+// Sink A project's sink. It carries exactly the one of `clickhouse`,
+// `object_storage` and `webhook` that its `kind` names.
+type Sink struct {
+	// AtRisk Whether retention is about to drop events the sink has not delivered.
+	AtRisk bool `json:"at_risk"`
+
+	// BatchSize The most events one delivery carries.
+	BatchSize int `json:"batch_size"`
+
+	// Clickhouse A ClickHouse sink's configuration, written to its HTTP interface. The
+	// platform creates `{table_prefix}_exposures`, `_aliases` and
+	// `_evaluation_summaries` when it enables the sink and `create_tables`
+	// is true.
+	Clickhouse *SinkClickHouse `json:"clickhouse,omitempty"`
+	CreatedAt  time.Time       `json:"created_at"`
+
+	// DeadLetters The dead letters waiting to be redelivered or discarded.
+	DeadLetters int  `json:"dead_letters"`
+	Enabled     bool `json:"enabled"`
+
+	// Environments The keys of the environments whose events are exported; empty for every one.
+	Environments []string `json:"environments"`
+
+	// EventKinds The event kinds exported; empty for all of them.
+	EventKinds []SinkEventKind `json:"event_kinds"`
+
+	// FlushInterval Seconds the sink waits between deliveries once it has caught up.
+	FlushInterval int `json:"flush_interval"`
+
+	// Gaps The gaps not yet dismissed.
+	Gaps int `json:"gaps"`
+
+	// Health The first that holds: `disabled` by a member; `stopped` after the
+	// target kept rejecting batches, until resumed; `failing` while a
+	// stream cannot reach its target; `degraded` while a dead letter waits;
+	// `lagging` while the oldest undelivered event is older than the
+	// operator's `FLAGNETIC_SINK_LAG_WARNING`; otherwise `healthy`.
+	Health SinkHealth         `json:"health"`
+	Id     openapi_types.UUID `json:"id"`
+
+	// Kind Which target a sink delivers to; fixed when the sink is created.
+	Kind SinkKind `json:"kind"`
+
+	// LagSeconds The age of the oldest undelivered event; null while the sink is disabled.
+	LagSeconds *int64 `json:"lag_seconds"`
+	Name       Name   `json:"name"`
+
+	// ObjectStorage An object storage sink's configuration, for any S3-compatible service.
+	ObjectStorage *SinkObjectStorage `json:"object_storage,omitempty"`
+	StoppedAt     *time.Time         `json:"stopped_at"`
+
+	// Streams One per event kind exported once the sink has been enabled; empty before.
+	Streams   []SinkStream `json:"streams"`
+	UpdatedAt time.Time    `json:"updated_at"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
+
+	// Warnings What the last check of the target found wrong without making delivery impossible.
+	Warnings []string `json:"warnings"`
+
+	// Webhook A webhook sink's configuration. Its secret is the sink's, drawn by the server.
+	Webhook *SinkWebhook `json:"webhook,omitempty"`
+	union   json.RawMessage
+}
+
+// Sink0 defines model for Sink.0.
+type Sink0 = interface{}
+
+// Sink1 defines model for Sink.1.
+type Sink1 = interface{}
+
+// Sink2 defines model for Sink.2.
+type Sink2 = interface{}
+
+// SinkClickHouse A ClickHouse sink's configuration, written to its HTTP interface. The
+// platform creates `{table_prefix}_exposures`, `_aliases` and
+// `_evaluation_summaries` when it enables the sink and `create_tables`
+// is true.
+type SinkClickHouse struct {
+	CreateTables bool   `json:"create_tables"`
+	Database     string `json:"database"`
+
+	// Password Always `***`; the stored password is never answered.
+	Password string `json:"password"`
+
+	// Settings ClickHouse settings sent with every insert. The ones delivery sets itself are refused.
+	Settings map[string]string `json:"settings"`
+
+	// TablePrefix Letters, digits and underscores, not starting with a digit.
+	TablePrefix   string `json:"table_prefix"`
+	TlsSkipVerify bool   `json:"tls_skip_verify"`
+
+	// Url Where the HTTP interface answers; http or https, without credentials.
+	Url      string `json:"url"`
+	Username string `json:"username"`
+}
+
+// SinkClickHouseInput A ClickHouse sink's configuration as it is written. Required, and
+// refused `invalid_sink` when absent: `url`, `database`, `username`
+// and, when creating, `password`.
+type SinkClickHouseInput struct {
+	// CreateTables True when absent.
+	CreateTables *bool   `json:"create_tables,omitempty"`
+	Database     *string `json:"database,omitempty"`
+
+	// Password Sealed on arrival. `***` or absent keeps the stored password when editing.
+	Password *string            `json:"password,omitempty"`
+	Settings *map[string]string `json:"settings,omitempty"`
+
+	// TablePrefix `flagnetic` when empty.
+	TablePrefix   *string `json:"table_prefix,omitempty"`
+	TlsSkipVerify *bool   `json:"tls_skip_verify,omitempty"`
+	Url           *string `json:"url,omitempty"`
+	Username      *string `json:"username,omitempty"`
+}
+
+// SinkCreate defines model for SinkCreate.
+type SinkCreate struct {
+	// BatchSize The kind's default when absent.
+	BatchSize *int `json:"batch_size,omitempty"`
+
+	// Clickhouse A ClickHouse sink's configuration as it is written. Required, and
+	// refused `invalid_sink` when absent: `url`, `database`, `username`
+	// and, when creating, `password`.
+	Clickhouse *SinkClickHouseInput `json:"clickhouse,omitempty"`
+
+	// Environments The keys of the environments whose events to export; empty or absent for every one.
+	Environments *[]string `json:"environments,omitempty"`
+
+	// EventKinds Empty or absent for every event kind.
+	EventKinds *[]string `json:"event_kinds,omitempty"`
+
+	// FlushInterval Seconds; the kind's default when absent.
+	FlushInterval *int `json:"flush_interval,omitempty"`
+
+	// Kind `clickhouse`, `object_storage` or `webhook`.
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+
+	// ObjectStorage An object storage sink's configuration as it is written. Required,
+	// and refused `invalid_sink` when absent: `bucket`, `access_key_id` and,
+	// when creating, `secret_access_key`.
+	ObjectStorage *SinkObjectStorageInput `json:"object_storage,omitempty"`
+
+	// Webhook A webhook sink's configuration as it is written. `url` is required.
+	Webhook *SinkWebhookInput `json:"webhook,omitempty"`
+}
+
+// SinkEventKind A kind of raw event a sink exports, each delivered through a stream of its own.
+type SinkEventKind string
+
+// SinkFailure The last failed call of a stream.
+type SinkFailure struct {
+	At time.Time `json:"at"`
+
+	// Class Why a call to a target failed, from a closed list; a target's own
+	// words are never kept or answered.
+	Class SinkFailureClass `json:"class"`
+
+	// Code The protocol's own error code, such as a ClickHouse exception or an S3 error code, when the target speaks one.
+	Code *string `json:"code"`
+
+	// Status The HTTP status the target answered, when it did.
+	Status *int `json:"status"`
+}
+
+// SinkFailureClass Why a call to a target failed, from a closed list; a target's own
+// words are never kept or answered.
+type SinkFailureClass string
+
+// SinkHealth The first that holds: `disabled` by a member; `stopped` after the
+// target kept rejecting batches, until resumed; `failing` while a
+// stream cannot reach its target; `degraded` while a dead letter waits;
+// `lagging` while the oldest undelivered event is older than the
+// operator's `FLAGNETIC_SINK_LAG_WARNING`; otherwise `healthy`.
+type SinkHealth string
+
+// SinkKind Which target a sink delivers to; fixed when the sink is created.
+type SinkKind string
+
+// SinkList defines model for SinkList.
+type SinkList struct {
+	Items []Sink `json:"items"`
+}
+
+// SinkObjectStorage An object storage sink's configuration, for any S3-compatible service.
+type SinkObjectStorage struct {
+	AccessKeyId string `json:"access_key_id"`
+	Bucket      string `json:"bucket"`
+
+	// Compression For `jsonl`; `parquet` files are always `zstd`.
+	Compression SinkObjectStorageCompression `json:"compression"`
+
+	// Endpoint A scheme, a host and a port; empty for AWS.
+	Endpoint  string                  `json:"endpoint"`
+	Format    SinkObjectStorageFormat `json:"format"`
+	PathStyle bool                    `json:"path_style"`
+
+	// Prefix Without outer slashes.
+	Prefix string `json:"prefix"`
+
+	// Region Empty asks the bucket.
+	Region string `json:"region"`
+
+	// SecretAccessKey Always `***`; the stored key is never answered.
+	SecretAccessKey string `json:"secret_access_key"`
+}
+
+// SinkObjectStorageCompression For `jsonl`; `parquet` files are always `zstd`.
+type SinkObjectStorageCompression string
+
+// SinkObjectStorageFormat defines model for SinkObjectStorage.Format.
+type SinkObjectStorageFormat string
+
+// SinkObjectStorageInput An object storage sink's configuration as it is written. Required,
+// and refused `invalid_sink` when absent: `bucket`, `access_key_id` and,
+// when creating, `secret_access_key`.
+type SinkObjectStorageInput struct {
+	AccessKeyId *string `json:"access_key_id,omitempty"`
+	Bucket      *string `json:"bucket,omitempty"`
+
+	// Compression `gzip` for `jsonl` and `zstd` for `parquet` when empty.
+	Compression *string `json:"compression,omitempty"`
+	Endpoint    *string `json:"endpoint,omitempty"`
+
+	// Format `jsonl` when empty.
+	Format    *string `json:"format,omitempty"`
+	PathStyle *bool   `json:"path_style,omitempty"`
+	Prefix    *string `json:"prefix,omitempty"`
+	Region    *string `json:"region,omitempty"`
+
+	// SecretAccessKey Sealed on arrival. `***` or absent keeps the stored key when editing.
+	SecretAccessKey *string `json:"secret_access_key,omitempty"`
+}
+
+// SinkPatch The properties to change; each absent one is left as it is.
+type SinkPatch struct {
+	BatchSize *int `json:"batch_size,omitempty"`
+
+	// Clickhouse A ClickHouse sink's configuration as it is written. Required, and
+	// refused `invalid_sink` when absent: `url`, `database`, `username`
+	// and, when creating, `password`.
+	Clickhouse *SinkClickHouseInput `json:"clickhouse,omitempty"`
+
+	// Enabled `false` only: a sink is enabled with its own operation.
+	Enabled       *bool     `json:"enabled,omitempty"`
+	Environments  *[]string `json:"environments,omitempty"`
+	EventKinds    *[]string `json:"event_kinds,omitempty"`
+	FlushInterval *int      `json:"flush_interval,omitempty"`
+
+	// Kind May be left out; naming a kind other than the sink's own is refused `kind_immutable`.
+	Kind *string `json:"kind,omitempty"`
+	Name *string `json:"name,omitempty"`
+
+	// ObjectStorage An object storage sink's configuration as it is written. Required,
+	// and refused `invalid_sink` when absent: `bucket`, `access_key_id` and,
+	// when creating, `secret_access_key`.
+	ObjectStorage *SinkObjectStorageInput `json:"object_storage,omitempty"`
+
+	// Webhook A webhook sink's configuration as it is written. `url` is required.
+	Webhook *SinkWebhookInput `json:"webhook,omitempty"`
+}
+
+// SinkStream One event kind's delivery. Cursors are never exposed.
+type SinkStream struct {
+	// EventKind A kind of raw event a sink exports, each delivered through a stream of its own.
+	EventKind       SinkEventKind `json:"event_kind"`
+	LastDeliveredAt *time.Time    `json:"last_delivered_at"`
+	LastFailure     *SinkFailure  `json:"last_failure"`
+}
+
+// SinkWebhook A webhook sink's configuration. Its secret is the sink's, drawn by the server.
+type SinkWebhook struct {
+	// Headers Sent with every call, before the platform's own. Names starting `X-Flagnetic-` are refused.
+	Headers map[string]string `json:"headers"`
+
+	// Url Where every batch is posted: `https` unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`.
+	Url string `json:"url"`
+}
+
+// SinkWebhookInput A webhook sink's configuration as it is written. `url` is required.
+type SinkWebhookInput struct {
+	Headers *map[string]string `json:"headers,omitempty"`
+	Url     *string            `json:"url,omitempty"`
+}
+
+// SinkWithSecret defines model for SinkWithSecret.
+type SinkWithSecret struct {
+	// AtRisk Whether retention is about to drop events the sink has not delivered.
+	AtRisk bool `json:"at_risk"`
+
+	// BatchSize The most events one delivery carries.
+	BatchSize int `json:"batch_size"`
+
+	// Clickhouse A ClickHouse sink's configuration, written to its HTTP interface. The
+	// platform creates `{table_prefix}_exposures`, `_aliases` and
+	// `_evaluation_summaries` when it enables the sink and `create_tables`
+	// is true.
+	Clickhouse *SinkClickHouse `json:"clickhouse,omitempty"`
+	CreatedAt  time.Time       `json:"created_at"`
+
+	// DeadLetters The dead letters waiting to be redelivered or discarded.
+	DeadLetters int  `json:"dead_letters"`
+	Enabled     bool `json:"enabled"`
+
+	// Environments The keys of the environments whose events are exported; empty for every one.
+	Environments []string `json:"environments"`
+
+	// EventKinds The event kinds exported; empty for all of them.
+	EventKinds []SinkEventKind `json:"event_kinds"`
+
+	// FlushInterval Seconds the sink waits between deliveries once it has caught up.
+	FlushInterval int `json:"flush_interval"`
+
+	// Gaps The gaps not yet dismissed.
+	Gaps int `json:"gaps"`
+
+	// Health The first that holds: `disabled` by a member; `stopped` after the
+	// target kept rejecting batches, until resumed; `failing` while a
+	// stream cannot reach its target; `degraded` while a dead letter waits;
+	// `lagging` while the oldest undelivered event is older than the
+	// operator's `FLAGNETIC_SINK_LAG_WARNING`; otherwise `healthy`.
+	Health SinkHealth         `json:"health"`
+	Id     openapi_types.UUID `json:"id"`
+
+	// Kind Which target a sink delivers to; fixed when the sink is created.
+	Kind SinkKind `json:"kind"`
+
+	// LagSeconds The age of the oldest undelivered event; null while the sink is disabled.
+	LagSeconds *int64 `json:"lag_seconds"`
+	Name       Name   `json:"name"`
+
+	// ObjectStorage An object storage sink's configuration, for any S3-compatible service.
+	ObjectStorage *SinkObjectStorage `json:"object_storage,omitempty"`
+
+	// Secret A webhook sink's secret, base64url of 32 random bytes, the
+	// key of every signature under the sink. Shown once, by the
+	// operation that issued it: it is stored sealed and never
+	// answered again. Absent for the other kinds.
+	Secret    *string    `json:"secret,omitempty"`
+	StoppedAt *time.Time `json:"stopped_at"`
+
+	// Streams One per event kind exported once the sink has been enabled; empty before.
+	Streams   []SinkStream `json:"streams"`
+	UpdatedAt time.Time    `json:"updated_at"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
+
+	// Warnings What the last check of the target found wrong without making delivery impossible.
+	Warnings []string `json:"warnings"`
+
+	// Webhook A webhook sink's configuration. Its secret is the sink's, drawn by the server.
+	Webhook *SinkWebhook `json:"webhook,omitempty"`
+	union   json.RawMessage
+}
+
+// SinkWithSecret0 defines model for SinkWithSecret.0.
+type SinkWithSecret0 = interface{}
+
+// SinkWithSecret1 defines model for SinkWithSecret.1.
+type SinkWithSecret1 = interface{}
+
+// SinkWithSecret2 defines model for SinkWithSecret.2.
+type SinkWithSecret2 = interface{}
+
 // StaleExperiment The running experiment past its expected end that makes the flag
 // stale as `experiment_overdue`, present with that reason only. When
 // several are, the one due earliest, then the first by key.
@@ -3760,6 +4441,9 @@ type AuditQ = string
 // AuditTo defines model for AuditTo.
 type AuditTo = time.Time
 
+// AuthProviderSlug defines model for AuthProviderSlug.
+type AuthProviderSlug = string
+
 // ChangeRequestID defines model for ChangeRequestID.
 type ChangeRequestID = openapi_types.UUID
 
@@ -3805,6 +4489,9 @@ type SegmentKey = string
 // SessionID defines model for SessionID.
 type SessionID = string
 
+// SinkID defines model for SinkID.
+type SinkID = openapi_types.UUID
+
 // TokenID defines model for TokenID.
 type TokenID = string
 
@@ -3813,6 +4500,9 @@ type UnitTypeKey = string
 
 // WebhookID defines model for WebhookID.
 type WebhookID = openapi_types.UUID
+
+// BadGateway A problem document (RFC 9457). Code-specific values are further members.
+type BadGateway = Problem
 
 // BadRequest A problem document (RFC 9457). Code-specific values are further members.
 type BadRequest = Problem
@@ -3938,6 +4628,16 @@ type ExportAuditEntriesParams struct {
 
 // ExportAuditEntriesParamsFormat defines parameters for ExportAuditEntries.
 type ExportAuditEntriesParamsFormat string
+
+// UpdateAuthProviderParams defines parameters for UpdateAuthProvider.
+type UpdateAuthProviderParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
 
 // RevokeMySessionsParams defines parameters for RevokeMySessions.
 type RevokeMySessionsParams struct {
@@ -4530,6 +5230,26 @@ type UpdateSegmentParams struct {
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
+// DeleteSinkParams defines parameters for DeleteSink.
+type DeleteSinkParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// UpdateSinkParams defines parameters for UpdateSink.
+type UpdateSinkParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
 // ListStaleFlagsParams defines parameters for ListStaleFlags.
 type ListStaleFlagsParams struct {
 	// Reason Lists only the flags stale for one of these reasons; absent for every stale flag.
@@ -4633,6 +5353,12 @@ type AcceptInvitationJSONRequestBody = InvitationAcceptance
 
 // SignInJSONRequestBody defines body for SignIn for application/json ContentType.
 type SignInJSONRequestBody = SignInRequest
+
+// CreateAuthProviderJSONRequestBody defines body for CreateAuthProvider for application/json ContentType.
+type CreateAuthProviderJSONRequestBody = AuthProviderCreate
+
+// UpdateAuthProviderJSONRequestBody defines body for UpdateAuthProvider for application/json ContentType.
+type UpdateAuthProviderJSONRequestBody = AuthProviderPatch
 
 // UpdateAuthSettingsJSONRequestBody defines body for UpdateAuthSettings for application/json ContentType.
 type UpdateAuthSettingsJSONRequestBody = AuthSettings
@@ -4747,6 +5473,12 @@ type CreateSegmentJSONRequestBody = SegmentCreate
 
 // UpdateSegmentJSONRequestBody defines body for UpdateSegment for application/json ContentType.
 type UpdateSegmentJSONRequestBody = SegmentPatch
+
+// CreateSinkJSONRequestBody defines body for CreateSink for application/json ContentType.
+type CreateSinkJSONRequestBody = SinkCreate
+
+// UpdateSinkJSONRequestBody defines body for UpdateSink for application/json ContentType.
+type UpdateSinkJSONRequestBody = SinkPatch
 
 // CreateProjectTokenJSONRequestBody defines body for CreateProjectToken for application/json ContentType.
 type CreateProjectTokenJSONRequestBody = ProjectTokenCreate
@@ -4997,6 +5729,792 @@ func (t *ProposedInput) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsSink0 returns the union data inside the Sink as a Sink0
+func (t Sink) AsSink0() (Sink0, error) {
+	var body Sink0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSink0 overwrites any union data inside the Sink as the provided Sink0
+func (t *Sink) FromSink0(v Sink0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSink0 performs a merge with any union data inside the Sink, using the provided Sink0
+func (t *Sink) MergeSink0(v Sink0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSink1 returns the union data inside the Sink as a Sink1
+func (t Sink) AsSink1() (Sink1, error) {
+	var body Sink1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSink1 overwrites any union data inside the Sink as the provided Sink1
+func (t *Sink) FromSink1(v Sink1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSink1 performs a merge with any union data inside the Sink, using the provided Sink1
+func (t *Sink) MergeSink1(v Sink1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSink2 returns the union data inside the Sink as a Sink2
+func (t Sink) AsSink2() (Sink2, error) {
+	var body Sink2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSink2 overwrites any union data inside the Sink as the provided Sink2
+func (t *Sink) FromSink2(v Sink2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSink2 performs a merge with any union data inside the Sink, using the provided Sink2
+func (t *Sink) MergeSink2(v Sink2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Sink) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	object["at_risk"], err = json.Marshal(t.AtRisk)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'at_risk': %w", err)
+	}
+
+	object["batch_size"], err = json.Marshal(t.BatchSize)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'batch_size': %w", err)
+	}
+
+	if t.Clickhouse != nil {
+		object["clickhouse"], err = json.Marshal(t.Clickhouse)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'clickhouse': %w", err)
+		}
+	}
+
+	object["created_at"], err = json.Marshal(t.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'created_at': %w", err)
+	}
+
+	object["dead_letters"], err = json.Marshal(t.DeadLetters)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'dead_letters': %w", err)
+	}
+
+	object["enabled"], err = json.Marshal(t.Enabled)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'enabled': %w", err)
+	}
+
+	if t.Environments != nil {
+		object["environments"], err = json.Marshal(t.Environments)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'environments': %w", err)
+		}
+	}
+
+	if t.EventKinds != nil {
+		object["event_kinds"], err = json.Marshal(t.EventKinds)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'event_kinds': %w", err)
+		}
+	}
+
+	object["flush_interval"], err = json.Marshal(t.FlushInterval)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'flush_interval': %w", err)
+	}
+
+	object["gaps"], err = json.Marshal(t.Gaps)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'gaps': %w", err)
+	}
+
+	object["health"], err = json.Marshal(t.Health)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'health': %w", err)
+	}
+
+	object["id"], err = json.Marshal(t.Id)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'id': %w", err)
+	}
+
+	object["kind"], err = json.Marshal(t.Kind)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'kind': %w", err)
+	}
+
+	object["lag_seconds"], err = json.Marshal(t.LagSeconds)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'lag_seconds': %w", err)
+	}
+
+	object["name"], err = json.Marshal(t.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'name': %w", err)
+	}
+
+	if t.ObjectStorage != nil {
+		object["object_storage"], err = json.Marshal(t.ObjectStorage)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'object_storage': %w", err)
+		}
+	}
+
+	object["stopped_at"], err = json.Marshal(t.StoppedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'stopped_at': %w", err)
+	}
+
+	if t.Streams != nil {
+		object["streams"], err = json.Marshal(t.Streams)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'streams': %w", err)
+		}
+	}
+
+	object["updated_at"], err = json.Marshal(t.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'updated_at': %w", err)
+	}
+
+	object["version"], err = json.Marshal(t.Version)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'version': %w", err)
+	}
+
+	if t.Warnings != nil {
+		object["warnings"], err = json.Marshal(t.Warnings)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'warnings': %w", err)
+		}
+	}
+
+	if t.Webhook != nil {
+		object["webhook"], err = json.Marshal(t.Webhook)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'webhook': %w", err)
+		}
+	}
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *Sink) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["at_risk"]; found {
+		err = json.Unmarshal(raw, &t.AtRisk)
+		if err != nil {
+			return fmt.Errorf("error reading 'at_risk': %w", err)
+		}
+	}
+
+	if raw, found := object["batch_size"]; found {
+		err = json.Unmarshal(raw, &t.BatchSize)
+		if err != nil {
+			return fmt.Errorf("error reading 'batch_size': %w", err)
+		}
+	}
+
+	if raw, found := object["clickhouse"]; found {
+		err = json.Unmarshal(raw, &t.Clickhouse)
+		if err != nil {
+			return fmt.Errorf("error reading 'clickhouse': %w", err)
+		}
+	}
+
+	if raw, found := object["created_at"]; found {
+		err = json.Unmarshal(raw, &t.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'created_at': %w", err)
+		}
+	}
+
+	if raw, found := object["dead_letters"]; found {
+		err = json.Unmarshal(raw, &t.DeadLetters)
+		if err != nil {
+			return fmt.Errorf("error reading 'dead_letters': %w", err)
+		}
+	}
+
+	if raw, found := object["enabled"]; found {
+		err = json.Unmarshal(raw, &t.Enabled)
+		if err != nil {
+			return fmt.Errorf("error reading 'enabled': %w", err)
+		}
+	}
+
+	if raw, found := object["environments"]; found {
+		err = json.Unmarshal(raw, &t.Environments)
+		if err != nil {
+			return fmt.Errorf("error reading 'environments': %w", err)
+		}
+	}
+
+	if raw, found := object["event_kinds"]; found {
+		err = json.Unmarshal(raw, &t.EventKinds)
+		if err != nil {
+			return fmt.Errorf("error reading 'event_kinds': %w", err)
+		}
+	}
+
+	if raw, found := object["flush_interval"]; found {
+		err = json.Unmarshal(raw, &t.FlushInterval)
+		if err != nil {
+			return fmt.Errorf("error reading 'flush_interval': %w", err)
+		}
+	}
+
+	if raw, found := object["gaps"]; found {
+		err = json.Unmarshal(raw, &t.Gaps)
+		if err != nil {
+			return fmt.Errorf("error reading 'gaps': %w", err)
+		}
+	}
+
+	if raw, found := object["health"]; found {
+		err = json.Unmarshal(raw, &t.Health)
+		if err != nil {
+			return fmt.Errorf("error reading 'health': %w", err)
+		}
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &t.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+	}
+
+	if raw, found := object["kind"]; found {
+		err = json.Unmarshal(raw, &t.Kind)
+		if err != nil {
+			return fmt.Errorf("error reading 'kind': %w", err)
+		}
+	}
+
+	if raw, found := object["lag_seconds"]; found {
+		err = json.Unmarshal(raw, &t.LagSeconds)
+		if err != nil {
+			return fmt.Errorf("error reading 'lag_seconds': %w", err)
+		}
+	}
+
+	if raw, found := object["name"]; found {
+		err = json.Unmarshal(raw, &t.Name)
+		if err != nil {
+			return fmt.Errorf("error reading 'name': %w", err)
+		}
+	}
+
+	if raw, found := object["object_storage"]; found {
+		err = json.Unmarshal(raw, &t.ObjectStorage)
+		if err != nil {
+			return fmt.Errorf("error reading 'object_storage': %w", err)
+		}
+	}
+
+	if raw, found := object["stopped_at"]; found {
+		err = json.Unmarshal(raw, &t.StoppedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'stopped_at': %w", err)
+		}
+	}
+
+	if raw, found := object["streams"]; found {
+		err = json.Unmarshal(raw, &t.Streams)
+		if err != nil {
+			return fmt.Errorf("error reading 'streams': %w", err)
+		}
+	}
+
+	if raw, found := object["updated_at"]; found {
+		err = json.Unmarshal(raw, &t.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'updated_at': %w", err)
+		}
+	}
+
+	if raw, found := object["version"]; found {
+		err = json.Unmarshal(raw, &t.Version)
+		if err != nil {
+			return fmt.Errorf("error reading 'version': %w", err)
+		}
+	}
+
+	if raw, found := object["warnings"]; found {
+		err = json.Unmarshal(raw, &t.Warnings)
+		if err != nil {
+			return fmt.Errorf("error reading 'warnings': %w", err)
+		}
+	}
+
+	if raw, found := object["webhook"]; found {
+		err = json.Unmarshal(raw, &t.Webhook)
+		if err != nil {
+			return fmt.Errorf("error reading 'webhook': %w", err)
+		}
+	}
+
+	return err
+}
+
+// AsSinkWithSecret0 returns the union data inside the SinkWithSecret as a SinkWithSecret0
+func (t SinkWithSecret) AsSinkWithSecret0() (SinkWithSecret0, error) {
+	var body SinkWithSecret0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSinkWithSecret0 overwrites any union data inside the SinkWithSecret as the provided SinkWithSecret0
+func (t *SinkWithSecret) FromSinkWithSecret0(v SinkWithSecret0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSinkWithSecret0 performs a merge with any union data inside the SinkWithSecret, using the provided SinkWithSecret0
+func (t *SinkWithSecret) MergeSinkWithSecret0(v SinkWithSecret0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSinkWithSecret1 returns the union data inside the SinkWithSecret as a SinkWithSecret1
+func (t SinkWithSecret) AsSinkWithSecret1() (SinkWithSecret1, error) {
+	var body SinkWithSecret1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSinkWithSecret1 overwrites any union data inside the SinkWithSecret as the provided SinkWithSecret1
+func (t *SinkWithSecret) FromSinkWithSecret1(v SinkWithSecret1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSinkWithSecret1 performs a merge with any union data inside the SinkWithSecret, using the provided SinkWithSecret1
+func (t *SinkWithSecret) MergeSinkWithSecret1(v SinkWithSecret1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSinkWithSecret2 returns the union data inside the SinkWithSecret as a SinkWithSecret2
+func (t SinkWithSecret) AsSinkWithSecret2() (SinkWithSecret2, error) {
+	var body SinkWithSecret2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSinkWithSecret2 overwrites any union data inside the SinkWithSecret as the provided SinkWithSecret2
+func (t *SinkWithSecret) FromSinkWithSecret2(v SinkWithSecret2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSinkWithSecret2 performs a merge with any union data inside the SinkWithSecret, using the provided SinkWithSecret2
+func (t *SinkWithSecret) MergeSinkWithSecret2(v SinkWithSecret2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SinkWithSecret) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	object["at_risk"], err = json.Marshal(t.AtRisk)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'at_risk': %w", err)
+	}
+
+	object["batch_size"], err = json.Marshal(t.BatchSize)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'batch_size': %w", err)
+	}
+
+	if t.Clickhouse != nil {
+		object["clickhouse"], err = json.Marshal(t.Clickhouse)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'clickhouse': %w", err)
+		}
+	}
+
+	object["created_at"], err = json.Marshal(t.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'created_at': %w", err)
+	}
+
+	object["dead_letters"], err = json.Marshal(t.DeadLetters)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'dead_letters': %w", err)
+	}
+
+	object["enabled"], err = json.Marshal(t.Enabled)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'enabled': %w", err)
+	}
+
+	if t.Environments != nil {
+		object["environments"], err = json.Marshal(t.Environments)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'environments': %w", err)
+		}
+	}
+
+	if t.EventKinds != nil {
+		object["event_kinds"], err = json.Marshal(t.EventKinds)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'event_kinds': %w", err)
+		}
+	}
+
+	object["flush_interval"], err = json.Marshal(t.FlushInterval)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'flush_interval': %w", err)
+	}
+
+	object["gaps"], err = json.Marshal(t.Gaps)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'gaps': %w", err)
+	}
+
+	object["health"], err = json.Marshal(t.Health)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'health': %w", err)
+	}
+
+	object["id"], err = json.Marshal(t.Id)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'id': %w", err)
+	}
+
+	object["kind"], err = json.Marshal(t.Kind)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'kind': %w", err)
+	}
+
+	object["lag_seconds"], err = json.Marshal(t.LagSeconds)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'lag_seconds': %w", err)
+	}
+
+	object["name"], err = json.Marshal(t.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'name': %w", err)
+	}
+
+	if t.ObjectStorage != nil {
+		object["object_storage"], err = json.Marshal(t.ObjectStorage)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'object_storage': %w", err)
+		}
+	}
+
+	if t.Secret != nil {
+		object["secret"], err = json.Marshal(t.Secret)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'secret': %w", err)
+		}
+	}
+
+	object["stopped_at"], err = json.Marshal(t.StoppedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'stopped_at': %w", err)
+	}
+
+	if t.Streams != nil {
+		object["streams"], err = json.Marshal(t.Streams)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'streams': %w", err)
+		}
+	}
+
+	object["updated_at"], err = json.Marshal(t.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'updated_at': %w", err)
+	}
+
+	object["version"], err = json.Marshal(t.Version)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'version': %w", err)
+	}
+
+	if t.Warnings != nil {
+		object["warnings"], err = json.Marshal(t.Warnings)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'warnings': %w", err)
+		}
+	}
+
+	if t.Webhook != nil {
+		object["webhook"], err = json.Marshal(t.Webhook)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'webhook': %w", err)
+		}
+	}
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *SinkWithSecret) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["at_risk"]; found {
+		err = json.Unmarshal(raw, &t.AtRisk)
+		if err != nil {
+			return fmt.Errorf("error reading 'at_risk': %w", err)
+		}
+	}
+
+	if raw, found := object["batch_size"]; found {
+		err = json.Unmarshal(raw, &t.BatchSize)
+		if err != nil {
+			return fmt.Errorf("error reading 'batch_size': %w", err)
+		}
+	}
+
+	if raw, found := object["clickhouse"]; found {
+		err = json.Unmarshal(raw, &t.Clickhouse)
+		if err != nil {
+			return fmt.Errorf("error reading 'clickhouse': %w", err)
+		}
+	}
+
+	if raw, found := object["created_at"]; found {
+		err = json.Unmarshal(raw, &t.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'created_at': %w", err)
+		}
+	}
+
+	if raw, found := object["dead_letters"]; found {
+		err = json.Unmarshal(raw, &t.DeadLetters)
+		if err != nil {
+			return fmt.Errorf("error reading 'dead_letters': %w", err)
+		}
+	}
+
+	if raw, found := object["enabled"]; found {
+		err = json.Unmarshal(raw, &t.Enabled)
+		if err != nil {
+			return fmt.Errorf("error reading 'enabled': %w", err)
+		}
+	}
+
+	if raw, found := object["environments"]; found {
+		err = json.Unmarshal(raw, &t.Environments)
+		if err != nil {
+			return fmt.Errorf("error reading 'environments': %w", err)
+		}
+	}
+
+	if raw, found := object["event_kinds"]; found {
+		err = json.Unmarshal(raw, &t.EventKinds)
+		if err != nil {
+			return fmt.Errorf("error reading 'event_kinds': %w", err)
+		}
+	}
+
+	if raw, found := object["flush_interval"]; found {
+		err = json.Unmarshal(raw, &t.FlushInterval)
+		if err != nil {
+			return fmt.Errorf("error reading 'flush_interval': %w", err)
+		}
+	}
+
+	if raw, found := object["gaps"]; found {
+		err = json.Unmarshal(raw, &t.Gaps)
+		if err != nil {
+			return fmt.Errorf("error reading 'gaps': %w", err)
+		}
+	}
+
+	if raw, found := object["health"]; found {
+		err = json.Unmarshal(raw, &t.Health)
+		if err != nil {
+			return fmt.Errorf("error reading 'health': %w", err)
+		}
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &t.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+	}
+
+	if raw, found := object["kind"]; found {
+		err = json.Unmarshal(raw, &t.Kind)
+		if err != nil {
+			return fmt.Errorf("error reading 'kind': %w", err)
+		}
+	}
+
+	if raw, found := object["lag_seconds"]; found {
+		err = json.Unmarshal(raw, &t.LagSeconds)
+		if err != nil {
+			return fmt.Errorf("error reading 'lag_seconds': %w", err)
+		}
+	}
+
+	if raw, found := object["name"]; found {
+		err = json.Unmarshal(raw, &t.Name)
+		if err != nil {
+			return fmt.Errorf("error reading 'name': %w", err)
+		}
+	}
+
+	if raw, found := object["object_storage"]; found {
+		err = json.Unmarshal(raw, &t.ObjectStorage)
+		if err != nil {
+			return fmt.Errorf("error reading 'object_storage': %w", err)
+		}
+	}
+
+	if raw, found := object["secret"]; found {
+		err = json.Unmarshal(raw, &t.Secret)
+		if err != nil {
+			return fmt.Errorf("error reading 'secret': %w", err)
+		}
+	}
+
+	if raw, found := object["stopped_at"]; found {
+		err = json.Unmarshal(raw, &t.StoppedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'stopped_at': %w", err)
+		}
+	}
+
+	if raw, found := object["streams"]; found {
+		err = json.Unmarshal(raw, &t.Streams)
+		if err != nil {
+			return fmt.Errorf("error reading 'streams': %w", err)
+		}
+	}
+
+	if raw, found := object["updated_at"]; found {
+		err = json.Unmarshal(raw, &t.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'updated_at': %w", err)
+		}
+	}
+
+	if raw, found := object["version"]; found {
+		err = json.Unmarshal(raw, &t.Version)
+		if err != nil {
+			return fmt.Errorf("error reading 'version': %w", err)
+		}
+	}
+
+	if raw, found := object["warnings"]; found {
+		err = json.Unmarshal(raw, &t.Warnings)
+		if err != nil {
+			return fmt.Errorf("error reading 'warnings': %w", err)
+		}
+	}
+
+	if raw, found := object["webhook"]; found {
+		err = json.Unmarshal(raw, &t.Webhook)
+		if err != nil {
+			return fmt.Errorf("error reading 'webhook': %w", err)
+		}
+	}
+
+	return err
+}
+
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
 
@@ -5209,6 +6727,115 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /auth/sign-out (the `SignOut` operationId).
 	SignOut(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAuthProviders The instance's auth providers
+	//
+	// Ordered by display name. A client secret is never listed:
+	// `client_secret_set` says whether there is one.
+	//
+	// Corresponds with GET /instance/auth-providers (the `ListAuthProviders` operationId).
+	ListAuthProviders(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAuthProviderWithBody Add an auth provider
+	//
+	// Adds an identity provider members can sign in through. It vouches only
+	// for the email domains it names (`domains`, at least one, lowercased).
+	// The client secret is sealed and never read back. The answer carries the
+	// `redirect_uri` to register at the identity provider. Refused 422
+	// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+	// `insecure_url` for an `http` issuer other than on a loopback address;
+	// private networks are allowed. A slug already in use is 409
+	// `already_exists`. Audited `auth_provider.created`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+	CreateAuthProviderWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAuthProvider Add an auth provider
+	//
+	// Adds an identity provider members can sign in through. It vouches only
+	// for the email domains it names (`domains`, at least one, lowercased).
+	// The client secret is sealed and never read back. The answer carries the
+	// `redirect_uri` to register at the identity provider. Refused 422
+	// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+	// `insecure_url` for an `http` issuer other than on a loopback address;
+	// private networks are allowed. A slug already in use is 409
+	// `already_exists`. Audited `auth_provider.created`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+	CreateAuthProvider(ctx context.Context, body CreateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteAuthProvider Delete an auth provider
+	//
+	// Refused 409 `provider_in_use` while something depends on the provider;
+	// `used_by` names what. Disable it instead: that stops its sign-ins
+	// and leaves its members, identities and grants as they are. Audited
+	// `auth_provider.deleted`.
+	//
+	// Corresponds with DELETE /instance/auth-providers/{provider} (the `DeleteAuthProvider` operationId).
+	DeleteAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAuthProvider An auth provider
+	//
+	// Corresponds with GET /instance/auth-providers/{provider} (the `GetAuthProvider` operationId).
+	GetAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAuthProviderWithBody Edit an auth provider
+	//
+	// Changes any property but `slug` and `kind`; each absent one is left as
+	// it is, a sent `client_secret` replaces the stored one, and a `claims`
+	// member names only the claims to rename. Whether the provider is enabled
+	// is changed with `enable` and `disable`. Refused as a creation is.
+	// Audited `auth_provider.updated`; an edit that changes nothing is not.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+	UpdateAuthProviderWithBody(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAuthProvider Edit an auth provider
+	//
+	// Changes any property but `slug` and `kind`; each absent one is left as
+	// it is, a sent `client_secret` replaces the stored one, and a `claims`
+	// member names only the claims to rename. Whether the provider is enabled
+	// is changed with `enable` and `disable`. Refused as a creation is.
+	// Audited `auth_provider.updated`; an edit that changes nothing is not.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+	UpdateAuthProvider(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, body UpdateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DisableAuthProvider Disable an auth provider
+	//
+	// Stops the provider's sign-ins and leaves its
+	// members, identities and grants as they are. A disabled provider is
+	// answered as it is. Audited `auth_provider.disabled`.
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/disable (the `DisableAuthProvider` operationId).
+	DisableAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EnableAuthProvider Enable an auth provider
+	//
+	// Offers the provider on the sign-in page. Refused 422
+	// `base_url_required` as a creation is. An enabled provider is answered
+	// as it is. Audited `auth_provider.enabled`.
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/enable (the `EnableAuthProvider` operationId).
+	EnableAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TestAuthProvider Test that an auth provider can be reached
+	//
+	// Fetches the provider's discovery document now, enabled or not, and
+	// answers what it found. Refused 502 `provider_unreachable` with the
+	// `failure` when the provider does not answer, answers anything but a
+	// document, or names another issuer. Nothing is stored.
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/test (the `TestAuthProvider` operationId).
+	TestAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAuthSettings The instance's auth settings
 	//
@@ -7191,6 +8818,159 @@ type ClientInterface interface {
 	// Corresponds with GET /projects/{project}/segments/{segment}/usages (the `ListSegmentUsages` operationId).
 	ListSegmentUsages(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListSinks The project's sinks
+	//
+	// The oldest first. A sink's credentials are never listed: the
+	// ClickHouse `password` and the object storage `secret_access_key` read
+	// back as `***`, and a webhook sink's secret is shown once, when it is
+	// issued. Reading sinks needs `sink.manage` too, since a sink's
+	// configuration names internal hosts, buckets and URLs that may carry
+	// tokens.
+	//
+	// Corresponds with GET /projects/{project}/sinks (the `ListSinks` operationId).
+	ListSinks(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSinkWithBody Add a sink
+	//
+	// Creates a sink of the `kind` given and the configuration of that kind
+	// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+	// delivers nothing until it is enabled. The ClickHouse `password` and
+	// the object storage `secret_access_key` are required, stored sealed
+	// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+	// secret is drawn by the server, 32 random bytes as unpadded base64url,
+	// and answered as `secret` this once; audit entries record every secret
+	// as `[redacted]`. Receivers verify a webhook sink's calls as they
+	// verify a webhook subscription's.
+	//
+	// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+	// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+	// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+	// empty mean every one.
+	//
+	// Refused as `invalid_sink`, with `errors` naming each field by JSON
+	// Pointer: a blank name, a configuration missing or of another kind,
+	// a URL that is not an absolute http or https URL without credentials,
+	// a required field left out, a setting delivery sets itself, a header
+	// of the platform's own, an event kind or a batching value out of
+	// range. An environment the project does not have is
+	// `unknown_environment`. A webhook sink's `url` must be `https`
+	// (`insecure_url`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+	// loopback, private, link-local, unspecified or multicast address
+	// (`private_network_target`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+	// storage target may be on a private or loopback address, never on a
+	// link-local one (`link_local_target`), which no setting lifts. A name
+	// that does not resolve is accepted.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+	CreateSinkWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSink Add a sink
+	//
+	// Creates a sink of the `kind` given and the configuration of that kind
+	// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+	// delivers nothing until it is enabled. The ClickHouse `password` and
+	// the object storage `secret_access_key` are required, stored sealed
+	// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+	// secret is drawn by the server, 32 random bytes as unpadded base64url,
+	// and answered as `secret` this once; audit entries record every secret
+	// as `[redacted]`. Receivers verify a webhook sink's calls as they
+	// verify a webhook subscription's.
+	//
+	// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+	// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+	// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+	// empty mean every one.
+	//
+	// Refused as `invalid_sink`, with `errors` naming each field by JSON
+	// Pointer: a blank name, a configuration missing or of another kind,
+	// a URL that is not an absolute http or https URL without credentials,
+	// a required field left out, a setting delivery sets itself, a header
+	// of the platform's own, an event kind or a batching value out of
+	// range. An environment the project does not have is
+	// `unknown_environment`. A webhook sink's `url` must be `https`
+	// (`insecure_url`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+	// loopback, private, link-local, unspecified or multicast address
+	// (`private_network_target`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+	// storage target may be on a private or loopback address, never on a
+	// link-local one (`link_local_target`), which no setting lifts. A name
+	// that does not resolve is accepted.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+	CreateSink(ctx context.Context, project ProjectKey, body CreateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteSink Delete a sink
+	//
+	// The sink goes, and nothing more is sent to its target.
+	//
+	// Corresponds with DELETE /projects/{project}/sinks/{sink} (the `DeleteSink` operationId).
+	DeleteSink(ctx context.Context, project ProjectKey, sink SinkID, params *DeleteSinkParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSink A sink
+	//
+	// Corresponds with GET /projects/{project}/sinks/{sink} (the `GetSink` operationId).
+	GetSink(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSinkWithBody Edit a sink
+	//
+	// Changes each property present and leaves the others as they are. A
+	// sub-object of the sink's kind replaces its configuration whole, so
+	// nothing of the earlier one lingers; the one exception is its secret:
+	// `***`, as every read answers it, or no secret at all keeps the stored
+	// one, and any other value replaces it. A sub-object of another kind,
+	// or a `kind` other than the sink's own, is refused `kind_immutable`.
+	// `enabled` takes `false` only, which lets the attempt in progress
+	// finish and keeps the sink's place; a sink is enabled with its own
+	// operation, which checks the target first. A new target is checked as
+	// on creation, and an edit that changes nothing stores and records
+	// nothing. An edit of batching or filters applies from the next batch.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+	UpdateSinkWithBody(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSink Edit a sink
+	//
+	// Changes each property present and leaves the others as they are. A
+	// sub-object of the sink's kind replaces its configuration whole, so
+	// nothing of the earlier one lingers; the one exception is its secret:
+	// `***`, as every read answers it, or no secret at all keeps the stored
+	// one, and any other value replaces it. A sub-object of another kind,
+	// or a `kind` other than the sink's own, is refused `kind_immutable`.
+	// `enabled` takes `false` only, which lets the attempt in progress
+	// finish and keeps the sink's place; a sink is enabled with its own
+	// operation, which checks the target first. A new target is checked as
+	// on creation, and an edit that changes nothing stores and records
+	// nothing. An edit of batching or filters applies from the next batch.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+	UpdateSink(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, body UpdateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RotateSinkSecret Rotate a webhook sink's secret
+	//
+	// Issues a webhook sink a new secret, answered this once. The secret it
+	// replaces keeps signing beside the new one for the operator's
+	// `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+	// each call carries two `v1=` signatures meanwhile and a receiver
+	// holding either verifies. A secret an earlier rotation left signing is
+	// dropped at once: no more than two sign. A sink of another kind has no
+	// secret the server draws and is refused `no_secret_to_rotate`; its
+	// password or secret access key is changed by editing it. It takes no
+	// `If-Match`.
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/rotate-secret (the `RotateSinkSecret` operationId).
+	RotateSinkSecret(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListStaleFlags The project's stale flags
 	//
 	// The project's stale flags with their reasons, by key in byte order
@@ -7884,6 +9664,215 @@ func (c *Client) SignIn(ctx context.Context, body SignInJSONRequestBody, reqEdit
 // Corresponds with POST /auth/sign-out (the `SignOut` operationId).
 func (c *Client) SignOut(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSignOutRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAuthProviders The instance's auth providers
+//
+// Ordered by display name. A client secret is never listed:
+// `client_secret_set` says whether there is one.
+//
+// Corresponds with GET /instance/auth-providers (the `ListAuthProviders` operationId).
+func (c *Client) ListAuthProviders(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAuthProvidersRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateAuthProviderWithBody Add an auth provider
+//
+// Adds an identity provider members can sign in through. It vouches only
+// for the email domains it names (`domains`, at least one, lowercased).
+// The client secret is sealed and never read back. The answer carries the
+// `redirect_uri` to register at the identity provider. Refused 422
+// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+// `insecure_url` for an `http` issuer other than on a loopback address;
+// private networks are allowed. A slug already in use is 409
+// `already_exists`. Audited `auth_provider.created`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+func (c *Client) CreateAuthProviderWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAuthProviderRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateAuthProvider Add an auth provider
+//
+// Adds an identity provider members can sign in through. It vouches only
+// for the email domains it names (`domains`, at least one, lowercased).
+// The client secret is sealed and never read back. The answer carries the
+// `redirect_uri` to register at the identity provider. Refused 422
+// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+// `insecure_url` for an `http` issuer other than on a loopback address;
+// private networks are allowed. A slug already in use is 409
+// `already_exists`. Audited `auth_provider.created`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+func (c *Client) CreateAuthProvider(ctx context.Context, body CreateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAuthProviderRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteAuthProvider Delete an auth provider
+//
+// Refused 409 `provider_in_use` while something depends on the provider;
+// `used_by` names what. Disable it instead: that stops its sign-ins
+// and leaves its members, identities and grants as they are. Audited
+// `auth_provider.deleted`.
+//
+// Corresponds with DELETE /instance/auth-providers/{provider} (the `DeleteAuthProvider` operationId).
+func (c *Client) DeleteAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteAuthProviderRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAuthProvider An auth provider
+//
+// Corresponds with GET /instance/auth-providers/{provider} (the `GetAuthProvider` operationId).
+func (c *Client) GetAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuthProviderRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateAuthProviderWithBody Edit an auth provider
+//
+// Changes any property but `slug` and `kind`; each absent one is left as
+// it is, a sent `client_secret` replaces the stored one, and a `claims`
+// member names only the claims to rename. Whether the provider is enabled
+// is changed with `enable` and `disable`. Refused as a creation is.
+// Audited `auth_provider.updated`; an edit that changes nothing is not.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+func (c *Client) UpdateAuthProviderWithBody(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAuthProviderRequestWithBody(c.Server, provider, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateAuthProvider Edit an auth provider
+//
+// Changes any property but `slug` and `kind`; each absent one is left as
+// it is, a sent `client_secret` replaces the stored one, and a `claims`
+// member names only the claims to rename. Whether the provider is enabled
+// is changed with `enable` and `disable`. Refused as a creation is.
+// Audited `auth_provider.updated`; an edit that changes nothing is not.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+func (c *Client) UpdateAuthProvider(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, body UpdateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAuthProviderRequest(c.Server, provider, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DisableAuthProvider Disable an auth provider
+//
+// Stops the provider's sign-ins and leaves its
+// members, identities and grants as they are. A disabled provider is
+// answered as it is. Audited `auth_provider.disabled`.
+//
+// Corresponds with POST /instance/auth-providers/{provider}/disable (the `DisableAuthProvider` operationId).
+func (c *Client) DisableAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDisableAuthProviderRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EnableAuthProvider Enable an auth provider
+//
+// Offers the provider on the sign-in page. Refused 422
+// `base_url_required` as a creation is. An enabled provider is answered
+// as it is. Audited `auth_provider.enabled`.
+//
+// Corresponds with POST /instance/auth-providers/{provider}/enable (the `EnableAuthProvider` operationId).
+func (c *Client) EnableAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEnableAuthProviderRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// TestAuthProvider Test that an auth provider can be reached
+//
+// Fetches the provider's discovery document now, enabled or not, and
+// answers what it found. Refused 502 `provider_unreachable` with the
+// `failure` when the provider does not answer, answers anything but a
+// document, or names another issuer. Nothing is stored.
+//
+// Corresponds with POST /instance/auth-providers/{provider}/test (the `TestAuthProvider` operationId).
+func (c *Client) TestAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTestAuthProviderRequest(c.Server, provider)
 	if err != nil {
 		return nil, err
 	}
@@ -11355,6 +13344,239 @@ func (c *Client) ListSegmentUsages(ctx context.Context, project ProjectKey, segm
 	return c.Client.Do(req)
 }
 
+// ListSinks The project's sinks
+//
+// The oldest first. A sink's credentials are never listed: the
+// ClickHouse `password` and the object storage `secret_access_key` read
+// back as `***`, and a webhook sink's secret is shown once, when it is
+// issued. Reading sinks needs `sink.manage` too, since a sink's
+// configuration names internal hosts, buckets and URLs that may carry
+// tokens.
+//
+// Corresponds with GET /projects/{project}/sinks (the `ListSinks` operationId).
+func (c *Client) ListSinks(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSinksRequest(c.Server, project)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSinkWithBody Add a sink
+//
+// Creates a sink of the `kind` given and the configuration of that kind
+// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+// delivers nothing until it is enabled. The ClickHouse `password` and
+// the object storage `secret_access_key` are required, stored sealed
+// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+// secret is drawn by the server, 32 random bytes as unpadded base64url,
+// and answered as `secret` this once; audit entries record every secret
+// as `[redacted]`. Receivers verify a webhook sink's calls as they
+// verify a webhook subscription's.
+//
+// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+// empty mean every one.
+//
+// Refused as `invalid_sink`, with `errors` naming each field by JSON
+// Pointer: a blank name, a configuration missing or of another kind,
+// a URL that is not an absolute http or https URL without credentials,
+// a required field left out, a setting delivery sets itself, a header
+// of the platform's own, an event kind or a batching value out of
+// range. An environment the project does not have is
+// `unknown_environment`. A webhook sink's `url` must be `https`
+// (`insecure_url`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+// loopback, private, link-local, unspecified or multicast address
+// (`private_network_target`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+// storage target may be on a private or loopback address, never on a
+// link-local one (`link_local_target`), which no setting lifts. A name
+// that does not resolve is accepted.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+func (c *Client) CreateSinkWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSinkRequestWithBody(c.Server, project, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSink Add a sink
+//
+// Creates a sink of the `kind` given and the configuration of that kind
+// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+// delivers nothing until it is enabled. The ClickHouse `password` and
+// the object storage `secret_access_key` are required, stored sealed
+// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+// secret is drawn by the server, 32 random bytes as unpadded base64url,
+// and answered as `secret` this once; audit entries record every secret
+// as `[redacted]`. Receivers verify a webhook sink's calls as they
+// verify a webhook subscription's.
+//
+// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+// empty mean every one.
+//
+// Refused as `invalid_sink`, with `errors` naming each field by JSON
+// Pointer: a blank name, a configuration missing or of another kind,
+// a URL that is not an absolute http or https URL without credentials,
+// a required field left out, a setting delivery sets itself, a header
+// of the platform's own, an event kind or a batching value out of
+// range. An environment the project does not have is
+// `unknown_environment`. A webhook sink's `url` must be `https`
+// (`insecure_url`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+// loopback, private, link-local, unspecified or multicast address
+// (`private_network_target`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+// storage target may be on a private or loopback address, never on a
+// link-local one (`link_local_target`), which no setting lifts. A name
+// that does not resolve is accepted.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+func (c *Client) CreateSink(ctx context.Context, project ProjectKey, body CreateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSinkRequest(c.Server, project, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteSink Delete a sink
+//
+// The sink goes, and nothing more is sent to its target.
+//
+// Corresponds with DELETE /projects/{project}/sinks/{sink} (the `DeleteSink` operationId).
+func (c *Client) DeleteSink(ctx context.Context, project ProjectKey, sink SinkID, params *DeleteSinkParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSinkRequest(c.Server, project, sink, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSink A sink
+//
+// Corresponds with GET /projects/{project}/sinks/{sink} (the `GetSink` operationId).
+func (c *Client) GetSink(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSinkRequest(c.Server, project, sink)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateSinkWithBody Edit a sink
+//
+// Changes each property present and leaves the others as they are. A
+// sub-object of the sink's kind replaces its configuration whole, so
+// nothing of the earlier one lingers; the one exception is its secret:
+// `***`, as every read answers it, or no secret at all keeps the stored
+// one, and any other value replaces it. A sub-object of another kind,
+// or a `kind` other than the sink's own, is refused `kind_immutable`.
+// `enabled` takes `false` only, which lets the attempt in progress
+// finish and keeps the sink's place; a sink is enabled with its own
+// operation, which checks the target first. A new target is checked as
+// on creation, and an edit that changes nothing stores and records
+// nothing. An edit of batching or filters applies from the next batch.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+func (c *Client) UpdateSinkWithBody(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSinkRequestWithBody(c.Server, project, sink, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateSink Edit a sink
+//
+// Changes each property present and leaves the others as they are. A
+// sub-object of the sink's kind replaces its configuration whole, so
+// nothing of the earlier one lingers; the one exception is its secret:
+// `***`, as every read answers it, or no secret at all keeps the stored
+// one, and any other value replaces it. A sub-object of another kind,
+// or a `kind` other than the sink's own, is refused `kind_immutable`.
+// `enabled` takes `false` only, which lets the attempt in progress
+// finish and keeps the sink's place; a sink is enabled with its own
+// operation, which checks the target first. A new target is checked as
+// on creation, and an edit that changes nothing stores and records
+// nothing. An edit of batching or filters applies from the next batch.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+func (c *Client) UpdateSink(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, body UpdateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSinkRequest(c.Server, project, sink, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RotateSinkSecret Rotate a webhook sink's secret
+//
+// Issues a webhook sink a new secret, answered this once. The secret it
+// replaces keeps signing beside the new one for the operator's
+// `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+// each call carries two `v1=` signatures meanwhile and a receiver
+// holding either verifies. A secret an earlier rotation left signing is
+// dropped at once: no more than two sign. A sink of another kind has no
+// secret the server draws and is refused `no_secret_to_rotate`; its
+// password or secret access key is changed by editing it. It takes no
+// `If-Match`.
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/rotate-secret (the `RotateSinkSecret` operationId).
+func (c *Client) RotateSinkSecret(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRotateSinkSecretRequest(c.Server, project, sink)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListStaleFlags The project's stale flags
 //
 // The project's stale flags with their reasons, by key in byte order
@@ -12814,6 +15036,305 @@ func NewSignOutRequest(server string) (*http.Request, error) {
 	}
 
 	operationPath := fmt.Sprintf("/auth/sign-out")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListAuthProvidersRequest constructs an http.Request for the ListAuthProviders method
+func NewListAuthProvidersRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateAuthProviderRequest calls the generic CreateAuthProvider builder with application/json body
+func NewCreateAuthProviderRequest(server string, body CreateAuthProviderJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateAuthProviderRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateAuthProviderRequestWithBody constructs an http.Request for the CreateAuthProvider method, with any body, and a specified content type
+func NewCreateAuthProviderRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteAuthProviderRequest constructs an http.Request for the DeleteAuthProvider method
+func NewDeleteAuthProviderRequest(server string, provider AuthProviderSlug) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAuthProviderRequest constructs an http.Request for the GetAuthProvider method
+func NewGetAuthProviderRequest(server string, provider AuthProviderSlug) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateAuthProviderRequest calls the generic UpdateAuthProvider builder with application/json body
+func NewUpdateAuthProviderRequest(server string, provider AuthProviderSlug, params *UpdateAuthProviderParams, body UpdateAuthProviderJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateAuthProviderRequestWithBody(server, provider, params, "application/json", bodyReader)
+}
+
+// NewUpdateAuthProviderRequestWithBody constructs an http.Request for the UpdateAuthProvider method, with any body, and a specified content type
+func NewUpdateAuthProviderRequestWithBody(server string, provider AuthProviderSlug, params *UpdateAuthProviderParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewDisableAuthProviderRequest constructs an http.Request for the DisableAuthProvider method
+func NewDisableAuthProviderRequest(server string, provider AuthProviderSlug) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s/disable", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewEnableAuthProviderRequest constructs an http.Request for the EnableAuthProvider method
+func NewEnableAuthProviderRequest(server string, provider AuthProviderSlug) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s/enable", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewTestAuthProviderRequest constructs an http.Request for the TestAuthProvider method
+func NewTestAuthProviderRequest(server string, provider AuthProviderSlug) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s/test", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -19060,6 +21581,294 @@ func NewListSegmentUsagesRequest(server string, project ProjectKey, segment Segm
 	return req, nil
 }
 
+// NewListSinksRequest constructs an http.Request for the ListSinks method
+func NewListSinksRequest(server string, project ProjectKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateSinkRequest calls the generic CreateSink builder with application/json body
+func NewCreateSinkRequest(server string, project ProjectKey, body CreateSinkJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateSinkRequestWithBody(server, project, "application/json", bodyReader)
+}
+
+// NewCreateSinkRequestWithBody constructs an http.Request for the CreateSink method, with any body, and a specified content type
+func NewCreateSinkRequestWithBody(server string, project ProjectKey, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteSinkRequest constructs an http.Request for the DeleteSink method
+func NewDeleteSinkRequest(server string, project ProjectKey, sink SinkID, params *DeleteSinkParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetSinkRequest constructs an http.Request for the GetSink method
+func NewGetSinkRequest(server string, project ProjectKey, sink SinkID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateSinkRequest calls the generic UpdateSink builder with application/json body
+func NewUpdateSinkRequest(server string, project ProjectKey, sink SinkID, params *UpdateSinkParams, body UpdateSinkJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateSinkRequestWithBody(server, project, sink, params, "application/json", bodyReader)
+}
+
+// NewUpdateSinkRequestWithBody constructs an http.Request for the UpdateSink method, with any body, and a specified content type
+func NewUpdateSinkRequestWithBody(server string, project ProjectKey, sink SinkID, params *UpdateSinkParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewRotateSinkSecretRequest constructs an http.Request for the RotateSinkSecret method
+func NewRotateSinkSecretRequest(server string, project ProjectKey, sink SinkID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s/rotate-secret", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListStaleFlagsRequest constructs an http.Request for the ListStaleFlags method
 func NewListStaleFlagsRequest(server string, project ProjectKey, params *ListStaleFlagsParams) (*http.Request, error) {
 	var err error
@@ -20924,6 +23733,127 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /auth/sign-out (the `SignOut` operationId).
 	SignOutWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SignOutResponse, error)
+
+	// ListAuthProvidersWithResponse The instance's auth providers
+	//
+	// Ordered by display name. A client secret is never listed:
+	// `client_secret_set` says whether there is one.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /instance/auth-providers (the `ListAuthProviders` operationId).
+	ListAuthProvidersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAuthProvidersResponse, error)
+
+	// CreateAuthProviderWithBodyWithResponse Add an auth provider
+	//
+	// Adds an identity provider members can sign in through. It vouches only
+	// for the email domains it names (`domains`, at least one, lowercased).
+	// The client secret is sealed and never read back. The answer carries the
+	// `redirect_uri` to register at the identity provider. Refused 422
+	// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+	// `insecure_url` for an `http` issuer other than on a loopback address;
+	// private networks are allowed. A slug already in use is 409
+	// `already_exists`. Audited `auth_provider.created`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+	CreateAuthProviderWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAuthProviderResponse, error)
+
+	// CreateAuthProviderWithResponse Add an auth provider
+	//
+	// Adds an identity provider members can sign in through. It vouches only
+	// for the email domains it names (`domains`, at least one, lowercased).
+	// The client secret is sealed and never read back. The answer carries the
+	// `redirect_uri` to register at the identity provider. Refused 422
+	// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+	// `insecure_url` for an `http` issuer other than on a loopback address;
+	// private networks are allowed. A slug already in use is 409
+	// `already_exists`. Audited `auth_provider.created`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+	CreateAuthProviderWithResponse(ctx context.Context, body CreateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAuthProviderResponse, error)
+
+	// DeleteAuthProviderWithResponse Delete an auth provider
+	//
+	// Refused 409 `provider_in_use` while something depends on the provider;
+	// `used_by` names what. Disable it instead: that stops its sign-ins
+	// and leaves its members, identities and grants as they are. Audited
+	// `auth_provider.deleted`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /instance/auth-providers/{provider} (the `DeleteAuthProvider` operationId).
+	DeleteAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*DeleteAuthProviderResponse, error)
+
+	// GetAuthProviderWithResponse An auth provider
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /instance/auth-providers/{provider} (the `GetAuthProvider` operationId).
+	GetAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*GetAuthProviderResponse, error)
+
+	// UpdateAuthProviderWithBodyWithResponse Edit an auth provider
+	//
+	// Changes any property but `slug` and `kind`; each absent one is left as
+	// it is, a sent `client_secret` replaces the stored one, and a `claims`
+	// member names only the claims to rename. Whether the provider is enabled
+	// is changed with `enable` and `disable`. Refused as a creation is.
+	// Audited `auth_provider.updated`; an edit that changes nothing is not.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+	UpdateAuthProviderWithBodyWithResponse(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAuthProviderResponse, error)
+
+	// UpdateAuthProviderWithResponse Edit an auth provider
+	//
+	// Changes any property but `slug` and `kind`; each absent one is left as
+	// it is, a sent `client_secret` replaces the stored one, and a `claims`
+	// member names only the claims to rename. Whether the provider is enabled
+	// is changed with `enable` and `disable`. Refused as a creation is.
+	// Audited `auth_provider.updated`; an edit that changes nothing is not.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+	UpdateAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, body UpdateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAuthProviderResponse, error)
+
+	// DisableAuthProviderWithResponse Disable an auth provider
+	//
+	// Stops the provider's sign-ins and leaves its
+	// members, identities and grants as they are. A disabled provider is
+	// answered as it is. Audited `auth_provider.disabled`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/disable (the `DisableAuthProvider` operationId).
+	DisableAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*DisableAuthProviderResponse, error)
+
+	// EnableAuthProviderWithResponse Enable an auth provider
+	//
+	// Offers the provider on the sign-in page. Refused 422
+	// `base_url_required` as a creation is. An enabled provider is answered
+	// as it is. Audited `auth_provider.enabled`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/enable (the `EnableAuthProvider` operationId).
+	EnableAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*EnableAuthProviderResponse, error)
+
+	// TestAuthProviderWithResponse Test that an auth provider can be reached
+	//
+	// Fetches the provider's discovery document now, enabled or not, and
+	// answers what it found. Refused 502 `provider_unreachable` with the
+	// `failure` when the provider does not answer, answers anything but a
+	// document, or names another issuer. Nothing is stored.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/test (the `TestAuthProvider` operationId).
+	TestAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*TestAuthProviderResponse, error)
 
 	// GetAuthSettingsWithResponse The instance's auth settings
 	//
@@ -23056,6 +25986,167 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /projects/{project}/segments/{segment}/usages (the `ListSegmentUsages` operationId).
 	ListSegmentUsagesWithResponse(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*ListSegmentUsagesResponse, error)
 
+	// ListSinksWithResponse The project's sinks
+	//
+	// The oldest first. A sink's credentials are never listed: the
+	// ClickHouse `password` and the object storage `secret_access_key` read
+	// back as `***`, and a webhook sink's secret is shown once, when it is
+	// issued. Reading sinks needs `sink.manage` too, since a sink's
+	// configuration names internal hosts, buckets and URLs that may carry
+	// tokens.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/sinks (the `ListSinks` operationId).
+	ListSinksWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListSinksResponse, error)
+
+	// CreateSinkWithBodyWithResponse Add a sink
+	//
+	// Creates a sink of the `kind` given and the configuration of that kind
+	// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+	// delivers nothing until it is enabled. The ClickHouse `password` and
+	// the object storage `secret_access_key` are required, stored sealed
+	// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+	// secret is drawn by the server, 32 random bytes as unpadded base64url,
+	// and answered as `secret` this once; audit entries record every secret
+	// as `[redacted]`. Receivers verify a webhook sink's calls as they
+	// verify a webhook subscription's.
+	//
+	// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+	// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+	// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+	// empty mean every one.
+	//
+	// Refused as `invalid_sink`, with `errors` naming each field by JSON
+	// Pointer: a blank name, a configuration missing or of another kind,
+	// a URL that is not an absolute http or https URL without credentials,
+	// a required field left out, a setting delivery sets itself, a header
+	// of the platform's own, an event kind or a batching value out of
+	// range. An environment the project does not have is
+	// `unknown_environment`. A webhook sink's `url` must be `https`
+	// (`insecure_url`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+	// loopback, private, link-local, unspecified or multicast address
+	// (`private_network_target`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+	// storage target may be on a private or loopback address, never on a
+	// link-local one (`link_local_target`), which no setting lifts. A name
+	// that does not resolve is accepted.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+	CreateSinkWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSinkResponse, error)
+
+	// CreateSinkWithResponse Add a sink
+	//
+	// Creates a sink of the `kind` given and the configuration of that kind
+	// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+	// delivers nothing until it is enabled. The ClickHouse `password` and
+	// the object storage `secret_access_key` are required, stored sealed
+	// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+	// secret is drawn by the server, 32 random bytes as unpadded base64url,
+	// and answered as `secret` this once; audit entries record every secret
+	// as `[redacted]`. Receivers verify a webhook sink's calls as they
+	// verify a webhook subscription's.
+	//
+	// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+	// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+	// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+	// empty mean every one.
+	//
+	// Refused as `invalid_sink`, with `errors` naming each field by JSON
+	// Pointer: a blank name, a configuration missing or of another kind,
+	// a URL that is not an absolute http or https URL without credentials,
+	// a required field left out, a setting delivery sets itself, a header
+	// of the platform's own, an event kind or a batching value out of
+	// range. An environment the project does not have is
+	// `unknown_environment`. A webhook sink's `url` must be `https`
+	// (`insecure_url`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+	// loopback, private, link-local, unspecified or multicast address
+	// (`private_network_target`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+	// storage target may be on a private or loopback address, never on a
+	// link-local one (`link_local_target`), which no setting lifts. A name
+	// that does not resolve is accepted.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+	CreateSinkWithResponse(ctx context.Context, project ProjectKey, body CreateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSinkResponse, error)
+
+	// DeleteSinkWithResponse Delete a sink
+	//
+	// The sink goes, and nothing more is sent to its target.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /projects/{project}/sinks/{sink} (the `DeleteSink` operationId).
+	DeleteSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, params *DeleteSinkParams, reqEditors ...RequestEditorFn) (*DeleteSinkResponse, error)
+
+	// GetSinkWithResponse A sink
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/sinks/{sink} (the `GetSink` operationId).
+	GetSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*GetSinkResponse, error)
+
+	// UpdateSinkWithBodyWithResponse Edit a sink
+	//
+	// Changes each property present and leaves the others as they are. A
+	// sub-object of the sink's kind replaces its configuration whole, so
+	// nothing of the earlier one lingers; the one exception is its secret:
+	// `***`, as every read answers it, or no secret at all keeps the stored
+	// one, and any other value replaces it. A sub-object of another kind,
+	// or a `kind` other than the sink's own, is refused `kind_immutable`.
+	// `enabled` takes `false` only, which lets the attempt in progress
+	// finish and keeps the sink's place; a sink is enabled with its own
+	// operation, which checks the target first. A new target is checked as
+	// on creation, and an edit that changes nothing stores and records
+	// nothing. An edit of batching or filters applies from the next batch.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+	UpdateSinkWithBodyWithResponse(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSinkResponse, error)
+
+	// UpdateSinkWithResponse Edit a sink
+	//
+	// Changes each property present and leaves the others as they are. A
+	// sub-object of the sink's kind replaces its configuration whole, so
+	// nothing of the earlier one lingers; the one exception is its secret:
+	// `***`, as every read answers it, or no secret at all keeps the stored
+	// one, and any other value replaces it. A sub-object of another kind,
+	// or a `kind` other than the sink's own, is refused `kind_immutable`.
+	// `enabled` takes `false` only, which lets the attempt in progress
+	// finish and keeps the sink's place; a sink is enabled with its own
+	// operation, which checks the target first. A new target is checked as
+	// on creation, and an edit that changes nothing stores and records
+	// nothing. An edit of batching or filters applies from the next batch.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+	UpdateSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, body UpdateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSinkResponse, error)
+
+	// RotateSinkSecretWithResponse Rotate a webhook sink's secret
+	//
+	// Issues a webhook sink a new secret, answered this once. The secret it
+	// replaces keeps signing beside the new one for the operator's
+	// `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+	// each call carries two `v1=` signatures meanwhile and a receiver
+	// holding either verifies. A secret an earlier rotation left signing is
+	// dropped at once: no more than two sign. A sink of another kind has no
+	// secret the server draws and is refused `no_secret_to_rotate`; its
+	// password or secret access key is changed by editing it. It takes no
+	// `If-Match`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/rotate-secret (the `RotateSinkSecret` operationId).
+	RotateSinkSecretWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*RotateSinkSecretResponse, error)
+
 	// ListStaleFlagsWithResponse The project's stale flags
 	//
 	// The project's stale flags with their reasons, by key in byte order
@@ -24156,6 +27247,642 @@ func (r SignOutResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r SignOutResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListAuthProvidersResponse401Headers the declared response headers of an HTTP 401 response for ListAuthProviders
+type ListAuthProvidersResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListAuthProvidersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthProviderList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListAuthProvidersResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAuthProvidersResponse) GetJSON200() *AuthProviderList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListAuthProvidersResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListAuthProvidersResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAuthProvidersResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAuthProvidersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAuthProvidersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAuthProvidersResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateAuthProviderResponse201Headers the declared response headers of an HTTP 201 response for CreateAuthProvider
+type CreateAuthProviderResponse201Headers struct {
+	ETag *string
+}
+
+// CreateAuthProviderResponse401Headers the declared response headers of an HTTP 401 response for CreateAuthProvider
+type CreateAuthProviderResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateAuthProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *AuthProvider
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreateAuthProviderResponse201Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateAuthProviderResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateAuthProviderResponse) GetJSON201() *AuthProvider {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CreateAuthProviderResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateAuthProviderResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CreateAuthProviderResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreateAuthProviderResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateAuthProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateAuthProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateAuthProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateAuthProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeleteAuthProviderResponse401Headers the declared response headers of an HTTP 401 response for DeleteAuthProvider
+type DeleteAuthProviderResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DeleteAuthProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeleteAuthProviderResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteAuthProviderResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteAuthProviderResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r DeleteAuthProviderResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteAuthProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteAuthProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteAuthProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteAuthProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetAuthProviderResponse200Headers the declared response headers of an HTTP 200 response for GetAuthProvider
+type GetAuthProviderResponse200Headers struct {
+	ETag *string
+}
+
+// GetAuthProviderResponse401Headers the declared response headers of an HTTP 401 response for GetAuthProvider
+type GetAuthProviderResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetAuthProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthProvider
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetAuthProviderResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetAuthProviderResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAuthProviderResponse) GetJSON200() *AuthProvider {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetAuthProviderResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetAuthProviderResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAuthProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuthProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuthProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAuthProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateAuthProviderResponse200Headers the declared response headers of an HTTP 200 response for UpdateAuthProvider
+type UpdateAuthProviderResponse200Headers struct {
+	ETag *string
+}
+
+// UpdateAuthProviderResponse401Headers the declared response headers of an HTTP 401 response for UpdateAuthProvider
+type UpdateAuthProviderResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateAuthProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthProvider
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *UpdateAuthProviderResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateAuthProviderResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateAuthProviderResponse) GetJSON200() *AuthProvider {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateAuthProviderResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateAuthProviderResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdateAuthProviderResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r UpdateAuthProviderResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateAuthProviderResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r UpdateAuthProviderResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateAuthProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateAuthProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateAuthProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateAuthProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DisableAuthProviderResponse200Headers the declared response headers of an HTTP 200 response for DisableAuthProvider
+type DisableAuthProviderResponse200Headers struct {
+	ETag *string
+}
+
+// DisableAuthProviderResponse401Headers the declared response headers of an HTTP 401 response for DisableAuthProvider
+type DisableAuthProviderResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DisableAuthProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthProvider
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DisableAuthProviderResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DisableAuthProviderResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DisableAuthProviderResponse) GetJSON200() *AuthProvider {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DisableAuthProviderResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DisableAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DisableAuthProviderResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r DisableAuthProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DisableAuthProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DisableAuthProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DisableAuthProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// EnableAuthProviderResponse200Headers the declared response headers of an HTTP 200 response for EnableAuthProvider
+type EnableAuthProviderResponse200Headers struct {
+	ETag *string
+}
+
+// EnableAuthProviderResponse401Headers the declared response headers of an HTTP 401 response for EnableAuthProvider
+type EnableAuthProviderResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type EnableAuthProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthProvider
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *EnableAuthProviderResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *EnableAuthProviderResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r EnableAuthProviderResponse) GetJSON200() *AuthProvider {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r EnableAuthProviderResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r EnableAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r EnableAuthProviderResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r EnableAuthProviderResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r EnableAuthProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r EnableAuthProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EnableAuthProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EnableAuthProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// TestAuthProviderResponse401Headers the declared response headers of an HTTP 401 response for TestAuthProvider
+type TestAuthProviderResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type TestAuthProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthProviderTest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *TestAuthProviderResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r TestAuthProviderResponse) GetJSON200() *AuthProviderTest {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r TestAuthProviderResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r TestAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r TestAuthProviderResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r TestAuthProviderResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r TestAuthProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r TestAuthProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TestAuthProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r TestAuthProviderResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -33377,6 +37104,504 @@ func (r ListSegmentUsagesResponse) ContentType() string {
 	return ""
 }
 
+// ListSinksResponse401Headers the declared response headers of an HTTP 401 response for ListSinks
+type ListSinksResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListSinksResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SinkList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListSinksResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSinksResponse) GetJSON200() *SinkList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListSinksResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListSinksResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListSinksResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSinksResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSinksResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSinksResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSinksResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateSinkResponse201Headers the declared response headers of an HTTP 201 response for CreateSink
+type CreateSinkResponse201Headers struct {
+	ETag *string
+}
+
+// CreateSinkResponse401Headers the declared response headers of an HTTP 401 response for CreateSink
+type CreateSinkResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateSinkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *SinkWithSecret
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreateSinkResponse201Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateSinkResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateSinkResponse) GetJSON201() *SinkWithSecret {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CreateSinkResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateSinkResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateSinkResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CreateSinkResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreateSinkResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateSinkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateSinkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateSinkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateSinkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeleteSinkResponse401Headers the declared response headers of an HTTP 401 response for DeleteSink
+type DeleteSinkResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DeleteSinkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeleteSinkResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteSinkResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteSinkResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteSinkResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r DeleteSinkResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r DeleteSinkResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteSinkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteSinkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteSinkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteSinkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetSinkResponse200Headers the declared response headers of an HTTP 200 response for GetSink
+type GetSinkResponse200Headers struct {
+	ETag *string
+}
+
+// GetSinkResponse401Headers the declared response headers of an HTTP 401 response for GetSink
+type GetSinkResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetSinkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Sink
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetSinkResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetSinkResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSinkResponse) GetJSON200() *Sink {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetSinkResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetSinkResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetSinkResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSinkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSinkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSinkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSinkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateSinkResponse200Headers the declared response headers of an HTTP 200 response for UpdateSink
+type UpdateSinkResponse200Headers struct {
+	ETag *string
+}
+
+// UpdateSinkResponse401Headers the declared response headers of an HTTP 401 response for UpdateSink
+type UpdateSinkResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateSinkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Sink
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *UpdateSinkResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateSinkResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateSinkResponse) GetJSON200() *Sink {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateSinkResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateSinkResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateSinkResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdateSinkResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r UpdateSinkResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateSinkResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r UpdateSinkResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateSinkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateSinkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateSinkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateSinkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RotateSinkSecretResponse200Headers the declared response headers of an HTTP 200 response for RotateSinkSecret
+type RotateSinkSecretResponse200Headers struct {
+	ETag *string
+}
+
+// RotateSinkSecretResponse401Headers the declared response headers of an HTTP 401 response for RotateSinkSecret
+type RotateSinkSecretResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RotateSinkSecretResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SinkWithSecret
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *RotateSinkSecretResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RotateSinkSecretResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RotateSinkSecretResponse) GetJSON200() *SinkWithSecret {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RotateSinkSecretResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RotateSinkSecretResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RotateSinkSecretResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r RotateSinkSecretResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r RotateSinkSecretResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RotateSinkSecretResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RotateSinkSecretResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RotateSinkSecretResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListStaleFlagsResponse401Headers the declared response headers of an HTTP 401 response for ListStaleFlags
 type ListStaleFlagsResponse401Headers struct {
 	WWWAuthenticate *string
@@ -36267,6 +40492,187 @@ func (c *ClientWithResponses) SignOutWithResponse(ctx context.Context, reqEditor
 		return nil, err
 	}
 	return ParseSignOutResponse(rsp)
+}
+
+// ListAuthProvidersWithResponse The instance's auth providers
+//
+// Ordered by display name. A client secret is never listed:
+// `client_secret_set` says whether there is one.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/auth-providers (the `ListAuthProviders` operationId).
+func (c *ClientWithResponses) ListAuthProvidersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAuthProvidersResponse, error) {
+	rsp, err := c.ListAuthProviders(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAuthProvidersResponse(rsp)
+}
+
+// CreateAuthProviderWithBodyWithResponse Add an auth provider
+//
+// Adds an identity provider members can sign in through. It vouches only
+// for the email domains it names (`domains`, at least one, lowercased).
+// The client secret is sealed and never read back. The answer carries the
+// `redirect_uri` to register at the identity provider. Refused 422
+// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+// `insecure_url` for an `http` issuer other than on a loopback address;
+// private networks are allowed. A slug already in use is 409
+// `already_exists`. Audited `auth_provider.created`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+func (c *ClientWithResponses) CreateAuthProviderWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAuthProviderResponse, error) {
+	rsp, err := c.CreateAuthProviderWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAuthProviderResponse(rsp)
+}
+
+// CreateAuthProviderWithResponse Add an auth provider
+//
+// Adds an identity provider members can sign in through. It vouches only
+// for the email domains it names (`domains`, at least one, lowercased).
+// The client secret is sealed and never read back. The answer carries the
+// `redirect_uri` to register at the identity provider. Refused 422
+// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+// `insecure_url` for an `http` issuer other than on a loopback address;
+// private networks are allowed. A slug already in use is 409
+// `already_exists`. Audited `auth_provider.created`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+func (c *ClientWithResponses) CreateAuthProviderWithResponse(ctx context.Context, body CreateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAuthProviderResponse, error) {
+	rsp, err := c.CreateAuthProvider(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAuthProviderResponse(rsp)
+}
+
+// DeleteAuthProviderWithResponse Delete an auth provider
+//
+// Refused 409 `provider_in_use` while something depends on the provider;
+// `used_by` names what. Disable it instead: that stops its sign-ins
+// and leaves its members, identities and grants as they are. Audited
+// `auth_provider.deleted`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /instance/auth-providers/{provider} (the `DeleteAuthProvider` operationId).
+func (c *ClientWithResponses) DeleteAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*DeleteAuthProviderResponse, error) {
+	rsp, err := c.DeleteAuthProvider(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteAuthProviderResponse(rsp)
+}
+
+// GetAuthProviderWithResponse An auth provider
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/auth-providers/{provider} (the `GetAuthProvider` operationId).
+func (c *ClientWithResponses) GetAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*GetAuthProviderResponse, error) {
+	rsp, err := c.GetAuthProvider(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuthProviderResponse(rsp)
+}
+
+// UpdateAuthProviderWithBodyWithResponse Edit an auth provider
+//
+// Changes any property but `slug` and `kind`; each absent one is left as
+// it is, a sent `client_secret` replaces the stored one, and a `claims`
+// member names only the claims to rename. Whether the provider is enabled
+// is changed with `enable` and `disable`. Refused as a creation is.
+// Audited `auth_provider.updated`; an edit that changes nothing is not.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+func (c *ClientWithResponses) UpdateAuthProviderWithBodyWithResponse(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAuthProviderResponse, error) {
+	rsp, err := c.UpdateAuthProviderWithBody(ctx, provider, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAuthProviderResponse(rsp)
+}
+
+// UpdateAuthProviderWithResponse Edit an auth provider
+//
+// Changes any property but `slug` and `kind`; each absent one is left as
+// it is, a sent `client_secret` replaces the stored one, and a `claims`
+// member names only the claims to rename. Whether the provider is enabled
+// is changed with `enable` and `disable`. Refused as a creation is.
+// Audited `auth_provider.updated`; an edit that changes nothing is not.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+func (c *ClientWithResponses) UpdateAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, body UpdateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAuthProviderResponse, error) {
+	rsp, err := c.UpdateAuthProvider(ctx, provider, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAuthProviderResponse(rsp)
+}
+
+// DisableAuthProviderWithResponse Disable an auth provider
+//
+// Stops the provider's sign-ins and leaves its
+// members, identities and grants as they are. A disabled provider is
+// answered as it is. Audited `auth_provider.disabled`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /instance/auth-providers/{provider}/disable (the `DisableAuthProvider` operationId).
+func (c *ClientWithResponses) DisableAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*DisableAuthProviderResponse, error) {
+	rsp, err := c.DisableAuthProvider(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDisableAuthProviderResponse(rsp)
+}
+
+// EnableAuthProviderWithResponse Enable an auth provider
+//
+// Offers the provider on the sign-in page. Refused 422
+// `base_url_required` as a creation is. An enabled provider is answered
+// as it is. Audited `auth_provider.enabled`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /instance/auth-providers/{provider}/enable (the `EnableAuthProvider` operationId).
+func (c *ClientWithResponses) EnableAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*EnableAuthProviderResponse, error) {
+	rsp, err := c.EnableAuthProvider(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEnableAuthProviderResponse(rsp)
+}
+
+// TestAuthProviderWithResponse Test that an auth provider can be reached
+//
+// Fetches the provider's discovery document now, enabled or not, and
+// answers what it found. Refused 502 `provider_unreachable` with the
+// `failure` when the provider does not answer, answers anything but a
+// document, or names another issuer. Nothing is stored.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /instance/auth-providers/{provider}/test (the `TestAuthProvider` operationId).
+func (c *ClientWithResponses) TestAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*TestAuthProviderResponse, error) {
+	rsp, err := c.TestAuthProvider(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTestAuthProviderResponse(rsp)
 }
 
 // GetAuthSettingsWithResponse The instance's auth settings
@@ -39288,6 +43694,215 @@ func (c *ClientWithResponses) ListSegmentUsagesWithResponse(ctx context.Context,
 	return ParseListSegmentUsagesResponse(rsp)
 }
 
+// ListSinksWithResponse The project's sinks
+//
+// The oldest first. A sink's credentials are never listed: the
+// ClickHouse `password` and the object storage `secret_access_key` read
+// back as `***`, and a webhook sink's secret is shown once, when it is
+// issued. Reading sinks needs `sink.manage` too, since a sink's
+// configuration names internal hosts, buckets and URLs that may carry
+// tokens.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/sinks (the `ListSinks` operationId).
+func (c *ClientWithResponses) ListSinksWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListSinksResponse, error) {
+	rsp, err := c.ListSinks(ctx, project, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSinksResponse(rsp)
+}
+
+// CreateSinkWithBodyWithResponse Add a sink
+//
+// Creates a sink of the `kind` given and the configuration of that kind
+// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+// delivers nothing until it is enabled. The ClickHouse `password` and
+// the object storage `secret_access_key` are required, stored sealed
+// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+// secret is drawn by the server, 32 random bytes as unpadded base64url,
+// and answered as `secret` this once; audit entries record every secret
+// as `[redacted]`. Receivers verify a webhook sink's calls as they
+// verify a webhook subscription's.
+//
+// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+// empty mean every one.
+//
+// Refused as `invalid_sink`, with `errors` naming each field by JSON
+// Pointer: a blank name, a configuration missing or of another kind,
+// a URL that is not an absolute http or https URL without credentials,
+// a required field left out, a setting delivery sets itself, a header
+// of the platform's own, an event kind or a batching value out of
+// range. An environment the project does not have is
+// `unknown_environment`. A webhook sink's `url` must be `https`
+// (`insecure_url`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+// loopback, private, link-local, unspecified or multicast address
+// (`private_network_target`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+// storage target may be on a private or loopback address, never on a
+// link-local one (`link_local_target`), which no setting lifts. A name
+// that does not resolve is accepted.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+func (c *ClientWithResponses) CreateSinkWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSinkResponse, error) {
+	rsp, err := c.CreateSinkWithBody(ctx, project, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSinkResponse(rsp)
+}
+
+// CreateSinkWithResponse Add a sink
+//
+// Creates a sink of the `kind` given and the configuration of that kind
+// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+// delivers nothing until it is enabled. The ClickHouse `password` and
+// the object storage `secret_access_key` are required, stored sealed
+// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+// secret is drawn by the server, 32 random bytes as unpadded base64url,
+// and answered as `secret` this once; audit entries record every secret
+// as `[redacted]`. Receivers verify a webhook sink's calls as they
+// verify a webhook subscription's.
+//
+// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+// empty mean every one.
+//
+// Refused as `invalid_sink`, with `errors` naming each field by JSON
+// Pointer: a blank name, a configuration missing or of another kind,
+// a URL that is not an absolute http or https URL without credentials,
+// a required field left out, a setting delivery sets itself, a header
+// of the platform's own, an event kind or a batching value out of
+// range. An environment the project does not have is
+// `unknown_environment`. A webhook sink's `url` must be `https`
+// (`insecure_url`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+// loopback, private, link-local, unspecified or multicast address
+// (`private_network_target`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+// storage target may be on a private or loopback address, never on a
+// link-local one (`link_local_target`), which no setting lifts. A name
+// that does not resolve is accepted.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+func (c *ClientWithResponses) CreateSinkWithResponse(ctx context.Context, project ProjectKey, body CreateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSinkResponse, error) {
+	rsp, err := c.CreateSink(ctx, project, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSinkResponse(rsp)
+}
+
+// DeleteSinkWithResponse Delete a sink
+//
+// The sink goes, and nothing more is sent to its target.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /projects/{project}/sinks/{sink} (the `DeleteSink` operationId).
+func (c *ClientWithResponses) DeleteSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, params *DeleteSinkParams, reqEditors ...RequestEditorFn) (*DeleteSinkResponse, error) {
+	rsp, err := c.DeleteSink(ctx, project, sink, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteSinkResponse(rsp)
+}
+
+// GetSinkWithResponse A sink
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/sinks/{sink} (the `GetSink` operationId).
+func (c *ClientWithResponses) GetSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*GetSinkResponse, error) {
+	rsp, err := c.GetSink(ctx, project, sink, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSinkResponse(rsp)
+}
+
+// UpdateSinkWithBodyWithResponse Edit a sink
+//
+// Changes each property present and leaves the others as they are. A
+// sub-object of the sink's kind replaces its configuration whole, so
+// nothing of the earlier one lingers; the one exception is its secret:
+// `***`, as every read answers it, or no secret at all keeps the stored
+// one, and any other value replaces it. A sub-object of another kind,
+// or a `kind` other than the sink's own, is refused `kind_immutable`.
+// `enabled` takes `false` only, which lets the attempt in progress
+// finish and keeps the sink's place; a sink is enabled with its own
+// operation, which checks the target first. A new target is checked as
+// on creation, and an edit that changes nothing stores and records
+// nothing. An edit of batching or filters applies from the next batch.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+func (c *ClientWithResponses) UpdateSinkWithBodyWithResponse(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSinkResponse, error) {
+	rsp, err := c.UpdateSinkWithBody(ctx, project, sink, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSinkResponse(rsp)
+}
+
+// UpdateSinkWithResponse Edit a sink
+//
+// Changes each property present and leaves the others as they are. A
+// sub-object of the sink's kind replaces its configuration whole, so
+// nothing of the earlier one lingers; the one exception is its secret:
+// `***`, as every read answers it, or no secret at all keeps the stored
+// one, and any other value replaces it. A sub-object of another kind,
+// or a `kind` other than the sink's own, is refused `kind_immutable`.
+// `enabled` takes `false` only, which lets the attempt in progress
+// finish and keeps the sink's place; a sink is enabled with its own
+// operation, which checks the target first. A new target is checked as
+// on creation, and an edit that changes nothing stores and records
+// nothing. An edit of batching or filters applies from the next batch.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+func (c *ClientWithResponses) UpdateSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, body UpdateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSinkResponse, error) {
+	rsp, err := c.UpdateSink(ctx, project, sink, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSinkResponse(rsp)
+}
+
+// RotateSinkSecretWithResponse Rotate a webhook sink's secret
+//
+// Issues a webhook sink a new secret, answered this once. The secret it
+// replaces keeps signing beside the new one for the operator's
+// `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+// each call carries two `v1=` signatures meanwhile and a receiver
+// holding either verifies. A secret an earlier rotation left signing is
+// dropped at once: no more than two sign. A sink of another kind has no
+// secret the server draws and is refused `no_secret_to_rotate`; its
+// password or secret access key is changed by editing it. It takes no
+// `If-Match`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/rotate-secret (the `RotateSinkSecret` operationId).
+func (c *ClientWithResponses) RotateSinkSecretWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*RotateSinkSecretResponse, error) {
+	rsp, err := c.RotateSinkSecret(ctx, project, sink, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRotateSinkSecretResponse(rsp)
+}
+
 // ListStaleFlagsWithResponse The project's stale flags
 //
 // The project's stale flags with their reasons, by key in byte order
@@ -40596,6 +45211,588 @@ func ParseSignOutResponse(rsp *http.Response) (*SignOutResponse, error) {
 		response.Headers204 = &headers
 	case rsp.StatusCode == 401:
 		var headers SignOutResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListAuthProvidersResponse parses an HTTP response from a ListAuthProvidersWithResponse call
+func ParseListAuthProvidersResponse(rsp *http.Response) (*ListAuthProvidersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAuthProvidersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthProviderList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListAuthProvidersResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateAuthProviderResponse parses an HTTP response from a CreateAuthProviderWithResponse call
+func ParseCreateAuthProviderResponse(rsp *http.Response) (*CreateAuthProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateAuthProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest AuthProvider
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers CreateAuthProviderResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
+	case rsp.StatusCode == 401:
+		var headers CreateAuthProviderResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeleteAuthProviderResponse parses an HTTP response from a DeleteAuthProviderWithResponse call
+func ParseDeleteAuthProviderResponse(rsp *http.Response) (*DeleteAuthProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteAuthProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DeleteAuthProviderResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetAuthProviderResponse parses an HTTP response from a GetAuthProviderWithResponse call
+func ParseGetAuthProviderResponse(rsp *http.Response) (*GetAuthProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuthProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthProvider
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetAuthProviderResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers GetAuthProviderResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateAuthProviderResponse parses an HTTP response from a UpdateAuthProviderWithResponse call
+func ParseUpdateAuthProviderResponse(rsp *http.Response) (*UpdateAuthProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateAuthProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthProvider
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers UpdateAuthProviderResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers UpdateAuthProviderResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDisableAuthProviderResponse parses an HTTP response from a DisableAuthProviderWithResponse call
+func ParseDisableAuthProviderResponse(rsp *http.Response) (*DisableAuthProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DisableAuthProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthProvider
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers DisableAuthProviderResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers DisableAuthProviderResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseEnableAuthProviderResponse parses an HTTP response from a EnableAuthProviderWithResponse call
+func ParseEnableAuthProviderResponse(rsp *http.Response) (*EnableAuthProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EnableAuthProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthProvider
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers EnableAuthProviderResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers EnableAuthProviderResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseTestAuthProviderResponse parses an HTTP response from a TestAuthProviderWithResponse call
+func ParseTestAuthProviderResponse(rsp *http.Response) (*TestAuthProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TestAuthProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthProviderTest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers TestAuthProviderResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -49041,6 +54238,465 @@ func ParseListSegmentUsagesResponse(rsp *http.Response) (*ListSegmentUsagesRespo
 	return response, nil
 }
 
+// ParseListSinksResponse parses an HTTP response from a ListSinksWithResponse call
+func ParseListSinksResponse(rsp *http.Response) (*ListSinksResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSinksResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SinkList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListSinksResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateSinkResponse parses an HTTP response from a CreateSinkWithResponse call
+func ParseCreateSinkResponse(rsp *http.Response) (*CreateSinkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateSinkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest SinkWithSecret
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers CreateSinkResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
+	case rsp.StatusCode == 401:
+		var headers CreateSinkResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeleteSinkResponse parses an HTTP response from a DeleteSinkWithResponse call
+func ParseDeleteSinkResponse(rsp *http.Response) (*DeleteSinkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteSinkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DeleteSinkResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetSinkResponse parses an HTTP response from a GetSinkWithResponse call
+func ParseGetSinkResponse(rsp *http.Response) (*GetSinkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSinkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Sink
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetSinkResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers GetSinkResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateSinkResponse parses an HTTP response from a UpdateSinkWithResponse call
+func ParseUpdateSinkResponse(rsp *http.Response) (*UpdateSinkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateSinkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Sink
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers UpdateSinkResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers UpdateSinkResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRotateSinkSecretResponse parses an HTTP response from a RotateSinkSecretWithResponse call
+func ParseRotateSinkSecretResponse(rsp *http.Response) (*RotateSinkSecretResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RotateSinkSecretResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SinkWithSecret
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers RotateSinkSecretResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers RotateSinkSecretResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListStaleFlagsResponse parses an HTTP response from a ListStaleFlagsWithResponse call
 func ParseListStaleFlagsResponse(rsp *http.Response) (*ListStaleFlagsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -51501,6 +57157,30 @@ type ServerInterface interface {
 	// SignOut Sign out
 	// (POST /auth/sign-out)
 	SignOut(w http.ResponseWriter, r *http.Request)
+	// ListAuthProviders The instance's auth providers
+	// (GET /instance/auth-providers)
+	ListAuthProviders(w http.ResponseWriter, r *http.Request)
+	// CreateAuthProvider Add an auth provider
+	// (POST /instance/auth-providers)
+	CreateAuthProvider(w http.ResponseWriter, r *http.Request)
+	// DeleteAuthProvider Delete an auth provider
+	// (DELETE /instance/auth-providers/{provider})
+	DeleteAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// GetAuthProvider An auth provider
+	// (GET /instance/auth-providers/{provider})
+	GetAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// UpdateAuthProvider Edit an auth provider
+	// (PATCH /instance/auth-providers/{provider})
+	UpdateAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug, params UpdateAuthProviderParams)
+	// DisableAuthProvider Disable an auth provider
+	// (POST /instance/auth-providers/{provider}/disable)
+	DisableAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// EnableAuthProvider Enable an auth provider
+	// (POST /instance/auth-providers/{provider}/enable)
+	EnableAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// TestAuthProvider Test that an auth provider can be reached
+	// (POST /instance/auth-providers/{provider}/test)
+	TestAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
 	// GetAuthSettings The instance's auth settings
 	// (GET /instance/auth-settings)
 	GetAuthSettings(w http.ResponseWriter, r *http.Request)
@@ -51831,6 +57511,24 @@ type ServerInterface interface {
 	// ListSegmentUsages Where a segment is used
 	// (GET /projects/{project}/segments/{segment}/usages)
 	ListSegmentUsages(w http.ResponseWriter, r *http.Request, project ProjectKey, segment SegmentKey)
+	// ListSinks The project's sinks
+	// (GET /projects/{project}/sinks)
+	ListSinks(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// CreateSink Add a sink
+	// (POST /projects/{project}/sinks)
+	CreateSink(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// DeleteSink Delete a sink
+	// (DELETE /projects/{project}/sinks/{sink})
+	DeleteSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, params DeleteSinkParams)
+	// GetSink A sink
+	// (GET /projects/{project}/sinks/{sink})
+	GetSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
+	// UpdateSink Edit a sink
+	// (PATCH /projects/{project}/sinks/{sink})
+	UpdateSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, params UpdateSinkParams)
+	// RotateSinkSecret Rotate a webhook sink's secret
+	// (POST /projects/{project}/sinks/{sink}/rotate-secret)
+	RotateSinkSecret(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
 	// ListStaleFlags The project's stale flags
 	// (GET /projects/{project}/stale-flags)
 	ListStaleFlags(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListStaleFlagsParams)
@@ -52423,6 +58121,214 @@ func (siw *ServerInterfaceWrapper) SignOut(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SignOut(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAuthProviders operation middleware
+func (siw *ServerInterfaceWrapper) ListAuthProviders(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAuthProviders(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAuthProvider operation middleware
+func (siw *ServerInterfaceWrapper) CreateAuthProvider(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAuthProvider(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAuthProvider operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAuthProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAuthProvider(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAuthProvider operation middleware
+func (siw *ServerInterfaceWrapper) GetAuthProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuthProvider(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAuthProvider operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAuthProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateAuthProviderParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAuthProvider(w, r, provider, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisableAuthProvider operation middleware
+func (siw *ServerInterfaceWrapper) DisableAuthProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisableAuthProvider(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EnableAuthProvider operation middleware
+func (siw *ServerInterfaceWrapper) EnableAuthProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EnableAuthProvider(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TestAuthProvider operation middleware
+func (siw *ServerInterfaceWrapper) TestAuthProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TestAuthProvider(w, r, provider)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -57574,6 +63480,246 @@ func (siw *ServerInterfaceWrapper) ListSegmentUsages(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// ListSinks operation middleware
+func (siw *ServerInterfaceWrapper) ListSinks(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSinks(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateSink operation middleware
+func (siw *ServerInterfaceWrapper) CreateSink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSink(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteSink operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteSinkParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSink(w, r, project, sink, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSink operation middleware
+func (siw *ServerInterfaceWrapper) GetSink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSink(w, r, project, sink)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateSink operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateSinkParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSink(w, r, project, sink, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RotateSinkSecret operation middleware
+func (siw *ServerInterfaceWrapper) RotateSinkSecret(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RotateSinkSecret(w, r, project, sink)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListStaleFlags operation middleware
 func (siw *ServerInterfaceWrapper) ListStaleFlags(w http.ResponseWriter, r *http.Request) {
 
@@ -59160,6 +65306,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/members/{member}/tokens/{token}", wrapper.RevokeMemberToken)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-settings", wrapper.GetAuthSettings)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/auth-settings", wrapper.UpdateAuthSettings)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-providers", wrapper.ListAuthProviders)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers", wrapper.CreateAuthProvider)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/instance/auth-providers/{provider}", wrapper.DeleteAuthProvider)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-providers/{provider}", wrapper.GetAuthProvider)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/instance/auth-providers/{provider}", wrapper.UpdateAuthProvider)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/enable", wrapper.EnableAuthProvider)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/disable", wrapper.DisableAuthProvider)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/test", wrapper.TestAuthProvider)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit", wrapper.ListAuditEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/export", wrapper.ExportAuditEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/webhook-event-types", wrapper.ListWebhookEventTypes)
@@ -59174,6 +65328,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/deliveries", wrapper.ListWebhookDeliveries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/deliveries/{delivery}", wrapper.GetWebhookDelivery)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver", wrapper.RedeliverWebhookDelivery)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/sinks", wrapper.ListSinks)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks", wrapper.CreateSink)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/sinks/{sink}", wrapper.DeleteSink)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/sinks/{sink}", wrapper.GetSink)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/sinks/{sink}", wrapper.UpdateSink)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/rotate-secret", wrapper.RotateSinkSecret)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/webhooks", wrapper.ListInstanceWebhooks)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/webhooks", wrapper.CreateInstanceWebhook)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/webhooks/{webhook}", wrapper.DeleteInstanceWebhook)
@@ -59188,6 +65348,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	return m
 }
+
+type BadGatewayApplicationProblemPlusJSONResponse Problem
 
 type BadRequestApplicationProblemPlusJSONResponse Problem
 
@@ -59949,6 +66111,763 @@ func (response SignOut403ApplicationProblemPlusJSONResponse) VisitSignOutRespons
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAuthProvidersRequestObject struct {
+}
+
+type ListAuthProvidersResponseObject interface {
+	VisitListAuthProvidersResponse(w http.ResponseWriter) error
+}
+
+type ListAuthProviders200JSONResponse AuthProviderList
+
+func (response ListAuthProviders200JSONResponse) VisitListAuthProvidersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAuthProviders401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListAuthProviders401ApplicationProblemPlusJSONResponse) VisitListAuthProvidersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAuthProviders403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListAuthProviders403ApplicationProblemPlusJSONResponse) VisitListAuthProvidersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAuthProviderRequestObject struct {
+	Body *CreateAuthProviderJSONRequestBody
+}
+
+type CreateAuthProviderResponseObject interface {
+	VisitCreateAuthProviderResponse(w http.ResponseWriter) error
+}
+
+type CreateAuthProvider201ResponseHeaders struct {
+	ETag *string
+}
+
+type CreateAuthProvider201JSONResponse struct {
+	Body    AuthProvider
+	Headers CreateAuthProvider201ResponseHeaders
+}
+
+func (response CreateAuthProvider201JSONResponse) VisitCreateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAuthProvider400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAuthProvider400ApplicationProblemPlusJSONResponse) VisitCreateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAuthProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAuthProvider401ApplicationProblemPlusJSONResponse) VisitCreateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAuthProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAuthProvider403ApplicationProblemPlusJSONResponse) VisitCreateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAuthProvider409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAuthProvider409ApplicationProblemPlusJSONResponse) VisitCreateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAuthProvider422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAuthProvider422ApplicationProblemPlusJSONResponse) VisitCreateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAuthProviderRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+}
+
+type DeleteAuthProviderResponseObject interface {
+	VisitDeleteAuthProviderResponse(w http.ResponseWriter) error
+}
+
+type DeleteAuthProvider204Response struct {
+}
+
+func (response DeleteAuthProvider204Response) VisitDeleteAuthProviderResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteAuthProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAuthProvider401ApplicationProblemPlusJSONResponse) VisitDeleteAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAuthProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAuthProvider403ApplicationProblemPlusJSONResponse) VisitDeleteAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAuthProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAuthProvider404ApplicationProblemPlusJSONResponse) VisitDeleteAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAuthProvider409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAuthProvider409ApplicationProblemPlusJSONResponse) VisitDeleteAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProviderRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+}
+
+type GetAuthProviderResponseObject interface {
+	VisitGetAuthProviderResponse(w http.ResponseWriter) error
+}
+
+type GetAuthProvider200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetAuthProvider200JSONResponse struct {
+	Body    AuthProvider
+	Headers GetAuthProvider200ResponseHeaders
+}
+
+func (response GetAuthProvider200JSONResponse) VisitGetAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthProvider401ApplicationProblemPlusJSONResponse) VisitGetAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthProvider403ApplicationProblemPlusJSONResponse) VisitGetAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthProvider404ApplicationProblemPlusJSONResponse) VisitGetAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProviderRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+	Params   UpdateAuthProviderParams
+	Body     *UpdateAuthProviderJSONRequestBody
+}
+
+type UpdateAuthProviderResponseObject interface {
+	VisitUpdateAuthProviderResponse(w http.ResponseWriter) error
+}
+
+type UpdateAuthProvider200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateAuthProvider200JSONResponse struct {
+	Body    AuthProvider
+	Headers UpdateAuthProvider200ResponseHeaders
+}
+
+func (response UpdateAuthProvider200JSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProvider400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthProvider400ApplicationProblemPlusJSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthProvider401ApplicationProblemPlusJSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthProvider403ApplicationProblemPlusJSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthProvider404ApplicationProblemPlusJSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProvider412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthProvider412ApplicationProblemPlusJSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProvider422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthProvider422ApplicationProblemPlusJSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProvider428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthProvider428ApplicationProblemPlusJSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableAuthProviderRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+}
+
+type DisableAuthProviderResponseObject interface {
+	VisitDisableAuthProviderResponse(w http.ResponseWriter) error
+}
+
+type DisableAuthProvider200ResponseHeaders struct {
+	ETag *string
+}
+
+type DisableAuthProvider200JSONResponse struct {
+	Body    AuthProvider
+	Headers DisableAuthProvider200ResponseHeaders
+}
+
+func (response DisableAuthProvider200JSONResponse) VisitDisableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableAuthProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DisableAuthProvider401ApplicationProblemPlusJSONResponse) VisitDisableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableAuthProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DisableAuthProvider403ApplicationProblemPlusJSONResponse) VisitDisableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableAuthProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DisableAuthProvider404ApplicationProblemPlusJSONResponse) VisitDisableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableAuthProviderRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+}
+
+type EnableAuthProviderResponseObject interface {
+	VisitEnableAuthProviderResponse(w http.ResponseWriter) error
+}
+
+type EnableAuthProvider200ResponseHeaders struct {
+	ETag *string
+}
+
+type EnableAuthProvider200JSONResponse struct {
+	Body    AuthProvider
+	Headers EnableAuthProvider200ResponseHeaders
+}
+
+func (response EnableAuthProvider200JSONResponse) VisitEnableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableAuthProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response EnableAuthProvider401ApplicationProblemPlusJSONResponse) VisitEnableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableAuthProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response EnableAuthProvider403ApplicationProblemPlusJSONResponse) VisitEnableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableAuthProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response EnableAuthProvider404ApplicationProblemPlusJSONResponse) VisitEnableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableAuthProvider422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response EnableAuthProvider422ApplicationProblemPlusJSONResponse) VisitEnableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestAuthProviderRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+}
+
+type TestAuthProviderResponseObject interface {
+	VisitTestAuthProviderResponse(w http.ResponseWriter) error
+}
+
+type TestAuthProvider200JSONResponse AuthProviderTest
+
+func (response TestAuthProvider200JSONResponse) VisitTestAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestAuthProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response TestAuthProvider401ApplicationProblemPlusJSONResponse) VisitTestAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestAuthProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response TestAuthProvider403ApplicationProblemPlusJSONResponse) VisitTestAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestAuthProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response TestAuthProvider404ApplicationProblemPlusJSONResponse) VisitTestAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestAuthProvider502ApplicationProblemPlusJSONResponse struct {
+	BadGatewayApplicationProblemPlusJSONResponse
+}
+
+func (response TestAuthProvider502ApplicationProblemPlusJSONResponse) VisitTestAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(502)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -71700,6 +78619,630 @@ func (response ListSegmentUsages404ApplicationProblemPlusJSONResponse) VisitList
 	return err
 }
 
+type ListSinksRequestObject struct {
+	Project ProjectKey `json:"project"`
+}
+
+type ListSinksResponseObject interface {
+	VisitListSinksResponse(w http.ResponseWriter) error
+}
+
+type ListSinks200JSONResponse SinkList
+
+func (response ListSinks200JSONResponse) VisitListSinksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSinks401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListSinks401ApplicationProblemPlusJSONResponse) VisitListSinksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSinks403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListSinks403ApplicationProblemPlusJSONResponse) VisitListSinksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSinks404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListSinks404ApplicationProblemPlusJSONResponse) VisitListSinksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSinkRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Body    *CreateSinkJSONRequestBody
+}
+
+type CreateSinkResponseObject interface {
+	VisitCreateSinkResponse(w http.ResponseWriter) error
+}
+
+type CreateSink201ResponseHeaders struct {
+	ETag *string
+}
+
+type CreateSink201JSONResponse struct {
+	Body    SinkWithSecret
+	Headers CreateSink201ResponseHeaders
+}
+
+func (response CreateSink201JSONResponse) VisitCreateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSink400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSink400ApplicationProblemPlusJSONResponse) VisitCreateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSink401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSink401ApplicationProblemPlusJSONResponse) VisitCreateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSink403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSink403ApplicationProblemPlusJSONResponse) VisitCreateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSink404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSink404ApplicationProblemPlusJSONResponse) VisitCreateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSink422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSink422ApplicationProblemPlusJSONResponse) VisitCreateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSinkRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+	Params  DeleteSinkParams
+}
+
+type DeleteSinkResponseObject interface {
+	VisitDeleteSinkResponse(w http.ResponseWriter) error
+}
+
+type DeleteSink204Response struct {
+}
+
+func (response DeleteSink204Response) VisitDeleteSinkResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteSink401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSink401ApplicationProblemPlusJSONResponse) VisitDeleteSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSink403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSink403ApplicationProblemPlusJSONResponse) VisitDeleteSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSink404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSink404ApplicationProblemPlusJSONResponse) VisitDeleteSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSink412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSink412ApplicationProblemPlusJSONResponse) VisitDeleteSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSink428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSink428ApplicationProblemPlusJSONResponse) VisitDeleteSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSinkRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+}
+
+type GetSinkResponseObject interface {
+	VisitGetSinkResponse(w http.ResponseWriter) error
+}
+
+type GetSink200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetSink200JSONResponse struct {
+	Body    Sink
+	Headers GetSink200ResponseHeaders
+}
+
+func (response GetSink200JSONResponse) VisitGetSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSink401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetSink401ApplicationProblemPlusJSONResponse) VisitGetSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSink403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetSink403ApplicationProblemPlusJSONResponse) VisitGetSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSink404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetSink404ApplicationProblemPlusJSONResponse) VisitGetSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSinkRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+	Params  UpdateSinkParams
+	Body    *UpdateSinkJSONRequestBody
+}
+
+type UpdateSinkResponseObject interface {
+	VisitUpdateSinkResponse(w http.ResponseWriter) error
+}
+
+type UpdateSink200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateSink200JSONResponse struct {
+	Body    Sink
+	Headers UpdateSink200ResponseHeaders
+}
+
+func (response UpdateSink200JSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSink400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSink400ApplicationProblemPlusJSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSink401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSink401ApplicationProblemPlusJSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSink403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSink403ApplicationProblemPlusJSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSink404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSink404ApplicationProblemPlusJSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSink412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSink412ApplicationProblemPlusJSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSink422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSink422ApplicationProblemPlusJSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSink428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSink428ApplicationProblemPlusJSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSinkSecretRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+}
+
+type RotateSinkSecretResponseObject interface {
+	VisitRotateSinkSecretResponse(w http.ResponseWriter) error
+}
+
+type RotateSinkSecret200ResponseHeaders struct {
+	ETag *string
+}
+
+type RotateSinkSecret200JSONResponse struct {
+	Body    SinkWithSecret
+	Headers RotateSinkSecret200ResponseHeaders
+}
+
+func (response RotateSinkSecret200JSONResponse) VisitRotateSinkSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSinkSecret401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RotateSinkSecret401ApplicationProblemPlusJSONResponse) VisitRotateSinkSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSinkSecret403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RotateSinkSecret403ApplicationProblemPlusJSONResponse) VisitRotateSinkSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSinkSecret404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RotateSinkSecret404ApplicationProblemPlusJSONResponse) VisitRotateSinkSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSinkSecret422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response RotateSinkSecret422ApplicationProblemPlusJSONResponse) VisitRotateSinkSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListStaleFlagsRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Params  ListStaleFlagsParams
@@ -74925,6 +82468,30 @@ type StrictServerInterface interface {
 	// SignOut Sign out
 	// (POST /auth/sign-out)
 	SignOut(ctx context.Context, request SignOutRequestObject) (SignOutResponseObject, error)
+	// ListAuthProviders The instance's auth providers
+	// (GET /instance/auth-providers)
+	ListAuthProviders(ctx context.Context, request ListAuthProvidersRequestObject) (ListAuthProvidersResponseObject, error)
+	// CreateAuthProvider Add an auth provider
+	// (POST /instance/auth-providers)
+	CreateAuthProvider(ctx context.Context, request CreateAuthProviderRequestObject) (CreateAuthProviderResponseObject, error)
+	// DeleteAuthProvider Delete an auth provider
+	// (DELETE /instance/auth-providers/{provider})
+	DeleteAuthProvider(ctx context.Context, request DeleteAuthProviderRequestObject) (DeleteAuthProviderResponseObject, error)
+	// GetAuthProvider An auth provider
+	// (GET /instance/auth-providers/{provider})
+	GetAuthProvider(ctx context.Context, request GetAuthProviderRequestObject) (GetAuthProviderResponseObject, error)
+	// UpdateAuthProvider Edit an auth provider
+	// (PATCH /instance/auth-providers/{provider})
+	UpdateAuthProvider(ctx context.Context, request UpdateAuthProviderRequestObject) (UpdateAuthProviderResponseObject, error)
+	// DisableAuthProvider Disable an auth provider
+	// (POST /instance/auth-providers/{provider}/disable)
+	DisableAuthProvider(ctx context.Context, request DisableAuthProviderRequestObject) (DisableAuthProviderResponseObject, error)
+	// EnableAuthProvider Enable an auth provider
+	// (POST /instance/auth-providers/{provider}/enable)
+	EnableAuthProvider(ctx context.Context, request EnableAuthProviderRequestObject) (EnableAuthProviderResponseObject, error)
+	// TestAuthProvider Test that an auth provider can be reached
+	// (POST /instance/auth-providers/{provider}/test)
+	TestAuthProvider(ctx context.Context, request TestAuthProviderRequestObject) (TestAuthProviderResponseObject, error)
 	// GetAuthSettings The instance's auth settings
 	// (GET /instance/auth-settings)
 	GetAuthSettings(ctx context.Context, request GetAuthSettingsRequestObject) (GetAuthSettingsResponseObject, error)
@@ -75255,6 +82822,24 @@ type StrictServerInterface interface {
 	// ListSegmentUsages Where a segment is used
 	// (GET /projects/{project}/segments/{segment}/usages)
 	ListSegmentUsages(ctx context.Context, request ListSegmentUsagesRequestObject) (ListSegmentUsagesResponseObject, error)
+	// ListSinks The project's sinks
+	// (GET /projects/{project}/sinks)
+	ListSinks(ctx context.Context, request ListSinksRequestObject) (ListSinksResponseObject, error)
+	// CreateSink Add a sink
+	// (POST /projects/{project}/sinks)
+	CreateSink(ctx context.Context, request CreateSinkRequestObject) (CreateSinkResponseObject, error)
+	// DeleteSink Delete a sink
+	// (DELETE /projects/{project}/sinks/{sink})
+	DeleteSink(ctx context.Context, request DeleteSinkRequestObject) (DeleteSinkResponseObject, error)
+	// GetSink A sink
+	// (GET /projects/{project}/sinks/{sink})
+	GetSink(ctx context.Context, request GetSinkRequestObject) (GetSinkResponseObject, error)
+	// UpdateSink Edit a sink
+	// (PATCH /projects/{project}/sinks/{sink})
+	UpdateSink(ctx context.Context, request UpdateSinkRequestObject) (UpdateSinkResponseObject, error)
+	// RotateSinkSecret Rotate a webhook sink's secret
+	// (POST /projects/{project}/sinks/{sink}/rotate-secret)
+	RotateSinkSecret(ctx context.Context, request RotateSinkSecretRequestObject) (RotateSinkSecretResponseObject, error)
 	// ListStaleFlags The project's stale flags
 	// (GET /projects/{project}/stale-flags)
 	ListStaleFlags(ctx context.Context, request ListStaleFlagsRequestObject) (ListStaleFlagsResponseObject, error)
@@ -75584,6 +83169,225 @@ func (sh *strictHandler) SignOut(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SignOutResponseObject); ok {
 		if err := validResponse.VisitSignOutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAuthProviders operation middleware
+func (sh *strictHandler) ListAuthProviders(w http.ResponseWriter, r *http.Request) {
+	var request ListAuthProvidersRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAuthProviders(ctx, request.(ListAuthProvidersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAuthProviders")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAuthProvidersResponseObject); ok {
+		if err := validResponse.VisitListAuthProvidersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateAuthProvider operation middleware
+func (sh *strictHandler) CreateAuthProvider(w http.ResponseWriter, r *http.Request) {
+	var request CreateAuthProviderRequestObject
+
+	var body CreateAuthProviderJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateAuthProvider(ctx, request.(CreateAuthProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateAuthProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateAuthProviderResponseObject); ok {
+		if err := validResponse.VisitCreateAuthProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteAuthProvider operation middleware
+func (sh *strictHandler) DeleteAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request DeleteAuthProviderRequestObject
+
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteAuthProvider(ctx, request.(DeleteAuthProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteAuthProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteAuthProviderResponseObject); ok {
+		if err := validResponse.VisitDeleteAuthProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAuthProvider operation middleware
+func (sh *strictHandler) GetAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request GetAuthProviderRequestObject
+
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAuthProvider(ctx, request.(GetAuthProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAuthProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAuthProviderResponseObject); ok {
+		if err := validResponse.VisitGetAuthProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateAuthProvider operation middleware
+func (sh *strictHandler) UpdateAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug, params UpdateAuthProviderParams) {
+	var request UpdateAuthProviderRequestObject
+
+	request.Provider = provider
+	request.Params = params
+
+	var body UpdateAuthProviderJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateAuthProvider(ctx, request.(UpdateAuthProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateAuthProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateAuthProviderResponseObject); ok {
+		if err := validResponse.VisitUpdateAuthProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DisableAuthProvider operation middleware
+func (sh *strictHandler) DisableAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request DisableAuthProviderRequestObject
+
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DisableAuthProvider(ctx, request.(DisableAuthProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DisableAuthProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DisableAuthProviderResponseObject); ok {
+		if err := validResponse.VisitDisableAuthProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EnableAuthProvider operation middleware
+func (sh *strictHandler) EnableAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request EnableAuthProviderRequestObject
+
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EnableAuthProvider(ctx, request.(EnableAuthProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EnableAuthProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EnableAuthProviderResponseObject); ok {
+		if err := validResponse.VisitEnableAuthProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TestAuthProvider operation middleware
+func (sh *strictHandler) TestAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request TestAuthProviderRequestObject
+
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TestAuthProvider(ctx, request.(TestAuthProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TestAuthProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TestAuthProviderResponseObject); ok {
+		if err := validResponse.VisitTestAuthProviderResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -78818,6 +86622,182 @@ func (sh *strictHandler) ListSegmentUsages(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListSegmentUsagesResponseObject); ok {
 		if err := validResponse.VisitListSegmentUsagesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSinks operation middleware
+func (sh *strictHandler) ListSinks(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request ListSinksRequestObject
+
+	request.Project = project
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSinks(ctx, request.(ListSinksRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSinks")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSinksResponseObject); ok {
+		if err := validResponse.VisitListSinksResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateSink operation middleware
+func (sh *strictHandler) CreateSink(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request CreateSinkRequestObject
+
+	request.Project = project
+
+	var body CreateSinkJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateSink(ctx, request.(CreateSinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateSink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateSinkResponseObject); ok {
+		if err := validResponse.VisitCreateSinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteSink operation middleware
+func (sh *strictHandler) DeleteSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, params DeleteSinkParams) {
+	var request DeleteSinkRequestObject
+
+	request.Project = project
+	request.Sink = sink
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteSink(ctx, request.(DeleteSinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteSink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteSinkResponseObject); ok {
+		if err := validResponse.VisitDeleteSinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSink operation middleware
+func (sh *strictHandler) GetSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID) {
+	var request GetSinkRequestObject
+
+	request.Project = project
+	request.Sink = sink
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSink(ctx, request.(GetSinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSinkResponseObject); ok {
+		if err := validResponse.VisitGetSinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateSink operation middleware
+func (sh *strictHandler) UpdateSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, params UpdateSinkParams) {
+	var request UpdateSinkRequestObject
+
+	request.Project = project
+	request.Sink = sink
+	request.Params = params
+
+	var body UpdateSinkJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateSink(ctx, request.(UpdateSinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateSink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateSinkResponseObject); ok {
+		if err := validResponse.VisitUpdateSinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RotateSinkSecret operation middleware
+func (sh *strictHandler) RotateSinkSecret(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID) {
+	var request RotateSinkSecretRequestObject
+
+	request.Project = project
+	request.Sink = sink
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RotateSinkSecret(ctx, request.(RotateSinkSecretRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RotateSinkSecret")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RotateSinkSecretResponseObject); ok {
+		if err := validResponse.VisitRotateSinkSecretResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

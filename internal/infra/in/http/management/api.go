@@ -19,6 +19,8 @@ import (
 	appexperiments "github.com/azverinus/flagnetic/internal/app/experiments"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
+	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
+	appsinks "github.com/azverinus/flagnetic/internal/app/sinks"
 	apptransfer "github.com/azverinus/flagnetic/internal/app/transfer"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/access"
@@ -68,6 +70,16 @@ type Handlers struct {
 	RevokeProjectToken  *appaccess.RevokeProjectToken
 	ProjectPermissions  *appaccess.ProjectPermissions
 	WorkingProjects     *appaccess.WorkingProjects
+
+	ListAuthProviders        *appidentity.ListProviders
+	ListEnabledAuthProviders *appidentity.ListEnabledProviders
+	CreateAuthProvider       *appidentity.CreateProvider
+	GetAuthProvider          *appidentity.GetProvider
+	UpdateAuthProvider       *appidentity.UpdateProvider
+	DeleteAuthProvider       *appidentity.DeleteProvider
+	EnableAuthProvider       *appidentity.EnableProvider
+	DisableAuthProvider      *appidentity.DisableProvider
+	TestAuthProvider         *appidentity.TestProvider
 
 	FindProject   *appworkspace.FindProject
 	ListProjects  *appworkspace.ListProjects
@@ -174,6 +186,13 @@ type Handlers struct {
 	EnableWebhook         *appgovernance.EnableWebhook
 	RotateWebhookSecret   *appgovernance.RotateWebhookSecret
 	SendStaleFlagDigest   *appgovernance.SendStaleFlagDigest
+
+	ListSinks        *appsinks.ListSinks
+	CreateSink       *appsinks.Create
+	GetSink          *appsinks.GetSink
+	UpdateSink       *appsinks.Update
+	DeleteSink       *appsinks.Delete
+	RotateSinkSecret *appsinks.RotateSecret
 
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment

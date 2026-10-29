@@ -222,7 +222,7 @@ func Settings() []Setting {
 			Key:  "base_url",
 			Description: "The public URL the console is reached at, such as the address of the reverse proxy in front. " +
 				"Its scheme decides whether the session cookie is `Secure`, and its origin is trusted for requests signed in through the console " +
-				"even when the proxy rewrites `Host`. Invitation links start with it. When unset, the scheme and origin of each request are used.",
+				"even when the proxy rewrites `Host`. Invitation links start with it. When unset, the scheme and origin of each request are used. Auth providers need it: a provider's redirect URI, which the identity provider is told, is built from it, so creating, editing or enabling one is refused with `base_url_required` while it is unset.",
 			Example: "https://flags.example.com",
 			apply: func(cfg *Config, v string) error {
 				u, err := url.Parse(v)
@@ -520,7 +520,7 @@ func Settings() []Setting {
 			Name:    "FLAGNETIC_WEBHOOK_ALLOW_HTTP",
 			Key:     "webhook_allow_http",
 			Default: "false",
-			Description: "Accept webhook subscriptions whose target is plain `http`, which sends events and their signatures unencrypted. " +
+			Description: "Accept webhook subscriptions and webhook sinks whose target is plain `http`, which sends events and their signatures unencrypted. " +
 				"Without it such a target is refused `insecure_url`. Meant for a receiver on the same host or a trusted network.",
 			Example: "true",
 			apply:   boolSetting(func(c *Config, b bool) { c.WebhookAllowHTTP = b }),
@@ -530,8 +530,9 @@ func Settings() []Setting {
 			Key:     "webhook_allow_private_networks",
 			Default: "false",
 			Description: "Accept webhook targets that resolve to loopback, private, link-local, unspecified or multicast addresses. " +
-				"Without it such a target is refused `private_network_target` when a subscription is written, " +
-				"so that whoever manages webhooks cannot reach the network the instance runs in.",
+				"Without it such a target is refused `private_network_target` when a subscription or a webhook sink is written, " +
+				"so that whoever manages webhooks or sinks cannot reach the network the instance runs in. " +
+				"ClickHouse and object storage sinks may reach private networks regardless, and never a link-local address.",
 			Example: "true",
 			apply:   boolSetting(func(c *Config, b bool) { c.WebhookAllowPrivateNetworks = b }),
 		},
@@ -550,7 +551,7 @@ func Settings() []Setting {
 			Key:     "webhook_secret_overlap",
 			Default: "24h",
 			Unit:    "duration",
-			Description: "How long the secret a webhook subscription's rotation replaced keeps signing beside the new one, " +
+			Description: "How long the secret a rotation replaced, a webhook subscription's or a webhook sink's, keeps signing beside the new one, " +
 				"so a receiver can take the new secret without refusing a single event.",
 			Example: "24h",
 			apply:   durationSetting(func(c *Config, d time.Duration) { c.WebhookSecretOverlap = d }),

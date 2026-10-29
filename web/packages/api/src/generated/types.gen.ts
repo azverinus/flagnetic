@@ -36,6 +36,14 @@ export type Problem = {
    * What still names what the write would remove or hide, for `in_use`.
    */
   references?: Array<Reference>;
+  /**
+   * What refers to an auth provider that cannot be deleted, such as `identities`, for `provider_in_use`.
+   */
+  used_by?: Array<string>;
+  /**
+   * Why a system the server asked did not answer as needed, for `provider_unreachable`.
+   */
+  failure?: string;
   errors?: Array<Violation>;
 };
 
@@ -59,17 +67,177 @@ export type SignInRequest = {
   password: string;
 };
 
+/**
+ * The protocol the provider speaks.
+ */
+export type AuthProviderKind = "oidc";
+
+/**
+ * The claims of the provider's tokens that carry what the instance reads of a person.
+ */
+export type AuthProviderClaims = {
+  /**
+   * Default `email`.
+   */
+  email: string;
+  /**
+   * Default `name`.
+   */
+  name: string;
+  /**
+   * Default `groups`.
+   */
+  groups: string;
+};
+
+/**
+ * The claims to rename; each absent one is left as it is.
+ */
+export type AuthProviderClaimsPatch = {
+  email?: string;
+  name?: string;
+  groups?: string;
+};
+
+export type AuthProvider = {
+  id: string;
+  /**
+   * Names the provider in sign-in buttons and URLs; never changes.
+   */
+  slug: string;
+  kind: AuthProviderKind;
+  /**
+   * What the sign-in button says, 1 to 200 characters.
+   */
+  display_name: string;
+  enabled: boolean;
+  /**
+   * The email domains the provider vouches for, lowercase.
+   */
+  domains: Array<string>;
+  /**
+   * Whether a sign-in whose email is in `domains` is linked to the existing member with that email.
+   */
+  link_by_email: boolean;
+  /**
+   * Whether a sign-in whose email is in `domains` creates its member.
+   */
+  auto_provision: boolean;
+  /**
+   * The OIDC provider's issuer URL.
+   */
+  issuer?: string;
+  client_id?: string;
+  /**
+   * Whether a client secret is stored; the secret itself is never answered.
+   */
+  client_secret_set?: boolean;
+  scopes?: Array<string>;
+  claims?: AuthProviderClaims;
+  /**
+   * Whether a sign-in whose token does not say the email is verified is refused.
+   */
+  require_verified_email?: boolean;
+  /**
+   * The redirect URI to register at the identity provider, built from
+   * `FLAGNETIC_BASE_URL`; absent while the instance has none.
+   *
+   */
+  redirect_uri?: string;
+  created_at: string;
+  updated_at: string;
+  version: number;
+};
+
+export type AuthProviderList = {
+  items: Array<AuthProvider>;
+};
+
+export type AuthProviderCreate = {
+  slug: string;
+  kind: AuthProviderKind;
+  display_name: string;
+  /**
+   * Default true.
+   */
+  enabled?: boolean;
+  domains: Array<string>;
+  /**
+   * Default false.
+   */
+  link_by_email?: boolean;
+  /**
+   * Default false.
+   */
+  auto_provision?: boolean;
+  /**
+   * `https`, or `http` on a loopback address.
+   */
+  issuer: string;
+  client_id: string;
+  /**
+   * Default `openid`, `email` and `profile`.
+   */
+  scopes?: Array<string>;
+  claims?: AuthProviderClaimsPatch;
+  /**
+   * Default true.
+   */
+  require_verified_email?: boolean;
+};
+
+/**
+ * The properties to change; each absent one is left as it is.
+ */
+export type AuthProviderPatch = {
+  display_name?: string;
+  domains?: Array<string>;
+  link_by_email?: boolean;
+  auto_provision?: boolean;
+  issuer?: string;
+  client_id?: string;
+  scopes?: Array<string>;
+  claims?: AuthProviderClaimsPatch;
+  require_verified_email?: boolean;
+};
+
+/**
+ * What the provider's discovery document says.
+ */
+export type AuthProviderTest = {
+  issuer: string;
+  authorization_endpoint: string;
+  token_endpoint: string;
+  jwks_uri: string;
+  /**
+   * Absent when the provider offers none.
+   */
+  userinfo_endpoint?: string;
+  /**
+   * Absent when the document does not list them.
+   */
+  scopes_supported?: Array<string>;
+  /**
+   * Absent when the document does not list them; sign-in needs `S256`.
+   */
+  code_challenge_methods_supported?: Array<string>;
+};
+
 export type AuthMethods = {
   /**
    * Whether a member signs in with their email and password.
    */
   local_login_enabled: boolean;
   /**
-   * The identity providers a member signs in through; none yet.
+   * The enabled auth providers a member signs in through, ordered by display name.
    */
-  providers: Array<{
-    [key: string]: unknown;
-  }>;
+  providers: Array<AuthMethodProvider>;
+};
+
+export type AuthMethodProvider = {
+  slug: string;
+  display_name: string;
+  kind: AuthProviderKind;
 };
 
 export type MemberStatus = "invited" | "active" | "deactivated";
@@ -2705,6 +2873,323 @@ export type WebhookList = {
 };
 
 /**
+ * Which target a sink delivers to; fixed when the sink is created.
+ */
+export type SinkKind = "clickhouse" | "object_storage" | "webhook";
+
+/**
+ * A kind of raw event a sink exports, each delivered through a stream of its own.
+ */
+export type SinkEventKind = "exposure" | "alias" | "evaluation_summary";
+
+/**
+ * The first that holds: `disabled` by a member; `stopped` after the
+ * target kept rejecting batches, until resumed; `failing` while a
+ * stream cannot reach its target; `degraded` while a dead letter waits;
+ * `lagging` while the oldest undelivered event is older than the
+ * operator's `FLAGNETIC_SINK_LAG_WARNING`; otherwise `healthy`.
+ *
+ */
+export type SinkHealth = "disabled" | "stopped" | "failing" | "degraded" | "lagging" | "healthy";
+
+/**
+ * Why a call to a target failed, from a closed list; a target's own
+ * words are never kept or answered.
+ *
+ */
+export type SinkFailureClass =
+  "dns" | "connect" | "tls" | "timeout" | "refused_target" | "redirect" | "status" | "rejected";
+
+/**
+ * The last failed call of a stream.
+ */
+export type SinkFailure = {
+  class: SinkFailureClass;
+  /**
+   * The HTTP status the target answered, when it did.
+   */
+  status: number | null;
+  /**
+   * The protocol's own error code, such as a ClickHouse exception or an S3 error code, when the target speaks one.
+   */
+  code: string | null;
+  at: string;
+};
+
+/**
+ * One event kind's delivery. Cursors are never exposed.
+ */
+export type SinkStream = {
+  event_kind: SinkEventKind;
+  last_delivered_at: string | null;
+  last_failure: SinkFailure | null;
+};
+
+/**
+ * A ClickHouse sink's configuration, written to its HTTP interface. The
+ * platform creates `{table_prefix}_exposures`, `_aliases` and
+ * `_evaluation_summaries` when it enables the sink and `create_tables`
+ * is true.
+ *
+ */
+export type SinkClickHouse = {
+  /**
+   * Where the HTTP interface answers; http or https, without credentials.
+   */
+  url: string;
+  database: string;
+  /**
+   * Letters, digits and underscores, not starting with a digit.
+   */
+  table_prefix: string;
+  username: string;
+  /**
+   * Always `***`; the stored password is never answered.
+   */
+  password: string;
+  tls_skip_verify: boolean;
+  create_tables: boolean;
+  /**
+   * ClickHouse settings sent with every insert. The ones delivery sets itself are refused.
+   */
+  settings: {
+    [key: string]: string;
+  };
+};
+
+/**
+ * An object storage sink's configuration, for any S3-compatible service.
+ */
+export type SinkObjectStorage = {
+  /**
+   * A scheme, a host and a port; empty for AWS.
+   */
+  endpoint: string;
+  /**
+   * Empty asks the bucket.
+   */
+  region: string;
+  bucket: string;
+  /**
+   * Without outer slashes.
+   */
+  prefix: string;
+  access_key_id: string;
+  /**
+   * Always `***`; the stored key is never answered.
+   */
+  secret_access_key: string;
+  path_style: boolean;
+  format: "jsonl" | "parquet";
+  /**
+   * For `jsonl`; `parquet` files are always `zstd`.
+   */
+  compression: "gzip" | "zstd" | "none";
+};
+
+/**
+ * A webhook sink's configuration. Its secret is the sink's, drawn by the server.
+ */
+export type SinkWebhook = {
+  /**
+   * Where every batch is posted: `https` unless the operator set
+   * `FLAGNETIC_WEBHOOK_ALLOW_HTTP`.
+   *
+   */
+  url: string;
+  /**
+   * Sent with every call, before the platform's own. Names starting `X-Flagnetic-` are refused.
+   */
+  headers: {
+    [key: string]: string;
+  };
+};
+
+export type Sink = unknown & {
+  id: string;
+  name: Name;
+  kind: SinkKind;
+  clickhouse?: SinkClickHouse;
+  object_storage?: SinkObjectStorage;
+  webhook?: SinkWebhook;
+  /**
+   * The event kinds exported; empty for all of them.
+   */
+  event_kinds: Array<SinkEventKind>;
+  /**
+   * The keys of the environments whose events are exported; empty for every one.
+   */
+  environments: Array<string>;
+  /**
+   * The most events one delivery carries.
+   */
+  batch_size: number;
+  /**
+   * Seconds the sink waits between deliveries once it has caught up.
+   */
+  flush_interval: number;
+  enabled: boolean;
+  health: SinkHealth;
+  /**
+   * Whether retention is about to drop events the sink has not delivered.
+   */
+  at_risk: boolean;
+  /**
+   * The age of the oldest undelivered event; null while the sink is disabled.
+   */
+  lag_seconds: number | null;
+  /**
+   * The dead letters waiting to be redelivered or discarded.
+   */
+  dead_letters: number;
+  /**
+   * The gaps not yet dismissed.
+   */
+  gaps: number;
+  stopped_at: string | null;
+  /**
+   * What the last check of the target found wrong without making delivery impossible.
+   */
+  warnings: Array<string>;
+  /**
+   * One per event kind exported once the sink has been enabled; empty before.
+   */
+  streams: Array<SinkStream>;
+  created_at: string;
+  updated_at: string;
+  version: Version;
+};
+
+export type SinkWithSecret = Sink & {
+  /**
+   * A webhook sink's secret, base64url of 32 random bytes, the
+   * key of every signature under the sink. Shown once, by the
+   * operation that issued it: it is stored sealed and never
+   * answered again. Absent for the other kinds.
+   *
+   */
+  secret?: string;
+};
+
+/**
+ * A ClickHouse sink's configuration as it is written. Required, and
+ * refused `invalid_sink` when absent: `url`, `database`, `username`
+ * and, when creating, `password`.
+ *
+ */
+export type SinkClickHouseInput = {
+  url?: string;
+  database?: string;
+  /**
+   * `flagnetic` when empty.
+   */
+  table_prefix?: string;
+  username?: string;
+  /**
+   * Sealed on arrival. `***` or absent keeps the stored password when editing.
+   */
+  password?: string;
+  tls_skip_verify?: boolean;
+  /**
+   * True when absent.
+   */
+  create_tables?: boolean;
+  settings?: {
+    [key: string]: string;
+  };
+};
+
+/**
+ * An object storage sink's configuration as it is written. Required,
+ * and refused `invalid_sink` when absent: `bucket`, `access_key_id` and,
+ * when creating, `secret_access_key`.
+ *
+ */
+export type SinkObjectStorageInput = {
+  endpoint?: string;
+  region?: string;
+  bucket?: string;
+  prefix?: string;
+  access_key_id?: string;
+  /**
+   * Sealed on arrival. `***` or absent keeps the stored key when editing.
+   */
+  secret_access_key?: string;
+  path_style?: boolean;
+  /**
+   * `jsonl` when empty.
+   */
+  format?: string;
+  /**
+   * `gzip` for `jsonl` and `zstd` for `parquet` when empty.
+   */
+  compression?: string;
+};
+
+/**
+ * A webhook sink's configuration as it is written. `url` is required.
+ */
+export type SinkWebhookInput = {
+  url?: string;
+  headers?: {
+    [key: string]: string;
+  };
+};
+
+export type SinkCreate = {
+  name: string;
+  /**
+   * `clickhouse`, `object_storage` or `webhook`.
+   */
+  kind: string;
+  clickhouse?: SinkClickHouseInput;
+  object_storage?: SinkObjectStorageInput;
+  webhook?: SinkWebhookInput;
+  /**
+   * Empty or absent for every event kind.
+   */
+  event_kinds?: Array<string>;
+  /**
+   * The keys of the environments whose events to export; empty or absent for every one.
+   */
+  environments?: Array<string>;
+  /**
+   * The kind's default when absent.
+   */
+  batch_size?: number;
+  /**
+   * Seconds; the kind's default when absent.
+   */
+  flush_interval?: number;
+};
+
+/**
+ * The properties to change; each absent one is left as it is.
+ */
+export type SinkPatch = {
+  name?: string;
+  /**
+   * May be left out; naming a kind other than the sink's own is refused `kind_immutable`.
+   */
+  kind?: string;
+  clickhouse?: SinkClickHouseInput;
+  object_storage?: SinkObjectStorageInput;
+  webhook?: SinkWebhookInput;
+  event_kinds?: Array<string>;
+  environments?: Array<string>;
+  batch_size?: number;
+  flush_interval?: number;
+  /**
+   * `false` only: a sink is enabled with its own operation.
+   */
+  enabled?: boolean;
+};
+
+export type SinkList = {
+  items: Array<Sink>;
+};
+
+/**
  * `pending` waits for its next attempt; `succeeded` was accepted by the
  * receiver; `failed` was refused in a way a retry would not change;
  * `exhausted` ran out of attempts; `dropped` was left unsent because
@@ -3021,6 +3506,56 @@ export type DocumentDecision = {
   note?: string;
 };
 
+export type AuthProviderCreateWritable = {
+  slug: string;
+  kind: AuthProviderKind;
+  display_name: string;
+  /**
+   * Default true.
+   */
+  enabled?: boolean;
+  domains: Array<string>;
+  /**
+   * Default false.
+   */
+  link_by_email?: boolean;
+  /**
+   * Default false.
+   */
+  auto_provision?: boolean;
+  /**
+   * `https`, or `http` on a loopback address.
+   */
+  issuer: string;
+  client_id: string;
+  client_secret: string;
+  /**
+   * Default `openid`, `email` and `profile`.
+   */
+  scopes?: Array<string>;
+  claims?: AuthProviderClaimsPatch;
+  /**
+   * Default true.
+   */
+  require_verified_email?: boolean;
+};
+
+/**
+ * The properties to change; each absent one is left as it is.
+ */
+export type AuthProviderPatchWritable = {
+  display_name?: string;
+  domains?: Array<string>;
+  link_by_email?: boolean;
+  auto_provision?: boolean;
+  issuer?: string;
+  client_id?: string;
+  client_secret?: string;
+  scopes?: Array<string>;
+  claims?: AuthProviderClaimsPatch;
+  require_verified_email?: boolean;
+};
+
 /**
  * A member's identifier; their own changes and those of their personal access tokens.
  */
@@ -3104,9 +3639,19 @@ export type FlagKey = string;
 export type ChangeRequestId = string;
 
 /**
+ * The auth provider's slug.
+ */
+export type AuthProviderSlug = string;
+
+/**
  * The webhook subscription's identifier.
  */
 export type WebhookId = string;
+
+/**
+ * The sink's identifier.
+ */
+export type SinkId = string;
 
 /**
  * The experiment's key.
@@ -11496,6 +12041,453 @@ export type UpdateAuthSettingsResponses = {
 export type UpdateAuthSettingsResponse =
   UpdateAuthSettingsResponses[keyof UpdateAuthSettingsResponses];
 
+export type ListAuthProvidersData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/instance/auth-providers";
+};
+
+export type ListAuthProvidersErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+};
+
+export type ListAuthProvidersError = ListAuthProvidersErrors[keyof ListAuthProvidersErrors];
+
+export type ListAuthProvidersResponses = {
+  /**
+   * The auth providers.
+   */
+  200: AuthProviderList;
+};
+
+export type ListAuthProvidersResponse =
+  ListAuthProvidersResponses[keyof ListAuthProvidersResponses];
+
+export type CreateAuthProviderData = {
+  body: AuthProviderCreateWritable;
+  path?: never;
+  query?: never;
+  url: "/instance/auth-providers";
+};
+
+export type CreateAuthProviderErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CreateAuthProviderError = CreateAuthProviderErrors[keyof CreateAuthProviderErrors];
+
+export type CreateAuthProviderResponses = {
+  /**
+   * The new auth provider.
+   */
+  201: AuthProvider;
+};
+
+export type CreateAuthProviderResponse =
+  CreateAuthProviderResponses[keyof CreateAuthProviderResponses];
+
+export type DeleteAuthProviderData = {
+  body?: never;
+  path: {
+    /**
+     * The auth provider's slug.
+     */
+    provider: string;
+  };
+  query?: never;
+  url: "/instance/auth-providers/{provider}";
+};
+
+export type DeleteAuthProviderErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+};
+
+export type DeleteAuthProviderError = DeleteAuthProviderErrors[keyof DeleteAuthProviderErrors];
+
+export type DeleteAuthProviderResponses = {
+  /**
+   * Deleted.
+   */
+  204: void;
+};
+
+export type DeleteAuthProviderResponse =
+  DeleteAuthProviderResponses[keyof DeleteAuthProviderResponses];
+
+export type GetAuthProviderData = {
+  body?: never;
+  path: {
+    /**
+     * The auth provider's slug.
+     */
+    provider: string;
+  };
+  query?: never;
+  url: "/instance/auth-providers/{provider}";
+};
+
+export type GetAuthProviderErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetAuthProviderError = GetAuthProviderErrors[keyof GetAuthProviderErrors];
+
+export type GetAuthProviderResponses = {
+  /**
+   * The auth provider; its `ETag` is its version.
+   */
+  200: AuthProvider;
+};
+
+export type GetAuthProviderResponse = GetAuthProviderResponses[keyof GetAuthProviderResponses];
+
+export type UpdateAuthProviderData = {
+  body: AuthProviderPatchWritable;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The auth provider's slug.
+     */
+    provider: string;
+  };
+  query?: never;
+  url: "/instance/auth-providers/{provider}";
+};
+
+export type UpdateAuthProviderErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type UpdateAuthProviderError = UpdateAuthProviderErrors[keyof UpdateAuthProviderErrors];
+
+export type UpdateAuthProviderResponses = {
+  /**
+   * The auth provider as it is now.
+   */
+  200: AuthProvider;
+};
+
+export type UpdateAuthProviderResponse =
+  UpdateAuthProviderResponses[keyof UpdateAuthProviderResponses];
+
+export type EnableAuthProviderData = {
+  body?: never;
+  path: {
+    /**
+     * The auth provider's slug.
+     */
+    provider: string;
+  };
+  query?: never;
+  url: "/instance/auth-providers/{provider}/enable";
+};
+
+export type EnableAuthProviderErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type EnableAuthProviderError = EnableAuthProviderErrors[keyof EnableAuthProviderErrors];
+
+export type EnableAuthProviderResponses = {
+  /**
+   * The auth provider, enabled.
+   */
+  200: AuthProvider;
+};
+
+export type EnableAuthProviderResponse =
+  EnableAuthProviderResponses[keyof EnableAuthProviderResponses];
+
+export type DisableAuthProviderData = {
+  body?: never;
+  path: {
+    /**
+     * The auth provider's slug.
+     */
+    provider: string;
+  };
+  query?: never;
+  url: "/instance/auth-providers/{provider}/disable";
+};
+
+export type DisableAuthProviderErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type DisableAuthProviderError = DisableAuthProviderErrors[keyof DisableAuthProviderErrors];
+
+export type DisableAuthProviderResponses = {
+  /**
+   * The auth provider, disabled.
+   */
+  200: AuthProvider;
+};
+
+export type DisableAuthProviderResponse =
+  DisableAuthProviderResponses[keyof DisableAuthProviderResponses];
+
+export type TestAuthProviderData = {
+  body?: never;
+  path: {
+    /**
+     * The auth provider's slug.
+     */
+    provider: string;
+  };
+  query?: never;
+  url: "/instance/auth-providers/{provider}/test";
+};
+
+export type TestAuthProviderErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * `provider_unreachable`: a system the server asked, such as an identity provider, did not answer as needed; `failure` says why.
+   */
+  502: Problem;
+};
+
+export type TestAuthProviderError = TestAuthProviderErrors[keyof TestAuthProviderErrors];
+
+export type TestAuthProviderResponses = {
+  /**
+   * What the discovery document says.
+   */
+  200: AuthProviderTest;
+};
+
+export type TestAuthProviderResponse = TestAuthProviderResponses[keyof TestAuthProviderResponses];
+
 export type ListAuditEntriesData = {
   body?: never;
   path?: never;
@@ -12432,6 +13424,386 @@ export type RedeliverWebhookDeliveryResponses = {
 
 export type RedeliverWebhookDeliveryResponse =
   RedeliverWebhookDeliveryResponses[keyof RedeliverWebhookDeliveryResponses];
+
+export type ListSinksData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks";
+};
+
+export type ListSinksErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListSinksError = ListSinksErrors[keyof ListSinksErrors];
+
+export type ListSinksResponses = {
+  /**
+   * The project's sinks.
+   */
+  200: SinkList;
+};
+
+export type ListSinksResponse = ListSinksResponses[keyof ListSinksResponses];
+
+export type CreateSinkData = {
+  body: SinkCreate;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks";
+};
+
+export type CreateSinkErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CreateSinkError = CreateSinkErrors[keyof CreateSinkErrors];
+
+export type CreateSinkResponses = {
+  /**
+   * The new sink, with its secret when it is a webhook sink, shown this once.
+   */
+  201: SinkWithSecret;
+};
+
+export type CreateSinkResponse = CreateSinkResponses[keyof CreateSinkResponses];
+
+export type DeleteSinkData = {
+  body?: never;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The sink's identifier.
+     */
+    sink: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks/{sink}";
+};
+
+export type DeleteSinkErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type DeleteSinkError = DeleteSinkErrors[keyof DeleteSinkErrors];
+
+export type DeleteSinkResponses = {
+  /**
+   * Deleted.
+   */
+  204: void;
+};
+
+export type DeleteSinkResponse = DeleteSinkResponses[keyof DeleteSinkResponses];
+
+export type GetSinkData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The sink's identifier.
+     */
+    sink: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks/{sink}";
+};
+
+export type GetSinkErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetSinkError = GetSinkErrors[keyof GetSinkErrors];
+
+export type GetSinkResponses = {
+  /**
+   * The sink; its `ETag` is its version.
+   */
+  200: Sink;
+};
+
+export type GetSinkResponse = GetSinkResponses[keyof GetSinkResponses];
+
+export type UpdateSinkData = {
+  body: SinkPatch;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The sink's identifier.
+     */
+    sink: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks/{sink}";
+};
+
+export type UpdateSinkErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type UpdateSinkError = UpdateSinkErrors[keyof UpdateSinkErrors];
+
+export type UpdateSinkResponses = {
+  /**
+   * The sink as it is now.
+   */
+  200: Sink;
+};
+
+export type UpdateSinkResponse = UpdateSinkResponses[keyof UpdateSinkResponses];
+
+export type RotateSinkSecretData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The sink's identifier.
+     */
+    sink: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks/{sink}/rotate-secret";
+};
+
+export type RotateSinkSecretErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type RotateSinkSecretError = RotateSinkSecretErrors[keyof RotateSinkSecretErrors];
+
+export type RotateSinkSecretResponses = {
+  /**
+   * The sink with its new secret.
+   */
+  200: SinkWithSecret;
+};
+
+export type RotateSinkSecretResponse = RotateSinkSecretResponses[keyof RotateSinkSecretResponses];
 
 export type ListInstanceWebhooksData = {
   body?: never;

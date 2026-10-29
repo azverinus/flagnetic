@@ -21,6 +21,8 @@ import (
 	appexperiments "github.com/azverinus/flagnetic/internal/app/experiments"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
+	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
+	appsinks "github.com/azverinus/flagnetic/internal/app/sinks"
 	apptransfer "github.com/azverinus/flagnetic/internal/app/transfer"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/events"
@@ -32,6 +34,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
+	"github.com/azverinus/flagnetic/internal/infra/out/oidc"
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
@@ -40,6 +43,8 @@ import (
 	pgexperiments "github.com/azverinus/flagnetic/internal/infra/out/postgres/experiments"
 	pgflags "github.com/azverinus/flagnetic/internal/infra/out/postgres/flags"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
+	pgidentity "github.com/azverinus/flagnetic/internal/infra/out/postgres/identity"
+	pgsinks "github.com/azverinus/flagnetic/internal/infra/out/postgres/sinks"
 	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/out/webhook"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
@@ -202,6 +207,12 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Tx: tx, Store: webhookStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
 		Sealer: o.Keyring, Resolver: net.DefaultResolver, Targets: o.WebhookTargets, SecretOverlap: o.WebhookSecretOverlap,
 	}
+	// A sink's secret is sealed under the same key, its target resolved by the
+	// same resolver and judged by the webhook subscriptions' policy.
+	sinks := appsinks.Deps{
+		Tx: tx, Store: pgsinks.NewStore(d.Pool), Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
+		Sealer: o.Keyring, Resolver: net.DefaultResolver, Targets: o.WebhookTargets, SecretOverlap: o.WebhookSecretOverlap,
+	}
 	deliveryRequests := appgovernance.DeliveryRequestDeps{
 		Tx: tx, Webhooks: webhookStore, Deliveries: webhookStore, Queue: outbox, Clock: d.Clock, IDs: d.IDs,
 	}
@@ -292,11 +303,27 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// replica and written in rounds, so no evaluation waits on recording.
 	discoveries := appdelivery.NewDiscoveries(tx, deliveryStore)
 	createAttribute := appworkspace.NewCreateAttribute(tx, ws, rulesets, rec)
+	// An auth provider's client secret is sealed under the instance's secret
+	// key. Each context that holds something referring to a provider adds its
+	// own check to References.
+	identityStore := pgidentity.NewStore(d.Pool)
+	authProviders := appidentity.ProviderDeps{
+		Tx: tx, Store: identityStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Sealer: o.Keyring, BaseURL: o.BaseURL,
+	}
 	managementOptions := o.Options
 	managementOptions.Clock = d.Clock
 	management.Mount(edge, management.Handlers{
-		AuthenticateToken:   appaccess.NewAuthenticateToken(accessStore, tokenUses, d.Clock),
-		AuthenticateSession: appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey),
+		ListAuthProviders:        appidentity.NewListProviders(identityStore),
+		ListEnabledAuthProviders: appidentity.NewListEnabledProviders(identityStore),
+		CreateAuthProvider:       appidentity.NewCreateProvider(authProviders),
+		GetAuthProvider:          appidentity.NewGetProvider(identityStore),
+		UpdateAuthProvider:       appidentity.NewUpdateProvider(authProviders),
+		DeleteAuthProvider:       appidentity.NewDeleteProvider(authProviders),
+		EnableAuthProvider:       appidentity.NewEnableProvider(authProviders),
+		DisableAuthProvider:      appidentity.NewDisableProvider(authProviders),
+		TestAuthProvider:         appidentity.NewTestProvider(identityStore, oidc.NewDiscoverer()),
+		AuthenticateToken:        appaccess.NewAuthenticateToken(accessStore, tokenUses, d.Clock),
+		AuthenticateSession:      appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey),
 		SignIn: appaccess.NewSignIn(appaccess.SignInDeps{
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 			Random: rand.Reader, Key: sessionKey,
@@ -487,6 +514,13 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		RedeliverWebhook:      appgovernance.NewRedeliver(deliveryRequests),
 		EnableWebhook:         appgovernance.NewEnableWebhook(webhooks),
 		RotateWebhookSecret:   appgovernance.NewRotateWebhookSecret(webhooks),
+
+		ListSinks:        appsinks.NewListSinks(sinks.Store),
+		CreateSink:       appsinks.NewCreate(sinks),
+		GetSink:          appsinks.NewGetSink(sinks.Store),
+		UpdateSink:       appsinks.NewUpdate(sinks),
+		DeleteSink:       appsinks.NewDelete(sinks),
+		RotateSinkSecret: appsinks.NewRotateSecret(sinks),
 
 		ListSegments: appflags.NewListSegments(tx, flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),

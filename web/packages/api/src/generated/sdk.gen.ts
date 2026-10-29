@@ -49,6 +49,9 @@ import type {
   CreateAttributeData,
   CreateAttributeErrors,
   CreateAttributeResponses,
+  CreateAuthProviderData,
+  CreateAuthProviderErrors,
+  CreateAuthProviderResponses,
   CreateChangeRequestData,
   CreateChangeRequestErrors,
   CreateChangeRequestResponses,
@@ -82,6 +85,9 @@ import type {
   CreateSegmentData,
   CreateSegmentErrors,
   CreateSegmentResponses,
+  CreateSinkData,
+  CreateSinkErrors,
+  CreateSinkResponses,
   CreateUnitTypeData,
   CreateUnitTypeErrors,
   CreateUnitTypeResponses,
@@ -97,6 +103,9 @@ import type {
   DeleteAttributeData,
   DeleteAttributeErrors,
   DeleteAttributeResponses,
+  DeleteAuthProviderData,
+  DeleteAuthProviderErrors,
+  DeleteAuthProviderResponses,
   DeleteEnvironmentData,
   DeleteEnvironmentErrors,
   DeleteEnvironmentResponses,
@@ -121,15 +130,24 @@ import type {
   DeleteSegmentData,
   DeleteSegmentErrors,
   DeleteSegmentResponses,
+  DeleteSinkData,
+  DeleteSinkErrors,
+  DeleteSinkResponses,
   DeleteUnitTypeData,
   DeleteUnitTypeErrors,
   DeleteUnitTypeResponses,
   DeleteWebhookData,
   DeleteWebhookErrors,
   DeleteWebhookResponses,
+  DisableAuthProviderData,
+  DisableAuthProviderErrors,
+  DisableAuthProviderResponses,
   DismissDiscoveredAttributeData,
   DismissDiscoveredAttributeErrors,
   DismissDiscoveredAttributeResponses,
+  EnableAuthProviderData,
+  EnableAuthProviderErrors,
+  EnableAuthProviderResponses,
   EnableInstanceWebhookData,
   EnableInstanceWebhookErrors,
   EnableInstanceWebhookResponses,
@@ -154,6 +172,9 @@ import type {
   GetAuthMethodsData,
   GetAuthMethodsErrors,
   GetAuthMethodsResponses,
+  GetAuthProviderData,
+  GetAuthProviderErrors,
+  GetAuthProviderResponses,
   GetAuthSettingsData,
   GetAuthSettingsErrors,
   GetAuthSettingsResponses,
@@ -220,6 +241,9 @@ import type {
   GetSegmentData,
   GetSegmentErrors,
   GetSegmentResponses,
+  GetSinkData,
+  GetSinkErrors,
+  GetSinkResponses,
   GetUnitTypeData,
   GetUnitTypeErrors,
   GetUnitTypeResponses,
@@ -241,6 +265,9 @@ import type {
   ListAuditEntriesData,
   ListAuditEntriesErrors,
   ListAuditEntriesResponses,
+  ListAuthProvidersData,
+  ListAuthProvidersErrors,
+  ListAuthProvidersResponses,
   ListChangeRequestsData,
   ListChangeRequestsErrors,
   ListChangeRequestsResponses,
@@ -310,6 +337,9 @@ import type {
   ListSegmentUsagesData,
   ListSegmentUsagesErrors,
   ListSegmentUsagesResponses,
+  ListSinksData,
+  ListSinksErrors,
+  ListSinksResponses,
   ListStaleFlagsData,
   ListStaleFlagsErrors,
   ListStaleFlagsResponses,
@@ -391,6 +421,9 @@ import type {
   RotateSdkKeyData,
   RotateSdkKeyErrors,
   RotateSdkKeyResponses,
+  RotateSinkSecretData,
+  RotateSinkSecretErrors,
+  RotateSinkSecretResponses,
   RotateWebhookSecretData,
   RotateWebhookSecretErrors,
   RotateWebhookSecretResponses,
@@ -419,6 +452,9 @@ import type {
   StreamProjectChangesErrors,
   StreamProjectChangesResponse,
   StreamProjectChangesResponses,
+  TestAuthProviderData,
+  TestAuthProviderErrors,
+  TestAuthProviderResponses,
   TestInstanceWebhookData,
   TestInstanceWebhookErrors,
   TestInstanceWebhookResponses,
@@ -428,6 +464,9 @@ import type {
   UpdateAttributeData,
   UpdateAttributeErrors,
   UpdateAttributeResponses,
+  UpdateAuthProviderData,
+  UpdateAuthProviderErrors,
+  UpdateAuthProviderResponses,
   UpdateAuthSettingsData,
   UpdateAuthSettingsErrors,
   UpdateAuthSettingsResponses,
@@ -461,6 +500,9 @@ import type {
   UpdateSegmentData,
   UpdateSegmentErrors,
   UpdateSegmentResponses,
+  UpdateSinkData,
+  UpdateSinkErrors,
+  UpdateSinkResponses,
   UpdateUnitTypeData,
   UpdateUnitTypeErrors,
   UpdateUnitTypeResponses,
@@ -4219,6 +4261,233 @@ export const updateAuthSettings = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * The instance's auth providers
+ *
+ * Ordered by display name. A client secret is never listed:
+ * `client_secret_set` says whether there is one.
+ *
+ */
+export const listAuthProviders = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAuthProvidersData, ThrowOnError>,
+): RequestResult<ListAuthProvidersResponses, ListAuthProvidersErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListAuthProvidersResponses,
+    ListAuthProvidersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers",
+    ...options,
+  });
+
+/**
+ * Add an auth provider
+ *
+ * Adds an identity provider members can sign in through. It vouches only
+ * for the email domains it names (`domains`, at least one, lowercased).
+ * The client secret is sealed and never read back. The answer carries the
+ * `redirect_uri` to register at the identity provider. Refused 422
+ * `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+ * `insecure_url` for an `http` issuer other than on a loopback address;
+ * private networks are allowed. A slug already in use is 409
+ * `already_exists`. Audited `auth_provider.created`.
+ *
+ */
+export const createAuthProvider = <ThrowOnError extends boolean = false>(
+  options: Options<CreateAuthProviderData, ThrowOnError>,
+): RequestResult<CreateAuthProviderResponses, CreateAuthProviderErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateAuthProviderResponses,
+    CreateAuthProviderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete an auth provider
+ *
+ * Refused 409 `provider_in_use` while something depends on the provider;
+ * `used_by` names what. Disable it instead: that stops its sign-ins
+ * and leaves its members, identities and grants as they are. Audited
+ * `auth_provider.deleted`.
+ *
+ */
+export const deleteAuthProvider = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteAuthProviderData, ThrowOnError>,
+): RequestResult<DeleteAuthProviderResponses, DeleteAuthProviderErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteAuthProviderResponses,
+    DeleteAuthProviderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}",
+    ...options,
+  });
+
+/**
+ * An auth provider
+ */
+export const getAuthProvider = <ThrowOnError extends boolean = false>(
+  options: Options<GetAuthProviderData, ThrowOnError>,
+): RequestResult<GetAuthProviderResponses, GetAuthProviderErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetAuthProviderResponses, GetAuthProviderErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}",
+    ...options,
+  });
+
+/**
+ * Edit an auth provider
+ *
+ * Changes any property but `slug` and `kind`; each absent one is left as
+ * it is, a sent `client_secret` replaces the stored one, and a `claims`
+ * member names only the claims to rename. Whether the provider is enabled
+ * is changed with `enable` and `disable`. Refused as a creation is.
+ * Audited `auth_provider.updated`; an edit that changes nothing is not.
+ *
+ */
+export const updateAuthProvider = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateAuthProviderData, ThrowOnError>,
+): RequestResult<UpdateAuthProviderResponses, UpdateAuthProviderErrors, ThrowOnError> =>
+  (options.client ?? client).patch<
+    UpdateAuthProviderResponses,
+    UpdateAuthProviderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Enable an auth provider
+ *
+ * Offers the provider on the sign-in page. Refused 422
+ * `base_url_required` as a creation is. An enabled provider is answered
+ * as it is. Audited `auth_provider.enabled`.
+ *
+ */
+export const enableAuthProvider = <ThrowOnError extends boolean = false>(
+  options: Options<EnableAuthProviderData, ThrowOnError>,
+): RequestResult<EnableAuthProviderResponses, EnableAuthProviderErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    EnableAuthProviderResponses,
+    EnableAuthProviderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}/enable",
+    ...options,
+  });
+
+/**
+ * Disable an auth provider
+ *
+ * Stops the provider's sign-ins and leaves its
+ * members, identities and grants as they are. A disabled provider is
+ * answered as it is. Audited `auth_provider.disabled`.
+ *
+ */
+export const disableAuthProvider = <ThrowOnError extends boolean = false>(
+  options: Options<DisableAuthProviderData, ThrowOnError>,
+): RequestResult<DisableAuthProviderResponses, DisableAuthProviderErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    DisableAuthProviderResponses,
+    DisableAuthProviderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}/disable",
+    ...options,
+  });
+
+/**
+ * Test that an auth provider can be reached
+ *
+ * Fetches the provider's discovery document now, enabled or not, and
+ * answers what it found. Refused 502 `provider_unreachable` with the
+ * `failure` when the provider does not answer, answers anything but a
+ * document, or names another issuer. Nothing is stored.
+ *
+ */
+export const testAuthProvider = <ThrowOnError extends boolean = false>(
+  options: Options<TestAuthProviderData, ThrowOnError>,
+): RequestResult<TestAuthProviderResponses, TestAuthProviderErrors, ThrowOnError> =>
+  (options.client ?? client).post<TestAuthProviderResponses, TestAuthProviderErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}/test",
+    ...options,
+  });
+
+/**
  * The instance's audit log
  *
  * Every entry of the instance, of every project and of none (members,
@@ -4614,6 +4883,194 @@ export const redeliverWebhookDelivery = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver",
+    ...options,
+  });
+
+/**
+ * The project's sinks
+ *
+ * The oldest first. A sink's credentials are never listed: the
+ * ClickHouse `password` and the object storage `secret_access_key` read
+ * back as `***`, and a webhook sink's secret is shown once, when it is
+ * issued. Reading sinks needs `sink.manage` too, since a sink's
+ * configuration names internal hosts, buckets and URLs that may carry
+ * tokens.
+ *
+ */
+export const listSinks = <ThrowOnError extends boolean = false>(
+  options: Options<ListSinksData, ThrowOnError>,
+): RequestResult<ListSinksResponses, ListSinksErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListSinksResponses, ListSinksErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks",
+    ...options,
+  });
+
+/**
+ * Add a sink
+ *
+ * Creates a sink of the `kind` given and the configuration of that kind
+ * alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+ * delivers nothing until it is enabled. The ClickHouse `password` and
+ * the object storage `secret_access_key` are required, stored sealed
+ * under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+ * secret is drawn by the server, 32 random bytes as unpadded base64url,
+ * and answered as `secret` this once; audit entries record every secret
+ * as `[redacted]`. Receivers verify a webhook sink's calls as they
+ * verify a webhook subscription's.
+ *
+ * Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+ * storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+ * 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+ * empty mean every one.
+ *
+ * Refused as `invalid_sink`, with `errors` naming each field by JSON
+ * Pointer: a blank name, a configuration missing or of another kind,
+ * a URL that is not an absolute http or https URL without credentials,
+ * a required field left out, a setting delivery sets itself, a header
+ * of the platform's own, an event kind or a batching value out of
+ * range. An environment the project does not have is
+ * `unknown_environment`. A webhook sink's `url` must be `https`
+ * (`insecure_url`) unless the operator set
+ * `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+ * loopback, private, link-local, unspecified or multicast address
+ * (`private_network_target`) unless the operator set
+ * `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+ * storage target may be on a private or loopback address, never on a
+ * link-local one (`link_local_target`), which no setting lifts. A name
+ * that does not resolve is accepted.
+ *
+ */
+export const createSink = <ThrowOnError extends boolean = false>(
+  options: Options<CreateSinkData, ThrowOnError>,
+): RequestResult<CreateSinkResponses, CreateSinkErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateSinkResponses, CreateSinkErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a sink
+ *
+ * The sink goes, and nothing more is sent to its target.
+ */
+export const deleteSink = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteSinkData, ThrowOnError>,
+): RequestResult<DeleteSinkResponses, DeleteSinkErrors, ThrowOnError> =>
+  (options.client ?? client).delete<DeleteSinkResponses, DeleteSinkErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}",
+    ...options,
+  });
+
+/**
+ * A sink
+ */
+export const getSink = <ThrowOnError extends boolean = false>(
+  options: Options<GetSinkData, ThrowOnError>,
+): RequestResult<GetSinkResponses, GetSinkErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetSinkResponses, GetSinkErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}",
+    ...options,
+  });
+
+/**
+ * Edit a sink
+ *
+ * Changes each property present and leaves the others as they are. A
+ * sub-object of the sink's kind replaces its configuration whole, so
+ * nothing of the earlier one lingers; the one exception is its secret:
+ * `***`, as every read answers it, or no secret at all keeps the stored
+ * one, and any other value replaces it. A sub-object of another kind,
+ * or a `kind` other than the sink's own, is refused `kind_immutable`.
+ * `enabled` takes `false` only, which lets the attempt in progress
+ * finish and keeps the sink's place; a sink is enabled with its own
+ * operation, which checks the target first. A new target is checked as
+ * on creation, and an edit that changes nothing stores and records
+ * nothing. An edit of batching or filters applies from the next batch.
+ *
+ */
+export const updateSink = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateSinkData, ThrowOnError>,
+): RequestResult<UpdateSinkResponses, UpdateSinkErrors, ThrowOnError> =>
+  (options.client ?? client).patch<UpdateSinkResponses, UpdateSinkErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Rotate a webhook sink's secret
+ *
+ * Issues a webhook sink a new secret, answered this once. The secret it
+ * replaces keeps signing beside the new one for the operator's
+ * `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+ * each call carries two `v1=` signatures meanwhile and a receiver
+ * holding either verifies. A secret an earlier rotation left signing is
+ * dropped at once: no more than two sign. A sink of another kind has no
+ * secret the server draws and is refused `no_secret_to_rotate`; its
+ * password or secret access key is changed by editing it. It takes no
+ * `If-Match`.
+ *
+ */
+export const rotateSinkSecret = <ThrowOnError extends boolean = false>(
+  options: Options<RotateSinkSecretData, ThrowOnError>,
+): RequestResult<RotateSinkSecretResponses, RotateSinkSecretErrors, ThrowOnError> =>
+  (options.client ?? client).post<RotateSinkSecretResponses, RotateSinkSecretErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/rotate-secret",
     ...options,
   });
 

@@ -47,13 +47,14 @@ Data crosses layers as: HTTP DTO → command → domain model → result → HTT
 | Context | Owns |
 |---|---|
 | workspace | projects, environments, unit types, declared attributes |
-| access | members, sessions, tokens, permissions, roles, grants, SSO and SCIM identities |
+| access | members, sessions, tokens, permissions, roles, grants, invitations, password resets, auth settings, the SMTP configuration |
+| identity | auth providers, identities, sign-in attempts, SSO enforcement, SCIM tokens, users and groups, group mappings |
 | flags | flags, variations, configurations per environment, rules, rollouts, overrides, prerequisites, the kill switch, segments and their conditions |
 | experiments | experiments, their status machine, assignment, the sample-ratio check |
 | delivery | rulesets, their versions and materialization, SDK keys, the SDK API, remote evaluation, discovered attributes |
 | events | exposures, aliases, evaluation summaries, rollups, retention |
 | governance | protected environments, change requests, scheduled changes, the audit log, webhooks, notices |
-| integrations | sinks to ClickHouse, object storage and webhooks; import and export |
+| sinks | data export: a project's sinks to ClickHouse, object storage and webhooks, their credentials, targets and delivery |
 
 A context reaches another only through an application port, never by importing the other context's adapters.
 
@@ -78,6 +79,7 @@ Domain and application code return errors of a fixed set of kinds from `internal
 | `gone` | 410 |
 | `rate_limited` | 429, with `Retry-After` |
 | `unavailable` | 503, with `Retry-After` when the wait is known (such as `busy`) |
+| `bad_gateway` | 502: a system the server asked on the caller's behalf, such as an identity provider, did not answer as needed |
 
 Only the HTTP adapter answers problems about the HTTP request itself: 400 `invalid_request` (a request it cannot decode), 404 `not_found` and 405 `method_not_allowed` (no route), 408 `request_timeout` (a body that did not arrive in time), 413 `request_too_large` (a body over its limit), 415 `unsupported_media_type` (a body sent as a media type the operation does not accept) and 428 `precondition_required` (a write without `If-Match`). Any error carrying no kind is 500 `internal`, answered with no detail and logged with its cause and the request ID. A request whose client went away before it was answered is the exception: an error that comes from the context net/http served it under being canceled, with no cause of the server's own, is answered nothing and recorded as 499 in the access log and the metrics, logged only at debug, because a browser navigating away is no failure of the server and must not reach the error log or the 5xx count. A server deadline, a handler cancelling a context it derived, and the replica ending its requests when it stops (when the grace period runs out, or at once on a second signal), stay 500. Every API answers errors as RFC 9457 problem documents (`application/problem+json`) written in one place in `internal/infra/in/http`; nothing below the adapter knows about HTTP.
 
