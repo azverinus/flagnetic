@@ -76,28 +76,22 @@ func (h *ExportProject) Handle(ctx context.Context, q ExportQuery) (Exported, er
 	return out, err
 }
 
-// read fills s with what project holds, apart from the project itself.
-func (h *ExportProject) read(ctx context.Context, project workspace.ProjectID, s *transfer.Snapshot) (err error) {
-	if s.Environments, err = h.d.Workspace.Environments(ctx, project); err != nil {
-		return err
+// read fills s with what project holds, apart from the project itself. The
+// reads run in order and the first failure ends them.
+func (h *ExportProject) read(ctx context.Context, project workspace.ProjectID, s *transfer.Snapshot) error {
+	reads := []func() (err error){
+		func() (err error) { s.Environments, err = h.d.Workspace.Environments(ctx, project); return },
+		func() (err error) { s.UnitTypes, err = h.d.Workspace.UnitTypes(ctx, project); return },
+		func() (err error) { s.Attributes, err = h.d.Workspace.Attributes(ctx, project); return },
+		func() (err error) { s.Segments, err = h.d.Flags.Segments(ctx, project); return },
+		func() (err error) { s.Flags, err = h.d.Flags.ProjectFlags(ctx, project); return },
+		func() (err error) { s.Configurations, err = h.d.Flags.ProjectConfigurations(ctx, project); return },
+		func() (err error) { s.Experiments, err = h.d.Experiments.ProjectExperiments(ctx, project); return },
 	}
-	if s.UnitTypes, err = h.d.Workspace.UnitTypes(ctx, project); err != nil {
-		return err
-	}
-	if s.Attributes, err = h.d.Workspace.Attributes(ctx, project); err != nil {
-		return err
-	}
-	if s.Segments, err = h.d.Flags.Segments(ctx, project); err != nil {
-		return err
-	}
-	if s.Flags, err = h.d.Flags.ProjectFlags(ctx, project); err != nil {
-		return err
-	}
-	if s.Configurations, err = h.d.Flags.ProjectConfigurations(ctx, project); err != nil {
-		return err
-	}
-	if s.Experiments, err = h.d.Experiments.ProjectExperiments(ctx, project); err != nil {
-		return err
+	for _, read := range reads {
+		if err := read(); err != nil {
+			return err
+		}
 	}
 	owners := make([]access.MemberID, 0, len(s.Flags)+len(s.Experiments))
 	for _, f := range s.Flags {
@@ -106,6 +100,7 @@ func (h *ExportProject) read(ctx context.Context, project workspace.ProjectID, s
 	for _, e := range s.Experiments {
 		owners = append(owners, e.Owner)
 	}
+	var err error
 	s.Emails, err = h.d.Members.MemberEmails(ctx, owners)
 	return err
 }

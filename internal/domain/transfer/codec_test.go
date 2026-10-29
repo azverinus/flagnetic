@@ -467,3 +467,70 @@ func TestFormatsAreNamedAndHaveAnExtension(t *testing.T) {
 		t.Errorf("xml parsed")
 	}
 }
+
+func TestStrictDecodingRefusesAValueOfTheWrongShape(t *testing.T) {
+	_, err := transfer.Decode(transfer.JSON, []byte(`{"schema_version": 1, "project": [],
+		"environments": {"key": "a"}, "unit_types": [null],
+		"flags": [{"key": "f", "configurations": [], "variations": "none", "expected_removal_at": 5}],
+		"experiments": [{"key": "e", "expected_end_at": 20260105, "started_at": null, "variations": [{"weight": null}]}]}`))
+	got := map[string]string{}
+	for _, v := range violations(t, err, "invalid_document") {
+		got[v.Pointer] = v.Code
+	}
+	want := map[string]string{
+		"/project": "invalid_type", "/environments": "invalid_type", "/unit_types/0": "invalid_type",
+		"/flags/0/configurations": "invalid_type", "/flags/0/variations": "invalid_type",
+		"/flags/0/expected_removal_at": "invalid_type", "/experiments/0/expected_end_at": "invalid_type",
+		"/experiments/0/variations/0/weight": "invalid_type",
+	}
+	if len(got) != len(want) {
+		t.Errorf("violations = %v, want %v", got, want)
+	}
+	for p, c := range want {
+		if got[p] != c {
+			t.Errorf("violation at %s = %q, want %q (all: %v)", p, got[p], c, got)
+		}
+	}
+}
+
+func TestAnExpectedEndGivenAsAnInstantCountsAsItsUTCDay(t *testing.T) {
+	d, err := transfer.Decode(transfer.JSON, []byte(`{"schema_version": 1,
+		"experiments": [{"key": "e", "expected_end_at": "2026-11-05T23:00:00-05:00"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := d.Experiments[0].ExpectedEndAt; got == nil || got.Format("2006-01-02") != "2026-11-06" {
+		t.Errorf("expected_end_at = %v, want 2026-11-06", got)
+	}
+}
+
+func TestANumberJSONCannotHoldIsMalformedYAML(t *testing.T) {
+	for _, src := range []string{"schema_version: 1\nflags: .nan\n", "schema_version: 1\nflags: .inf\n"} {
+		_, err := transfer.Decode(transfer.YAML, []byte(src))
+		var m *transfer.MalformedError
+		if !errors.As(err, &m) {
+			t.Errorf("%q: error = %v, want a MalformedError", src, err)
+		} else if !strings.Contains(m.Error(), "malformed project document") {
+			t.Errorf("error text = %q", m.Error())
+		}
+	}
+}
+
+func TestAFormatThatIsNotJSONOrYAMLIsNeitherReadNorWritten(t *testing.T) {
+	if _, err := transfer.Decode("xml", []byte(`{}`)); err == nil {
+		t.Error("decoding an unknown format succeeded")
+	}
+	if _, err := transfer.Encode("xml", sample()); err == nil {
+		t.Error("encoding an unknown format succeeded")
+	}
+}
+
+func TestAVariationValueThatIsNotJSONIsNotEncoded(t *testing.T) {
+	d := sample()
+	d.Flags[0].Variations[0].Value = raw(`{broken`)
+	for _, f := range []transfer.Format{transfer.JSON, transfer.YAML} {
+		if _, err := transfer.Encode(f, d); err == nil {
+			t.Errorf("%s: encoding a variation value that is not JSON succeeded", f)
+		}
+	}
+}
