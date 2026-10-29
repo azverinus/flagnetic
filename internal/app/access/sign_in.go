@@ -210,7 +210,14 @@ func (a passwordAttempt) right() bool { return a.ok && a.hash != "" }
 func attemptPassword(ctx context.Context, tx Transactor, store passwordStore, hasher PasswordVerifier,
 	attempt access.Attempt, password secret.String,
 ) (passwordAttempt, error) {
-	reserved, err := store.ReserveAttempt(ctx, attempt)
+	// The reservation takes a unit of work of its own, so the lock it
+	// reports is the one its failures were judged against.
+	var reserved access.Reservation
+	err := tx.Within(ctx, func(ctx context.Context) error {
+		var err error
+		reserved, err = store.ReserveAttempt(ctx, attempt)
+		return err
+	})
 	if err != nil {
 		return passwordAttempt{}, err
 	}

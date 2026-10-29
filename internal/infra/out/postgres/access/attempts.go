@@ -24,7 +24,8 @@ import (
 // the window the domain's schedule gives its count. The row is locked and
 // its lock read before it is counted, in the same statement, so the lock it
 // answers is the one its count was judged against: a statement waiting on
-// another sees that one's outcome. The source's row is taken before the
+// another sees that one's outcome, when the row existed as it began
+// (ReserveAttempt reads the lock otherwise). The source's row is taken before the
 // email's, as every other write to both takes them, so two never wait on
 // each other: prior joins source, so it locks the email's row only once the
 // source's is written, whatever order the statement's parts run in, and
@@ -81,7 +82,15 @@ const reserveAttempt = `
 
 // ReserveAttempt counts a as a failure before its password is verified, and
 // returns what it found: failures locked by earlier ones are not counted
-// again, and report when they unlock.
+// again, and report when they unlock. It runs in the unit of work ctx
+// carries.
+//
+// A statement sees only the rows committed before it began, so failures
+// first counted by a statement it waited on, on the source's row, say, are
+// invisible to its prior: the count finds them locked and skips them, but
+// the statement cannot say until when. The skipped row is locked all the
+// same until the unit of work ends, so a second statement, which sees it,
+// reads the lock it was judged against.
 func (s *Store) ReserveAttempt(ctx context.Context, a access.Attempt) (access.Reservation, error) {
 	schedule := access.LockoutSchedule()
 	seconds := make([]int64, len(schedule))
@@ -99,13 +108,25 @@ func (s *Store) ReserveAttempt(ctx context.Context, a access.Attempt) (access.Re
 	if err != nil {
 		return access.Reservation{}, fmt.Errorf("reserving a sign-in attempt: %w", err)
 	}
-	if failures != nil {
+	switch {
+	case failures != nil:
 		r.Failures = *failures
 		if locksUntil != nil {
 			r.LocksUntil = *locksUntil
 		}
-	} else if lockedTil != nil {
+	case lockedTil != nil:
 		r.LockedUntil = *lockedTil
+	case r.SourceFailures <= access.SourceFailureLimit:
+		// Counted nowhere, yet not throttled: the failures it is counted
+		// under were locked by a statement committed after this one began.
+		f := failuresOf(r)
+		err = s.db(ctx).QueryRow(ctx, `SELECT locked_until FROM `+f.table+` WHERE `+f.key, f.args...).Scan(&lockedTil)
+		if err != nil {
+			return access.Reservation{}, fmt.Errorf("reading the lock of an email's failures: %w", err)
+		}
+		if lockedTil != nil {
+			r.LockedUntil = *lockedTil
+		}
 	}
 	return r, nil
 }
