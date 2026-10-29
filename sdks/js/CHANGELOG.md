@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/js/v0.1.0...sdks/js/v0.1.1) (2026-10-29)
+
+
+### Bug Fixes
+
+* **sdk-js:** fire the change listeners when a flag's detail changes ([#177](https://github.com/azverinus/flagnetic/issues/177)) ([565902a](https://github.com/azverinus/flagnetic/commit/565902ae11bd21cc8da380b62562a815f5772038))
+* **sdk-js:** serve a local JSON override as a copy the caller may mutate ([#178](https://github.com/azverinus/flagnetic/issues/178)) ([4f3596f](https://github.com/azverinus/flagnetic/commit/4f3596ffaa2da05180d4bf7db5146900710ce6b9))
+
 ## 0.1.0 (2026-10-27)
 
 

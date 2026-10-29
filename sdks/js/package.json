@@ -1,6 +1,6 @@
 {
   "name": "flagnetic",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Flagnetic SDK for JavaScript and TypeScript: feature flags and experiments, self-hosted.",
   "license": "Apache-2.0",
   "repository": {
