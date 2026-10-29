@@ -558,7 +558,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			worker.ChangeRequestScheduler(o.Schedule.Tick,
 				appgovernance.NewRunScheduler(changeRequests, changeRequestStore, o.Schedule.MaxFailures).Handle),
 			worker.ExperimentChecks(appexperiments.CheckInterval, appexperiments.NewRunChecks(appexperiments.RunChecksDeps{
-				Tx: tx, Lock: experimentStore, Running: experimentStore, Projects: experimentStore, Store: experimentStore,
+				Tx: tx, Lock: experimentStore, Running: experimentStore, Pending: experimentStore, Final: eventStore,
+				Projects: experimentStore, Store: experimentStore,
 				Holders: flagStore, FirstExposures: eventStore, Exposures: eventStore, Checks: experimentStore, Recorder: experimentRec,
 			}).Handle),
 		},

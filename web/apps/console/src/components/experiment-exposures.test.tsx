@@ -75,6 +75,7 @@ const checked = (check: Partial<NonNullable<ExperimentExposures["sample_ratio"]>
     p_value: 0.000063,
     skipped_reason: null,
     active: true,
+    final: true,
     checked_at: "2026-10-21T09:40:00Z",
     ...check,
   },
@@ -263,12 +264,37 @@ describe("an environment's exposures", () => {
     ).toBeVisible();
   });
 
-  it("says a stopped experiment keeps the check its stop took", () => {
+  it("says the final check of a stopped experiment was taken after the stop", () => {
     show({
-      summary: checked({ active: false, p_value: 0.5, chi_square: 0.45 }),
+      summary: checked({
+        active: false,
+        p_value: 0.5,
+        chi_square: 0.45,
+        checked_at: "2026-10-21T09:50:00Z",
+      }),
       stoppedAt: "2026-10-21T09:40:00.000Z",
     });
-    expect(within(sampleRatio()).getByText(/^Final check, taken at the stop/)).toBeVisible();
+    expect(
+      within(sampleRatio()).getByText(/^Final check, taken .*; it is never run again/),
+    ).toBeVisible();
+    expect(within(sampleRatio()).queryByText(/^Final check pending/)).toBeNull();
+  });
+
+  it("says the final check is pending while the stop's own check is not final", () => {
+    show({
+      summary: checked({ final: false, checked_at: "2026-10-21T09:40:00Z" }),
+      stoppedAt: "2026-10-21T09:40:00.000Z",
+    });
+    const region = sampleRatio();
+    expect(
+      within(region).getByText(/^Final check pending: this is the check the stop took/),
+    ).toBeVisible();
+    expect(within(region).queryByText(/^Final check, taken/)).toBeNull();
+  });
+
+  it("does not speak of a final check while the experiment runs", () => {
+    show({ summary: checked({ final: true }) });
+    expect(within(sampleRatio()).queryByText(/Final check/)).toBeNull();
   });
 
   it("does not call a check from before the stop its final one", () => {

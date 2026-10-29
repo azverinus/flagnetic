@@ -67,7 +67,7 @@ func sampleRatioOf(st *appexperiments.SampleRatioState) *SampleRatioCheck {
 	if st == nil {
 		return nil
 	}
-	out := &SampleRatioCheck{N: st.N, ChiSquare: st.ChiSquare, PValue: st.PValue, Active: st.Active, CheckedAt: st.CheckedAt}
+	out := &SampleRatioCheck{N: st.N, ChiSquare: st.ChiSquare, PValue: st.PValue, Active: st.Active, Final: st.Final, CheckedAt: st.CheckedAt}
 	if st.Skipped != "" {
 		reason := SampleRatioSkippedReason(st.Skipped)
 		out.SkippedReason = &reason

@@ -159,3 +159,14 @@ func (s *Store) OldestUnread(ctx context.Context, stream events.Stream) (at time
 	}
 	return at.UTC(), true, nil
 }
+
+// ExposuresReadThrough reports whether the exposures stream has read every
+// exposure received at or before at: the oldest one it has not read, when any,
+// was received after.
+func (s *Store) ExposuresReadThrough(ctx context.Context, at time.Time) (bool, error) {
+	oldest, unread, err := s.OldestUnread(ctx, events.StreamExposures)
+	if err != nil {
+		return false, err
+	}
+	return !unread || oldest.After(at), nil
+}

@@ -2788,8 +2788,8 @@ export const checkHashUniformity = <ThrowOnError extends boolean = false>(
  * by reason.
  *
  * `sample_ratio` is the latest sample-ratio check of the experiment in
- * the environment, null before the first. Every 10 minutes, and once
- * more at its stop, each running experiment is checked in each
+ * the environment, null before the first. Every 10 minutes, and when it
+ * stops, each running experiment is checked in each
  * environment holding its rule: with `N` its first exposures over the
  * variations it weighs, `O` a variation's first exposures and
  * `E = N × weight / 10000`, `X² = Σ (O − E)² / E` at one degree of
@@ -2798,8 +2798,11 @@ export const checkHashUniformity = <ThrowOnError extends boolean = false>(
  * variation expecting fewer than 5 (`expected_below_5`) the check is
  * skipped and leaves any alert as it is. An `srm` alert is raised at
  * `p_value` below 0.001 and cleared above 0.01; between the two it
- * stays as it is. A stopped experiment keeps the check its stop took,
- * `checked_at` its stop, and is never checked again. For example,
+ * stays as it is. The stop takes a check at its time, with `final`
+ * false, since exposures accepted before the stop may not have been
+ * rolled up yet; once they have, the next round takes the final check
+ * over every exposure received at or before the stop, `final` true and
+ * `checked_at` that round's time, and nothing replaces it. For example,
  * weights 5,000/5,000 and 5,200/4,800 first exposures give `X²` 16 and
  * `p_value` about 0.000063: an alert.
  *

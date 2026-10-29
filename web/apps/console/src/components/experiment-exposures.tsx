@@ -159,8 +159,8 @@ export type ExposuresViewProps = {
   /** The experiment's variations in its order, which the timeline's columns follow. */
   variations: readonly string[];
   /**
-   * When the experiment stopped, if it did: no sample-ratio check runs
-   * after, and the one taken at that instant is the stop's final check.
+   * When the experiment stopped, if it did: the only check run after is the
+   * final one, which completes the check the stop took.
    */
   stoppedAt?: string | null;
   refreshing?: boolean;
@@ -311,9 +311,11 @@ function VariationTable({ rows }: { rows: readonly VariationExposures[] }) {
  * chi-square, or why the check computed nothing. An `srm` alert stays
  * active between a p-value of 0.001 and 0.01 once raised, so whether one
  * is active, not the p-value alone, says which way the check came out.
- * A stop takes the final check only in the environments holding the rule
- * at that moment, so one that stopped holding it earlier keeps the last
- * check taken while the experiment ran, or none.
+ * A stop takes a check only in the environments holding the rule at that
+ * moment, so one that stopped holding it earlier keeps the last check taken
+ * while the experiment ran, or none. The stop's own check is not final: the
+ * exposure rollup may not have read every exposure received before the stop,
+ * so the final check follows once it has, and replaces it.
  */
 function SampleRatioResult({
   check,
@@ -327,8 +329,12 @@ function SampleRatioResult({
   const n = check ? formatNumber(i18n, check.n) : "";
 
   const stopped = stoppedAt !== null;
-  const takenAtStop =
-    stopped && check !== null && Date.parse(check.checked_at) === Date.parse(stoppedAt);
+  const finalPending = stopped && check !== null && !check.final;
+  const finalTaken =
+    stopped &&
+    check !== null &&
+    check.final &&
+    Date.parse(check.checked_at) >= Date.parse(stoppedAt);
 
   let verdict: ReactNode;
   if (check === null && stopped) {
@@ -399,10 +405,16 @@ function SampleRatioResult({
         ) : null}
         {check === null ? null : (
           <p className="text-muted-foreground">
-            {takenAtStop ? (
+            {finalPending ? (
               <Trans>
-                Final check, taken at the stop on <Moment value={check.checked_at} />; it is never
-                run again.
+                Final check pending: this is the check the stop took on{" "}
+                <Moment value={check.checked_at} />, over the exposures rolled up by then. It is
+                replaced once every exposure received before the stop has been rolled up.
+              </Trans>
+            ) : finalTaken ? (
+              <Trans>
+                Final check, taken <Moment value={check.checked_at} />, over every exposure received
+                before the stop; it is never run again.
               </Trans>
             ) : stopped ? (
               <Trans>

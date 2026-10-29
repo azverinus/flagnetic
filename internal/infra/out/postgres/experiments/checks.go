@@ -70,6 +70,48 @@ func (s *Store) RunningExperiments(ctx context.Context) ([]experiments.Experimen
 	return out, rows.Err()
 }
 
+// PendingFinalExperiments returns the stopped or archived experiments of every
+// project with a sample-ratio result that is not final.
+func (s *Store) PendingFinalExperiments(ctx context.Context) ([]experiments.Experiment, error) {
+	rows, err := s.db(ctx).Query(ctx, `SELECT `+columns+from+`
+		WHERE e.status IN ('stopped', 'archived')
+		  AND EXISTS (SELECT 1 FROM experiment_sample_ratios r WHERE r.experiment_id = e.id AND NOT r.final)
+		ORDER BY e.id`)
+	if err != nil {
+		return nil, fmt.Errorf("listing experiments awaiting a final check: %w", err)
+	}
+	defer rows.Close()
+	var out []experiments.Experiment
+	for rows.Next() {
+		e, err := scan(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// PendingFinalEnvironments returns the environments in which experiment's
+// sample-ratio result is not final.
+func (s *Store) PendingFinalEnvironments(ctx context.Context, experiment experiments.ExperimentID) ([]workspace.EnvironmentID, error) {
+	rows, err := s.db(ctx).Query(ctx, `SELECT environment_id FROM experiment_sample_ratios
+		WHERE experiment_id = $1 AND NOT final ORDER BY environment_id`, experiment.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("listing the environments awaiting a final check: %w", err)
+	}
+	defer rows.Close()
+	var out []workspace.EnvironmentID
+	for rows.Next() {
+		var env [16]byte
+		if err = rows.Scan(&env); err != nil {
+			return nil, fmt.Errorf("listing the environments awaiting a final check: %w", err)
+		}
+		out = append(out, id.FromBytes[workspace.Environment](env))
+	}
+	return out, rows.Err()
+}
+
 // EnvironmentByKey returns project's environment keyed key, or
 // appexperiments.ErrNotFound.
 func (s *Store) EnvironmentByKey(ctx context.Context, project workspace.ProjectID, key string) (workspace.EnvironmentID, error) {
@@ -85,21 +127,21 @@ func (s *Store) EnvironmentByKey(ctx context.Context, project workspace.ProjectI
 }
 
 // SaveSampleRatio stores r, checked at, as the latest check of experiment in
-// environment.
+// environment, final when nothing is left to wait for.
 func (s *Store) SaveSampleRatio(ctx context.Context, experiment experiments.ExperimentID, environment workspace.EnvironmentID,
-	r experiments.SampleRatio, at time.Time,
+	r experiments.SampleRatio, at time.Time, final bool,
 ) error {
 	var skipped any
 	if r.Skipped != "" {
 		skipped = string(r.Skipped)
 	}
 	_, err := s.db(ctx).Exec(ctx, `
-		INSERT INTO experiment_sample_ratios (experiment_id, environment_id, n, chi_square, p_value, skipped_reason, checked_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO experiment_sample_ratios (experiment_id, environment_id, n, chi_square, p_value, skipped_reason, checked_at, final)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (experiment_id, environment_id) DO UPDATE SET
 		    n = excluded.n, chi_square = excluded.chi_square, p_value = excluded.p_value,
-		    skipped_reason = excluded.skipped_reason, checked_at = excluded.checked_at`,
-		experiment.Bytes(), environment.Bytes(), r.N, r.ChiSquare, r.PValue, skipped, at)
+		    skipped_reason = excluded.skipped_reason, checked_at = excluded.checked_at, final = excluded.final`,
+		experiment.Bytes(), environment.Bytes(), r.N, r.ChiSquare, r.PValue, skipped, at, final)
 	if err != nil {
 		return fmt.Errorf("storing a sample-ratio check: %w", err)
 	}
@@ -115,14 +157,14 @@ func (s *Store) SampleRatioOf(ctx context.Context, experiment experiments.Experi
 		skipped *string
 	)
 	err := s.db(ctx).QueryRow(ctx, `
-		SELECT r.n, r.chi_square, r.p_value, r.skipped_reason, r.checked_at,
+		SELECT r.n, r.chi_square, r.p_value, r.skipped_reason, r.checked_at, r.final,
 		    EXISTS (SELECT 1 FROM experiment_alerts a
 		        WHERE a.experiment_id = r.experiment_id AND a.environment_id = r.environment_id
 		          AND a.kind = $3 AND a.cleared_at IS NULL)
 		FROM experiment_sample_ratios r
 		WHERE r.experiment_id = $1 AND r.environment_id = $2`,
 		experiment.Bytes(), environment.Bytes(), string(experiments.AlertKindSampleRatio),
-	).Scan(&st.N, &st.ChiSquare, &st.PValue, &skipped, &st.CheckedAt, &st.Active)
+	).Scan(&st.N, &st.ChiSquare, &st.PValue, &skipped, &st.CheckedAt, &st.Final, &st.Active)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

@@ -270,7 +270,7 @@ The earliest recorded exposure of a unit in an experiment. Sample-ratio checks a
 _Avoid_: enrolment, entry
 
 **Sample-ratio check**:
-A chi-square test, every 10 minutes and once at stop, of each running experiment's first exposures per variation against its weights, in each environment holding its rule. Below 1000 first exposures, or when a variation expects fewer than 5, it is skipped. It raises an alert at p below 0.001 and clears it at p above 0.01. The statistic is documented on [The sample-ratio check](sample-ratio-check.md) so an analyst can reproduce it.
+A chi-square test, every 10 minutes and at stop, of each running experiment's first exposures per variation against its weights, in each environment holding its rule. Below 1000 first exposures, or when a variation expects fewer than 5, it is skipped. It raises an alert at p below 0.001 and clears it at p above 0.01. The statistic is documented on [The sample-ratio check](sample-ratio-check.md) so an analyst can reproduce it. The check a stop takes is not final: the final one follows once the exposure rollup has read every exposure received by the stop.
 _Avoid_: SRM test, balance check (`srm` names only the alert kind and its events)
 
 **Alert**:

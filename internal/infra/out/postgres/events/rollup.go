@@ -458,6 +458,41 @@ func (s *Store) FirstExposureCounts(ctx context.Context, environment workspace.E
 	return out, nil
 }
 
+// FirstExposureCountsReceivedBy returns experiment's first exposures in
+// environment among the exposures received at or before by, by variation,
+// read from the raw rows with the rule the rollup applies: each unit's
+// non-override exposure with the earliest occurred_at, ties broken by the
+// smaller event_id. It is what a stopped experiment's final check counts: the
+// aggregates also hold what was received after the stop by the time the check
+// runs.
+func (s *Store) FirstExposureCountsReceivedBy(ctx context.Context, environment workspace.EnvironmentID,
+	experiment experiments.ExperimentID, by time.Time,
+) (map[string]int64, error) {
+	rows, err := s.db(ctx).Query(ctx, `
+		SELECT variation_key, count(*) FROM (
+			SELECT DISTINCT ON (unit_type, unit_id) variation_key
+			FROM exposure_events
+			WHERE experiment_id = $1 AND environment_id = $2 AND received_at <= $3 AND NOT override
+			ORDER BY unit_type, unit_id, occurred_at, event_id) f
+		GROUP BY variation_key`, experiment.Bytes(), environment.Bytes(), by)
+	if err != nil {
+		return nil, fmt.Errorf("reading first exposures received by %s: %w", by.Format(time.RFC3339), err)
+	}
+	out := map[string]int64{}
+	var (
+		variation string
+		n         int64
+	)
+	_, err = pgx.ForEachRow(rows, []any{&variation, &n}, func() error {
+		out[variation] = n
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("reading first exposures received by %s: %w", by.Format(time.RFC3339), err)
+	}
+	return out, nil
+}
+
 // ExposureTimeline returns experiment's exposure counts in environment per
 // UTC day and variation, by day then variation key, from the day from to the
 // day to, both included; nil leaves that end open.

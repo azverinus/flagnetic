@@ -92,11 +92,14 @@ func (h *StopExperiment) Handle(ctx context.Context, cmd StopExperimentCommand) 
 			cmd.Caller, now, c.Request); err != nil {
 			return err
 		}
-		final := checker{holders: h.d.Holders, counts: h.d.FirstExposures, store: h.d.Checks, recorder: h.d.Recorder}
-		if err = final.sampleRatio(ctx, before, holders, now, c.Request); err != nil {
+		check := checker{holders: h.d.Holders, counts: h.d.FirstExposures, store: h.d.Checks, recorder: h.d.Recorder}
+		counts := func(env workspace.EnvironmentID) (map[string]int64, error) {
+			return h.d.FirstExposures.FirstExposureCounts(ctx, env, before.ID)
+		}
+		if err = check.sampleRatio(ctx, before, holders, now, false, counts, c.Request); err != nil {
 			return err
 		}
-		if err = final.atStop(ctx, before, now, c.Request); err != nil {
+		if err = check.atStop(ctx, before, now, c.Request); err != nil {
 			return err
 		}
 		out = after

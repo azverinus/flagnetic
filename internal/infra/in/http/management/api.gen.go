@@ -2747,11 +2747,18 @@ type SampleRatioCheck struct {
 	// Active An `srm` alert is active in the environment, acknowledged or not.
 	Active bool `json:"active"`
 
-	// CheckedAt When the check ran; a stopped experiment's is its stop.
+	// CheckedAt When the check ran; a stopped experiment's is its stop until the final check replaces it.
 	CheckedAt time.Time `json:"checked_at"`
 
 	// ChiSquare `X²`; null when the check was skipped.
 	ChiSquare *float64 `json:"chi_square"`
+
+	// Final Whether this is the result the experiment keeps. Every result of a running experiment is final. The
+	// stop takes its own result at its time, not final, since exposures accepted before the stop may not
+	// have been rolled up yet; once the exposure rollup has read every exposure received at or before the
+	// stop, the next round of the checks takes the final one over exactly those exposures, with
+	// `checked_at` the round's time. Nothing replaces a final result.
+	Final bool `json:"final"`
 
 	// N The first exposures of the variations the experiment weighs.
 	N int64 `json:"n"`
@@ -6205,8 +6212,8 @@ type ClientInterface interface {
 	// by reason.
 	//
 	// `sample_ratio` is the latest sample-ratio check of the experiment in
-	// the environment, null before the first. Every 10 minutes, and once
-	// more at its stop, each running experiment is checked in each
+	// the environment, null before the first. Every 10 minutes, and when it
+	// stops, each running experiment is checked in each
 	// environment holding its rule: with `N` its first exposures over the
 	// variations it weighs, `O` a variation's first exposures and
 	// `E = N × weight / 10000`, `X² = Σ (O − E)² / E` at one degree of
@@ -6215,8 +6222,11 @@ type ClientInterface interface {
 	// variation expecting fewer than 5 (`expected_below_5`) the check is
 	// skipped and leaves any alert as it is. An `srm` alert is raised at
 	// `p_value` below 0.001 and cleared above 0.01; between the two it
-	// stays as it is. A stopped experiment keeps the check its stop took,
-	// `checked_at` its stop, and is never checked again. For example,
+	// stays as it is. The stop takes a check at its time, with `final`
+	// false, since exposures accepted before the stop may not have been
+	// rolled up yet; once they have, the next round takes the final check
+	// over every exposure received at or before the stop, `final` true and
+	// `checked_at` that round's time, and nothing replaces it. For example,
 	// weights 5,000/5,000 and 5,200/4,800 first exposures give `X²` 16 and
 	// `p_value` about 0.000063: an alert.
 	//
@@ -9880,8 +9890,8 @@ func (c *Client) SetExperimentDecisionNote(ctx context.Context, project ProjectK
 // by reason.
 //
 // `sample_ratio` is the latest sample-ratio check of the experiment in
-// the environment, null before the first. Every 10 minutes, and once
-// more at its stop, each running experiment is checked in each
+// the environment, null before the first. Every 10 minutes, and when it
+// stops, each running experiment is checked in each
 // environment holding its rule: with `N` its first exposures over the
 // variations it weighs, `O` a variation's first exposures and
 // `E = N × weight / 10000`, `X² = Σ (O − E)² / E` at one degree of
@@ -9890,8 +9900,11 @@ func (c *Client) SetExperimentDecisionNote(ctx context.Context, project ProjectK
 // variation expecting fewer than 5 (`expected_below_5`) the check is
 // skipped and leaves any alert as it is. An `srm` alert is raised at
 // `p_value` below 0.001 and cleared above 0.01; between the two it
-// stays as it is. A stopped experiment keeps the check its stop took,
-// `checked_at` its stop, and is never checked again. For example,
+// stays as it is. The stop takes a check at its time, with `final`
+// false, since exposures accepted before the stop may not have been
+// rolled up yet; once they have, the next round takes the final check
+// over every exposure received at or before the stop, `final` true and
+// `checked_at` that round's time, and nothing replaces it. For example,
 // weights 5,000/5,000 and 5,200/4,800 first exposures give `X²` 16 and
 // `p_value` about 0.000063: an alert.
 //
@@ -21897,8 +21910,8 @@ type ClientWithResponsesInterface interface {
 	// by reason.
 	//
 	// `sample_ratio` is the latest sample-ratio check of the experiment in
-	// the environment, null before the first. Every 10 minutes, and once
-	// more at its stop, each running experiment is checked in each
+	// the environment, null before the first. Every 10 minutes, and when it
+	// stops, each running experiment is checked in each
 	// environment holding its rule: with `N` its first exposures over the
 	// variations it weighs, `O` a variation's first exposures and
 	// `E = N × weight / 10000`, `X² = Σ (O − E)² / E` at one degree of
@@ -21907,8 +21920,11 @@ type ClientWithResponsesInterface interface {
 	// variation expecting fewer than 5 (`expected_below_5`) the check is
 	// skipped and leaves any alert as it is. An `srm` alert is raised at
 	// `p_value` below 0.001 and cleared above 0.01; between the two it
-	// stays as it is. A stopped experiment keeps the check its stop took,
-	// `checked_at` its stop, and is never checked again. For example,
+	// stays as it is. The stop takes a check at its time, with `final`
+	// false, since exposures accepted before the stop may not have been
+	// rolled up yet; once they have, the next round takes the final check
+	// over every exposure received at or before the stop, `final` true and
+	// `checked_at` that round's time, and nothing replaces it. For example,
 	// weights 5,000/5,000 and 5,200/4,800 first exposures give `X²` 16 and
 	// `p_value` about 0.000063: an alert.
 	//
@@ -37731,8 +37747,8 @@ func (c *ClientWithResponses) SetExperimentDecisionNoteWithResponse(ctx context.
 // by reason.
 //
 // `sample_ratio` is the latest sample-ratio check of the experiment in
-// the environment, null before the first. Every 10 minutes, and once
-// more at its stop, each running experiment is checked in each
+// the environment, null before the first. Every 10 minutes, and when it
+// stops, each running experiment is checked in each
 // environment holding its rule: with `N` its first exposures over the
 // variations it weighs, `O` a variation's first exposures and
 // `E = N × weight / 10000`, `X² = Σ (O − E)² / E` at one degree of
@@ -37741,8 +37757,11 @@ func (c *ClientWithResponses) SetExperimentDecisionNoteWithResponse(ctx context.
 // variation expecting fewer than 5 (`expected_below_5`) the check is
 // skipped and leaves any alert as it is. An `srm` alert is raised at
 // `p_value` below 0.001 and cleared above 0.01; between the two it
-// stays as it is. A stopped experiment keeps the check its stop took,
-// `checked_at` its stop, and is never checked again. For example,
+// stays as it is. The stop takes a check at its time, with `final`
+// false, since exposures accepted before the stop may not have been
+// rolled up yet; once they have, the next round takes the final check
+// over every exposure received at or before the stop, `final` true and
+// `checked_at` that round's time, and nothing replaces it. For example,
 // weights 5,000/5,000 and 5,200/4,800 first exposures give `X²` 16 and
 // `p_value` about 0.000063: an alert.
 //
