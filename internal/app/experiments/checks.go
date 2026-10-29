@@ -22,6 +22,12 @@ const CheckInterval = 10 * time.Minute
 // hangs rolls back alone and leaves the round time for the others.
 const experimentCheckTimeout = 30 * time.Second
 
+// finalCheckDelay is how long after a stop its final sample-ratio check
+// waits: longer than an ingest request can run, so that no exposure received
+// by the stop is still in a transaction the rollup's watermark cannot see
+// when the check counts.
+const finalCheckDelay = time.Minute
+
 // checksActor is who raises and clears alerts: the server itself, whether a
 // round of the checks or a stop took the check.
 var checksActor = governance.Actor{Kind: governance.ActorSystem, ID: "experiment_checks", Name: "experiment checks"}
@@ -365,11 +371,14 @@ type ChecksLock interface {
 
 // RunChecksDeps are what RunChecks runs on.
 type RunChecksDeps struct {
-	Tx             Transactor
-	Lock           ChecksLock
-	Running        RunningExperiments
-	Pending        PendingFinalChecks
-	Final          FinalExposures
+	Tx      Transactor
+	Lock    ChecksLock
+	Running RunningExperiments
+	Pending PendingFinalChecks
+	Final   FinalExposures
+	// Retention is how long raw exposures are kept: an experiment started
+	// before it may have lost raw rows its final check would count.
+	Retention      time.Duration
 	Projects       ProjectLocker
 	Store          Reader
 	Holders        Holders
@@ -456,14 +465,16 @@ func (h *RunChecks) one(ctx context.Context, check checker, listed experiments.E
 }
 
 // final completes the sample-ratio check of the stopped experiment listed,
-// under its project's row lock, once the exposure rollup has read every
-// exposure received at or before the stop. The check runs over exactly those
-// exposures, read from the raw rows: the rollup's aggregates also hold what
-// was received after the stop by now, which stays out. It runs in the
+// under its project's row lock, once finalCheckDelay has passed since the stop
+// and the exposure rollup has read every exposure received at or before it.
+// The check runs over exactly those exposures, read from the raw rows: the
+// rollup's aggregates also hold what was received after the stop by now,
+// which stays out. An experiment started before the raw rows' retention may
+// have lost some of them, which would leave units out and shift others to a
+// later exposure, so it takes the rollup's aggregates instead. It runs in the
 // environments the stop checked, is stored final at the round's time, and
 // raises or clears the sample-ratio alert as a running check does. Before
-// the rollup has caught up the stop's result stays as it is, for the next
-// round.
+// then the stop's result stays as it is, for the next round.
 func (h *RunChecks) final(ctx context.Context, check checker, listed experiments.Experiment) error {
 	ctx, cancel := context.WithTimeout(ctx, experimentCheckTimeout)
 	defer cancel()
@@ -483,6 +494,9 @@ func (h *RunChecks) final(ctx context.Context, check checker, listed experiments
 		if err != nil {
 			return err
 		}
+		if now.Before(e.StoppedAt.Add(finalCheckDelay)) {
+			return nil
+		}
 		envs, err := h.d.Pending.PendingFinalEnvironments(ctx, e.ID)
 		if err != nil || len(envs) == 0 {
 			return err
@@ -491,7 +505,11 @@ func (h *RunChecks) final(ctx context.Context, check checker, listed experiments
 		if err != nil || !read {
 			return err
 		}
+		rawKept := e.StartedAt != nil && !e.StartedAt.Before(now.Add(-h.d.Retention))
 		counts := func(env workspace.EnvironmentID) (map[string]int64, error) {
+			if !rawKept {
+				return check.counts.FirstExposureCounts(ctx, env, e.ID)
+			}
 			return h.d.Final.FirstExposureCountsReceivedBy(ctx, env, e.ID, *e.StoppedAt)
 		}
 		return check.sampleRatio(ctx, e, envs, now, true, counts, governance.Request{})

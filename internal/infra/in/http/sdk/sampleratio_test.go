@@ -545,6 +545,50 @@ func TestTheFinalCheckClearsAnAlertTheRestOfTheExposuresAnswer(t *testing.T) {
 	}
 }
 
+// The final check waits a minute after the stop, so that an exposure received
+// by the stop and still being written is in.
+func TestTheFinalCheckWaitsAMinuteAfterTheStop(t *testing.T) {
+	srv, c := startSampleRatioServer(t)
+	f := startSampleRatio(t, srv, c, 5000, 5000, 10000)
+	f.expose(t, "staging", map[string]int{"true": 5200, "false": 4800})
+	srv.TickRollup(t, worker.ExposureRollupName)
+	c.Advance(time.Minute)
+	f.stopRemoved(t)
+
+	c.Advance(59 * time.Second)
+	check(t, srv)
+	if early := f.sampleRatio(t, "staging"); early.Final {
+		t.Fatalf("59 s after the stop = %+v, want the stop's check still pending", early)
+	}
+	c.Advance(time.Second)
+	roundAt := c.Now()
+	check(t, srv)
+	if final := f.sampleRatio(t, "staging"); !final.Final || !final.CheckedAt.Equal(roundAt) {
+		t.Errorf("a minute after the stop = %+v, want final at %s", final, roundAt)
+	}
+}
+
+// Raw exposures are kept for a window; an experiment that started before it
+// may have lost some, so its final check counts what the rollup holds
+// instead, late exposures included.
+func TestTheFinalCheckOfAnExperimentOlderThanTheRawWindowUsesTheRollup(t *testing.T) {
+	srv, c := startSampleRatioServer(t)
+	f := startSampleRatio(t, srv, c, 5000, 5000, 10000)
+	c.Advance(40 * 24 * time.Hour)
+	f.expose(t, "staging", map[string]int{"true": 5200, "false": 4800})
+	srv.TickRollup(t, worker.ExposureRollupName)
+	c.Advance(time.Minute)
+	f.stopRemoved(t)
+	c.Advance(time.Minute)
+	f.expose(t, "staging", map[string]int{"false": 400})
+
+	c.Advance(10 * time.Minute)
+	check(t, srv)
+	if final := f.sampleRatio(t, "staging"); !final.Final || final.N != 10400 {
+		t.Errorf("final check = %+v, want final over the rollup's 10400 first exposures", final)
+	}
+}
+
 // A stop followed by an archive before the rollup has caught up still gets
 // its final check.
 func TestTheFinalCheckIsTakenForAnArchivedExperiment(t *testing.T) {

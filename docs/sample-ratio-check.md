@@ -11,9 +11,9 @@ Each experiment is checked in a transaction of its own, so one experiment slow t
 
 ## The final check
 
-A stopped experiment is checked once more, over every exposure it accepted before the stop. The stop cannot wait for that: the exposure rollup can lag for as long as a transaction stays open on the database, and the stop holds the project's lock while it rewrites the rules. So the stop takes its own check at its time, marked not final, and the next rounds of the checks leave it as it is until the rollup has read every exposure received at or before the stop (the oldest exposure the rollup has not read yet, if any, was received after it). The first round to find so then:
+A stopped experiment is checked once more, over every exposure it accepted before the stop. The stop cannot wait for that: the exposure rollup can lag for as long as a transaction stays open on the database, and the stop holds the project's lock while it rewrites the rules. So the stop takes its own check at its time, marked not final, and the next rounds of the checks leave it as it is until a minute has passed since the stop, so that an exposure still being written when it happened is in, and the rollup has read every exposure received at or before the stop (the oldest exposure the rollup has not read yet, if any, was received after it). The first round to find so then:
 
-- counts the first exposures among the exposures received at or before the stop, whatever the rollup has read since: an exposure received after the stop stays out, though it is counted in the experiment's exposures;
+- counts the first exposures among the exposures received at or before the stop, whatever the rollup has read since: an exposure received after the stop stays out, though it is counted in the experiment's exposures. An experiment that started before the raw exposures' retention (`FLAGNETIC_EVENTS_RETENTION_DAYS`) may have lost some of them, so its final check counts what the rollup holds instead, which includes exposures received after the stop that the rollup had read by then;
 - stores the result in each environment the stop checked, final, with `checked_at` the round's time;
 - raises or clears the `srm` alert as a running check does, so an alert the stop raised on partial counts is cleared when the whole of the exposures turns out to be in line.
 

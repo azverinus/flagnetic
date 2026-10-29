@@ -60,7 +60,7 @@ func TestAnExperimentWhoseChecksFailRollsBackAlone(t *testing.T) {
 	store, flagStore, eventStore := pgexperiments.NewStore(pool), pgflags.NewStore(pool), pgevents.NewStore(pool)
 	failing := id.FromBytes[experiments.Experiment](experimentOf(t, admin, broken.Key).Id)
 	err := appexperiments.NewRunChecks(appexperiments.RunChecksDeps{
-		Tx: postgres.NewTransactor(pool), Lock: store, Running: store, Pending: store, Final: eventStore, Projects: store, Store: store, Holders: flagStore,
+		Tx: postgres.NewTransactor(pool), Lock: store, Running: store, Pending: store, Final: eventStore, Retention: 30 * 24 * time.Hour, Projects: store, Store: store, Holders: flagStore,
 		FirstExposures: eventStore, Exposures: failingExposures{Store: eventStore, failing: failing}, Checks: store,
 		Recorder: appexperiments.NewRecorder(testkit.Record(pool), c, id.NewSource(c)),
 	}).Handle(t.Context())
