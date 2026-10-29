@@ -76,6 +76,21 @@ func (e AttributeType) Valid() bool {
 	}
 }
 
+// Defines values for AuthProviderKind.
+const (
+	AuthProviderKindOidc AuthProviderKind = "oidc"
+)
+
+// Valid indicates whether the value is a known member of the AuthProviderKind enum.
+func (e AuthProviderKind) Valid() bool {
+	switch e {
+	case AuthProviderKindOidc:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ChangeRequestApplierKind.
 const (
 	ChangeRequestApplierKindMember ChangeRequestApplierKind = "member"
@@ -1114,13 +1129,158 @@ type AuditEntryList struct {
 	NextCursor *string `json:"next_cursor"`
 }
 
+// AuthMethodProvider defines model for AuthMethodProvider.
+type AuthMethodProvider struct {
+	DisplayName string `json:"display_name"`
+
+	// Kind The protocol the provider speaks.
+	Kind AuthProviderKind `json:"kind"`
+	Slug string           `json:"slug"`
+}
+
 // AuthMethods defines model for AuthMethods.
 type AuthMethods struct {
 	// LocalLoginEnabled Whether a member signs in with their email and password.
 	LocalLoginEnabled bool `json:"local_login_enabled"`
 
-	// Providers The identity providers a member signs in through; none yet.
-	Providers []map[string]interface{} `json:"providers"`
+	// Providers The enabled auth providers a member signs in through, ordered by display name.
+	Providers []AuthMethodProvider `json:"providers"`
+}
+
+// AuthProvider defines model for AuthProvider.
+type AuthProvider struct {
+	// AutoProvision Whether a sign-in whose email is in `domains` creates its member.
+	AutoProvision bool `json:"auto_provision"`
+
+	// Claims The claims of the provider's tokens that carry what the instance reads of a person.
+	Claims   *AuthProviderClaims `json:"claims,omitempty"`
+	ClientId *string             `json:"client_id,omitempty"`
+
+	// ClientSecretSet Whether a client secret is stored; the secret itself is never answered.
+	ClientSecretSet *bool     `json:"client_secret_set,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+
+	// DisplayName What the sign-in button says, 1 to 200 characters.
+	DisplayName string `json:"display_name"`
+
+	// Domains The email domains the provider vouches for, lowercase.
+	Domains []string           `json:"domains"`
+	Enabled bool               `json:"enabled"`
+	Id      openapi_types.UUID `json:"id"`
+
+	// Issuer The OIDC provider's issuer URL.
+	Issuer *string `json:"issuer,omitempty"`
+
+	// Kind The protocol the provider speaks.
+	Kind AuthProviderKind `json:"kind"`
+
+	// LinkByEmail Whether a sign-in whose email is in `domains` is linked to the existing member with that email.
+	LinkByEmail bool `json:"link_by_email"`
+
+	// RedirectUri The redirect URI to register at the identity provider, built from
+	// `FLAGNETIC_BASE_URL`; absent while the instance has none.
+	RedirectUri *string `json:"redirect_uri,omitempty"`
+
+	// RequireVerifiedEmail Whether a sign-in whose token does not say the email is verified is refused.
+	RequireVerifiedEmail *bool     `json:"require_verified_email,omitempty"`
+	Scopes               *[]string `json:"scopes,omitempty"`
+
+	// Slug Names the provider in sign-in buttons and URLs; never changes.
+	Slug      string    `json:"slug"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Version   int64     `json:"version"`
+}
+
+// AuthProviderClaims The claims of the provider's tokens that carry what the instance reads of a person.
+type AuthProviderClaims struct {
+	// Email Default `email`.
+	Email string `json:"email"`
+
+	// Groups Default `groups`.
+	Groups string `json:"groups"`
+
+	// Name Default `name`.
+	Name string `json:"name"`
+}
+
+// AuthProviderClaimsPatch The claims to rename; each absent one is left as it is.
+type AuthProviderClaimsPatch struct {
+	Email  *string `json:"email,omitempty"`
+	Groups *string `json:"groups,omitempty"`
+	Name   *string `json:"name,omitempty"`
+}
+
+// AuthProviderCreate defines model for AuthProviderCreate.
+type AuthProviderCreate struct {
+	// AutoProvision Default false.
+	AutoProvision *bool `json:"auto_provision,omitempty"`
+
+	// Claims The claims to rename; each absent one is left as it is.
+	Claims       *AuthProviderClaimsPatch `json:"claims,omitempty"`
+	ClientId     string                   `json:"client_id"`
+	ClientSecret *string                  `json:"client_secret,omitempty"`
+	DisplayName  string                   `json:"display_name"`
+	Domains      []string                 `json:"domains"`
+
+	// Enabled Default true.
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Issuer `https`, or `http` on a loopback address.
+	Issuer string `json:"issuer"`
+
+	// Kind The protocol the provider speaks.
+	Kind AuthProviderKind `json:"kind"`
+
+	// LinkByEmail Default false.
+	LinkByEmail *bool `json:"link_by_email,omitempty"`
+
+	// RequireVerifiedEmail Default true.
+	RequireVerifiedEmail *bool `json:"require_verified_email,omitempty"`
+
+	// Scopes Default `openid`, `email` and `profile`.
+	Scopes *[]string `json:"scopes,omitempty"`
+	Slug   string    `json:"slug"`
+}
+
+// AuthProviderKind The protocol the provider speaks.
+type AuthProviderKind string
+
+// AuthProviderList defines model for AuthProviderList.
+type AuthProviderList struct {
+	Items []AuthProvider `json:"items"`
+}
+
+// AuthProviderPatch The properties to change; each absent one is left as it is.
+type AuthProviderPatch struct {
+	AutoProvision *bool `json:"auto_provision,omitempty"`
+
+	// Claims The claims to rename; each absent one is left as it is.
+	Claims               *AuthProviderClaimsPatch `json:"claims,omitempty"`
+	ClientId             *string                  `json:"client_id,omitempty"`
+	ClientSecret         *string                  `json:"client_secret,omitempty"`
+	DisplayName          *string                  `json:"display_name,omitempty"`
+	Domains              *[]string                `json:"domains,omitempty"`
+	Issuer               *string                  `json:"issuer,omitempty"`
+	LinkByEmail          *bool                    `json:"link_by_email,omitempty"`
+	RequireVerifiedEmail *bool                    `json:"require_verified_email,omitempty"`
+	Scopes               *[]string                `json:"scopes,omitempty"`
+}
+
+// AuthProviderTest What the provider's discovery document says.
+type AuthProviderTest struct {
+	AuthorizationEndpoint string `json:"authorization_endpoint"`
+
+	// CodeChallengeMethodsSupported Absent when the document does not list them; sign-in needs `S256`.
+	CodeChallengeMethodsSupported *[]string `json:"code_challenge_methods_supported,omitempty"`
+	Issuer                        string    `json:"issuer"`
+	JwksUri                       string    `json:"jwks_uri"`
+
+	// ScopesSupported Absent when the document does not list them.
+	ScopesSupported *[]string `json:"scopes_supported,omitempty"`
+	TokenEndpoint   string    `json:"token_endpoint"`
+
+	// UserinfoEndpoint Absent when the provider offers none.
+	UserinfoEndpoint *string `json:"userinfo_endpoint,omitempty"`
 }
 
 // AuthSettings The instance's rules for sessions, API tokens and passwords.
@@ -2617,6 +2777,9 @@ type Problem struct {
 	Detail *string      `json:"detail,omitempty"`
 	Errors *[]Violation `json:"errors,omitempty"`
 
+	// Failure Why a system the server asked did not answer as needed, for `provider_unreachable`.
+	Failure *string `json:"failure,omitempty"`
+
 	// Permission The permission the caller lacks, for `forbidden`, or the role's permission the caller lacks, for `role_not_allowed`.
 	Permission *string `json:"permission,omitempty"`
 
@@ -2629,6 +2792,9 @@ type Problem struct {
 	Status     int    `json:"status"`
 	Title      string `json:"title"`
 	Type       string `json:"type"`
+
+	// UsedBy What refers to an auth provider that cannot be deleted, such as `identities`, for `provider_in_use`.
+	UsedBy *[]string `json:"used_by,omitempty"`
 }
 
 // Project defines model for Project.
@@ -3985,6 +4151,9 @@ type AuditQ = string
 // AuditTo defines model for AuditTo.
 type AuditTo = time.Time
 
+// AuthProviderSlug defines model for AuthProviderSlug.
+type AuthProviderSlug = string
+
 // ChangeRequestID defines model for ChangeRequestID.
 type ChangeRequestID = openapi_types.UUID
 
@@ -4038,6 +4207,9 @@ type UnitTypeKey = string
 
 // WebhookID defines model for WebhookID.
 type WebhookID = openapi_types.UUID
+
+// BadGateway A problem document (RFC 9457). Code-specific values are further members.
+type BadGateway = Problem
 
 // BadRequest A problem document (RFC 9457). Code-specific values are further members.
 type BadRequest = Problem
@@ -4163,6 +4335,16 @@ type ExportAuditEntriesParams struct {
 
 // ExportAuditEntriesParamsFormat defines parameters for ExportAuditEntries.
 type ExportAuditEntriesParamsFormat string
+
+// UpdateAuthProviderParams defines parameters for UpdateAuthProvider.
+type UpdateAuthProviderParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
 
 // RevokeMySessionsParams defines parameters for RevokeMySessions.
 type RevokeMySessionsParams struct {
@@ -4869,6 +5051,12 @@ type AcceptInvitationJSONRequestBody = InvitationAcceptance
 
 // SignInJSONRequestBody defines body for SignIn for application/json ContentType.
 type SignInJSONRequestBody = SignInRequest
+
+// CreateAuthProviderJSONRequestBody defines body for CreateAuthProvider for application/json ContentType.
+type CreateAuthProviderJSONRequestBody = AuthProviderCreate
+
+// UpdateAuthProviderJSONRequestBody defines body for UpdateAuthProvider for application/json ContentType.
+type UpdateAuthProviderJSONRequestBody = AuthProviderPatch
 
 // UpdateAuthSettingsJSONRequestBody defines body for UpdateAuthSettings for application/json ContentType.
 type UpdateAuthSettingsJSONRequestBody = AuthSettings
@@ -6237,6 +6425,115 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /auth/sign-out (the `SignOut` operationId).
 	SignOut(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAuthProviders The instance's auth providers
+	//
+	// Ordered by display name. A client secret is never listed:
+	// `client_secret_set` says whether there is one.
+	//
+	// Corresponds with GET /instance/auth-providers (the `ListAuthProviders` operationId).
+	ListAuthProviders(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAuthProviderWithBody Add an auth provider
+	//
+	// Adds an identity provider members can sign in through. It vouches only
+	// for the email domains it names (`domains`, at least one, lowercased).
+	// The client secret is sealed and never read back. The answer carries the
+	// `redirect_uri` to register at the identity provider. Refused 422
+	// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+	// `insecure_url` for an `http` issuer other than on a loopback address;
+	// private networks are allowed. A slug already in use is 409
+	// `already_exists`. Audited `auth_provider.created`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+	CreateAuthProviderWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAuthProvider Add an auth provider
+	//
+	// Adds an identity provider members can sign in through. It vouches only
+	// for the email domains it names (`domains`, at least one, lowercased).
+	// The client secret is sealed and never read back. The answer carries the
+	// `redirect_uri` to register at the identity provider. Refused 422
+	// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+	// `insecure_url` for an `http` issuer other than on a loopback address;
+	// private networks are allowed. A slug already in use is 409
+	// `already_exists`. Audited `auth_provider.created`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+	CreateAuthProvider(ctx context.Context, body CreateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteAuthProvider Delete an auth provider
+	//
+	// Refused 409 `provider_in_use` while something depends on the provider;
+	// `references` names what. Disable it instead: that stops its sign-ins
+	// and leaves its members, identities and grants as they are. Audited
+	// `auth_provider.deleted`.
+	//
+	// Corresponds with DELETE /instance/auth-providers/{provider} (the `DeleteAuthProvider` operationId).
+	DeleteAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAuthProvider An auth provider
+	//
+	// Corresponds with GET /instance/auth-providers/{provider} (the `GetAuthProvider` operationId).
+	GetAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAuthProviderWithBody Edit an auth provider
+	//
+	// Changes any property but `slug` and `kind`; each absent one is left as
+	// it is, a sent `client_secret` replaces the stored one, and a `claims`
+	// member names only the claims to rename. Whether the provider is enabled
+	// is changed with `enable` and `disable`. Refused as a creation is.
+	// Audited `auth_provider.updated`; an edit that changes nothing is not.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+	UpdateAuthProviderWithBody(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAuthProvider Edit an auth provider
+	//
+	// Changes any property but `slug` and `kind`; each absent one is left as
+	// it is, a sent `client_secret` replaces the stored one, and a `claims`
+	// member names only the claims to rename. Whether the provider is enabled
+	// is changed with `enable` and `disable`. Refused as a creation is.
+	// Audited `auth_provider.updated`; an edit that changes nothing is not.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+	UpdateAuthProvider(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, body UpdateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DisableAuthProvider Disable an auth provider
+	//
+	// Stops the provider's sign-ins and its SCIM tokens and leaves its
+	// members, identities and grants as they are. A disabled provider is
+	// answered as it is. Audited `auth_provider.disabled`.
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/disable (the `DisableAuthProvider` operationId).
+	DisableAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EnableAuthProvider Enable an auth provider
+	//
+	// Offers the provider on the sign-in page. Refused 422
+	// `base_url_required` as a creation is. An enabled provider is answered
+	// as it is. Audited `auth_provider.enabled`.
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/enable (the `EnableAuthProvider` operationId).
+	EnableAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TestAuthProvider Test that an auth provider can be reached
+	//
+	// Fetches the provider's discovery document now, enabled or not, and
+	// answers what it found. Refused 502 `provider_unreachable` with the
+	// `failure` when the provider does not answer, answers anything but a
+	// document, or names another issuer. Nothing is stored.
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/test (the `TestAuthProvider` operationId).
+	TestAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAuthSettings The instance's auth settings
 	//
@@ -9039,6 +9336,215 @@ func (c *Client) SignIn(ctx context.Context, body SignInJSONRequestBody, reqEdit
 // Corresponds with POST /auth/sign-out (the `SignOut` operationId).
 func (c *Client) SignOut(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSignOutRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAuthProviders The instance's auth providers
+//
+// Ordered by display name. A client secret is never listed:
+// `client_secret_set` says whether there is one.
+//
+// Corresponds with GET /instance/auth-providers (the `ListAuthProviders` operationId).
+func (c *Client) ListAuthProviders(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAuthProvidersRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateAuthProviderWithBody Add an auth provider
+//
+// Adds an identity provider members can sign in through. It vouches only
+// for the email domains it names (`domains`, at least one, lowercased).
+// The client secret is sealed and never read back. The answer carries the
+// `redirect_uri` to register at the identity provider. Refused 422
+// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+// `insecure_url` for an `http` issuer other than on a loopback address;
+// private networks are allowed. A slug already in use is 409
+// `already_exists`. Audited `auth_provider.created`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+func (c *Client) CreateAuthProviderWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAuthProviderRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateAuthProvider Add an auth provider
+//
+// Adds an identity provider members can sign in through. It vouches only
+// for the email domains it names (`domains`, at least one, lowercased).
+// The client secret is sealed and never read back. The answer carries the
+// `redirect_uri` to register at the identity provider. Refused 422
+// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+// `insecure_url` for an `http` issuer other than on a loopback address;
+// private networks are allowed. A slug already in use is 409
+// `already_exists`. Audited `auth_provider.created`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+func (c *Client) CreateAuthProvider(ctx context.Context, body CreateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAuthProviderRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteAuthProvider Delete an auth provider
+//
+// Refused 409 `provider_in_use` while something depends on the provider;
+// `references` names what. Disable it instead: that stops its sign-ins
+// and leaves its members, identities and grants as they are. Audited
+// `auth_provider.deleted`.
+//
+// Corresponds with DELETE /instance/auth-providers/{provider} (the `DeleteAuthProvider` operationId).
+func (c *Client) DeleteAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteAuthProviderRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAuthProvider An auth provider
+//
+// Corresponds with GET /instance/auth-providers/{provider} (the `GetAuthProvider` operationId).
+func (c *Client) GetAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuthProviderRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateAuthProviderWithBody Edit an auth provider
+//
+// Changes any property but `slug` and `kind`; each absent one is left as
+// it is, a sent `client_secret` replaces the stored one, and a `claims`
+// member names only the claims to rename. Whether the provider is enabled
+// is changed with `enable` and `disable`. Refused as a creation is.
+// Audited `auth_provider.updated`; an edit that changes nothing is not.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+func (c *Client) UpdateAuthProviderWithBody(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAuthProviderRequestWithBody(c.Server, provider, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateAuthProvider Edit an auth provider
+//
+// Changes any property but `slug` and `kind`; each absent one is left as
+// it is, a sent `client_secret` replaces the stored one, and a `claims`
+// member names only the claims to rename. Whether the provider is enabled
+// is changed with `enable` and `disable`. Refused as a creation is.
+// Audited `auth_provider.updated`; an edit that changes nothing is not.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+func (c *Client) UpdateAuthProvider(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, body UpdateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAuthProviderRequest(c.Server, provider, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DisableAuthProvider Disable an auth provider
+//
+// Stops the provider's sign-ins and its SCIM tokens and leaves its
+// members, identities and grants as they are. A disabled provider is
+// answered as it is. Audited `auth_provider.disabled`.
+//
+// Corresponds with POST /instance/auth-providers/{provider}/disable (the `DisableAuthProvider` operationId).
+func (c *Client) DisableAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDisableAuthProviderRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EnableAuthProvider Enable an auth provider
+//
+// Offers the provider on the sign-in page. Refused 422
+// `base_url_required` as a creation is. An enabled provider is answered
+// as it is. Audited `auth_provider.enabled`.
+//
+// Corresponds with POST /instance/auth-providers/{provider}/enable (the `EnableAuthProvider` operationId).
+func (c *Client) EnableAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEnableAuthProviderRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// TestAuthProvider Test that an auth provider can be reached
+//
+// Fetches the provider's discovery document now, enabled or not, and
+// answers what it found. Refused 502 `provider_unreachable` with the
+// `failure` when the provider does not answer, answers anything but a
+// document, or names another issuer. Nothing is stored.
+//
+// Corresponds with POST /instance/auth-providers/{provider}/test (the `TestAuthProvider` operationId).
+func (c *Client) TestAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTestAuthProviderRequest(c.Server, provider)
 	if err != nil {
 		return nil, err
 	}
@@ -14166,6 +14672,305 @@ func NewSignOutRequest(server string) (*http.Request, error) {
 	}
 
 	operationPath := fmt.Sprintf("/auth/sign-out")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListAuthProvidersRequest constructs an http.Request for the ListAuthProviders method
+func NewListAuthProvidersRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateAuthProviderRequest calls the generic CreateAuthProvider builder with application/json body
+func NewCreateAuthProviderRequest(server string, body CreateAuthProviderJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateAuthProviderRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateAuthProviderRequestWithBody constructs an http.Request for the CreateAuthProvider method, with any body, and a specified content type
+func NewCreateAuthProviderRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteAuthProviderRequest constructs an http.Request for the DeleteAuthProvider method
+func NewDeleteAuthProviderRequest(server string, provider AuthProviderSlug) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAuthProviderRequest constructs an http.Request for the GetAuthProvider method
+func NewGetAuthProviderRequest(server string, provider AuthProviderSlug) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateAuthProviderRequest calls the generic UpdateAuthProvider builder with application/json body
+func NewUpdateAuthProviderRequest(server string, provider AuthProviderSlug, params *UpdateAuthProviderParams, body UpdateAuthProviderJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateAuthProviderRequestWithBody(server, provider, params, "application/json", bodyReader)
+}
+
+// NewUpdateAuthProviderRequestWithBody constructs an http.Request for the UpdateAuthProvider method, with any body, and a specified content type
+func NewUpdateAuthProviderRequestWithBody(server string, provider AuthProviderSlug, params *UpdateAuthProviderParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewDisableAuthProviderRequest constructs an http.Request for the DisableAuthProvider method
+func NewDisableAuthProviderRequest(server string, provider AuthProviderSlug) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s/disable", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewEnableAuthProviderRequest constructs an http.Request for the EnableAuthProvider method
+func NewEnableAuthProviderRequest(server string, provider AuthProviderSlug) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s/enable", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewTestAuthProviderRequest constructs an http.Request for the TestAuthProvider method
+func NewTestAuthProviderRequest(server string, provider AuthProviderSlug) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s/test", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -22504,6 +23309,127 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /auth/sign-out (the `SignOut` operationId).
 	SignOutWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SignOutResponse, error)
 
+	// ListAuthProvidersWithResponse The instance's auth providers
+	//
+	// Ordered by display name. A client secret is never listed:
+	// `client_secret_set` says whether there is one.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /instance/auth-providers (the `ListAuthProviders` operationId).
+	ListAuthProvidersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAuthProvidersResponse, error)
+
+	// CreateAuthProviderWithBodyWithResponse Add an auth provider
+	//
+	// Adds an identity provider members can sign in through. It vouches only
+	// for the email domains it names (`domains`, at least one, lowercased).
+	// The client secret is sealed and never read back. The answer carries the
+	// `redirect_uri` to register at the identity provider. Refused 422
+	// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+	// `insecure_url` for an `http` issuer other than on a loopback address;
+	// private networks are allowed. A slug already in use is 409
+	// `already_exists`. Audited `auth_provider.created`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+	CreateAuthProviderWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAuthProviderResponse, error)
+
+	// CreateAuthProviderWithResponse Add an auth provider
+	//
+	// Adds an identity provider members can sign in through. It vouches only
+	// for the email domains it names (`domains`, at least one, lowercased).
+	// The client secret is sealed and never read back. The answer carries the
+	// `redirect_uri` to register at the identity provider. Refused 422
+	// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+	// `insecure_url` for an `http` issuer other than on a loopback address;
+	// private networks are allowed. A slug already in use is 409
+	// `already_exists`. Audited `auth_provider.created`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+	CreateAuthProviderWithResponse(ctx context.Context, body CreateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAuthProviderResponse, error)
+
+	// DeleteAuthProviderWithResponse Delete an auth provider
+	//
+	// Refused 409 `provider_in_use` while something depends on the provider;
+	// `references` names what. Disable it instead: that stops its sign-ins
+	// and leaves its members, identities and grants as they are. Audited
+	// `auth_provider.deleted`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /instance/auth-providers/{provider} (the `DeleteAuthProvider` operationId).
+	DeleteAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*DeleteAuthProviderResponse, error)
+
+	// GetAuthProviderWithResponse An auth provider
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /instance/auth-providers/{provider} (the `GetAuthProvider` operationId).
+	GetAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*GetAuthProviderResponse, error)
+
+	// UpdateAuthProviderWithBodyWithResponse Edit an auth provider
+	//
+	// Changes any property but `slug` and `kind`; each absent one is left as
+	// it is, a sent `client_secret` replaces the stored one, and a `claims`
+	// member names only the claims to rename. Whether the provider is enabled
+	// is changed with `enable` and `disable`. Refused as a creation is.
+	// Audited `auth_provider.updated`; an edit that changes nothing is not.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+	UpdateAuthProviderWithBodyWithResponse(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAuthProviderResponse, error)
+
+	// UpdateAuthProviderWithResponse Edit an auth provider
+	//
+	// Changes any property but `slug` and `kind`; each absent one is left as
+	// it is, a sent `client_secret` replaces the stored one, and a `claims`
+	// member names only the claims to rename. Whether the provider is enabled
+	// is changed with `enable` and `disable`. Refused as a creation is.
+	// Audited `auth_provider.updated`; an edit that changes nothing is not.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+	UpdateAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, body UpdateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAuthProviderResponse, error)
+
+	// DisableAuthProviderWithResponse Disable an auth provider
+	//
+	// Stops the provider's sign-ins and its SCIM tokens and leaves its
+	// members, identities and grants as they are. A disabled provider is
+	// answered as it is. Audited `auth_provider.disabled`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/disable (the `DisableAuthProvider` operationId).
+	DisableAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*DisableAuthProviderResponse, error)
+
+	// EnableAuthProviderWithResponse Enable an auth provider
+	//
+	// Offers the provider on the sign-in page. Refused 422
+	// `base_url_required` as a creation is. An enabled provider is answered
+	// as it is. Audited `auth_provider.enabled`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/enable (the `EnableAuthProvider` operationId).
+	EnableAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*EnableAuthProviderResponse, error)
+
+	// TestAuthProviderWithResponse Test that an auth provider can be reached
+	//
+	// Fetches the provider's discovery document now, enabled or not, and
+	// answers what it found. Refused 502 `provider_unreachable` with the
+	// `failure` when the provider does not answer, answers anything but a
+	// document, or names another issuer. Nothing is stored.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/test (the `TestAuthProvider` operationId).
+	TestAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*TestAuthProviderResponse, error)
+
 	// GetAuthSettingsWithResponse The instance's auth settings
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -25868,6 +26794,642 @@ func (r SignOutResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r SignOutResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListAuthProvidersResponse401Headers the declared response headers of an HTTP 401 response for ListAuthProviders
+type ListAuthProvidersResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListAuthProvidersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthProviderList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListAuthProvidersResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAuthProvidersResponse) GetJSON200() *AuthProviderList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListAuthProvidersResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListAuthProvidersResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAuthProvidersResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAuthProvidersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAuthProvidersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAuthProvidersResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateAuthProviderResponse201Headers the declared response headers of an HTTP 201 response for CreateAuthProvider
+type CreateAuthProviderResponse201Headers struct {
+	ETag *string
+}
+
+// CreateAuthProviderResponse401Headers the declared response headers of an HTTP 401 response for CreateAuthProvider
+type CreateAuthProviderResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateAuthProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *AuthProvider
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreateAuthProviderResponse201Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateAuthProviderResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateAuthProviderResponse) GetJSON201() *AuthProvider {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CreateAuthProviderResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateAuthProviderResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CreateAuthProviderResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreateAuthProviderResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateAuthProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateAuthProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateAuthProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateAuthProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeleteAuthProviderResponse401Headers the declared response headers of an HTTP 401 response for DeleteAuthProvider
+type DeleteAuthProviderResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DeleteAuthProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeleteAuthProviderResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteAuthProviderResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteAuthProviderResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r DeleteAuthProviderResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteAuthProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteAuthProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteAuthProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteAuthProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetAuthProviderResponse200Headers the declared response headers of an HTTP 200 response for GetAuthProvider
+type GetAuthProviderResponse200Headers struct {
+	ETag *string
+}
+
+// GetAuthProviderResponse401Headers the declared response headers of an HTTP 401 response for GetAuthProvider
+type GetAuthProviderResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetAuthProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthProvider
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetAuthProviderResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetAuthProviderResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAuthProviderResponse) GetJSON200() *AuthProvider {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetAuthProviderResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetAuthProviderResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAuthProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuthProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuthProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAuthProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateAuthProviderResponse200Headers the declared response headers of an HTTP 200 response for UpdateAuthProvider
+type UpdateAuthProviderResponse200Headers struct {
+	ETag *string
+}
+
+// UpdateAuthProviderResponse401Headers the declared response headers of an HTTP 401 response for UpdateAuthProvider
+type UpdateAuthProviderResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateAuthProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthProvider
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *UpdateAuthProviderResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateAuthProviderResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateAuthProviderResponse) GetJSON200() *AuthProvider {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateAuthProviderResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateAuthProviderResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdateAuthProviderResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r UpdateAuthProviderResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateAuthProviderResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r UpdateAuthProviderResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateAuthProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateAuthProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateAuthProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateAuthProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DisableAuthProviderResponse200Headers the declared response headers of an HTTP 200 response for DisableAuthProvider
+type DisableAuthProviderResponse200Headers struct {
+	ETag *string
+}
+
+// DisableAuthProviderResponse401Headers the declared response headers of an HTTP 401 response for DisableAuthProvider
+type DisableAuthProviderResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DisableAuthProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthProvider
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DisableAuthProviderResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DisableAuthProviderResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DisableAuthProviderResponse) GetJSON200() *AuthProvider {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DisableAuthProviderResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DisableAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DisableAuthProviderResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r DisableAuthProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DisableAuthProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DisableAuthProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DisableAuthProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// EnableAuthProviderResponse200Headers the declared response headers of an HTTP 200 response for EnableAuthProvider
+type EnableAuthProviderResponse200Headers struct {
+	ETag *string
+}
+
+// EnableAuthProviderResponse401Headers the declared response headers of an HTTP 401 response for EnableAuthProvider
+type EnableAuthProviderResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type EnableAuthProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthProvider
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *EnableAuthProviderResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *EnableAuthProviderResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r EnableAuthProviderResponse) GetJSON200() *AuthProvider {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r EnableAuthProviderResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r EnableAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r EnableAuthProviderResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r EnableAuthProviderResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r EnableAuthProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r EnableAuthProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EnableAuthProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EnableAuthProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// TestAuthProviderResponse401Headers the declared response headers of an HTTP 401 response for TestAuthProvider
+type TestAuthProviderResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type TestAuthProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthProviderTest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *TestAuthProviderResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r TestAuthProviderResponse) GetJSON200() *AuthProviderTest {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r TestAuthProviderResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r TestAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r TestAuthProviderResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r TestAuthProviderResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r TestAuthProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r TestAuthProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TestAuthProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r TestAuthProviderResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -38388,6 +39950,187 @@ func (c *ClientWithResponses) SignOutWithResponse(ctx context.Context, reqEditor
 	return ParseSignOutResponse(rsp)
 }
 
+// ListAuthProvidersWithResponse The instance's auth providers
+//
+// Ordered by display name. A client secret is never listed:
+// `client_secret_set` says whether there is one.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/auth-providers (the `ListAuthProviders` operationId).
+func (c *ClientWithResponses) ListAuthProvidersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAuthProvidersResponse, error) {
+	rsp, err := c.ListAuthProviders(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAuthProvidersResponse(rsp)
+}
+
+// CreateAuthProviderWithBodyWithResponse Add an auth provider
+//
+// Adds an identity provider members can sign in through. It vouches only
+// for the email domains it names (`domains`, at least one, lowercased).
+// The client secret is sealed and never read back. The answer carries the
+// `redirect_uri` to register at the identity provider. Refused 422
+// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+// `insecure_url` for an `http` issuer other than on a loopback address;
+// private networks are allowed. A slug already in use is 409
+// `already_exists`. Audited `auth_provider.created`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+func (c *ClientWithResponses) CreateAuthProviderWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAuthProviderResponse, error) {
+	rsp, err := c.CreateAuthProviderWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAuthProviderResponse(rsp)
+}
+
+// CreateAuthProviderWithResponse Add an auth provider
+//
+// Adds an identity provider members can sign in through. It vouches only
+// for the email domains it names (`domains`, at least one, lowercased).
+// The client secret is sealed and never read back. The answer carries the
+// `redirect_uri` to register at the identity provider. Refused 422
+// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+// `insecure_url` for an `http` issuer other than on a loopback address;
+// private networks are allowed. A slug already in use is 409
+// `already_exists`. Audited `auth_provider.created`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /instance/auth-providers (the `CreateAuthProvider` operationId).
+func (c *ClientWithResponses) CreateAuthProviderWithResponse(ctx context.Context, body CreateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAuthProviderResponse, error) {
+	rsp, err := c.CreateAuthProvider(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAuthProviderResponse(rsp)
+}
+
+// DeleteAuthProviderWithResponse Delete an auth provider
+//
+// Refused 409 `provider_in_use` while something depends on the provider;
+// `references` names what. Disable it instead: that stops its sign-ins
+// and leaves its members, identities and grants as they are. Audited
+// `auth_provider.deleted`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /instance/auth-providers/{provider} (the `DeleteAuthProvider` operationId).
+func (c *ClientWithResponses) DeleteAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*DeleteAuthProviderResponse, error) {
+	rsp, err := c.DeleteAuthProvider(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteAuthProviderResponse(rsp)
+}
+
+// GetAuthProviderWithResponse An auth provider
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/auth-providers/{provider} (the `GetAuthProvider` operationId).
+func (c *ClientWithResponses) GetAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*GetAuthProviderResponse, error) {
+	rsp, err := c.GetAuthProvider(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuthProviderResponse(rsp)
+}
+
+// UpdateAuthProviderWithBodyWithResponse Edit an auth provider
+//
+// Changes any property but `slug` and `kind`; each absent one is left as
+// it is, a sent `client_secret` replaces the stored one, and a `claims`
+// member names only the claims to rename. Whether the provider is enabled
+// is changed with `enable` and `disable`. Refused as a creation is.
+// Audited `auth_provider.updated`; an edit that changes nothing is not.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+func (c *ClientWithResponses) UpdateAuthProviderWithBodyWithResponse(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAuthProviderResponse, error) {
+	rsp, err := c.UpdateAuthProviderWithBody(ctx, provider, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAuthProviderResponse(rsp)
+}
+
+// UpdateAuthProviderWithResponse Edit an auth provider
+//
+// Changes any property but `slug` and `kind`; each absent one is left as
+// it is, a sent `client_secret` replaces the stored one, and a `claims`
+// member names only the claims to rename. Whether the provider is enabled
+// is changed with `enable` and `disable`. Refused as a creation is.
+// Audited `auth_provider.updated`; an edit that changes nothing is not.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /instance/auth-providers/{provider} (the `UpdateAuthProvider` operationId).
+func (c *ClientWithResponses) UpdateAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, params *UpdateAuthProviderParams, body UpdateAuthProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAuthProviderResponse, error) {
+	rsp, err := c.UpdateAuthProvider(ctx, provider, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAuthProviderResponse(rsp)
+}
+
+// DisableAuthProviderWithResponse Disable an auth provider
+//
+// Stops the provider's sign-ins and its SCIM tokens and leaves its
+// members, identities and grants as they are. A disabled provider is
+// answered as it is. Audited `auth_provider.disabled`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /instance/auth-providers/{provider}/disable (the `DisableAuthProvider` operationId).
+func (c *ClientWithResponses) DisableAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*DisableAuthProviderResponse, error) {
+	rsp, err := c.DisableAuthProvider(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDisableAuthProviderResponse(rsp)
+}
+
+// EnableAuthProviderWithResponse Enable an auth provider
+//
+// Offers the provider on the sign-in page. Refused 422
+// `base_url_required` as a creation is. An enabled provider is answered
+// as it is. Audited `auth_provider.enabled`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /instance/auth-providers/{provider}/enable (the `EnableAuthProvider` operationId).
+func (c *ClientWithResponses) EnableAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*EnableAuthProviderResponse, error) {
+	rsp, err := c.EnableAuthProvider(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEnableAuthProviderResponse(rsp)
+}
+
+// TestAuthProviderWithResponse Test that an auth provider can be reached
+//
+// Fetches the provider's discovery document now, enabled or not, and
+// answers what it found. Refused 502 `provider_unreachable` with the
+// `failure` when the provider does not answer, answers anything but a
+// document, or names another issuer. Nothing is stored.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /instance/auth-providers/{provider}/test (the `TestAuthProvider` operationId).
+func (c *ClientWithResponses) TestAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*TestAuthProviderResponse, error) {
+	rsp, err := c.TestAuthProvider(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTestAuthProviderResponse(rsp)
+}
+
 // GetAuthSettingsWithResponse The instance's auth settings
 //
 // Returns a wrapper object for the known response body format(s).
@@ -42890,6 +44633,588 @@ func ParseSignOutResponse(rsp *http.Response) (*SignOutResponse, error) {
 		response.Headers204 = &headers
 	case rsp.StatusCode == 401:
 		var headers SignOutResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListAuthProvidersResponse parses an HTTP response from a ListAuthProvidersWithResponse call
+func ParseListAuthProvidersResponse(rsp *http.Response) (*ListAuthProvidersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAuthProvidersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthProviderList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListAuthProvidersResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateAuthProviderResponse parses an HTTP response from a CreateAuthProviderWithResponse call
+func ParseCreateAuthProviderResponse(rsp *http.Response) (*CreateAuthProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateAuthProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest AuthProvider
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers CreateAuthProviderResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
+	case rsp.StatusCode == 401:
+		var headers CreateAuthProviderResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeleteAuthProviderResponse parses an HTTP response from a DeleteAuthProviderWithResponse call
+func ParseDeleteAuthProviderResponse(rsp *http.Response) (*DeleteAuthProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteAuthProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DeleteAuthProviderResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetAuthProviderResponse parses an HTTP response from a GetAuthProviderWithResponse call
+func ParseGetAuthProviderResponse(rsp *http.Response) (*GetAuthProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuthProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthProvider
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetAuthProviderResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers GetAuthProviderResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateAuthProviderResponse parses an HTTP response from a UpdateAuthProviderWithResponse call
+func ParseUpdateAuthProviderResponse(rsp *http.Response) (*UpdateAuthProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateAuthProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthProvider
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers UpdateAuthProviderResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers UpdateAuthProviderResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDisableAuthProviderResponse parses an HTTP response from a DisableAuthProviderWithResponse call
+func ParseDisableAuthProviderResponse(rsp *http.Response) (*DisableAuthProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DisableAuthProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthProvider
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers DisableAuthProviderResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers DisableAuthProviderResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseEnableAuthProviderResponse parses an HTTP response from a EnableAuthProviderWithResponse call
+func ParseEnableAuthProviderResponse(rsp *http.Response) (*EnableAuthProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EnableAuthProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthProvider
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers EnableAuthProviderResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers EnableAuthProviderResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseTestAuthProviderResponse parses an HTTP response from a TestAuthProviderWithResponse call
+func ParseTestAuthProviderResponse(rsp *http.Response) (*TestAuthProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TestAuthProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthProviderTest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers TestAuthProviderResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -54163,6 +56488,30 @@ type ServerInterface interface {
 	// SignOut Sign out
 	// (POST /auth/sign-out)
 	SignOut(w http.ResponseWriter, r *http.Request)
+	// ListAuthProviders The instance's auth providers
+	// (GET /instance/auth-providers)
+	ListAuthProviders(w http.ResponseWriter, r *http.Request)
+	// CreateAuthProvider Add an auth provider
+	// (POST /instance/auth-providers)
+	CreateAuthProvider(w http.ResponseWriter, r *http.Request)
+	// DeleteAuthProvider Delete an auth provider
+	// (DELETE /instance/auth-providers/{provider})
+	DeleteAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// GetAuthProvider An auth provider
+	// (GET /instance/auth-providers/{provider})
+	GetAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// UpdateAuthProvider Edit an auth provider
+	// (PATCH /instance/auth-providers/{provider})
+	UpdateAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug, params UpdateAuthProviderParams)
+	// DisableAuthProvider Disable an auth provider
+	// (POST /instance/auth-providers/{provider}/disable)
+	DisableAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// EnableAuthProvider Enable an auth provider
+	// (POST /instance/auth-providers/{provider}/enable)
+	EnableAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// TestAuthProvider Test that an auth provider can be reached
+	// (POST /instance/auth-providers/{provider}/test)
+	TestAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
 	// GetAuthSettings The instance's auth settings
 	// (GET /instance/auth-settings)
 	GetAuthSettings(w http.ResponseWriter, r *http.Request)
@@ -55100,6 +57449,214 @@ func (siw *ServerInterfaceWrapper) SignOut(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SignOut(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAuthProviders operation middleware
+func (siw *ServerInterfaceWrapper) ListAuthProviders(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAuthProviders(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAuthProvider operation middleware
+func (siw *ServerInterfaceWrapper) CreateAuthProvider(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAuthProvider(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAuthProvider operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAuthProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAuthProvider(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAuthProvider operation middleware
+func (siw *ServerInterfaceWrapper) GetAuthProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuthProvider(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAuthProvider operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAuthProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateAuthProviderParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAuthProvider(w, r, provider, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisableAuthProvider operation middleware
+func (siw *ServerInterfaceWrapper) DisableAuthProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisableAuthProvider(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EnableAuthProvider operation middleware
+func (siw *ServerInterfaceWrapper) EnableAuthProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EnableAuthProvider(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TestAuthProvider operation middleware
+func (siw *ServerInterfaceWrapper) TestAuthProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TestAuthProvider(w, r, provider)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -62034,6 +64591,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/members/{member}/tokens/{token}", wrapper.RevokeMemberToken)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-settings", wrapper.GetAuthSettings)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/auth-settings", wrapper.UpdateAuthSettings)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-providers", wrapper.ListAuthProviders)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers", wrapper.CreateAuthProvider)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/instance/auth-providers/{provider}", wrapper.DeleteAuthProvider)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-providers/{provider}", wrapper.GetAuthProvider)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/instance/auth-providers/{provider}", wrapper.UpdateAuthProvider)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/enable", wrapper.EnableAuthProvider)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/disable", wrapper.DisableAuthProvider)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/test", wrapper.TestAuthProvider)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit", wrapper.ListAuditEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/export", wrapper.ExportAuditEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/webhook-event-types", wrapper.ListWebhookEventTypes)
@@ -62068,6 +64633,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	return m
 }
+
+type BadGatewayApplicationProblemPlusJSONResponse Problem
 
 type BadRequestApplicationProblemPlusJSONResponse Problem
 
@@ -62829,6 +65396,763 @@ func (response SignOut403ApplicationProblemPlusJSONResponse) VisitSignOutRespons
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAuthProvidersRequestObject struct {
+}
+
+type ListAuthProvidersResponseObject interface {
+	VisitListAuthProvidersResponse(w http.ResponseWriter) error
+}
+
+type ListAuthProviders200JSONResponse AuthProviderList
+
+func (response ListAuthProviders200JSONResponse) VisitListAuthProvidersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAuthProviders401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListAuthProviders401ApplicationProblemPlusJSONResponse) VisitListAuthProvidersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAuthProviders403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListAuthProviders403ApplicationProblemPlusJSONResponse) VisitListAuthProvidersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAuthProviderRequestObject struct {
+	Body *CreateAuthProviderJSONRequestBody
+}
+
+type CreateAuthProviderResponseObject interface {
+	VisitCreateAuthProviderResponse(w http.ResponseWriter) error
+}
+
+type CreateAuthProvider201ResponseHeaders struct {
+	ETag *string
+}
+
+type CreateAuthProvider201JSONResponse struct {
+	Body    AuthProvider
+	Headers CreateAuthProvider201ResponseHeaders
+}
+
+func (response CreateAuthProvider201JSONResponse) VisitCreateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAuthProvider400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAuthProvider400ApplicationProblemPlusJSONResponse) VisitCreateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAuthProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAuthProvider401ApplicationProblemPlusJSONResponse) VisitCreateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAuthProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAuthProvider403ApplicationProblemPlusJSONResponse) VisitCreateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAuthProvider409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAuthProvider409ApplicationProblemPlusJSONResponse) VisitCreateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAuthProvider422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAuthProvider422ApplicationProblemPlusJSONResponse) VisitCreateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAuthProviderRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+}
+
+type DeleteAuthProviderResponseObject interface {
+	VisitDeleteAuthProviderResponse(w http.ResponseWriter) error
+}
+
+type DeleteAuthProvider204Response struct {
+}
+
+func (response DeleteAuthProvider204Response) VisitDeleteAuthProviderResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteAuthProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAuthProvider401ApplicationProblemPlusJSONResponse) VisitDeleteAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAuthProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAuthProvider403ApplicationProblemPlusJSONResponse) VisitDeleteAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAuthProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAuthProvider404ApplicationProblemPlusJSONResponse) VisitDeleteAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAuthProvider409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAuthProvider409ApplicationProblemPlusJSONResponse) VisitDeleteAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProviderRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+}
+
+type GetAuthProviderResponseObject interface {
+	VisitGetAuthProviderResponse(w http.ResponseWriter) error
+}
+
+type GetAuthProvider200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetAuthProvider200JSONResponse struct {
+	Body    AuthProvider
+	Headers GetAuthProvider200ResponseHeaders
+}
+
+func (response GetAuthProvider200JSONResponse) VisitGetAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthProvider401ApplicationProblemPlusJSONResponse) VisitGetAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthProvider403ApplicationProblemPlusJSONResponse) VisitGetAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthProvider404ApplicationProblemPlusJSONResponse) VisitGetAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProviderRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+	Params   UpdateAuthProviderParams
+	Body     *UpdateAuthProviderJSONRequestBody
+}
+
+type UpdateAuthProviderResponseObject interface {
+	VisitUpdateAuthProviderResponse(w http.ResponseWriter) error
+}
+
+type UpdateAuthProvider200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateAuthProvider200JSONResponse struct {
+	Body    AuthProvider
+	Headers UpdateAuthProvider200ResponseHeaders
+}
+
+func (response UpdateAuthProvider200JSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProvider400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthProvider400ApplicationProblemPlusJSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthProvider401ApplicationProblemPlusJSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthProvider403ApplicationProblemPlusJSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthProvider404ApplicationProblemPlusJSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProvider412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthProvider412ApplicationProblemPlusJSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProvider422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthProvider422ApplicationProblemPlusJSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthProvider428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthProvider428ApplicationProblemPlusJSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableAuthProviderRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+}
+
+type DisableAuthProviderResponseObject interface {
+	VisitDisableAuthProviderResponse(w http.ResponseWriter) error
+}
+
+type DisableAuthProvider200ResponseHeaders struct {
+	ETag *string
+}
+
+type DisableAuthProvider200JSONResponse struct {
+	Body    AuthProvider
+	Headers DisableAuthProvider200ResponseHeaders
+}
+
+func (response DisableAuthProvider200JSONResponse) VisitDisableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableAuthProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DisableAuthProvider401ApplicationProblemPlusJSONResponse) VisitDisableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableAuthProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DisableAuthProvider403ApplicationProblemPlusJSONResponse) VisitDisableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableAuthProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DisableAuthProvider404ApplicationProblemPlusJSONResponse) VisitDisableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableAuthProviderRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+}
+
+type EnableAuthProviderResponseObject interface {
+	VisitEnableAuthProviderResponse(w http.ResponseWriter) error
+}
+
+type EnableAuthProvider200ResponseHeaders struct {
+	ETag *string
+}
+
+type EnableAuthProvider200JSONResponse struct {
+	Body    AuthProvider
+	Headers EnableAuthProvider200ResponseHeaders
+}
+
+func (response EnableAuthProvider200JSONResponse) VisitEnableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableAuthProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response EnableAuthProvider401ApplicationProblemPlusJSONResponse) VisitEnableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableAuthProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response EnableAuthProvider403ApplicationProblemPlusJSONResponse) VisitEnableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableAuthProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response EnableAuthProvider404ApplicationProblemPlusJSONResponse) VisitEnableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableAuthProvider422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response EnableAuthProvider422ApplicationProblemPlusJSONResponse) VisitEnableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestAuthProviderRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+}
+
+type TestAuthProviderResponseObject interface {
+	VisitTestAuthProviderResponse(w http.ResponseWriter) error
+}
+
+type TestAuthProvider200JSONResponse AuthProviderTest
+
+func (response TestAuthProvider200JSONResponse) VisitTestAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestAuthProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response TestAuthProvider401ApplicationProblemPlusJSONResponse) VisitTestAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestAuthProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response TestAuthProvider403ApplicationProblemPlusJSONResponse) VisitTestAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestAuthProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response TestAuthProvider404ApplicationProblemPlusJSONResponse) VisitTestAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestAuthProvider502ApplicationProblemPlusJSONResponse struct {
+	BadGatewayApplicationProblemPlusJSONResponse
+}
+
+func (response TestAuthProvider502ApplicationProblemPlusJSONResponse) VisitTestAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(502)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -78298,6 +81622,30 @@ type StrictServerInterface interface {
 	// SignOut Sign out
 	// (POST /auth/sign-out)
 	SignOut(ctx context.Context, request SignOutRequestObject) (SignOutResponseObject, error)
+	// ListAuthProviders The instance's auth providers
+	// (GET /instance/auth-providers)
+	ListAuthProviders(ctx context.Context, request ListAuthProvidersRequestObject) (ListAuthProvidersResponseObject, error)
+	// CreateAuthProvider Add an auth provider
+	// (POST /instance/auth-providers)
+	CreateAuthProvider(ctx context.Context, request CreateAuthProviderRequestObject) (CreateAuthProviderResponseObject, error)
+	// DeleteAuthProvider Delete an auth provider
+	// (DELETE /instance/auth-providers/{provider})
+	DeleteAuthProvider(ctx context.Context, request DeleteAuthProviderRequestObject) (DeleteAuthProviderResponseObject, error)
+	// GetAuthProvider An auth provider
+	// (GET /instance/auth-providers/{provider})
+	GetAuthProvider(ctx context.Context, request GetAuthProviderRequestObject) (GetAuthProviderResponseObject, error)
+	// UpdateAuthProvider Edit an auth provider
+	// (PATCH /instance/auth-providers/{provider})
+	UpdateAuthProvider(ctx context.Context, request UpdateAuthProviderRequestObject) (UpdateAuthProviderResponseObject, error)
+	// DisableAuthProvider Disable an auth provider
+	// (POST /instance/auth-providers/{provider}/disable)
+	DisableAuthProvider(ctx context.Context, request DisableAuthProviderRequestObject) (DisableAuthProviderResponseObject, error)
+	// EnableAuthProvider Enable an auth provider
+	// (POST /instance/auth-providers/{provider}/enable)
+	EnableAuthProvider(ctx context.Context, request EnableAuthProviderRequestObject) (EnableAuthProviderResponseObject, error)
+	// TestAuthProvider Test that an auth provider can be reached
+	// (POST /instance/auth-providers/{provider}/test)
+	TestAuthProvider(ctx context.Context, request TestAuthProviderRequestObject) (TestAuthProviderResponseObject, error)
 	// GetAuthSettings The instance's auth settings
 	// (GET /instance/auth-settings)
 	GetAuthSettings(ctx context.Context, request GetAuthSettingsRequestObject) (GetAuthSettingsResponseObject, error)
@@ -78972,6 +82320,225 @@ func (sh *strictHandler) SignOut(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SignOutResponseObject); ok {
 		if err := validResponse.VisitSignOutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAuthProviders operation middleware
+func (sh *strictHandler) ListAuthProviders(w http.ResponseWriter, r *http.Request) {
+	var request ListAuthProvidersRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAuthProviders(ctx, request.(ListAuthProvidersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAuthProviders")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAuthProvidersResponseObject); ok {
+		if err := validResponse.VisitListAuthProvidersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateAuthProvider operation middleware
+func (sh *strictHandler) CreateAuthProvider(w http.ResponseWriter, r *http.Request) {
+	var request CreateAuthProviderRequestObject
+
+	var body CreateAuthProviderJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateAuthProvider(ctx, request.(CreateAuthProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateAuthProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateAuthProviderResponseObject); ok {
+		if err := validResponse.VisitCreateAuthProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteAuthProvider operation middleware
+func (sh *strictHandler) DeleteAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request DeleteAuthProviderRequestObject
+
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteAuthProvider(ctx, request.(DeleteAuthProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteAuthProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteAuthProviderResponseObject); ok {
+		if err := validResponse.VisitDeleteAuthProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAuthProvider operation middleware
+func (sh *strictHandler) GetAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request GetAuthProviderRequestObject
+
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAuthProvider(ctx, request.(GetAuthProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAuthProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAuthProviderResponseObject); ok {
+		if err := validResponse.VisitGetAuthProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateAuthProvider operation middleware
+func (sh *strictHandler) UpdateAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug, params UpdateAuthProviderParams) {
+	var request UpdateAuthProviderRequestObject
+
+	request.Provider = provider
+	request.Params = params
+
+	var body UpdateAuthProviderJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateAuthProvider(ctx, request.(UpdateAuthProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateAuthProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateAuthProviderResponseObject); ok {
+		if err := validResponse.VisitUpdateAuthProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DisableAuthProvider operation middleware
+func (sh *strictHandler) DisableAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request DisableAuthProviderRequestObject
+
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DisableAuthProvider(ctx, request.(DisableAuthProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DisableAuthProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DisableAuthProviderResponseObject); ok {
+		if err := validResponse.VisitDisableAuthProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EnableAuthProvider operation middleware
+func (sh *strictHandler) EnableAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request EnableAuthProviderRequestObject
+
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EnableAuthProvider(ctx, request.(EnableAuthProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EnableAuthProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EnableAuthProviderResponseObject); ok {
+		if err := validResponse.VisitEnableAuthProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TestAuthProvider operation middleware
+func (sh *strictHandler) TestAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request TestAuthProviderRequestObject
+
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TestAuthProvider(ctx, request.(TestAuthProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TestAuthProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TestAuthProviderResponseObject); ok {
+		if err := validResponse.VisitTestAuthProviderResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -29,6 +29,8 @@ const (
 	// PurposeSinkWebhookSecret seals the secret signing a webhook sink's
 	// calls.
 	PurposeSinkWebhookSecret Purpose = "sink_webhook_secret" //nolint:gosec // a label, not a credential
+	// PurposeOIDCClientSecret seals the client secrets of OIDC auth providers.
+	PurposeOIDCClientSecret Purpose = "oidc client secret" //nolint:gosec // a label, not a credential
 )
 
 // Use names a key derived from the secret key for something other than

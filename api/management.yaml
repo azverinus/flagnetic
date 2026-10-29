@@ -4698,6 +4698,240 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "422":
           $ref: "#/components/responses/Invalid"
+  /instance/auth-providers:
+    get:
+      operationId: listAuthProviders
+      summary: The instance's auth providers
+      description: |
+        Ordered by display name. A client secret is never listed:
+        `client_secret_set` says whether there is one.
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "200":
+          description: The auth providers.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthProviderList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createAuthProvider
+      summary: Add an auth provider
+      description: |
+        Adds an identity provider members can sign in through. It vouches only
+        for the email domains it names (`domains`, at least one, lowercased).
+        The client secret is sealed and never read back. The answer carries the
+        `redirect_uri` to register at the identity provider. Refused 422
+        `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
+        `insecure_url` for an `http` issuer other than on a loopback address;
+        private networks are allowed. A slug already in use is 409
+        `already_exists`. Audited `auth_provider.created`.
+      x-permission: instance_admin
+      tags: [instance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthProviderCreate"
+      responses:
+        "201":
+          description: The new auth provider.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthProvider"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /instance/auth-providers/{provider}:
+    parameters:
+      - $ref: "#/components/parameters/AuthProviderSlug"
+    get:
+      operationId: getAuthProvider
+      summary: An auth provider
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "200":
+          description: The auth provider; its `ETag` is its version.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthProvider"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateAuthProvider
+      summary: Edit an auth provider
+      description: |
+        Changes any property but `slug` and `kind`; each absent one is left as
+        it is, a sent `client_secret` replaces the stored one, and a `claims`
+        member names only the claims to rename. Whether the provider is enabled
+        is changed with `enable` and `disable`. Refused as a creation is.
+        Audited `auth_provider.updated`; an edit that changes nothing is not.
+      x-permission: instance_admin
+      tags: [instance]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthProviderPatch"
+      responses:
+        "200":
+          description: The auth provider as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthProvider"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+    delete:
+      operationId: deleteAuthProvider
+      summary: Delete an auth provider
+      description: |
+        Refused 409 `provider_in_use` while something depends on the provider;
+        `references` names what. Disable it instead: that stops its sign-ins
+        and leaves its members, identities and grants as they are. Audited
+        `auth_provider.deleted`.
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /instance/auth-providers/{provider}/enable:
+    parameters:
+      - $ref: "#/components/parameters/AuthProviderSlug"
+    post:
+      operationId: enableAuthProvider
+      summary: Enable an auth provider
+      description: |
+        Offers the provider on the sign-in page. Refused 422
+        `base_url_required` as a creation is. An enabled provider is answered
+        as it is. Audited `auth_provider.enabled`.
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "200":
+          description: The auth provider, enabled.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthProvider"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /instance/auth-providers/{provider}/disable:
+    parameters:
+      - $ref: "#/components/parameters/AuthProviderSlug"
+    post:
+      operationId: disableAuthProvider
+      summary: Disable an auth provider
+      description: |
+        Stops the provider's sign-ins and its SCIM tokens and leaves its
+        members, identities and grants as they are. A disabled provider is
+        answered as it is. Audited `auth_provider.disabled`.
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "200":
+          description: The auth provider, disabled.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthProvider"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /instance/auth-providers/{provider}/test:
+    parameters:
+      - $ref: "#/components/parameters/AuthProviderSlug"
+    post:
+      operationId: testAuthProvider
+      summary: Test that an auth provider can be reached
+      description: |
+        Fetches the provider's discovery document now, enabled or not, and
+        answers what it found. Refused 502 `provider_unreachable` with the
+        `failure` when the provider does not answer, answers anything but a
+        document, or names another issuer. Nothing is stored.
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "200":
+          description: What the discovery document says.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthProviderTest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
   /audit:
     get:
       operationId: listAuditEntries
@@ -5871,6 +6105,13 @@ components:
       schema:
         type: string
         format: uuid
+    AuthProviderSlug:
+      name: provider
+      in: path
+      required: true
+      description: The auth provider's slug.
+      schema:
+        type: string
     WebhookID:
       name: webhook
       in: path
@@ -6016,6 +6257,12 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
+    BadGateway:
+      description: "`provider_unreachable`: a system the server asked, such as an identity provider, did not answer as needed; `failure` says why."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
     Invalid:
       description: The request is well formed but breaks a rule; `errors` names each field to fix.
       content:
@@ -6147,6 +6394,14 @@ components:
           description: What still names what the write would remove or hide, for `in_use`.
           items:
             $ref: "#/components/schemas/Reference"
+        used_by:
+          type: array
+          description: What refers to an auth provider that cannot be deleted, such as `identities`, for `provider_in_use`.
+          items:
+            type: string
+        failure:
+          type: string
+          description: Why a system the server asked did not answer as needed, for `provider_unreachable`.
         errors:
           type: array
           items:
@@ -6175,6 +6430,201 @@ components:
         password:
           type: string
           format: password
+    AuthProviderKind:
+      type: string
+      description: The protocol the provider speaks.
+      enum: [oidc]
+    AuthProviderClaims:
+      type: object
+      description: The claims of the provider's tokens that carry what the instance reads of a person.
+      required: [email, name, groups]
+      properties:
+        email:
+          type: string
+          description: Default `email`.
+        name:
+          type: string
+          description: Default `name`.
+        groups:
+          type: string
+          description: Default `groups`.
+    AuthProviderClaimsPatch:
+      type: object
+      description: The claims to rename; each absent one is left as it is.
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        groups:
+          type: string
+    AuthProvider:
+      type: object
+      required: [id, slug, kind, display_name, enabled, domains, link_by_email, auto_provision, created_at, updated_at, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+          pattern: "^[a-z][a-z0-9_-]{0,63}$"
+          description: Names the provider in sign-in buttons and URLs; never changes.
+        kind:
+          $ref: "#/components/schemas/AuthProviderKind"
+        display_name:
+          type: string
+          description: What the sign-in button says, 1 to 200 characters.
+        enabled:
+          type: boolean
+        domains:
+          type: array
+          description: The email domains the provider vouches for, lowercase.
+          items:
+            type: string
+        link_by_email:
+          type: boolean
+          description: Whether a sign-in whose email is in `domains` is linked to the existing member with that email.
+        auto_provision:
+          type: boolean
+          description: Whether a sign-in whose email is in `domains` creates its member.
+        issuer:
+          type: string
+          description: The OIDC provider's issuer URL.
+        client_id:
+          type: string
+        client_secret_set:
+          type: boolean
+          description: Whether a client secret is stored; the secret itself is never answered.
+        scopes:
+          type: array
+          items:
+            type: string
+        claims:
+          $ref: "#/components/schemas/AuthProviderClaims"
+        require_verified_email:
+          type: boolean
+          description: Whether a sign-in whose token does not say the email is verified is refused.
+        redirect_uri:
+          type: string
+          description: |
+            The redirect URI to register at the identity provider, built from
+            `FLAGNETIC_BASE_URL`; absent while the instance has none.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+    AuthProviderList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuthProvider"
+    AuthProviderCreate:
+      type: object
+      required: [slug, kind, display_name, domains, issuer, client_id, client_secret]
+      properties:
+        slug:
+          type: string
+          pattern: "^[a-z][a-z0-9_-]{0,63}$"
+        kind:
+          $ref: "#/components/schemas/AuthProviderKind"
+        display_name:
+          type: string
+        enabled:
+          type: boolean
+          description: Default true.
+        domains:
+          type: array
+          items:
+            type: string
+        link_by_email:
+          type: boolean
+          description: Default false.
+        auto_provision:
+          type: boolean
+          description: Default false.
+        issuer:
+          type: string
+          description: "`https`, or `http` on a loopback address."
+        client_id:
+          type: string
+        client_secret:
+          type: string
+          format: password
+          writeOnly: true
+        scopes:
+          type: array
+          description: Default `openid`, `email` and `profile`.
+          items:
+            type: string
+        claims:
+          $ref: "#/components/schemas/AuthProviderClaimsPatch"
+        require_verified_email:
+          type: boolean
+          description: Default true.
+    AuthProviderPatch:
+      type: object
+      description: The properties to change; each absent one is left as it is.
+      properties:
+        display_name:
+          type: string
+        domains:
+          type: array
+          items:
+            type: string
+        link_by_email:
+          type: boolean
+        auto_provision:
+          type: boolean
+        issuer:
+          type: string
+        client_id:
+          type: string
+        client_secret:
+          type: string
+          format: password
+          writeOnly: true
+        scopes:
+          type: array
+          items:
+            type: string
+        claims:
+          $ref: "#/components/schemas/AuthProviderClaimsPatch"
+        require_verified_email:
+          type: boolean
+    AuthProviderTest:
+      type: object
+      description: What the provider's discovery document says.
+      required: [issuer, authorization_endpoint, token_endpoint, jwks_uri]
+      properties:
+        issuer:
+          type: string
+        authorization_endpoint:
+          type: string
+        token_endpoint:
+          type: string
+        jwks_uri:
+          type: string
+        userinfo_endpoint:
+          type: string
+          description: Absent when the provider offers none.
+        scopes_supported:
+          type: array
+          description: Absent when the document does not list them.
+          items:
+            type: string
+        code_challenge_methods_supported:
+          type: array
+          description: Absent when the document does not list them; sign-in needs `S256`.
+          items:
+            type: string
     AuthMethods:
       type: object
       required: [local_login_enabled, providers]
@@ -6184,9 +6634,19 @@ components:
           description: Whether a member signs in with their email and password.
         providers:
           type: array
-          description: The identity providers a member signs in through; none yet.
+          description: The enabled auth providers a member signs in through, ordered by display name.
           items:
-            type: object
+            $ref: "#/components/schemas/AuthMethodProvider"
+    AuthMethodProvider:
+      type: object
+      required: [slug, display_name, kind]
+      properties:
+        slug:
+          type: string
+        display_name:
+          type: string
+        kind:
+          $ref: "#/components/schemas/AuthProviderKind"
     MemberStatus:
       type: string
       enum: [invited, active, deactivated]

@@ -39,6 +39,9 @@ const (
 	KindRateLimited
 	// KindUnavailable: a dependency failed in a way worth retrying later.
 	KindUnavailable
+	// KindBadGateway: a system the server asked on the caller's behalf, such as
+	// an identity provider, did not answer as needed.
+	KindBadGateway
 )
 
 var kindNames = [...]string{
@@ -51,6 +54,7 @@ var kindNames = [...]string{
 	KindGone:               "gone",
 	KindRateLimited:        "rate_limited",
 	KindUnavailable:        "unavailable",
+	KindBadGateway:         "bad_gateway",
 }
 
 // String returns the kind's snake_case name, or "none" for the zero value.
@@ -139,6 +143,9 @@ func RateLimited(code, detail string, retryAfter time.Duration) *Error {
 
 // Unavailable reports a dependency failure worth retrying later.
 func Unavailable(code, detail string) *Error { return newError(KindUnavailable, code, detail) }
+
+// BadGateway is an error of KindBadGateway.
+func BadGateway(code, detail string) *Error { return newError(KindBadGateway, code, detail) }
 
 // WithRetryAfter returns a copy of e saying how long to wait before
 // retrying, for an unavailable error whose wait is known, such as a busy
