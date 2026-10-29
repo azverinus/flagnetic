@@ -145,6 +145,9 @@ import type {
   ExportProjectAuditEntriesData,
   ExportProjectAuditEntriesErrors,
   ExportProjectAuditEntriesResponses,
+  ExportProjectData,
+  ExportProjectErrors,
+  ExportProjectResponses,
   GetAttributeData,
   GetAttributeErrors,
   GetAttributeResponses,
@@ -1015,6 +1018,44 @@ export const getProjectMe = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/me",
+    ...options,
+  });
+
+/**
+ * Download the project's configuration as a project document
+ *
+ * Writes the project's whole configuration as a project document, in
+ * JSON (the default, and the canonical encoding) or YAML (derived from
+ * it field for field): its environments in their order, unit types,
+ * declared attributes, segments, flags with their configuration in every
+ * environment, and experiments, each list by key, so that two exports of
+ * an unchanged project are the same bytes. Rule identifiers and rollout
+ * salts are in it, which keep every unit in its bucket in a copy; owners
+ * are email addresses, and an override's note is in it and its author is
+ * not.
+ *
+ * Members, grants, tokens, SDK keys, webhook subscriptions, change
+ * requests, audit entries, events, the standard attributes and the
+ * discovered attributes are never in it.
+ *
+ * The `ETag` is the identifier of the project's latest audit entry,
+ * quoted: a later change to the project, whatever it touches, moves it.
+ * Reading the project is all it takes, so nothing is audited.
+ *
+ */
+export const exportProject = <ThrowOnError extends boolean = false>(
+  options: Options<ExportProjectData, ThrowOnError>,
+): RequestResult<ExportProjectResponses, ExportProjectErrors, ThrowOnError> =>
+  (options.client ?? client).get<ExportProjectResponses, ExportProjectErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/export",
     ...options,
   });
 

@@ -2765,6 +2765,263 @@ export type WebhookDeliveryList = {
 };
 
 /**
+ * A project's whole configuration, versioned apart from this API: it
+ * has its own `schema_version`, a server imports every version it ever
+ * exported, and within a version a document changes only additively
+ * (a new optional field or section). A field it does not define is
+ * refused naming its JSON Pointer. Identity is the key: no entity
+ * identifier travels, except rule ids and rollout salts.
+ *
+ */
+export type ProjectDocument = {
+  schema_version: 1;
+  project: DocumentProject;
+  /**
+   * In their sort order, which the array's order is.
+   */
+  environments: Array<DocumentEnvironment>;
+  /**
+   * By key.
+   */
+  unit_types: Array<DocumentUnitType>;
+  /**
+   * By key. The standard attributes are never listed.
+   */
+  attributes: Array<DocumentAttribute>;
+  /**
+   * By key.
+   */
+  segments: Array<DocumentSegment>;
+  /**
+   * By key.
+   */
+  flags: Array<DocumentFlag>;
+  /**
+   * By key, whatever their status.
+   */
+  experiments: Array<DocumentExperiment>;
+};
+
+export type DocumentProject = {
+  key: string;
+  name: string;
+  description?: string;
+};
+
+export type DocumentEnvironment = {
+  key: string;
+  name: string;
+  protected: boolean;
+};
+
+export type DocumentUnitType = {
+  key: string;
+  name: string;
+  description?: string;
+};
+
+export type DocumentAttribute = {
+  key: string;
+  /**
+   * `string`, `number`, `boolean`, `semver` or `date`.
+   */
+  type: string;
+  name: string;
+  description?: string;
+};
+
+export type DocumentSegment = {
+  key: string;
+  name: string;
+  description?: string;
+  private: boolean;
+  conditions: Array<DocumentCondition>;
+};
+
+/**
+ * One comparison inside a rule or a segment. An `attribute` condition
+ * names an `attribute`, an operator (`op`) and a `value` (none for
+ * `exists`, `not_exists` and `is_empty`); `in_segment` and
+ * `not_in_segment` name a `segment`; `prerequisite` names a `flag` and
+ * one of its `variation`s.
+ *
+ */
+export type DocumentCondition = {
+  kind: string;
+  attribute?: string;
+  op?: string;
+  /**
+   * A string, number, boolean or list, as the operator needs.
+   */
+  value?: unknown;
+  segment?: string;
+  flag?: string;
+  variation?: string;
+};
+
+export type DocumentFlag = {
+  key: string;
+  /**
+   * `boolean`, `string`, `number` or `json`; never changes.
+   */
+  type: string;
+  name: string;
+  description?: string;
+  /**
+   * The email address of the flag's owner.
+   */
+  owner?: string;
+  tags?: Array<string>;
+  /**
+   * `temporary` or `permanent`.
+   */
+  lifetime: string;
+  /**
+   * When a temporary flag is expected to be removed; null for a permanent one.
+   */
+  expected_removal_at?: string | null;
+  automatic_exposure?: boolean;
+  archived?: boolean;
+  /**
+   * In the order the flag lists them, the first being the default of a flag that is not boolean.
+   */
+  variations: Array<DocumentVariation>;
+  /**
+   * The flag's configuration in each environment, keyed by environment key.
+   */
+  configurations: {
+    [key: string]: DocumentConfiguration;
+  };
+};
+
+export type DocumentVariation = {
+  key: string;
+  /**
+   * JSON of the flag's type.
+   */
+  value: unknown;
+  name?: string;
+  description?: string;
+};
+
+export type DocumentConfiguration = {
+  on: boolean;
+  off_variation: string;
+  fallthrough: string;
+  /**
+   * By flag.
+   */
+  prerequisites?: Array<DocumentPrerequisite>;
+  /**
+   * By unit type, then unit ID.
+   */
+  overrides?: Array<DocumentOverride>;
+  /**
+   * In the order they are checked.
+   */
+  rules: Array<DocumentRule>;
+};
+
+export type DocumentPrerequisite = {
+  flag: string;
+  variation: string;
+};
+
+export type DocumentOverride = {
+  unit_type: string;
+  unit_id: string;
+  variation: string;
+  /**
+   * Why the unit is pinned. Who pinned it does not travel.
+   */
+  note?: string;
+};
+
+export type DocumentRule = {
+  /**
+   * Kept across instances so that an SDK's rule id stays stable; minted on import when absent.
+   */
+  id?: string;
+  description?: string;
+  conditions: Array<DocumentCondition>;
+  serve: DocumentServe;
+};
+
+/**
+ * What a matching rule serves. `variation` serves `variation`; `rollout`
+ * serves `variation` to `percentage` (basis points, 0 to 10,000) of the
+ * units of `unit_type`, bucketed by `salt`; `experiment` serves the
+ * experiment `experiment` of the flag.
+ *
+ */
+export type DocumentServe = {
+  /**
+   * `variation`, `rollout` or `experiment`.
+   */
+  kind: string;
+  variation?: string;
+  experiment?: string;
+  unit_type?: string;
+  percentage?: number;
+  /**
+   * A rollout's salt, 16 lower-case letters and digits; it decides which units fall in the share, so it travels. Minted on import when absent.
+   */
+  salt?: string;
+};
+
+export type DocumentExperiment = {
+  key: string;
+  name: string;
+  hypothesis?: string;
+  /**
+   * The email address of the experiment's owner.
+   */
+  owner?: string;
+  tags?: Array<string>;
+  /**
+   * The key of the flag whose variations are compared.
+   */
+  flag: string;
+  unit_type: string;
+  /**
+   * In the order that fixes the cumulative bucket ranges.
+   */
+  variations: Array<DocumentExperimentVariation>;
+  /**
+   * The share of units included, in basis points.
+   */
+  traffic_allocation: number;
+  inclusion_salt?: string;
+  variation_salt?: string;
+  /**
+   * `draft`, `running`, `stopped` or `archived`.
+   */
+  status: string;
+  expected_end_at?: string | null;
+  started_at?: string | null;
+  stopped_at?: string | null;
+  archived_at?: string | null;
+  decision?: DocumentDecision | null;
+};
+
+export type DocumentExperimentVariation = {
+  variation: string;
+  /**
+   * The share of the allocated traffic, in basis points.
+   */
+  weight: number;
+};
+
+export type DocumentDecision = {
+  /**
+   * `winner` or `removed`.
+   */
+  outcome: string;
+  winner_variation?: string;
+  note?: string;
+};
+
+/**
  * A member's identifier; their own changes and those of their personal access tokens.
  */
 export type AuditActor = string;
@@ -2810,6 +3067,11 @@ export type AuditKillSwitch = boolean;
  * A change request's identifier; lists the entries its application wrote.
  */
 export type AuditChangeRequest = string;
+
+/**
+ * The document's encoding, JSON unless `yaml` is asked for.
+ */
+export type DocumentFormat = "json" | "yaml";
 
 /**
  * The download's format, JSON Lines unless `csv` is asked for.
@@ -3987,6 +4249,68 @@ export type GetProjectMeResponses = {
 };
 
 export type GetProjectMeResponse = GetProjectMeResponses[keyof GetProjectMeResponses];
+
+export type ExportProjectData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: {
+    /**
+     * The document's encoding, JSON unless `yaml` is asked for.
+     */
+    format?: "json" | "yaml";
+  };
+  url: "/projects/{project}/export";
+};
+
+export type ExportProjectErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ExportProjectError = ExportProjectErrors[keyof ExportProjectErrors];
+
+export type ExportProjectResponses = {
+  /**
+   * The project document, as an attachment named
+   * `{project key}-{UTC time, yyyymmddThhmmssZ}.{json|yaml}`.
+   *
+   */
+  200: ProjectDocument;
+};
+
+export type ExportProjectResponse = ExportProjectResponses[keyof ExportProjectResponses];
 
 export type ListEnvironmentsData = {
   body?: never;

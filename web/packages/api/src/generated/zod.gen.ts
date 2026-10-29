@@ -1994,6 +1994,174 @@ export const zWebhookDeliveryList = z.object({
   next_cursor: z.string().nullable(),
 });
 
+export const zDocumentProject = z.object({
+  key: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+});
+
+export const zDocumentEnvironment = z.object({
+  key: z.string(),
+  name: z.string(),
+  protected: z.boolean(),
+});
+
+export const zDocumentUnitType = z.object({
+  key: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+});
+
+export const zDocumentAttribute = z.object({
+  key: z.string(),
+  type: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+});
+
+/**
+ * One comparison inside a rule or a segment. An `attribute` condition
+ * names an `attribute`, an operator (`op`) and a `value` (none for
+ * `exists`, `not_exists` and `is_empty`); `in_segment` and
+ * `not_in_segment` name a `segment`; `prerequisite` names a `flag` and
+ * one of its `variation`s.
+ *
+ */
+export const zDocumentCondition = z.object({
+  kind: z.string(),
+  attribute: z.string().optional(),
+  op: z.string().optional(),
+  value: z.unknown().optional(),
+  segment: z.string().optional(),
+  flag: z.string().optional(),
+  variation: z.string().optional(),
+});
+
+export const zDocumentSegment = z.object({
+  key: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  private: z.boolean(),
+  conditions: z.array(zDocumentCondition),
+});
+
+export const zDocumentVariation = z.object({
+  key: z.string(),
+  value: z.unknown(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+});
+
+export const zDocumentPrerequisite = z.object({
+  flag: z.string(),
+  variation: z.string(),
+});
+
+export const zDocumentOverride = z.object({
+  unit_type: z.string(),
+  unit_id: z.string(),
+  variation: z.string(),
+  note: z.string().optional(),
+});
+
+/**
+ * What a matching rule serves. `variation` serves `variation`; `rollout`
+ * serves `variation` to `percentage` (basis points, 0 to 10,000) of the
+ * units of `unit_type`, bucketed by `salt`; `experiment` serves the
+ * experiment `experiment` of the flag.
+ *
+ */
+export const zDocumentServe = z.object({
+  kind: z.string(),
+  variation: z.string().optional(),
+  experiment: z.string().optional(),
+  unit_type: z.string().optional(),
+  percentage: z.int().optional(),
+  salt: z.string().optional(),
+});
+
+export const zDocumentRule = z.object({
+  id: z.uuid().optional(),
+  description: z.string().optional(),
+  conditions: z.array(zDocumentCondition),
+  serve: zDocumentServe,
+});
+
+export const zDocumentConfiguration = z.object({
+  on: z.boolean(),
+  off_variation: z.string(),
+  fallthrough: z.string(),
+  prerequisites: z.array(zDocumentPrerequisite).optional(),
+  overrides: z.array(zDocumentOverride).optional(),
+  rules: z.array(zDocumentRule),
+});
+
+export const zDocumentFlag = z.object({
+  key: z.string(),
+  type: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  owner: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  lifetime: z.string(),
+  expected_removal_at: z.iso.datetime().nullish(),
+  automatic_exposure: z.boolean().optional(),
+  archived: z.boolean().optional(),
+  variations: z.array(zDocumentVariation),
+  configurations: z.record(z.string(), zDocumentConfiguration),
+});
+
+export const zDocumentExperimentVariation = z.object({
+  variation: z.string(),
+  weight: z.int(),
+});
+
+export const zDocumentDecision = z.object({
+  outcome: z.string(),
+  winner_variation: z.string().optional(),
+  note: z.string().optional(),
+});
+
+export const zDocumentExperiment = z.object({
+  key: z.string(),
+  name: z.string(),
+  hypothesis: z.string().optional(),
+  owner: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  flag: z.string(),
+  unit_type: z.string(),
+  variations: z.array(zDocumentExperimentVariation),
+  traffic_allocation: z.int(),
+  inclusion_salt: z.string().optional(),
+  variation_salt: z.string().optional(),
+  status: z.string(),
+  expected_end_at: z.iso.date().nullish(),
+  started_at: z.iso.datetime().nullish(),
+  stopped_at: z.iso.datetime().nullish(),
+  archived_at: z.iso.datetime().nullish(),
+  decision: zDocumentDecision.nullish(),
+});
+
+/**
+ * A project's whole configuration, versioned apart from this API: it
+ * has its own `schema_version`, a server imports every version it ever
+ * exported, and within a version a document changes only additively
+ * (a new optional field or section). A field it does not define is
+ * refused naming its JSON Pointer. Identity is the key: no entity
+ * identifier travels, except rule ids and rollout salts.
+ *
+ */
+export const zProjectDocument = z.object({
+  schema_version: z.literal(1),
+  project: zDocumentProject,
+  environments: z.array(zDocumentEnvironment),
+  unit_types: z.array(zDocumentUnitType),
+  attributes: z.array(zDocumentAttribute),
+  segments: z.array(zDocumentSegment),
+  flags: z.array(zDocumentFlag),
+  experiments: z.array(zDocumentExperiment),
+});
+
 /**
  * A member's identifier; their own changes and those of their personal access tokens.
  */
@@ -2040,6 +2208,11 @@ export const zAuditKillSwitch = z.boolean();
  * A change request's identifier; lists the entries its application wrote.
  */
 export const zAuditChangeRequest = z.uuid();
+
+/**
+ * The document's encoding, JSON unless `yaml` is asked for.
+ */
+export const zDocumentFormat = z.enum(["json", "yaml"]).default("json");
 
 /**
  * The download's format, JSON Lines unless `csv` is asked for.
@@ -2308,6 +2481,21 @@ export const zGetProjectMePath = z.object({
  * The caller's grants and permissions.
  */
 export const zGetProjectMeResponse = zProjectMe;
+
+export const zExportProjectPath = z.object({
+  project: z.string(),
+});
+
+export const zExportProjectQuery = z.object({
+  format: z.enum(["json", "yaml"]).optional().default("json"),
+});
+
+/**
+ * The project document, as an attachment named
+ * `{project key}-{UTC time, yyyymmddThhmmssZ}.{json|yaml}`.
+ *
+ */
+export const zExportProjectResponse = zProjectDocument;
 
 export const zListEnvironmentsPath = z.object({
   project: z.string(),

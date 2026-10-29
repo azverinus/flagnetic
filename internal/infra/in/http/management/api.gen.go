@@ -17,6 +17,8 @@ import (
 	"strings"
 	"time"
 
+	"go.yaml.in/yaml/v3"
+
 	"github.com/oapi-codegen/nullable"
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -472,6 +474,21 @@ func (e PatchOperationOp) Valid() bool {
 	}
 }
 
+// Defines values for ProjectDocumentSchemaVersion.
+const (
+	ProjectDocumentSchemaVersionN1 ProjectDocumentSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the ProjectDocumentSchemaVersion enum.
+func (e ProjectDocumentSchemaVersion) Valid() bool {
+	switch e {
+	case ProjectDocumentSchemaVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RoleName.
 const (
 	RoleNameDeveloper  RoleName = "developer"
@@ -703,6 +720,24 @@ func (e AuditExportFormat) Valid() bool {
 	}
 }
 
+// Defines values for DocumentFormat.
+const (
+	DocumentFormatJson DocumentFormat = "json"
+	DocumentFormatYaml DocumentFormat = "yaml"
+)
+
+// Valid indicates whether the value is a known member of the DocumentFormat enum.
+func (e DocumentFormat) Valid() bool {
+	switch e {
+	case DocumentFormatJson:
+		return true
+	case DocumentFormatYaml:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ExportAuditEntriesParamsFormat.
 const (
 	ExportAuditEntriesParamsFormatCsv   ExportAuditEntriesParamsFormat = "csv"
@@ -733,6 +768,24 @@ func (e ExportProjectAuditEntriesParamsFormat) Valid() bool {
 	case ExportProjectAuditEntriesParamsFormatCsv:
 		return true
 	case ExportProjectAuditEntriesParamsFormatJsonl:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ExportProjectParamsFormat.
+const (
+	ExportProjectParamsFormatJson ExportProjectParamsFormat = "json"
+	ExportProjectParamsFormatYaml ExportProjectParamsFormat = "yaml"
+)
+
+// Valid indicates whether the value is a known member of the ExportProjectParamsFormat enum.
+func (e ExportProjectParamsFormat) Valid() bool {
+	switch e {
+	case ExportProjectParamsFormatJson:
+		return true
+	case ExportProjectParamsFormatYaml:
 		return true
 	default:
 		return false
@@ -1319,6 +1372,212 @@ type DiscoveredAttributeDeclaration struct {
 // DiscoveredAttributeList defines model for DiscoveredAttributeList.
 type DiscoveredAttributeList struct {
 	Items []DiscoveredAttribute `json:"items"`
+}
+
+// DocumentAttribute defines model for DocumentAttribute.
+type DocumentAttribute struct {
+	Description *string `json:"description,omitempty"`
+	Key         string  `json:"key"`
+	Name        string  `json:"name"`
+
+	// Type `string`, `number`, `boolean`, `semver` or `date`.
+	Type string `json:"type"`
+}
+
+// DocumentCondition One comparison inside a rule or a segment. An `attribute` condition
+// names an `attribute`, an operator (`op`) and a `value` (none for
+// `exists`, `not_exists` and `is_empty`); `in_segment` and
+// `not_in_segment` name a `segment`; `prerequisite` names a `flag` and
+// one of its `variation`s.
+type DocumentCondition struct {
+	Attribute *string `json:"attribute,omitempty"`
+	Flag      *string `json:"flag,omitempty"`
+	Kind      string  `json:"kind"`
+	Op        *string `json:"op,omitempty"`
+	Segment   *string `json:"segment,omitempty"`
+
+	// Value A string, number, boolean or list, as the operator needs.
+	Value     interface{} `json:"value,omitempty"`
+	Variation *string     `json:"variation,omitempty"`
+}
+
+// DocumentConfiguration defines model for DocumentConfiguration.
+type DocumentConfiguration struct {
+	Fallthrough  string `json:"fallthrough"`
+	OffVariation string `json:"off_variation"`
+	On           bool   `json:"on"`
+
+	// Overrides By unit type, then unit ID.
+	Overrides *[]DocumentOverride `json:"overrides,omitempty"`
+
+	// Prerequisites By flag.
+	Prerequisites *[]DocumentPrerequisite `json:"prerequisites,omitempty"`
+
+	// Rules In the order they are checked.
+	Rules []DocumentRule `json:"rules"`
+}
+
+// DocumentDecision defines model for DocumentDecision.
+type DocumentDecision struct {
+	Note *string `json:"note,omitempty"`
+
+	// Outcome `winner` or `removed`.
+	Outcome         string  `json:"outcome"`
+	WinnerVariation *string `json:"winner_variation,omitempty"`
+}
+
+// DocumentEnvironment defines model for DocumentEnvironment.
+type DocumentEnvironment struct {
+	Key       string `json:"key"`
+	Name      string `json:"name"`
+	Protected bool   `json:"protected"`
+}
+
+// DocumentExperiment defines model for DocumentExperiment.
+type DocumentExperiment struct {
+	ArchivedAt    *time.Time          `json:"archived_at,omitempty"`
+	Decision      *DocumentDecision   `json:"decision,omitempty"`
+	ExpectedEndAt *openapi_types.Date `json:"expected_end_at,omitempty"`
+
+	// Flag The key of the flag whose variations are compared.
+	Flag          string  `json:"flag"`
+	Hypothesis    *string `json:"hypothesis,omitempty"`
+	InclusionSalt *string `json:"inclusion_salt,omitempty"`
+	Key           string  `json:"key"`
+	Name          string  `json:"name"`
+
+	// Owner The email address of the experiment's owner.
+	Owner     *string    `json:"owner,omitempty"`
+	StartedAt *time.Time `json:"started_at,omitempty"`
+
+	// Status `draft`, `running`, `stopped` or `archived`.
+	Status    string     `json:"status"`
+	StoppedAt *time.Time `json:"stopped_at,omitempty"`
+	Tags      *[]string  `json:"tags,omitempty"`
+
+	// TrafficAllocation The share of units included, in basis points.
+	TrafficAllocation int     `json:"traffic_allocation"`
+	UnitType          string  `json:"unit_type"`
+	VariationSalt     *string `json:"variation_salt,omitempty"`
+
+	// Variations In the order that fixes the cumulative bucket ranges.
+	Variations []DocumentExperimentVariation `json:"variations"`
+}
+
+// DocumentExperimentVariation defines model for DocumentExperimentVariation.
+type DocumentExperimentVariation struct {
+	Variation string `json:"variation"`
+
+	// Weight The share of the allocated traffic, in basis points.
+	Weight int `json:"weight"`
+}
+
+// DocumentFlag defines model for DocumentFlag.
+type DocumentFlag struct {
+	Archived          *bool `json:"archived,omitempty"`
+	AutomaticExposure *bool `json:"automatic_exposure,omitempty"`
+
+	// Configurations The flag's configuration in each environment, keyed by environment key.
+	Configurations map[string]DocumentConfiguration `json:"configurations"`
+	Description    *string                          `json:"description,omitempty"`
+
+	// ExpectedRemovalAt When a temporary flag is expected to be removed; null for a permanent one.
+	ExpectedRemovalAt *time.Time `json:"expected_removal_at,omitempty"`
+	Key               string     `json:"key"`
+
+	// Lifetime `temporary` or `permanent`.
+	Lifetime string `json:"lifetime"`
+	Name     string `json:"name"`
+
+	// Owner The email address of the flag's owner.
+	Owner *string   `json:"owner,omitempty"`
+	Tags  *[]string `json:"tags,omitempty"`
+
+	// Type `boolean`, `string`, `number` or `json`; never changes.
+	Type string `json:"type"`
+
+	// Variations In the order the flag lists them, the first being the default of a flag that is not boolean.
+	Variations []DocumentVariation `json:"variations"`
+}
+
+// DocumentOverride defines model for DocumentOverride.
+type DocumentOverride struct {
+	// Note Why the unit is pinned. Who pinned it does not travel.
+	Note      *string `json:"note,omitempty"`
+	UnitId    string  `json:"unit_id"`
+	UnitType  string  `json:"unit_type"`
+	Variation string  `json:"variation"`
+}
+
+// DocumentPrerequisite defines model for DocumentPrerequisite.
+type DocumentPrerequisite struct {
+	Flag      string `json:"flag"`
+	Variation string `json:"variation"`
+}
+
+// DocumentProject defines model for DocumentProject.
+type DocumentProject struct {
+	Description *string `json:"description,omitempty"`
+	Key         string  `json:"key"`
+	Name        string  `json:"name"`
+}
+
+// DocumentRule defines model for DocumentRule.
+type DocumentRule struct {
+	Conditions  []DocumentCondition `json:"conditions"`
+	Description *string             `json:"description,omitempty"`
+
+	// Id Kept across instances so that an SDK's rule id stays stable; minted on import when absent.
+	Id *openapi_types.UUID `json:"id,omitempty"`
+
+	// Serve What a matching rule serves. `variation` serves `variation`; `rollout`
+	// serves `variation` to `percentage` (basis points, 0 to 10,000) of the
+	// units of `unit_type`, bucketed by `salt`; `experiment` serves the
+	// experiment `experiment` of the flag.
+	Serve DocumentServe `json:"serve"`
+}
+
+// DocumentSegment defines model for DocumentSegment.
+type DocumentSegment struct {
+	Conditions  []DocumentCondition `json:"conditions"`
+	Description *string             `json:"description,omitempty"`
+	Key         string              `json:"key"`
+	Name        string              `json:"name"`
+	Private     bool                `json:"private"`
+}
+
+// DocumentServe What a matching rule serves. `variation` serves `variation`; `rollout`
+// serves `variation` to `percentage` (basis points, 0 to 10,000) of the
+// units of `unit_type`, bucketed by `salt`; `experiment` serves the
+// experiment `experiment` of the flag.
+type DocumentServe struct {
+	Experiment *string `json:"experiment,omitempty"`
+
+	// Kind `variation`, `rollout` or `experiment`.
+	Kind       string `json:"kind"`
+	Percentage *int   `json:"percentage,omitempty"`
+
+	// Salt A rollout's salt, 16 lower-case letters and digits; it decides which units fall in the share, so it travels. Minted on import when absent.
+	Salt      *string `json:"salt,omitempty"`
+	UnitType  *string `json:"unit_type,omitempty"`
+	Variation *string `json:"variation,omitempty"`
+}
+
+// DocumentUnitType defines model for DocumentUnitType.
+type DocumentUnitType struct {
+	Description *string `json:"description,omitempty"`
+	Key         string  `json:"key"`
+	Name        string  `json:"name"`
+}
+
+// DocumentVariation defines model for DocumentVariation.
+type DocumentVariation struct {
+	Description *string `json:"description,omitempty"`
+	Key         string  `json:"key"`
+	Name        *string `json:"name,omitempty"`
+
+	// Value JSON of the flag's type.
+	Value interface{} `json:"value"`
 }
 
 // Environment defines model for Environment.
@@ -2509,6 +2768,37 @@ type ProjectCreate struct {
 	Name Name `json:"name"`
 }
 
+// ProjectDocument A project's whole configuration, versioned apart from this API: it
+// has its own `schema_version`, a server imports every version it ever
+// exported, and within a version a document changes only additively
+// (a new optional field or section). A field it does not define is
+// refused naming its JSON Pointer. Identity is the key: no entity
+// identifier travels, except rule ids and rollout salts.
+type ProjectDocument struct {
+	// Attributes By key. The standard attributes are never listed.
+	Attributes []DocumentAttribute `json:"attributes"`
+
+	// Environments In their sort order, which the array's order is.
+	Environments []DocumentEnvironment `json:"environments"`
+
+	// Experiments By key, whatever their status.
+	Experiments []DocumentExperiment `json:"experiments"`
+
+	// Flags By key.
+	Flags         []DocumentFlag               `json:"flags"`
+	Project       DocumentProject              `json:"project"`
+	SchemaVersion ProjectDocumentSchemaVersion `json:"schema_version"`
+
+	// Segments By key.
+	Segments []DocumentSegment `json:"segments"`
+
+	// UnitTypes By key.
+	UnitTypes []DocumentUnitType `json:"unit_types"`
+}
+
+// ProjectDocumentSchemaVersion defines model for ProjectDocument.SchemaVersion.
+type ProjectDocumentSchemaVersion int
+
 // ProjectList defines model for ProjectList.
 type ProjectList struct {
 	Items []Project `json:"items"`
@@ -3476,6 +3766,9 @@ type ChangeRequestID = openapi_types.UUID
 // Cursor defines model for Cursor.
 type Cursor = string
 
+// DocumentFormat defines model for DocumentFormat.
+type DocumentFormat string
+
 // EnvironmentKey defines model for EnvironmentKey.
 type EnvironmentKey = string
 
@@ -4066,6 +4359,15 @@ type StopExperimentParams struct {
 	// is validated.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
+
+// ExportProjectParams defines parameters for ExportProject.
+type ExportProjectParams struct {
+	// Format The document's encoding, JSON unless `yaml` is asked for.
+	Format *ExportProjectParamsFormat `form:"format,omitempty" json:"format,omitempty"`
+}
+
+// ExportProjectParamsFormat defines parameters for ExportProject.
+type ExportProjectParamsFormat string
 
 // ListFlagsParams defines parameters for ListFlags.
 type ListFlagsParams struct {
@@ -6318,6 +6620,29 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/experiments/{experiment}/stop (the `StopExperiment` operationId).
 	StopExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StopExperimentParams, body StopExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExportProject Download the project's configuration as a project document
+	//
+	// Writes the project's whole configuration as a project document, in
+	// JSON (the default, and the canonical encoding) or YAML (derived from
+	// it field for field): its environments in their order, unit types,
+	// declared attributes, segments, flags with their configuration in every
+	// environment, and experiments, each list by key, so that two exports of
+	// an unchanged project are the same bytes. Rule identifiers and rollout
+	// salts are in it, which keep every unit in its bucket in a copy; owners
+	// are email addresses, and an override's note is in it and its author is
+	// not.
+	//
+	// Members, grants, tokens, SDK keys, webhook subscriptions, change
+	// requests, audit entries, events, the standard attributes and the
+	// discovered attributes are never in it.
+	//
+	// The `ETag` is the identifier of the project's latest audit entry,
+	// quoted: a later change to the project, whatever it touches, moves it.
+	// Reading the project is all it takes, so nothing is audited.
+	//
+	// Corresponds with GET /projects/{project}/export (the `ExportProject` operationId).
+	ExportProject(ctx context.Context, project ProjectKey, params *ExportProjectParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListFlags The project's flags
 	//
@@ -10047,6 +10372,39 @@ func (c *Client) StopExperimentWithBody(ctx context.Context, project ProjectKey,
 // Corresponds with POST /projects/{project}/experiments/{experiment}/stop (the `StopExperiment` operationId).
 func (c *Client) StopExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StopExperimentParams, body StopExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewStopExperimentRequest(c.Server, project, experiment, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ExportProject Download the project's configuration as a project document
+//
+// Writes the project's whole configuration as a project document, in
+// JSON (the default, and the canonical encoding) or YAML (derived from
+// it field for field): its environments in their order, unit types,
+// declared attributes, segments, flags with their configuration in every
+// environment, and experiments, each list by key, so that two exports of
+// an unchanged project are the same bytes. Rule identifiers and rollout
+// salts are in it, which keep every unit in its bucket in a copy; owners
+// are email addresses, and an override's note is in it and its author is
+// not.
+//
+// Members, grants, tokens, SDK keys, webhook subscriptions, change
+// requests, audit entries, events, the standard attributes and the
+// discovered attributes are never in it.
+//
+// The `ETag` is the identifier of the project's latest audit entry,
+// quoted: a later change to the project, whatever it touches, moves it.
+// Reading the project is all it takes, so nothing is audited.
+//
+// Corresponds with GET /projects/{project}/export (the `ExportProject` operationId).
+func (c *Client) ExportProject(ctx context.Context, project ProjectKey, params *ExportProjectParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportProjectRequest(c.Server, project, params)
 	if err != nil {
 		return nil, err
 	}
@@ -16973,6 +17331,67 @@ func NewStopExperimentRequestWithBody(server string, project ProjectKey, experim
 	return req, nil
 }
 
+// NewExportProjectRequest constructs an http.Request for the ExportProject method
+func NewExportProjectRequest(server string, project ProjectKey, params *ExportProjectParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/export", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Format != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "format", *params.Format, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListFlagsRequest constructs an http.Request for the ListFlags method
 func NewListFlagsRequest(server string, project ProjectKey, params *ListFlagsParams) (*http.Request, error) {
 	var err error
@@ -22024,6 +22443,31 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/experiments/{experiment}/stop (the `StopExperiment` operationId).
 	StopExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StopExperimentParams, body StopExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*StopExperimentResponse, error)
+
+	// ExportProjectWithResponse Download the project's configuration as a project document
+	//
+	// Writes the project's whole configuration as a project document, in
+	// JSON (the default, and the canonical encoding) or YAML (derived from
+	// it field for field): its environments in their order, unit types,
+	// declared attributes, segments, flags with their configuration in every
+	// environment, and experiments, each list by key, so that two exports of
+	// an unchanged project are the same bytes. Rule identifiers and rollout
+	// salts are in it, which keep every unit in its bucket in a copy; owners
+	// are email addresses, and an override's note is in it and its author is
+	// not.
+	//
+	// Members, grants, tokens, SDK keys, webhook subscriptions, change
+	// requests, audit entries, events, the standard attributes and the
+	// discovered attributes are never in it.
+	//
+	// The `ETag` is the identifier of the project's latest audit entry,
+	// quoted: a later change to the project, whatever it touches, moves it.
+	// Reading the project is all it takes, so nothing is audited.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/export (the `ExportProject` operationId).
+	ExportProjectWithResponse(ctx context.Context, project ProjectKey, params *ExportProjectParams, reqEditors ...RequestEditorFn) (*ExportProjectResponse, error)
 
 	// ListFlagsWithResponse The project's flags
 	//
@@ -30404,6 +30848,97 @@ func (r StopExperimentResponse) ContentType() string {
 	return ""
 }
 
+// ExportProjectResponse200Headers the declared response headers of an HTTP 200 response for ExportProject
+type ExportProjectResponse200Headers struct {
+	ContentDisposition *string
+	ETag               *string
+}
+
+// ExportProjectResponse401Headers the declared response headers of an HTTP 401 response for ExportProject
+type ExportProjectResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ExportProjectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ProjectDocument
+	// YAML200 the response for an HTTP 200 `application/yaml` response
+	YAML200 *openapi_types.File
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ExportProjectResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ExportProjectResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ExportProjectResponse) GetJSON200() *ProjectDocument {
+	return r.JSON200
+}
+
+// GetYAML200 returns the response for an HTTP 200 `application/yaml` response
+func (r ExportProjectResponse) GetYAML200() *openapi_types.File {
+	return r.YAML200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ExportProjectResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ExportProjectResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ExportProjectResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ExportProjectResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ExportProjectResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ExportProjectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExportProjectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ExportProjectResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListFlagsResponse401Headers the declared response headers of an HTTP 401 response for ListFlags
 type ListFlagsResponse401Headers struct {
 	WWWAuthenticate *string
@@ -37896,6 +38431,37 @@ func (c *ClientWithResponses) StopExperimentWithResponse(ctx context.Context, pr
 		return nil, err
 	}
 	return ParseStopExperimentResponse(rsp)
+}
+
+// ExportProjectWithResponse Download the project's configuration as a project document
+//
+// Writes the project's whole configuration as a project document, in
+// JSON (the default, and the canonical encoding) or YAML (derived from
+// it field for field): its environments in their order, unit types,
+// declared attributes, segments, flags with their configuration in every
+// environment, and experiments, each list by key, so that two exports of
+// an unchanged project are the same bytes. Rule identifiers and rollout
+// salts are in it, which keep every unit in its bucket in a copy; owners
+// are email addresses, and an override's note is in it and its author is
+// not.
+//
+// Members, grants, tokens, SDK keys, webhook subscriptions, change
+// requests, audit entries, events, the standard attributes and the
+// discovered attributes are never in it.
+//
+// The `ETag` is the identifier of the project's latest audit entry,
+// quoted: a later change to the project, whatever it touches, moves it.
+// Reading the project is all it takes, so nothing is audited.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/export (the `ExportProject` operationId).
+func (c *ClientWithResponses) ExportProjectWithResponse(ctx context.Context, project ProjectKey, params *ExportProjectParams, reqEditors ...RequestEditorFn) (*ExportProjectResponse, error) {
+	rsp, err := c.ExportProject(ctx, project, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExportProjectResponse(rsp)
 }
 
 // ListFlagsWithResponse The project's flags
@@ -46138,6 +46704,97 @@ func ParseStopExperimentResponse(rsp *http.Response) (*StopExperimentResponse, e
 	return response, nil
 }
 
+// ParseExportProjectResponse parses an HTTP response from a ExportProjectWithResponse call
+func ParseExportProjectResponse(rsp *http.Response) (*ExportProjectResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExportProjectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ProjectDocument
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "yaml") && rsp.StatusCode == 200:
+		var dest openapi_types.File
+		if err := yaml.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.YAML200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ExportProjectResponse200Headers
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers ExportProjectResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListFlagsResponse parses an HTTP response from a ListFlagsWithResponse call
 func ParseListFlagsResponse(rsp *http.Response) (*ListFlagsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -51075,6 +51732,9 @@ type ServerInterface interface {
 	// StopExperiment Stop a running experiment with a decision
 	// (POST /projects/{project}/experiments/{experiment}/stop)
 	StopExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params StopExperimentParams)
+	// ExportProject Download the project's configuration as a project document
+	// (GET /projects/{project}/export)
+	ExportProject(w http.ResponseWriter, r *http.Request, project ProjectKey, params ExportProjectParams)
 	// ListFlags The project's flags
 	// (GET /projects/{project}/flags)
 	ListFlags(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListFlagsParams)
@@ -55420,6 +56080,48 @@ func (siw *ServerInterfaceWrapper) StopExperiment(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ExportProject operation middleware
+func (siw *ServerInterfaceWrapper) ExportProject(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExportProjectParams
+
+	// ------------- Optional query parameter "format" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "format", r.URL.Query(), &params.Format, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "format"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "format", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExportProject(w, r, project, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListFlags operation middleware
 func (siw *ServerInterfaceWrapper) ListFlags(w http.ResponseWriter, r *http.Request) {
 
@@ -58340,6 +59042,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}", wrapper.GetProject)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}", wrapper.UpdateProject)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/me", wrapper.GetProjectMe)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/export", wrapper.ExportProject)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments", wrapper.ListEnvironments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/environments", wrapper.CreateEnvironment)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.DeleteEnvironment)
@@ -67684,6 +68387,137 @@ func (response StopExperiment428ApplicationProblemPlusJSONResponse) VisitStopExp
 	return err
 }
 
+type ExportProjectRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Params  ExportProjectParams
+}
+
+type ExportProjectResponseObject interface {
+	VisitExportProjectResponse(w http.ResponseWriter) error
+}
+
+type ExportProject200ResponseHeaders struct {
+	ContentDisposition *string
+	ETag               *string
+}
+
+type ExportProject200JSONResponse struct {
+	Body    ProjectDocument
+	Headers ExportProject200ResponseHeaders
+}
+
+func (response ExportProject200JSONResponse) VisitExportProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ContentDisposition != nil {
+		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportProject200ApplicationyamlResponse struct {
+	Body          io.Reader
+	Headers       ExportProject200ResponseHeaders
+	ContentLength int64
+}
+
+func (response ExportProject200ApplicationyamlResponse) VisitExportProjectResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "application/yaml")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	if response.Headers.ContentDisposition != nil {
+		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type ExportProject400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ExportProject400ApplicationProblemPlusJSONResponse) VisitExportProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportProject401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ExportProject401ApplicationProblemPlusJSONResponse) VisitExportProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportProject403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ExportProject403ApplicationProblemPlusJSONResponse) VisitExportProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportProject404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ExportProject404ApplicationProblemPlusJSONResponse) VisitExportProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListFlagsRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Params  ListFlagsParams
@@ -74322,6 +75156,9 @@ type StrictServerInterface interface {
 	// StopExperiment Stop a running experiment with a decision
 	// (POST /projects/{project}/experiments/{experiment}/stop)
 	StopExperiment(ctx context.Context, request StopExperimentRequestObject) (StopExperimentResponseObject, error)
+	// ExportProject Download the project's configuration as a project document
+	// (GET /projects/{project}/export)
+	ExportProject(ctx context.Context, request ExportProjectRequestObject) (ExportProjectResponseObject, error)
 	// ListFlags The project's flags
 	// (GET /projects/{project}/flags)
 	ListFlags(ctx context.Context, request ListFlagsRequestObject) (ListFlagsResponseObject, error)
@@ -77089,6 +77926,33 @@ func (sh *strictHandler) StopExperiment(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(StopExperimentResponseObject); ok {
 		if err := validResponse.VisitStopExperimentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ExportProject operation middleware
+func (sh *strictHandler) ExportProject(w http.ResponseWriter, r *http.Request, project ProjectKey, params ExportProjectParams) {
+	var request ExportProjectRequestObject
+
+	request.Project = project
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ExportProject(ctx, request.(ExportProjectRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ExportProject")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ExportProjectResponseObject); ok {
+		if err := validResponse.VisitExportProjectResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

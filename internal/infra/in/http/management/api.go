@@ -19,6 +19,7 @@ import (
 	appexperiments "github.com/azverinus/flagnetic/internal/app/experiments"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
+	apptransfer "github.com/azverinus/flagnetic/internal/app/transfer"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -185,6 +186,8 @@ type Handlers struct {
 	GetAuditEntry      *appgovernance.GetAuditEntry
 	ExportAuditEntries *appgovernance.ExportAuditEntries
 	StreamChanges      *appgovernance.StreamChanges
+
+	ExportProject *apptransfer.ExportProject
 }
 
 // api serves every operation of the document.
