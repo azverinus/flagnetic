@@ -28,7 +28,7 @@ func EmbeddedTemplates() fs.FS {
 }
 
 // Rendered is a mail written for its recipient: a subject and the same
-// message as text and as HTML.
+// mail as text and as HTML.
 type Rendered struct {
 	Subject string
 	Text    string

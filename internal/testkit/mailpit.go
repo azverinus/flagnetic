@@ -45,7 +45,9 @@ const (
 	// MailpitTLS takes mail only over TLS from the first byte, from
 	// MailpitUser.
 	MailpitTLS MailpitMode = "tls"
-	// MailpitPicky refuses every recipient but those at picky.example.
+	// MailpitPicky takes mail over a plain connection only from MailpitUser,
+	// and refuses every recipient but those at picky.example: the refusal
+	// comes after a login the server accepted.
 	MailpitPicky MailpitMode = "picky"
 )
 
@@ -143,7 +145,7 @@ func StartMailpit(t testing.TB, mode MailpitMode) *Mailpit {
 				testcontainers.ContainerFile{Reader: bytes.NewReader(key), ContainerFilePath: "/certs/tls.key", FileMode: 0o644},
 			))
 	case MailpitPicky:
-		opts = append(opts, testcontainers.WithEnv(map[string]string{
+		opts = append(opts, mailpit.WithSMTPAuth(MailpitUser, MailpitPassword), testcontainers.WithEnv(map[string]string{
 			"MP_SMTP_ALLOWED_RECIPIENTS": "@" + strings.ReplaceAll(MailpitAllowedDomain, ".", `\.`) + "$",
 		}))
 	default:
@@ -194,7 +196,7 @@ func (m *Mailpit) Security() string {
 
 // Credentials reports whether this Mailpit asks the client to authenticate.
 func (m *Mailpit) Credentials() bool {
-	return m.mode == MailpitAuth || m.mode == MailpitStartTLS || m.mode == MailpitTLS
+	return m.mode != MailpitOpen
 }
 
 // ReceivedMail is a mail Mailpit holds.

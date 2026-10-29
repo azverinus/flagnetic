@@ -311,7 +311,7 @@ func TestATestMailReachesTheCaller(t *testing.T) {
 				t.Errorf("subject %q, text %q; want the English test mail naming the instance", m.Subject, m.Text)
 			}
 			if !strings.Contains(m.HTML, "<p>") || !strings.Contains(m.HTML, smtpBaseURL) {
-				t.Errorf("HTML part %q, want the same message as markup", m.HTML)
+				t.Errorf("HTML part %q, want the same mail as markup", m.HTML)
 			}
 			if !m.Date.Equal(testkit.Start) {
 				t.Errorf("Date = %v, want the server's clock %v", m.Date, testkit.Start)

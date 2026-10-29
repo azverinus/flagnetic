@@ -4,7 +4,7 @@ An instance admin configures one SMTP server, and the instance sends its mail th
 
 ## Configuring the SMTP server
 
-`PUT /instance/smtp` sets the server; `GET /instance/smtp` reads it and `DELETE /instance/smtp` removes it (both answer `404 not_found` while none is configured). All four operations, with `POST /instance/smtp/test`, are an instance admin's. The console's **Mail** screen does the same.
+`PUT /instance/smtp` sets the server; `GET /instance/smtp` reads it and `DELETE /instance/smtp` removes it (both answer `404 not_found` while none is configured). All four operations, with `POST /instance/smtp/test`, are an instance admin's.
 
 | Field | |
 |---|---|
@@ -28,7 +28,7 @@ The change is recorded as `smtp.updated` with the settings before and after, and
 - `tls` speaks TLS from the first byte (often port 465).
 - `none` secures nothing. Use it for a relay on the same machine or inside a network you trust.
 
-Both secure modes require TLS 1.2 or later and verify the server's certificate against the system's roots and the `host` you gave: a certificate for another name, an expired one or one from an authority the system does not trust fails as `tls`. Sending times out after 10 seconds to connect and 30 seconds in all. Authentication uses the best mechanism the server offers among PLAIN, LOGIN and CRAM-MD5; PLAIN and LOGIN are used only over TLS or to this machine.
+Both secure modes require TLS 1.2 or later and verify the server's certificate against the system's roots and the `host` you gave: a certificate for another name, an expired one or one from an authority the system does not trust fails as `tls`. Sending times out after 10 seconds to connect and 30 seconds for the whole exchange after that. Authentication uses the best mechanism the server offers among PLAIN, LOGIN and CRAM-MD5; PLAIN and LOGIN are used only over TLS or to this machine.
 
 ## The test mail
 

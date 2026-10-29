@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	netmail "net/mail"
 	"net/textproto"
 	"slices"
 	"strings"
@@ -63,18 +64,20 @@ func (s *Sender) Send(ctx context.Context, server appaccess.MailServer, m appacc
 	msg.AddAlternativeString(gomail.TypeTextHTML, rendered.HTML)
 
 	tlsConfig := &tls.Config{ServerName: server.Host, RootCAs: s.roots, MinVersion: tls.VersionTLS12}
-	dialer := &net.Dialer{Timeout: dialTimeout}
-	// The dial is bounded apart from the exchange.
-	dial := dialer.DialContext
+	exchange := &boundedExchange{ctx: ctx, dialer: &net.Dialer{Timeout: dialTimeout}}
+	if server.Security == access.SMTPTLS {
+		exchange.tls = tlsConfig
+	}
+	defer exchange.release()
 	opts := []gomail.Option{
 		gomail.WithPort(server.Port),
 		gomail.WithTimeout(exchangeTimeout),
 		gomail.WithTLSConfig(tlsConfig),
 		gomail.WithHELO(heloName(server.From)),
+		gomail.WithDialContextFunc(exchange.dial),
 	}
 	switch server.Security {
 	case access.SMTPTLS:
-		dial = (&tls.Dialer{NetDialer: dialer, Config: tlsConfig}).DialContext
 		opts = append(opts, gomail.WithSSL())
 	case access.SMTPStartTLS:
 		opts = append(opts, gomail.WithTLSPolicy(gomail.TLSMandatory))
@@ -85,7 +88,6 @@ func (s *Sender) Send(ctx context.Context, server appaccess.MailServer, m appacc
 		username: server.Username, password: server.Password.Reveal(), host: server.Host,
 		insecureAllowed: server.Security == access.SMTPNone,
 	}
-	opts = append(opts, gomail.WithDialContextFunc(dial))
 	if server.Username != "" {
 		opts = append(opts, gomail.WithSMTPAuthCustom(auth))
 	}
@@ -95,25 +97,94 @@ func (s *Sender) Send(ctx context.Context, server appaccess.MailServer, m appacc
 	}
 	err = client.DialAndSendWithContext(ctx, msg)
 	if err != nil {
-		return &appaccess.MailError{Failure: classify(err, auth.started), Err: scrub(err, server)}
+		return &appaccess.MailError{Failure: classify(err, auth.authenticating), Err: scrub(err, server)}
 	}
 	return nil
+}
+
+// boundedExchange connects to the server within dialTimeout and ends the
+// whole exchange after it within exchangeTimeout, or when ctx ends if that
+// comes first. The client library sets a fresh deadline before each of its
+// steps and reads ctx only while connecting, so the connection it is given
+// holds every deadline to the exchange's end and is closed when ctx ends.
+type boundedExchange struct {
+	ctx    context.Context
+	dialer *net.Dialer
+	// tls is set when the server speaks TLS from the first byte.
+	tls *tls.Config
+	// stop ends the watch on ctx once the exchange is over.
+	stop func() bool
+}
+
+func (e *boundedExchange) dial(ctx context.Context, network, addr string) (net.Conn, error) {
+	raw, err := e.dialer.DialContext(ctx, network, addr)
+	if err != nil {
+		return nil, err
+	}
+	end := time.Now().Add(exchangeTimeout)
+	if d, ok := e.ctx.Deadline(); ok && d.Before(end) {
+		end = d
+	}
+	e.release()
+	e.stop = context.AfterFunc(e.ctx, func() { _ = raw.Close() })
+	conn := &boundedConn{Conn: raw, end: end}
+	if err = conn.SetDeadline(end); err != nil {
+		_ = raw.Close()
+		return nil, err
+	}
+	if e.tls == nil {
+		return conn, nil
+	}
+	// The TLS layer sits on the bounded connection, and the client library
+	// still sees a *tls.Conn, which is how it learns the connection is secure.
+	secured := tls.Client(conn, e.tls)
+	if err = secured.HandshakeContext(ctx); err != nil {
+		_ = raw.Close()
+		return nil, err
+	}
+	return secured, nil
+}
+
+// release ends the watch on ctx.
+func (e *boundedExchange) release() {
+	if e.stop != nil {
+		e.stop()
+	}
+}
+
+// boundedConn never lets a deadline pass the end of the exchange.
+type boundedConn struct {
+	net.Conn
+	end time.Time
+}
+
+func (c *boundedConn) SetDeadline(t time.Time) error { return c.Conn.SetDeadline(c.bound(t)) }
+
+func (c *boundedConn) SetReadDeadline(t time.Time) error { return c.Conn.SetReadDeadline(c.bound(t)) }
+
+func (c *boundedConn) SetWriteDeadline(t time.Time) error { return c.Conn.SetWriteDeadline(c.bound(t)) }
+
+func (c *boundedConn) bound(t time.Time) time.Time {
+	if t.IsZero() || t.After(c.end) {
+		return c.end
+	}
+	return t
 }
 
 // heloName is the name the client greets the server with: the sender's
 // domain, which every server accepts, rather than the local host name.
 func heloName(from string) string {
-	if _, domain, ok := strings.Cut(from, "@"); ok {
-		if domain = strings.Trim(strings.TrimSpace(domain), "<>"); domain != "" {
+	if addr, err := netmail.ParseAddress(from); err == nil {
+		if _, domain, ok := strings.Cut(addr.Address, "@"); ok && domain != "" {
 			return domain
 		}
 	}
 	return "localhost"
 }
 
-// classify names the step that failed. authStarted says the server's answer
-// to the credentials was under way.
-func classify(err error, authStarted bool) access.MailFailure {
+// classify names the step that failed. authenticating says the exchange of
+// credentials had begun and not yet succeeded.
+func classify(err error, authenticating bool) access.MailFailure {
 	var (
 		verify  *tls.CertificateVerificationError
 		unknown x509.UnknownAuthorityError
@@ -130,11 +201,11 @@ func classify(err error, authStarted bool) access.MailFailure {
 		errors.As(err, &record), errors.As(err, &alert),
 		strings.Contains(err.Error(), "STARTTLS"):
 		return access.MailFailureTLS
-	case authStarted:
+	case errors.As(err, &network), isBrokenConnection(err):
+		return access.MailFailureConnection
+	case authenticating:
 		return access.MailFailureAuthentication
-	case errors.As(err, &sendErr) && !errors.As(err, &network) && !isBrokenConnection(err):
-		return access.MailFailureRejected
-	case errors.As(err, &proto):
+	case errors.As(err, &sendErr), errors.As(err, &proto):
 		return access.MailFailureRejected
 	default:
 		return access.MailFailureConnection
@@ -166,15 +237,16 @@ type negotiatedAuth struct {
 	insecureAllowed bool
 
 	inner smtp.Auth
-	// started is set once the exchange of credentials begins, so a failure
-	// from then on is the server's answer to them.
-	started bool
+	// authenticating is set while the exchange of credentials is under way,
+	// so a failure then is the server's answer to them; a failure after the
+	// server accepted them is not.
+	authenticating bool
 }
 
 var errNoMechanism = errors.New("the server offers no authentication mechanism this connection may use")
 
 func (a *negotiatedAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
-	a.started = true
+	a.authenticating = true
 	secure := server.TLS || a.insecureAllowed
 	switch {
 	case secure && slices.Contains(server.Auth, "PLAIN"):
@@ -190,5 +262,10 @@ func (a *negotiatedAuth) Start(server *smtp.ServerInfo) (string, []byte, error) 
 }
 
 func (a *negotiatedAuth) Next(fromServer []byte, more bool) ([]byte, error) {
-	return a.inner.Next(fromServer, more)
+	toServer, err := a.inner.Next(fromServer, more)
+	if err == nil && !more {
+		// The server's last answer, without a challenge, accepted them.
+		a.authenticating = false
+	}
+	return toServer, err
 }

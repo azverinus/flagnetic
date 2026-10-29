@@ -15,7 +15,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
-// Mail is one message to one recipient, before it is written: the kind and
+// Mail is one mail to one recipient, before it is written: the kind and
 // the language choose the template, Data fills it.
 type Mail struct {
 	Kind access.MailKind
@@ -115,6 +115,11 @@ type PostmanDeps struct {
 type Postman struct {
 	d  PostmanDeps
 	wg sync.WaitGroup
+	// mu orders each mail's place in wg before Wait begins: once waiting is
+	// set, a mail still goes out but is not awaited, since adding to an empty
+	// wait group while it is being waited on is not allowed.
+	mu      sync.Mutex
+	waiting bool
 }
 
 // NewPostman returns the service.
@@ -139,14 +144,26 @@ func (p *Postman) Queue(ctx context.Context, m Mail) {
 		// Counted once the change has committed, not when queued: a change
 		// that rolls back sends nothing and has nothing to await. The mail
 		// outlives the request that caused it.
-		p.wg.Add(1)
+		done := p.track()
 		bg, cancel := context.WithTimeout(context.WithoutCancel(committed), MailBound)
 		safego.Go(bg, "mail "+string(m.Kind), p.d.Logger, func(ctx context.Context) {
-			defer p.wg.Done()
+			defer done()
 			defer cancel()
 			p.sendInBackground(ctx, m)
 		})
 	})
+}
+
+// track counts a mail Wait awaits and returns what ends it, or nothing to
+// end once Wait has begun.
+func (p *Postman) track() (done func()) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.waiting {
+		return func() {}
+	}
+	p.wg.Add(1)
+	return p.wg.Done
 }
 
 func (p *Postman) sendInBackground(ctx context.Context, m Mail) {
@@ -168,6 +185,11 @@ func (p *Postman) sendInBackground(ctx context.Context, m Mail) {
 func (p *Postman) Deliver(ctx context.Context, m Mail) error {
 	settings, err := p.d.Settings.SMTPSettings(ctx)
 	if err != nil {
+		if !errors.Is(err, ErrSMTPNotConfigured) {
+			// A mail that could not be tried at all is still one the replica
+			// failed to send; one with no server to send through is not.
+			p.d.Counter.Count(m.Kind, mailError)
+		}
 		return err
 	}
 	server := MailServer{
@@ -202,6 +224,9 @@ func failureOf(err error) string {
 // or ctx ends. A replica stopping calls it after its requests are done, so
 // the mails they caused leave with it.
 func (p *Postman) Wait(ctx context.Context) {
+	p.mu.Lock()
+	p.waiting = true
+	p.mu.Unlock()
 	done := make(chan struct{})
 	go func() {
 		p.wg.Wait()

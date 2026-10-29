@@ -256,3 +256,34 @@ func TestNothingIsSentOnceSMTPIsRemoved(t *testing.T) {
 		t.Errorf("counted %v, want nothing for a mail with no server to send it through", got)
 	}
 }
+
+func TestAMailQueuedOnceWaitingHasBegunStillLeaves(t *testing.T) {
+	mp := testkit.StartMailpit(t, testkit.MailpitOpen)
+	p := newPostman(t, smtpFor(mp), nil)
+	to := uniqueAddress()
+	// The replica is stopping: nothing is in flight yet.
+	waitFor(t, p.Postman)
+
+	if err := p.tx.Within(t.Context(), func(ctx context.Context) error {
+		p.Queue(ctx, testMail(to))
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := mp.AwaitMails(t, to, 1); len(got) != 1 {
+		t.Errorf("%d mails, want 1", len(got))
+	}
+}
+
+func TestAMailWhoseSettingsCannotBeReadIsCountedAsAnError(t *testing.T) {
+	p := newPostman(t, access.SMTPChange{Host: "127.0.0.1", Port: 25, Security: access.SMTPNone, From: "flags@example.com"}, nil)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	if err := p.Deliver(ctx, testMail("ada@example.com")); err == nil {
+		t.Fatal("a mail whose settings could not be read was delivered")
+	}
+	if got := p.count.results(); len(got) != 1 || got[0] != "test/error" {
+		t.Errorf("counted %v, want one test/error", got)
+	}
+}

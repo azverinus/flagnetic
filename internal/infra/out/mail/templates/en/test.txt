@@ -2,4 +2,4 @@ Hello {{.Recipient.Name}},
 
 Your Flagnetic instance{{with .Data.Instance}} at {{.}}{{end}} can send mail: this test mail reached {{.Recipient.Email}}.
 
-Nothing else is needed. You can ignore this message.
+Nothing else is needed. You can ignore this mail.
