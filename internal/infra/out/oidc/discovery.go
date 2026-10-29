@@ -22,7 +22,10 @@ const (
 	// maxResponseBytes caps what a provider may answer with, so a provider
 	// that never stops talking cannot fill the replica's memory.
 	maxResponseBytes = 1 << 20
-	maxRedirects     = 3
+	// maxRedirects is how many redirects one fetch follows; via in
+	// CheckRedirect already holds the first request, so the redirect being
+	// checked is the len(via)-th.
+	maxRedirects = 3
 )
 
 var errTooLarge = errors.New("the identity provider's answer is larger than 1 MiB")
@@ -40,7 +43,7 @@ func NewDiscoverer() *Discoverer {
 	return &Discoverer{client: &http.Client{
 		Timeout: discoveryTimeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= maxRedirects {
+			if len(via) > maxRedirects {
 				return errors.New("the identity provider redirected too many times")
 			}
 			if req.URL.Scheme != "https" && !identity.IsLoopbackHost(req.URL.Hostname()) {

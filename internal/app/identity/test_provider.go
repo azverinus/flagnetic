@@ -2,6 +2,7 @@ package identity
 
 import (
 	"context"
+	"unicode/utf8"
 
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 )
@@ -52,7 +53,25 @@ func (h *TestProvider) Handle(ctx context.Context, slug string) (OIDCDiscovery, 
 	if err != nil {
 		return OIDCDiscovery{}, apperrors.BadGateway("provider_unreachable",
 			"the identity provider's discovery document could not be fetched or is not the issuer's").
-			WithCause(err).WithExtension("failure", err.Error())
+			WithCause(err).WithExtension("failure", clip(err.Error(), maxFailureBytes))
 	}
 	return found, nil
+}
+
+// maxFailureBytes bounds the failure answered for an unreachable provider. The
+// discovery error can carry the whole body the address answered, up to a
+// megabyte; a few hundred bytes say why, and the instance admin is not handed
+// whatever an arbitrary address on the network returns.
+const maxFailureBytes = 512
+
+// clip cuts s to n bytes without splitting a character and marks the cut.
+func clip(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	s = s[:n]
+	for !utf8.ValidString(s) {
+		s = s[:len(s)-1]
+	}
+	return s + "…"
 }

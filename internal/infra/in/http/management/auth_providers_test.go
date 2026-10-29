@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -434,7 +435,7 @@ func TestTestingAnAuthProviderThatCannotBeReachedIsABadGatewaySayingWhy(t *testi
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 
 	notADocument := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "<html>not here</html>", http.StatusNotFound)
+		http.Error(w, "<html>"+strings.Repeat("not here ", 8<<10)+"</html>", http.StatusNotFound)
 	}))
 	t.Cleanup(notADocument.Close)
 	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -469,7 +470,57 @@ func TestTestingAnAuthProviderThatCannotBeReachedIsABadGatewaySayingWhy(t *testi
 		if err := json.Unmarshal(res.Body, &ext); err != nil || ext.Failure == "" {
 			t.Errorf("%s: no failure in %s (%v)", name, res.Body, err)
 		}
+		if len(ext.Failure) > 1<<10 {
+			t.Errorf("%s: failure of %d bytes, want it cut short", name, len(ext.Failure))
+		}
 	}
 	unknown := do(admin.TestAuthProviderWithResponse(t.Context(), providerSlug()))
 	assertProblem(t, "an unknown provider", unknown.StatusCode(), unknown.Body, http.StatusNotFound, "not_found")
+}
+
+// redirecting answers the discovery document of its own URL after hops
+// redirects, each to the next path on the same server.
+func redirecting(t *testing.T, hops int) *httptest.Server {
+	t.Helper()
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n, _ := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/hop/"))
+		if n < hops {
+			http.Redirect(w, r, fmt.Sprintf("/hop/%d", n+1), http.StatusFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"issuer":%q,"authorization_endpoint":"%[1]s/auth","token_endpoint":"%[1]s/token","jwks_uri":"%[1]s/keys"}`, srv.URL)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestTestingAnAuthProviderFollowsThreeRedirectsAndNeverToPlainHTTPAwayFromLoopback(t *testing.T) {
+	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	test := func(issuer string) *management.TestAuthProviderResponse {
+		t.Helper()
+		slug := providerSlug()
+		body := corporate(slug)
+		body.Issuer = issuer
+		createProvider(t, admin, body)
+		return do(admin.TestAuthProviderWithResponse(t.Context(), slug))
+	}
+
+	if res := test(redirecting(t, 3).URL); res.JSON200 == nil {
+		t.Errorf("three redirects = %d: %s", res.StatusCode(), res.Body)
+	}
+	res := test(redirecting(t, 4).URL)
+	assertProblem(t, "four redirects", res.StatusCode(), res.Body, http.StatusBadGateway, "provider_unreachable")
+
+	downgrade := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "http://idp.example.com"+r.URL.Path, http.StatusFound)
+	}))
+	t.Cleanup(downgrade.Close)
+	res = test(downgrade.URL)
+	assertProblem(t, "a redirect to plain http away from loopback", res.StatusCode(), res.Body, http.StatusBadGateway, "provider_unreachable")
+	if !strings.Contains(string(res.Body), "plain http") {
+		t.Errorf("the failure does not say the redirect went to plain http: %s", res.Body)
+	}
 }

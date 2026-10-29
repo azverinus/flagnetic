@@ -4284,7 +4284,7 @@ export const createAuthProvider = <ThrowOnError extends boolean = false>(
  * Delete an auth provider
  *
  * Refused 409 `provider_in_use` while something depends on the provider;
- * `references` names what. Disable it instead: that stops its sign-ins
+ * `used_by` names what. Disable it instead: that stops its sign-ins
  * and leaves its members, identities and grants as they are. Audited
  * `auth_provider.deleted`.
  *

@@ -6469,7 +6469,7 @@ type ClientInterface interface {
 	// DeleteAuthProvider Delete an auth provider
 	//
 	// Refused 409 `provider_in_use` while something depends on the provider;
-	// `references` names what. Disable it instead: that stops its sign-ins
+	// `used_by` names what. Disable it instead: that stops its sign-ins
 	// and leaves its members, identities and grants as they are. Audited
 	// `auth_provider.deleted`.
 	//
@@ -9419,7 +9419,7 @@ func (c *Client) CreateAuthProvider(ctx context.Context, body CreateAuthProvider
 // DeleteAuthProvider Delete an auth provider
 //
 // Refused 409 `provider_in_use` while something depends on the provider;
-// `references` names what. Disable it instead: that stops its sign-ins
+// `used_by` names what. Disable it instead: that stops its sign-ins
 // and leaves its members, identities and grants as they are. Audited
 // `auth_provider.deleted`.
 //
@@ -23354,7 +23354,7 @@ type ClientWithResponsesInterface interface {
 	// DeleteAuthProviderWithResponse Delete an auth provider
 	//
 	// Refused 409 `provider_in_use` while something depends on the provider;
-	// `references` names what. Disable it instead: that stops its sign-ins
+	// `used_by` names what. Disable it instead: that stops its sign-ins
 	// and leaves its members, identities and grants as they are. Audited
 	// `auth_provider.deleted`.
 	//
@@ -40013,7 +40013,7 @@ func (c *ClientWithResponses) CreateAuthProviderWithResponse(ctx context.Context
 // DeleteAuthProviderWithResponse Delete an auth provider
 //
 // Refused 409 `provider_in_use` while something depends on the provider;
-// `references` names what. Disable it instead: that stops its sign-ins
+// `used_by` names what. Disable it instead: that stops its sign-ins
 // and leaves its members, identities and grants as they are. Audited
 // `auth_provider.deleted`.
 //
