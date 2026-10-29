@@ -2,6 +2,7 @@ package management_test
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"net/http"
 	"net/netip"
 	"regexp"
@@ -450,8 +451,20 @@ func TestAuthMethodsAreServedWithoutAuthentication(t *testing.T) {
 			b.SetCookie(management.SessionCookie, cookie)
 		}
 		res, body := b.Do(t, http.MethodGet, "/api/v1/auth/methods", "", "")
-		if res.StatusCode != http.StatusOK || body != `{"local_login_enabled":true,"providers":[]}`+"\n" {
-			t.Errorf("%s: %d %q, want local sign-in alone", name, res.StatusCode, body)
+		// Other tests of the package leave auth providers behind, so the
+		// providers are judged by their shape: all a visitor learns of one is
+		// what its sign-in button says.
+		var methods struct {
+			LocalLoginEnabled bool             `json:"local_login_enabled"`
+			Providers         []map[string]any `json:"providers"`
+		}
+		if err := json.Unmarshal([]byte(body), &methods); err != nil || res.StatusCode != http.StatusOK || !methods.LocalLoginEnabled {
+			t.Errorf("%s: %d %q (%v), want local sign-in on", name, res.StatusCode, body, err)
+		}
+		for _, p := range methods.Providers {
+			if len(p) != 3 || p["slug"] == nil || p["display_name"] == nil || p["kind"] == nil {
+				t.Errorf("%s: provider %v, want a slug, a display name and a kind alone", name, p)
+			}
 		}
 	}
 }
