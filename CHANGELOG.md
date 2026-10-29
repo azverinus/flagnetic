@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/azverinus/flagnetic/compare/v0.2.0...v0.3.0) (2026-10-29)
+
+
+### Features
+
+* **access:** configure the instance's SMTP server and send a test mail ([#192](https://github.com/azverinus/flagnetic/issues/192)) ([ef8d974](https://github.com/azverinus/flagnetic/commit/ef8d9746d5d81e9efebb297d8570a87e803a7dd6))
+* **identity:** add the auth provider resource ([#191](https://github.com/azverinus/flagnetic/issues/191)) ([a169535](https://github.com/azverinus/flagnetic/commit/a16953593783054f200aaefa5f58087f858a2576))
+* **sinks:** add the sink resource and the sink.manage permission ([#189](https://github.com/azverinus/flagnetic/issues/189)) ([40af907](https://github.com/azverinus/flagnetic/commit/40af9079d0c8e0fceb5eacd60b1e62be3119f245))
+* **transfer:** export a project as a project document ([#190](https://github.com/azverinus/flagnetic/issues/190)) ([bcc0cab](https://github.com/azverinus/flagnetic/commit/bcc0cabaf910fdf6f3c85c8611d7f760a605e937))
+
+
+### Bug Fixes
+
+* **events:** check the window against the event_id time plus the skew ([#185](https://github.com/azverinus/flagnetic/issues/185)) ([41bcf63](https://github.com/azverinus/flagnetic/commit/41bcf63c96d845c80b458507a3775a5be6a22355))
+* **experiments:** take the final sample-ratio check after the rollup watermark ([#187](https://github.com/azverinus/flagnetic/issues/187)) ([f7ba3d6](https://github.com/azverinus/flagnetic/commit/f7ba3d640d302526fb9c1a523bcf9b6337f71a5a))
+
 ## [0.2.0](https://github.com/azverinus/flagnetic/compare/v0.1.0...v0.2.0) (2026-10-29)
 
 
