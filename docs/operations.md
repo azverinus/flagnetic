@@ -33,7 +33,7 @@ To run migrations as a separate step instead, for example as a job before the ne
 With `FLAGNETIC_AUTO_MIGRATE=false`, `serve` compares the database's schema with the migrations the binary carries before it opens any port:
 
 - **Behind** (the job has not run yet): `serve` refuses to start, exit code 1, naming both versions and `flagnetic migrate`. New code never meets an old schema.
-- **Ahead** (a newer version migrated the database): `serve` starts and logs a warning naming both versions. 0.1 does not promise that an older version works against a newer schema: to go back after an upgrade, restore the backup taken before it (see [Upgrades](install.md#upgrades)).
+- **Ahead** (a newer version migrated the database): `serve` starts and logs a warning naming both versions. 0.x does not promise that an older version works against a newer schema: to go back after an upgrade, restore the backup taken before it (see [Upgrades](install.md#upgrades)).
 - **Equal**: `serve` starts without a word.
 
 ## The secret key

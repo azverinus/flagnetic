@@ -8,7 +8,7 @@ Include what you found, how to reproduce it, the version or commit, and the impa
 
 ## Supported versions
 
-Flagnetic has not had a release yet. Until 1.0, fixes go to `main` and the latest release only.
+Until 1.0, fixes go to `main` and the latest release only, currently 0.2.
 
 ## Scope
 
