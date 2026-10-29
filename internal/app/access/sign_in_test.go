@@ -92,6 +92,37 @@ func TestParallelWrongSignInsLockAfterAboutOneVerificationPastTheThreshold(t *te
 	}
 }
 
+func TestParallelWrongSignInsFromAKnownSourceLockAfterAboutOneVerificationPastTheThreshold(t *testing.T) {
+	v := &countingVerifier{Hasher: password.NewBoundedHasher(password.DefaultParams, semaphore.NewWeighted(4), password.SlotWait)}
+	h := newSignIn(t, v)
+	m := testkit.NewMember(t, testkit.Pool(t))
+	home := anAddress()
+	if _, err := h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New(m.Password), ClientIP: home}); err != nil {
+		t.Fatal(err)
+	}
+	v.verified.Store(0)
+	const attempts = 24
+	codes := make([]string, attempts)
+	var wg sync.WaitGroup
+	for i := range attempts {
+		wg.Go(func() {
+			_, err := h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New("not-the-password-9"), ClientIP: home})
+			codes[i] = codeOf(err)
+		})
+	}
+	wg.Wait()
+	locked := 0
+	for _, c := range codes {
+		if c == "locked" {
+			locked++
+		}
+	}
+	if n := v.verified.Load(); n > access.LockoutThreshold+1 || locked < attempts-access.LockoutThreshold-1 {
+		t.Errorf("%d verifications and %d attempts locked of %d from a known source, want at most %d verified: "+
+			"its failures are reserved first too", n, locked, attempts, access.LockoutThreshold+1)
+	}
+}
+
 func TestEverySlotHeldAnswersBusyAndRefusedAttemptsTakeNoSlot(t *testing.T) {
 	const wait = 200 * time.Millisecond
 	slots := semaphore.NewWeighted(2)

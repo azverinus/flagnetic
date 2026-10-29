@@ -193,12 +193,126 @@ func TestALockoutFromOneReplicaIsHonouredByAnother(t *testing.T) {
 	a := testkit.StartServer(t, trustLoopback())
 	b := testkit.StartServer(t, trustLoopback())
 	m := testkit.NewMember(t, testkit.Pool(t))
+	home := someAddress()
+	fromAddress(t, a, home).SignIn(t, m.Email, m.Password)
 	addr := someAddress()
 	for range 6 {
 		signInAs(t, fromAddress(t, a, addr), m.Email, wrongPassword)
 	}
 	if status, code, _ := signInAs(t, fromAddress(t, b, someAddress()), m.Email, m.Password); status != 429 || code != "locked" {
 		t.Errorf("the right password on the other replica: %d %s, want 429 locked", status, code)
+	}
+	if status, code, _ := signInAs(t, fromAddress(t, b, home), m.Email, m.Password); status != 200 {
+		t.Errorf("the right password on the other replica from where the member signed in on the first: %d %s, want 200", status, code)
+	}
+}
+
+// someSubscriber returns an IPv6 /64 no other test of the run shares, to
+// write its addresses after.
+func someSubscriber() string {
+	n, _ := rand.Int(rand.Reader, big.NewInt(1<<32))
+	return fmt.Sprintf("2001:db8:%x:%x::", n.Int64()>>16, n.Int64()&0xffff)
+}
+
+// lockEmail locks email with wrong passwords from an address of its own.
+func lockEmail(t *testing.T, srv *testkit.Server, email string) {
+	t.Helper()
+	b := fromAddress(t, srv, someAddress())
+	for range 5 {
+		signInAs(t, b, email, wrongPassword)
+	}
+	if status, code, _ := signInAs(t, b, email, wrongPassword); status != 429 || code != "locked" {
+		t.Fatalf("after five wrong passwords: %d %s, want 429 locked", status, code)
+	}
+}
+
+func TestALockedEmailLetsItsMemberInFromASourceTheySignedInFrom(t *testing.T) {
+	c := testkit.Clock()
+	srv := testkit.StartServer(t, testkit.WithClock(c), trustLoopback())
+	m, other := testkit.NewMember(t, testkit.Pool(t)), testkit.NewMember(t, testkit.Pool(t))
+	home := someSubscriber()
+	fromAddress(t, srv, home+"1").SignIn(t, m.Email, m.Password)
+	c.Advance(29 * 24 * time.Hour)
+	lockEmail(t, srv, m.Email)
+	lockEmail(t, srv, other.Email)
+
+	// Any address of the /64 the member signed in from is that source.
+	if status, code, _ := signInAs(t, fromAddress(t, srv, home+"2"), m.Email, m.Password); status != 200 {
+		t.Errorf("the right password from a source the member signed in from: %d %s, want 200 despite the lock", status, code)
+	}
+	if status, code, _ := signInAs(t, fromAddress(t, srv, someAddress()), m.Email, m.Password); status != 429 || code != "locked" {
+		t.Errorf("the right password from a source the member never signed in from: %d %s, want 429 locked", status, code)
+	}
+	// The source is known to that member alone.
+	if status, code, _ := signInAs(t, fromAddress(t, srv, home+"3"), other.Email, other.Password); status != 429 || code != "locked" {
+		t.Errorf("another member's email from the source: %d %s, want 429 locked", status, code)
+	}
+}
+
+func TestAKnownSourceIsLockedByItsOwnFailuresAndLeavesTheEmailsAlone(t *testing.T) {
+	c := testkit.Clock()
+	srv := testkit.StartServer(t, testkit.WithClock(c), trustLoopback())
+	m := testkit.NewMember(t, testkit.Pool(t))
+	home := fromAddress(t, srv, someAddress())
+	home.SignIn(t, m.Email, m.Password)
+	for i := range 5 {
+		if status, code, _ := signInAs(t, home, m.Email, wrongPassword); status != 401 || code != "invalid_credentials" {
+			t.Fatalf("failure %d from the known source: %d %s, want 401 invalid_credentials", i+1, status, code)
+		}
+	}
+	if status, code, wait := signInAs(t, home, m.Email, m.Password); status != 429 || code != "locked" || wait != 60 {
+		t.Fatalf("the right password after five failures from the known source: %d %s retry after %d, want 429 locked for 60 seconds",
+			status, code, wait)
+	}
+	if n := len(auditOf(t, srv, "auth.locked_out", m.ID.String())); n != 1 {
+		t.Errorf("%d locked_out entries, want 1", n)
+	}
+
+	// The email counted none of them: elsewhere, it locks after five
+	// failures of its own.
+	away := fromAddress(t, srv, someAddress())
+	for i := range 5 {
+		if status, code, _ := signInAs(t, away, m.Email, wrongPassword); status != 401 {
+			t.Fatalf("failure %d elsewhere: %d %s, want 401: the known source's failures are its own", i+1, status, code)
+		}
+	}
+	if status, code, wait := signInAs(t, away, m.Email, m.Password); status != 429 || code != "locked" || wait != 60 {
+		t.Errorf("elsewhere after five failures: %d %s retry after %d, want 429 locked for 60 seconds", status, code, wait)
+	}
+
+	c.Advance(61 * time.Second)
+	if status, _, _ := signInAs(t, home, m.Email, wrongPassword); status != 401 {
+		t.Fatalf("the known source's first failure after its lock: %d, want 401", status)
+	}
+	if status, code, wait := signInAs(t, home, m.Email, wrongPassword); status != 429 || code != "locked" || wait != 120 {
+		t.Errorf("the known source after its sixth consecutive failure: %d %s retry after %d, want locked for 120 seconds", status, code, wait)
+	}
+}
+
+func TestASourceIsKnownForThirtyDaysAfterTheLastSignInFromIt(t *testing.T) {
+	c := testkit.Clock()
+	srv := testkit.StartServer(t, testkit.WithClock(c), trustLoopback())
+	m := testkit.NewMember(t, testkit.Pool(t))
+	home := someAddress()
+	fromAddress(t, srv, home).SignIn(t, m.Email, m.Password)
+	c.Advance(30 * 24 * time.Hour)
+	lockEmail(t, srv, m.Email)
+	if status, code, _ := signInAs(t, fromAddress(t, srv, home), m.Email, m.Password); status != 429 || code != "locked" {
+		t.Errorf("the right password thirty days after the last sign-in from the source: %d %s, want 429 locked", status, code)
+	}
+}
+
+func TestAcceptingAnInvitationMakesItsSourceKnown(t *testing.T) {
+	srv := testkit.StartServer(t, testkit.WithClock(testkit.Clock()), trustLoopback())
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	mi := invite(t, admin, "Ada Lovelace")
+	home := someAddress()
+	if res := accept(t, fromAddress(t, srv, home), mi.Invitation.Url, newPassword); res.JSON200 == nil {
+		t.Fatalf("accept = %d: %s", res.StatusCode(), res.Body)
+	}
+	lockEmail(t, srv, mi.Member.Email)
+	if status, code, _ := signInAs(t, fromAddress(t, srv, home), mi.Member.Email, newPassword); status != 200 {
+		t.Errorf("the right password from where the invitation was accepted: %d %s, want 200 despite the lock", status, code)
 	}
 }
 

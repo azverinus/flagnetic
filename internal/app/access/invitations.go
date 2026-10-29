@@ -252,6 +252,7 @@ type AcceptStore interface {
 	SaveMember(ctx context.Context, m access.Member, at time.Time) error
 	SetPasswordHash(ctx context.Context, member access.MemberID, hash string, at time.Time) error
 	RecordSignIn(ctx context.Context, member access.MemberID, at time.Time) error
+	knownSourceRecorder
 	CreateSession(ctx context.Context, s access.Session) error
 	// ReserveSourceAttempt counts a as a failure of its source alone,
 	// before what it presents is checked, and returns what it found.
@@ -399,6 +400,11 @@ func (h *AcceptInvitation) join(ctx context.Context, cmd AcceptInvitationCommand
 		Timeouts: settings.SessionTimeouts(), Now: now,
 	}, h.d.Random, h.d.Key)
 	if err := h.d.Store.RecordSignIn(ctx, m.ID, now); err != nil {
+		return SignInResult{}, err
+	}
+	// Accepting signs the member in, so where they accepted from is a
+	// source they sign in from, as after a sign-in.
+	if err := recordKnownSource(ctx, h.d.Store, m.ID, cmd.ClientIP, now); err != nil {
 		return SignInResult{}, err
 	}
 	if err := h.d.Store.CreateSession(ctx, session); err != nil {

@@ -36,17 +36,37 @@ type SignInStore interface {
 	LockMemberPassword(ctx context.Context, member access.MemberID) (access.Member, string, error)
 	SetPasswordHash(ctx context.Context, member access.MemberID, hash string, at time.Time) error
 	RecordSignIn(ctx context.Context, member access.MemberID, at time.Time) error
+	knownSourceRecorder
 	CreateSession(ctx context.Context, s access.Session) error
+}
+
+// knownSourceRecorder records where members sign in from.
+type knownSourceRecorder interface {
+	// RecordKnownSource records that member signed in from source at.
+	RecordKnownSource(ctx context.Context, member access.MemberID, source netip.Prefix, at time.Time) error
+}
+
+// recordKnownSource records that member signed in from ip at, when there
+// is an address: their email's lock no longer refuses that source.
+func recordKnownSource(ctx context.Context, store knownSourceRecorder, member access.MemberID, ip netip.Addr, at time.Time) error {
+	source, ok := access.KnownSourceOf(ip)
+	if !ok {
+		return nil
+	}
+	return store.RecordKnownSource(ctx, member, source, at)
 }
 
 // AttemptStore counts the failed attempts at a password, per email and per
 // source, which lock an email and throttle a source.
 type AttemptStore interface {
 	// ReserveAttempt counts a as a failure before its password is verified,
-	// in one atomic step, and returns what it found.
+	// in one atomic step, and returns what it found: from a source known to
+	// the email's member, it is counted under the email and that source
+	// rather than the email alone.
 	ReserveAttempt(ctx context.Context, a access.Attempt) (access.Reservation, error)
-	// ClearAttempt takes back the failure r reserved, and ends the email's
-	// consecutive failures, once the password proved right.
+	// ClearAttempt takes back the failure r reserved, and ends the
+	// consecutive failures it was counted under, once the password proved
+	// right.
 	ClearAttempt(ctx context.Context, r access.Reservation) error
 	// ReleaseAttempt takes back the failure r reserved when the attempt
 	// guessed nothing: its password could not be verified, or proved right.
@@ -113,7 +133,10 @@ const reasonWrongPassword = "wrong_password"
 // its source before the password is verified, so attempts made at once
 // cannot all pass the lockout; a locked email (locked) or a throttled source
 // (rate_limited) is refused before any hash, and a right password takes the
-// failure back. An unknown email is verified against a hash no
+// failure back. A source the member signed in from lately is counted and
+// locked under the email and that source alone, so a stranger locking the
+// email does not keep the member out, and a successful sign-in makes its
+// source known. An unknown email is verified against a hash no
 // password matches, so it takes as long as a wrong password; a member who
 // is not active is refused like a wrong password even when the password is
 // right. Failures of a known member are audited, attempts on unknown emails
@@ -305,6 +328,9 @@ func (h *SignIn) open(ctx context.Context, session access.Session, rehash string
 		}
 	}
 	if err := h.d.Store.RecordSignIn(ctx, session.Member, session.CreatedAt); err != nil {
+		return err
+	}
+	if err := recordKnownSource(ctx, h.d.Store, session.Member, session.ClientIP, session.CreatedAt); err != nil {
 		return err
 	}
 	if err := h.d.Store.CreateSession(ctx, session); err != nil {

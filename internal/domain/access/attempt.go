@@ -13,11 +13,35 @@ import (
 // failure locks the email, for a minute at first and twice as long with each
 // further failure, up to an hour. Guessing one member's password is slow,
 // and since unknown emails lock the same way, enumeration learns nothing.
+//
+// The lock holds against every source but the member's known ones, those
+// they signed in from within KnownSourceAge: a known source's attempts are
+// counted under the email and that source alone, and locked by the same
+// schedule. Anyone can lock an email by guessing at it, so a lock meeting
+// every source would let them keep its member, an instance admin included,
+// out for as long as they keep guessing; a known source is one an attacker
+// rarely shares with the member.
 const (
 	LockoutThreshold = 5
 	firstLockout     = time.Minute
 	longestLockout   = time.Hour
 )
+
+// KnownSourceAge is how long a source stays known to a member after they
+// last signed in from it: long enough to span a holiday away from the desk,
+// short enough that an address the member gave up, which someone else may
+// hold now, stops being theirs.
+const KnownSourceAge = 30 * 24 * time.Hour
+
+// KnownSourceOf returns the source a sign-in from ip makes known to its
+// member, and false when there is no address: every attempt without one
+// shares the unspecified source, which is nobody's own.
+func KnownSourceOf(ip netip.Addr) (netip.Prefix, bool) {
+	if !ip.Unmap().IsValid() {
+		return netip.Prefix{}, false
+	}
+	return SourceOf(ip), true
+}
 
 // LockoutWindow returns how long the failures-th consecutive failure on an
 // email locks it, 0 below the threshold.
@@ -78,12 +102,16 @@ type FailureCutoffs struct {
 	// SourceWindowStartBy ends a source's failures when its window opened at
 	// or before it: the window is over, and the next failure opens another.
 	SourceWindowStartBy time.Time
+	// KnownSourceBy ends a member's known source when they last signed in
+	// from it at or before it.
+	KnownSourceBy time.Time
 }
 
 // AttemptCutoffs returns the cutoffs at now.
 func AttemptCutoffs(now time.Time) FailureCutoffs {
 	return FailureCutoffs{
 		Now: now, LastEmailFailureBy: now.Add(-EmailFailureRetention), SourceWindowStartBy: now.Add(-SourceWindow),
+		KnownSourceBy: now.Add(-KnownSourceAge),
 	}
 }
 
@@ -110,16 +138,27 @@ func NewAttempt(email string, ip netip.Addr, at time.Time) Attempt {
 	return Attempt{Email: strings.ToLower(strings.TrimSpace(email)), Source: SourceOf(ip), At: at}
 }
 
+// KnownAfter returns the instant after which the member the attempt's email
+// names must have signed in from its source for the source to be known.
+func (a Attempt) KnownAfter() time.Time { return a.At.Add(-KnownSourceAge) }
+
 // Reservation is what reserving a failure for an attempt before its password
 // is verified found: whether the email or the source refuses the attempt,
 // the failures counted with this one, and the lock it starts.
 type Reservation struct {
 	Attempt
-	// LockedUntil is when an email locked before this attempt unlocks; zero
-	// when it was not locked, and then the attempt counts as a failure.
+	// KnownSource is whether the attempt comes from a source known to the
+	// member its email names: its failures are then counted, and locked,
+	// under the email and that source alone, and the email's lock does not
+	// refuse it. An email no member has knows no source.
+	KnownSource bool
+	// LockedUntil is when the failures the attempt is counted under, locked
+	// before this attempt, unlock; zero when they were not locked, and then
+	// the attempt counts as a failure.
 	LockedUntil time.Time
-	// Failures are the consecutive failures on the email, this one
-	// included; 0 when the attempt was not counted against the email.
+	// Failures are the consecutive failures the attempt is counted under,
+	// this one included; 0 when the attempt was not counted against the
+	// email.
 	Failures int
 	// LocksUntil is when the lock this attempt's failure starts ends, as
 	// stored; zero when it starts none.
@@ -133,8 +172,9 @@ type Reservation struct {
 
 // Refusal returns why the attempt is refused before its password is
 // verified, judged at the time the attempt was reserved, or nil when it is
-// verified: a throttled source first, then a locked email. A refused attempt
-// takes no hashing slot.
+// verified: a throttled source first, then a locked email, or, from a source
+// known to its member, the lock of that source's own failures on it, which
+// answers the same. A refused attempt takes no hashing slot.
 func (r Reservation) Refusal() error {
 	if r.SourceFailures > SourceFailureLimit {
 		return apperrors.RateLimited("rate_limited", "too many failed attempts from this address; wait before trying again",

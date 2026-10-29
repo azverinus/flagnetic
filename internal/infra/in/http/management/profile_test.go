@@ -230,9 +230,10 @@ func TestChangingThePasswordChecksTheCurrentOneAndThePolicy(t *testing.T) {
 }
 
 func TestAWrongCurrentPasswordCountsTowardsTheLockout(t *testing.T) {
-	srv := testkit.StartServer(t)
+	srv := testkit.StartServer(t, trustLoopback())
 	m := testkit.NewMember(t, testkit.Pool(t))
-	b := fromAddress(t, srv, someAddress())
+	addr := someAddress()
+	b := fromAddress(t, srv, addr)
 	b.SignIn(t, m.Email, m.Password)
 
 	for range 4 {
@@ -246,13 +247,18 @@ func TestAWrongCurrentPasswordCountsTowardsTheLockout(t *testing.T) {
 	}
 
 	// Locked: refused before the password is checked, the right one
-	// included, here and at sign-in.
+	// included, here and at sign-in from the same source. The member signed
+	// in from it, so its failures are its own, as at the sign-in page, and
+	// the email elsewhere is left as it was.
 	res = changePassword(t, b, m.Password, changedPassword)
 	if p := res.ApplicationproblemJSON429; p == nil || p.Code != "locked" || p.RetryAfter == nil || *p.RetryAfter <= 0 {
 		t.Errorf("a change while locked = %d %s, want 429 locked with retry_after", res.StatusCode(), res.Body)
 	}
-	if status, code, _ := signInAs(t, fromAddress(t, srv, someAddress()), m.Email, m.Password); status != http.StatusTooManyRequests || code != "locked" {
-		t.Errorf("sign-in while locked = %d %s, want 429 locked", status, code)
+	if status, code, _ := signInAs(t, fromAddress(t, srv, addr), m.Email, m.Password); status != http.StatusTooManyRequests || code != "locked" {
+		t.Errorf("sign-in from the same source while locked = %d %s, want 429 locked", status, code)
+	}
+	if status, code, _ := signInAs(t, fromAddress(t, srv, someAddress()), m.Email, m.Password); status != http.StatusOK {
+		t.Errorf("sign-in from elsewhere = %d %s, want 200: the source's failures are not the email's", status, code)
 	}
 	wantSignedIn(t, b, "the device that guessed")
 }
