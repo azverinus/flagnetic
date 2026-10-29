@@ -19,6 +19,7 @@ import (
 	appexperiments "github.com/azverinus/flagnetic/internal/app/experiments"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
+	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
 	appsinks "github.com/azverinus/flagnetic/internal/app/sinks"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/access"
@@ -68,6 +69,16 @@ type Handlers struct {
 	RevokeProjectToken  *appaccess.RevokeProjectToken
 	ProjectPermissions  *appaccess.ProjectPermissions
 	WorkingProjects     *appaccess.WorkingProjects
+
+	ListAuthProviders        *appidentity.ListProviders
+	ListEnabledAuthProviders *appidentity.ListEnabledProviders
+	CreateAuthProvider       *appidentity.CreateProvider
+	GetAuthProvider          *appidentity.GetProvider
+	UpdateAuthProvider       *appidentity.UpdateProvider
+	DeleteAuthProvider       *appidentity.DeleteProvider
+	EnableAuthProvider       *appidentity.EnableProvider
+	DisableAuthProvider      *appidentity.DisableProvider
+	TestAuthProvider         *appidentity.TestProvider
 
 	FindProject   *appworkspace.FindProject
 	ListProjects  *appworkspace.ListProjects

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	"github.com/azverinus/flagnetic/internal/domain/identity"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
@@ -154,10 +155,19 @@ func (a *api) SignOut(ctx context.Context, _ SignOutRequestObject) (SignOutRespo
 	return SignOut204Response{Headers: SignOut204ResponseHeaders{SetCookie: &cleared}}, nil
 }
 
-// GetAuthMethods answers that members sign in with their email and
-// password, the only way until identity providers can be configured.
-func (a *api) GetAuthMethods(context.Context, GetAuthMethodsRequestObject) (GetAuthMethodsResponseObject, error) {
-	return GetAuthMethods200JSONResponse{LocalLoginEnabled: true, Providers: []map[string]any{}}, nil
+// GetAuthMethods answers how members sign in: with their email and password,
+// and through each enabled auth provider.
+func (a *api) GetAuthMethods(ctx context.Context, _ GetAuthMethodsRequestObject) (GetAuthMethodsResponseObject, error) {
+	list, err := a.h.ListEnabledAuthProviders.Handle(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return GetAuthMethods200JSONResponse{
+		LocalLoginEnabled: true,
+		Providers: each(list, func(p identity.Provider) AuthMethodProvider {
+			return AuthMethodProvider{Slug: p.Slug, DisplayName: p.DisplayName, Kind: AuthProviderKind(p.Kind)}
+		}),
+	}, nil
 }
 
 // GetInvitation answers what an invitation's link opens.
