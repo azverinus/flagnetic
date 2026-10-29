@@ -73,6 +73,7 @@ func smtpAudit(t *testing.T, c *management.ClientWithResponses, action string) [
 }
 
 func TestSMTPNeedsABaseURL(t *testing.T) {
+	t.Parallel()
 	pool := testkit.FreshPool(t)
 	srv := testkit.StartServer(t, testkit.WithPool(pool))
 	admin := testkit.Client(t, srv, testkit.Bootstrap(t, pool))
@@ -92,6 +93,7 @@ func TestSMTPNeedsABaseURL(t *testing.T) {
 }
 
 func TestSMTPSettingsAreWrittenReadAndRemoved(t *testing.T) {
+	t.Parallel()
 	in := startSMTPInstance(t, nil)
 	const password = "relay-password-4417"
 
@@ -189,6 +191,7 @@ func TestSMTPSettingsAreWrittenReadAndRemoved(t *testing.T) {
 }
 
 func TestSettingsThatChangeNothingRecordNothing(t *testing.T) {
+	t.Parallel()
 	in := startSMTPInstance(t, nil)
 	body := management.SmtpSettingsUpdate{Host: "smtp.example.com", Port: 25, Security: management.SmtpSecurityNone, From: "flags@example.com"}
 	putSMTP(t, in.admin, body)
@@ -199,6 +202,7 @@ func TestSettingsThatChangeNothingRecordNothing(t *testing.T) {
 }
 
 func TestSMTPSettingsRefuseWhatCannotSend(t *testing.T) {
+	t.Parallel()
 	in := startSMTPInstance(t, nil)
 	valid := management.SmtpSettingsUpdate{Host: "smtp.example.com", Port: 587, Security: management.SmtpSecurityStarttls, From: "flags@example.com"}
 	for name, tc := range map[string]struct {
@@ -221,6 +225,7 @@ func TestSMTPSettingsRefuseWhatCannotSend(t *testing.T) {
 		}, "/security"},
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			body := valid
 			tc.edit(&body)
 			res, err := in.admin.UpdateMailSettingsWithResponse(t.Context(), body)
@@ -239,6 +244,7 @@ func TestSMTPSettingsRefuseWhatCannotSend(t *testing.T) {
 }
 
 func TestCredentialsMayCrossNoSecurityToThisMachineAlone(t *testing.T) {
+	t.Parallel()
 	in := startSMTPInstance(t, nil)
 	for _, host := range []string{"localhost", "127.0.0.1", "::1"} {
 		putSMTP(t, in.admin, management.SmtpSettingsUpdate{
@@ -249,6 +255,7 @@ func TestCredentialsMayCrossNoSecurityToThisMachineAlone(t *testing.T) {
 }
 
 func TestSMTPIsForInstanceAdminsAlone(t *testing.T) {
+	t.Parallel()
 	in := startSMTPInstance(t, nil)
 	member := testkit.Client(t, in.srv, testkit.MemberToken(t, in.pool, access.ScopeRead, access.ScopeInstanceAdmin))
 	body := management.SmtpSettingsUpdate{Host: "smtp.example.com", Port: 25, Security: management.SmtpSecurityNone, From: "flags@example.com"}
@@ -276,8 +283,10 @@ func TestSMTPIsForInstanceAdminsAlone(t *testing.T) {
 }
 
 func TestATestMailReachesTheCaller(t *testing.T) {
+	t.Parallel()
 	for _, mode := range []testkit.MailpitMode{testkit.MailpitOpen, testkit.MailpitAuth, testkit.MailpitStartTLS, testkit.MailpitTLS} {
 		t.Run(string(mode), func(t *testing.T) {
+			t.Parallel()
 			mp := testkit.StartMailpit(t, mode)
 			in := startSMTPInstance(t, nil)
 			putSMTP(t, in.admin, settingsFor(mp))
@@ -312,6 +321,7 @@ func TestATestMailReachesTheCaller(t *testing.T) {
 }
 
 func TestATestMailIsWrittenInTheCallersLanguage(t *testing.T) {
+	t.Parallel()
 	mp := testkit.StartMailpit(t, testkit.MailpitOpen)
 	for name, tc := range map[string]struct {
 		server []testkit.ServerOption
@@ -324,6 +334,7 @@ func TestATestMailIsWrittenInTheCallersLanguage(t *testing.T) {
 		"English by default":                  {nil, nil, "Flagnetic test mail"},
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			in := startSMTPInstance(t, tc.server, tc.member...)
 			putSMTP(t, in.admin, settingsFor(mp))
 			res, err := in.admin.SendTestMailWithResponse(t.Context())
@@ -339,6 +350,7 @@ func TestATestMailIsWrittenInTheCallersLanguage(t *testing.T) {
 }
 
 func TestATestMailThatFailsNamesTheFailure(t *testing.T) {
+	t.Parallel()
 	closedPort := func(t *testing.T) int {
 		l, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 		if err != nil {
@@ -368,6 +380,7 @@ func TestATestMailThatFailsNamesTheFailure(t *testing.T) {
 		"a refused recipient": {mode: testkit.MailpitPicky, failure: "rejected"},
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			mp := testkit.StartMailpit(t, tc.mode)
 			in := startSMTPInstance(t, tc.server)
 			body := settingsFor(mp)
@@ -392,6 +405,7 @@ func TestATestMailThatFailsNamesTheFailure(t *testing.T) {
 }
 
 func TestATestMailWithoutSMTPIsRefused(t *testing.T) {
+	t.Parallel()
 	in := startSMTPInstance(t, nil)
 	res, err := in.admin.SendTestMailWithResponse(t.Context())
 	if err != nil {
@@ -401,6 +415,7 @@ func TestATestMailWithoutSMTPIsRefused(t *testing.T) {
 }
 
 func TestMailsAreCountedByKindAndResult(t *testing.T) {
+	t.Parallel()
 	open := testkit.StartMailpit(t, testkit.MailpitOpen)
 	picky := testkit.StartMailpit(t, testkit.MailpitPicky)
 	in := startSMTPInstance(t, nil)
@@ -428,6 +443,7 @@ func TestMailsAreCountedByKindAndResult(t *testing.T) {
 }
 
 func TestEveryReplicaLearnsTheSMTPSettingsOfAnother(t *testing.T) {
+	t.Parallel()
 	pool := testkit.FreshPool(t)
 	_, token := testkit.NewInstanceAdmin(t, pool)
 	opts := []testkit.ServerOption{testkit.WithPool(pool), testkit.WithBaseURL(smtpBaseURL)}
