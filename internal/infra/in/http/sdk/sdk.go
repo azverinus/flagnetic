@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/netip"
 	"regexp"
 	"strconv"
 	"strings"
@@ -160,25 +161,19 @@ func presentedOf(ctx context.Context) presented {
 	return p
 }
 
-// guard admits a request to op: it refuses a client IP that presented too
-// many refused keys before its key is looked up, authenticates the key,
-// applies the key's allowed origins, refuses a key of a kind op does not
-// serve, and counts the request against
-// the key's limits, holding a stream slot for a stream until it ends. The
-// key then travels in the request's context.
+// guard admits a request to op: it authenticates the key, refusing a client
+// IP that presented too many malformed or unknown keys before a key it does
+// not hold is looked up, applies the key's allowed origins, refuses a key of
+// a kind op does not serve, and counts the request against the key's limits,
+// holding a stream slot for a stream until it ends. The key then travels in
+// the request's context.
 func (a *api) guard(op operation, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := flaghttp.ClientOf(r.Context()).IP
 		value, err := a.keyValue(op, r)
-		if err == nil && value != "" {
-			err = a.limits.guessing(w, op.endpoint, ip)
-		}
 		var key delivery.SDKKey
 		if err == nil {
-			key, err = a.h.Authenticate.Handle(r.Context(), value)
-			if refusesPresentedKey(err) {
-				a.limits.failed(ip)
-			}
+			key, err = a.authenticate(r.Context(), w, op.endpoint, value, ip)
 		}
 		if err == nil {
 			err = admitOrigin(w, r, key.AdmitOrigin)
@@ -199,11 +194,35 @@ func (a *api) guard(op operation, next http.Handler) http.Handler {
 	})
 }
 
-// refusesPresentedKey reports whether err refuses a key that was presented:
-// what guessing keys looks like, unlike sending none.
-func refusesPresentedKey(err error) bool {
+// authenticate returns the key value presents in a request from ip to ep.
+// A key the replica holds already is judged at once, whoever presents it:
+// an address refused for guessing keys may be a NAT or a proxy many clients
+// share, and their keys in use keep working. Any other key from such an
+// address is refused before it is looked up, so guessing stays cheap to
+// refuse.
+func (a *api) authenticate(ctx context.Context, w http.ResponseWriter, ep endpoint, value string, ip netip.Addr) (delivery.SDKKey, error) {
+	if key, held, err := a.h.Authenticate.HandleHeld(value); held {
+		return key, err
+	}
+	if value != "" {
+		if err := a.limits.guessing(w, ep, ip); err != nil {
+			return delivery.SDKKey{}, err
+		}
+	}
+	key, err := a.h.Authenticate.Handle(ctx, value)
+	if guessed(err) {
+		a.limits.failed(ip)
+	}
+	return key, err
+}
+
+// guessed reports whether err refuses a key that is malformed or unknown:
+// what guessing keys looks like. A revoked or expired key is a client not
+// yet given its new key, which may poll for long, and sending no key
+// guesses nothing.
+func guessed(err error) bool {
 	e, ok := apperrors.From(err)
-	return ok && e.Kind == apperrors.KindUnauthenticated && e.Code != delivery.ErrSDKKeyMissing.Code
+	return ok && e.Code == delivery.ErrSDKKeyInvalid.Code
 }
 
 // keyValue returns the SDK key value r presents: the bearer of its

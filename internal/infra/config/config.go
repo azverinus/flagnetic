@@ -141,8 +141,9 @@ type RateLimits struct {
 	ServerEvaluate          int
 	ServerEvents            int
 	ServerConcurrentStreams int
-	// FailedAuthentications limits the refused SDK keys per client IP and
-	// minute, checked before any key is looked up.
+	// FailedAuthentications limits the malformed or unknown SDK keys per
+	// client IP and minute, checked before a key the replica does not hold
+	// is looked up.
 	FailedAuthentications int
 }
 
@@ -648,8 +649,10 @@ func Settings() []Setting {
 			"Ruleset streams a server key may hold open on one replica at once, counted per key. A server key's stream connects are not limited per minute.",
 			func(l *RateLimits) *int { return &l.ServerConcurrentStreams }),
 		rateLimit("FLAGNETIC_RATE_LIMIT_FAILED_AUTHENTICATIONS", "30", "refusals per minute",
-			"SDK API requests from one client IP whose key is refused (malformed, unknown, revoked or expired) that one replica takes per minute. "+
-				"Past it, every SDK API request from that IP is answered 429 before its key is looked up, which keeps guessing keys slow. A request without a key is not counted.",
+			"SDK API requests from one client IP whose key is malformed or unknown that one replica takes per minute. "+
+				"Past it, an SDK API request from that IP is answered 429 before its key is looked up, which keeps guessing keys slow, "+
+				"unless the replica already holds its key from an earlier lookup, so the valid keys in use behind a shared address keep working. "+
+				"A revoked or expired key, and a request without a key, are not counted.",
 			func(l *RateLimits) *int { return &l.FailedAuthentications }),
 	}
 }

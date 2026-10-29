@@ -264,3 +264,74 @@ func TestALimitSwitchedOffCountsNothing(t *testing.T) {
 		t.Errorf("stream with its limits off: RateLimit-Limit %q, want none", s.res.Header.Get("RateLimit-Limit"))
 	}
 }
+
+func TestMalformedAndUnknownKeysCountTogetherAsGuesses(t *testing.T) {
+	srv := testkit.StartServer(t, behindAProxy())
+	unknown := "fn_srv_" + strings.Repeat("x", 40)
+
+	for i := range 15 {
+		res := ruleset(t, srv, "not-a-key", fromIP("198.51.100.7"))
+		refused(t, "malformed "+strconv.Itoa(i+1), res.StatusCode(), res.Body, http.StatusUnauthorized, "sdk_key_invalid")
+		res = ruleset(t, srv, unknown, fromIP("198.51.100.7"))
+		refused(t, "unknown "+strconv.Itoa(i+1), res.StatusCode(), res.Body, http.StatusUnauthorized, "sdk_key_invalid")
+	}
+	res := ruleset(t, srv, "not-a-key", fromIP("198.51.100.7"))
+	rateLimited(t, "a malformed key past the limit", res.StatusCode(), res.HTTPResponse.Header, res.Body, 30)
+}
+
+func TestARevokedOrExpiredKeyStillPolledDoesNotBlockItsAddress(t *testing.T) {
+	srv := testkit.StartServer(t, behindAProxy())
+	p := newProject(t, srv)
+	revoked, revokedValue := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	p.revoke(t, "production", revoked)
+	expired, expiredValue := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	p.rotate(t, "production", expired, 0)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
+
+	for i := range 40 {
+		res := ruleset(t, srv, revokedValue, fromIP("198.51.100.7"))
+		refused(t, "revoked "+strconv.Itoa(i+1), res.StatusCode(), res.Body, http.StatusUnauthorized, "sdk_key_revoked")
+		res = ruleset(t, srv, expiredValue, fromIP("198.51.100.7"))
+		refused(t, "expired "+strconv.Itoa(i+1), res.StatusCode(), res.Body, http.StatusUnauthorized, "sdk_key_expired")
+	}
+	if res := ruleset(t, srv, value, fromIP("198.51.100.7")); res.StatusCode() != http.StatusOK {
+		t.Errorf("a valid key from the address = %d, want 200: %s", res.StatusCode(), res.Body)
+	}
+}
+
+func TestAnAddressRefusedForGuessingStillReachesTheAPIWithAKeyTheReplicaHolds(t *testing.T) {
+	srv := testkit.StartServer(t, behindAProxy())
+	// The replica holds keys only while its listener is up, and drops them
+	// when it comes up: wait for it, so the key it holds stays held.
+	const sdkKeysListenerUp = `flagnetic_listener_up{channel="sdk_keys"}`
+	if !eventually(5*time.Second, func() bool { return testkit.Metric(t, srv.Scrape(t), sdkKeysListenerUp) == 1 }) {
+		t.Fatal("the SDK keys listener never came up")
+	}
+	p := newProject(t, srv)
+	_, held := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	_, unseen := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	// A lookup is not kept when a notification lands while it is under way:
+	// a second one is kept should a late notification of an earlier test
+	// have dropped the first.
+	for range 2 {
+		if res := ruleset(t, srv, held, fromIP("198.51.100.8")); res.StatusCode() != http.StatusOK {
+			t.Fatalf("the key from another address = %d: %s", res.StatusCode(), res.Body)
+		}
+	}
+
+	guessed := "fn_srv_" + strings.Repeat("x", 40)
+	for i := range 30 {
+		res := ruleset(t, srv, guessed, fromIP("198.51.100.7"))
+		refused(t, "guess "+strconv.Itoa(i+1), res.StatusCode(), res.Body, http.StatusUnauthorized, "sdk_key_invalid")
+	}
+	res := ruleset(t, srv, guessed, fromIP("198.51.100.7"))
+	rateLimited(t, "the 31st guess, a key the replica never holds", res.StatusCode(), res.HTTPResponse.Header, res.Body, 30)
+	res = ruleset(t, srv, held, fromIP("198.51.100.7"))
+	if res.StatusCode() != http.StatusOK {
+		t.Errorf("a key the replica holds, from the guessing address = %d, want 200: %s", res.StatusCode(), res.Body)
+	}
+	// A key the replica does not hold is refused before it is looked up,
+	// valid or not: looking it up is what guessing would cost.
+	res = ruleset(t, srv, unseen, fromIP("198.51.100.7"))
+	rateLimited(t, "a key the replica does not hold, from the guessing address", res.StatusCode(), res.HTTPResponse.Header, res.Body, 30)
+}

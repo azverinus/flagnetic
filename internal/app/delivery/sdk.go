@@ -39,6 +39,10 @@ type SDKKeyLookup interface {
 	// SDKKeyByHash returns the key whose value hashes to hash, or
 	// ErrNotFound.
 	SDKKeyByHash(ctx context.Context, hash delivery.SDKKeyHash) (delivery.SDKKey, error)
+	// HeldSDKKeyByHash returns the key whose value hashes to hash when the
+	// lookup holds it in memory already, without looking it up anywhere,
+	// and false otherwise. A hash known not to name a key is never held.
+	HeldSDKKeyByHash(hash delivery.SDKKeyHash) (delivery.SDKKey, bool)
 }
 
 // AuthenticateSDKKey authenticates the SDK key a request to the SDK API
@@ -75,6 +79,31 @@ func (h *AuthenticateSDKKey) Handle(ctx context.Context, value string) (delivery
 	if err != nil {
 		return delivery.SDKKey{}, errSDKKeyLookupFailed.WithCause(err)
 	}
+	return h.accept(k)
+}
+
+// HandleHeld is Handle for a key the lookup holds in memory already: it
+// judges the key whose value is presented as Handle does when the key is
+// held, and reports held false, without looking anything up, for any other
+// value, malformed or missing ones included. A caller refusing a client for
+// now, such as one presenting too many malformed or unknown keys, still
+// admits a key in use without making a lookup it means to spare.
+func (h *AuthenticateSDKKey) HandleHeld(value string) (key delivery.SDKKey, held bool, err error) {
+	_, hash, err := delivery.ParseSDKKeyValue(value)
+	if err != nil {
+		return delivery.SDKKey{}, false, nil
+	}
+	k, ok := h.keys.HeldSDKKeyByHash(hash)
+	if !ok {
+		return delivery.SDKKey{}, false, nil
+	}
+	key, err = h.accept(k)
+	return key, true, err
+}
+
+// accept returns k when it still works at the clock's time, noting its
+// use.
+func (h *AuthenticateSDKKey) accept(k delivery.SDKKey) (delivery.SDKKey, error) {
 	now := h.clock.Now()
 	if err := k.AcceptAt(now); err != nil {
 		return delivery.SDKKey{}, err
