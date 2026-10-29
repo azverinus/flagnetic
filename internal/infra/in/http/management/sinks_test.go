@@ -535,17 +535,12 @@ func TestBatchingTakesItsKindsDefaultsAndRefusesWhatIsOutOfItsBounds(t *testing.
 		"object storage flushing every half minute": {objectStorageSink(), nil, ptr(30), "/flush_interval"},
 		"object storage flushing every two hours":   {objectStorageSink(), nil, ptr(7_201), "/flush_interval"},
 		"a webhook batch of 5,001":                  {webhookSink(), ptr(5_001), nil, "/batch_size"},
-		"a batch of none":                           {clickHouseSink(), ptr(0), nil, ""},
+		"a batch of none":                           {clickHouseSink(), ptr(0), nil, "/batch_size"},
+		"a flush interval of none":                  {clickHouseSink(), nil, ptr(0), "/flush_interval"},
 		"a negative flush interval":                 {clickHouseSink(), nil, ptr(-1), "/flush_interval"},
 	} {
 		tc.body.BatchSize, tc.body.FlushInterval = tc.batch, tc.flush
 		res := do(admin.CreateSinkWithResponse(t.Context(), p.Key, tc.body))
-		if tc.pointer == "" { // zero means the default
-			if res.JSON201 == nil || res.JSON201.BatchSize != 5_000 {
-				t.Errorf("%s: %d %s, want the default", name, res.StatusCode(), res.Body)
-			}
-			continue
-		}
 		pr := assertProblem(t, name, res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid_sink")
 		if got := problemViolations(pr); got[tc.pointer] != "out_of_range" {
 			t.Errorf("%s: violations %v, want out_of_range at %s", name, got, tc.pointer)
@@ -554,8 +549,16 @@ func TestBatchingTakesItsKindsDefaultsAndRefusesWhatIsOutOfItsBounds(t *testing.
 
 	custom := objectStorageSink()
 	custom.BatchSize, custom.FlushInterval = ptr(1_000_000), ptr(3_600)
-	if created := createSink(t, admin, p.Key, custom); created.BatchSize != 1_000_000 || created.FlushInterval != 3_600 {
+	created := createSink(t, admin, p.Key, custom)
+	if created.BatchSize != 1_000_000 || created.FlushInterval != 3_600 {
 		t.Errorf("batching %d every %ds", created.BatchSize, created.FlushInterval)
+	}
+
+	// An edit naming none does not reset the batching to the default.
+	reset := updateSink(t, admin, p.Key, sinkOf(created), management.SinkPatch{BatchSize: ptr(0)})
+	pr := assertProblem(t, "an edit to a batch of none", reset.StatusCode(), reset.Body, http.StatusUnprocessableEntity, "invalid_sink")
+	if got := problemViolations(pr); got["/batch_size"] != "out_of_range" {
+		t.Errorf("violations %v, want out_of_range at /batch_size", got)
 	}
 }
 

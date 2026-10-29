@@ -31,8 +31,8 @@ func (a *api) CreateSink(ctx context.Context, req CreateSinkRequestObject) (Crea
 	}
 	draft := sinks.Draft{Input: sinks.Input{
 		Name: b.Name, Kind: sinks.Kind(b.Kind), EventKinds: eventKindsIn(b.EventKinds),
-		Environments: valueOr(b.Environments, nil), BatchSize: valueOr(b.BatchSize, 0),
-		FlushInterval: flushOf(valueOr(b.FlushInterval, 0)),
+		Environments: valueOr(b.Environments, nil), BatchSize: explicit(b.BatchSize),
+		FlushInterval: flushOf(explicit(b.FlushInterval)),
 	}}
 	config, secret := configIn(b.Clickhouse, b.ObjectStorage, b.Webhook)
 	if config != nil {
@@ -70,7 +70,7 @@ func (a *api) UpdateSink(ctx context.Context, req UpdateSinkRequestObject) (Upda
 	}
 	b := *req.Body
 	change := sinks.Change{
-		Name: b.Name, EventKinds: patchKinds(b.EventKinds), Environments: b.Environments, BatchSize: b.BatchSize,
+		Name: b.Name, EventKinds: patchKinds(b.EventKinds), Environments: b.Environments, BatchSize: patchInt(b.BatchSize),
 		FlushInterval: patchSeconds(b.FlushInterval), Enabled: b.Enabled,
 	}
 	if b.Kind != nil {
@@ -179,8 +179,29 @@ func patchSeconds(n *int) *time.Duration {
 	if n == nil {
 		return nil
 	}
-	d := flushOf(*n)
+	d := flushOf(explicit(n))
 	return &d
+}
+
+// explicit returns the batching value a request named, or 0, which the
+// domain reads as the kind's default, when it named none. A value below 1 is
+// passed on as -1 so that it is refused instead of read as absence.
+func explicit(n *int) int {
+	switch {
+	case n == nil:
+		return 0
+	case *n < 1:
+		return -1
+	}
+	return *n
+}
+
+func patchInt(n *int) *int {
+	if n == nil {
+		return nil
+	}
+	v := explicit(n)
+	return &v
 }
 
 // sinkWithSecret answers a sink with the secret just issued to it, when it has
