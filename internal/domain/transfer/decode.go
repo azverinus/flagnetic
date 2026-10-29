@@ -53,7 +53,7 @@ func Decode(f Format, data []byte) (Document, error) {
 	if !ok {
 		return Document{}, &MalformedError{Detail: "a project document is an object"}
 	}
-	if err := checkVersion(root); err != nil {
+	if err = checkVersion(root); err != nil {
 		return Document{}, err
 	}
 	w := &walker{}

@@ -56,6 +56,8 @@ func (d *documentDownload) VisitExportProjectResponse(w http.ResponseWriter) err
 		w.Header().Set("ETag", d.etag)
 	}
 	w.WriteHeader(http.StatusOK)
-	_, err := w.Write(d.body)
+	// The body is JSON or YAML under a matching Content-Type and an
+	// attachment disposition, never HTML a browser would render.
+	_, err := w.Write(d.body) //nolint:gosec // G705: see above
 	return err
 }
