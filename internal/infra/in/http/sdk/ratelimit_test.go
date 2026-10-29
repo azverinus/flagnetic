@@ -312,7 +312,8 @@ func TestAnAddressRefusedForGuessingStillReachesTheAPIWithAKeyTheReplicaHolds(t 
 	}
 	res := ruleset(t, srv, guessed, fromIP("198.51.100.7"))
 	rateLimited(t, "the 31st guess, a key the replica never holds", res.StatusCode(), res.HTTPResponse.Header, res.Body, 30)
-	if res := ruleset(t, srv, held, fromIP("198.51.100.7")); res.StatusCode() != http.StatusOK {
+	res = ruleset(t, srv, held, fromIP("198.51.100.7"))
+	if res.StatusCode() != http.StatusOK {
 		t.Errorf("a key the replica holds, from the guessing address = %d, want 200: %s", res.StatusCode(), res.Body)
 	}
 	// A key the replica does not hold is refused before it is looked up,
