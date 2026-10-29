@@ -91,8 +91,8 @@ type Config struct {
 	// RateLimits are the limits of the SDK API.
 	RateLimits RateLimits
 	// EventsRetentionDays is how many days the raw events window spans: the window
-	// within which an event ID is recognised as a retry and an event's
-	// time is accepted.
+	// within which an event's time, shifted by the batch's clock skew, is
+	// accepted. Event IDs are kept longer, to recognise retries and replays.
 	EventsRetentionDays int
 	// EventsPartitionsAhead is how many days after today the raw event
 	// tables' partitions are created ahead of time.
@@ -490,8 +490,9 @@ func Settings() []Setting {
 			Key:     "events_retention_days",
 			Default: "30",
 			Unit:    "days",
-			Description: "The window of the raw events SDKs post. An event whose ID was received within it is recognised as a retry and stored once; " +
-				"an event whose time is older is rejected `out_of_window`. Raw events are kept as long: each day is dropped once it is wholly older.",
+			Description: "The window of the raw events SDKs post. An event whose time is older, after the batch's clock-skew shift, is rejected `out_of_window`. " +
+				"Raw events are kept as long: each day is dropped once it is wholly older. An event ID is recognised as a retry and the event stored once " +
+				"for a year, or the window plus a day when that is longer, so it outlives the raw events.",
 			Example: "30",
 			apply:   wholeNumber(func(c *Config, n int) { c.EventsRetentionDays = n }),
 		},

@@ -164,9 +164,12 @@ func ClockSkew(sentAt, receivedAt time.Time) time.Duration {
 
 // JudgeEvent judges one event of a batch received at receivedAt, against a
 // retention window of retention: its type, its event_id, its members, then
-// its time, which skew (see ClockSkew) has shifted first. Whatever only the
-// stored state can tell (duplicates, declared unit types, known flags, the
-// experiment an exposure names) is left to the caller.
+// its time, which skew (see ClockSkew) has shifted first. The window check
+// reads the time in event_id plus skew too, so a device whose clock is behind
+// by more than the window keeps its fresh events; the event_id itself, and
+// its time, are never shifted. Whatever only the stored state can tell
+// (duplicates, declared unit types, known flags, the experiment an exposure
+// names) is left to the caller.
 func JudgeEvent(raw json.RawMessage, receivedAt time.Time, retention, skew time.Duration) JudgedEvent {
 	var e JudgedEvent
 	dec := json.NewDecoder(bytes.NewReader(raw))
@@ -195,7 +198,7 @@ func JudgeEvent(raw json.RawMessage, receivedAt time.Time, retention, skew time.
 	}
 	e.ID = eventID
 	oldest := receivedAt.Add(-retention)
-	if e.ID.Time().Before(oldest) {
+	if e.ID.Time().Add(skew).Before(oldest) {
 		return e.reject(RejectOutOfWindow, "the event_id time is older than the raw retention")
 	}
 	switch e.Type {

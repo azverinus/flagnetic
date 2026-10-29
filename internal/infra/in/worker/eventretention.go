@@ -29,8 +29,8 @@ type Purge interface {
 
 // EventRetention returns the worker keeping what SDKs report bounded, every
 // hour: r creates the raw event tables' partitions ahead of time, drops those
-// past retention and purges the event IDs past the deduplication window,
-// then inventory forgets the SDKs not seen for its own retention. Replicas
+// past retention and purges the event IDs a year old (or older than the
+// retention and a day, if that is longer), then inventory forgets the SDKs not seen for its own retention. Replicas
 // running it at once take turns in PostgreSQL. The rows a drop took from a
 // rollup that had not read them are counted in
 // flagnetic_event_gap_rows_total, registered on reg, and each gap is logged

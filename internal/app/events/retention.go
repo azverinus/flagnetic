@@ -16,9 +16,24 @@ import (
 const ClaimPurgeBatch = 10000
 
 // claimWindowMargin is how much longer than the raw retention an event ID is
-// kept: a retry arriving in the last hours of the window still finds its ID,
-// whatever the time of day the purge runs.
+// kept at least: a retry arriving in the last hours of the window still finds
+// its ID, whatever the time of day the purge runs.
 const claimWindowMargin = 24 * time.Hour
+
+// claimMinimumRetention is how long an event ID is kept whatever the raw
+// retention. The window check reads the time in event_id plus the batch's
+// skew, so a verbatim replay of an old envelope (whose sent_at is as old as
+// its IDs) always lands inside the window; only the recorded ID refuses it, so
+// the IDs outlive the raw events, and a window shorter than a year does not
+// shorten them.
+const claimMinimumRetention = 365 * 24 * time.Hour
+
+// claimRetention is how long the event IDs received are kept when raw events
+// are kept for retention: a year, or the window plus a day when that is
+// longer.
+func claimRetention(retention time.Duration) time.Duration {
+	return max(claimMinimumRetention, retention+claimWindowMargin)
+}
 
 // RetentionStore is what retention reads, drops and purges.
 type RetentionStore interface {
@@ -65,7 +80,7 @@ type RetentionReport struct {
 
 // RunRetention keeps the raw event tables bounded: it creates their
 // partitions ahead of time, drops the partitions past retention whole, and
-// purges the event IDs past the deduplication window.
+// purges the event IDs a year (or the window and a day, if longer) old.
 type RunRetention struct {
 	tx        Transactor
 	store     RetentionStore
@@ -104,7 +119,7 @@ func (h *RunRetention) Handle(ctx context.Context) (RetentionReport, error) {
 		report.Gaps = append(report.Gaps, gaps...)
 	}
 	for _, typ := range events.RawEventTypes {
-		if err := h.purgeClaims(ctx, typ, now.Add(-h.retention-claimWindowMargin)); err != nil {
+		if err := h.purgeClaims(ctx, typ, now.Add(-claimRetention(h.retention))); err != nil {
 			errs = append(errs, err)
 		}
 	}

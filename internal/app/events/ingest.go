@@ -20,8 +20,8 @@ import (
 )
 
 // DefaultEventsRetention is how long raw events are kept when the
-// configuration does not say: the window within which an event ID is
-// recognised as a retry and an event's time is accepted.
+// configuration does not say: the window within which an event's time,
+// shifted by the batch's clock skew, is accepted.
 const DefaultEventsRetention = 30 * 24 * time.Hour
 
 // Transactor runs a unit of work.
@@ -117,9 +117,9 @@ func (r BatchResult) AcceptedTotal() int {
 // Handle judges each event of b on its own and stores those accepted in one
 // unit of work, so that once it returns every accepted event is durable and
 // the SDK may drop the batch. An event whose ID was received before, in this
-// batch or within the retention window, is a duplicate and stored once. A
-// summary row naming a flag the project does not have is dropped: nobody
-// could read it. An exposure is checked against the experiment it names;
+// batch or for as long as event IDs are kept (see claimRetention), is a
+// duplicate and stored once. A summary row naming a flag the project does
+// not have is dropped: nobody could read it. An exposure is checked against the experiment it names;
 // the details of its refusal are specific to a server key and generic to a
 // client key.
 //

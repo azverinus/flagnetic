@@ -41,7 +41,7 @@ Otherwise each event is judged on its own and a refused one is listed in `reject
 | `event_invalid` | A member is missing, of the wrong type, a string over 256 bytes or holding U+0000; a summary holds over 1,000 rows, a row counts less than 1 or names a reason that is none, or its interval starts after it ends; an alias names the same unit type on both sides. |
 | `event_type_unknown` | The server does not know events of this `type`. |
 | `event_id_invalid` | `event_id` is not a lowercase UUIDv7. |
-| `out_of_window` | The time in `event_id`, or `occurred_at` (`interval_end` for a summary), is older than the retention window. |
+| `out_of_window` | The time in `event_id`, or `occurred_at` (`interval_end` for a summary), is older than the retention window once a wrong device clock's shift (below) is applied. |
 | `undeclared_unit_type` | An alias names a unit type the project does not declare. |
 | `unknown_experiment` | An exposure names no experiment of the project. An experiment of any status exists, a draft or a stopped one too, since a mobile app may flush its queue days after the exposure. |
 | `unit_type_mismatch` | An exposure's `unit_type` is not the unit type its experiment assigns. |
@@ -66,7 +66,9 @@ A summary row's `reason` is a true reason (`rule`, `rollout`, `fallthrough`, `pr
 
 An event's time more than 24 hours ahead of the server clock is taken as the time the event was received.
 
-When `sent_at` differs from the time the server received the batch by more than one minute, the SDK's clock is taken to be wrong, and every time in the batch (`occurred_at` of an alias or an exposure, `interval_start` and `interval_end` of a summary) is shifted by the server's time minus `sent_at` before it is checked against the retention window and stored. A phone whose clock is wrong thereby neither loses its events as `out_of_window` nor moves an exposure in time. The time in `event_id` is not shifted.
+When `sent_at` differs from the time the server received the batch by more than one minute, the SDK's clock is taken to be wrong, and every time in the batch (`occurred_at` of an alias or an exposure, `interval_start` and `interval_end` of a summary) is shifted by the server's time minus `sent_at` before it is checked against the retention window and stored. The window check reads the time in `event_id` plus the same shift, so a phone whose clock is behind by more than the retention window keeps its fresh events; the stored `event_id` and its time are never shifted. A phone whose clock is wrong thereby neither loses its events as `out_of_window` nor moves an exposure in time.
+
+An event that really is older than the window is still refused: a retry stamps a fresh `sent_at`, so nothing shifts its `event_id` back into the window. A verbatim replay of an old envelope is the exception, since its `sent_at` is as old as its IDs and the shift lands it inside the window. Only its recorded `event_id` refuses it, so the server keeps event IDs for a year (or the retention window plus a day, if that is longer) and answers such a replay as a duplicate. A replay of an envelope older than that is accepted again, since nothing remembers its IDs.
 
 ## From a closing page
 
@@ -83,7 +85,7 @@ The body is read as JSON, with the same limits and answers as above, and the req
 
 ## Retries
 
-Each event is stored once by its `event_id`, per project, within the retention window (`FLAGNETIC_EVENTS_RETENTION_DAYS`, 30 days by default): an event received before, in an earlier batch, on any replica and on any day, or earlier in the same batch, is counted in `duplicates`. An SDK retrying a batch therefore resends it with the same IDs.
+Each event is stored once by its `event_id`, per project, for a year (or the retention window, `FLAGNETIC_EVENTS_RETENTION_DAYS`, 30 days by default, plus a day if that is longer): an event received before, in an earlier batch, on any replica and on any day, or earlier in the same batch, is counted in `duplicates`. An SDK retrying a batch therefore resends it with the same IDs.
 
 
 ## Evaluations answered remotely

@@ -229,13 +229,13 @@ For mobile apps, and web apps used from large offices, raise the client-key limi
 
 ## Raw events
 
-The [events](sdks/events.md) SDKs post are stored as received in tables partitioned by the UTC day they were received. `FLAGNETIC_EVENTS_RETENTION_DAYS` (30 by default) is the window within which an event ID is recognised as a retry and an event's time is accepted, and how long raw events are kept.
+The [events](sdks/events.md) SDKs post are stored as received in tables partitioned by the UTC day they were received. `FLAGNETIC_EVENTS_RETENTION_DAYS` (30 by default) is the window within which an event's time is accepted and how long raw events are kept; an event ID is recognised as a retry for a year (see below).
 
 Every replica runs the event retention worker once an hour; replicas running it at once take turns, so each partition is dropped once. A round:
 
 - creates the partitions of today and the `FLAGNETIC_EVENTS_PARTITIONS_AHEAD` days after it (3 by default), so events arriving after midnight never wait for one;
 - drops, one table at a time, every partition whose whole day is older than the retention. Rows are never deleted one by one: a dropped partition leaves nothing to vacuum. A drop waits at most 5 seconds for a transaction still writing the table (ingest queues behind it meanwhile) and otherwise leaves the table to the next round;
-- purges the event IDs kept to recognise retries once they are a day older than the retention, 10,000 at a time;
+- purges the event IDs kept to recognise retries once they are a year old, or a day older than the retention if that is longer, 10,000 at a time. The IDs outlive the raw events by design: a verbatim replay of an old envelope passes the [clock skew](sdks/events.md) shift into the window, and only the recorded ID refuses it. The tables of event IDs (one row of project, ID and receipt time per event) therefore hold a year of events whatever `FLAGNETIC_EVENTS_RETENTION_DAYS` is, so size the database for them;
 - forgets the SDKs of the SDK inventory not seen for `FLAGNETIC_SDK_INVENTORY_RETENTION_DAYS`.
 
 What the rollups keep from the raw events (first exposures, exposure counts per day, conflicts, evaluations per day, when SDKs last evaluated each flag, events received per day) and alias links are kept forever: they outlive the partitions they were read from.

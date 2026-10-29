@@ -1,6 +1,7 @@
 package sdk_test
 
 import (
+	"encoding/json"
 	"slices"
 	"sync"
 	"testing"
@@ -211,11 +212,14 @@ func TestARetryIsADuplicateInsideTheWindowThenOutOfWindow(t *testing.T) {
 	retry("a day past the window", false)
 }
 
-func TestEventIDsArePurgedADayPastRetention(t *testing.T) {
+func TestEventIDsOutliveTheWindowAndArePurgedAYearOn(t *testing.T) {
 	f := startRetention(t)
 	at := f.clock.Now()
 	ev := f.summary(at.Add(-time.Minute), counted("checkout", "true", "rule", 1))
-	f.post(t, ev)
+	envelope := f.envelope(t, ev)
+	if res := batchResult(t, f.srv, f.server, envelope); res.Accepted != 1 {
+		t.Fatalf("batch = %+v, want accepted", res)
+	}
 	eventID := id.MustParse[delivery.Event](ev["event_id"].(string))
 	claimed := func() bool {
 		t.Helper()
@@ -229,15 +233,48 @@ func TestEventIDsArePurgedADayPastRetention(t *testing.T) {
 		return !got[eventID]
 	}
 
-	f.clock.Advance(retention + 23*time.Hour)
+	f.clock.Advance(retention + 2*24*time.Hour)
 	f.retain(t)
 	if !claimed() {
-		t.Error("the event ID was purged before retention plus a day")
+		t.Error("the event ID was purged with the raw events, a window and a day on")
+	}
+	// A verbatim replay of the envelope is shifted by the skew to the time it
+	// is received, well inside the window, so only the event ID still
+	// recorded refuses it.
+	if res := batchResult(t, f.srv, f.server, envelope); res.Duplicates != 1 || res.Accepted != 0 {
+		t.Errorf("a replay past the window = %+v, want a duplicate", res)
+	}
+	f.clock.Advance(365*24*time.Hour - retention - 2*24*time.Hour - time.Hour)
+	f.retain(t)
+	if !claimed() {
+		t.Error("the event ID was purged before a year")
 	}
 	f.clock.Advance(2 * time.Hour)
 	f.retain(t)
 	if claimed() {
-		t.Error("the event ID was kept past retention plus a day")
+		t.Error("the event ID was kept past a year")
+	}
+}
+
+func TestAnEnvelopeSixtyDaysBehindIsKeptAndItsReplayIsADuplicateAfterTheWindow(t *testing.T) {
+	f := startRetention(t)
+	slow := f.clock.Now().Add(-60 * 24 * time.Hour)
+	ev := f.summary(slow.Add(-time.Minute), counted("checkout", "true", "rule", 1))
+	envelope, err := json.Marshal(map[string]any{
+		"schema_version": 1, "sent_at": slow.Format(time.RFC3339Nano),
+		"sdk": map[string]any{"name": "flagnetic-go", "version": "1.4.0", "platform": "linux"}, "events": []any{ev},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res := batchResult(t, f.srv, f.server, envelope); res.Accepted != 1 || len(res.Rejected) != 0 {
+		t.Fatalf("an envelope 60 days behind = %+v, want accepted", res)
+	}
+
+	f.clock.Advance(retention + 2*24*time.Hour)
+	f.retain(t)
+	if res := batchResult(t, f.srv, f.server, envelope); res.Duplicates != 1 || res.Accepted != 0 || len(res.Rejected) != 0 {
+		t.Errorf("the same envelope after the raw window = %+v, want a duplicate", res)
 	}
 }
 
