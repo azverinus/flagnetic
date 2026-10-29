@@ -3319,6 +3319,10 @@ msgid "manage SDK keys"
 msgstr ""
 
 #: src/lib/access-names.ts
+msgid "manage sinks"
+msgstr ""
+
+#: src/lib/access-names.ts
 msgid "manage unit types and attributes"
 msgstr ""
 

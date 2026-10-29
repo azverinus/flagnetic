@@ -19,6 +19,7 @@ import (
 	appexperiments "github.com/azverinus/flagnetic/internal/app/experiments"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
+	appsinks "github.com/azverinus/flagnetic/internal/app/sinks"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -173,6 +174,13 @@ type Handlers struct {
 	EnableWebhook         *appgovernance.EnableWebhook
 	RotateWebhookSecret   *appgovernance.RotateWebhookSecret
 	SendStaleFlagDigest   *appgovernance.SendStaleFlagDigest
+
+	ListSinks        *appsinks.ListSinks
+	CreateSink       *appsinks.Create
+	GetSink          *appsinks.GetSink
+	UpdateSink       *appsinks.Update
+	DeleteSink       *appsinks.Delete
+	RotateSinkSecret *appsinks.RotateSecret
 
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment

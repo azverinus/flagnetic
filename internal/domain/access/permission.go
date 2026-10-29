@@ -105,6 +105,11 @@ const (
 	// webhook subscriptions. Reading them needs it too: a subscription
 	// says where a project's changes are sent.
 	PermWebhookManage Permission = "webhook.manage"
+	// PermSinkManage creates, reads, edits, enables and deletes a project's
+	// sinks and acts on their recovery. Reading them needs it too: a sink's
+	// configuration names internal hosts, buckets and URLs that carry
+	// tokens, which everyone who can read the project may not see.
+	PermSinkManage Permission = "sink.manage"
 	// PermProjectDelete deletes a project with everything in it.
 	PermProjectDelete Permission = "project.delete"
 )
@@ -153,6 +158,9 @@ var catalog = []PermissionSpec{
 	// project's changes; a subscription changes nothing SDKs receive and
 	// nobody's access.
 	{Name: PermWebhookManage, Scope: ScopeProjectAdmin},
+	// A sink's credentials are the target's, not the platform's, so no
+	// session is needed; it is managed by whoever manages webhooks.
+	{Name: PermSinkManage, Scope: ScopeProjectAdmin},
 	// Deleting a project erases everything in it and cannot be undone, so
 	// it stays with members, and its operation further needs a session: a
 	// leaked token, a member's own included, cannot erase a project.
@@ -252,12 +260,13 @@ var roles = []Role{
 		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive, PermFlagConfigurationUpdate,
 		PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete, PermSDKKeyManage,
 		PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose, PermChangeRequestApprove, PermWebhookManage,
-		PermProjectDelete,
+		PermSinkManage, PermProjectDelete,
 	}},
 	{Name: RoleMaintainer, Permissions: []Permission{
 		PermProjectRead, PermEnvironmentManage, PermDeclarationManage, PermFlagEdit, PermFlagArchive,
 		PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete,
 		PermSDKKeyManage, PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose, PermChangeRequestApprove, PermWebhookManage,
+		PermSinkManage,
 	}},
 	{Name: RoleDeveloper, Permissions: []Permission{
 		PermProjectRead, PermFlagEdit, PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermFlagConfigurationRevert,

@@ -598,6 +598,153 @@ func (e SessionMethod) Valid() bool {
 	}
 }
 
+// Defines values for SinkEventKind.
+const (
+	SinkEventKindAlias             SinkEventKind = "alias"
+	SinkEventKindEvaluationSummary SinkEventKind = "evaluation_summary"
+	SinkEventKindExposure          SinkEventKind = "exposure"
+)
+
+// Valid indicates whether the value is a known member of the SinkEventKind enum.
+func (e SinkEventKind) Valid() bool {
+	switch e {
+	case SinkEventKindAlias:
+		return true
+	case SinkEventKindEvaluationSummary:
+		return true
+	case SinkEventKindExposure:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SinkFailureClass.
+const (
+	SinkFailureClassConnect       SinkFailureClass = "connect"
+	SinkFailureClassDns           SinkFailureClass = "dns"
+	SinkFailureClassRedirect      SinkFailureClass = "redirect"
+	SinkFailureClassRefusedTarget SinkFailureClass = "refused_target"
+	SinkFailureClassRejected      SinkFailureClass = "rejected"
+	SinkFailureClassStatus        SinkFailureClass = "status"
+	SinkFailureClassTimeout       SinkFailureClass = "timeout"
+	SinkFailureClassTls           SinkFailureClass = "tls"
+)
+
+// Valid indicates whether the value is a known member of the SinkFailureClass enum.
+func (e SinkFailureClass) Valid() bool {
+	switch e {
+	case SinkFailureClassConnect:
+		return true
+	case SinkFailureClassDns:
+		return true
+	case SinkFailureClassRedirect:
+		return true
+	case SinkFailureClassRefusedTarget:
+		return true
+	case SinkFailureClassRejected:
+		return true
+	case SinkFailureClassStatus:
+		return true
+	case SinkFailureClassTimeout:
+		return true
+	case SinkFailureClassTls:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SinkHealth.
+const (
+	SinkHealthDegraded SinkHealth = "degraded"
+	SinkHealthDisabled SinkHealth = "disabled"
+	SinkHealthFailing  SinkHealth = "failing"
+	SinkHealthHealthy  SinkHealth = "healthy"
+	SinkHealthLagging  SinkHealth = "lagging"
+	SinkHealthStopped  SinkHealth = "stopped"
+)
+
+// Valid indicates whether the value is a known member of the SinkHealth enum.
+func (e SinkHealth) Valid() bool {
+	switch e {
+	case SinkHealthDegraded:
+		return true
+	case SinkHealthDisabled:
+		return true
+	case SinkHealthFailing:
+		return true
+	case SinkHealthHealthy:
+		return true
+	case SinkHealthLagging:
+		return true
+	case SinkHealthStopped:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SinkKind.
+const (
+	SinkKindClickhouse    SinkKind = "clickhouse"
+	SinkKindObjectStorage SinkKind = "object_storage"
+	SinkKindWebhook       SinkKind = "webhook"
+)
+
+// Valid indicates whether the value is a known member of the SinkKind enum.
+func (e SinkKind) Valid() bool {
+	switch e {
+	case SinkKindClickhouse:
+		return true
+	case SinkKindObjectStorage:
+		return true
+	case SinkKindWebhook:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SinkObjectStorageCompression.
+const (
+	SinkObjectStorageCompressionGzip SinkObjectStorageCompression = "gzip"
+	SinkObjectStorageCompressionNone SinkObjectStorageCompression = "none"
+	SinkObjectStorageCompressionZstd SinkObjectStorageCompression = "zstd"
+)
+
+// Valid indicates whether the value is a known member of the SinkObjectStorageCompression enum.
+func (e SinkObjectStorageCompression) Valid() bool {
+	switch e {
+	case SinkObjectStorageCompressionGzip:
+		return true
+	case SinkObjectStorageCompressionNone:
+		return true
+	case SinkObjectStorageCompressionZstd:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SinkObjectStorageFormat.
+const (
+	SinkObjectStorageFormatJsonl   SinkObjectStorageFormat = "jsonl"
+	SinkObjectStorageFormatParquet SinkObjectStorageFormat = "parquet"
+)
+
+// Valid indicates whether the value is a known member of the SinkObjectStorageFormat enum.
+func (e SinkObjectStorageFormat) Valid() bool {
+	switch e {
+	case SinkObjectStorageFormatJsonl:
+		return true
+	case SinkObjectStorageFormatParquet:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for StaleReason.
 const (
 	StaleReasonExperimentOverdue StaleReason = "experiment_overdue"
@@ -3068,6 +3215,374 @@ type SignInRequest struct {
 	Password string `json:"password"`
 }
 
+// Sink A project's sink. It carries exactly the one of `clickhouse`,
+// `object_storage` and `webhook` that its `kind` names.
+type Sink struct {
+	// AtRisk Whether retention is about to drop events the sink has not delivered.
+	AtRisk bool `json:"at_risk"`
+
+	// BatchSize The most events one delivery carries.
+	BatchSize int `json:"batch_size"`
+
+	// Clickhouse A ClickHouse sink's configuration, written to its HTTP interface. The
+	// platform creates `{table_prefix}_exposures`, `_aliases` and
+	// `_evaluation_summaries` when it enables the sink and `create_tables`
+	// is true.
+	Clickhouse *SinkClickHouse `json:"clickhouse,omitempty"`
+	CreatedAt  time.Time       `json:"created_at"`
+
+	// DeadLetters The dead letters waiting to be redelivered or discarded.
+	DeadLetters int  `json:"dead_letters"`
+	Enabled     bool `json:"enabled"`
+
+	// Environments The keys of the environments whose events are exported; empty for every one.
+	Environments []string `json:"environments"`
+
+	// EventKinds The event kinds exported; empty for all of them.
+	EventKinds []SinkEventKind `json:"event_kinds"`
+
+	// FlushInterval Seconds the sink waits between deliveries once it has caught up.
+	FlushInterval int `json:"flush_interval"`
+
+	// Gaps The gaps not yet dismissed.
+	Gaps int `json:"gaps"`
+
+	// Health The first that holds: `disabled` by a member; `stopped` after the
+	// target kept rejecting batches, until resumed; `failing` while a
+	// stream cannot reach its target; `degraded` while a dead letter waits;
+	// `lagging` while the oldest undelivered event is older than the
+	// operator's `FLAGNETIC_SINK_LAG_WARNING`; otherwise `healthy`.
+	Health SinkHealth         `json:"health"`
+	Id     openapi_types.UUID `json:"id"`
+
+	// Kind Which target a sink delivers to; fixed when the sink is created.
+	Kind SinkKind `json:"kind"`
+
+	// LagSeconds The age of the oldest undelivered event; null while the sink is disabled.
+	LagSeconds *int64 `json:"lag_seconds"`
+	Name       Name   `json:"name"`
+
+	// ObjectStorage An object storage sink's configuration, for any S3-compatible service.
+	ObjectStorage *SinkObjectStorage `json:"object_storage,omitempty"`
+	StoppedAt     *time.Time         `json:"stopped_at"`
+
+	// Streams One per event kind exported once the sink has been enabled; empty before.
+	Streams   []SinkStream `json:"streams"`
+	UpdatedAt time.Time    `json:"updated_at"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
+
+	// Warnings What the last check of the target found wrong without making delivery impossible.
+	Warnings []string `json:"warnings"`
+
+	// Webhook A webhook sink's configuration. Its secret is the sink's, drawn by the server.
+	Webhook *SinkWebhook `json:"webhook,omitempty"`
+	union   json.RawMessage
+}
+
+// Sink0 defines model for Sink.0.
+type Sink0 = interface{}
+
+// Sink1 defines model for Sink.1.
+type Sink1 = interface{}
+
+// Sink2 defines model for Sink.2.
+type Sink2 = interface{}
+
+// SinkClickHouse A ClickHouse sink's configuration, written to its HTTP interface. The
+// platform creates `{table_prefix}_exposures`, `_aliases` and
+// `_evaluation_summaries` when it enables the sink and `create_tables`
+// is true.
+type SinkClickHouse struct {
+	CreateTables bool   `json:"create_tables"`
+	Database     string `json:"database"`
+
+	// Password Always `***`; the stored password is never answered.
+	Password string `json:"password"`
+
+	// Settings ClickHouse settings sent with every insert. The ones delivery sets itself are refused.
+	Settings map[string]string `json:"settings"`
+
+	// TablePrefix Letters, digits and underscores, not starting with a digit.
+	TablePrefix   string `json:"table_prefix"`
+	TlsSkipVerify bool   `json:"tls_skip_verify"`
+
+	// Url Where the HTTP interface answers; http or https, without credentials.
+	Url      string `json:"url"`
+	Username string `json:"username"`
+}
+
+// SinkClickHouseInput A ClickHouse sink's configuration as it is written. Required, and
+// refused `invalid_sink` when absent: `url`, `database`, `username`
+// and, when creating, `password`.
+type SinkClickHouseInput struct {
+	// CreateTables True when absent.
+	CreateTables *bool   `json:"create_tables,omitempty"`
+	Database     *string `json:"database,omitempty"`
+
+	// Password Sealed on arrival. `***` or absent keeps the stored password when editing.
+	Password *string            `json:"password,omitempty"`
+	Settings *map[string]string `json:"settings,omitempty"`
+
+	// TablePrefix `flagnetic` when empty.
+	TablePrefix   *string `json:"table_prefix,omitempty"`
+	TlsSkipVerify *bool   `json:"tls_skip_verify,omitempty"`
+	Url           *string `json:"url,omitempty"`
+	Username      *string `json:"username,omitempty"`
+}
+
+// SinkCreate defines model for SinkCreate.
+type SinkCreate struct {
+	// BatchSize The kind's default when absent.
+	BatchSize *int `json:"batch_size,omitempty"`
+
+	// Clickhouse A ClickHouse sink's configuration as it is written. Required, and
+	// refused `invalid_sink` when absent: `url`, `database`, `username`
+	// and, when creating, `password`.
+	Clickhouse *SinkClickHouseInput `json:"clickhouse,omitempty"`
+
+	// Environments The keys of the environments whose events to export; empty or absent for every one.
+	Environments *[]string `json:"environments,omitempty"`
+
+	// EventKinds Empty or absent for every event kind.
+	EventKinds *[]string `json:"event_kinds,omitempty"`
+
+	// FlushInterval Seconds; the kind's default when absent.
+	FlushInterval *int `json:"flush_interval,omitempty"`
+
+	// Kind `clickhouse`, `object_storage` or `webhook`.
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+
+	// ObjectStorage An object storage sink's configuration as it is written. Required,
+	// and refused `invalid_sink` when absent: `bucket`, `access_key_id` and,
+	// when creating, `secret_access_key`.
+	ObjectStorage *SinkObjectStorageInput `json:"object_storage,omitempty"`
+
+	// Webhook A webhook sink's configuration as it is written. `url` is required.
+	Webhook *SinkWebhookInput `json:"webhook,omitempty"`
+}
+
+// SinkEventKind A kind of raw event a sink exports, each delivered through a stream of its own.
+type SinkEventKind string
+
+// SinkFailure The last failed call of a stream.
+type SinkFailure struct {
+	At time.Time `json:"at"`
+
+	// Class Why a call to a target failed, from a closed list; a target's own
+	// words are never kept or answered.
+	Class SinkFailureClass `json:"class"`
+
+	// Code The protocol's own error code, such as a ClickHouse exception or an S3 error code, when the target speaks one.
+	Code *string `json:"code"`
+
+	// Status The HTTP status the target answered, when it did.
+	Status *int `json:"status"`
+}
+
+// SinkFailureClass Why a call to a target failed, from a closed list; a target's own
+// words are never kept or answered.
+type SinkFailureClass string
+
+// SinkHealth The first that holds: `disabled` by a member; `stopped` after the
+// target kept rejecting batches, until resumed; `failing` while a
+// stream cannot reach its target; `degraded` while a dead letter waits;
+// `lagging` while the oldest undelivered event is older than the
+// operator's `FLAGNETIC_SINK_LAG_WARNING`; otherwise `healthy`.
+type SinkHealth string
+
+// SinkKind Which target a sink delivers to; fixed when the sink is created.
+type SinkKind string
+
+// SinkList defines model for SinkList.
+type SinkList struct {
+	Items []Sink `json:"items"`
+}
+
+// SinkObjectStorage An object storage sink's configuration, for any S3-compatible service.
+type SinkObjectStorage struct {
+	AccessKeyId string `json:"access_key_id"`
+	Bucket      string `json:"bucket"`
+
+	// Compression For `jsonl`; `parquet` files are always `zstd`.
+	Compression SinkObjectStorageCompression `json:"compression"`
+
+	// Endpoint A scheme, a host and a port; empty for AWS.
+	Endpoint  string                  `json:"endpoint"`
+	Format    SinkObjectStorageFormat `json:"format"`
+	PathStyle bool                    `json:"path_style"`
+
+	// Prefix Without outer slashes.
+	Prefix string `json:"prefix"`
+
+	// Region Empty asks the bucket.
+	Region string `json:"region"`
+
+	// SecretAccessKey Always `***`; the stored key is never answered.
+	SecretAccessKey string `json:"secret_access_key"`
+}
+
+// SinkObjectStorageCompression For `jsonl`; `parquet` files are always `zstd`.
+type SinkObjectStorageCompression string
+
+// SinkObjectStorageFormat defines model for SinkObjectStorage.Format.
+type SinkObjectStorageFormat string
+
+// SinkObjectStorageInput An object storage sink's configuration as it is written. Required,
+// and refused `invalid_sink` when absent: `bucket`, `access_key_id` and,
+// when creating, `secret_access_key`.
+type SinkObjectStorageInput struct {
+	AccessKeyId *string `json:"access_key_id,omitempty"`
+	Bucket      *string `json:"bucket,omitempty"`
+
+	// Compression `gzip` for `jsonl` and `zstd` for `parquet` when empty.
+	Compression *string `json:"compression,omitempty"`
+	Endpoint    *string `json:"endpoint,omitempty"`
+
+	// Format `jsonl` when empty.
+	Format    *string `json:"format,omitempty"`
+	PathStyle *bool   `json:"path_style,omitempty"`
+	Prefix    *string `json:"prefix,omitempty"`
+	Region    *string `json:"region,omitempty"`
+
+	// SecretAccessKey Sealed on arrival. `***` or absent keeps the stored key when editing.
+	SecretAccessKey *string `json:"secret_access_key,omitempty"`
+}
+
+// SinkPatch The properties to change; each absent one is left as it is.
+type SinkPatch struct {
+	BatchSize *int `json:"batch_size,omitempty"`
+
+	// Clickhouse A ClickHouse sink's configuration as it is written. Required, and
+	// refused `invalid_sink` when absent: `url`, `database`, `username`
+	// and, when creating, `password`.
+	Clickhouse *SinkClickHouseInput `json:"clickhouse,omitempty"`
+
+	// Enabled `false` only: a sink is enabled with its own operation.
+	Enabled       *bool     `json:"enabled,omitempty"`
+	Environments  *[]string `json:"environments,omitempty"`
+	EventKinds    *[]string `json:"event_kinds,omitempty"`
+	FlushInterval *int      `json:"flush_interval,omitempty"`
+
+	// Kind May be left out; naming a kind other than the sink's own is refused `kind_immutable`.
+	Kind *string `json:"kind,omitempty"`
+	Name *string `json:"name,omitempty"`
+
+	// ObjectStorage An object storage sink's configuration as it is written. Required,
+	// and refused `invalid_sink` when absent: `bucket`, `access_key_id` and,
+	// when creating, `secret_access_key`.
+	ObjectStorage *SinkObjectStorageInput `json:"object_storage,omitempty"`
+
+	// Webhook A webhook sink's configuration as it is written. `url` is required.
+	Webhook *SinkWebhookInput `json:"webhook,omitempty"`
+}
+
+// SinkStream One event kind's delivery. Cursors are never exposed.
+type SinkStream struct {
+	// EventKind A kind of raw event a sink exports, each delivered through a stream of its own.
+	EventKind       SinkEventKind `json:"event_kind"`
+	LastDeliveredAt *time.Time    `json:"last_delivered_at"`
+	LastFailure     *SinkFailure  `json:"last_failure"`
+}
+
+// SinkWebhook A webhook sink's configuration. Its secret is the sink's, drawn by the server.
+type SinkWebhook struct {
+	// Headers Sent with every call, before the platform's own. Names starting `X-Flagnetic-` are refused.
+	Headers map[string]string `json:"headers"`
+
+	// Url Where every batch is posted: `https` unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`.
+	Url string `json:"url"`
+}
+
+// SinkWebhookInput A webhook sink's configuration as it is written. `url` is required.
+type SinkWebhookInput struct {
+	Headers *map[string]string `json:"headers,omitempty"`
+	Url     *string            `json:"url,omitempty"`
+}
+
+// SinkWithSecret defines model for SinkWithSecret.
+type SinkWithSecret struct {
+	// AtRisk Whether retention is about to drop events the sink has not delivered.
+	AtRisk bool `json:"at_risk"`
+
+	// BatchSize The most events one delivery carries.
+	BatchSize int `json:"batch_size"`
+
+	// Clickhouse A ClickHouse sink's configuration, written to its HTTP interface. The
+	// platform creates `{table_prefix}_exposures`, `_aliases` and
+	// `_evaluation_summaries` when it enables the sink and `create_tables`
+	// is true.
+	Clickhouse *SinkClickHouse `json:"clickhouse,omitempty"`
+	CreatedAt  time.Time       `json:"created_at"`
+
+	// DeadLetters The dead letters waiting to be redelivered or discarded.
+	DeadLetters int  `json:"dead_letters"`
+	Enabled     bool `json:"enabled"`
+
+	// Environments The keys of the environments whose events are exported; empty for every one.
+	Environments []string `json:"environments"`
+
+	// EventKinds The event kinds exported; empty for all of them.
+	EventKinds []SinkEventKind `json:"event_kinds"`
+
+	// FlushInterval Seconds the sink waits between deliveries once it has caught up.
+	FlushInterval int `json:"flush_interval"`
+
+	// Gaps The gaps not yet dismissed.
+	Gaps int `json:"gaps"`
+
+	// Health The first that holds: `disabled` by a member; `stopped` after the
+	// target kept rejecting batches, until resumed; `failing` while a
+	// stream cannot reach its target; `degraded` while a dead letter waits;
+	// `lagging` while the oldest undelivered event is older than the
+	// operator's `FLAGNETIC_SINK_LAG_WARNING`; otherwise `healthy`.
+	Health SinkHealth         `json:"health"`
+	Id     openapi_types.UUID `json:"id"`
+
+	// Kind Which target a sink delivers to; fixed when the sink is created.
+	Kind SinkKind `json:"kind"`
+
+	// LagSeconds The age of the oldest undelivered event; null while the sink is disabled.
+	LagSeconds *int64 `json:"lag_seconds"`
+	Name       Name   `json:"name"`
+
+	// ObjectStorage An object storage sink's configuration, for any S3-compatible service.
+	ObjectStorage *SinkObjectStorage `json:"object_storage,omitempty"`
+
+	// Secret A webhook sink's secret, base64url of 32 random bytes, the
+	// key of every signature under the sink. Shown once, by the
+	// operation that issued it: it is stored sealed and never
+	// answered again. Absent for the other kinds.
+	Secret    *string    `json:"secret,omitempty"`
+	StoppedAt *time.Time `json:"stopped_at"`
+
+	// Streams One per event kind exported once the sink has been enabled; empty before.
+	Streams   []SinkStream `json:"streams"`
+	UpdatedAt time.Time    `json:"updated_at"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
+
+	// Warnings What the last check of the target found wrong without making delivery impossible.
+	Warnings []string `json:"warnings"`
+
+	// Webhook A webhook sink's configuration. Its secret is the sink's, drawn by the server.
+	Webhook *SinkWebhook `json:"webhook,omitempty"`
+	union   json.RawMessage
+}
+
+// SinkWithSecret0 defines model for SinkWithSecret.0.
+type SinkWithSecret0 = interface{}
+
+// SinkWithSecret1 defines model for SinkWithSecret.1.
+type SinkWithSecret1 = interface{}
+
+// SinkWithSecret2 defines model for SinkWithSecret.2.
+type SinkWithSecret2 = interface{}
+
 // StaleExperiment The running experiment past its expected end that makes the flag
 // stale as `experiment_overdue`, present with that reason only. When
 // several are, the one due earliest, then the first by key.
@@ -3511,6 +4026,9 @@ type SegmentKey = string
 
 // SessionID defines model for SessionID.
 type SessionID = string
+
+// SinkID defines model for SinkID.
+type SinkID = openapi_types.UUID
 
 // TokenID defines model for TokenID.
 type TokenID = string
@@ -4228,6 +4746,26 @@ type UpdateSegmentParams struct {
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
+// DeleteSinkParams defines parameters for DeleteSink.
+type DeleteSinkParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// UpdateSinkParams defines parameters for UpdateSink.
+type UpdateSinkParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
 // ListStaleFlagsParams defines parameters for ListStaleFlags.
 type ListStaleFlagsParams struct {
 	// Reason Lists only the flags stale for one of these reasons; absent for every stale flag.
@@ -4445,6 +4983,12 @@ type CreateSegmentJSONRequestBody = SegmentCreate
 
 // UpdateSegmentJSONRequestBody defines body for UpdateSegment for application/json ContentType.
 type UpdateSegmentJSONRequestBody = SegmentPatch
+
+// CreateSinkJSONRequestBody defines body for CreateSink for application/json ContentType.
+type CreateSinkJSONRequestBody = SinkCreate
+
+// UpdateSinkJSONRequestBody defines body for UpdateSink for application/json ContentType.
+type UpdateSinkJSONRequestBody = SinkPatch
 
 // CreateProjectTokenJSONRequestBody defines body for CreateProjectToken for application/json ContentType.
 type CreateProjectTokenJSONRequestBody = ProjectTokenCreate
@@ -4692,6 +5236,792 @@ func (t ProposedInput) MarshalJSON() ([]byte, error) {
 
 func (t *ProposedInput) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSink0 returns the union data inside the Sink as a Sink0
+func (t Sink) AsSink0() (Sink0, error) {
+	var body Sink0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSink0 overwrites any union data inside the Sink as the provided Sink0
+func (t *Sink) FromSink0(v Sink0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSink0 performs a merge with any union data inside the Sink, using the provided Sink0
+func (t *Sink) MergeSink0(v Sink0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSink1 returns the union data inside the Sink as a Sink1
+func (t Sink) AsSink1() (Sink1, error) {
+	var body Sink1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSink1 overwrites any union data inside the Sink as the provided Sink1
+func (t *Sink) FromSink1(v Sink1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSink1 performs a merge with any union data inside the Sink, using the provided Sink1
+func (t *Sink) MergeSink1(v Sink1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSink2 returns the union data inside the Sink as a Sink2
+func (t Sink) AsSink2() (Sink2, error) {
+	var body Sink2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSink2 overwrites any union data inside the Sink as the provided Sink2
+func (t *Sink) FromSink2(v Sink2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSink2 performs a merge with any union data inside the Sink, using the provided Sink2
+func (t *Sink) MergeSink2(v Sink2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Sink) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	object["at_risk"], err = json.Marshal(t.AtRisk)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'at_risk': %w", err)
+	}
+
+	object["batch_size"], err = json.Marshal(t.BatchSize)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'batch_size': %w", err)
+	}
+
+	if t.Clickhouse != nil {
+		object["clickhouse"], err = json.Marshal(t.Clickhouse)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'clickhouse': %w", err)
+		}
+	}
+
+	object["created_at"], err = json.Marshal(t.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'created_at': %w", err)
+	}
+
+	object["dead_letters"], err = json.Marshal(t.DeadLetters)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'dead_letters': %w", err)
+	}
+
+	object["enabled"], err = json.Marshal(t.Enabled)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'enabled': %w", err)
+	}
+
+	if t.Environments != nil {
+		object["environments"], err = json.Marshal(t.Environments)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'environments': %w", err)
+		}
+	}
+
+	if t.EventKinds != nil {
+		object["event_kinds"], err = json.Marshal(t.EventKinds)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'event_kinds': %w", err)
+		}
+	}
+
+	object["flush_interval"], err = json.Marshal(t.FlushInterval)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'flush_interval': %w", err)
+	}
+
+	object["gaps"], err = json.Marshal(t.Gaps)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'gaps': %w", err)
+	}
+
+	object["health"], err = json.Marshal(t.Health)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'health': %w", err)
+	}
+
+	object["id"], err = json.Marshal(t.Id)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'id': %w", err)
+	}
+
+	object["kind"], err = json.Marshal(t.Kind)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'kind': %w", err)
+	}
+
+	object["lag_seconds"], err = json.Marshal(t.LagSeconds)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'lag_seconds': %w", err)
+	}
+
+	object["name"], err = json.Marshal(t.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'name': %w", err)
+	}
+
+	if t.ObjectStorage != nil {
+		object["object_storage"], err = json.Marshal(t.ObjectStorage)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'object_storage': %w", err)
+		}
+	}
+
+	object["stopped_at"], err = json.Marshal(t.StoppedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'stopped_at': %w", err)
+	}
+
+	if t.Streams != nil {
+		object["streams"], err = json.Marshal(t.Streams)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'streams': %w", err)
+		}
+	}
+
+	object["updated_at"], err = json.Marshal(t.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'updated_at': %w", err)
+	}
+
+	object["version"], err = json.Marshal(t.Version)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'version': %w", err)
+	}
+
+	if t.Warnings != nil {
+		object["warnings"], err = json.Marshal(t.Warnings)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'warnings': %w", err)
+		}
+	}
+
+	if t.Webhook != nil {
+		object["webhook"], err = json.Marshal(t.Webhook)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'webhook': %w", err)
+		}
+	}
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *Sink) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["at_risk"]; found {
+		err = json.Unmarshal(raw, &t.AtRisk)
+		if err != nil {
+			return fmt.Errorf("error reading 'at_risk': %w", err)
+		}
+	}
+
+	if raw, found := object["batch_size"]; found {
+		err = json.Unmarshal(raw, &t.BatchSize)
+		if err != nil {
+			return fmt.Errorf("error reading 'batch_size': %w", err)
+		}
+	}
+
+	if raw, found := object["clickhouse"]; found {
+		err = json.Unmarshal(raw, &t.Clickhouse)
+		if err != nil {
+			return fmt.Errorf("error reading 'clickhouse': %w", err)
+		}
+	}
+
+	if raw, found := object["created_at"]; found {
+		err = json.Unmarshal(raw, &t.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'created_at': %w", err)
+		}
+	}
+
+	if raw, found := object["dead_letters"]; found {
+		err = json.Unmarshal(raw, &t.DeadLetters)
+		if err != nil {
+			return fmt.Errorf("error reading 'dead_letters': %w", err)
+		}
+	}
+
+	if raw, found := object["enabled"]; found {
+		err = json.Unmarshal(raw, &t.Enabled)
+		if err != nil {
+			return fmt.Errorf("error reading 'enabled': %w", err)
+		}
+	}
+
+	if raw, found := object["environments"]; found {
+		err = json.Unmarshal(raw, &t.Environments)
+		if err != nil {
+			return fmt.Errorf("error reading 'environments': %w", err)
+		}
+	}
+
+	if raw, found := object["event_kinds"]; found {
+		err = json.Unmarshal(raw, &t.EventKinds)
+		if err != nil {
+			return fmt.Errorf("error reading 'event_kinds': %w", err)
+		}
+	}
+
+	if raw, found := object["flush_interval"]; found {
+		err = json.Unmarshal(raw, &t.FlushInterval)
+		if err != nil {
+			return fmt.Errorf("error reading 'flush_interval': %w", err)
+		}
+	}
+
+	if raw, found := object["gaps"]; found {
+		err = json.Unmarshal(raw, &t.Gaps)
+		if err != nil {
+			return fmt.Errorf("error reading 'gaps': %w", err)
+		}
+	}
+
+	if raw, found := object["health"]; found {
+		err = json.Unmarshal(raw, &t.Health)
+		if err != nil {
+			return fmt.Errorf("error reading 'health': %w", err)
+		}
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &t.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+	}
+
+	if raw, found := object["kind"]; found {
+		err = json.Unmarshal(raw, &t.Kind)
+		if err != nil {
+			return fmt.Errorf("error reading 'kind': %w", err)
+		}
+	}
+
+	if raw, found := object["lag_seconds"]; found {
+		err = json.Unmarshal(raw, &t.LagSeconds)
+		if err != nil {
+			return fmt.Errorf("error reading 'lag_seconds': %w", err)
+		}
+	}
+
+	if raw, found := object["name"]; found {
+		err = json.Unmarshal(raw, &t.Name)
+		if err != nil {
+			return fmt.Errorf("error reading 'name': %w", err)
+		}
+	}
+
+	if raw, found := object["object_storage"]; found {
+		err = json.Unmarshal(raw, &t.ObjectStorage)
+		if err != nil {
+			return fmt.Errorf("error reading 'object_storage': %w", err)
+		}
+	}
+
+	if raw, found := object["stopped_at"]; found {
+		err = json.Unmarshal(raw, &t.StoppedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'stopped_at': %w", err)
+		}
+	}
+
+	if raw, found := object["streams"]; found {
+		err = json.Unmarshal(raw, &t.Streams)
+		if err != nil {
+			return fmt.Errorf("error reading 'streams': %w", err)
+		}
+	}
+
+	if raw, found := object["updated_at"]; found {
+		err = json.Unmarshal(raw, &t.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'updated_at': %w", err)
+		}
+	}
+
+	if raw, found := object["version"]; found {
+		err = json.Unmarshal(raw, &t.Version)
+		if err != nil {
+			return fmt.Errorf("error reading 'version': %w", err)
+		}
+	}
+
+	if raw, found := object["warnings"]; found {
+		err = json.Unmarshal(raw, &t.Warnings)
+		if err != nil {
+			return fmt.Errorf("error reading 'warnings': %w", err)
+		}
+	}
+
+	if raw, found := object["webhook"]; found {
+		err = json.Unmarshal(raw, &t.Webhook)
+		if err != nil {
+			return fmt.Errorf("error reading 'webhook': %w", err)
+		}
+	}
+
+	return err
+}
+
+// AsSinkWithSecret0 returns the union data inside the SinkWithSecret as a SinkWithSecret0
+func (t SinkWithSecret) AsSinkWithSecret0() (SinkWithSecret0, error) {
+	var body SinkWithSecret0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSinkWithSecret0 overwrites any union data inside the SinkWithSecret as the provided SinkWithSecret0
+func (t *SinkWithSecret) FromSinkWithSecret0(v SinkWithSecret0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSinkWithSecret0 performs a merge with any union data inside the SinkWithSecret, using the provided SinkWithSecret0
+func (t *SinkWithSecret) MergeSinkWithSecret0(v SinkWithSecret0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSinkWithSecret1 returns the union data inside the SinkWithSecret as a SinkWithSecret1
+func (t SinkWithSecret) AsSinkWithSecret1() (SinkWithSecret1, error) {
+	var body SinkWithSecret1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSinkWithSecret1 overwrites any union data inside the SinkWithSecret as the provided SinkWithSecret1
+func (t *SinkWithSecret) FromSinkWithSecret1(v SinkWithSecret1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSinkWithSecret1 performs a merge with any union data inside the SinkWithSecret, using the provided SinkWithSecret1
+func (t *SinkWithSecret) MergeSinkWithSecret1(v SinkWithSecret1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSinkWithSecret2 returns the union data inside the SinkWithSecret as a SinkWithSecret2
+func (t SinkWithSecret) AsSinkWithSecret2() (SinkWithSecret2, error) {
+	var body SinkWithSecret2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSinkWithSecret2 overwrites any union data inside the SinkWithSecret as the provided SinkWithSecret2
+func (t *SinkWithSecret) FromSinkWithSecret2(v SinkWithSecret2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSinkWithSecret2 performs a merge with any union data inside the SinkWithSecret, using the provided SinkWithSecret2
+func (t *SinkWithSecret) MergeSinkWithSecret2(v SinkWithSecret2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SinkWithSecret) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	object["at_risk"], err = json.Marshal(t.AtRisk)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'at_risk': %w", err)
+	}
+
+	object["batch_size"], err = json.Marshal(t.BatchSize)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'batch_size': %w", err)
+	}
+
+	if t.Clickhouse != nil {
+		object["clickhouse"], err = json.Marshal(t.Clickhouse)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'clickhouse': %w", err)
+		}
+	}
+
+	object["created_at"], err = json.Marshal(t.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'created_at': %w", err)
+	}
+
+	object["dead_letters"], err = json.Marshal(t.DeadLetters)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'dead_letters': %w", err)
+	}
+
+	object["enabled"], err = json.Marshal(t.Enabled)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'enabled': %w", err)
+	}
+
+	if t.Environments != nil {
+		object["environments"], err = json.Marshal(t.Environments)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'environments': %w", err)
+		}
+	}
+
+	if t.EventKinds != nil {
+		object["event_kinds"], err = json.Marshal(t.EventKinds)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'event_kinds': %w", err)
+		}
+	}
+
+	object["flush_interval"], err = json.Marshal(t.FlushInterval)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'flush_interval': %w", err)
+	}
+
+	object["gaps"], err = json.Marshal(t.Gaps)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'gaps': %w", err)
+	}
+
+	object["health"], err = json.Marshal(t.Health)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'health': %w", err)
+	}
+
+	object["id"], err = json.Marshal(t.Id)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'id': %w", err)
+	}
+
+	object["kind"], err = json.Marshal(t.Kind)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'kind': %w", err)
+	}
+
+	object["lag_seconds"], err = json.Marshal(t.LagSeconds)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'lag_seconds': %w", err)
+	}
+
+	object["name"], err = json.Marshal(t.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'name': %w", err)
+	}
+
+	if t.ObjectStorage != nil {
+		object["object_storage"], err = json.Marshal(t.ObjectStorage)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'object_storage': %w", err)
+		}
+	}
+
+	if t.Secret != nil {
+		object["secret"], err = json.Marshal(t.Secret)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'secret': %w", err)
+		}
+	}
+
+	object["stopped_at"], err = json.Marshal(t.StoppedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'stopped_at': %w", err)
+	}
+
+	if t.Streams != nil {
+		object["streams"], err = json.Marshal(t.Streams)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'streams': %w", err)
+		}
+	}
+
+	object["updated_at"], err = json.Marshal(t.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'updated_at': %w", err)
+	}
+
+	object["version"], err = json.Marshal(t.Version)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'version': %w", err)
+	}
+
+	if t.Warnings != nil {
+		object["warnings"], err = json.Marshal(t.Warnings)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'warnings': %w", err)
+		}
+	}
+
+	if t.Webhook != nil {
+		object["webhook"], err = json.Marshal(t.Webhook)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'webhook': %w", err)
+		}
+	}
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *SinkWithSecret) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["at_risk"]; found {
+		err = json.Unmarshal(raw, &t.AtRisk)
+		if err != nil {
+			return fmt.Errorf("error reading 'at_risk': %w", err)
+		}
+	}
+
+	if raw, found := object["batch_size"]; found {
+		err = json.Unmarshal(raw, &t.BatchSize)
+		if err != nil {
+			return fmt.Errorf("error reading 'batch_size': %w", err)
+		}
+	}
+
+	if raw, found := object["clickhouse"]; found {
+		err = json.Unmarshal(raw, &t.Clickhouse)
+		if err != nil {
+			return fmt.Errorf("error reading 'clickhouse': %w", err)
+		}
+	}
+
+	if raw, found := object["created_at"]; found {
+		err = json.Unmarshal(raw, &t.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'created_at': %w", err)
+		}
+	}
+
+	if raw, found := object["dead_letters"]; found {
+		err = json.Unmarshal(raw, &t.DeadLetters)
+		if err != nil {
+			return fmt.Errorf("error reading 'dead_letters': %w", err)
+		}
+	}
+
+	if raw, found := object["enabled"]; found {
+		err = json.Unmarshal(raw, &t.Enabled)
+		if err != nil {
+			return fmt.Errorf("error reading 'enabled': %w", err)
+		}
+	}
+
+	if raw, found := object["environments"]; found {
+		err = json.Unmarshal(raw, &t.Environments)
+		if err != nil {
+			return fmt.Errorf("error reading 'environments': %w", err)
+		}
+	}
+
+	if raw, found := object["event_kinds"]; found {
+		err = json.Unmarshal(raw, &t.EventKinds)
+		if err != nil {
+			return fmt.Errorf("error reading 'event_kinds': %w", err)
+		}
+	}
+
+	if raw, found := object["flush_interval"]; found {
+		err = json.Unmarshal(raw, &t.FlushInterval)
+		if err != nil {
+			return fmt.Errorf("error reading 'flush_interval': %w", err)
+		}
+	}
+
+	if raw, found := object["gaps"]; found {
+		err = json.Unmarshal(raw, &t.Gaps)
+		if err != nil {
+			return fmt.Errorf("error reading 'gaps': %w", err)
+		}
+	}
+
+	if raw, found := object["health"]; found {
+		err = json.Unmarshal(raw, &t.Health)
+		if err != nil {
+			return fmt.Errorf("error reading 'health': %w", err)
+		}
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &t.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+	}
+
+	if raw, found := object["kind"]; found {
+		err = json.Unmarshal(raw, &t.Kind)
+		if err != nil {
+			return fmt.Errorf("error reading 'kind': %w", err)
+		}
+	}
+
+	if raw, found := object["lag_seconds"]; found {
+		err = json.Unmarshal(raw, &t.LagSeconds)
+		if err != nil {
+			return fmt.Errorf("error reading 'lag_seconds': %w", err)
+		}
+	}
+
+	if raw, found := object["name"]; found {
+		err = json.Unmarshal(raw, &t.Name)
+		if err != nil {
+			return fmt.Errorf("error reading 'name': %w", err)
+		}
+	}
+
+	if raw, found := object["object_storage"]; found {
+		err = json.Unmarshal(raw, &t.ObjectStorage)
+		if err != nil {
+			return fmt.Errorf("error reading 'object_storage': %w", err)
+		}
+	}
+
+	if raw, found := object["secret"]; found {
+		err = json.Unmarshal(raw, &t.Secret)
+		if err != nil {
+			return fmt.Errorf("error reading 'secret': %w", err)
+		}
+	}
+
+	if raw, found := object["stopped_at"]; found {
+		err = json.Unmarshal(raw, &t.StoppedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'stopped_at': %w", err)
+		}
+	}
+
+	if raw, found := object["streams"]; found {
+		err = json.Unmarshal(raw, &t.Streams)
+		if err != nil {
+			return fmt.Errorf("error reading 'streams': %w", err)
+		}
+	}
+
+	if raw, found := object["updated_at"]; found {
+		err = json.Unmarshal(raw, &t.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'updated_at': %w", err)
+		}
+	}
+
+	if raw, found := object["version"]; found {
+		err = json.Unmarshal(raw, &t.Version)
+		if err != nil {
+			return fmt.Errorf("error reading 'version': %w", err)
+		}
+	}
+
+	if raw, found := object["warnings"]; found {
+		err = json.Unmarshal(raw, &t.Warnings)
+		if err != nil {
+			return fmt.Errorf("error reading 'warnings': %w", err)
+		}
+	}
+
+	if raw, found := object["webhook"]; found {
+		err = json.Unmarshal(raw, &t.Webhook)
+		if err != nil {
+			return fmt.Errorf("error reading 'webhook': %w", err)
+		}
+	}
+
 	return err
 }
 
@@ -6862,6 +8192,159 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/segments/{segment}/usages (the `ListSegmentUsages` operationId).
 	ListSegmentUsages(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSinks The project's sinks
+	//
+	// The oldest first. A sink's credentials are never listed: the
+	// ClickHouse `password` and the object storage `secret_access_key` read
+	// back as `***`, and a webhook sink's secret is shown once, when it is
+	// issued. Reading sinks needs `sink.manage` too, since a sink's
+	// configuration names internal hosts, buckets and URLs that may carry
+	// tokens.
+	//
+	// Corresponds with GET /projects/{project}/sinks (the `ListSinks` operationId).
+	ListSinks(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSinkWithBody Add a sink
+	//
+	// Creates a sink of the `kind` given and the configuration of that kind
+	// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+	// delivers nothing until it is enabled. The ClickHouse `password` and
+	// the object storage `secret_access_key` are required, stored sealed
+	// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+	// secret is drawn by the server, 32 random bytes as unpadded base64url,
+	// and answered as `secret` this once; audit entries record every secret
+	// as `[redacted]`. Receivers verify a webhook sink's calls as they
+	// verify a webhook subscription's.
+	//
+	// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+	// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+	// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+	// empty mean every one.
+	//
+	// Refused as `invalid_sink`, with `errors` naming each field by JSON
+	// Pointer: a blank name, a configuration missing or of another kind,
+	// a URL that is not an absolute http or https URL without credentials,
+	// a required field left out, a setting delivery sets itself, a header
+	// of the platform's own, an event kind or a batching value out of
+	// range. An environment the project does not have is
+	// `unknown_environment`. A webhook sink's `url` must be `https`
+	// (`insecure_url`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+	// loopback, private, link-local, unspecified or multicast address
+	// (`private_network_target`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+	// storage target may be on a private or loopback address, never on a
+	// link-local one (`link_local_target`), which no setting lifts. A name
+	// that does not resolve is accepted.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+	CreateSinkWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSink Add a sink
+	//
+	// Creates a sink of the `kind` given and the configuration of that kind
+	// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+	// delivers nothing until it is enabled. The ClickHouse `password` and
+	// the object storage `secret_access_key` are required, stored sealed
+	// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+	// secret is drawn by the server, 32 random bytes as unpadded base64url,
+	// and answered as `secret` this once; audit entries record every secret
+	// as `[redacted]`. Receivers verify a webhook sink's calls as they
+	// verify a webhook subscription's.
+	//
+	// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+	// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+	// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+	// empty mean every one.
+	//
+	// Refused as `invalid_sink`, with `errors` naming each field by JSON
+	// Pointer: a blank name, a configuration missing or of another kind,
+	// a URL that is not an absolute http or https URL without credentials,
+	// a required field left out, a setting delivery sets itself, a header
+	// of the platform's own, an event kind or a batching value out of
+	// range. An environment the project does not have is
+	// `unknown_environment`. A webhook sink's `url` must be `https`
+	// (`insecure_url`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+	// loopback, private, link-local, unspecified or multicast address
+	// (`private_network_target`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+	// storage target may be on a private or loopback address, never on a
+	// link-local one (`link_local_target`), which no setting lifts. A name
+	// that does not resolve is accepted.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+	CreateSink(ctx context.Context, project ProjectKey, body CreateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteSink Delete a sink
+	//
+	// The sink goes, and nothing more is sent to its target.
+	//
+	// Corresponds with DELETE /projects/{project}/sinks/{sink} (the `DeleteSink` operationId).
+	DeleteSink(ctx context.Context, project ProjectKey, sink SinkID, params *DeleteSinkParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSink A sink
+	//
+	// Corresponds with GET /projects/{project}/sinks/{sink} (the `GetSink` operationId).
+	GetSink(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSinkWithBody Edit a sink
+	//
+	// Changes each property present and leaves the others as they are. A
+	// sub-object of the sink's kind replaces its configuration whole, so
+	// nothing of the earlier one lingers; the one exception is its secret:
+	// `***`, as every read answers it, or no secret at all keeps the stored
+	// one, and any other value replaces it. A sub-object of another kind,
+	// or a `kind` other than the sink's own, is refused `kind_immutable`.
+	// `enabled` takes `false` only, which lets the attempt in progress
+	// finish and keeps the sink's place; a sink is enabled with its own
+	// operation, which checks the target first. A new target is checked as
+	// on creation, and an edit that changes nothing stores and records
+	// nothing. An edit of batching or filters applies from the next batch.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+	UpdateSinkWithBody(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSink Edit a sink
+	//
+	// Changes each property present and leaves the others as they are. A
+	// sub-object of the sink's kind replaces its configuration whole, so
+	// nothing of the earlier one lingers; the one exception is its secret:
+	// `***`, as every read answers it, or no secret at all keeps the stored
+	// one, and any other value replaces it. A sub-object of another kind,
+	// or a `kind` other than the sink's own, is refused `kind_immutable`.
+	// `enabled` takes `false` only, which lets the attempt in progress
+	// finish and keeps the sink's place; a sink is enabled with its own
+	// operation, which checks the target first. A new target is checked as
+	// on creation, and an edit that changes nothing stores and records
+	// nothing. An edit of batching or filters applies from the next batch.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+	UpdateSink(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, body UpdateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RotateSinkSecret Rotate a webhook sink's secret
+	//
+	// Issues a webhook sink a new secret, answered this once. The secret it
+	// replaces keeps signing beside the new one for the operator's
+	// `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+	// each call carries two `v1=` signatures meanwhile and a receiver
+	// holding either verifies. A secret an earlier rotation left signing is
+	// dropped at once: no more than two sign. A sink of another kind has no
+	// secret the server draws and is refused `no_secret_to_rotate`; its
+	// password or secret access key is changed by editing it. It takes no
+	// `If-Match`.
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/rotate-secret (the `RotateSinkSecret` operationId).
+	RotateSinkSecret(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListStaleFlags The project's stale flags
 	//
@@ -10981,6 +12464,239 @@ func (c *Client) UpdateSegment(ctx context.Context, project ProjectKey, segment 
 // Corresponds with GET /projects/{project}/segments/{segment}/usages (the `ListSegmentUsages` operationId).
 func (c *Client) ListSegmentUsages(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListSegmentUsagesRequest(c.Server, project, segment)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListSinks The project's sinks
+//
+// The oldest first. A sink's credentials are never listed: the
+// ClickHouse `password` and the object storage `secret_access_key` read
+// back as `***`, and a webhook sink's secret is shown once, when it is
+// issued. Reading sinks needs `sink.manage` too, since a sink's
+// configuration names internal hosts, buckets and URLs that may carry
+// tokens.
+//
+// Corresponds with GET /projects/{project}/sinks (the `ListSinks` operationId).
+func (c *Client) ListSinks(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSinksRequest(c.Server, project)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSinkWithBody Add a sink
+//
+// Creates a sink of the `kind` given and the configuration of that kind
+// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+// delivers nothing until it is enabled. The ClickHouse `password` and
+// the object storage `secret_access_key` are required, stored sealed
+// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+// secret is drawn by the server, 32 random bytes as unpadded base64url,
+// and answered as `secret` this once; audit entries record every secret
+// as `[redacted]`. Receivers verify a webhook sink's calls as they
+// verify a webhook subscription's.
+//
+// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+// empty mean every one.
+//
+// Refused as `invalid_sink`, with `errors` naming each field by JSON
+// Pointer: a blank name, a configuration missing or of another kind,
+// a URL that is not an absolute http or https URL without credentials,
+// a required field left out, a setting delivery sets itself, a header
+// of the platform's own, an event kind or a batching value out of
+// range. An environment the project does not have is
+// `unknown_environment`. A webhook sink's `url` must be `https`
+// (`insecure_url`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+// loopback, private, link-local, unspecified or multicast address
+// (`private_network_target`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+// storage target may be on a private or loopback address, never on a
+// link-local one (`link_local_target`), which no setting lifts. A name
+// that does not resolve is accepted.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+func (c *Client) CreateSinkWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSinkRequestWithBody(c.Server, project, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSink Add a sink
+//
+// Creates a sink of the `kind` given and the configuration of that kind
+// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+// delivers nothing until it is enabled. The ClickHouse `password` and
+// the object storage `secret_access_key` are required, stored sealed
+// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+// secret is drawn by the server, 32 random bytes as unpadded base64url,
+// and answered as `secret` this once; audit entries record every secret
+// as `[redacted]`. Receivers verify a webhook sink's calls as they
+// verify a webhook subscription's.
+//
+// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+// empty mean every one.
+//
+// Refused as `invalid_sink`, with `errors` naming each field by JSON
+// Pointer: a blank name, a configuration missing or of another kind,
+// a URL that is not an absolute http or https URL without credentials,
+// a required field left out, a setting delivery sets itself, a header
+// of the platform's own, an event kind or a batching value out of
+// range. An environment the project does not have is
+// `unknown_environment`. A webhook sink's `url` must be `https`
+// (`insecure_url`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+// loopback, private, link-local, unspecified or multicast address
+// (`private_network_target`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+// storage target may be on a private or loopback address, never on a
+// link-local one (`link_local_target`), which no setting lifts. A name
+// that does not resolve is accepted.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+func (c *Client) CreateSink(ctx context.Context, project ProjectKey, body CreateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSinkRequest(c.Server, project, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteSink Delete a sink
+//
+// The sink goes, and nothing more is sent to its target.
+//
+// Corresponds with DELETE /projects/{project}/sinks/{sink} (the `DeleteSink` operationId).
+func (c *Client) DeleteSink(ctx context.Context, project ProjectKey, sink SinkID, params *DeleteSinkParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSinkRequest(c.Server, project, sink, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSink A sink
+//
+// Corresponds with GET /projects/{project}/sinks/{sink} (the `GetSink` operationId).
+func (c *Client) GetSink(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSinkRequest(c.Server, project, sink)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateSinkWithBody Edit a sink
+//
+// Changes each property present and leaves the others as they are. A
+// sub-object of the sink's kind replaces its configuration whole, so
+// nothing of the earlier one lingers; the one exception is its secret:
+// `***`, as every read answers it, or no secret at all keeps the stored
+// one, and any other value replaces it. A sub-object of another kind,
+// or a `kind` other than the sink's own, is refused `kind_immutable`.
+// `enabled` takes `false` only, which lets the attempt in progress
+// finish and keeps the sink's place; a sink is enabled with its own
+// operation, which checks the target first. A new target is checked as
+// on creation, and an edit that changes nothing stores and records
+// nothing. An edit of batching or filters applies from the next batch.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+func (c *Client) UpdateSinkWithBody(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSinkRequestWithBody(c.Server, project, sink, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateSink Edit a sink
+//
+// Changes each property present and leaves the others as they are. A
+// sub-object of the sink's kind replaces its configuration whole, so
+// nothing of the earlier one lingers; the one exception is its secret:
+// `***`, as every read answers it, or no secret at all keeps the stored
+// one, and any other value replaces it. A sub-object of another kind,
+// or a `kind` other than the sink's own, is refused `kind_immutable`.
+// `enabled` takes `false` only, which lets the attempt in progress
+// finish and keeps the sink's place; a sink is enabled with its own
+// operation, which checks the target first. A new target is checked as
+// on creation, and an edit that changes nothing stores and records
+// nothing. An edit of batching or filters applies from the next batch.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+func (c *Client) UpdateSink(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, body UpdateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSinkRequest(c.Server, project, sink, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RotateSinkSecret Rotate a webhook sink's secret
+//
+// Issues a webhook sink a new secret, answered this once. The secret it
+// replaces keeps signing beside the new one for the operator's
+// `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+// each call carries two `v1=` signatures meanwhile and a receiver
+// holding either verifies. A secret an earlier rotation left signing is
+// dropped at once: no more than two sign. A sink of another kind has no
+// secret the server draws and is refused `no_secret_to_rotate`; its
+// password or secret access key is changed by editing it. It takes no
+// `If-Match`.
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/rotate-secret (the `RotateSinkSecret` operationId).
+func (c *Client) RotateSinkSecret(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRotateSinkSecretRequest(c.Server, project, sink)
 	if err != nil {
 		return nil, err
 	}
@@ -18635,6 +20351,294 @@ func NewListSegmentUsagesRequest(server string, project ProjectKey, segment Segm
 	return req, nil
 }
 
+// NewListSinksRequest constructs an http.Request for the ListSinks method
+func NewListSinksRequest(server string, project ProjectKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateSinkRequest calls the generic CreateSink builder with application/json body
+func NewCreateSinkRequest(server string, project ProjectKey, body CreateSinkJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateSinkRequestWithBody(server, project, "application/json", bodyReader)
+}
+
+// NewCreateSinkRequestWithBody constructs an http.Request for the CreateSink method, with any body, and a specified content type
+func NewCreateSinkRequestWithBody(server string, project ProjectKey, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteSinkRequest constructs an http.Request for the DeleteSink method
+func NewDeleteSinkRequest(server string, project ProjectKey, sink SinkID, params *DeleteSinkParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetSinkRequest constructs an http.Request for the GetSink method
+func NewGetSinkRequest(server string, project ProjectKey, sink SinkID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateSinkRequest calls the generic UpdateSink builder with application/json body
+func NewUpdateSinkRequest(server string, project ProjectKey, sink SinkID, params *UpdateSinkParams, body UpdateSinkJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateSinkRequestWithBody(server, project, sink, params, "application/json", bodyReader)
+}
+
+// NewUpdateSinkRequestWithBody constructs an http.Request for the UpdateSink method, with any body, and a specified content type
+func NewUpdateSinkRequestWithBody(server string, project ProjectKey, sink SinkID, params *UpdateSinkParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewRotateSinkSecretRequest constructs an http.Request for the RotateSinkSecret method
+func NewRotateSinkSecretRequest(server string, project ProjectKey, sink SinkID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s/rotate-secret", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListStaleFlagsRequest constructs an http.Request for the ListStaleFlags method
 func NewListStaleFlagsRequest(server string, project ProjectKey, params *ListStaleFlagsParams) (*http.Request, error) {
 	var err error
@@ -22602,6 +24606,167 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/segments/{segment}/usages (the `ListSegmentUsages` operationId).
 	ListSegmentUsagesWithResponse(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*ListSegmentUsagesResponse, error)
+
+	// ListSinksWithResponse The project's sinks
+	//
+	// The oldest first. A sink's credentials are never listed: the
+	// ClickHouse `password` and the object storage `secret_access_key` read
+	// back as `***`, and a webhook sink's secret is shown once, when it is
+	// issued. Reading sinks needs `sink.manage` too, since a sink's
+	// configuration names internal hosts, buckets and URLs that may carry
+	// tokens.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/sinks (the `ListSinks` operationId).
+	ListSinksWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListSinksResponse, error)
+
+	// CreateSinkWithBodyWithResponse Add a sink
+	//
+	// Creates a sink of the `kind` given and the configuration of that kind
+	// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+	// delivers nothing until it is enabled. The ClickHouse `password` and
+	// the object storage `secret_access_key` are required, stored sealed
+	// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+	// secret is drawn by the server, 32 random bytes as unpadded base64url,
+	// and answered as `secret` this once; audit entries record every secret
+	// as `[redacted]`. Receivers verify a webhook sink's calls as they
+	// verify a webhook subscription's.
+	//
+	// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+	// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+	// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+	// empty mean every one.
+	//
+	// Refused as `invalid_sink`, with `errors` naming each field by JSON
+	// Pointer: a blank name, a configuration missing or of another kind,
+	// a URL that is not an absolute http or https URL without credentials,
+	// a required field left out, a setting delivery sets itself, a header
+	// of the platform's own, an event kind or a batching value out of
+	// range. An environment the project does not have is
+	// `unknown_environment`. A webhook sink's `url` must be `https`
+	// (`insecure_url`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+	// loopback, private, link-local, unspecified or multicast address
+	// (`private_network_target`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+	// storage target may be on a private or loopback address, never on a
+	// link-local one (`link_local_target`), which no setting lifts. A name
+	// that does not resolve is accepted.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+	CreateSinkWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSinkResponse, error)
+
+	// CreateSinkWithResponse Add a sink
+	//
+	// Creates a sink of the `kind` given and the configuration of that kind
+	// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+	// delivers nothing until it is enabled. The ClickHouse `password` and
+	// the object storage `secret_access_key` are required, stored sealed
+	// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+	// secret is drawn by the server, 32 random bytes as unpadded base64url,
+	// and answered as `secret` this once; audit entries record every secret
+	// as `[redacted]`. Receivers verify a webhook sink's calls as they
+	// verify a webhook subscription's.
+	//
+	// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+	// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+	// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+	// empty mean every one.
+	//
+	// Refused as `invalid_sink`, with `errors` naming each field by JSON
+	// Pointer: a blank name, a configuration missing or of another kind,
+	// a URL that is not an absolute http or https URL without credentials,
+	// a required field left out, a setting delivery sets itself, a header
+	// of the platform's own, an event kind or a batching value out of
+	// range. An environment the project does not have is
+	// `unknown_environment`. A webhook sink's `url` must be `https`
+	// (`insecure_url`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+	// loopback, private, link-local, unspecified or multicast address
+	// (`private_network_target`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+	// storage target may be on a private or loopback address, never on a
+	// link-local one (`link_local_target`), which no setting lifts. A name
+	// that does not resolve is accepted.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+	CreateSinkWithResponse(ctx context.Context, project ProjectKey, body CreateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSinkResponse, error)
+
+	// DeleteSinkWithResponse Delete a sink
+	//
+	// The sink goes, and nothing more is sent to its target.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /projects/{project}/sinks/{sink} (the `DeleteSink` operationId).
+	DeleteSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, params *DeleteSinkParams, reqEditors ...RequestEditorFn) (*DeleteSinkResponse, error)
+
+	// GetSinkWithResponse A sink
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/sinks/{sink} (the `GetSink` operationId).
+	GetSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*GetSinkResponse, error)
+
+	// UpdateSinkWithBodyWithResponse Edit a sink
+	//
+	// Changes each property present and leaves the others as they are. A
+	// sub-object of the sink's kind replaces its configuration whole, so
+	// nothing of the earlier one lingers; the one exception is its secret:
+	// `***`, as every read answers it, or no secret at all keeps the stored
+	// one, and any other value replaces it. A sub-object of another kind,
+	// or a `kind` other than the sink's own, is refused `kind_immutable`.
+	// `enabled` takes `false` only, which lets the attempt in progress
+	// finish and keeps the sink's place; a sink is enabled with its own
+	// operation, which checks the target first. A new target is checked as
+	// on creation, and an edit that changes nothing stores and records
+	// nothing. An edit of batching or filters applies from the next batch.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+	UpdateSinkWithBodyWithResponse(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSinkResponse, error)
+
+	// UpdateSinkWithResponse Edit a sink
+	//
+	// Changes each property present and leaves the others as they are. A
+	// sub-object of the sink's kind replaces its configuration whole, so
+	// nothing of the earlier one lingers; the one exception is its secret:
+	// `***`, as every read answers it, or no secret at all keeps the stored
+	// one, and any other value replaces it. A sub-object of another kind,
+	// or a `kind` other than the sink's own, is refused `kind_immutable`.
+	// `enabled` takes `false` only, which lets the attempt in progress
+	// finish and keeps the sink's place; a sink is enabled with its own
+	// operation, which checks the target first. A new target is checked as
+	// on creation, and an edit that changes nothing stores and records
+	// nothing. An edit of batching or filters applies from the next batch.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+	UpdateSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, body UpdateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSinkResponse, error)
+
+	// RotateSinkSecretWithResponse Rotate a webhook sink's secret
+	//
+	// Issues a webhook sink a new secret, answered this once. The secret it
+	// replaces keeps signing beside the new one for the operator's
+	// `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+	// each call carries two `v1=` signatures meanwhile and a receiver
+	// holding either verifies. A secret an earlier rotation left signing is
+	// dropped at once: no more than two sign. A sink of another kind has no
+	// secret the server draws and is refused `no_secret_to_rotate`; its
+	// password or secret access key is changed by editing it. It takes no
+	// `If-Match`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/rotate-secret (the `RotateSinkSecret` operationId).
+	RotateSinkSecretWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*RotateSinkSecretResponse, error)
 
 	// ListStaleFlagsWithResponse The project's stale flags
 	//
@@ -32833,6 +34998,504 @@ func (r ListSegmentUsagesResponse) ContentType() string {
 	return ""
 }
 
+// ListSinksResponse401Headers the declared response headers of an HTTP 401 response for ListSinks
+type ListSinksResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListSinksResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SinkList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListSinksResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSinksResponse) GetJSON200() *SinkList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListSinksResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListSinksResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListSinksResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSinksResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSinksResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSinksResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSinksResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateSinkResponse201Headers the declared response headers of an HTTP 201 response for CreateSink
+type CreateSinkResponse201Headers struct {
+	ETag *string
+}
+
+// CreateSinkResponse401Headers the declared response headers of an HTTP 401 response for CreateSink
+type CreateSinkResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateSinkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *SinkWithSecret
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreateSinkResponse201Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateSinkResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateSinkResponse) GetJSON201() *SinkWithSecret {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CreateSinkResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateSinkResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateSinkResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CreateSinkResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreateSinkResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateSinkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateSinkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateSinkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateSinkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeleteSinkResponse401Headers the declared response headers of an HTTP 401 response for DeleteSink
+type DeleteSinkResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DeleteSinkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeleteSinkResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteSinkResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteSinkResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteSinkResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r DeleteSinkResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r DeleteSinkResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteSinkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteSinkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteSinkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteSinkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetSinkResponse200Headers the declared response headers of an HTTP 200 response for GetSink
+type GetSinkResponse200Headers struct {
+	ETag *string
+}
+
+// GetSinkResponse401Headers the declared response headers of an HTTP 401 response for GetSink
+type GetSinkResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetSinkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Sink
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetSinkResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetSinkResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSinkResponse) GetJSON200() *Sink {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetSinkResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetSinkResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetSinkResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSinkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSinkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSinkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSinkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateSinkResponse200Headers the declared response headers of an HTTP 200 response for UpdateSink
+type UpdateSinkResponse200Headers struct {
+	ETag *string
+}
+
+// UpdateSinkResponse401Headers the declared response headers of an HTTP 401 response for UpdateSink
+type UpdateSinkResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateSinkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Sink
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *UpdateSinkResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateSinkResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateSinkResponse) GetJSON200() *Sink {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateSinkResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateSinkResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateSinkResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdateSinkResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r UpdateSinkResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateSinkResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r UpdateSinkResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateSinkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateSinkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateSinkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateSinkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RotateSinkSecretResponse200Headers the declared response headers of an HTTP 200 response for RotateSinkSecret
+type RotateSinkSecretResponse200Headers struct {
+	ETag *string
+}
+
+// RotateSinkSecretResponse401Headers the declared response headers of an HTTP 401 response for RotateSinkSecret
+type RotateSinkSecretResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RotateSinkSecretResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SinkWithSecret
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *RotateSinkSecretResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RotateSinkSecretResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RotateSinkSecretResponse) GetJSON200() *SinkWithSecret {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RotateSinkSecretResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RotateSinkSecretResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RotateSinkSecretResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r RotateSinkSecretResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r RotateSinkSecretResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RotateSinkSecretResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RotateSinkSecretResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RotateSinkSecretResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListStaleFlagsResponse401Headers the declared response headers of an HTTP 401 response for ListStaleFlags
 type ListStaleFlagsResponse401Headers struct {
 	WWWAuthenticate *string
@@ -38708,6 +41371,215 @@ func (c *ClientWithResponses) ListSegmentUsagesWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseListSegmentUsagesResponse(rsp)
+}
+
+// ListSinksWithResponse The project's sinks
+//
+// The oldest first. A sink's credentials are never listed: the
+// ClickHouse `password` and the object storage `secret_access_key` read
+// back as `***`, and a webhook sink's secret is shown once, when it is
+// issued. Reading sinks needs `sink.manage` too, since a sink's
+// configuration names internal hosts, buckets and URLs that may carry
+// tokens.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/sinks (the `ListSinks` operationId).
+func (c *ClientWithResponses) ListSinksWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListSinksResponse, error) {
+	rsp, err := c.ListSinks(ctx, project, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSinksResponse(rsp)
+}
+
+// CreateSinkWithBodyWithResponse Add a sink
+//
+// Creates a sink of the `kind` given and the configuration of that kind
+// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+// delivers nothing until it is enabled. The ClickHouse `password` and
+// the object storage `secret_access_key` are required, stored sealed
+// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+// secret is drawn by the server, 32 random bytes as unpadded base64url,
+// and answered as `secret` this once; audit entries record every secret
+// as `[redacted]`. Receivers verify a webhook sink's calls as they
+// verify a webhook subscription's.
+//
+// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+// empty mean every one.
+//
+// Refused as `invalid_sink`, with `errors` naming each field by JSON
+// Pointer: a blank name, a configuration missing or of another kind,
+// a URL that is not an absolute http or https URL without credentials,
+// a required field left out, a setting delivery sets itself, a header
+// of the platform's own, an event kind or a batching value out of
+// range. An environment the project does not have is
+// `unknown_environment`. A webhook sink's `url` must be `https`
+// (`insecure_url`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+// loopback, private, link-local, unspecified or multicast address
+// (`private_network_target`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+// storage target may be on a private or loopback address, never on a
+// link-local one (`link_local_target`), which no setting lifts. A name
+// that does not resolve is accepted.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+func (c *ClientWithResponses) CreateSinkWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSinkResponse, error) {
+	rsp, err := c.CreateSinkWithBody(ctx, project, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSinkResponse(rsp)
+}
+
+// CreateSinkWithResponse Add a sink
+//
+// Creates a sink of the `kind` given and the configuration of that kind
+// alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+// delivers nothing until it is enabled. The ClickHouse `password` and
+// the object storage `secret_access_key` are required, stored sealed
+// under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+// secret is drawn by the server, 32 random bytes as unpadded base64url,
+// and answered as `secret` this once; audit entries record every secret
+// as `[redacted]`. Receivers verify a webhook sink's calls as they
+// verify a webhook subscription's.
+//
+// Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+// storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+// 500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+// empty mean every one.
+//
+// Refused as `invalid_sink`, with `errors` naming each field by JSON
+// Pointer: a blank name, a configuration missing or of another kind,
+// a URL that is not an absolute http or https URL without credentials,
+// a required field left out, a setting delivery sets itself, a header
+// of the platform's own, an event kind or a batching value out of
+// range. An environment the project does not have is
+// `unknown_environment`. A webhook sink's `url` must be `https`
+// (`insecure_url`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+// loopback, private, link-local, unspecified or multicast address
+// (`private_network_target`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+// storage target may be on a private or loopback address, never on a
+// link-local one (`link_local_target`), which no setting lifts. A name
+// that does not resolve is accepted.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/sinks (the `CreateSink` operationId).
+func (c *ClientWithResponses) CreateSinkWithResponse(ctx context.Context, project ProjectKey, body CreateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSinkResponse, error) {
+	rsp, err := c.CreateSink(ctx, project, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSinkResponse(rsp)
+}
+
+// DeleteSinkWithResponse Delete a sink
+//
+// The sink goes, and nothing more is sent to its target.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /projects/{project}/sinks/{sink} (the `DeleteSink` operationId).
+func (c *ClientWithResponses) DeleteSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, params *DeleteSinkParams, reqEditors ...RequestEditorFn) (*DeleteSinkResponse, error) {
+	rsp, err := c.DeleteSink(ctx, project, sink, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteSinkResponse(rsp)
+}
+
+// GetSinkWithResponse A sink
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/sinks/{sink} (the `GetSink` operationId).
+func (c *ClientWithResponses) GetSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*GetSinkResponse, error) {
+	rsp, err := c.GetSink(ctx, project, sink, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSinkResponse(rsp)
+}
+
+// UpdateSinkWithBodyWithResponse Edit a sink
+//
+// Changes each property present and leaves the others as they are. A
+// sub-object of the sink's kind replaces its configuration whole, so
+// nothing of the earlier one lingers; the one exception is its secret:
+// `***`, as every read answers it, or no secret at all keeps the stored
+// one, and any other value replaces it. A sub-object of another kind,
+// or a `kind` other than the sink's own, is refused `kind_immutable`.
+// `enabled` takes `false` only, which lets the attempt in progress
+// finish and keeps the sink's place; a sink is enabled with its own
+// operation, which checks the target first. A new target is checked as
+// on creation, and an edit that changes nothing stores and records
+// nothing. An edit of batching or filters applies from the next batch.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+func (c *ClientWithResponses) UpdateSinkWithBodyWithResponse(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSinkResponse, error) {
+	rsp, err := c.UpdateSinkWithBody(ctx, project, sink, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSinkResponse(rsp)
+}
+
+// UpdateSinkWithResponse Edit a sink
+//
+// Changes each property present and leaves the others as they are. A
+// sub-object of the sink's kind replaces its configuration whole, so
+// nothing of the earlier one lingers; the one exception is its secret:
+// `***`, as every read answers it, or no secret at all keeps the stored
+// one, and any other value replaces it. A sub-object of another kind,
+// or a `kind` other than the sink's own, is refused `kind_immutable`.
+// `enabled` takes `false` only, which lets the attempt in progress
+// finish and keeps the sink's place; a sink is enabled with its own
+// operation, which checks the target first. A new target is checked as
+// on creation, and an edit that changes nothing stores and records
+// nothing. An edit of batching or filters applies from the next batch.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
+func (c *ClientWithResponses) UpdateSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, body UpdateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSinkResponse, error) {
+	rsp, err := c.UpdateSink(ctx, project, sink, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSinkResponse(rsp)
+}
+
+// RotateSinkSecretWithResponse Rotate a webhook sink's secret
+//
+// Issues a webhook sink a new secret, answered this once. The secret it
+// replaces keeps signing beside the new one for the operator's
+// `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+// each call carries two `v1=` signatures meanwhile and a receiver
+// holding either verifies. A secret an earlier rotation left signing is
+// dropped at once: no more than two sign. A sink of another kind has no
+// secret the server draws and is refused `no_secret_to_rotate`; its
+// password or secret access key is changed by editing it. It takes no
+// `If-Match`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/rotate-secret (the `RotateSinkSecret` operationId).
+func (c *ClientWithResponses) RotateSinkSecretWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*RotateSinkSecretResponse, error) {
+	rsp, err := c.RotateSinkSecret(ctx, project, sink, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRotateSinkSecretResponse(rsp)
 }
 
 // ListStaleFlagsWithResponse The project's stale flags
@@ -48372,6 +51244,465 @@ func ParseListSegmentUsagesResponse(rsp *http.Response) (*ListSegmentUsagesRespo
 	return response, nil
 }
 
+// ParseListSinksResponse parses an HTTP response from a ListSinksWithResponse call
+func ParseListSinksResponse(rsp *http.Response) (*ListSinksResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSinksResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SinkList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListSinksResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateSinkResponse parses an HTTP response from a CreateSinkWithResponse call
+func ParseCreateSinkResponse(rsp *http.Response) (*CreateSinkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateSinkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest SinkWithSecret
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers CreateSinkResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
+	case rsp.StatusCode == 401:
+		var headers CreateSinkResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeleteSinkResponse parses an HTTP response from a DeleteSinkWithResponse call
+func ParseDeleteSinkResponse(rsp *http.Response) (*DeleteSinkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteSinkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DeleteSinkResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetSinkResponse parses an HTTP response from a GetSinkWithResponse call
+func ParseGetSinkResponse(rsp *http.Response) (*GetSinkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSinkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Sink
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetSinkResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers GetSinkResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateSinkResponse parses an HTTP response from a UpdateSinkWithResponse call
+func ParseUpdateSinkResponse(rsp *http.Response) (*UpdateSinkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateSinkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Sink
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers UpdateSinkResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers UpdateSinkResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRotateSinkSecretResponse parses an HTTP response from a RotateSinkSecretWithResponse call
+func ParseRotateSinkSecretResponse(rsp *http.Response) (*RotateSinkSecretResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RotateSinkSecretResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SinkWithSecret
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers RotateSinkSecretResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers RotateSinkSecretResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListStaleFlagsResponse parses an HTTP response from a ListStaleFlagsWithResponse call
 func ParseListStaleFlagsResponse(rsp *http.Response) (*ListStaleFlagsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -51159,6 +54490,24 @@ type ServerInterface interface {
 	// ListSegmentUsages Where a segment is used
 	// (GET /projects/{project}/segments/{segment}/usages)
 	ListSegmentUsages(w http.ResponseWriter, r *http.Request, project ProjectKey, segment SegmentKey)
+	// ListSinks The project's sinks
+	// (GET /projects/{project}/sinks)
+	ListSinks(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// CreateSink Add a sink
+	// (POST /projects/{project}/sinks)
+	CreateSink(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// DeleteSink Delete a sink
+	// (DELETE /projects/{project}/sinks/{sink})
+	DeleteSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, params DeleteSinkParams)
+	// GetSink A sink
+	// (GET /projects/{project}/sinks/{sink})
+	GetSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
+	// UpdateSink Edit a sink
+	// (PATCH /projects/{project}/sinks/{sink})
+	UpdateSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, params UpdateSinkParams)
+	// RotateSinkSecret Rotate a webhook sink's secret
+	// (POST /projects/{project}/sinks/{sink}/rotate-secret)
+	RotateSinkSecret(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
 	// ListStaleFlags The project's stale flags
 	// (GET /projects/{project}/stale-flags)
 	ListStaleFlags(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListStaleFlagsParams)
@@ -56860,6 +60209,246 @@ func (siw *ServerInterfaceWrapper) ListSegmentUsages(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// ListSinks operation middleware
+func (siw *ServerInterfaceWrapper) ListSinks(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSinks(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateSink operation middleware
+func (siw *ServerInterfaceWrapper) CreateSink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSink(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteSink operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteSinkParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSink(w, r, project, sink, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSink operation middleware
+func (siw *ServerInterfaceWrapper) GetSink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSink(w, r, project, sink)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateSink operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateSinkParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSink(w, r, project, sink, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RotateSinkSecret operation middleware
+func (siw *ServerInterfaceWrapper) RotateSinkSecret(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RotateSinkSecret(w, r, project, sink)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListStaleFlags operation middleware
 func (siw *ServerInterfaceWrapper) ListStaleFlags(w http.ResponseWriter, r *http.Request) {
 
@@ -58459,6 +62048,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/deliveries", wrapper.ListWebhookDeliveries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/deliveries/{delivery}", wrapper.GetWebhookDelivery)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver", wrapper.RedeliverWebhookDelivery)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/sinks", wrapper.ListSinks)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks", wrapper.CreateSink)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/sinks/{sink}", wrapper.DeleteSink)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/sinks/{sink}", wrapper.GetSink)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/sinks/{sink}", wrapper.UpdateSink)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/rotate-secret", wrapper.RotateSinkSecret)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/webhooks", wrapper.ListInstanceWebhooks)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/webhooks", wrapper.CreateInstanceWebhook)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/webhooks/{webhook}", wrapper.DeleteInstanceWebhook)
@@ -70854,6 +74449,630 @@ func (response ListSegmentUsages404ApplicationProblemPlusJSONResponse) VisitList
 	return err
 }
 
+type ListSinksRequestObject struct {
+	Project ProjectKey `json:"project"`
+}
+
+type ListSinksResponseObject interface {
+	VisitListSinksResponse(w http.ResponseWriter) error
+}
+
+type ListSinks200JSONResponse SinkList
+
+func (response ListSinks200JSONResponse) VisitListSinksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSinks401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListSinks401ApplicationProblemPlusJSONResponse) VisitListSinksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSinks403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListSinks403ApplicationProblemPlusJSONResponse) VisitListSinksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSinks404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListSinks404ApplicationProblemPlusJSONResponse) VisitListSinksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSinkRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Body    *CreateSinkJSONRequestBody
+}
+
+type CreateSinkResponseObject interface {
+	VisitCreateSinkResponse(w http.ResponseWriter) error
+}
+
+type CreateSink201ResponseHeaders struct {
+	ETag *string
+}
+
+type CreateSink201JSONResponse struct {
+	Body    SinkWithSecret
+	Headers CreateSink201ResponseHeaders
+}
+
+func (response CreateSink201JSONResponse) VisitCreateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSink400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSink400ApplicationProblemPlusJSONResponse) VisitCreateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSink401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSink401ApplicationProblemPlusJSONResponse) VisitCreateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSink403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSink403ApplicationProblemPlusJSONResponse) VisitCreateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSink404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSink404ApplicationProblemPlusJSONResponse) VisitCreateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSink422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSink422ApplicationProblemPlusJSONResponse) VisitCreateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSinkRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+	Params  DeleteSinkParams
+}
+
+type DeleteSinkResponseObject interface {
+	VisitDeleteSinkResponse(w http.ResponseWriter) error
+}
+
+type DeleteSink204Response struct {
+}
+
+func (response DeleteSink204Response) VisitDeleteSinkResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteSink401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSink401ApplicationProblemPlusJSONResponse) VisitDeleteSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSink403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSink403ApplicationProblemPlusJSONResponse) VisitDeleteSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSink404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSink404ApplicationProblemPlusJSONResponse) VisitDeleteSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSink412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSink412ApplicationProblemPlusJSONResponse) VisitDeleteSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSink428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSink428ApplicationProblemPlusJSONResponse) VisitDeleteSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSinkRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+}
+
+type GetSinkResponseObject interface {
+	VisitGetSinkResponse(w http.ResponseWriter) error
+}
+
+type GetSink200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetSink200JSONResponse struct {
+	Body    Sink
+	Headers GetSink200ResponseHeaders
+}
+
+func (response GetSink200JSONResponse) VisitGetSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSink401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetSink401ApplicationProblemPlusJSONResponse) VisitGetSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSink403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetSink403ApplicationProblemPlusJSONResponse) VisitGetSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSink404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetSink404ApplicationProblemPlusJSONResponse) VisitGetSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSinkRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+	Params  UpdateSinkParams
+	Body    *UpdateSinkJSONRequestBody
+}
+
+type UpdateSinkResponseObject interface {
+	VisitUpdateSinkResponse(w http.ResponseWriter) error
+}
+
+type UpdateSink200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateSink200JSONResponse struct {
+	Body    Sink
+	Headers UpdateSink200ResponseHeaders
+}
+
+func (response UpdateSink200JSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSink400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSink400ApplicationProblemPlusJSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSink401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSink401ApplicationProblemPlusJSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSink403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSink403ApplicationProblemPlusJSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSink404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSink404ApplicationProblemPlusJSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSink412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSink412ApplicationProblemPlusJSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSink422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSink422ApplicationProblemPlusJSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSink428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSink428ApplicationProblemPlusJSONResponse) VisitUpdateSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSinkSecretRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+}
+
+type RotateSinkSecretResponseObject interface {
+	VisitRotateSinkSecretResponse(w http.ResponseWriter) error
+}
+
+type RotateSinkSecret200ResponseHeaders struct {
+	ETag *string
+}
+
+type RotateSinkSecret200JSONResponse struct {
+	Body    SinkWithSecret
+	Headers RotateSinkSecret200ResponseHeaders
+}
+
+func (response RotateSinkSecret200JSONResponse) VisitRotateSinkSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSinkSecret401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RotateSinkSecret401ApplicationProblemPlusJSONResponse) VisitRotateSinkSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSinkSecret403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RotateSinkSecret403ApplicationProblemPlusJSONResponse) VisitRotateSinkSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSinkSecret404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RotateSinkSecret404ApplicationProblemPlusJSONResponse) VisitRotateSinkSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSinkSecret422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response RotateSinkSecret422ApplicationProblemPlusJSONResponse) VisitRotateSinkSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListStaleFlagsRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Params  ListStaleFlagsParams
@@ -74406,6 +78625,24 @@ type StrictServerInterface interface {
 	// ListSegmentUsages Where a segment is used
 	// (GET /projects/{project}/segments/{segment}/usages)
 	ListSegmentUsages(ctx context.Context, request ListSegmentUsagesRequestObject) (ListSegmentUsagesResponseObject, error)
+	// ListSinks The project's sinks
+	// (GET /projects/{project}/sinks)
+	ListSinks(ctx context.Context, request ListSinksRequestObject) (ListSinksResponseObject, error)
+	// CreateSink Add a sink
+	// (POST /projects/{project}/sinks)
+	CreateSink(ctx context.Context, request CreateSinkRequestObject) (CreateSinkResponseObject, error)
+	// DeleteSink Delete a sink
+	// (DELETE /projects/{project}/sinks/{sink})
+	DeleteSink(ctx context.Context, request DeleteSinkRequestObject) (DeleteSinkResponseObject, error)
+	// GetSink A sink
+	// (GET /projects/{project}/sinks/{sink})
+	GetSink(ctx context.Context, request GetSinkRequestObject) (GetSinkResponseObject, error)
+	// UpdateSink Edit a sink
+	// (PATCH /projects/{project}/sinks/{sink})
+	UpdateSink(ctx context.Context, request UpdateSinkRequestObject) (UpdateSinkResponseObject, error)
+	// RotateSinkSecret Rotate a webhook sink's secret
+	// (POST /projects/{project}/sinks/{sink}/rotate-secret)
+	RotateSinkSecret(ctx context.Context, request RotateSinkSecretRequestObject) (RotateSinkSecretResponseObject, error)
 	// ListStaleFlags The project's stale flags
 	// (GET /projects/{project}/stale-flags)
 	ListStaleFlags(ctx context.Context, request ListStaleFlagsRequestObject) (ListStaleFlagsResponseObject, error)
@@ -77942,6 +82179,182 @@ func (sh *strictHandler) ListSegmentUsages(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListSegmentUsagesResponseObject); ok {
 		if err := validResponse.VisitListSegmentUsagesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSinks operation middleware
+func (sh *strictHandler) ListSinks(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request ListSinksRequestObject
+
+	request.Project = project
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSinks(ctx, request.(ListSinksRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSinks")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSinksResponseObject); ok {
+		if err := validResponse.VisitListSinksResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateSink operation middleware
+func (sh *strictHandler) CreateSink(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request CreateSinkRequestObject
+
+	request.Project = project
+
+	var body CreateSinkJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateSink(ctx, request.(CreateSinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateSink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateSinkResponseObject); ok {
+		if err := validResponse.VisitCreateSinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteSink operation middleware
+func (sh *strictHandler) DeleteSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, params DeleteSinkParams) {
+	var request DeleteSinkRequestObject
+
+	request.Project = project
+	request.Sink = sink
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteSink(ctx, request.(DeleteSinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteSink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteSinkResponseObject); ok {
+		if err := validResponse.VisitDeleteSinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSink operation middleware
+func (sh *strictHandler) GetSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID) {
+	var request GetSinkRequestObject
+
+	request.Project = project
+	request.Sink = sink
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSink(ctx, request.(GetSinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSinkResponseObject); ok {
+		if err := validResponse.VisitGetSinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateSink operation middleware
+func (sh *strictHandler) UpdateSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, params UpdateSinkParams) {
+	var request UpdateSinkRequestObject
+
+	request.Project = project
+	request.Sink = sink
+	request.Params = params
+
+	var body UpdateSinkJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateSink(ctx, request.(UpdateSinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateSink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateSinkResponseObject); ok {
+		if err := validResponse.VisitUpdateSinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RotateSinkSecret operation middleware
+func (sh *strictHandler) RotateSinkSecret(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID) {
+	var request RotateSinkSecretRequestObject
+
+	request.Project = project
+	request.Sink = sink
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RotateSinkSecret(ctx, request.(RotateSinkSecretRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RotateSinkSecret")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RotateSinkSecretResponseObject); ok {
+		if err := validResponse.VisitRotateSinkSecretResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

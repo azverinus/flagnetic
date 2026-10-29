@@ -53,7 +53,7 @@ Data crosses layers as: HTTP DTO → command → domain model → result → HTT
 | delivery | rulesets, their versions and materialization, SDK keys, the SDK API, remote evaluation, discovered attributes |
 | events | exposures, aliases, evaluation summaries, rollups, retention |
 | governance | protected environments, change requests, scheduled changes, the audit log, webhooks, notices |
-| integrations | sinks to ClickHouse, object storage and webhooks; import and export |
+| sinks | data export: a project's sinks to ClickHouse, object storage and webhooks, their credentials, targets and delivery |
 
 A context reaches another only through an application port, never by importing the other context's adapters.
 

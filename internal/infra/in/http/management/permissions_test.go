@@ -146,6 +146,10 @@ func matrix(t *testing.T) []matrixRow {
 			res := do(c.ListWebhooksWithResponse(t.Context(), p.Key))
 			return res.StatusCode(), res.Body
 		}},
+		{"sink.manage", "listSinks", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
+			res := do(c.ListSinksWithResponse(t.Context(), p.Key))
+			return res.StatusCode(), res.Body
+		}},
 		{"grant.manage", "createGrant", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
 			res := do(c.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: target.ID.Bytes(), Role: "viewer"}))
 			if res.JSON201 != nil {
@@ -201,6 +205,7 @@ func TestThePermissionMatrixHoldsRowByRow(t *testing.T) {
 		"change_request.propose":    {access.RoleDeveloper, access.RoleMaintainer, access.RoleOwner},
 		"change_request.approve":    {access.RoleMaintainer, access.RoleOwner},
 		"webhook.manage":            {access.RoleMaintainer, access.RoleOwner},
+		"sink.manage":               {access.RoleMaintainer, access.RoleOwner},
 	}
 	callers := map[string]*management.ClientWithResponses{
 		"instance admin": testkit.Client(t, srv, testkit.InstanceAdminToken(t)),
@@ -237,9 +242,9 @@ func TestProjectMeAnswersGrantsAndPermissionsPerRole(t *testing.T) {
 		access.RoleViewer:    {"project.read"},
 		access.RoleDeveloper: {"project.read", "flag.edit", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "experiment.edit", "change_request.propose"},
 		access.RoleMaintainer: {"project.read", "environment.manage", "declaration.manage", "flag.edit", "flag.archive",
-			"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage", "experiment.edit", "experiment.delete", "change_request.propose", "change_request.approve", "webhook.manage"},
+			"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage", "experiment.edit", "experiment.delete", "change_request.propose", "change_request.approve", "webhook.manage", "sink.manage"},
 		access.RoleOwner: {"project.read", "project.update", "environment.manage", "environment.protect", "declaration.manage", "grant.manage", "project_token.manage",
-			"flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage", "experiment.edit", "experiment.delete", "change_request.propose", "change_request.approve", "webhook.manage", "project.delete"},
+			"flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage", "experiment.edit", "experiment.delete", "change_request.propose", "change_request.approve", "webhook.manage", "sink.manage", "project.delete"},
 	} {
 		got := projectMe(t, testkit.Client(t, srv, testkit.GrantedToken(t, pool, projectIDOf(p), role)), p.Key)
 		if !slices.Equal(got.Permissions, want) || !slices.Equal(rolesOf(got.Grants), []string{string(role)}) {
