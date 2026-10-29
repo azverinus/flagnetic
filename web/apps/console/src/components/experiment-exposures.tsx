@@ -330,11 +330,20 @@ function SampleRatioResult({
 
   const stopped = stoppedAt !== null;
   const finalPending = stopped && check !== null && !check.final;
+  // A final check taken at the stop's instant is one stored before stops
+  // left their check to be completed: it counted only what the rollup had
+  // read by then, so it must not claim every exposure received before the
+  // stop. A completed final check runs in a later round.
+  const finalAtStop =
+    stopped &&
+    check !== null &&
+    check.final &&
+    Date.parse(check.checked_at) === Date.parse(stoppedAt);
   const finalTaken =
     stopped &&
     check !== null &&
     check.final &&
-    Date.parse(check.checked_at) >= Date.parse(stoppedAt);
+    Date.parse(check.checked_at) > Date.parse(stoppedAt);
 
   let verdict: ReactNode;
   if (check === null && stopped) {
@@ -410,6 +419,11 @@ function SampleRatioResult({
                 Final check pending: this is the check the stop took on{" "}
                 <Moment value={check.checked_at} />, over the exposures rolled up by then. It is
                 replaced once every exposure received before the stop has been rolled up.
+              </Trans>
+            ) : finalAtStop ? (
+              <Trans>
+                Final check, taken at the stop on <Moment value={check.checked_at} />; it is never
+                run again.
               </Trans>
             ) : finalTaken ? (
               <Trans>

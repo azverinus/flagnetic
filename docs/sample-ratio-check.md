@@ -21,7 +21,7 @@ Nothing replaces a final result afterwards, and an experiment archived before it
 
 ## What it counts
 
-Only first exposures count: each unit's earliest exposure in the experiment and environment by `occurred_at`, ties broken by the smaller `event_id`, override exposures left out (see [Exposures](experiments.md#exposures)). A unit counts once whatever it was exposed to later, so conflicts do not move the check, and override exposures, which QA sends to see a variation whatever the assignment, never do either. Only the variations the experiment weighs are counted. The counts are the exposure rollup's, so the check sees exposures some seconds after they are received.
+Only first exposures count: each unit's earliest exposure in the experiment and environment by `occurred_at`, ties broken by the smaller `event_id`, override exposures left out (see [Exposures](experiments.md#exposures)). A unit counts once whatever it was exposed to later, so conflicts do not move the check, and override exposures, which QA sends to see a variation whatever the assignment, never do either. Only the variations the experiment weighs are counted. The counts are the exposure rollup's, so the check sees exposures some seconds after they are received; a stopped experiment's final check instead reads the stored exposures received at or before the stop, applying the same rule.
 
 ## The statistic
 
@@ -109,4 +109,4 @@ GROUP BY n
 
 `first_exposures` keeps each unit's earliest non-override exposure; `observed` counts them per weighed variation, a variation nobody reached counting 0. With two variations, one degree of freedom, the p-value is `erfc(√(X² / 2))`, which the query computes; with more, take `chi_square` and `df` to a statistics library, such as `scipy.stats.chi2.sf(chi_square, df)`. Keep `event_id` as text, so that ties break in the order the server breaks them. A table holding an event twice, from an SDK's retry, gives the same answer, since both rows name the same first exposure.
 
-Your result can differ from the server's slightly: the server counts only the exposures it accepted, and moves each event's time when the SDK's clock was more than a minute off (see [Events](sdks/events.md#the-batch-and-each-event)), while your table holds what your SDKs recorded.
+Your result can differ from the server's slightly: the server counts only the exposures it accepted, and moves each event's time when the SDK's clock was more than a minute off (see [Events](sdks/events.md#the-batch-and-each-event)), while your table holds what your SDKs recorded. For a stopped experiment's final check, the server also leaves out the exposures it received after the stop.

@@ -292,6 +292,16 @@ describe("an environment's exposures", () => {
     expect(within(region).queryByText(/^Final check, taken/)).toBeNull();
   });
 
+  it("does not claim every exposure for a final check taken at the stop itself", () => {
+    show({
+      summary: checked({ final: true, checked_at: "2026-10-21T09:40:00Z" }),
+      stoppedAt: "2026-10-21T09:40:00.000Z",
+    });
+    const region = sampleRatio();
+    expect(within(region).getByText(/^Final check, taken at the stop/)).toBeVisible();
+    expect(within(region).queryByText(/over every exposure received/)).toBeNull();
+  });
+
   it("does not speak of a final check while the experiment runs", () => {
     show({ summary: checked({ final: true }) });
     expect(within(sampleRatio()).queryByText(/Final check/)).toBeNull();

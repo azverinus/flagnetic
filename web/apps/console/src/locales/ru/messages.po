@@ -2626,6 +2626,10 @@ msgstr "Последняя проверка ещё не сделана: это �
 msgid "Final check, taken <0/>, over every exposure received before the stop; it is never run again."
 msgstr "Последняя проверка, сделанная <0/> по всем экспозициям, полученным до остановки; больше она не запускается."
 
+#: src/components/experiment-exposures.tsx
+msgid "Final check, taken at the stop on <0/>; it is never run again."
+msgstr "Последняя проверка, сделанная при остановке <0/>; больше она не запускается."
+
 #: src/lib/stale-flags.ts
 msgid "Finished rollout"
 msgstr "Раскатка завершена"
