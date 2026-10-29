@@ -422,6 +422,8 @@ var entryOnlyActions = []string{
 	"sink.deleted",
 	"sink.secret_rotated",
 	"sink.updated",
+	"smtp.deleted",
+	"smtp.updated",
 	"unit_type.created",
 	"unit_type.deleted",
 	"unit_type.updated",

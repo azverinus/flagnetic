@@ -46,6 +46,10 @@ type Handlers struct {
 	RevokeSessions      *appaccess.RevokeSessions
 	GetAuthSettings     *appaccess.GetAuthSettings
 	UpdateAuthSettings  *appaccess.UpdateAuthSettings
+	GetSMTP             *appaccess.GetSMTP
+	ConfigureSMTP       *appaccess.ConfigureSMTP
+	RemoveSMTP          *appaccess.RemoveSMTP
+	SendTestMail        *appaccess.SendTestMail
 	ListMembers         *appaccess.ListMembers
 	GetMember           *appaccess.GetMember
 	UpdateMember        *appaccess.UpdateMember

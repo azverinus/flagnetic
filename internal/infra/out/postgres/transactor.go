@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"context"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
@@ -16,4 +18,14 @@ func NewTransactor(pool *pgxpool.Pool) *pgxtx.Transactor {
 		return errors.Unavailable("concurrent_change",
 			"the database refused the change because of a concurrent one; try again").WithCause(err)
 	}))
+}
+
+// AfterCommit runs functions once the unit of work their context carries has
+// committed, and never if it rolls back.
+type AfterCommit struct{}
+
+// AfterCommit runs fn as pgxtx.AfterCommit does, handing it the context
+// without the transaction, which has ended by then.
+func (AfterCommit) AfterCommit(ctx context.Context, fn func(committed context.Context)) {
+	pgxtx.AfterCommit(ctx, func() { fn(pgxtx.Outside(ctx)) })
 }

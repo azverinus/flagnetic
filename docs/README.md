@@ -8,6 +8,7 @@
 - [The sample-ratio check](sample-ratio-check.md): the statistic, when it is skipped, its two thresholds, a worked example and the warehouse SQL reproducing it.
 - [Governance](governance.md): protected environments, which writes they refuse, and the kill switch exception.
 - [Change requests](change-requests.md): proposing a flag's configuration for review, its diff and its states.
+- [Mail](mail.md): the SMTP server, its TLS modes, the test mail, the languages mail is written in, and what a failed send does.
 - [Webhooks](webhooks.md): subscribing a receiver to a project's events, its secret, the targets the platform calls, and the event catalogue.
 - [Segments](segments.md) and [Targeting](targeting.md): reusable sets of conditions, and the operators and limits of every condition.
 - [Operations](operations.md) and the [configuration reference](configuration.md): running the server, how changes reach SDKs across replicas, and what to watch.

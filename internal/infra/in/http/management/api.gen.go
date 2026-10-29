@@ -777,6 +777,27 @@ func (e SinkObjectStorageFormat) Valid() bool {
 	}
 }
 
+// Defines values for SmtpSecurity.
+const (
+	SmtpSecurityNone     SmtpSecurity = "none"
+	SmtpSecurityStarttls SmtpSecurity = "starttls"
+	SmtpSecurityTls      SmtpSecurity = "tls"
+)
+
+// Valid indicates whether the value is a known member of the SmtpSecurity enum.
+func (e SmtpSecurity) Valid() bool {
+	switch e {
+	case SmtpSecurityNone:
+		return true
+	case SmtpSecurityStarttls:
+		return true
+	case SmtpSecurityTls:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for StaleReason.
 const (
 	StaleReasonExperimentOverdue StaleReason = "experiment_overdue"
@@ -3036,7 +3057,7 @@ type Problem struct {
 	Detail *string      `json:"detail,omitempty"`
 	Errors *[]Violation `json:"errors,omitempty"`
 
-	// Failure Why a system the server asked did not answer as needed, for `provider_unreachable`.
+	// Failure Why a system the server asked did not answer as needed, for `provider_unreachable`; for `smtp_failed` the step that failed, `connection`, `tls`, `authentication` or `rejected`.
 	Failure *string `json:"failure,omitempty"`
 
 	// Permission The permission the caller lacks, for `forbidden`, or the role's permission the caller lacks, for `role_not_allowed`.
@@ -4038,6 +4059,48 @@ type SinkWithSecret1 = interface{}
 
 // SinkWithSecret2 defines model for SinkWithSecret.2.
 type SinkWithSecret2 = interface{}
+
+// SmtpSecurity `starttls` upgrades a plain connection and requires the server to offer it, `tls` speaks TLS from the first byte, `none` secures nothing. TLS 1.2 or later, the server's certificate verified, in both secure modes.
+type SmtpSecurity string
+
+// SmtpSettings The SMTP server the instance mails through. The password is never shown.
+type SmtpSettings struct {
+	// From The sender of every mail, such as `Flagnetic <flags@example.com>`.
+	From string `json:"from"`
+	Host string `json:"host"`
+
+	// PasswordSet Whether a password is stored.
+	PasswordSet bool `json:"password_set"`
+	Port        int  `json:"port"`
+
+	// Security `starttls` upgrades a plain connection and requires the server to offer it, `tls` speaks TLS from the first byte, `none` secures nothing. TLS 1.2 or later, the server's certificate verified, in both secure modes.
+	Security  SmtpSecurity `json:"security"`
+	UpdatedAt time.Time    `json:"updated_at"`
+
+	// Username Who to authenticate as; empty for no authentication.
+	Username string `json:"username"`
+}
+
+// SmtpSettingsUpdate The SMTP server to set.
+type SmtpSettingsUpdate struct {
+	// From One address, optionally with a display name.
+	From string `json:"from"`
+
+	// Host A host name or address, 1 to 253 characters without spaces.
+	Host string `json:"host"`
+
+	// Password The password for the username. Left out, the stored one is kept; with a username it must not be empty.
+	Password *string `json:"password,omitempty"`
+
+	// Port From 1 to 65535.
+	Port int `json:"port"`
+
+	// Security `starttls` upgrades a plain connection and requires the server to offer it, `tls` speaks TLS from the first byte, `none` secures nothing. TLS 1.2 or later, the server's certificate verified, in both secure modes.
+	Security SmtpSecurity `json:"security"`
+
+	// Username Who to authenticate as; empty or left out for no authentication, which drops the stored password too. At most 256 characters on one line.
+	Username *string `json:"username,omitempty"`
+}
 
 // StaleExperiment The running experiment past its expected end that makes the flag
 // stale as `experiment_overdue`, present with that reason only. When
@@ -5362,6 +5425,9 @@ type UpdateAuthProviderJSONRequestBody = AuthProviderPatch
 
 // UpdateAuthSettingsJSONRequestBody defines body for UpdateAuthSettings for application/json ContentType.
 type UpdateAuthSettingsJSONRequestBody = AuthSettings
+
+// UpdateMailSettingsJSONRequestBody defines body for UpdateMailSettings for application/json ContentType.
+type UpdateMailSettingsJSONRequestBody = SmtpSettingsUpdate
 
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = MePatch
@@ -6873,6 +6939,75 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
 	UpdateAuthSettings(ctx context.Context, body UpdateAuthSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteMailSettings Remove the instance's SMTP server
+	//
+	// The instance stops mailing; what it mails is shown as links again. Not found while no SMTP server is configured.
+	//
+	// Corresponds with DELETE /instance/smtp (the `DeleteMailSettings` operationId).
+	DeleteMailSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMailSettings The instance's SMTP server
+	//
+	// The server the instance mails through. The password is never answered, only whether one is stored. Not found while no SMTP server is configured.
+	//
+	// Corresponds with GET /instance/smtp (the `GetMailSettings` operationId).
+	GetMailSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateMailSettingsWithBody Set the instance's SMTP server
+	//
+	// Replaces the SMTP settings. Refused `base_url_required` (422) while
+	// the instance has no `FLAGNETIC_BASE_URL`, since every mailed link is
+	// built from it. Refused `invalid_smtp_settings` naming each field
+	// that breaks a rule: a host of 1 to 253 characters without spaces, a
+	// port from 1 to 65535, `starttls`, `tls` or `none` for the security, a
+	// sender that is one address, a username and a password together, and
+	// credentials over `none` only to a host that is this machine.
+	//
+	// The password is sealed under the instance's secret key and is write
+	// only. Leave it out to keep the stored one; send an empty one together
+	// with an empty username to remove both. A change that leaves the
+	// settings as they are is accepted and recorded nowhere.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /instance/smtp (the `UpdateMailSettings` operationId).
+	UpdateMailSettingsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateMailSettings Set the instance's SMTP server
+	//
+	// Replaces the SMTP settings. Refused `base_url_required` (422) while
+	// the instance has no `FLAGNETIC_BASE_URL`, since every mailed link is
+	// built from it. Refused `invalid_smtp_settings` naming each field
+	// that breaks a rule: a host of 1 to 253 characters without spaces, a
+	// port from 1 to 65535, `starttls`, `tls` or `none` for the security, a
+	// sender that is one address, a username and a password together, and
+	// credentials over `none` only to a host that is this machine.
+	//
+	// The password is sealed under the instance's secret key and is write
+	// only. Leave it out to keep the stored one; send an empty one together
+	// with an empty username to remove both. A change that leaves the
+	// settings as they are is accepted and recorded nowhere.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /instance/smtp (the `UpdateMailSettings` operationId).
+	UpdateMailSettings(ctx context.Context, body UpdateMailSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SendTestMail Send the caller a test mail
+	//
+	// Sends a mail to the caller's own address, in their language, through
+	// the SMTP server in force, and answers once the server accepted it: the
+	// only mail the instance sends while its sender waits. Refused
+	// `smtp_not_configured` (409) while there is no SMTP server, and
+	// `smtp_failed` (502) with `failure` naming the step that failed:
+	// `connection` (unreachable or broken), `tls` (no STARTTLS, a
+	// handshake or certificate that failed), `authentication` (the
+	// credentials were refused) or `rejected` (the sender, the recipient or
+	// the mail was refused).
+	//
+	// Corresponds with POST /instance/smtp/test (the `SendTestMail` operationId).
+	SendTestMail(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetMe Who the caller is
 	//
@@ -9940,6 +10075,125 @@ func (c *Client) UpdateAuthSettingsWithBody(ctx context.Context, contentType str
 // Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
 func (c *Client) UpdateAuthSettings(ctx context.Context, body UpdateAuthSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateAuthSettingsRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteMailSettings Remove the instance's SMTP server
+//
+// The instance stops mailing; what it mails is shown as links again. Not found while no SMTP server is configured.
+//
+// Corresponds with DELETE /instance/smtp (the `DeleteMailSettings` operationId).
+func (c *Client) DeleteMailSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteMailSettingsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetMailSettings The instance's SMTP server
+//
+// The server the instance mails through. The password is never answered, only whether one is stored. Not found while no SMTP server is configured.
+//
+// Corresponds with GET /instance/smtp (the `GetMailSettings` operationId).
+func (c *Client) GetMailSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMailSettingsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateMailSettingsWithBody Set the instance's SMTP server
+//
+// Replaces the SMTP settings. Refused `base_url_required` (422) while
+// the instance has no `FLAGNETIC_BASE_URL`, since every mailed link is
+// built from it. Refused `invalid_smtp_settings` naming each field
+// that breaks a rule: a host of 1 to 253 characters without spaces, a
+// port from 1 to 65535, `starttls`, `tls` or `none` for the security, a
+// sender that is one address, a username and a password together, and
+// credentials over `none` only to a host that is this machine.
+//
+// The password is sealed under the instance's secret key and is write
+// only. Leave it out to keep the stored one; send an empty one together
+// with an empty username to remove both. A change that leaves the
+// settings as they are is accepted and recorded nowhere.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /instance/smtp (the `UpdateMailSettings` operationId).
+func (c *Client) UpdateMailSettingsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateMailSettingsRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateMailSettings Set the instance's SMTP server
+//
+// Replaces the SMTP settings. Refused `base_url_required` (422) while
+// the instance has no `FLAGNETIC_BASE_URL`, since every mailed link is
+// built from it. Refused `invalid_smtp_settings` naming each field
+// that breaks a rule: a host of 1 to 253 characters without spaces, a
+// port from 1 to 65535, `starttls`, `tls` or `none` for the security, a
+// sender that is one address, a username and a password together, and
+// credentials over `none` only to a host that is this machine.
+//
+// The password is sealed under the instance's secret key and is write
+// only. Leave it out to keep the stored one; send an empty one together
+// with an empty username to remove both. A change that leaves the
+// settings as they are is accepted and recorded nowhere.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /instance/smtp (the `UpdateMailSettings` operationId).
+func (c *Client) UpdateMailSettings(ctx context.Context, body UpdateMailSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateMailSettingsRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SendTestMail Send the caller a test mail
+//
+// Sends a mail to the caller's own address, in their language, through
+// the SMTP server in force, and answers once the server accepted it: the
+// only mail the instance sends while its sender waits. Refused
+// `smtp_not_configured` (409) while there is no SMTP server, and
+// `smtp_failed` (502) with `failure` naming the step that failed:
+// `connection` (unreachable or broken), `tls` (no STARTTLS, a
+// handshake or certificate that failed), `authentication` (the
+// credentials were refused) or `rejected` (the sender, the recipient or
+// the mail was refused).
+//
+// Corresponds with POST /instance/smtp/test (the `SendTestMail` operationId).
+func (c *Client) SendTestMail(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSendTestMailRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -15415,6 +15669,127 @@ func NewUpdateAuthSettingsRequestWithBody(server string, contentType string, bod
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteMailSettingsRequest constructs an http.Request for the DeleteMailSettings method
+func NewDeleteMailSettingsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/smtp")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetMailSettingsRequest constructs an http.Request for the GetMailSettings method
+func NewGetMailSettingsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/smtp")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateMailSettingsRequest calls the generic UpdateMailSettings builder with application/json body
+func NewUpdateMailSettingsRequest(server string, body UpdateMailSettingsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateMailSettingsRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewUpdateMailSettingsRequestWithBody constructs an http.Request for the UpdateMailSettings method, with any body, and a specified content type
+func NewUpdateMailSettingsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/smtp")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewSendTestMailRequest constructs an http.Request for the SendTestMail method
+func NewSendTestMailRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/smtp/test")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -23894,6 +24269,81 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
 	UpdateAuthSettingsWithResponse(ctx context.Context, body UpdateAuthSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAuthSettingsResponse, error)
 
+	// DeleteMailSettingsWithResponse Remove the instance's SMTP server
+	//
+	// The instance stops mailing; what it mails is shown as links again. Not found while no SMTP server is configured.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /instance/smtp (the `DeleteMailSettings` operationId).
+	DeleteMailSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteMailSettingsResponse, error)
+
+	// GetMailSettingsWithResponse The instance's SMTP server
+	//
+	// The server the instance mails through. The password is never answered, only whether one is stored. Not found while no SMTP server is configured.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /instance/smtp (the `GetMailSettings` operationId).
+	GetMailSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMailSettingsResponse, error)
+
+	// UpdateMailSettingsWithBodyWithResponse Set the instance's SMTP server
+	//
+	// Replaces the SMTP settings. Refused `base_url_required` (422) while
+	// the instance has no `FLAGNETIC_BASE_URL`, since every mailed link is
+	// built from it. Refused `invalid_smtp_settings` naming each field
+	// that breaks a rule: a host of 1 to 253 characters without spaces, a
+	// port from 1 to 65535, `starttls`, `tls` or `none` for the security, a
+	// sender that is one address, a username and a password together, and
+	// credentials over `none` only to a host that is this machine.
+	//
+	// The password is sealed under the instance's secret key and is write
+	// only. Leave it out to keep the stored one; send an empty one together
+	// with an empty username to remove both. A change that leaves the
+	// settings as they are is accepted and recorded nowhere.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /instance/smtp (the `UpdateMailSettings` operationId).
+	UpdateMailSettingsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateMailSettingsResponse, error)
+
+	// UpdateMailSettingsWithResponse Set the instance's SMTP server
+	//
+	// Replaces the SMTP settings. Refused `base_url_required` (422) while
+	// the instance has no `FLAGNETIC_BASE_URL`, since every mailed link is
+	// built from it. Refused `invalid_smtp_settings` naming each field
+	// that breaks a rule: a host of 1 to 253 characters without spaces, a
+	// port from 1 to 65535, `starttls`, `tls` or `none` for the security, a
+	// sender that is one address, a username and a password together, and
+	// credentials over `none` only to a host that is this machine.
+	//
+	// The password is sealed under the instance's secret key and is write
+	// only. Leave it out to keep the stored one; send an empty one together
+	// with an empty username to remove both. A change that leaves the
+	// settings as they are is accepted and recorded nowhere.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /instance/smtp (the `UpdateMailSettings` operationId).
+	UpdateMailSettingsWithResponse(ctx context.Context, body UpdateMailSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMailSettingsResponse, error)
+
+	// SendTestMailWithResponse Send the caller a test mail
+	//
+	// Sends a mail to the caller's own address, in their language, through
+	// the SMTP server in force, and answers once the server accepted it: the
+	// only mail the instance sends while its sender waits. Refused
+	// `smtp_not_configured` (409) while there is no SMTP server, and
+	// `smtp_failed` (502) with `failure` naming the step that failed:
+	// `connection` (unreachable or broken), `tls` (no STARTTLS, a
+	// handshake or certificate that failed), `authentication` (the
+	// credentials were refused) or `rejected` (the sender, the recipient or
+	// the mail was refused).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /instance/smtp/test (the `SendTestMail` operationId).
+	SendTestMailWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SendTestMailResponse, error)
+
 	// GetMeWithResponse Who the caller is
 	//
 	// The member the credential in use acts for, the credential itself, the address the request came from, and the instance's bound on an API token's expiry, which every caller may read.
@@ -28014,6 +28464,275 @@ func (r UpdateAuthSettingsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r UpdateAuthSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeleteMailSettingsResponse401Headers the declared response headers of an HTTP 401 response for DeleteMailSettings
+type DeleteMailSettingsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DeleteMailSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeleteMailSettingsResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteMailSettingsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteMailSettingsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteMailSettingsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteMailSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteMailSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteMailSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteMailSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetMailSettingsResponse401Headers the declared response headers of an HTTP 401 response for GetMailSettings
+type GetMailSettingsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetMailSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SmtpSettings
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetMailSettingsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetMailSettingsResponse) GetJSON200() *SmtpSettings {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetMailSettingsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetMailSettingsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetMailSettingsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetMailSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMailSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMailSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetMailSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateMailSettingsResponse401Headers the declared response headers of an HTTP 401 response for UpdateMailSettings
+type UpdateMailSettingsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateMailSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SmtpSettings
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateMailSettingsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateMailSettingsResponse) GetJSON200() *SmtpSettings {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateMailSettingsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateMailSettingsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateMailSettingsResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateMailSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateMailSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateMailSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateMailSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// SendTestMailResponse401Headers the declared response headers of an HTTP 401 response for SendTestMail
+type SendTestMailResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type SendTestMailResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *SendTestMailResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SendTestMailResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SendTestMailResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r SendTestMailResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r SendTestMailResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r SendTestMailResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SendTestMailResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SendTestMailResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SendTestMailResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -40732,6 +41451,111 @@ func (c *ClientWithResponses) UpdateAuthSettingsWithResponse(ctx context.Context
 	return ParseUpdateAuthSettingsResponse(rsp)
 }
 
+// DeleteMailSettingsWithResponse Remove the instance's SMTP server
+//
+// The instance stops mailing; what it mails is shown as links again. Not found while no SMTP server is configured.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /instance/smtp (the `DeleteMailSettings` operationId).
+func (c *ClientWithResponses) DeleteMailSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteMailSettingsResponse, error) {
+	rsp, err := c.DeleteMailSettings(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteMailSettingsResponse(rsp)
+}
+
+// GetMailSettingsWithResponse The instance's SMTP server
+//
+// The server the instance mails through. The password is never answered, only whether one is stored. Not found while no SMTP server is configured.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/smtp (the `GetMailSettings` operationId).
+func (c *ClientWithResponses) GetMailSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMailSettingsResponse, error) {
+	rsp, err := c.GetMailSettings(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMailSettingsResponse(rsp)
+}
+
+// UpdateMailSettingsWithBodyWithResponse Set the instance's SMTP server
+//
+// Replaces the SMTP settings. Refused `base_url_required` (422) while
+// the instance has no `FLAGNETIC_BASE_URL`, since every mailed link is
+// built from it. Refused `invalid_smtp_settings` naming each field
+// that breaks a rule: a host of 1 to 253 characters without spaces, a
+// port from 1 to 65535, `starttls`, `tls` or `none` for the security, a
+// sender that is one address, a username and a password together, and
+// credentials over `none` only to a host that is this machine.
+//
+// The password is sealed under the instance's secret key and is write
+// only. Leave it out to keep the stored one; send an empty one together
+// with an empty username to remove both. A change that leaves the
+// settings as they are is accepted and recorded nowhere.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/smtp (the `UpdateMailSettings` operationId).
+func (c *ClientWithResponses) UpdateMailSettingsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateMailSettingsResponse, error) {
+	rsp, err := c.UpdateMailSettingsWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateMailSettingsResponse(rsp)
+}
+
+// UpdateMailSettingsWithResponse Set the instance's SMTP server
+//
+// Replaces the SMTP settings. Refused `base_url_required` (422) while
+// the instance has no `FLAGNETIC_BASE_URL`, since every mailed link is
+// built from it. Refused `invalid_smtp_settings` naming each field
+// that breaks a rule: a host of 1 to 253 characters without spaces, a
+// port from 1 to 65535, `starttls`, `tls` or `none` for the security, a
+// sender that is one address, a username and a password together, and
+// credentials over `none` only to a host that is this machine.
+//
+// The password is sealed under the instance's secret key and is write
+// only. Leave it out to keep the stored one; send an empty one together
+// with an empty username to remove both. A change that leaves the
+// settings as they are is accepted and recorded nowhere.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/smtp (the `UpdateMailSettings` operationId).
+func (c *ClientWithResponses) UpdateMailSettingsWithResponse(ctx context.Context, body UpdateMailSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMailSettingsResponse, error) {
+	rsp, err := c.UpdateMailSettings(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateMailSettingsResponse(rsp)
+}
+
+// SendTestMailWithResponse Send the caller a test mail
+//
+// Sends a mail to the caller's own address, in their language, through
+// the SMTP server in force, and answers once the server accepted it: the
+// only mail the instance sends while its sender waits. Refused
+// `smtp_not_configured` (409) while there is no SMTP server, and
+// `smtp_failed` (502) with `failure` naming the step that failed:
+// `connection` (unreachable or broken), `tls` (no STARTTLS, a
+// handshake or certificate that failed), `authentication` (the
+// credentials were refused) or `rejected` (the sender, the recipient or
+// the mail was refused).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /instance/smtp/test (the `SendTestMail` operationId).
+func (c *ClientWithResponses) SendTestMailWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SendTestMailResponse, error) {
+	rsp, err := c.SendTestMail(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSendTestMailResponse(rsp)
+}
+
 // GetMeWithResponse Who the caller is
 //
 // The member the credential in use acts for, the credential itself, the address the request came from, and the instance's bound on an API token's expiry, which every caller may read.
@@ -45906,6 +46730,245 @@ func ParseUpdateAuthSettingsResponse(rsp *http.Response) (*UpdateAuthSettingsRes
 	switch {
 	case rsp.StatusCode == 401:
 		var headers UpdateAuthSettingsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeleteMailSettingsResponse parses an HTTP response from a DeleteMailSettingsWithResponse call
+func ParseDeleteMailSettingsResponse(rsp *http.Response) (*DeleteMailSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteMailSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DeleteMailSettingsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetMailSettingsResponse parses an HTTP response from a GetMailSettingsWithResponse call
+func ParseGetMailSettingsResponse(rsp *http.Response) (*GetMailSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMailSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SmtpSettings
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetMailSettingsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateMailSettingsResponse parses an HTTP response from a UpdateMailSettingsWithResponse call
+func ParseUpdateMailSettingsResponse(rsp *http.Response) (*UpdateMailSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateMailSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SmtpSettings
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers UpdateMailSettingsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseSendTestMailResponse parses an HTTP response from a SendTestMailWithResponse call
+func ParseSendTestMailResponse(rsp *http.Response) (*SendTestMailResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SendTestMailResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers SendTestMailResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -57187,6 +58250,18 @@ type ServerInterface interface {
 	// UpdateAuthSettings Change the instance's auth settings
 	// (PUT /instance/auth-settings)
 	UpdateAuthSettings(w http.ResponseWriter, r *http.Request)
+	// DeleteMailSettings Remove the instance's SMTP server
+	// (DELETE /instance/smtp)
+	DeleteMailSettings(w http.ResponseWriter, r *http.Request)
+	// GetMailSettings The instance's SMTP server
+	// (GET /instance/smtp)
+	GetMailSettings(w http.ResponseWriter, r *http.Request)
+	// UpdateMailSettings Set the instance's SMTP server
+	// (PUT /instance/smtp)
+	UpdateMailSettings(w http.ResponseWriter, r *http.Request)
+	// SendTestMail Send the caller a test mail
+	// (POST /instance/smtp/test)
+	SendTestMail(w http.ResponseWriter, r *http.Request)
 	// GetMe Who the caller is
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -58357,6 +59432,62 @@ func (siw *ServerInterfaceWrapper) UpdateAuthSettings(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAuthSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteMailSettings operation middleware
+func (siw *ServerInterfaceWrapper) DeleteMailSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteMailSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMailSettings operation middleware
+func (siw *ServerInterfaceWrapper) GetMailSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMailSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMailSettings operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMailSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMailSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SendTestMail operation middleware
+func (siw *ServerInterfaceWrapper) SendTestMail(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SendTestMail(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -65314,6 +66445,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/enable", wrapper.EnableAuthProvider)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/disable", wrapper.DisableAuthProvider)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/test", wrapper.TestAuthProvider)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/instance/smtp", wrapper.DeleteMailSettings)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/smtp", wrapper.GetMailSettings)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/smtp", wrapper.UpdateMailSettings)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/smtp/test", wrapper.SendTestMail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit", wrapper.ListAuditEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/export", wrapper.ExportAuditEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/webhook-event-types", wrapper.ListWebhookEventTypes)
@@ -66997,6 +68132,299 @@ func (response UpdateAuthSettings422ApplicationProblemPlusJSONResponse) VisitUpd
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMailSettingsRequestObject struct {
+}
+
+type DeleteMailSettingsResponseObject interface {
+	VisitDeleteMailSettingsResponse(w http.ResponseWriter) error
+}
+
+type DeleteMailSettings204Response struct {
+}
+
+func (response DeleteMailSettings204Response) VisitDeleteMailSettingsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteMailSettings401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteMailSettings401ApplicationProblemPlusJSONResponse) VisitDeleteMailSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMailSettings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteMailSettings403ApplicationProblemPlusJSONResponse) VisitDeleteMailSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMailSettings404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteMailSettings404ApplicationProblemPlusJSONResponse) VisitDeleteMailSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMailSettingsRequestObject struct {
+}
+
+type GetMailSettingsResponseObject interface {
+	VisitGetMailSettingsResponse(w http.ResponseWriter) error
+}
+
+type GetMailSettings200JSONResponse SmtpSettings
+
+func (response GetMailSettings200JSONResponse) VisitGetMailSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMailSettings401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetMailSettings401ApplicationProblemPlusJSONResponse) VisitGetMailSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMailSettings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetMailSettings403ApplicationProblemPlusJSONResponse) VisitGetMailSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMailSettings404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetMailSettings404ApplicationProblemPlusJSONResponse) VisitGetMailSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMailSettingsRequestObject struct {
+	Body *UpdateMailSettingsJSONRequestBody
+}
+
+type UpdateMailSettingsResponseObject interface {
+	VisitUpdateMailSettingsResponse(w http.ResponseWriter) error
+}
+
+type UpdateMailSettings200JSONResponse SmtpSettings
+
+func (response UpdateMailSettings200JSONResponse) VisitUpdateMailSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMailSettings401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMailSettings401ApplicationProblemPlusJSONResponse) VisitUpdateMailSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMailSettings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMailSettings403ApplicationProblemPlusJSONResponse) VisitUpdateMailSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMailSettings422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMailSettings422ApplicationProblemPlusJSONResponse) VisitUpdateMailSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendTestMailRequestObject struct {
+}
+
+type SendTestMailResponseObject interface {
+	VisitSendTestMailResponse(w http.ResponseWriter) error
+}
+
+type SendTestMail204Response struct {
+}
+
+func (response SendTestMail204Response) VisitSendTestMailResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type SendTestMail401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response SendTestMail401ApplicationProblemPlusJSONResponse) VisitSendTestMailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendTestMail403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SendTestMail403ApplicationProblemPlusJSONResponse) VisitSendTestMailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendTestMail409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response SendTestMail409ApplicationProblemPlusJSONResponse) VisitSendTestMailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendTestMail502ApplicationProblemPlusJSONResponse struct {
+	BadGatewayApplicationProblemPlusJSONResponse
+}
+
+func (response SendTestMail502ApplicationProblemPlusJSONResponse) VisitSendTestMailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(502)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -82498,6 +83926,18 @@ type StrictServerInterface interface {
 	// UpdateAuthSettings Change the instance's auth settings
 	// (PUT /instance/auth-settings)
 	UpdateAuthSettings(ctx context.Context, request UpdateAuthSettingsRequestObject) (UpdateAuthSettingsResponseObject, error)
+	// DeleteMailSettings Remove the instance's SMTP server
+	// (DELETE /instance/smtp)
+	DeleteMailSettings(ctx context.Context, request DeleteMailSettingsRequestObject) (DeleteMailSettingsResponseObject, error)
+	// GetMailSettings The instance's SMTP server
+	// (GET /instance/smtp)
+	GetMailSettings(ctx context.Context, request GetMailSettingsRequestObject) (GetMailSettingsResponseObject, error)
+	// UpdateMailSettings Set the instance's SMTP server
+	// (PUT /instance/smtp)
+	UpdateMailSettings(ctx context.Context, request UpdateMailSettingsRequestObject) (UpdateMailSettingsResponseObject, error)
+	// SendTestMail Send the caller a test mail
+	// (POST /instance/smtp/test)
+	SendTestMail(ctx context.Context, request SendTestMailRequestObject) (SendTestMailResponseObject, error)
 	// GetMe Who the caller is
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -83443,6 +84883,109 @@ func (sh *strictHandler) UpdateAuthSettings(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateAuthSettingsResponseObject); ok {
 		if err := validResponse.VisitUpdateAuthSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteMailSettings operation middleware
+func (sh *strictHandler) DeleteMailSettings(w http.ResponseWriter, r *http.Request) {
+	var request DeleteMailSettingsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteMailSettings(ctx, request.(DeleteMailSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteMailSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteMailSettingsResponseObject); ok {
+		if err := validResponse.VisitDeleteMailSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMailSettings operation middleware
+func (sh *strictHandler) GetMailSettings(w http.ResponseWriter, r *http.Request) {
+	var request GetMailSettingsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMailSettings(ctx, request.(GetMailSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMailSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMailSettingsResponseObject); ok {
+		if err := validResponse.VisitGetMailSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateMailSettings operation middleware
+func (sh *strictHandler) UpdateMailSettings(w http.ResponseWriter, r *http.Request) {
+	var request UpdateMailSettingsRequestObject
+
+	var body UpdateMailSettingsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateMailSettings(ctx, request.(UpdateMailSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateMailSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateMailSettingsResponseObject); ok {
+		if err := validResponse.VisitUpdateMailSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SendTestMail operation middleware
+func (sh *strictHandler) SendTestMail(w http.ResponseWriter, r *http.Request) {
+	var request SendTestMailRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SendTestMail(ctx, request.(SendTestMailRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SendTestMail")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SendTestMailResponseObject); ok {
+		if err := validResponse.VisitSendTestMailResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

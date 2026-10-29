@@ -121,6 +121,9 @@ import type {
   DeleteInstanceWebhookData,
   DeleteInstanceWebhookErrors,
   DeleteInstanceWebhookResponses,
+  DeleteMailSettingsData,
+  DeleteMailSettingsErrors,
+  DeleteMailSettingsResponses,
   DeleteOverrideData,
   DeleteOverrideErrors,
   DeleteOverrideResponses,
@@ -223,6 +226,9 @@ import type {
   GetInvitationData,
   GetInvitationErrors,
   GetInvitationResponses,
+  GetMailSettingsData,
+  GetMailSettingsErrors,
+  GetMailSettingsResponses,
   GetMeData,
   GetMeErrors,
   GetMemberData,
@@ -430,6 +436,9 @@ import type {
   SendStaleFlagDigestData,
   SendStaleFlagDigestErrors,
   SendStaleFlagDigestResponses,
+  SendTestMailData,
+  SendTestMailErrors,
+  SendTestMailResponses,
   SetEnvironmentProtectionData,
   SetEnvironmentProtectionErrors,
   SetEnvironmentProtectionResponses,
@@ -485,6 +494,9 @@ import type {
   UpdateInstanceWebhookData,
   UpdateInstanceWebhookErrors,
   UpdateInstanceWebhookResponses,
+  UpdateMailSettingsData,
+  UpdateMailSettingsErrors,
+  UpdateMailSettingsResponses,
   UpdateMeData,
   UpdateMeErrors,
   UpdateMemberData,
@@ -4484,6 +4496,123 @@ export const testAuthProvider = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/instance/auth-providers/{provider}/test",
+    ...options,
+  });
+
+/**
+ * Remove the instance's SMTP server
+ *
+ * The instance stops mailing; what it mails is shown as links again. Not found while no SMTP server is configured.
+ */
+export const deleteMailSettings = <ThrowOnError extends boolean = false>(
+  options?: Options<DeleteMailSettingsData, ThrowOnError>,
+): RequestResult<DeleteMailSettingsResponses, DeleteMailSettingsErrors, ThrowOnError> =>
+  (options?.client ?? client).delete<
+    DeleteMailSettingsResponses,
+    DeleteMailSettingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/smtp",
+    ...options,
+  });
+
+/**
+ * The instance's SMTP server
+ *
+ * The server the instance mails through. The password is never answered, only whether one is stored. Not found while no SMTP server is configured.
+ */
+export const getMailSettings = <ThrowOnError extends boolean = false>(
+  options?: Options<GetMailSettingsData, ThrowOnError>,
+): RequestResult<GetMailSettingsResponses, GetMailSettingsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<GetMailSettingsResponses, GetMailSettingsErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/smtp",
+    ...options,
+  });
+
+/**
+ * Set the instance's SMTP server
+ *
+ * Replaces the SMTP settings. Refused `base_url_required` (422) while
+ * the instance has no `FLAGNETIC_BASE_URL`, since every mailed link is
+ * built from it. Refused `invalid_smtp_settings` naming each field
+ * that breaks a rule: a host of 1 to 253 characters without spaces, a
+ * port from 1 to 65535, `starttls`, `tls` or `none` for the security, a
+ * sender that is one address, a username and a password together, and
+ * credentials over `none` only to a host that is this machine.
+ *
+ * The password is sealed under the instance's secret key and is write
+ * only. Leave it out to keep the stored one; send an empty one together
+ * with an empty username to remove both. A change that leaves the
+ * settings as they are is accepted and recorded nowhere.
+ *
+ */
+export const updateMailSettings = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateMailSettingsData, ThrowOnError>,
+): RequestResult<UpdateMailSettingsResponses, UpdateMailSettingsErrors, ThrowOnError> =>
+  (options.client ?? client).put<
+    UpdateMailSettingsResponses,
+    UpdateMailSettingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/smtp",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Send the caller a test mail
+ *
+ * Sends a mail to the caller's own address, in their language, through
+ * the SMTP server in force, and answers once the server accepted it: the
+ * only mail the instance sends while its sender waits. Refused
+ * `smtp_not_configured` (409) while there is no SMTP server, and
+ * `smtp_failed` (502) with `failure` naming the step that failed:
+ * `connection` (unreachable or broken), `tls` (no STARTTLS, a
+ * handshake or certificate that failed), `authentication` (the
+ * credentials were refused) or `rejected` (the sender, the recipient or
+ * the mail was refused).
+ *
+ */
+export const sendTestMail = <ThrowOnError extends boolean = false>(
+  options?: Options<SendTestMailData, ThrowOnError>,
+): RequestResult<SendTestMailResponses, SendTestMailErrors, ThrowOnError> =>
+  (options?.client ?? client).post<SendTestMailResponses, SendTestMailErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/smtp/test",
     ...options,
   });
 

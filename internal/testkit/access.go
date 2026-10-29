@@ -188,3 +188,12 @@ func GrantedToken(t testing.TB, pool *pgxpool.Pool, project workspace.ProjectID,
 	return PersonalToken(t, pool, m.ID, "granted", access.ScopeRead, access.ScopeFlagsWrite, access.ScopeExperimentsWrite,
 		access.ScopeProjectAdmin)
 }
+
+// NewInstanceAdmin creates an instance admin on pool and returns them with a
+// personal access token carrying every scope, so a test acts as an instance
+// admin whose address is its own: mail sent to them is theirs alone.
+func NewInstanceAdmin(t testing.TB, pool *pgxpool.Pool, opts ...MemberOption) (Member, string) {
+	t.Helper()
+	m := NewMember(t, pool, append([]MemberOption{AsInstanceAdmin()}, opts...)...)
+	return m, PersonalToken(t, pool, m.ID, "instance admin", access.AllScopes()...)
+}

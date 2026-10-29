@@ -4993,6 +4993,105 @@ paths:
           $ref: "#/components/responses/NotFound"
         "502":
           $ref: "#/components/responses/BadGateway"
+  /instance/smtp:
+    get:
+      operationId: getMailSettings
+      summary: The instance's SMTP server
+      description: The server the instance mails through. The password is never answered, only whether one is stored. Not found while no SMTP server is configured.
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "200":
+          description: The SMTP settings in force.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmtpSettings"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: updateMailSettings
+      summary: Set the instance's SMTP server
+      description: |
+        Replaces the SMTP settings. Refused `base_url_required` (422) while
+        the instance has no `FLAGNETIC_BASE_URL`, since every mailed link is
+        built from it. Refused `invalid_smtp_settings` naming each field
+        that breaks a rule: a host of 1 to 253 characters without spaces, a
+        port from 1 to 65535, `starttls`, `tls` or `none` for the security, a
+        sender that is one address, a username and a password together, and
+        credentials over `none` only to a host that is this machine.
+
+        The password is sealed under the instance's secret key and is write
+        only. Leave it out to keep the stored one; send an empty one together
+        with an empty username to remove both. A change that leaves the
+        settings as they are is accepted and recorded nowhere.
+      x-permission: instance_admin
+      tags: [instance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmtpSettingsUpdate"
+      responses:
+        "200":
+          description: The settings as stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmtpSettings"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/Invalid"
+    delete:
+      operationId: deleteMailSettings
+      summary: Remove the instance's SMTP server
+      description: The instance stops mailing; what it mails is shown as links again. Not found while no SMTP server is configured.
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "204":
+          description: Removed.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /instance/smtp/test:
+    post:
+      operationId: sendTestMail
+      summary: Send the caller a test mail
+      description: |
+        Sends a mail to the caller's own address, in their language, through
+        the SMTP server in force, and answers once the server accepted it: the
+        only mail the instance sends while its sender waits. Refused
+        `smtp_not_configured` (409) while there is no SMTP server, and
+        `smtp_failed` (502) with `failure` naming the step that failed:
+        `connection` (unreachable or broken), `tls` (no STARTTLS, a
+        handshake or certificate that failed), `authentication` (the
+        credentials were refused) or `rejected` (the sender, the recipient or
+        the mail was refused).
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "204":
+          description: The server accepted the mail.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "502":
+          $ref: "#/components/responses/BadGateway"
   /audit:
     get:
       operationId: listAuditEntries
@@ -6327,7 +6426,7 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
     BadGateway:
-      description: "`provider_unreachable`: a system the server asked, such as an identity provider, did not answer as needed; `failure` says why."
+      description: "`provider_unreachable` or `smtp_failed`: a system the server asked, such as an identity provider or the SMTP server, did not answer as needed; `failure` says why."
       content:
         application/problem+json:
           schema:
@@ -6470,7 +6569,7 @@ components:
             type: string
         failure:
           type: string
-          description: Why a system the server asked did not answer as needed, for `provider_unreachable`.
+          description: Why a system the server asked did not answer as needed, for `provider_unreachable`; for `smtp_failed` the step that failed, `connection`, `tls`, `authentication` or `rejected`.
         errors:
           type: array
           items:
@@ -7050,6 +7149,56 @@ components:
         password_min_length:
           type: integer
           description: The fewest characters a password chosen from now on has, never below 12. 12 on a fresh instance.
+    SmtpSecurity:
+      type: string
+      enum: [starttls, tls, none]
+      description: "`starttls` upgrades a plain connection and requires the server to offer it, `tls` speaks TLS from the first byte, `none` secures nothing. TLS 1.2 or later, the server's certificate verified, in both secure modes."
+    SmtpSettings:
+      type: object
+      description: The SMTP server the instance mails through. The password is never shown.
+      required: [host, port, security, username, password_set, from, updated_at]
+      properties:
+        host:
+          type: string
+        port:
+          type: integer
+        security:
+          $ref: "#/components/schemas/SmtpSecurity"
+        username:
+          type: string
+          description: Who to authenticate as; empty for no authentication.
+        password_set:
+          type: boolean
+          description: Whether a password is stored.
+        from:
+          type: string
+          description: The sender of every mail, such as `Flagnetic <flags@example.com>`.
+        updated_at:
+          type: string
+          format: date-time
+    SmtpSettingsUpdate:
+      type: object
+      description: The SMTP server to set.
+      required: [host, port, security, from]
+      properties:
+        host:
+          type: string
+          description: A host name or address, 1 to 253 characters without spaces.
+        port:
+          type: integer
+          description: From 1 to 65535.
+        security:
+          $ref: "#/components/schemas/SmtpSecurity"
+        username:
+          type: string
+          description: Who to authenticate as; empty or left out for no authentication, which drops the stored password too. At most 256 characters on one line.
+        password:
+          type: string
+          writeOnly: true
+          description: The password for the username. Left out, the stored one is kept; with a username it must not be empty.
+        from:
+          type: string
+          description: One address, optionally with a display name.
     Scope:
       type: string
       enum: [read, "flags:write", "experiments:write", "project:admin", "instance:admin"]

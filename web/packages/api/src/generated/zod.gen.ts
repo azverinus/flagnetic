@@ -323,6 +323,35 @@ export const zAuthSettings = z.object({
 });
 
 /**
+ * `starttls` upgrades a plain connection and requires the server to offer it, `tls` speaks TLS from the first byte, `none` secures nothing. TLS 1.2 or later, the server's certificate verified, in both secure modes.
+ */
+export const zSmtpSecurity = z.enum(["starttls", "tls", "none"]);
+
+/**
+ * The SMTP server the instance mails through. The password is never shown.
+ */
+export const zSmtpSettings = z.object({
+  host: z.string(),
+  port: z.int(),
+  security: zSmtpSecurity,
+  username: z.string(),
+  password_set: z.boolean(),
+  from: z.string(),
+  updated_at: z.iso.datetime(),
+});
+
+/**
+ * The SMTP server to set.
+ */
+export const zSmtpSettingsUpdate = z.object({
+  host: z.string(),
+  port: z.int(),
+  security: zSmtpSecurity,
+  username: z.string().optional(),
+  from: z.string(),
+});
+
+/**
  * What an API token may touch. Each permission falls under one scope, and a token exercises it only when it carries that scope.
  */
 export const zScope = z.enum([
@@ -2521,6 +2550,18 @@ export const zAuthProviderPatchWritable = z.object({
 });
 
 /**
+ * The SMTP server to set.
+ */
+export const zSmtpSettingsUpdateWritable = z.object({
+  host: z.string(),
+  port: z.int(),
+  security: zSmtpSecurity,
+  username: z.string().optional(),
+  password: z.string().optional(),
+  from: z.string(),
+});
+
+/**
  * A member's identifier; their own changes and those of their personal access tokens.
  */
 export const zAuditActor = z.uuid();
@@ -4263,6 +4304,28 @@ export const zTestAuthProviderPath = z.object({
  * What the discovery document says.
  */
 export const zTestAuthProviderResponse = zAuthProviderTest;
+
+/**
+ * Removed.
+ */
+export const zDeleteMailSettingsResponse = z.void();
+
+/**
+ * The SMTP settings in force.
+ */
+export const zGetMailSettingsResponse = zSmtpSettings;
+
+export const zUpdateMailSettingsBody = zSmtpSettingsUpdateWritable;
+
+/**
+ * The settings as stored.
+ */
+export const zUpdateMailSettingsResponse = zSmtpSettings;
+
+/**
+ * The server accepted the mail.
+ */
+export const zSendTestMailResponse = z.void();
 
 export const zListAuditEntriesQuery = z.object({
   project: z.uuid().optional(),

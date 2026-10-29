@@ -41,7 +41,7 @@ export type Problem = {
    */
   used_by?: Array<string>;
   /**
-   * Why a system the server asked did not answer as needed, for `provider_unreachable`.
+   * Why a system the server asked did not answer as needed, for `provider_unreachable`; for `smtp_failed` the step that failed, `connection`, `tls`, `authentication` or `rejected`.
    */
   failure?: string;
   errors?: Array<Violation>;
@@ -511,6 +511,56 @@ export type AuthSettings = {
    * The fewest characters a password chosen from now on has, never below 12. 12 on a fresh instance.
    */
   password_min_length: number;
+};
+
+/**
+ * `starttls` upgrades a plain connection and requires the server to offer it, `tls` speaks TLS from the first byte, `none` secures nothing. TLS 1.2 or later, the server's certificate verified, in both secure modes.
+ */
+export type SmtpSecurity = "starttls" | "tls" | "none";
+
+/**
+ * The SMTP server the instance mails through. The password is never shown.
+ */
+export type SmtpSettings = {
+  host: string;
+  port: number;
+  security: SmtpSecurity;
+  /**
+   * Who to authenticate as; empty for no authentication.
+   */
+  username: string;
+  /**
+   * Whether a password is stored.
+   */
+  password_set: boolean;
+  /**
+   * The sender of every mail, such as `Flagnetic <flags@example.com>`.
+   */
+  from: string;
+  updated_at: string;
+};
+
+/**
+ * The SMTP server to set.
+ */
+export type SmtpSettingsUpdate = {
+  /**
+   * A host name or address, 1 to 253 characters without spaces.
+   */
+  host: string;
+  /**
+   * From 1 to 65535.
+   */
+  port: number;
+  security: SmtpSecurity;
+  /**
+   * Who to authenticate as; empty or left out for no authentication, which drops the stored password too. At most 256 characters on one line.
+   */
+  username?: string;
+  /**
+   * One address, optionally with a display name.
+   */
+  from: string;
 };
 
 /**
@@ -3554,6 +3604,33 @@ export type AuthProviderPatchWritable = {
   scopes?: Array<string>;
   claims?: AuthProviderClaimsPatch;
   require_verified_email?: boolean;
+};
+
+/**
+ * The SMTP server to set.
+ */
+export type SmtpSettingsUpdateWritable = {
+  /**
+   * A host name or address, 1 to 253 characters without spaces.
+   */
+  host: string;
+  /**
+   * From 1 to 65535.
+   */
+  port: number;
+  security: SmtpSecurity;
+  /**
+   * Who to authenticate as; empty or left out for no authentication, which drops the stored password too. At most 256 characters on one line.
+   */
+  username?: string;
+  /**
+   * The password for the username. Left out, the stored one is kept; with a username it must not be empty.
+   */
+  password?: string;
+  /**
+   * One address, optionally with a display name.
+   */
+  from: string;
 };
 
 /**
@@ -12472,7 +12549,7 @@ export type TestAuthProviderErrors = {
    */
   404: Problem;
   /**
-   * `provider_unreachable`: a system the server asked, such as an identity provider, did not answer as needed; `failure` says why.
+   * `provider_unreachable` or `smtp_failed`: a system the server asked, such as an identity provider or the SMTP server, did not answer as needed; `failure` says why.
    */
   502: Problem;
 };
@@ -12487,6 +12564,196 @@ export type TestAuthProviderResponses = {
 };
 
 export type TestAuthProviderResponse = TestAuthProviderResponses[keyof TestAuthProviderResponses];
+
+export type DeleteMailSettingsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/instance/smtp";
+};
+
+export type DeleteMailSettingsErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type DeleteMailSettingsError = DeleteMailSettingsErrors[keyof DeleteMailSettingsErrors];
+
+export type DeleteMailSettingsResponses = {
+  /**
+   * Removed.
+   */
+  204: void;
+};
+
+export type DeleteMailSettingsResponse =
+  DeleteMailSettingsResponses[keyof DeleteMailSettingsResponses];
+
+export type GetMailSettingsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/instance/smtp";
+};
+
+export type GetMailSettingsErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetMailSettingsError = GetMailSettingsErrors[keyof GetMailSettingsErrors];
+
+export type GetMailSettingsResponses = {
+  /**
+   * The SMTP settings in force.
+   */
+  200: SmtpSettings;
+};
+
+export type GetMailSettingsResponse = GetMailSettingsResponses[keyof GetMailSettingsResponses];
+
+export type UpdateMailSettingsData = {
+  body: SmtpSettingsUpdateWritable;
+  path?: never;
+  query?: never;
+  url: "/instance/smtp";
+};
+
+export type UpdateMailSettingsErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type UpdateMailSettingsError = UpdateMailSettingsErrors[keyof UpdateMailSettingsErrors];
+
+export type UpdateMailSettingsResponses = {
+  /**
+   * The settings as stored.
+   */
+  200: SmtpSettings;
+};
+
+export type UpdateMailSettingsResponse =
+  UpdateMailSettingsResponses[keyof UpdateMailSettingsResponses];
+
+export type SendTestMailData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/instance/smtp/test";
+};
+
+export type SendTestMailErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `provider_unreachable` or `smtp_failed`: a system the server asked, such as an identity provider or the SMTP server, did not answer as needed; `failure` says why.
+   */
+  502: Problem;
+};
+
+export type SendTestMailError = SendTestMailErrors[keyof SendTestMailErrors];
+
+export type SendTestMailResponses = {
+  /**
+   * The server accepted the mail.
+   */
+  204: void;
+};
+
+export type SendTestMailResponse = SendTestMailResponses[keyof SendTestMailResponses];
 
 export type ListAuditEntriesData = {
   body?: never;
