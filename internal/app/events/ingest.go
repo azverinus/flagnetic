@@ -117,8 +117,8 @@ func (r BatchResult) AcceptedTotal() int {
 // Handle judges each event of b on its own and stores those accepted in one
 // unit of work, so that once it returns every accepted event is durable and
 // the SDK may drop the batch. An event whose ID was received before, in this
-// batch or within the retention window, is a duplicate and stored once. A
-// summary row naming a flag the project does not have is dropped: nobody
+// batch or within the year event IDs are kept, is a duplicate and stored
+// once. A summary row naming a flag the project does not have is dropped: nobody
 // could read it. An exposure is checked against the experiment it names;
 // the details of its refusal are specific to a server key and generic to a
 // client key.

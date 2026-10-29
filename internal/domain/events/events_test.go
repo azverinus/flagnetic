@@ -263,6 +263,51 @@ func TestSkewShiftsEveryTimeOfEveryEventBeforeTheWindowCheck(t *testing.T) {
 	}
 }
 
+func TestTheWindowChecksTheEventIDTimeShiftedByTheSkew(t *testing.T) {
+	day := 24 * time.Hour
+	at := func(skew, age time.Duration) events.JudgedEvent {
+		// A device stamps an event of the given true age with its own clock,
+		// which is skew behind (positive) or ahead (negative) of the server's.
+		stamped := received.Add(-age).Add(-skew)
+		return events.JudgeEvent(mustJSON(with(exposure(eventIDAt(stamped, 1)), map[string]any{
+			"occurred_at": stamped.Format(time.RFC3339),
+		})), received, retention, skew)
+	}
+
+	t.Run("a device 60 days behind keeps a fresh event", func(t *testing.T) {
+		e := at(60*day, time.Hour)
+		if e.Rejection != nil {
+			t.Fatalf("rejection = %+v, want a fresh event of a slow device kept", e.Rejection)
+		}
+		if got := e.ID.Time(); !got.Before(received.Add(-59 * day)) {
+			t.Errorf("event_id time = %v, want it left unshifted", got)
+		}
+	})
+	t.Run("an event 60 days old sent now is out of the window", func(t *testing.T) {
+		e := at(0, 60*day)
+		if e.Rejection == nil || e.Rejection.Code != events.RejectOutOfWindow {
+			t.Errorf("rejection = %+v, want out_of_window", e.Rejection)
+		}
+	})
+	t.Run("a slow device's event genuinely past the window is out of it", func(t *testing.T) {
+		e := at(60*day, 31*day)
+		if e.Rejection == nil || e.Rejection.Code != events.RejectOutOfWindow {
+			t.Errorf("rejection = %+v, want out_of_window", e.Rejection)
+		}
+	})
+	t.Run("a device ahead is judged as before", func(t *testing.T) {
+		if e := at(-5*day, time.Hour); e.Rejection != nil {
+			t.Errorf("a fresh event of a device ahead = %+v, want kept", e.Rejection)
+		}
+		if e := at(-5*day, 29*day); e.Rejection != nil {
+			t.Errorf("an event 29 days old of a device ahead = %+v, want kept", e.Rejection)
+		}
+		if e := at(-5*day, 31*day); e.Rejection == nil || e.Rejection.Code != events.RejectOutOfWindow {
+			t.Errorf("an event 31 days old of a device ahead = %+v, want out_of_window", e.Rejection)
+		}
+	})
+}
+
 func mustJSON(v any) json.RawMessage {
 	b, err := json.Marshal(v)
 	if err != nil {

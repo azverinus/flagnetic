@@ -66,7 +66,9 @@ A summary row's `reason` is a true reason (`rule`, `rollout`, `fallthrough`, `pr
 
 An event's time more than 24 hours ahead of the server clock is taken as the time the event was received.
 
-When `sent_at` differs from the time the server received the batch by more than one minute, the SDK's clock is taken to be wrong, and every time in the batch (`occurred_at` of an alias or an exposure, `interval_start` and `interval_end` of a summary) is shifted by the server's time minus `sent_at` before it is checked against the retention window and stored. A phone whose clock is wrong thereby neither loses its events as `out_of_window` nor moves an exposure in time. The time in `event_id` is not shifted.
+When `sent_at` differs from the time the server received the batch by more than one minute, the SDK's clock is taken to be wrong, and every time in the batch (`occurred_at` of an alias or an exposure, `interval_start` and `interval_end` of a summary) is shifted by the server's time minus `sent_at` before it is checked against the retention window and stored. The window check reads the time in `event_id` plus the same shift, so a phone whose clock is behind by more than the retention window keeps its fresh events; the stored `event_id` and its time are never shifted. A phone whose clock is wrong thereby neither loses its events as `out_of_window` nor moves an exposure in time.
+
+An event that really is older than the window is still refused: a retry stamps a fresh `sent_at`, so nothing shifts its `event_id` back into the window. A verbatim replay of an old envelope is the exception, since its `sent_at` is as old as its IDs and the shift lands it inside the window. Only its recorded `event_id` refuses it, so the server keeps event IDs for a year (or the retention window plus a day, if that is longer) and answers such a replay as a duplicate.
 
 ## From a closing page
 
@@ -83,7 +85,7 @@ The body is read as JSON, with the same limits and answers as above, and the req
 
 ## Retries
 
-Each event is stored once by its `event_id`, per project, within the retention window (`FLAGNETIC_EVENTS_RETENTION_DAYS`, 30 days by default): an event received before, in an earlier batch, on any replica and on any day, or earlier in the same batch, is counted in `duplicates`. An SDK retrying a batch therefore resends it with the same IDs.
+Each event is stored once by its `event_id`, per project, for a year (or the retention window, `FLAGNETIC_EVENTS_RETENTION_DAYS`, 30 days by default, plus a day if that is longer): an event received before, in an earlier batch, on any replica and on any day, or earlier in the same batch, is counted in `duplicates`. An SDK retrying a batch therefore resends it with the same IDs.
 
 
 ## Evaluations answered remotely
