@@ -134,10 +134,12 @@ type ChangeMyPasswordCommand struct {
 // The new password is held to the policy (weak_password at /new_password)
 // before the current one is checked, so a weak one costs no attempt. The
 // current one is checked as a sign-in checks a password, counting against
-// the member's email and the source: a right one takes the failure back, a
-// wrong one keeps it and is refused invalid_credentials, so a session left
-// open on a shared device cannot be used to guess the password, and the
-// email locks after the same failures a sign-in locks it after, recording
+// the member's email and the source, or, from a source the member signed in
+// from lately, against the email from that source alone: a right one takes
+// the failure back, a wrong one keeps it and is refused
+// invalid_credentials, so a session left open on a shared device cannot be
+// used to guess the password, and the email, or its known source, locks
+// after the same failures a sign-in locks it after, recording
 // auth.locked_out.
 func (h *ChangeMyPassword) Handle(ctx context.Context, cmd ChangeMyPasswordCommand) error {
 	if cmd.Caller.Member == nil || cmd.Caller.Session == nil {

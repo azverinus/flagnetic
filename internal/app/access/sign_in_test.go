@@ -66,16 +66,19 @@ func codeOf(err error) string {
 	return ""
 }
 
-func TestParallelWrongSignInsLockAfterAboutOneVerificationPastTheThreshold(t *testing.T) {
-	v := &countingVerifier{Hasher: password.NewBoundedHasher(password.DefaultParams, semaphore.NewWeighted(4), password.SlotWait)}
-	h := newSignIn(t, v)
-	m := testkit.NewMember(t, testkit.Pool(t))
+// wantParallelWrongSignInsLocked makes 24 wrong sign-ins on m's email at
+// once through h, each from the address from gives it, and fails unless
+// about one verification past the threshold was made: each attempt reserves
+// its failure first.
+func wantParallelWrongSignInsLocked(t *testing.T, h *appaccess.SignIn, v *countingVerifier, m testkit.Member, from func() netip.Addr) {
+	t.Helper()
+	v.verified.Store(0)
 	const attempts = 24
 	codes := make([]string, attempts)
 	var wg sync.WaitGroup
 	for i := range attempts {
 		wg.Go(func() {
-			_, err := h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New("not-the-password-9"), ClientIP: anAddress()})
+			_, err := h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New("not-the-password-9"), ClientIP: from()})
 			codes[i] = codeOf(err)
 		})
 	}
@@ -90,6 +93,32 @@ func TestParallelWrongSignInsLockAfterAboutOneVerificationPastTheThreshold(t *te
 		t.Errorf("%d verifications and %d attempts locked of %d, want at most %d verified: each attempt reserves its failure first",
 			n, locked, attempts, access.LockoutThreshold+1)
 	}
+}
+
+func TestParallelWrongSignInsLockAfterAboutOneVerificationPastTheThreshold(t *testing.T) {
+	v := &countingVerifier{Hasher: password.NewBoundedHasher(password.DefaultParams, semaphore.NewWeighted(4), password.SlotWait)}
+	wantParallelWrongSignInsLocked(t, newSignIn(t, v), v, testkit.NewMember(t, testkit.Pool(t)), anAddress)
+}
+
+func TestParallelWrongSignInsFromOneSourceLockAfterAboutOneVerificationPastTheThreshold(t *testing.T) {
+	// Attempts from one source wait on each other's count of it, each
+	// beginning before the one it waits on counted the email's first
+	// failure: the lock they meet is still the one their failures were
+	// judged against.
+	v := &countingVerifier{Hasher: password.NewBoundedHasher(password.DefaultParams, semaphore.NewWeighted(4), password.SlotWait)}
+	there := anAddress()
+	wantParallelWrongSignInsLocked(t, newSignIn(t, v), v, testkit.NewMember(t, testkit.Pool(t)), func() netip.Addr { return there })
+}
+
+func TestParallelWrongSignInsFromAKnownSourceLockAfterAboutOneVerificationPastTheThreshold(t *testing.T) {
+	v := &countingVerifier{Hasher: password.NewBoundedHasher(password.DefaultParams, semaphore.NewWeighted(4), password.SlotWait)}
+	h := newSignIn(t, v)
+	m := testkit.NewMember(t, testkit.Pool(t))
+	home := anAddress()
+	if _, err := h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New(m.Password), ClientIP: home}); err != nil {
+		t.Fatal(err)
+	}
+	wantParallelWrongSignInsLocked(t, h, v, m, func() netip.Addr { return home })
 }
 
 func TestEverySlotHeldAnswersBusyAndRefusedAttemptsTakeNoSlot(t *testing.T) {

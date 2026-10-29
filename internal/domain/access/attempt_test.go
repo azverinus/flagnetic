@@ -104,3 +104,22 @@ func TestFailuresArePurgedOnlyOnceTheyCanNoLongerCount(t *testing.T) {
 		t.Errorf("source cutoff = %v, want the source window before now", cut.SourceWindowStartBy)
 	}
 }
+
+func TestASourceIsKnownForThirtyDaysAfterTheMemberSignedInFromIt(t *testing.T) {
+	now := time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC)
+	a := access.NewAttempt("ada@example.com", netip.MustParseAddr("203.0.113.5"), now)
+	if got := a.KnownAfter(); !got.Equal(now.Add(-30 * 24 * time.Hour)) {
+		t.Errorf("KnownAfter = %v, want thirty days before the attempt", got)
+	}
+	if got := access.AttemptCutoffs(now).KnownSourceBy; !got.Equal(now.Add(-30 * 24 * time.Hour)) {
+		t.Errorf("KnownSourceBy = %v, want thirty days before now: a source no longer known is forgotten", got)
+	}
+	for addr, want := range map[string]string{"203.0.113.5": "203.0.113.5/32", "2001:db8:1:2::9": "2001:db8:1:2::/64"} {
+		if got, ok := access.KnownSourceOf(netip.MustParseAddr(addr)); !ok || got.String() != want {
+			t.Errorf("KnownSourceOf(%s) = %s %v, want %s, as its failures are counted", addr, got, ok, want)
+		}
+	}
+	if got, ok := access.KnownSourceOf(netip.Addr{}); ok {
+		t.Errorf("KnownSourceOf(no address) = %s, want none: every attempt without an address shares that source", got)
+	}
+}

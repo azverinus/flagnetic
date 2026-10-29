@@ -22,6 +22,13 @@ type AuthRetentionStore interface {
 	// PurgeSourceFailures deletes at most limit sources' failures whose
 	// window is over.
 	PurgeSourceFailures(ctx context.Context, cut access.FailureCutoffs, limit int) (int, error)
+	// PurgeKnownSourceFailures deletes at most limit failures of emails from
+	// their members' known sources that no lock holds and whose last
+	// failure is past the cutoff.
+	PurgeKnownSourceFailures(ctx context.Context, cut access.FailureCutoffs, limit int) (int, error)
+	// PurgeKnownSources deletes at most limit sources their members last
+	// signed in from at or before the cutoff, which are no longer known.
+	PurgeKnownSources(ctx context.Context, cut access.FailureCutoffs, limit int) (int, error)
 	// PurgeInvitations deletes at most limit invitations that ended at or
 	// before the cutoff, except each member's latest.
 	PurgeInvitations(ctx context.Context, cut access.InvitationCutoffs, limit int) (int, error)
@@ -33,15 +40,18 @@ const AuthRetentionBatch = 1000
 
 // AuthPurged counts the rows one purge deleted.
 type AuthPurged struct {
-	Sessions       int
-	EmailFailures  int
-	SourceFailures int
-	Invitations    int
+	Sessions            int
+	EmailFailures       int
+	SourceFailures      int
+	KnownSourceFailures int
+	KnownSources        int
+	Invitations         int
 }
 
 // PurgeAuthRecords deletes ended sessions, emails' failures that no longer
-// count, sources' windows that are over and invitations long past use, so
-// their tables do not grow forever.
+// count, sources' windows that are over, sources no longer known to their
+// members and invitations long past use, so their tables do not grow
+// forever.
 type PurgeAuthRecords struct {
 	tx       Transactor
 	store    AuthRetentionStore
@@ -84,6 +94,12 @@ func (h *PurgeAuthRecords) Handle(ctx context.Context) (AuthPurged, error) {
 		}},
 		{&purged.SourceFailures, func(ctx context.Context) (int, error) {
 			return h.store.PurgeSourceFailures(ctx, failures, AuthRetentionBatch)
+		}},
+		{&purged.KnownSourceFailures, func(ctx context.Context) (int, error) {
+			return h.store.PurgeKnownSourceFailures(ctx, failures, AuthRetentionBatch)
+		}},
+		{&purged.KnownSources, func(ctx context.Context) (int, error) {
+			return h.store.PurgeKnownSources(ctx, failures, AuthRetentionBatch)
 		}},
 		{&purged.Invitations, func(ctx context.Context) (int, error) {
 			return h.store.PurgeInvitations(ctx, invitations, AuthRetentionBatch)

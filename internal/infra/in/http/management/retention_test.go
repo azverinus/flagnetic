@@ -221,6 +221,31 @@ func TestTheRetentionWorkerPurgesOnlyLockoutsAndSourceFailuresPastTheirWindow(t 
 	}
 }
 
+func TestTheRetentionWorkerForgetsAKnownSourceThirtyDaysAfterTheLastSignInFromIt(t *testing.T) {
+	c := testkit.Clock()
+	srv, pool := retentionServer(t, c)
+	m := testkit.NewMember(t, pool)
+	home := fromAddress(t, srv, "203.0.113.20")
+	home.SignIn(t, m.Email, m.Password)
+	if status, _, _ := signInAs(t, home, m.Email, wrongPassword); status != http.StatusUnauthorized {
+		t.Fatalf("a wrong password from the known source = %d, want 401", status)
+	}
+
+	c.Advance(30*24*time.Hour - time.Second)
+	purge(t, srv)
+	if got := purged(t, srv, "known_source_failures"); got != 1 {
+		t.Errorf("purged known source failures = %d, want 1: its last failure is long past a day old", got)
+	}
+	if got := purged(t, srv, "known_sources"); got != 0 {
+		t.Errorf("purged known sources = %d a second before thirty days, want 0", got)
+	}
+	c.Advance(time.Second)
+	purge(t, srv)
+	if got := purged(t, srv, "known_sources"); got != 1 {
+		t.Errorf("purged known sources = %d thirty days after the sign-in, want 1", got)
+	}
+}
+
 func TestTheAuthPurgeRunsInBatchesUntilNothingIsLeft(t *testing.T) {
 	c := testkit.Clock()
 	srv, pool := retentionServer(t, c)
