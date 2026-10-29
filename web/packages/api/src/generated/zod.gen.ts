@@ -851,6 +851,7 @@ export const zSampleRatioCheck = z.object({
   skipped_reason: zSampleRatioSkippedReason.nullable(),
   active: z.boolean(),
   checked_at: z.iso.datetime(),
+  final: z.boolean(),
 });
 
 /**

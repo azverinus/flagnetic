@@ -1265,9 +1265,18 @@ export type SampleRatioCheck = {
    */
   active: boolean;
   /**
-   * When the check ran; a stopped experiment's is its stop.
+   * When the check ran; a stopped experiment's is its stop until the final check replaces it.
    */
   checked_at: string;
+  /**
+   * Whether this is the result the experiment keeps. Every result of a running experiment is final. The
+   * stop takes its own result at its time, not final, since exposures accepted before the stop may not
+   * have been rolled up yet; once the exposure rollup has read every exposure received at or before the
+   * stop, the next round of the checks takes the final one over exactly those exposures, with
+   * `checked_at` the round's time. Nothing replaces a final result.
+   *
+   */
+  final: boolean;
 };
 
 /**

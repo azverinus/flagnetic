@@ -450,8 +450,8 @@ test.describe("experiments", () => {
     await page.goto(`/projects/${project}/experiments/${key}`);
     const exposures = page.getByRole("region", { name: "Exposures" });
     // The rollup counts the exposures within seconds; the check every 10
-    // minutes would come too late for a test, so the stop takes the final
-    // check over what the rollup counted.
+    // minutes would come too late for a test, so the stop takes its check
+    // over what the rollup counted.
     await expect(async () => {
       await page.reload();
       await expect(exposures.getByText("1,200 units first exposed, counted up to")).toBeVisible({
@@ -480,7 +480,9 @@ test.describe("experiments", () => {
     await exposures.getByRole("tab", { name: "Staging" }).click();
     const check = exposures.getByRole("region", { name: "Sample-ratio check" });
     await expect(check).toContainText("Mismatch: the units first exposed are out of line");
-    await expect(check).toContainText("Final check, taken at the stop on");
+    // The next round of the checks would complete it, once the rollup has read
+    // every exposure received before the stop.
+    await expect(check).toContainText("Final check pending: this is the check the stop took on");
     await expectNoSeriousViolations(page, "an experiment's alerts");
 
     // The list marks it until someone acknowledges the alert.

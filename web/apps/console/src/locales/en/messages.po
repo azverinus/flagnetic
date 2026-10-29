@@ -2619,6 +2619,14 @@ msgid "Filter the segments"
 msgstr "Filter the segments"
 
 #: src/components/experiment-exposures.tsx
+msgid "Final check pending: this is the check the stop took on <0/>, over the exposures rolled up by then. It is replaced once every exposure received before the stop has been rolled up."
+msgstr "Final check pending: this is the check the stop took on <0/>, over the exposures rolled up by then. It is replaced once every exposure received before the stop has been rolled up."
+
+#: src/components/experiment-exposures.tsx
+msgid "Final check, taken <0/>, over every exposure received before the stop; it is never run again."
+msgstr "Final check, taken <0/>, over every exposure received before the stop; it is never run again."
+
+#: src/components/experiment-exposures.tsx
 msgid "Final check, taken at the stop on <0/>; it is never run again."
 msgstr "Final check, taken at the stop on <0/>; it is never run again."
 

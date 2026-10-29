@@ -390,33 +390,114 @@ func TestAcknowledgingAnAlertOfAnotherExperimentIsNotFound(t *testing.T) {
 	}
 }
 
-// The stop takes a final check in the environments its rule was held in, and
-// a stopped experiment is never checked again, though its late exposures are
-// still rolled up.
-func TestTheStopTakesAFinalCheckThatStays(t *testing.T) {
+// stopRemoved stops the experiment, removing its rules, and returns when.
+func (f *sampleRatioFixture) stopRemoved(t *testing.T) time.Time {
+	t.Helper()
+	return *f.stop(t, management.ExperimentStop{Outcome: "removed"}).StoppedAt
+}
+
+// A running experiment's results are final: nothing waits there.
+func TestARunningExperimentsSampleRatioIsFinal(t *testing.T) {
+	srv, c := startSampleRatioServer(t)
+	f := startSampleRatio(t, srv, c, 5000, 5000, 10000)
+	f.expose(t, "staging", map[string]int{"true": 5050, "false": 4950})
+	check(t, srv)
+	if srm := f.sampleRatio(t, "staging"); srm == nil || !srm.Final {
+		t.Errorf("sample_ratio = %+v, want final", srm)
+	}
+}
+
+// Exposures accepted before the stop but not rolled up yet enter the final
+// check: the stop takes its own at its time, not final, and the round of the
+// checks that finds the rollup past every exposure received by the stop takes
+// the final one, over exactly those exposures. Nothing replaces it, and an
+// exposure received after the stop is not counted, though the rollup read it
+// before the round.
+func TestTheFinalCheckCountsEveryExposureAcceptedBeforeTheStop(t *testing.T) {
+	srv, c := startSampleRatioServer(t)
+	f := startSampleRatio(t, srv, c, 5000, 5000, 10000)
+	f.expose(t, "staging", map[string]int{"true": 5200, "false": 4800})
+
+	c.Advance(time.Minute)
+	stoppedAt := f.stopRemoved(t)
+	atStop := f.sampleRatio(t, "staging")
+	if atStop == nil || atStop.Final || atStop.N != 0 || !atStop.CheckedAt.Equal(stoppedAt) ||
+		valueOf(atStop.SkippedReason) != management.SampleRatioSkippedReasonBelowMinimumSample {
+		t.Fatalf("at the stop = %+v, want the stop's check: not final, N 0 (nothing rolled up), at %s", atStop, stoppedAt)
+	}
+	if alerts := f.alerts(t, nil); len(alerts) != 0 {
+		t.Fatalf("alerts after the stop = %+v, want none", alerts)
+	}
+
+	// A round before the rollup has read the exposures leaves it pending.
+	c.Advance(10 * time.Minute)
+	if err := srv.Tick(t, worker.ExperimentChecksName); err != nil {
+		t.Fatalf("tick the checks: %v", err)
+	}
+	if still := f.sampleRatio(t, "staging"); still.Final || still.N != 0 || !still.CheckedAt.Equal(stoppedAt) {
+		t.Fatalf("after a round before the rollup = %+v, want the stop's check still pending", still)
+	}
+
+	// An exposure received after the stop is rolled up with the rest.
+	c.Advance(time.Minute)
+	f.expose(t, "staging", map[string]int{"false": 400})
+	c.Advance(10 * time.Minute)
+	roundAt := c.Now()
+	check(t, srv)
+	final := f.sampleRatio(t, "staging")
+	if final == nil || !final.Final || final.N != 10000 || valueOf(final.ChiSquare) != 16 || !final.Active || !final.CheckedAt.Equal(roundAt) {
+		t.Fatalf("final check = %+v, want final, N 10000, X² 16, the alert raised, at the round %s", final, roundAt)
+	}
+	if prod := f.sampleRatio(t, "production"); prod == nil || !prod.Final || prod.N != 0 ||
+		valueOf(prod.SkippedReason) != management.SampleRatioSkippedReasonBelowMinimumSample || !prod.CheckedAt.Equal(roundAt) {
+		t.Errorf("production's final check = %+v, want final, N 0 below the minimum, at the round", prod)
+	}
+	alerts := f.alerts(t, ptr(true))
+	if len(alerts) != 1 || alerts[0].Kind != "srm" || valueOf(alerts[0].Environment) != "staging" || !alerts[0].RaisedAt.Equal(roundAt) {
+		t.Errorf("active alerts = %+v, want the srm alert the final check raised", alerts)
+	}
+
+	// Nothing overwrites a final result.
+	c.Advance(10 * time.Minute)
+	f.expose(t, "staging", map[string]int{"false": 400})
+	check(t, srv)
+	after := f.sampleRatio(t, "staging")
+	if !after.Final || after.N != 10000 || !after.CheckedAt.Equal(roundAt) || !after.Active {
+		t.Errorf("after another round = %+v, want the final check unchanged", after)
+	}
+	if got := f.alerts(t, nil); len(got) != 1 {
+		t.Errorf("alerts after another round = %+v, want the one", got)
+	}
+}
+
+// With the rollup already past the stop, the next round makes the stop's check
+// final, and a stopped experiment's late exposures change nothing after it.
+func TestTheFinalCheckFollowsTheStopWhenTheRollupIsCurrent(t *testing.T) {
 	srv, c := startSampleRatioServer(t)
 	f := startSampleRatio(t, srv, c, 5000, 5000, 10000)
 	f.expose(t, "staging", map[string]int{"true": 5200, "false": 4800})
 	srv.TickRollup(t, worker.ExposureRollupName)
 
 	c.Advance(time.Minute)
-	stopped := do(f.p.admin.StopExperimentWithResponse(t.Context(), f.p.key, "checkout_test",
-		&management.StopExperimentParams{IfMatch: ptr(strconv.Quote(strconv.FormatInt(f.exp.Version, 10)))},
-		management.ExperimentStop{Outcome: "removed"}))
-	if stopped.JSON200 == nil {
-		t.Fatalf("stop = %d: %s", stopped.StatusCode(), stopped.Body)
+	stoppedAt := f.stopRemoved(t)
+	atStop := f.sampleRatio(t, "staging")
+	if atStop == nil || atStop.Final || atStop.N != 10000 || valueOf(atStop.ChiSquare) != 16 || !atStop.Active ||
+		!atStop.CheckedAt.Equal(stoppedAt) {
+		t.Fatalf("at the stop = %+v, want not final, N 10000, X² 16, the alert raised, at %s", atStop, stoppedAt)
 	}
-	stoppedAt := *stopped.JSON200.StoppedAt
+	if prod := f.sampleRatio(t, "production"); prod == nil || prod.Final || prod.N != 0 {
+		t.Errorf("production at the stop = %+v, want not final, N 0", prod)
+	}
+
+	c.Advance(10 * time.Minute)
+	roundAt := c.Now()
+	check(t, srv)
 	final := f.sampleRatio(t, "staging")
-	if final == nil || final.N != 10000 || valueOf(final.ChiSquare) != 16 || !final.Active || !final.CheckedAt.Equal(stoppedAt) {
-		t.Fatalf("final check = %+v, want N 10000, X² 16, the alert raised, at the stop %s", final, stoppedAt)
+	if final == nil || !final.Final || final.N != 10000 || !final.Active || !final.CheckedAt.Equal(roundAt) {
+		t.Fatalf("final check = %+v, want final, N 10000, the alert still active, at the round %s", final, roundAt)
 	}
-	if prod := f.sampleRatio(t, "production"); prod == nil || prod.N != 0 ||
-		valueOf(prod.SkippedReason) != management.SampleRatioSkippedReasonBelowMinimumSample {
-		t.Errorf("production's final check = %+v, want N 0 below the minimum", prod)
-	}
-	if alerts := f.alerts(t, ptr(true)); len(alerts) != 1 || !alerts[0].RaisedAt.Equal(stoppedAt) {
-		t.Errorf("active alerts = %+v, want the one the final check raised", alerts)
+	if prod := f.sampleRatio(t, "production"); prod == nil || !prod.Final {
+		t.Errorf("production's check = %+v, want final", prod)
 	}
 
 	// Balancing exposures arrive late and are rolled up, but nothing
@@ -425,8 +506,107 @@ func TestTheStopTakesAFinalCheckThatStays(t *testing.T) {
 	f.expose(t, "staging", map[string]int{"false": 400})
 	check(t, srv)
 	after := f.sampleRatio(t, "staging")
-	if after.N != 10000 || !after.CheckedAt.Equal(stoppedAt) || !after.Active {
-		t.Errorf("after a round past the stop = %+v, want the final check unchanged", after)
+	if !after.Final || after.N != 10000 || !after.CheckedAt.Equal(roundAt) || !after.Active {
+		t.Errorf("after a round past the final check = %+v, want it unchanged", after)
+	}
+}
+
+// The final check clears an alert the running checks raised on exposures that
+// had not yet balanced out, as a running check would.
+func TestTheFinalCheckClearsAnAlertTheRestOfTheExposuresAnswer(t *testing.T) {
+	srv, c := startSampleRatioServer(t)
+	f := startSampleRatio(t, srv, c, 5000, 5000, 10000)
+	f.expose(t, "staging", map[string]int{"true": 5200, "false": 4800})
+	check(t, srv)
+	if alerts := f.alerts(t, ptr(true)); len(alerts) != 1 {
+		t.Fatalf("active alerts = %+v, want the one the running check raised", alerts)
+	}
+
+	// 400 more of false, accepted before the stop and not rolled up: 5,200
+	// each way.
+	c.Advance(time.Minute)
+	f.expose(t, "staging", map[string]int{"false": 400})
+	c.Advance(time.Minute)
+	f.stopRemoved(t)
+	if atStop := f.sampleRatio(t, "staging"); atStop.Final || atStop.N != 10000 || !atStop.Active {
+		t.Fatalf("at the stop = %+v, want not final, N 10000 (the 400 not rolled up), the alert still active", atStop)
+	}
+
+	c.Advance(10 * time.Minute)
+	roundAt := c.Now()
+	check(t, srv)
+	final := f.sampleRatio(t, "staging")
+	if final == nil || !final.Final || final.N != 10400 || valueOf(final.ChiSquare) != 0 || final.Active || !final.CheckedAt.Equal(roundAt) {
+		t.Fatalf("final check = %+v, want final, N 10400, X² 0, no alert, at %s", final, roundAt)
+	}
+	cleared := f.alerts(t, ptr(false))
+	if len(cleared) != 1 || cleared[0].ClearedAt == nil || !cleared[0].ClearedAt.Equal(roundAt) {
+		t.Errorf("cleared alerts = %+v, want the one cleared by the final check at %s", cleared, roundAt)
+	}
+}
+
+// The final check waits a minute after the stop, so that an exposure received
+// by the stop and still being written is in.
+func TestTheFinalCheckWaitsAMinuteAfterTheStop(t *testing.T) {
+	srv, c := startSampleRatioServer(t)
+	f := startSampleRatio(t, srv, c, 5000, 5000, 10000)
+	f.expose(t, "staging", map[string]int{"true": 5200, "false": 4800})
+	srv.TickRollup(t, worker.ExposureRollupName)
+	c.Advance(time.Minute)
+	f.stopRemoved(t)
+
+	c.Advance(59 * time.Second)
+	check(t, srv)
+	if early := f.sampleRatio(t, "staging"); early.Final {
+		t.Fatalf("59 s after the stop = %+v, want the stop's check still pending", early)
+	}
+	c.Advance(time.Second)
+	roundAt := c.Now()
+	check(t, srv)
+	if final := f.sampleRatio(t, "staging"); !final.Final || !final.CheckedAt.Equal(roundAt) {
+		t.Errorf("a minute after the stop = %+v, want final at %s", final, roundAt)
+	}
+}
+
+// Raw exposures are kept for a window; an experiment that started before it
+// may have lost some, so its final check counts what the rollup holds
+// instead, late exposures included.
+func TestTheFinalCheckOfAnExperimentOlderThanTheRawWindowUsesTheRollup(t *testing.T) {
+	srv, c := startSampleRatioServer(t)
+	f := startSampleRatio(t, srv, c, 5000, 5000, 10000)
+	c.Advance(40 * 24 * time.Hour)
+	f.expose(t, "staging", map[string]int{"true": 5200, "false": 4800})
+	srv.TickRollup(t, worker.ExposureRollupName)
+	c.Advance(time.Minute)
+	f.stopRemoved(t)
+	c.Advance(time.Minute)
+	f.expose(t, "staging", map[string]int{"false": 400})
+
+	c.Advance(10 * time.Minute)
+	check(t, srv)
+	if final := f.sampleRatio(t, "staging"); !final.Final || final.N != 10400 {
+		t.Errorf("final check = %+v, want final over the rollup's 10400 first exposures", final)
+	}
+}
+
+// A stop followed by an archive before the rollup has caught up still gets
+// its final check.
+func TestTheFinalCheckIsTakenForAnArchivedExperiment(t *testing.T) {
+	srv, c := startSampleRatioServer(t)
+	f := startSampleRatio(t, srv, c, 5000, 5000, 10000)
+	f.expose(t, "staging", map[string]int{"true": 5200, "false": 4800})
+	c.Advance(time.Minute)
+	f.stopRemoved(t)
+	archived := do(f.p.admin.ArchiveExperimentWithResponse(t.Context(), f.p.key, "checkout_test",
+		&management.ArchiveExperimentParams{IfMatch: ptr(strconv.Quote(strconv.FormatInt(f.exp.Version, 10)))}))
+	if archived.JSON200 == nil {
+		t.Fatalf("archive = %d: %s", archived.StatusCode(), archived.Body)
+	}
+
+	c.Advance(10 * time.Minute)
+	check(t, srv)
+	if final := f.sampleRatio(t, "staging"); final == nil || !final.Final || final.N != 10000 || !final.Active {
+		t.Errorf("final check = %+v, want final, N 10000, the alert raised", final)
 	}
 }
 
