@@ -67,7 +67,12 @@ paths:
         before the password is checked, and is taken back when the password
         was right or could not be checked. Five consecutive failures lock the
         email, a hundred from one address in fifteen minutes throttle the
-        address; either is refused before the password is checked.
+        address; either is refused before the password is checked. An
+        address (an IPv6 one with the rest of its /64) the member signed in
+        from within thirty days is not refused by the email's lock: its
+        failures on the email are counted apart and lock it alone, after the
+        same five, so a stranger locking the email does not keep the member
+        out where they usually sign in.
       x-permission: public
       x-opens-session: true
       x-checks-password: true
@@ -286,9 +291,10 @@ paths:
         `invalid_credentials` with a violation at `/current_password` (not
         401: the caller is signed in and stays so) and counts as a failure
         of the caller's email and address like a wrong sign-in: the fifth
-        wrong attempt locks the email, and the attempts after it are refused
-        `locked`, so a session cannot be used to guess the password. Only a
-        session may do this.
+        wrong attempt locks the email, or, from an address the caller signed
+        in from within thirty days, the email from that address, and the
+        attempts after it are refused `locked`, so a session cannot be used
+        to guess the password. Only a session may do this.
       x-permission: member
       x-session-required: true
       x-checks-password: true
@@ -5813,7 +5819,9 @@ components:
     TooManyAttempts:
       description: |
         Refused before the password is checked: `locked` while the email is
-        locked by consecutive failures, `rate_limited` while the address is
+        locked by consecutive failures (from an address its member signed in
+        from within thirty days, by that address's own consecutive failures
+        on it), `rate_limited` while the address is
         throttled. `retry_after` and the `Retry-After` header give the
         seconds until the attempt can be made again.
       headers:

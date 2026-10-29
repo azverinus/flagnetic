@@ -4856,7 +4856,12 @@ type ClientInterface interface {
 	// before the password is checked, and is taken back when the password
 	// was right or could not be checked. Five consecutive failures lock the
 	// email, a hundred from one address in fifteen minutes throttle the
-	// address; either is refused before the password is checked.
+	// address; either is refused before the password is checked. An
+	// address (an IPv6 one with the rest of its /64) the member signed in
+	// from within thirty days is not refused by the email's lock: its
+	// failures on the email are counted apart and lock it alone, after the
+	// same five, so a stranger locking the email does not keep the member
+	// out where they usually sign in.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4875,7 +4880,12 @@ type ClientInterface interface {
 	// before the password is checked, and is taken back when the password
 	// was right or could not be checked. Five consecutive failures lock the
 	// email, a hundred from one address in fifteen minutes throttle the
-	// address; either is refused before the password is checked.
+	// address; either is refused before the password is checked. An
+	// address (an IPv6 one with the rest of its /64) the member signed in
+	// from within thirty days is not refused by the email's lock: its
+	// failures on the email are counted apart and lock it alone, after the
+	// same five, so a stranger locking the email does not keep the member
+	// out where they usually sign in.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4969,9 +4979,10 @@ type ClientInterface interface {
 	// `invalid_credentials` with a violation at `/current_password` (not
 	// 401: the caller is signed in and stays so) and counts as a failure
 	// of the caller's email and address like a wrong sign-in: the fifth
-	// wrong attempt locks the email, and the attempts after it are refused
-	// `locked`, so a session cannot be used to guess the password. Only a
-	// session may do this.
+	// wrong attempt locks the email, or, from an address the caller signed
+	// in from within thirty days, the email from that address, and the
+	// attempts after it are refused `locked`, so a session cannot be used
+	// to guess the password. Only a session may do this.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4990,9 +5001,10 @@ type ClientInterface interface {
 	// `invalid_credentials` with a violation at `/current_password` (not
 	// 401: the caller is signed in and stays so) and counts as a failure
 	// of the caller's email and address like a wrong sign-in: the fifth
-	// wrong attempt locks the email, and the attempts after it are refused
-	// `locked`, so a session cannot be used to guess the password. Only a
-	// session may do this.
+	// wrong attempt locks the email, or, from an address the caller signed
+	// in from within thirty days, the email from that address, and the
+	// attempts after it are refused `locked`, so a session cannot be used
+	// to guess the password. Only a session may do this.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -7467,7 +7479,12 @@ func (c *Client) GetAuthMethods(ctx context.Context, reqEditors ...RequestEditor
 // before the password is checked, and is taken back when the password
 // was right or could not be checked. Five consecutive failures lock the
 // email, a hundred from one address in fifteen minutes throttle the
-// address; either is refused before the password is checked.
+// address; either is refused before the password is checked. An
+// address (an IPv6 one with the rest of its /64) the member signed in
+// from within thirty days is not refused by the email's lock: its
+// failures on the email are counted apart and lock it alone, after the
+// same five, so a stranger locking the email does not keep the member
+// out where they usually sign in.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7496,7 +7513,12 @@ func (c *Client) SignInWithBody(ctx context.Context, contentType string, body io
 // before the password is checked, and is taken back when the password
 // was right or could not be checked. Five consecutive failures lock the
 // email, a hundred from one address in fifteen minutes throttle the
-// address; either is refused before the password is checked.
+// address; either is refused before the password is checked. An
+// address (an IPv6 one with the rest of its /64) the member signed in
+// from within thirty days is not refused by the email's lock: its
+// failures on the email are counted apart and lock it alone, after the
+// same five, so a stranger locking the email does not keep the member
+// out where they usually sign in.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7670,9 +7692,10 @@ func (c *Client) UpdateMe(ctx context.Context, body UpdateMeJSONRequestBody, req
 // `invalid_credentials` with a violation at `/current_password` (not
 // 401: the caller is signed in and stays so) and counts as a failure
 // of the caller's email and address like a wrong sign-in: the fifth
-// wrong attempt locks the email, and the attempts after it are refused
-// `locked`, so a session cannot be used to guess the password. Only a
-// session may do this.
+// wrong attempt locks the email, or, from an address the caller signed
+// in from within thirty days, the email from that address, and the
+// attempts after it are refused `locked`, so a session cannot be used
+// to guess the password. Only a session may do this.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7701,9 +7724,10 @@ func (c *Client) ChangeMyPasswordWithBody(ctx context.Context, contentType strin
 // `invalid_credentials` with a violation at `/current_password` (not
 // 401: the caller is signed in and stays so) and counts as a failure
 // of the caller's email and address like a wrong sign-in: the fifth
-// wrong attempt locks the email, and the attempts after it are refused
-// `locked`, so a session cannot be used to guess the password. Only a
-// session may do this.
+// wrong attempt locks the email, or, from an address the caller signed
+// in from within thirty days, the email from that address, and the
+// attempts after it are refused `locked`, so a session cannot be used
+// to guess the password. Only a session may do this.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -20412,7 +20436,12 @@ type ClientWithResponsesInterface interface {
 	// before the password is checked, and is taken back when the password
 	// was right or could not be checked. Five consecutive failures lock the
 	// email, a hundred from one address in fifteen minutes throttle the
-	// address; either is refused before the password is checked.
+	// address; either is refused before the password is checked. An
+	// address (an IPv6 one with the rest of its /64) the member signed in
+	// from within thirty days is not refused by the email's lock: its
+	// failures on the email are counted apart and lock it alone, after the
+	// same five, so a stranger locking the email does not keep the member
+	// out where they usually sign in.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -20431,7 +20460,12 @@ type ClientWithResponsesInterface interface {
 	// before the password is checked, and is taken back when the password
 	// was right or could not be checked. Five consecutive failures lock the
 	// email, a hundred from one address in fifteen minutes throttle the
-	// address; either is refused before the password is checked.
+	// address; either is refused before the password is checked. An
+	// address (an IPv6 one with the rest of its /64) the member signed in
+	// from within thirty days is not refused by the email's lock: its
+	// failures on the email are counted apart and lock it alone, after the
+	// same five, so a stranger locking the email does not keep the member
+	// out where they usually sign in.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -20531,9 +20565,10 @@ type ClientWithResponsesInterface interface {
 	// `invalid_credentials` with a violation at `/current_password` (not
 	// 401: the caller is signed in and stays so) and counts as a failure
 	// of the caller's email and address like a wrong sign-in: the fifth
-	// wrong attempt locks the email, and the attempts after it are refused
-	// `locked`, so a session cannot be used to guess the password. Only a
-	// session may do this.
+	// wrong attempt locks the email, or, from an address the caller signed
+	// in from within thirty days, the email from that address, and the
+	// attempts after it are refused `locked`, so a session cannot be used
+	// to guess the password. Only a session may do this.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -20552,9 +20587,10 @@ type ClientWithResponsesInterface interface {
 	// `invalid_credentials` with a violation at `/current_password` (not
 	// 401: the caller is signed in and stays so) and counts as a failure
 	// of the caller's email and address like a wrong sign-in: the fifth
-	// wrong attempt locks the email, and the attempts after it are refused
-	// `locked`, so a session cannot be used to guess the password. Only a
-	// session may do this.
+	// wrong attempt locks the email, or, from an address the caller signed
+	// in from within thirty days, the email from that address, and the
+	// attempts after it are refused `locked`, so a session cannot be used
+	// to guess the password. Only a session may do this.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35602,7 +35638,12 @@ func (c *ClientWithResponses) GetAuthMethodsWithResponse(ctx context.Context, re
 // before the password is checked, and is taken back when the password
 // was right or could not be checked. Five consecutive failures lock the
 // email, a hundred from one address in fifteen minutes throttle the
-// address; either is refused before the password is checked.
+// address; either is refused before the password is checked. An
+// address (an IPv6 one with the rest of its /64) the member signed in
+// from within thirty days is not refused by the email's lock: its
+// failures on the email are counted apart and lock it alone, after the
+// same five, so a stranger locking the email does not keep the member
+// out where they usually sign in.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -35627,7 +35668,12 @@ func (c *ClientWithResponses) SignInWithBodyWithResponse(ctx context.Context, co
 // before the password is checked, and is taken back when the password
 // was right or could not be checked. Five consecutive failures lock the
 // email, a hundred from one address in fifteen minutes throttle the
-// address; either is refused before the password is checked.
+// address; either is refused before the password is checked. An
+// address (an IPv6 one with the rest of its /64) the member signed in
+// from within thirty days is not refused by the email's lock: its
+// failures on the email are counted apart and lock it alone, after the
+// same five, so a stranger locking the email does not keep the member
+// out where they usually sign in.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -35775,9 +35821,10 @@ func (c *ClientWithResponses) UpdateMeWithResponse(ctx context.Context, body Upd
 // `invalid_credentials` with a violation at `/current_password` (not
 // 401: the caller is signed in and stays so) and counts as a failure
 // of the caller's email and address like a wrong sign-in: the fifth
-// wrong attempt locks the email, and the attempts after it are refused
-// `locked`, so a session cannot be used to guess the password. Only a
-// session may do this.
+// wrong attempt locks the email, or, from an address the caller signed
+// in from within thirty days, the email from that address, and the
+// attempts after it are refused `locked`, so a session cannot be used
+// to guess the password. Only a session may do this.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -35802,9 +35849,10 @@ func (c *ClientWithResponses) ChangeMyPasswordWithBodyWithResponse(ctx context.C
 // `invalid_credentials` with a violation at `/current_password` (not
 // 401: the caller is signed in and stays so) and counts as a failure
 // of the caller's email and address like a wrong sign-in: the fifth
-// wrong attempt locks the email, and the attempts after it are refused
-// `locked`, so a session cannot be used to guess the password. Only a
-// session may do this.
+// wrong attempt locks the email, or, from an address the caller signed
+// in from within thirty days, the email from that address, and the
+// attempts after it are refused `locked`, so a session cannot be used
+// to guess the password. Only a session may do this.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

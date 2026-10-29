@@ -2939,7 +2939,9 @@ export type SignInErrors = {
   415: Problem;
   /**
    * Refused before the password is checked: `locked` while the email is
-   * locked by consecutive failures, `rate_limited` while the address is
+   * locked by consecutive failures (from an address its member signed in
+   * from within thirty days, by that address's own consecutive failures
+   * on it), `rate_limited` while the address is
    * throttled. `retry_after` and the `Retry-After` header give the
    * seconds until the attempt can be made again.
    *
@@ -3123,7 +3125,9 @@ export type AcceptInvitationErrors = {
   422: Problem;
   /**
    * Refused before the password is checked: `locked` while the email is
-   * locked by consecutive failures, `rate_limited` while the address is
+   * locked by consecutive failures (from an address its member signed in
+   * from within thirty days, by that address's own consecutive failures
+   * on it), `rate_limited` while the address is
    * throttled. `retry_after` and the `Retry-After` header give the
    * seconds until the attempt can be made again.
    *
@@ -3280,7 +3284,9 @@ export type ChangeMyPasswordErrors = {
   422: Problem;
   /**
    * Refused before the password is checked: `locked` while the email is
-   * locked by consecutive failures, `rate_limited` while the address is
+   * locked by consecutive failures (from an address its member signed in
+   * from within thirty days, by that address's own consecutive failures
+   * on it), `rate_limited` while the address is
    * throttled. `retry_after` and the `Retry-After` header give the
    * seconds until the attempt can be made again.
    *
