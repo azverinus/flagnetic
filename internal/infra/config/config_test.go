@@ -298,8 +298,7 @@ func TestRateLimitsDefaultToTheirDocumentedValuesAndOffSwitchesOneOff(t *testing
 		t.Fatal(err)
 	}
 	want := config.RateLimits{
-		ClientEvaluate: 120, ClientEvents: 60, ClientStreamConnects: 30, ClientConcurrentStreams: 10,
-		ClientStreamsPerReplica: 10000,
+		ClientEvaluate: 120, ClientEvents: 60, ClientStreamConnects: 30, ClientConcurrentStreams: 10, ClientStreamsPerReplica: 10000,
 		ServerRuleset: 600, ServerEvaluate: 6000, ServerEvents: 600, ServerConcurrentStreams: 1000,
 		FailedAuthentications: 30,
 	}
