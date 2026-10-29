@@ -2,7 +2,7 @@
 
 Flagnetic is one binary, `flagnetic`, with the web console built in, and PostgreSQL is the only thing it needs. This guide installs it with Docker Compose or as a binary, puts it behind TLS and a reverse proxy, sizes its PostgreSQL connections and upgrades it. [Operations](operations.md) covers running it once it is up, and the [configuration reference](configuration.md) lists every setting.
 
-Flagnetic 0.1 is a developer preview: try it, build against it, and do not run it where an outage would hurt. See [what 0.1 promises](sdks/compatibility.md#what-01-promises) before you rely on it.
+Flagnetic 0.2 is a developer preview: try it, build against it, and do not run it where an outage would hurt. See [what 0.x promises](sdks/compatibility.md#what-0x-promises) before you rely on it.
 
 ## What you need
 
@@ -25,7 +25,7 @@ docker compose up -d
 Compose reads the secret key from `.env` and refuses to start without it. The server image is `ghcr.io/azverinus/flagnetic`, for `linux/amd64` and `linux/arm64`, with build provenance and an SBOM. The compose file pulls `latest`; to pin a release, add it to `.env` before `docker compose up -d`:
 
 ```bash
-echo "FLAGNETIC_VERSION=0.1.0" >> .env
+echo "FLAGNETIC_VERSION=0.2.0" >> .env
 ```
 
 `docker compose build` builds the image from your checkout instead.
@@ -53,7 +53,7 @@ docker compose exec -T postgres pg_dump -U flagnetic flagnetic > flagnetic.sql
 From the release image, for Linux (add `--platform linux/arm64` to `docker create` for ARM):
 
 ```bash
-docker create --name flagnetic-binary ghcr.io/azverinus/flagnetic:0.1.0
+docker create --name flagnetic-binary ghcr.io/azverinus/flagnetic:0.2.0
 docker cp flagnetic-binary:/usr/local/bin/flagnetic ./flagnetic
 docker rm flagnetic-binary
 ```
@@ -61,7 +61,7 @@ docker rm flagnetic-binary
 Or built from source, for any platform Go supports, with Go, Node.js, pnpm and [Task](https://taskfile.dev):
 
 ```bash
-git clone --branch v0.1.0 https://github.com/azverinus/flagnetic.git
+git clone --branch v0.2.0 https://github.com/azverinus/flagnetic.git
 cd flagnetic
 task build        # the console, then bin/flagnetic embedding it
 ```
@@ -224,10 +224,10 @@ Both are on the public listener. A load balancer routes only to ready replicas; 
 Read the release notes of every version between yours and the new one: a change that needs you to act is marked there.
 
 1. **Back up the database.** A backup taken before the upgrade is the way back if anything goes wrong.
-2. **Stop every replica.** In this developer preview, upgrade all replicas together and accept a brief downtime: 0.1 does not promise that two versions serve side by side.
+2. **Stop every replica.** In this developer preview, upgrade all replicas together and accept a brief downtime: 0.x does not promise that two versions serve side by side.
 3. **Migrate.** Run `flagnetic migrate` with the new version, as a job. Or leave `FLAGNETIC_AUTO_MIGRATE` on: the first new replica migrates, and replicas starting together take turns. With Compose, set the new `FLAGNETIC_VERSION` in `.env` and run `docker compose pull && docker compose up -d`: the `migrate` job runs again before the new server starts.
 4. **Start the new replicas.**
 
-From 0.1.0 on, migrations only move forward, without data loss: a migration is never edited once released, and there are no down migrations. 0.1 does not promise that an older version keeps working against a database a newer one migrated: to go back, restore the backup taken before the upgrade and deploy the previous version. A replica never runs against a schema older than its own: with auto-migration off it refuses to start until `flagnetic migrate` has run (see [Migrations](operations.md#migrations)).
+From 0.1.0 on, migrations only move forward, without data loss: a migration is never edited once released, and there are no down migrations. 0.x does not promise that an older version keeps working against a database a newer one migrated: to go back, restore the backup taken before the upgrade and deploy the previous version. A replica never runs against a schema older than its own: with auto-migration off it refuses to start until `flagnetic migrate` has run (see [Migrations](operations.md#migrations)).
 
 The SDK API (`/sdk/v1`) and the ruleset format only grow, so SDKs keep working across server upgrades without being upgraded themselves. The management API (`/api/v1`) and the console may still change incompatibly between 0.x releases, each such change marked as breaking in the release notes; scripts using the management API should be checked against them.

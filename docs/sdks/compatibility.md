@@ -4,23 +4,23 @@ Which server an SDK build can talk to, and what an SDK version promises. A build
 
 Every SDK is in its 0.x line: until 1.0.0 a minor release may still change the SDK's own API, while the protocol between an SDK and the server only grows.
 
-## What 0.1 promises
+## What 0.x promises
 
-Flagnetic 0.1.0 is the first release, a developer preview. From it on:
+Flagnetic is a developer preview. From 0.1.0, its first release, on:
 
 - **The SDK API and the ruleset format only grow.** `/sdk/v1`, its headers, answers and problem codes, and the ruleset document change only additively, under the degradation rules below, so an SDK released with 0.1 keeps working with every later 0.x and 1.x server. Anything an older SDK could not read is served only to an SDK that asks for it, as a new `schema_version` or under a new SDK API path beside `/sdk/v1`.
-- **Upgrades only migrate forward, without data loss.** Migrations are never edited once released and there are no down migrations; upgrading a server keeps every flag, segment, key and audit entry. Take a database backup before an upgrade and upgrade all replicas together; 0.1 does not promise that an older version runs against a database a newer one migrated, nor that two versions serve side by side (see [Upgrades](../install.md#upgrades)).
+- **Upgrades only migrate forward, without data loss.** Migrations are never edited once released and there are no down migrations; upgrading a server keeps every flag, segment, key and audit entry. Take a database backup before an upgrade and upgrade all replicas together; 0.x does not promise that an older version runs against a database a newer one migrated, nor that two versions serve side by side (see [Upgrades](../install.md#upgrades)).
 - **The management API and the console may still change.** `/api/v1` and the console may change incompatibly in a 0.x minor release; every such change is marked as breaking in the release notes.
 
-What 0.1 does not have yet: experiments (every exposure an SDK posts is rejected `unknown_experiment` until they exist), governance beyond roles and the audit log: protected environments, change requests, scheduled changes and webhooks (`environment.protected` is `false` everywhere, so local overrides work in every environment) and single sign-on. It needs PostgreSQL 16 or later.
+Single sign-on is not there yet. The server needs PostgreSQL 16 or later.
 
 ### Experiments
 
-0.1 rejects every exposure `unknown_experiment`, since it has no experiments. A server with experiments accepts an exposure of an experiment the project has, in any status, and rejects the others per event with `unknown_experiment`, `unit_type_mismatch`, `unknown_variation` or `event_invalid` (see [Events](events.md#the-batch-and-each-event)); the batch is answered `202` either way, so an SDK built against 0.1 sends exposures unchanged and needs no upgrade. Its ruleset carries a running experiment's rules, which the SDKs already evaluate: the experiment scenarios of the [behaviour matrix](behaviour-matrix.md) prove it for each.
+A 0.1 server has no experiments and rejects every exposure `unknown_experiment`. A server from 0.2 on accepts an exposure of an experiment the project has, in any status, and rejects the others per event with `unknown_experiment`, `unit_type_mismatch`, `unknown_variation` or `event_invalid` (see [Events](events.md#the-batch-and-each-event)); the batch is answered `202` either way, so an SDK built against 0.1 sends exposures unchanged and needs no upgrade. Its ruleset carries a running experiment's rules, which the SDKs already evaluate: the experiment scenarios of the [behaviour matrix](behaviour-matrix.md) prove it for each.
 
 ### Protected environments
 
-0.1 serves `environment.protected` as `false` in every ruleset and evaluate answer, so local overrides work everywhere. A server with protected environments serves the real value: an environment an owner protects, and the production environment of every project created on that server, answer `true`, and a server SDK ignores local overrides there, as it always promised. Environments that existed before the upgrade stay unprotected until an owner protects them, so an upgrade alone changes nothing an SDK does. Protecting or unprotecting an environment moves its ruleset version, so SDKs pick the change up like any other. A test that sets local overrides against a protected environment should use an unprotected one, such as development, or the SDK's test client.
+A 0.1 server serves `environment.protected` as `false` in every ruleset and evaluate answer, so local overrides work everywhere. A server from 0.2 on serves the real value: an environment an owner protects, and the production environment of every project created on that server, answer `true`, and a server SDK ignores local overrides there, as it always promised. Environments that existed before the upgrade stay unprotected until an owner protects them, so an upgrade alone changes nothing an SDK does. Protecting or unprotecting an environment moves its ruleset version, so SDKs pick the change up like any other. A test that sets local overrides against a protected environment should use an unprotected one, such as development, or the SDK's test client.
 
 ## Compatibility table
 
