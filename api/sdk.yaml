@@ -57,8 +57,9 @@ info:
     windows counted by each replica (a client key per key and client IP).
     A limited answer carries `RateLimit-Limit` and `RateLimit-Remaining`; a
     refusal is `429 rate_limited` with `Retry-After` and `RateLimit-Reset` in
-    whole seconds and the problem's `retry_after`. Failed authentications
-    are limited per client IP before any key is looked up.
+    whole seconds and the problem's `retry_after`. Malformed and unknown
+    keys are limited per client IP: past the limit, a key the replica does
+    not hold already is refused before it is looked up.
 
     **Bodies.** A request body may be gzip (`Content-Encoding: gzip`); every
     size limit counts the body after decompression. A body over its limit

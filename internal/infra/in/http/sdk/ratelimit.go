@@ -160,7 +160,7 @@ func (l *limiter) guessing(w http.ResponseWriter, ep endpoint, ip netip.Addr) er
 	return l.refuse(w, ep, noKeyKind, limit, reset)
 }
 
-// failed counts a key refused for a request from ip.
+// failed counts a malformed or unknown key presented in a request from ip.
 func (l *limiter) failed(ip netip.Addr) {
 	if l.limits.FailedAuthentications == 0 {
 		return

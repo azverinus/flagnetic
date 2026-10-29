@@ -61,6 +61,16 @@ func (c *SDKKeyCache) SDKKeyByHash(ctx context.Context, hash delivery.SDKKeyHash
 	return k, nil
 }
 
+// HeldSDKKeyByHash returns the key whose value hashes to hash when the cache
+// holds it, without reading PostgreSQL. It holds nothing while its listener
+// is down, and never a hash that names no key.
+func (c *SDKKeyCache) HeldSDKKeyByHash(hash delivery.SDKKeyHash) (delivery.SDKKey, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	k, ok := c.byHash[hash]
+	return k, ok
+}
+
 // Listening is told when the listener starts or stops listening: either way
 // a notification may have been missed, so everything held is dropped.
 func (c *SDKKeyCache) Listening(up bool) {
