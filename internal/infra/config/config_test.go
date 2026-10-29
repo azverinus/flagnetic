@@ -299,6 +299,7 @@ func TestRateLimitsDefaultToTheirDocumentedValuesAndOffSwitchesOneOff(t *testing
 	}
 	want := config.RateLimits{
 		ClientEvaluate: 120, ClientEvents: 60, ClientStreamConnects: 30, ClientConcurrentStreams: 10,
+		ClientStreamsPerReplica: 10000,
 		ServerRuleset: 600, ServerEvaluate: 6000, ServerEvents: 600, ServerConcurrentStreams: 1000,
 		FailedAuthentications: 30,
 	}
@@ -318,6 +319,15 @@ func TestRateLimitsDefaultToTheirDocumentedValuesAndOffSwitchesOneOff(t *testing
 	if cfg.RateLimits.ClientEvaluate != 0 || cfg.RateLimits.ServerRuleset != 1200 || cfg.RateLimits.FailedAuthentications != 0 ||
 		cfg.RateLimits.ClientEvents != 60 {
 		t.Errorf("RateLimits = %+v, want client evaluate and failed authentications off, server ruleset 1200", cfg.RateLimits)
+	}
+
+	for value, want := range map[string]int{"off": 0, "250": 250} {
+		cfg, err = config.Load(env(map[string]string{
+			"DATABASE_URL": "postgres://localhost/flagnetic", "FLAGNETIC_RATE_LIMIT_CLIENT_STREAMS_PER_REPLICA": value,
+		}))
+		if err != nil || cfg.RateLimits.ClientStreamsPerReplica != want {
+			t.Errorf("FLAGNETIC_RATE_LIMIT_CLIENT_STREAMS_PER_REPLICA=%s: %d, %v; want %d", value, cfg.RateLimits.ClientStreamsPerReplica, err, want)
+		}
 	}
 }
 
