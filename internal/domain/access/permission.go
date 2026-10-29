@@ -105,8 +105,8 @@ const (
 	// webhook subscriptions. Reading them needs it too: a subscription
 	// says where a project's changes are sent.
 	PermWebhookManage Permission = "webhook.manage"
-	// PermSinkManage creates, reads, edits, enables and deletes a project's
-	// sinks and acts on their recovery. Reading them needs it too: a sink's
+	// PermSinkManage creates, reads, edits and deletes a project's sinks and
+	// rotates a webhook sink's secret. Reading them needs it too: a sink's
 	// configuration names internal hosts, buckets and URLs that carry
 	// tokens, which everyone who can read the project may not see.
 	PermSinkManage Permission = "sink.manage"

@@ -329,7 +329,7 @@ var (
 		"a sink's kind never changes; create a sink of the other kind instead")
 	errUseEnable = apperrors.Invalid("invalid_sink", "the sink is not valid", apperrors.Violation{
 		Pointer: "/enabled", Code: "use_enable",
-		Detail: "a sink is enabled with POST .../enable, which checks its target first; an edit only disables",
+		Detail: "a sink is enabled by an operation of its own, which checks its target first; an edit only disables",
 	})
 )
 
