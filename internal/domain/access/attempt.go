@@ -6,6 +6,7 @@ import (
 	"time"
 
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
+	"github.com/azverinus/flagnetic/internal/shared/subnet"
 )
 
 // The lockout of an email: from the fifth consecutive failure on, each
@@ -90,17 +91,7 @@ func AttemptCutoffs(now time.Time) FailureCutoffs {
 // an IPv4 address alone, an IPv6 address with the rest of its /64, which one
 // subscriber usually holds whole. Without an address, the source is the
 // unspecified one.
-func SourceOf(ip netip.Addr) netip.Prefix {
-	ip = ip.Unmap()
-	switch {
-	case !ip.IsValid():
-		return netip.PrefixFrom(netip.IPv4Unspecified(), 32)
-	case ip.Is4():
-		return netip.PrefixFrom(ip, 32)
-	}
-	p, _ := ip.WithZone("").Prefix(64)
-	return p
-}
+func SourceOf(ip netip.Addr) netip.Prefix { return subnet.Of(ip) }
 
 // Attempt is one attempt at a password, counted under its email and its
 // source.

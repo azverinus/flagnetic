@@ -190,7 +190,7 @@ Nothing short of contexts a client cannot choose closes the first, so do not use
 
 ## Rate limits on the SDK API
 
-Every operation of the SDK API (`/sdk/v1`) is limited per SDK key, so one misbehaving app cannot exhaust a replica. A client key ships in many apps at once, so its requests are counted per key and client IP; a server key's per key, whatever the IP. Requests are counted in fixed one-minute windows, each starting with the first request counted, and streams by how many a key holds open at once:
+Every operation of the SDK API (`/sdk/v1`) is limited per SDK key, so one misbehaving app cannot exhaust a replica. A client key ships in many apps at once, so its requests are counted per key and client IP; a server key's per key, whatever the IP. A client IP is an IPv4 address, or an IPv6 address together with the rest of its /64, which one subscriber usually holds whole and could otherwise rotate through to escape every limit. Requests are counted in fixed one-minute windows, each starting with the first request counted, and streams by how many a key holds open at once, and the streams of all client keys together by how many the replica holds:
 
 | Setting | Default | Limit |
 |---|---|---|
@@ -198,11 +198,14 @@ Every operation of the SDK API (`/sdk/v1`) is limited per SDK key, so one misbeh
 | `FLAGNETIC_RATE_LIMIT_CLIENT_EVENTS` | `60` | Event batches per minute of a client key and IP. |
 | `FLAGNETIC_RATE_LIMIT_CLIENT_STREAM_CONNECTS` | `30` | Streams opened per minute by a client key and IP. |
 | `FLAGNETIC_RATE_LIMIT_CLIENT_CONCURRENT_STREAMS` | `10` | Streams a client key and IP hold open at once. |
+| `FLAGNETIC_RATE_LIMIT_CLIENT_STREAMS_PER_REPLICA` | `10000` | Streams all client keys together hold open on the replica at once, whatever their keys and IPs. |
 | `FLAGNETIC_RATE_LIMIT_SERVER_RULESET` | `600` | Ruleset downloads per minute of a server key. |
 | `FLAGNETIC_RATE_LIMIT_SERVER_EVALUATE` | `6000` | Remote evaluations per minute of a server key. |
 | `FLAGNETIC_RATE_LIMIT_SERVER_EVENTS` | `600` | Event batches per minute of a server key. |
 | `FLAGNETIC_RATE_LIMIT_SERVER_CONCURRENT_STREAMS` | `1000` | Streams a server key holds open at once; its stream connects are not limited per minute. |
 | `FLAGNETIC_RATE_LIMIT_FAILED_AUTHENTICATIONS` | `30` | Malformed or unknown keys per minute from one client IP. |
+
+A client key is public, so anyone can open streams with it from many addresses; the per-replica limit on client streams bounds the connections, and the memory and goroutines they hold, that all of them together can tie up on one replica. Server keys' streams are not counted in it. Once the replica holds that many client streams, a new one is refused `429 rate_limited` with `Retry-After` until one ends.
 
 The failed authentications are checked before a key is looked up: once an IP presented 30 keys in a minute that were malformed or unknown, an SDK API request from it is refused until the window ends, which makes guessing keys slow and cheap to refuse. A key the replica already holds, from an earlier lookup of any client's, is still accepted from that IP, so a few clients sending junk keys through a shared NAT or proxy do not lock out the valid keys behind it; any other key is refused without a lookup. A revoked or expired key, and a request that carries no key, are not counted.
 
@@ -219,9 +222,9 @@ The client-key limits count each key and client IP together, which assumes that 
 - **Evaluations.** Each change of the environment makes every open app evaluate once, at about the same moment: past 120 open apps behind one address, the rest are refused until the minute ends (`FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE`), and so are their evaluations on start.
 - **Failed authentications.** Only malformed and unknown keys count against an address, so an app still shipping a revoked or expired key is refused without blocking anyone. Past 30 in a minute, a key the replica does not already hold is refused from that address until the minute ends, while the keys it holds keep working (`FLAGNETIC_RATE_LIMIT_FAILED_AUTHENTICATIONS`). A replica holds a key once it has looked it up and while its listener for key changes is up, so right after a replica starts, or while it cannot listen, a valid key may be refused from such an address too.
 
-A refused request is answered `429 rate_limited` with `Retry-After`, and an SDK keeps the values it holds and asks again once that time has passed, so a limit that is too low delays changes rather than breaking apps. Over IPv6, each device usually has an address of its own and is counted alone.
+A refused request is answered `429 rate_limited` with `Retry-After`, and an SDK keeps the values it holds and asks again once that time has passed, so a limit that is too low delays changes rather than breaking apps. Over IPv6 there is rarely a shared address: a client is counted by its /64, usually one phone or the devices of one home network.
 
-For mobile apps, and web apps used from large offices, raise the client-key limits to the number of app instances you expect behind one address on one replica (a load balancer spreads them over the replicas, but after a deploy one replica may hold most of them), with headroom for evaluations: for example, for up to 1,000 apps behind one address, `FLAGNETIC_RATE_LIMIT_CLIENT_CONCURRENT_STREAMS=1000`, `FLAGNETIC_RATE_LIMIT_CLIENT_STREAM_CONNECTS=1000` and `FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE=2000`. `off` switches a limit off; the failed-authentication limit still keeps guessing keys slow. Watch `flagnetic_sdk_rate_limited_total{kind="client"}` to see whether your limits refuse real apps.
+For mobile apps, and web apps used from large offices, raise the client-key limits to the number of app instances you expect behind one address on one replica (a load balancer spreads them over the replicas, but after a deploy one replica may hold most of them), with headroom for evaluations: for example, for up to 1,000 apps behind one address, `FLAGNETIC_RATE_LIMIT_CLIENT_CONCURRENT_STREAMS=1000`, `FLAGNETIC_RATE_LIMIT_CLIENT_STREAM_CONNECTS=1000` and `FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE=2000`. If one replica may hold more than 10,000 open apps in all, raise `FLAGNETIC_RATE_LIMIT_CLIENT_STREAMS_PER_REPLICA` too, within the file descriptors the replica may open. `off` switches a limit off; the failed-authentication limit still keeps guessing keys slow. Watch `flagnetic_sdk_rate_limited_total{kind="client"}` to see whether your limits refuse real apps.
 
 ## Raw events
 

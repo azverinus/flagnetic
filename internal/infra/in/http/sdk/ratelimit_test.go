@@ -1,6 +1,7 @@
 package sdk_test
 
 import (
+	"bytes"
 	"net/http"
 	"net/netip"
 	"strconv"
@@ -334,4 +335,99 @@ func TestAnAddressRefusedForGuessingStillReachesTheAPIWithAKeyTheReplicaHolds(t 
 	// valid or not: looking it up is what guessing would cost.
 	res = ruleset(t, srv, unseen, fromIP("198.51.100.7"))
 	rateLimited(t, "a key the replica does not hold, from the guessing address", res.StatusCode(), res.HTTPResponse.Header, res.Body, 30)
+}
+
+// postEventsFrom posts an empty batch with the client key value from ip.
+func postEventsFrom(t *testing.T, srv *testkit.Server, value, ip string) *sdk.PostEventsResponse {
+	t.Helper()
+	return do(client(t, srv).PostEventsWithBodyWithResponse(t.Context(), &sdk.PostEventsParams{}, "application/json",
+		bytes.NewReader(batch()), bearer(value), fromIP(ip)))
+}
+
+func TestAClientKeysLimitsCountAnIPv6ClientByItsWhole64(t *testing.T) {
+	srv := testkit.StartServer(t, behindAProxy(), limits(func(l *config.RateLimits) {
+		l.ClientEvents, l.ClientConcurrentStreams = 1, 1
+	}))
+	p := newProject(t, srv)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindClient)
+	params := &sdk.StreamRulesetParams{SdkKey: &value}
+
+	if res := postEventsFrom(t, srv, value, "2001:db8:1:2::1"); res.StatusCode() != http.StatusAccepted {
+		t.Fatalf("the first batch = %d: %s", res.StatusCode(), res.Body)
+	}
+	res := postEventsFrom(t, srv, value, "2001:db8:1:2:ffff::9")
+	rateLimited(t, "a batch from another address of the same /64", res.StatusCode(), res.HTTPResponse.Header, res.Body, 1)
+	if res := postEventsFrom(t, srv, value, "2001:db8:1:3::1"); res.StatusCode() != http.StatusAccepted {
+		t.Errorf("a batch from another /64 = %d, want its own budget", res.StatusCode())
+	}
+
+	openStream(t, srv, params, fromIP("2001:db8:1:2::1")).started(t)
+	s := do(client(t, srv).StreamRulesetWithResponse(t.Context(), params, fromIP("2001:db8:1:2::abcd")))
+	rateLimited(t, "a stream from another address of the same /64", s.StatusCode(), s.HTTPResponse.Header, s.Body, 1)
+	openStream(t, srv, params, fromIP("2001:db8:1:3::1")).started(t)
+}
+
+func TestRefusedKeysFromOneIPv6_64AreCountedTogether(t *testing.T) {
+	srv := testkit.StartServer(t, behindAProxy(), limits(func(l *config.RateLimits) { l.FailedAuthentications = 2 }))
+	p := newProject(t, srv)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	guessed := "fn_srv_" + strings.Repeat("x", 40)
+
+	for _, ip := range []string{"2001:db8:5:6::1", "2001:db8:5:6::2"} {
+		res := ruleset(t, srv, guessed, fromIP(ip))
+		refused(t, "a guess from "+ip, res.StatusCode(), res.Body, http.StatusUnauthorized, "sdk_key_invalid")
+	}
+	res := ruleset(t, srv, guessed, fromIP("2001:db8:5:6::3"))
+	rateLimited(t, "a third guess from the same /64", res.StatusCode(), res.HTTPResponse.Header, res.Body, 2)
+	if res := ruleset(t, srv, value, fromIP("2001:db8:5:7::1")); res.StatusCode() != http.StatusOK {
+		t.Errorf("another /64 = %d, want 200", res.StatusCode())
+	}
+}
+
+func TestAReplicaHoldsAtMostItsClientStreamsWhateverTheirKeysAndIPs(t *testing.T) {
+	srv := testkit.StartServer(t, behindAProxy(), limits(func(l *config.RateLimits) {
+		l.ClientStreamsPerReplica, l.ClientConcurrentStreams = 2, 0
+	}))
+	p := newProject(t, srv)
+	_, one := p.sdkKey(t, "production", management.SdkKeyKindClient)
+	_, two := p.sdkKey(t, "production", management.SdkKeyKindClient)
+	_, serverKey := p.sdkKey(t, "production", management.SdkKeyKindServer)
+
+	first := openStream(t, srv, &sdk.StreamRulesetParams{SdkKey: &one}, fromIP("192.0.2.1"))
+	first.started(t)
+	openStream(t, srv, &sdk.StreamRulesetParams{SdkKey: &two}, fromIP("192.0.2.2")).started(t)
+	res := do(client(t, srv).StreamRulesetWithResponse(t.Context(), &sdk.StreamRulesetParams{SdkKey: &one}, fromIP("192.0.2.3")))
+	rateLimited(t, "a third client stream on the replica", res.StatusCode(), res.HTTPResponse.Header, res.Body, 2)
+	if got := testkit.Metric(t, srv.Scrape(t), `flagnetic_sdk_rate_limited_total{endpoint="stream",kind="client"}`); got != 1 {
+		t.Errorf("client stream refusals counted = %v, want 1", got)
+	}
+	// A server key's streams are bounded by their own limit alone.
+	openStream(t, srv, nil, bearer(serverKey), fromIP("192.0.2.4")).started(t)
+
+	// A client stream that ends gives its place back.
+	_ = first.res.Body.Close()
+	if !eventually(5*time.Second, func() bool {
+		s := openStream(t, srv, &sdk.StreamRulesetParams{SdkKey: &two}, fromIP("192.0.2.5"))
+		defer func() { _ = s.res.Body.Close() }()
+		return s.res.StatusCode == http.StatusOK
+	}) {
+		t.Error("the place of the client stream that ended was never given back")
+	}
+}
+
+func TestAClientStreamPastBothItsKeysAndTheReplicasLimitIsRefusedByItsKeys(t *testing.T) {
+	srv := testkit.StartServer(t, behindAProxy(), limits(func(l *config.RateLimits) {
+		l.ClientStreamsPerReplica, l.ClientConcurrentStreams = 3, 1
+	}))
+	p := newProject(t, srv)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindClient)
+	params := &sdk.StreamRulesetParams{SdkKey: &value}
+
+	for _, ip := range []string{"192.0.2.1", "192.0.2.2", "192.0.2.3"} {
+		openStream(t, srv, params, fromIP(ip)).started(t)
+	}
+	res := do(client(t, srv).StreamRulesetWithResponse(t.Context(), params, fromIP("192.0.2.1")))
+	rateLimited(t, "a second stream of one key and IP on a full replica", res.StatusCode(), res.HTTPResponse.Header, res.Body, 1)
+	res = do(client(t, srv).StreamRulesetWithResponse(t.Context(), params, fromIP("192.0.2.4")))
+	rateLimited(t, "a first stream of another IP on a full replica", res.StatusCode(), res.HTTPResponse.Header, res.Body, 3)
 }

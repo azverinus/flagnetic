@@ -131,12 +131,16 @@ type Config struct {
 // RateLimits are the limits of the SDK API, each counted by every replica on
 // its own; 0 is a limit switched off. The per-minute limits count requests
 // in fixed one-minute windows, a client key's per key and client IP, a
-// server key's per key.
+// server key's per key. A client IP is an IPv4 address, or an IPv6 address
+// with the rest of its /64.
 type RateLimits struct {
 	ClientEvaluate          int
 	ClientEvents            int
 	ClientStreamConnects    int
 	ClientConcurrentStreams int
+	// ClientStreamsPerReplica limits the streams all client keys together
+	// hold open on the replica, whatever their keys and IPs.
+	ClientStreamsPerReplica int
 	ServerRuleset           int
 	ServerEvaluate          int
 	ServerEvents            int
@@ -625,17 +629,21 @@ func Settings() []Setting {
 			},
 		},
 		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE", "120", "requests per minute",
-			"Remote evaluations a client key may ask of one replica per minute, counted per key and client IP.",
+			"Remote evaluations a client key may ask of one replica per minute, counted per key and client IP, an IPv6 client by its /64.",
 			func(l *RateLimits) *int { return &l.ClientEvaluate }),
 		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_EVENTS", "60", "requests per minute",
-			"Event batches a client key may post to one replica per minute, counted per key and client IP.",
+			"Event batches a client key may post to one replica per minute, counted per key and client IP, an IPv6 client by its /64.",
 			func(l *RateLimits) *int { return &l.ClientEvents }),
 		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_STREAM_CONNECTS", "30", "requests per minute",
-			"Ruleset streams a client key may open on one replica per minute, counted per key and client IP.",
+			"Ruleset streams a client key may open on one replica per minute, counted per key and client IP, an IPv6 client by its /64.",
 			func(l *RateLimits) *int { return &l.ClientStreamConnects }),
 		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_CONCURRENT_STREAMS", "10", "streams",
-			"Ruleset streams a client key may hold open on one replica at once, counted per key and client IP.",
+			"Ruleset streams a client key may hold open on one replica at once, counted per key and client IP, an IPv6 client by its /64.",
 			func(l *RateLimits) *int { return &l.ClientConcurrentStreams }),
+		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_STREAMS_PER_REPLICA", "10000", "streams",
+			"Ruleset streams all client keys together may hold open on one replica at once, whatever their keys and client IPs, "+
+				"which bounds the connections a public client key can hold the replica to.",
+			func(l *RateLimits) *int { return &l.ClientStreamsPerReplica }),
 		rateLimit("FLAGNETIC_RATE_LIMIT_SERVER_RULESET", "600", "requests per minute",
 			"Ruleset downloads a server key may ask of one replica per minute, counted per key.",
 			func(l *RateLimits) *int { return &l.ServerRuleset }),
@@ -649,8 +657,8 @@ func Settings() []Setting {
 			"Ruleset streams a server key may hold open on one replica at once, counted per key. A server key's stream connects are not limited per minute.",
 			func(l *RateLimits) *int { return &l.ServerConcurrentStreams }),
 		rateLimit("FLAGNETIC_RATE_LIMIT_FAILED_AUTHENTICATIONS", "30", "refusals per minute",
-			"SDK API requests from one client IP whose key is malformed or unknown that one replica takes per minute. "+
-				"Past it, an SDK API request from that IP is answered 429 before its key is looked up, which keeps guessing keys slow, "+
+			"SDK API requests from one client IP (an IPv6 client by its /64) whose key is malformed or unknown that one replica takes per minute. "+
+				"Past it, an SDK API request from that IP or /64 is answered 429 before its key is looked up, which keeps guessing keys slow, "+
 				"unless the replica already holds its key from an earlier lookup, so the valid keys in use behind a shared address keep working. "+
 				"A revoked or expired key, and a request without a key, are not counted.",
 			func(l *RateLimits) *int { return &l.FailedAuthentications }),

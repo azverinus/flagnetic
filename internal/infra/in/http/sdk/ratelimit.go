@@ -15,6 +15,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
+	"github.com/azverinus/flagnetic/internal/shared/subnet"
 )
 
 // endpoint names an operation of the SDK API as its limits count it.
@@ -43,7 +44,9 @@ const (
 // limiter counts the requests of the SDK API against its limits, in memory
 // on each replica: fixed one-minute windows per endpoint and key (and
 // client IP for a client key), the malformed or unknown keys per client
-// IP, and the streams each key holds open.
+// IP, the streams each key holds open, and the streams all client keys hold
+// open together. A client IP is counted as subnet.Of groups it: an IPv6
+// client by its whole /64, which it can rotate through at will.
 type limiter struct {
 	limits  config.RateLimits
 	clock   clock.Clock
@@ -51,8 +54,10 @@ type limiter struct {
 
 	mu       sync.Mutex
 	windows  map[string]*window
-	failures map[netip.Addr]*window
+	failures map[netip.Prefix]*window
 	streams  map[string]int
+	// clientStreams is the number of streams client keys hold open.
+	clientStreams int
 	// windowsSwept and failuresSwept are when each map was last swept.
 	windowsSwept, failuresSwept time.Time
 }
@@ -71,7 +76,7 @@ func newLimiter(limits config.RateLimits, c clock.Clock, reg prometheus.Register
 			Namespace: metrics.Namespace, Subsystem: "sdk", Name: "rate_limited_total",
 			Help: "SDK API requests refused 429 rate_limited, by endpoint and key kind (none for a refusal of the client IP before its key is known).",
 		}, []string{"endpoint", "kind"}),
-		windows: map[string]*window{}, failures: map[netip.Addr]*window{}, streams: map[string]int{},
+		windows: map[string]*window{}, failures: map[netip.Prefix]*window{}, streams: map[string]int{},
 	}
 	reg.MustRegister(l.refused)
 	return l
@@ -107,12 +112,13 @@ func (l *limiter) concurrent(kind delivery.SDKKeyKind) int {
 }
 
 // counterKey is what a key's requests to ep are counted under: a client
-// key ships in many apps, so each client IP using it is counted apart, and
-// one abusive install cannot use up every other's budget.
+// key ships in many apps, so each client IP using it is counted apart, an
+// IPv6 client by its /64, and one abusive install cannot use up every
+// other's budget.
 func counterKey(ep endpoint, key delivery.SDKKey, ip netip.Addr) string {
 	k := string(ep) + "\x00" + key.ID.String()
 	if key.Kind == delivery.SDKKeyClient {
-		k += "\x00" + ip.String()
+		k += "\x00" + subnet.Of(ip).String()
 	}
 	return k
 }
@@ -150,7 +156,7 @@ func (l *limiter) guessing(w http.ResponseWriter, ep endpoint, ip netip.Addr) er
 	}
 	now := l.clock.Now()
 	l.mu.Lock()
-	f := l.failures[ip]
+	f := l.failures[subnet.Of(ip)]
 	if f == nil || !now.Before(f.start.Add(rateWindow)) || f.count < limit {
 		l.mu.Unlock()
 		return nil
@@ -169,9 +175,10 @@ func (l *limiter) failed(ip netip.Addr) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	sweep(l.failures, now, &l.failuresSwept)
-	f := current(l.failures[ip], now)
+	src := subnet.Of(ip)
+	f := current(l.failures[src], now)
 	f.count++
-	l.failures[ip] = f
+	l.failures[src] = f
 }
 
 // take counts a request of key from ip to ep against its per-minute limit
@@ -202,31 +209,54 @@ func (l *limiter) take(w http.ResponseWriter, ep endpoint, key delivery.SDKKey, 
 	return l.hold(w, key, ip)
 }
 
-// hold takes one of the stream slots of key from ip. A stream's answer
-// tells the budget of its slots, which is what bounds it while it is open.
+// hold takes one of the stream slots of key from ip and, for a client key,
+// one of the replica's places for client streams: a client key is public,
+// so its holders together must not tie up every connection the replica
+// can hold. A stream's answer tells the budget of its key's slots, which
+// is what bounds it while it is open.
 func (l *limiter) hold(w http.ResponseWriter, key delivery.SDKKey, ip netip.Addr) (func(), error) {
 	limit := l.concurrent(key.Kind)
-	if limit == 0 {
+	replica := 0
+	if key.Kind == delivery.SDKKeyClient {
+		replica = l.limits.ClientStreamsPerReplica
+	}
+	if limit == 0 && replica == 0 {
 		return func() {}, nil
 	}
 	sk := counterKey(endpointStream, key, ip)
 	l.mu.Lock()
 	held := l.streams[sk]
-	if held >= limit {
+	// No window ends a held stream: the SDK tries again shortly.
+	if limit > 0 && held >= limit {
 		l.mu.Unlock()
-		// No window ends a held stream: the SDK tries again shortly.
 		return nil, l.refuse(w, endpointStream, string(key.Kind), limit, time.Second)
 	}
-	l.streams[sk] = held + 1
+	if replica > 0 && l.clientStreams >= replica {
+		l.mu.Unlock()
+		return nil, l.refuse(w, endpointStream, string(key.Kind), replica, time.Second)
+	}
+	if limit > 0 {
+		l.streams[sk] = held + 1
+	}
+	if replica > 0 {
+		l.clientStreams++
+	}
 	l.mu.Unlock()
-	setBudget(w, limit, limit-held-1)
+	if limit > 0 {
+		setBudget(w, limit, limit-held-1)
+	}
 	var once sync.Once
 	return func() {
 		once.Do(func() {
 			l.mu.Lock()
 			defer l.mu.Unlock()
-			if l.streams[sk]--; l.streams[sk] <= 0 {
-				delete(l.streams, sk)
+			if limit > 0 {
+				if l.streams[sk]--; l.streams[sk] <= 0 {
+					delete(l.streams, sk)
+				}
+			}
+			if replica > 0 {
+				l.clientStreams--
 			}
 		})
 	}, nil
