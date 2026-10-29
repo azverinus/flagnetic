@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.1.0...sdks/python/v0.1.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **sdk-python:** keep comparing pre-release identifiers equal in value ([#176](https://github.com/azverinus/flagnetic/issues/176)) ([a3ed282](https://github.com/azverinus/flagnetic/commit/a3ed2828db1e780c3e8200d44883524198134223))
+
 ## 0.1.0 (2026-10-28)
 
 
