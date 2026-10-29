@@ -214,8 +214,5 @@ func (s *Store) RecordKnownSource(ctx context.Context, member access.MemberID, s
 		INSERT INTO sign_in_known_sources AS k (member_id, source, signed_in_at) VALUES ($1, $2, $3)
 		ON CONFLICT (member_id, source) DO UPDATE SET signed_in_at = GREATEST(k.signed_in_at, EXCLUDED.signed_in_at)`,
 		member.Bytes(), source, at)
-	if err != nil {
-		return fmt.Errorf("recording a known source: %w", err)
-	}
-	return nil
+	return err
 }
