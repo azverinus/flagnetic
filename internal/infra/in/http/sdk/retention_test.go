@@ -238,8 +238,9 @@ func TestEventIDsOutliveTheWindowAndArePurgedAYearOn(t *testing.T) {
 	if !claimed() {
 		t.Error("the event ID was purged with the raw events, a window and a day on")
 	}
-	// A verbatim replay of the envelope lands on the window's edge once the
-	// skew is applied, so only the event ID still recorded refuses it.
+	// A verbatim replay of the envelope is shifted by the skew to the time it
+	// is received, well inside the window, so only the event ID still
+	// recorded refuses it.
 	if res := batchResult(t, f.srv, f.server, envelope); res.Duplicates != 1 || res.Accepted != 0 {
 		t.Errorf("a replay past the window = %+v, want a duplicate", res)
 	}

@@ -41,7 +41,7 @@ Otherwise each event is judged on its own and a refused one is listed in `reject
 | `event_invalid` | A member is missing, of the wrong type, a string over 256 bytes or holding U+0000; a summary holds over 1,000 rows, a row counts less than 1 or names a reason that is none, or its interval starts after it ends; an alias names the same unit type on both sides. |
 | `event_type_unknown` | The server does not know events of this `type`. |
 | `event_id_invalid` | `event_id` is not a lowercase UUIDv7. |
-| `out_of_window` | The time in `event_id`, or `occurred_at` (`interval_end` for a summary), is older than the retention window. |
+| `out_of_window` | The time in `event_id`, or `occurred_at` (`interval_end` for a summary), is older than the retention window once a wrong device clock's shift (below) is applied. |
 | `undeclared_unit_type` | An alias names a unit type the project does not declare. |
 | `unknown_experiment` | An exposure names no experiment of the project. An experiment of any status exists, a draft or a stopped one too, since a mobile app may flush its queue days after the exposure. |
 | `unit_type_mismatch` | An exposure's `unit_type` is not the unit type its experiment assigns. |

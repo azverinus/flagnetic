@@ -702,8 +702,9 @@ type ClientInterface interface {
 	// Otherwise each event is judged on its own and the batch is answered
 	// `202` once every accepted event is durable, so the SDK can drop what
 	// it sent. Each event is idempotent by its `event_id`, a lowercase
-	// UUIDv7, within the retention window: one already received is
-	// counted in `duplicates`, never twice. A summary row naming a flag
+	// UUIDv7, for a year, or the retention window and a day when that is
+	// longer: one already received is counted in `duplicates`, never
+	// twice. A summary row naming a flag
 	// the environment does not have is dropped and counted in
 	// `dropped_rows`. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
@@ -715,7 +716,7 @@ type ClientInterface interface {
 	// member missing, of the wrong type, a string over 256 bytes or
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-	// time older than the retention window), `undeclared_unit_type`,
+	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 	// `unknown_experiment` (an exposure naming no experiment of the
 	// project; an experiment of any status exists, since a mobile app
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
@@ -738,7 +739,9 @@ type ClientInterface interface {
 	// `interval_end` of an evaluation summary) is shifted by the server's
 	// time minus `sent_at` before it is checked against the retention
 	// window and stored, so a device with a wrong clock keeps its events
-	// in the right place. Stamp `sent_at` from the same clock as the
+	// in the right place. The event ID's time is checked against the
+	// window shifted the same way; the `event_id` stored is never
+	// shifted. Stamp `sent_at` from the same clock as the
 	// events.
 	//
 	// **From a closing page.** A browser page that is closing hands its
@@ -772,8 +775,9 @@ type ClientInterface interface {
 	// Otherwise each event is judged on its own and the batch is answered
 	// `202` once every accepted event is durable, so the SDK can drop what
 	// it sent. Each event is idempotent by its `event_id`, a lowercase
-	// UUIDv7, within the retention window: one already received is
-	// counted in `duplicates`, never twice. A summary row naming a flag
+	// UUIDv7, for a year, or the retention window and a day when that is
+	// longer: one already received is counted in `duplicates`, never
+	// twice. A summary row naming a flag
 	// the environment does not have is dropped and counted in
 	// `dropped_rows`. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
@@ -785,7 +789,7 @@ type ClientInterface interface {
 	// member missing, of the wrong type, a string over 256 bytes or
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-	// time older than the retention window), `undeclared_unit_type`,
+	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 	// `unknown_experiment` (an exposure naming no experiment of the
 	// project; an experiment of any status exists, since a mobile app
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
@@ -808,7 +812,9 @@ type ClientInterface interface {
 	// `interval_end` of an evaluation summary) is shifted by the server's
 	// time minus `sent_at` before it is checked against the retention
 	// window and stored, so a device with a wrong clock keeps its events
-	// in the right place. Stamp `sent_at` from the same clock as the
+	// in the right place. The event ID's time is checked against the
+	// window shifted the same way; the `event_id` stored is never
+	// shifted. Stamp `sent_at` from the same clock as the
 	// events.
 	//
 	// **From a closing page.** A browser page that is closing hands its
@@ -842,8 +848,9 @@ type ClientInterface interface {
 	// Otherwise each event is judged on its own and the batch is answered
 	// `202` once every accepted event is durable, so the SDK can drop what
 	// it sent. Each event is idempotent by its `event_id`, a lowercase
-	// UUIDv7, within the retention window: one already received is
-	// counted in `duplicates`, never twice. A summary row naming a flag
+	// UUIDv7, for a year, or the retention window and a day when that is
+	// longer: one already received is counted in `duplicates`, never
+	// twice. A summary row naming a flag
 	// the environment does not have is dropped and counted in
 	// `dropped_rows`. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
@@ -855,7 +862,7 @@ type ClientInterface interface {
 	// member missing, of the wrong type, a string over 256 bytes or
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-	// time older than the retention window), `undeclared_unit_type`,
+	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 	// `unknown_experiment` (an exposure naming no experiment of the
 	// project; an experiment of any status exists, since a mobile app
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
@@ -878,7 +885,9 @@ type ClientInterface interface {
 	// `interval_end` of an evaluation summary) is shifted by the server's
 	// time minus `sent_at` before it is checked against the retention
 	// window and stored, so a device with a wrong clock keeps its events
-	// in the right place. Stamp `sent_at` from the same clock as the
+	// in the right place. The event ID's time is checked against the
+	// window shifted the same way; the `event_id` stored is never
+	// shifted. Stamp `sent_at` from the same clock as the
 	// events.
 	//
 	// **From a closing page.** A browser page that is closing hands its
@@ -1032,8 +1041,9 @@ func (c *Client) Evaluate(ctx context.Context, params *EvaluateParams, body Eval
 // Otherwise each event is judged on its own and the batch is answered
 // `202` once every accepted event is durable, so the SDK can drop what
 // it sent. Each event is idempotent by its `event_id`, a lowercase
-// UUIDv7, within the retention window: one already received is
-// counted in `duplicates`, never twice. A summary row naming a flag
+// UUIDv7, for a year, or the retention window and a day when that is
+// longer: one already received is counted in `duplicates`, never
+// twice. A summary row naming a flag
 // the environment does not have is dropped and counted in
 // `dropped_rows`. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
@@ -1045,7 +1055,7 @@ func (c *Client) Evaluate(ctx context.Context, params *EvaluateParams, body Eval
 // member missing, of the wrong type, a string over 256 bytes or
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-// time older than the retention window), `undeclared_unit_type`,
+// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 // `unknown_experiment` (an exposure naming no experiment of the
 // project; an experiment of any status exists, since a mobile app
 // flushes its queue days late), `unit_type_mismatch` (an exposure
@@ -1068,7 +1078,9 @@ func (c *Client) Evaluate(ctx context.Context, params *EvaluateParams, body Eval
 // `interval_end` of an evaluation summary) is shifted by the server's
 // time minus `sent_at` before it is checked against the retention
 // window and stored, so a device with a wrong clock keeps its events
-// in the right place. Stamp `sent_at` from the same clock as the
+// in the right place. The event ID's time is checked against the
+// window shifted the same way; the `event_id` stored is never
+// shifted. Stamp `sent_at` from the same clock as the
 // events.
 //
 // **From a closing page.** A browser page that is closing hands its
@@ -1112,8 +1124,9 @@ func (c *Client) PostEventsWithBody(ctx context.Context, params *PostEventsParam
 // Otherwise each event is judged on its own and the batch is answered
 // `202` once every accepted event is durable, so the SDK can drop what
 // it sent. Each event is idempotent by its `event_id`, a lowercase
-// UUIDv7, within the retention window: one already received is
-// counted in `duplicates`, never twice. A summary row naming a flag
+// UUIDv7, for a year, or the retention window and a day when that is
+// longer: one already received is counted in `duplicates`, never
+// twice. A summary row naming a flag
 // the environment does not have is dropped and counted in
 // `dropped_rows`. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
@@ -1125,7 +1138,7 @@ func (c *Client) PostEventsWithBody(ctx context.Context, params *PostEventsParam
 // member missing, of the wrong type, a string over 256 bytes or
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-// time older than the retention window), `undeclared_unit_type`,
+// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 // `unknown_experiment` (an exposure naming no experiment of the
 // project; an experiment of any status exists, since a mobile app
 // flushes its queue days late), `unit_type_mismatch` (an exposure
@@ -1148,7 +1161,9 @@ func (c *Client) PostEventsWithBody(ctx context.Context, params *PostEventsParam
 // `interval_end` of an evaluation summary) is shifted by the server's
 // time minus `sent_at` before it is checked against the retention
 // window and stored, so a device with a wrong clock keeps its events
-// in the right place. Stamp `sent_at` from the same clock as the
+// in the right place. The event ID's time is checked against the
+// window shifted the same way; the `event_id` stored is never
+// shifted. Stamp `sent_at` from the same clock as the
 // events.
 //
 // **From a closing page.** A browser page that is closing hands its
@@ -1192,8 +1207,9 @@ func (c *Client) PostEvents(ctx context.Context, params *PostEventsParams, body 
 // Otherwise each event is judged on its own and the batch is answered
 // `202` once every accepted event is durable, so the SDK can drop what
 // it sent. Each event is idempotent by its `event_id`, a lowercase
-// UUIDv7, within the retention window: one already received is
-// counted in `duplicates`, never twice. A summary row naming a flag
+// UUIDv7, for a year, or the retention window and a day when that is
+// longer: one already received is counted in `duplicates`, never
+// twice. A summary row naming a flag
 // the environment does not have is dropped and counted in
 // `dropped_rows`. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
@@ -1205,7 +1221,7 @@ func (c *Client) PostEvents(ctx context.Context, params *PostEventsParams, body 
 // member missing, of the wrong type, a string over 256 bytes or
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-// time older than the retention window), `undeclared_unit_type`,
+// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 // `unknown_experiment` (an exposure naming no experiment of the
 // project; an experiment of any status exists, since a mobile app
 // flushes its queue days late), `unit_type_mismatch` (an exposure
@@ -1228,7 +1244,9 @@ func (c *Client) PostEvents(ctx context.Context, params *PostEventsParams, body 
 // `interval_end` of an evaluation summary) is shifted by the server's
 // time minus `sent_at` before it is checked against the retention
 // window and stored, so a device with a wrong clock keeps its events
-// in the right place. Stamp `sent_at` from the same clock as the
+// in the right place. The event ID's time is checked against the
+// window shifted the same way; the `event_id` stored is never
+// shifted. Stamp `sent_at` from the same clock as the
 // events.
 //
 // **From a closing page.** A browser page that is closing hands its
@@ -1727,8 +1745,9 @@ type ClientWithResponsesInterface interface {
 	// Otherwise each event is judged on its own and the batch is answered
 	// `202` once every accepted event is durable, so the SDK can drop what
 	// it sent. Each event is idempotent by its `event_id`, a lowercase
-	// UUIDv7, within the retention window: one already received is
-	// counted in `duplicates`, never twice. A summary row naming a flag
+	// UUIDv7, for a year, or the retention window and a day when that is
+	// longer: one already received is counted in `duplicates`, never
+	// twice. A summary row naming a flag
 	// the environment does not have is dropped and counted in
 	// `dropped_rows`. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
@@ -1740,7 +1759,7 @@ type ClientWithResponsesInterface interface {
 	// member missing, of the wrong type, a string over 256 bytes or
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-	// time older than the retention window), `undeclared_unit_type`,
+	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 	// `unknown_experiment` (an exposure naming no experiment of the
 	// project; an experiment of any status exists, since a mobile app
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
@@ -1763,7 +1782,9 @@ type ClientWithResponsesInterface interface {
 	// `interval_end` of an evaluation summary) is shifted by the server's
 	// time minus `sent_at` before it is checked against the retention
 	// window and stored, so a device with a wrong clock keeps its events
-	// in the right place. Stamp `sent_at` from the same clock as the
+	// in the right place. The event ID's time is checked against the
+	// window shifted the same way; the `event_id` stored is never
+	// shifted. Stamp `sent_at` from the same clock as the
 	// events.
 	//
 	// **From a closing page.** A browser page that is closing hands its
@@ -1797,8 +1818,9 @@ type ClientWithResponsesInterface interface {
 	// Otherwise each event is judged on its own and the batch is answered
 	// `202` once every accepted event is durable, so the SDK can drop what
 	// it sent. Each event is idempotent by its `event_id`, a lowercase
-	// UUIDv7, within the retention window: one already received is
-	// counted in `duplicates`, never twice. A summary row naming a flag
+	// UUIDv7, for a year, or the retention window and a day when that is
+	// longer: one already received is counted in `duplicates`, never
+	// twice. A summary row naming a flag
 	// the environment does not have is dropped and counted in
 	// `dropped_rows`. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
@@ -1810,7 +1832,7 @@ type ClientWithResponsesInterface interface {
 	// member missing, of the wrong type, a string over 256 bytes or
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-	// time older than the retention window), `undeclared_unit_type`,
+	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 	// `unknown_experiment` (an exposure naming no experiment of the
 	// project; an experiment of any status exists, since a mobile app
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
@@ -1833,7 +1855,9 @@ type ClientWithResponsesInterface interface {
 	// `interval_end` of an evaluation summary) is shifted by the server's
 	// time minus `sent_at` before it is checked against the retention
 	// window and stored, so a device with a wrong clock keeps its events
-	// in the right place. Stamp `sent_at` from the same clock as the
+	// in the right place. The event ID's time is checked against the
+	// window shifted the same way; the `event_id` stored is never
+	// shifted. Stamp `sent_at` from the same clock as the
 	// events.
 	//
 	// **From a closing page.** A browser page that is closing hands its
@@ -1867,8 +1891,9 @@ type ClientWithResponsesInterface interface {
 	// Otherwise each event is judged on its own and the batch is answered
 	// `202` once every accepted event is durable, so the SDK can drop what
 	// it sent. Each event is idempotent by its `event_id`, a lowercase
-	// UUIDv7, within the retention window: one already received is
-	// counted in `duplicates`, never twice. A summary row naming a flag
+	// UUIDv7, for a year, or the retention window and a day when that is
+	// longer: one already received is counted in `duplicates`, never
+	// twice. A summary row naming a flag
 	// the environment does not have is dropped and counted in
 	// `dropped_rows`. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
@@ -1880,7 +1905,7 @@ type ClientWithResponsesInterface interface {
 	// member missing, of the wrong type, a string over 256 bytes or
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-	// time older than the retention window), `undeclared_unit_type`,
+	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 	// `unknown_experiment` (an exposure naming no experiment of the
 	// project; an experiment of any status exists, since a mobile app
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
@@ -1903,7 +1928,9 @@ type ClientWithResponsesInterface interface {
 	// `interval_end` of an evaluation summary) is shifted by the server's
 	// time minus `sent_at` before it is checked against the retention
 	// window and stored, so a device with a wrong clock keeps its events
-	// in the right place. Stamp `sent_at` from the same clock as the
+	// in the right place. The event ID's time is checked against the
+	// window shifted the same way; the `event_id` stored is never
+	// shifted. Stamp `sent_at` from the same clock as the
 	// events.
 	//
 	// **From a closing page.** A browser page that is closing hands its
@@ -2537,8 +2564,9 @@ func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, params *
 // Otherwise each event is judged on its own and the batch is answered
 // `202` once every accepted event is durable, so the SDK can drop what
 // it sent. Each event is idempotent by its `event_id`, a lowercase
-// UUIDv7, within the retention window: one already received is
-// counted in `duplicates`, never twice. A summary row naming a flag
+// UUIDv7, for a year, or the retention window and a day when that is
+// longer: one already received is counted in `duplicates`, never
+// twice. A summary row naming a flag
 // the environment does not have is dropped and counted in
 // `dropped_rows`. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
@@ -2550,7 +2578,7 @@ func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, params *
 // member missing, of the wrong type, a string over 256 bytes or
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-// time older than the retention window), `undeclared_unit_type`,
+// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 // `unknown_experiment` (an exposure naming no experiment of the
 // project; an experiment of any status exists, since a mobile app
 // flushes its queue days late), `unit_type_mismatch` (an exposure
@@ -2573,7 +2601,9 @@ func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, params *
 // `interval_end` of an evaluation summary) is shifted by the server's
 // time minus `sent_at` before it is checked against the retention
 // window and stored, so a device with a wrong clock keeps its events
-// in the right place. Stamp `sent_at` from the same clock as the
+// in the right place. The event ID's time is checked against the
+// window shifted the same way; the `event_id` stored is never
+// shifted. Stamp `sent_at` from the same clock as the
 // events.
 //
 // **From a closing page.** A browser page that is closing hands its
@@ -2613,8 +2643,9 @@ func (c *ClientWithResponses) PostEventsWithBodyWithResponse(ctx context.Context
 // Otherwise each event is judged on its own and the batch is answered
 // `202` once every accepted event is durable, so the SDK can drop what
 // it sent. Each event is idempotent by its `event_id`, a lowercase
-// UUIDv7, within the retention window: one already received is
-// counted in `duplicates`, never twice. A summary row naming a flag
+// UUIDv7, for a year, or the retention window and a day when that is
+// longer: one already received is counted in `duplicates`, never
+// twice. A summary row naming a flag
 // the environment does not have is dropped and counted in
 // `dropped_rows`. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
@@ -2626,7 +2657,7 @@ func (c *ClientWithResponses) PostEventsWithBodyWithResponse(ctx context.Context
 // member missing, of the wrong type, a string over 256 bytes or
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-// time older than the retention window), `undeclared_unit_type`,
+// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 // `unknown_experiment` (an exposure naming no experiment of the
 // project; an experiment of any status exists, since a mobile app
 // flushes its queue days late), `unit_type_mismatch` (an exposure
@@ -2649,7 +2680,9 @@ func (c *ClientWithResponses) PostEventsWithBodyWithResponse(ctx context.Context
 // `interval_end` of an evaluation summary) is shifted by the server's
 // time minus `sent_at` before it is checked against the retention
 // window and stored, so a device with a wrong clock keeps its events
-// in the right place. Stamp `sent_at` from the same clock as the
+// in the right place. The event ID's time is checked against the
+// window shifted the same way; the `event_id` stored is never
+// shifted. Stamp `sent_at` from the same clock as the
 // events.
 //
 // **From a closing page.** A browser page that is closing hands its
@@ -2689,8 +2722,9 @@ func (c *ClientWithResponses) PostEventsWithResponse(ctx context.Context, params
 // Otherwise each event is judged on its own and the batch is answered
 // `202` once every accepted event is durable, so the SDK can drop what
 // it sent. Each event is idempotent by its `event_id`, a lowercase
-// UUIDv7, within the retention window: one already received is
-// counted in `duplicates`, never twice. A summary row naming a flag
+// UUIDv7, for a year, or the retention window and a day when that is
+// longer: one already received is counted in `duplicates`, never
+// twice. A summary row naming a flag
 // the environment does not have is dropped and counted in
 // `dropped_rows`. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
@@ -2702,7 +2736,7 @@ func (c *ClientWithResponses) PostEventsWithResponse(ctx context.Context, params
 // member missing, of the wrong type, a string over 256 bytes or
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-// time older than the retention window), `undeclared_unit_type`,
+// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 // `unknown_experiment` (an exposure naming no experiment of the
 // project; an experiment of any status exists, since a mobile app
 // flushes its queue days late), `unit_type_mismatch` (an exposure
@@ -2725,7 +2759,9 @@ func (c *ClientWithResponses) PostEventsWithResponse(ctx context.Context, params
 // `interval_end` of an evaluation summary) is shifted by the server's
 // time minus `sent_at` before it is checked against the retention
 // window and stored, so a device with a wrong clock keeps its events
-// in the right place. Stamp `sent_at` from the same clock as the
+// in the right place. The event ID's time is checked against the
+// window shifted the same way; the `event_id` stored is never
+// shifted. Stamp `sent_at` from the same clock as the
 // events.
 //
 // **From a closing page.** A browser page that is closing hands its
