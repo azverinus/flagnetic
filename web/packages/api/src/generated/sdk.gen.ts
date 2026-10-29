@@ -4393,7 +4393,7 @@ export const enableAuthProvider = <ThrowOnError extends boolean = false>(
 /**
  * Disable an auth provider
  *
- * Stops the provider's sign-ins and its SCIM tokens and leaves its
+ * Stops the provider's sign-ins and leaves its
  * members, identities and grants as they are. A disabled provider is
  * answered as it is. Audited `auth_provider.disabled`.
  *

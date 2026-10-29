@@ -6509,7 +6509,7 @@ type ClientInterface interface {
 
 	// DisableAuthProvider Disable an auth provider
 	//
-	// Stops the provider's sign-ins and its SCIM tokens and leaves its
+	// Stops the provider's sign-ins and leaves its
 	// members, identities and grants as they are. A disabled provider is
 	// answered as it is. Audited `auth_provider.disabled`.
 	//
@@ -9499,7 +9499,7 @@ func (c *Client) UpdateAuthProvider(ctx context.Context, provider AuthProviderSl
 
 // DisableAuthProvider Disable an auth provider
 //
-// Stops the provider's sign-ins and its SCIM tokens and leaves its
+// Stops the provider's sign-ins and leaves its
 // members, identities and grants as they are. A disabled provider is
 // answered as it is. Audited `auth_provider.disabled`.
 //
@@ -23398,7 +23398,7 @@ type ClientWithResponsesInterface interface {
 
 	// DisableAuthProviderWithResponse Disable an auth provider
 	//
-	// Stops the provider's sign-ins and its SCIM tokens and leaves its
+	// Stops the provider's sign-ins and leaves its
 	// members, identities and grants as they are. A disabled provider is
 	// answered as it is. Audited `auth_provider.disabled`.
 	//
@@ -40081,7 +40081,7 @@ func (c *ClientWithResponses) UpdateAuthProviderWithResponse(ctx context.Context
 
 // DisableAuthProviderWithResponse Disable an auth provider
 //
-// Stops the provider's sign-ins and its SCIM tokens and leaves its
+// Stops the provider's sign-ins and leaves its
 // members, identities and grants as they are. A disabled provider is
 // answered as it is. Audited `auth_provider.disabled`.
 //
