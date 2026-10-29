@@ -42,6 +42,9 @@ describe("a refusal in the member's language", () => {
     expect(problemMessage(i18n, refusal(409, { code: "last_environment" }))).toBe(
       "This is the project's last environment. A project always keeps one to serve from.",
     );
+    expect(problemMessage(i18n, refusal(409, { code: "environment_protected" }))).toBe(
+      "A protected environment cannot be deleted. Stop protecting it on its page first.",
+    );
     expect(problemMessage(i18n, refusal(409, { code: "standard_attribute" }))).toBe(
       "Standard attributes are part of every project, so they cannot be deleted.",
     );

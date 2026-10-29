@@ -79,6 +79,10 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(
         msg`This is the project's last environment. A project always keeps one to serve from.`,
       );
+    case "environment_protected":
+      return i18n._(
+        msg`A protected environment cannot be deleted. Stop protecting it on its page first.`,
+      );
     case "standard_attribute":
       return i18n._(msg`Standard attributes are part of every project, so they cannot be deleted.`);
     case "type_immutable":

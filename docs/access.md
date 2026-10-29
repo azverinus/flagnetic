@@ -10,7 +10,7 @@ Every operation of the management API declares the one thing it needs in the Ope
 |---|---|---|---|
 | `project.read` | every ordinary read in a project, its audit log included, and the uniformity check | `read` | |
 | `project.update` | renaming a project and changing its description | `project:admin` | |
-| `environment.manage` | creating, renaming and deleting environments | `project:admin` | |
+| `environment.manage` | creating, renaming and deleting environments (a protected one only once unprotected) | `project:admin` | |
 | `environment.protect` | protecting an environment and stopping protecting it | `project:admin` | ✓ |
 | `declaration.manage` | declaring, renaming and deleting unit types and attributes; declaring and dismissing discovered attributes | `flags:write` | |
 | `grant.manage` | making and removing grants | `project:admin` | ✓ |

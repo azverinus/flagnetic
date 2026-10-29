@@ -1060,7 +1060,7 @@ export const createEnvironment = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Deletes the environment; the last one of a project is refused with `last_environment`.
+ * Deletes the environment with its configurations and SDK keys, and supersedes the change requests proposed for it. The last one of a project is refused with `last_environment`. A protected one is refused with `environment_protected`, since its deletion would take what its protection guards without a review: stop protecting it first, which needs `environment.protect`. Both are judged after `If-Match`.
  */
 export const deleteEnvironment = <ThrowOnError extends boolean = false>(
   options: Options<DeleteEnvironmentData, ThrowOnError>,

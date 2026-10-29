@@ -76,11 +76,27 @@ func TestAnEnvironmentIsProtectedAndUnprotected(t *testing.T) {
 }
 
 func TestTheLastEnvironmentCannotBeDeleted(t *testing.T) {
-	if err := workspace.CanDeleteEnvironment(2); err != nil {
+	e, _ := workspace.NewEnvironment(id.New[workspace.Environment](ids()), newProjectID(), "qa", "QA", 4, now)
+	if err := workspace.CanDeleteEnvironment(e, 2); err != nil {
 		t.Errorf("one of two: %v", err)
 	}
-	if got := conflictCode(workspace.CanDeleteEnvironment(1)); got != "last_environment" {
+	if got := conflictCode(workspace.CanDeleteEnvironment(e, 1)); got != "last_environment" {
 		t.Errorf("the last one: refusal = %q, want last_environment", got)
+	}
+}
+
+func TestAProtectedEnvironmentCannotBeDeleted(t *testing.T) {
+	e, _ := workspace.NewEnvironment(id.New[workspace.Environment](ids()), newProjectID(), "qa", "QA", 4, now)
+	protected, _ := e.Protect(true, now)
+	if got := conflictCode(workspace.CanDeleteEnvironment(protected, 2)); got != "environment_protected" {
+		t.Errorf("one of two, protected: refusal = %q, want environment_protected", got)
+	}
+	if got := conflictCode(workspace.CanDeleteEnvironment(protected, 1)); got != "last_environment" {
+		t.Errorf("the last one, protected: refusal = %q, want last_environment, which unprotecting would not lift", got)
+	}
+	unprotected, _ := protected.Protect(false, now)
+	if err := workspace.CanDeleteEnvironment(unprotected, 2); err != nil {
+		t.Errorf("one of two, unprotected again: %v", err)
 	}
 }
 

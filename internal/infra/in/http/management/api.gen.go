@@ -5683,7 +5683,7 @@ type ClientInterface interface {
 
 	// DeleteEnvironment performs a DELETE /projects/{project}/environments/{environment} (the `DeleteEnvironment` operationId) request.
 	//
-	// Deletes the environment; the last one of a project is refused with `last_environment`.
+	// Deletes the environment with its configurations and SDK keys, and supersedes the change requests proposed for it. The last one of a project is refused with `last_environment`. A protected one is refused with `environment_protected`, since its deletion would take what its protection guards without a review: stop protecting it first, which needs `environment.protect`. Both are judged after `If-Match`.
 	DeleteEnvironment(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *DeleteEnvironmentParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetEnvironment performs a GET /projects/{project}/environments/{environment} (the `GetEnvironment` operationId) request.
@@ -8994,7 +8994,7 @@ func (c *Client) CreateEnvironment(ctx context.Context, project ProjectKey, body
 
 // DeleteEnvironment performs a DELETE /projects/{project}/environments/{environment} (the `DeleteEnvironment` operationId) request.
 //
-// Deletes the environment; the last one of a project is refused with `last_environment`.
+// Deletes the environment with its configurations and SDK keys, and supersedes the change requests proposed for it. The last one of a project is refused with `last_environment`. A protected one is refused with `environment_protected`, since its deletion would take what its protection guards without a review: stop protecting it first, which needs `environment.protect`. Both are judged after `If-Match`.
 func (c *Client) DeleteEnvironment(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *DeleteEnvironmentParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteEnvironmentRequest(c.Server, project, environment, params)
 	if err != nil {
@@ -21313,7 +21313,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteEnvironmentWithResponse performs a DELETE /projects/{project}/environments/{environment} (the `DeleteEnvironment` operationId) request.
 	//
-	// Deletes the environment; the last one of a project is refused with `last_environment`.
+	// Deletes the environment with its configurations and SDK keys, and supersedes the change requests proposed for it. The last one of a project is refused with `last_environment`. A protected one is refused with `environment_protected`, since its deletion would take what its protection guards without a review: stop protecting it first, which needs `environment.protect`. Both are judged after `If-Match`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DeleteEnvironmentWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *DeleteEnvironmentParams, reqEditors ...RequestEditorFn) (*DeleteEnvironmentResponse, error)
@@ -36923,7 +36923,7 @@ func (c *ClientWithResponses) CreateEnvironmentWithResponse(ctx context.Context,
 
 // DeleteEnvironmentWithResponse performs a DELETE /projects/{project}/environments/{environment} (the `DeleteEnvironment` operationId) request.
 //
-// Deletes the environment; the last one of a project is refused with `last_environment`.
+// Deletes the environment with its configurations and SDK keys, and supersedes the change requests proposed for it. The last one of a project is refused with `last_environment`. A protected one is refused with `environment_protected`, since its deletion would take what its protection guards without a review: stop protecting it first, which needs `environment.protect`. Both are judged after `If-Match`.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DeleteEnvironmentWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *DeleteEnvironmentParams, reqEditors ...RequestEditorFn) (*DeleteEnvironmentResponse, error) {

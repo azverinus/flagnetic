@@ -116,13 +116,15 @@ func TestTheLastEnvironmentCannotBeDeleted(t *testing.T) {
 func TestTwoDeletionsAtOnceNeverRemoveTheLastEnvironment(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
-	p := createProjectAsCreated(t, admin, projectKey()).Key
+	// Production is unprotected, at version 2, so the one refusal can only be
+	// the last environment's.
+	p := createProject(t, admin, projectKey()).Key
 	do(admin.DeleteEnvironmentWithResponse(t.Context(), p, "development", &management.DeleteEnvironmentParams{IfMatch: ifMatch(1)}))
 
 	statuses := make(chan int, 2)
-	for _, key := range []string{"staging", "production"} {
+	for key, version := range map[string]int64{"staging": 1, "production": 2} {
 		go func() {
-			statuses <- do(admin.DeleteEnvironmentWithResponse(t.Context(), p, key, &management.DeleteEnvironmentParams{IfMatch: ifMatch(1)})).StatusCode()
+			statuses <- do(admin.DeleteEnvironmentWithResponse(t.Context(), p, key, &management.DeleteEnvironmentParams{IfMatch: ifMatch(version)})).StatusCode()
 		}()
 	}
 	got := []int{<-statuses, <-statuses}

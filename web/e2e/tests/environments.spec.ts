@@ -2,7 +2,14 @@ import { getEnvironment, updateEnvironment } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
-import { type Credentials, managementClient, must, seedProject, signIn } from "../support/console";
+import {
+  type Credentials,
+  managementClient,
+  must,
+  seedProject,
+  signIn,
+  unprotectProduction,
+} from "../support/console";
 import { admin, seededProject, viewer } from "../support/instance";
 
 /** Signs in and opens one project's environments. */
@@ -56,6 +63,8 @@ test.describe("environments", () => {
     page,
   }) => {
     const projectKey = await seedProject("environments-delete");
+    // A protected environment is never deleted, so production goes unprotected.
+    await unprotectProduction(projectKey);
     await openEnvironments(page, projectKey);
 
     await page.getByRole("button", { name: "New environment" }).click();
@@ -91,6 +100,24 @@ test.describe("environments", () => {
     );
     await page.keyboard.press("Escape");
     await expect(environmentRow(page, "sandbox")).toBeVisible();
+  });
+
+  test("refuses to delete a protected environment, in the member's words", async ({ page }) => {
+    const projectKey = await seedProject("environments-protected");
+    await openEnvironments(page, projectKey);
+
+    await environmentRow(page, "production")
+      .getByRole("button", { name: "Delete production" })
+      .click();
+    const confirm = page.getByRole("dialog", { name: "Delete production" });
+    await confirm.getByLabel("Type production to confirm").fill("production");
+    await confirm.getByRole("button", { name: "Delete environment" }).click();
+
+    await expect(confirm.getByRole("alert")).toHaveText(
+      "A protected environment cannot be deleted. Stop protecting it on its page first.",
+    );
+    await page.keyboard.press("Escape");
+    await expect(environmentRow(page, "production")).toBeVisible();
   });
 });
 

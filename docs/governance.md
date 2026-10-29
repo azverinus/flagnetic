@@ -16,6 +16,8 @@ In the console, an environment's page has a **Protected** switch, which asks for
 
 A write that would change what a protected environment's SDKs receive is refused `403 change_request_required`, whatever it touches and whichever endpoint it goes through: a flag's configuration there (replacing it, an override, a rollout's salt, a revert, a copy into it), a flag's variations or automatic exposure, a segment's conditions or private switch when a flag uses the segment there, archiving a flag switched on there or restoring one that was, and an experiment's start, stop or traffic allocation growth when the environment holds a rule serving it. The refusal's `detail` names the protected environments the write would change. Nothing of the write is kept: a write that would change a protected environment and others too, such as editing a segment that staging and production both use, changes none of them.
 
+Deleting a protected environment is refused `409 environment_protected`, since the deletion would take its configurations and SDK keys with it and supersede the change requests proposed for it, all without a review. Stop protecting it first, which needs `environment.protect`; it is then deleted like any other environment. The last environment of a project is refused `409 last_environment`, protected or not.
+
 Protection judges the result, not the endpoint. When a write is about to commit, the server builds each protected environment's ruleset as the write would leave it and compares it with the ruleset that environment serves now. It leaves out what no evaluation depends on, so these writes stay direct in a protected environment:
 
 - a flag's name, description, tags, owner and lifetime, and creating a flag;
