@@ -485,6 +485,10 @@ msgstr ""
 msgid "A project token never approves or rejects change requests."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "A protected environment cannot be deleted. Stop protecting it on its page first."
+msgstr ""
+
 #: src/components/sdk-keys.tsx
 msgid "A replacement key is created with the same kind, name and allowed origins. The old key keeps working for the overlap, so services can move to the new one without an outage; then it is refused."
 msgstr ""

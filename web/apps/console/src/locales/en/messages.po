@@ -485,6 +485,10 @@ msgstr "A project token does what its role allows in this project, narrowed to i
 msgid "A project token never approves or rejects change requests."
 msgstr "A project token never approves or rejects change requests."
 
+#: src/lib/problem-messages.ts
+msgid "A protected environment cannot be deleted. Stop protecting it on its page first."
+msgstr "A protected environment cannot be deleted. Stop protecting it on its page first."
+
 #: src/components/sdk-keys.tsx
 msgid "A replacement key is created with the same kind, name and allowed origins. The old key keeps working for the overlap, so services can move to the new one without an outage; then it is refused."
 msgstr "A replacement key is created with the same kind, name and allowed origins. The old key keeps working for the overlap, so services can move to the new one without an outage; then it is refused."
