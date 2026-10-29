@@ -86,8 +86,8 @@ func (h *AuthenticateSDKKey) Handle(ctx context.Context, value string) (delivery
 // judges the key whose value is presented as Handle does when the key is
 // held, and reports held false, without looking anything up, for any other
 // value, malformed or missing ones included. A caller refusing a client for
-// now, such as one presenting too many unknown keys, still admits a key in
-// use without making a lookup it means to spare.
+// now, such as one presenting too many malformed or unknown keys, still
+// admits a key in use without making a lookup it means to spare.
 func (h *AuthenticateSDKKey) HandleHeld(value string) (key delivery.SDKKey, held bool, err error) {
 	_, hash, err := delivery.ParseSDKKeyValue(value)
 	if err != nil {

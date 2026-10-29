@@ -265,6 +265,20 @@ func TestALimitSwitchedOffCountsNothing(t *testing.T) {
 	}
 }
 
+func TestMalformedAndUnknownKeysCountTogetherAsGuesses(t *testing.T) {
+	srv := testkit.StartServer(t, behindAProxy())
+	unknown := "fn_srv_" + strings.Repeat("x", 40)
+
+	for i := range 15 {
+		res := ruleset(t, srv, "not-a-key", fromIP("198.51.100.7"))
+		refused(t, "malformed "+strconv.Itoa(i+1), res.StatusCode(), res.Body, http.StatusUnauthorized, "sdk_key_invalid")
+		res = ruleset(t, srv, unknown, fromIP("198.51.100.7"))
+		refused(t, "unknown "+strconv.Itoa(i+1), res.StatusCode(), res.Body, http.StatusUnauthorized, "sdk_key_invalid")
+	}
+	res := ruleset(t, srv, "not-a-key", fromIP("198.51.100.7"))
+	rateLimited(t, "a malformed key past the limit", res.StatusCode(), res.HTTPResponse.Header, res.Body, 30)
+}
+
 func TestARevokedOrExpiredKeyStillPolledDoesNotBlockItsAddress(t *testing.T) {
 	srv := testkit.StartServer(t, behindAProxy())
 	p := newProject(t, srv)

@@ -162,11 +162,11 @@ func presentedOf(ctx context.Context) presented {
 }
 
 // guard admits a request to op: it authenticates the key, refusing a client
-// IP that presented too many unknown keys before a key it does not hold is
-// looked up, applies the key's allowed origins, refuses a key of a kind op
-// does not serve, and counts the request against the key's limits, holding
-// a stream slot for a stream until it ends. The key then travels in the
-// request's context.
+// IP that presented too many malformed or unknown keys before a key it does
+// not hold is looked up, applies the key's allowed origins, refuses a key of
+// a kind op does not serve, and counts the request against the key's limits,
+// holding a stream slot for a stream until it ends. The key then travels in
+// the request's context.
 func (a *api) guard(op operation, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := flaghttp.ClientOf(r.Context()).IP

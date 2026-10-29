@@ -141,8 +141,9 @@ type RateLimits struct {
 	ServerEvaluate          int
 	ServerEvents            int
 	ServerConcurrentStreams int
-	// FailedAuthentications limits the refused SDK keys per client IP and
-	// minute, checked before any key is looked up.
+	// FailedAuthentications limits the malformed or unknown SDK keys per
+	// client IP and minute, checked before a key the replica does not hold
+	// is looked up.
 	FailedAuthentications int
 }
 
