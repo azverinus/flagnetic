@@ -21,6 +21,7 @@ import (
 	appexperiments "github.com/azverinus/flagnetic/internal/app/experiments"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
+	appsinks "github.com/azverinus/flagnetic/internal/app/sinks"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -39,6 +40,7 @@ import (
 	pgexperiments "github.com/azverinus/flagnetic/internal/infra/out/postgres/experiments"
 	pgflags "github.com/azverinus/flagnetic/internal/infra/out/postgres/flags"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
+	pgsinks "github.com/azverinus/flagnetic/internal/infra/out/postgres/sinks"
 	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/out/webhook"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
@@ -199,6 +201,12 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	webhookStore := pggovernance.NewWebhooks(d.Pool)
 	webhooks := appgovernance.WebhookDeps{
 		Tx: tx, Store: webhookStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
+		Sealer: o.Keyring, Resolver: net.DefaultResolver, Targets: o.WebhookTargets, SecretOverlap: o.WebhookSecretOverlap,
+	}
+	// A sink's secret is sealed under the same key, its target resolved by the
+	// same resolver and judged by the webhook subscriptions' policy.
+	sinks := appsinks.Deps{
+		Tx: tx, Store: pgsinks.NewStore(d.Pool), Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
 		Sealer: o.Keyring, Resolver: net.DefaultResolver, Targets: o.WebhookTargets, SecretOverlap: o.WebhookSecretOverlap,
 	}
 	deliveryRequests := appgovernance.DeliveryRequestDeps{
@@ -486,6 +494,13 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		RedeliverWebhook:      appgovernance.NewRedeliver(deliveryRequests),
 		EnableWebhook:         appgovernance.NewEnableWebhook(webhooks),
 		RotateWebhookSecret:   appgovernance.NewRotateWebhookSecret(webhooks),
+
+		ListSinks:        appsinks.NewListSinks(sinks.Store),
+		CreateSink:       appsinks.NewCreate(sinks),
+		GetSink:          appsinks.NewGetSink(sinks.Store),
+		UpdateSink:       appsinks.NewUpdate(sinks),
+		DeleteSink:       appsinks.NewDelete(sinks),
+		RotateSinkSecret: appsinks.NewRotateSecret(sinks),
 
 		ListSegments: appflags.NewListSegments(tx, flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),

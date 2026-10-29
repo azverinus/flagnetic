@@ -5210,6 +5210,228 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /projects/{project}/sinks:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listSinks
+      summary: The project's sinks
+      description: |
+        The oldest first. A sink's credentials are never listed: the
+        ClickHouse `password` and the object storage `secret_access_key` read
+        back as `***`, and a webhook sink's secret is shown once, when it is
+        issued. Reading sinks needs `sink.manage` too, since a sink's
+        configuration names internal hosts, buckets and URLs that may carry
+        tokens.
+      x-permission: sink.manage
+      tags: [sinks]
+      responses:
+        "200":
+          description: The project's sinks.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SinkList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createSink
+      summary: Add a sink
+      description: |
+        Creates a sink of the `kind` given and the configuration of that kind
+        alone (`clickhouse`, `object_storage` or `webhook`), disabled: it
+        delivers nothing until it is enabled. The ClickHouse `password` and
+        the object storage `secret_access_key` are required, stored sealed
+        under `FLAGNETIC_SECRET_KEY` and read back as `***`. A webhook sink's
+        secret is drawn by the server, 32 random bytes as unpadded base64url,
+        and answered as `secret` this once; audit entries record every secret
+        as `[redacted]`. Receivers verify a webhook sink's calls as they
+        verify a webhook subscription's.
+
+        Batching defaults by kind: ClickHouse 5,000 events every 10 s, object
+        storage 500,000 every 300 s (flush interval 60 to 3,600 s), webhook
+        500 every 5 s (at most 5,000). `event_kinds` and `environments` left
+        empty mean every one.
+
+        Refused as `invalid_sink`, with `errors` naming each field by JSON
+        Pointer: a blank name, a configuration missing or of another kind,
+        a URL that is not an absolute http or https URL without credentials,
+        a required field left out, a setting delivery sets itself, a header
+        of the platform's own, an event kind or a batching value out of
+        range. An environment the project does not have is
+        `unknown_environment`. A webhook sink's `url` must be `https`
+        (`insecure_url`) unless the operator set
+        `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
+        loopback, private, link-local, unspecified or multicast address
+        (`private_network_target`) unless the operator set
+        `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
+        storage target may be on a private or loopback address, never on a
+        link-local one (`link_local_target`), which no setting lifts. A name
+        that does not resolve is accepted.
+      x-permission: sink.manage
+      tags: [sinks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SinkCreate"
+      responses:
+        "201":
+          description: The new sink, with its secret when it is a webhook sink, shown this once.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SinkWithSecret"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/sinks/{sink}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/SinkID"
+    get:
+      operationId: getSink
+      summary: A sink
+      x-permission: sink.manage
+      tags: [sinks]
+      responses:
+        "200":
+          description: The sink; its `ETag` is its version.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sink"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateSink
+      summary: Edit a sink
+      description: |
+        Changes each property present and leaves the others as they are. A
+        sub-object of the sink's kind replaces its configuration whole, so
+        nothing of the earlier one lingers; the one exception is its secret:
+        `***`, as every read answers it, or no secret at all keeps the stored
+        one, and any other value replaces it. A sub-object of another kind,
+        or a `kind` other than the sink's own, is refused `kind_immutable`.
+        `enabled` takes `false` only, which lets the attempt in progress
+        finish and keeps the sink's place; a sink is enabled with its own
+        operation, which checks the target first. A new target is checked as
+        on creation, and an edit that changes nothing stores and records
+        nothing. An edit of batching or filters applies from the next batch.
+      x-permission: sink.manage
+      tags: [sinks]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SinkPatch"
+      responses:
+        "200":
+          description: The sink as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sink"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+    delete:
+      operationId: deleteSink
+      summary: Delete a sink
+      description: The sink goes, and nothing more is sent to its target.
+      x-permission: sink.manage
+      tags: [sinks]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/sinks/{sink}/rotate-secret:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/SinkID"
+    post:
+      operationId: rotateSinkSecret
+      summary: Rotate a webhook sink's secret
+      description: |
+        Issues a webhook sink a new secret, answered this once. The secret it
+        replaces keeps signing beside the new one for the operator's
+        `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+        each call carries two `v1=` signatures meanwhile and a receiver
+        holding either verifies. A secret an earlier rotation left signing is
+        dropped at once: no more than two sign. A sink of another kind has no
+        secret the server draws and is refused `no_secret_to_rotate`; its
+        password or secret access key is changed by editing it. It takes no
+        `If-Match`.
+      x-permission: sink.manage
+      tags: [sinks]
+      responses:
+        "200":
+          description: The sink with its new secret.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SinkWithSecret"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /webhooks:
     get:
       operationId: listInstanceWebhooks
@@ -5654,6 +5876,14 @@ components:
       in: path
       required: true
       description: The webhook subscription's identifier.
+      schema:
+        type: string
+        format: uuid
+    SinkID:
+      name: sink
+      in: path
+      required: true
+      description: The sink's identifier.
       schema:
         type: string
         format: uuid
@@ -9282,6 +9512,366 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Webhook"
+    SinkKind:
+      type: string
+      enum: [clickhouse, object_storage, webhook]
+      description: Which target a sink delivers to; fixed when the sink is created.
+    SinkEventKind:
+      type: string
+      enum: [exposure, alias, evaluation_summary]
+      description: A kind of raw event a sink exports, each delivered through a stream of its own.
+    SinkHealth:
+      type: string
+      enum: [disabled, stopped, failing, degraded, lagging, healthy]
+      description: |
+        The first that holds: `disabled` by a member; `stopped` after the
+        target kept rejecting batches, until resumed; `failing` while a
+        stream cannot reach its target; `degraded` while a dead letter waits;
+        `lagging` while the oldest undelivered event is older than the
+        operator's `FLAGNETIC_SINK_LAG_WARNING`; otherwise `healthy`.
+    SinkFailureClass:
+      type: string
+      enum: [dns, connect, tls, timeout, refused_target, redirect, status, rejected]
+      description: |
+        Why a call to a target failed, from a closed list; a target's own
+        words are never kept or answered.
+    SinkFailure:
+      type: object
+      description: The last failed call of a stream.
+      required: [class, status, code, at]
+      properties:
+        class:
+          $ref: "#/components/schemas/SinkFailureClass"
+        status:
+          type: integer
+          nullable: true
+          description: The HTTP status the target answered, when it did.
+        code:
+          type: string
+          nullable: true
+          description: The protocol's own error code, such as a ClickHouse exception or an S3 error code, when the target speaks one.
+        at:
+          type: string
+          format: date-time
+    SinkStream:
+      type: object
+      description: One event kind's delivery. Cursors are never exposed.
+      required: [event_kind, last_delivered_at, last_failure]
+      properties:
+        event_kind:
+          $ref: "#/components/schemas/SinkEventKind"
+        last_delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_failure:
+          allOf:
+            - $ref: "#/components/schemas/SinkFailure"
+          nullable: true
+    SinkClickHouse:
+      type: object
+      description: |
+        A ClickHouse sink's configuration, written to its HTTP interface. The
+        platform creates `{table_prefix}_exposures`, `_aliases` and
+        `_evaluation_summaries` when it enables the sink and `create_tables`
+        is true.
+      required: [url, database, table_prefix, username, password, tls_skip_verify, create_tables, settings]
+      properties:
+        url:
+          type: string
+          description: Where the HTTP interface answers; http or https, without credentials.
+        database:
+          type: string
+        table_prefix:
+          type: string
+          description: Letters, digits and underscores, not starting with a digit.
+        username:
+          type: string
+        password:
+          type: string
+          description: Always `***`; the stored password is never answered.
+        tls_skip_verify:
+          type: boolean
+        create_tables:
+          type: boolean
+        settings:
+          type: object
+          description: ClickHouse settings sent with every insert. The ones delivery sets itself are refused.
+          additionalProperties:
+            type: string
+    SinkObjectStorage:
+      type: object
+      description: An object storage sink's configuration, for any S3-compatible service.
+      required: [endpoint, region, bucket, prefix, access_key_id, secret_access_key, path_style, format, compression]
+      properties:
+        endpoint:
+          type: string
+          description: A scheme, a host and a port; empty for AWS.
+        region:
+          type: string
+          description: Empty asks the bucket.
+        bucket:
+          type: string
+        prefix:
+          type: string
+          description: Without outer slashes.
+        access_key_id:
+          type: string
+        secret_access_key:
+          type: string
+          description: Always `***`; the stored key is never answered.
+        path_style:
+          type: boolean
+        format:
+          type: string
+          enum: [jsonl, parquet]
+        compression:
+          type: string
+          enum: [gzip, zstd, none]
+          description: For `jsonl`; `parquet` files are always `zstd`.
+    SinkWebhook:
+      type: object
+      description: A webhook sink's configuration. Its secret is the sink's, drawn by the server.
+      required: [url, headers]
+      properties:
+        url:
+          type: string
+          description: |
+            Where every batch is posted: `https` unless the operator set
+            `FLAGNETIC_WEBHOOK_ALLOW_HTTP`.
+        headers:
+          type: object
+          description: Sent with every call, before the platform's own. Names starting `X-Flagnetic-` are refused.
+          additionalProperties:
+            type: string
+    Sink:
+      type: object
+      description: |
+        A project's sink. It carries exactly the one of `clickhouse`,
+        `object_storage` and `webhook` that its `kind` names.
+      required: [id, name, kind, event_kinds, environments, batch_size, flush_interval, enabled, health, at_risk,
+        lag_seconds, dead_letters, gaps, stopped_at, warnings, streams, created_at, updated_at, version]
+      oneOf:
+        - required: [clickhouse]
+        - required: [object_storage]
+        - required: [webhook]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          $ref: "#/components/schemas/Name"
+        kind:
+          $ref: "#/components/schemas/SinkKind"
+        clickhouse:
+          $ref: "#/components/schemas/SinkClickHouse"
+        object_storage:
+          $ref: "#/components/schemas/SinkObjectStorage"
+        webhook:
+          $ref: "#/components/schemas/SinkWebhook"
+        event_kinds:
+          type: array
+          description: The event kinds exported; empty for all of them.
+          items:
+            $ref: "#/components/schemas/SinkEventKind"
+        environments:
+          type: array
+          description: The keys of the environments whose events are exported; empty for every one.
+          items:
+            type: string
+        batch_size:
+          type: integer
+          description: The most events one delivery carries.
+        flush_interval:
+          type: integer
+          description: Seconds the sink waits between deliveries once it has caught up.
+        enabled:
+          type: boolean
+        health:
+          $ref: "#/components/schemas/SinkHealth"
+        at_risk:
+          type: boolean
+          description: Whether retention is about to drop events the sink has not delivered.
+        lag_seconds:
+          type: integer
+          format: int64
+          nullable: true
+          description: The age of the oldest undelivered event; null while the sink is disabled.
+        dead_letters:
+          type: integer
+          description: The dead letters waiting to be redelivered or discarded.
+        gaps:
+          type: integer
+          description: The gaps not yet dismissed.
+        stopped_at:
+          type: string
+          format: date-time
+          nullable: true
+        warnings:
+          type: array
+          description: What the last check of the target found wrong without making delivery impossible.
+          items:
+            type: string
+        streams:
+          type: array
+          description: One per event kind exported once the sink has been enabled; empty before.
+          items:
+            $ref: "#/components/schemas/SinkStream"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        version:
+          $ref: "#/components/schemas/Version"
+    SinkWithSecret:
+      allOf:
+        - $ref: "#/components/schemas/Sink"
+        - type: object
+          properties:
+            secret:
+              type: string
+              description: |
+                A webhook sink's secret, base64url of 32 random bytes, the
+                key of every signature under the sink. Shown once, by the
+                operation that issued it: it is stored sealed and never
+                answered again. Absent for the other kinds.
+    SinkClickHouseInput:
+      type: object
+      description: |
+        A ClickHouse sink's configuration as it is written. Required, and
+        refused `invalid_sink` when absent: `url`, `database`, `username`
+        and, when creating, `password`.
+      properties:
+        url:
+          type: string
+        database:
+          type: string
+        table_prefix:
+          type: string
+          description: "`flagnetic` when empty."
+        username:
+          type: string
+        password:
+          type: string
+          description: Sealed on arrival. `***` or absent keeps the stored password when editing.
+        tls_skip_verify:
+          type: boolean
+        create_tables:
+          type: boolean
+          description: True when absent.
+        settings:
+          type: object
+          additionalProperties:
+            type: string
+    SinkObjectStorageInput:
+      type: object
+      description: |
+        An object storage sink's configuration as it is written. Required,
+        and refused `invalid_sink` when absent: `bucket`, `access_key_id` and,
+        when creating, `secret_access_key`.
+      properties:
+        endpoint:
+          type: string
+        region:
+          type: string
+        bucket:
+          type: string
+        prefix:
+          type: string
+        access_key_id:
+          type: string
+        secret_access_key:
+          type: string
+          description: Sealed on arrival. `***` or absent keeps the stored key when editing.
+        path_style:
+          type: boolean
+        format:
+          type: string
+          description: "`jsonl` when empty."
+        compression:
+          type: string
+          description: "`gzip` for `jsonl` and `zstd` for `parquet` when empty."
+    SinkWebhookInput:
+      type: object
+      description: A webhook sink's configuration as it is written. `url` is required.
+      properties:
+        url:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+    SinkCreate:
+      type: object
+      required: [name, kind]
+      properties:
+        name:
+          type: string
+        kind:
+          type: string
+          description: "`clickhouse`, `object_storage` or `webhook`."
+        clickhouse:
+          $ref: "#/components/schemas/SinkClickHouseInput"
+        object_storage:
+          $ref: "#/components/schemas/SinkObjectStorageInput"
+        webhook:
+          $ref: "#/components/schemas/SinkWebhookInput"
+        event_kinds:
+          type: array
+          description: Empty or absent for every event kind.
+          items:
+            type: string
+        environments:
+          type: array
+          description: The keys of the environments whose events to export; empty or absent for every one.
+          items:
+            type: string
+        batch_size:
+          type: integer
+          description: The kind's default when absent.
+        flush_interval:
+          type: integer
+          description: Seconds; the kind's default when absent.
+    SinkPatch:
+      type: object
+      description: The properties to change; each absent one is left as it is.
+      properties:
+        name:
+          type: string
+        kind:
+          type: string
+          description: May be left out; naming a kind other than the sink's own is refused `kind_immutable`.
+        clickhouse:
+          $ref: "#/components/schemas/SinkClickHouseInput"
+        object_storage:
+          $ref: "#/components/schemas/SinkObjectStorageInput"
+        webhook:
+          $ref: "#/components/schemas/SinkWebhookInput"
+        event_kinds:
+          type: array
+          items:
+            type: string
+        environments:
+          type: array
+          items:
+            type: string
+        batch_size:
+          type: integer
+        flush_interval:
+          type: integer
+        enabled:
+          type: boolean
+          description: "`false` only: a sink is enabled with its own operation."
+    SinkList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Sink"
     WebhookDeliveryStatus:
       type: string
       description: |

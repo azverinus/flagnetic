@@ -21,6 +21,14 @@ const (
 	PurposeCanary Purpose = "canary"
 	// PurposeWebhookSecret seals the secrets signing webhook calls.
 	PurposeWebhookSecret Purpose = "webhook secret"
+	// PurposeSinkClickHousePassword seals the password of a ClickHouse sink.
+	PurposeSinkClickHousePassword Purpose = "sink_clickhouse_password"
+	// PurposeSinkObjectStorageSecret seals the secret access key of an
+	// object storage sink.
+	PurposeSinkObjectStorageSecret Purpose = "sink_object_storage_secret"
+	// PurposeSinkWebhookSecret seals the secret signing a webhook sink's
+	// calls.
+	PurposeSinkWebhookSecret Purpose = "sink_webhook_secret" //nolint:gosec // a label, not a credential
 )
 
 // Use names a key derived from the secret key for something other than
