@@ -1028,8 +1028,11 @@ export const getProjectMe = <ThrowOnError extends boolean = false>(
  * JSON (the default, and the canonical encoding) or YAML (derived from
  * it field for field): its environments in their order, unit types,
  * declared attributes, segments, flags with their configuration in every
- * environment, and experiments, each list by key, so that two exports of
- * an unchanged project are the same bytes. Rule identifiers and rollout
+ * environment, and experiments. A list whose order means something keeps
+ * it (a configuration's rules, a flag's variations, an experiment's
+ * weights, tags); every other list and map is by key, overrides by unit
+ * type then unit identifier and prerequisites by flag, so that two
+ * exports of an unchanged project are the same bytes. Rule identifiers and rollout
  * salts are in it, which keep every unit in its bucket in a copy; owners
  * are email addresses, and an override's note is in it and its author is
  * not.

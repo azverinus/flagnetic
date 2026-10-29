@@ -237,6 +237,57 @@ func TestYAMLIsTheJSONDocumentFieldForField(t *testing.T) {
 	}
 }
 
+func TestYAMLQuotesTextAYAML11ReaderTakesForAnotherType(t *testing.T) {
+	d := sample()
+	// Base-60 numbers, the merge key and the value key are not text to a
+	// YAML 1.1 reader when written bare.
+	odd := []string{"1:20", "-10:30:05", "1:20.5", "<<", "="}
+	d.Flags[0].Tags = odd
+	asYAML := mustEncode(t, transfer.YAML, d)
+	for _, s := range odd {
+		if !bytes.Contains(asYAML, []byte(`- "`+s+`"`)) {
+			t.Errorf("%s is not quoted:\n%s", s, asYAML)
+		}
+	}
+	got, err := transfer.Decode(transfer.YAML, asYAML)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got.Flags[1].Tags, odd) {
+		t.Errorf("tags = %q, want %q", got.Flags[1].Tags, odd)
+	}
+}
+
+func TestYAMLTextThatLooksLikeATimestampStaysAsWritten(t *testing.T) {
+	src := `
+schema_version: 1
+project: {key: demo, name: 2026-11-05, description: 2001-12-14 21:59:43.10 -5}
+flags:
+  - key: launch
+    type: string
+    name: Launch
+    variations:
+      - {key: day, value: 2026-11-05, name: Day}
+experiments:
+  - {key: e, expected_end_at: 2026-11-05, started_at: 2026-10-01T09:00:00Z}
+`
+	d, err := transfer.Decode(transfer.YAML, []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Project.Name != "2026-11-05" || d.Project.Description != "2001-12-14 21:59:43.10 -5" {
+		t.Errorf("project = %+v, want its text as written", d.Project)
+	}
+	if v := string(d.Flags[0].Variations[0].Value); v != `"2026-11-05"` {
+		t.Errorf("variation value = %s, want the text 2026-11-05", v)
+	}
+	e := d.Experiments[0]
+	if e.ExpectedEndAt == nil || e.ExpectedEndAt.Format(time.DateOnly) != "2026-11-05" ||
+		e.StartedAt == nil || !e.StartedAt.Equal(time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)) {
+		t.Errorf("experiment = %+v, want its day and instant read", e)
+	}
+}
+
 func TestADocumentSurvivesDecodingInEitherFormat(t *testing.T) {
 	d := sample()
 	want := mustEncode(t, transfer.JSON, d)
@@ -381,6 +432,9 @@ func TestMalformedAndTrailingInputIsRefusedAsMalformed(t *testing.T) {
 		"trailing JSON":       {transfer.JSON, `{"schema_version": 1} {"schema_version": 1}`},
 		"trailing JSON text":  {transfer.JSON, `{"schema_version": 1} x`},
 		"not an object":       {transfer.JSON, `[1]`},
+		"a repeated JSON key": {transfer.JSON, `{"schema_version": 1, "project": {"key": "a", "name": "A", "key": "b"}}`},
+		"a repeated top key":  {transfer.JSON, `{"schema_version": 1, "flags": [], "flags": []}`},
+		"a repeated YAML key": {transfer.YAML, "schema_version: 1\nflags: []\nflags: []\n"},
 		"empty":               {transfer.JSON, ``},
 		"bad YAML":            {transfer.YAML, "schema_version: [1\n"},
 		"a second YAML file":  {transfer.YAML, "schema_version: 1\n---\nschema_version: 1\n"},
@@ -391,6 +445,14 @@ func TestMalformedAndTrailingInputIsRefusedAsMalformed(t *testing.T) {
 		if !errors.As(err, &m) {
 			t.Errorf("%s: error = %v, want a MalformedError", name, err)
 		}
+	}
+}
+
+func TestTheSameKeyInSeparateObjectsOrAsAValueIsNotRepeated(t *testing.T) {
+	const doc = `{"schema_version": 1, "project": {"key": "name", "name": "key", "description": "description"},
+		"environments": [{"key": "a", "name": "A", "protected": false}, {"key": "b", "name": "B", "protected": false}]}`
+	if _, err := transfer.Decode(transfer.JSON, []byte(doc)); err != nil {
+		t.Fatal(err)
 	}
 }
 

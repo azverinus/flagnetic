@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -204,15 +205,20 @@ func yamlNode(dec *json.Decoder) (*yaml.Node, error) {
 }
 
 // stringNode is a YAML string. The encoder quotes a string that YAML 1.2
-// would read as another type, but not one that only YAML 1.1 reads as a
-// boolean (on, off, yes, no, y, n), and a key such as on is one; a document
-// is read by tools of both, so these are quoted here.
+// would read as another type, but not one that only YAML 1.1 reads as
+// something else: a boolean (on, off, yes, no, y, n, and a key such as on is
+// one), a base-60 number (1:20), the merge key (<<) or the value key (=). A
+// document is read by tools of both, so these are quoted here.
 func stringNode(s string) *yaml.Node {
 	n := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: s}
-	if slices.Contains(yaml11Booleans, strings.ToLower(s)) {
+	if slices.Contains(yaml11Booleans, strings.ToLower(s)) || s == "<<" || s == "=" || yaml11Sexagesimal.MatchString(s) {
 		n.Style = yaml.DoubleQuotedStyle
 	}
 	return n
 }
 
-var yaml11Booleans = []string{"y", "n", "yes", "no", "on", "off"}
+var (
+	yaml11Booleans = []string{"y", "n", "yes", "no", "on", "off"}
+	// yaml11Sexagesimal matches YAML 1.1's base-60 integers and floats.
+	yaml11Sexagesimal = regexp.MustCompile(`^[-+]?[0-9][0-9_]*(:[0-5]?[0-9])+(\.[0-9_]*)?$`)
+)

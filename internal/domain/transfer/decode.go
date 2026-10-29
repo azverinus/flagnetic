@@ -101,22 +101,90 @@ func parseJSON(data []byte) (any, error) {
 	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
 		return nil, &MalformedError{Detail: "the JSON holds more than one value"}
 	}
+	if key, ok := repeatedKey(data); ok {
+		return nil, &MalformedError{Detail: fmt.Sprintf("the JSON names the key %q twice in one object", key)}
+	}
 	return v, nil
 }
 
+// repeatedKey returns a key that one object of the JSON value in data names
+// twice, and whether there is one. The JSON decoder keeps the last of two
+// equal keys without a word, which would drop the first value silently; the
+// YAML decoder refuses them, and a document reads the same in both.
+func repeatedKey(data []byte) (string, bool) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	// One frame per open object or array; keys is nil for an array.
+	type frame struct {
+		keys    map[string]bool
+		wantKey bool
+	}
+	var open []*frame
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return "", false
+		}
+		if tok == json.Delim('}') || tok == json.Delim(']') {
+			open = open[:len(open)-1]
+			if len(open) == 0 {
+				return "", false
+			}
+			continue
+		}
+		if len(open) > 0 && open[len(open)-1].keys != nil {
+			top := open[len(open)-1]
+			if top.wantKey {
+				s, _ := tok.(string)
+				if top.keys[s] {
+					return s, true
+				}
+				top.keys[s], top.wantKey = true, false
+				continue
+			}
+			top.wantKey = true
+		}
+		switch tok {
+		case json.Delim('{'):
+			open = append(open, &frame{keys: map[string]bool{}, wantKey: true})
+		case json.Delim('['):
+			open = append(open, &frame{})
+		}
+	}
+}
+
 // parseYAML reads the one YAML document data holds into the tree JSON would
-// give: maps by string key, numbers as json.Number and instants as text.
+// give: maps by string key and numbers as json.Number.
 func parseYAML(data []byte) (any, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
-	var v any
-	if err := dec.Decode(&v); err != nil {
+	var n yaml.Node
+	if err := dec.Decode(&n); err != nil {
 		return nil, &MalformedError{Detail: "the YAML does not parse: " + err.Error()}
 	}
-	var second any
+	var second yaml.Node
 	if err := dec.Decode(&second); !errors.Is(err, io.EOF) {
 		return nil, &MalformedError{Detail: "the YAML holds more than one document"}
 	}
+	keepTimestampsAsText(&n)
+	var v any
+	if err := n.Decode(&v); err != nil {
+		return nil, &MalformedError{Detail: "the YAML does not parse: " + err.Error()}
+	}
 	return jsonTree(v)
+}
+
+// keepTimestampsAsText makes every plain scalar that YAML reads as a
+// timestamp, such as 2026-11-05, the text it is written as. Otherwise a
+// name or a string variation spelled like a day would come back as an
+// instant at midnight; a field holding an instant or a day reads the text
+// as JSON would.
+func keepTimestampsAsText(n *yaml.Node) {
+	if n.Kind == yaml.ScalarNode && n.ShortTag() == "!!timestamp" {
+		n.Tag = "!!str"
+	}
+	for _, c := range n.Content {
+		keepTimestampsAsText(c)
+	}
 }
 
 // jsonTree converts what the YAML decoder gives into what the JSON decoder
@@ -154,8 +222,6 @@ func jsonTree(v any) (any, error) {
 			return nil, &MalformedError{Detail: "the YAML holds a number JSON cannot"}
 		}
 		return json.Number(strconv.FormatFloat(v, 'g', -1, 64)), nil
-	case time.Time:
-		return v.UTC().Format(time.RFC3339Nano), nil
 	case string, bool, nil:
 		return v, nil
 	case map[any]any:
