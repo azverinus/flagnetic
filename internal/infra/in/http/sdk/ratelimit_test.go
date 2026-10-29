@@ -414,3 +414,20 @@ func TestAReplicaHoldsAtMostItsClientStreamsWhateverTheirKeysAndIPs(t *testing.T
 		t.Error("the place of the client stream that ended was never given back")
 	}
 }
+
+func TestAClientStreamPastBothItsKeysAndTheReplicasLimitIsRefusedByItsKeys(t *testing.T) {
+	srv := testkit.StartServer(t, behindAProxy(), limits(func(l *config.RateLimits) {
+		l.ClientStreamsPerReplica, l.ClientConcurrentStreams = 3, 1
+	}))
+	p := newProject(t, srv)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindClient)
+	params := &sdk.StreamRulesetParams{SdkKey: &value}
+
+	for _, ip := range []string{"192.0.2.1", "192.0.2.2", "192.0.2.3"} {
+		openStream(t, srv, params, fromIP(ip)).started(t)
+	}
+	res := do(client(t, srv).StreamRulesetWithResponse(t.Context(), params, fromIP("192.0.2.1")))
+	rateLimited(t, "a second stream of one key and IP on a full replica", res.StatusCode(), res.HTTPResponse.Header, res.Body, 1)
+	res = do(client(t, srv).StreamRulesetWithResponse(t.Context(), params, fromIP("192.0.2.4")))
+	rateLimited(t, "a first stream of another IP on a full replica", res.StatusCode(), res.HTTPResponse.Header, res.Body, 3)
+}
