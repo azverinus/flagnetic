@@ -42,8 +42,8 @@ const (
 
 // limiter counts the requests of the SDK API against its limits, in memory
 // on each replica: fixed one-minute windows per endpoint and key (and
-// client IP for a client key), the refused keys per client IP, and the
-// streams each key holds open.
+// client IP for a client key), the malformed or unknown keys per client
+// IP, and the streams each key holds open.
 type limiter struct {
 	limits  config.RateLimits
 	clock   clock.Clock
@@ -141,8 +141,8 @@ func sweep[K comparable](m map[K]*window, now time.Time, swept *time.Time) {
 	}
 }
 
-// guessing refuses a request from ip once ip's refused keys reached their
-// limit in the current window, before its key is looked up.
+// guessing refuses a request from ip once ip's malformed or unknown keys
+// reached their limit in the current window, before its key is looked up.
 func (l *limiter) guessing(w http.ResponseWriter, ep endpoint, ip netip.Addr) error {
 	limit := l.limits.FailedAuthentications
 	if limit == 0 {
