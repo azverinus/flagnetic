@@ -81,12 +81,20 @@ func (e Environment) Protect(protected bool, now time.Time) (Environment, bool) 
 	return out, true
 }
 
-// CanDeleteEnvironment refuses to delete one of a project's count
-// environments when it is the last: a project always has somewhere to serve
-// its flags from.
-func CanDeleteEnvironment(count int) error {
+// CanDeleteEnvironment refuses to delete e, one of its project's count
+// environments, when it is the last, since a project always has somewhere to
+// serve its flags from, or while it is protected. Deleting an environment
+// removes its configurations and SDK keys and closes the change requests
+// proposed for it, so a protected environment would otherwise lose
+// everything its protection guards without any approval; it has to be
+// unprotected first, which takes a permission of its own. The last
+// environment is judged first: unprotecting it would not let it go.
+func CanDeleteEnvironment(e Environment, count int) error {
 	if count <= 1 {
 		return apperrors.Conflict("last_environment", "the last environment of a project cannot be deleted")
+	}
+	if e.Protected {
+		return apperrors.Conflict("environment_protected", "a protected environment cannot be deleted; stop protecting it first")
 	}
 	return nil
 }

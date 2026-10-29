@@ -123,6 +123,41 @@ func TestOnlyAMemberHoldingEnvironmentProtectChangesProtection(t *testing.T) {
 	}
 }
 
+func TestAProtectedEnvironmentIsNotDeletedUntilUnprotected(t *testing.T) {
+	pool := testkit.Pool(t)
+	srv := testkit.StartServer(t, testkit.WithPool(pool))
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	project := createProjectAsCreated(t, admin, projectKey())
+	p := project.Key
+	maintainer := testkit.Client(t, srv, testkit.GrantedToken(t, pool, projectIDOf(project), access.RoleMaintainer))
+	mustCreateSDKKey(t, admin, p, "production", management.SdkKeyCreate{Kind: "server", Name: "Backend"})
+
+	stale := do(maintainer.DeleteEnvironmentWithResponse(t.Context(), p, "production", &management.DeleteEnvironmentParams{IfMatch: ifMatch(7)}))
+	assertProblem(t, "a stale version", stale.StatusCode(), stale.Body, http.StatusPreconditionFailed, "version_mismatch")
+	for name, c := range map[string]*management.ClientWithResponses{"a maintainer": maintainer, "an instance admin": admin} {
+		res := do(c.DeleteEnvironmentWithResponse(t.Context(), p, "production", &management.DeleteEnvironmentParams{IfMatch: ifMatch(1)}))
+		assertProblem(t, name, res.StatusCode(), res.Body, http.StatusConflict, "environment_protected")
+	}
+	if keys := environmentKeys(t, admin, p); !slices.Equal(keys, []string{"development", "staging", "production"}) {
+		t.Errorf("environments = %v, want production kept", keys)
+	}
+	if keys := sdkKeys(t, admin, p, "production"); len(keys) != 1 {
+		t.Errorf("production's keys = %+v, want its key kept", keys)
+	}
+	if actions := auditActions(t, admin, p); slices.Contains(actions, "environment.deleted") {
+		t.Errorf("audit = %v, want no deletion recorded", actions)
+	}
+
+	if res := protect(t, admin, p, "production", 1, false); !status(t, "unprotect", res.StatusCode(), res.Body, http.StatusOK) {
+		return
+	}
+	deleted := do(maintainer.DeleteEnvironmentWithResponse(t.Context(), p, "production", &management.DeleteEnvironmentParams{IfMatch: ifMatch(2)}))
+	status(t, "delete once unprotected", deleted.StatusCode(), deleted.Body, http.StatusNoContent)
+	if keys := environmentKeys(t, admin, p); !slices.Equal(keys, []string{"development", "staging"}) {
+		t.Errorf("environments = %v, want production deleted", keys)
+	}
+}
+
 func TestProtectionIsJudgedAgainstTheEnvironmentsVersion(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))

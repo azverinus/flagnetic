@@ -8,7 +8,8 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
-// EnvironmentDeleter deletes an environment unless it is its project's last.
+// EnvironmentDeleter deletes an environment unless it is its project's last
+// or protected.
 type EnvironmentDeleter interface {
 	ProjectLocker
 	EnvironmentByKey(ctx context.Context, project workspace.ProjectID, key string, lock bool) (workspace.Environment, error)
@@ -56,7 +57,7 @@ func (h *DeleteEnvironment) Handle(ctx context.Context, cmd DeleteEnvironmentCom
 		if err != nil {
 			return err
 		}
-		if err := workspace.CanDeleteEnvironment(count); err != nil {
+		if err := workspace.CanDeleteEnvironment(e, count); err != nil {
 			return err
 		}
 		// The deletion is recorded before the rows go, so what it ends
