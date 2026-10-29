@@ -4858,7 +4858,8 @@ type ClientInterface interface {
 	// email, a hundred from one address in fifteen minutes throttle the
 	// address; either is refused before the password is checked. An
 	// address (an IPv6 one with the rest of its /64) the member signed in
-	// from within thirty days is not refused by the email's lock: its
+	// from, or accepted their invitation from, within thirty days is not
+	// refused by the email's lock: its
 	// failures on the email are counted apart and lock it alone, after the
 	// same five, so a stranger locking the email does not keep the member
 	// out where they usually sign in.
@@ -4882,7 +4883,8 @@ type ClientInterface interface {
 	// email, a hundred from one address in fifteen minutes throttle the
 	// address; either is refused before the password is checked. An
 	// address (an IPv6 one with the rest of its /64) the member signed in
-	// from within thirty days is not refused by the email's lock: its
+	// from, or accepted their invitation from, within thirty days is not
+	// refused by the email's lock: its
 	// failures on the email are counted apart and lock it alone, after the
 	// same five, so a stranger locking the email does not keep the member
 	// out where they usually sign in.
@@ -7481,7 +7483,8 @@ func (c *Client) GetAuthMethods(ctx context.Context, reqEditors ...RequestEditor
 // email, a hundred from one address in fifteen minutes throttle the
 // address; either is refused before the password is checked. An
 // address (an IPv6 one with the rest of its /64) the member signed in
-// from within thirty days is not refused by the email's lock: its
+// from, or accepted their invitation from, within thirty days is not
+// refused by the email's lock: its
 // failures on the email are counted apart and lock it alone, after the
 // same five, so a stranger locking the email does not keep the member
 // out where they usually sign in.
@@ -7515,7 +7518,8 @@ func (c *Client) SignInWithBody(ctx context.Context, contentType string, body io
 // email, a hundred from one address in fifteen minutes throttle the
 // address; either is refused before the password is checked. An
 // address (an IPv6 one with the rest of its /64) the member signed in
-// from within thirty days is not refused by the email's lock: its
+// from, or accepted their invitation from, within thirty days is not
+// refused by the email's lock: its
 // failures on the email are counted apart and lock it alone, after the
 // same five, so a stranger locking the email does not keep the member
 // out where they usually sign in.
@@ -20438,7 +20442,8 @@ type ClientWithResponsesInterface interface {
 	// email, a hundred from one address in fifteen minutes throttle the
 	// address; either is refused before the password is checked. An
 	// address (an IPv6 one with the rest of its /64) the member signed in
-	// from within thirty days is not refused by the email's lock: its
+	// from, or accepted their invitation from, within thirty days is not
+	// refused by the email's lock: its
 	// failures on the email are counted apart and lock it alone, after the
 	// same five, so a stranger locking the email does not keep the member
 	// out where they usually sign in.
@@ -20462,7 +20467,8 @@ type ClientWithResponsesInterface interface {
 	// email, a hundred from one address in fifteen minutes throttle the
 	// address; either is refused before the password is checked. An
 	// address (an IPv6 one with the rest of its /64) the member signed in
-	// from within thirty days is not refused by the email's lock: its
+	// from, or accepted their invitation from, within thirty days is not
+	// refused by the email's lock: its
 	// failures on the email are counted apart and lock it alone, after the
 	// same five, so a stranger locking the email does not keep the member
 	// out where they usually sign in.
@@ -35640,7 +35646,8 @@ func (c *ClientWithResponses) GetAuthMethodsWithResponse(ctx context.Context, re
 // email, a hundred from one address in fifteen minutes throttle the
 // address; either is refused before the password is checked. An
 // address (an IPv6 one with the rest of its /64) the member signed in
-// from within thirty days is not refused by the email's lock: its
+// from, or accepted their invitation from, within thirty days is not
+// refused by the email's lock: its
 // failures on the email are counted apart and lock it alone, after the
 // same five, so a stranger locking the email does not keep the member
 // out where they usually sign in.
@@ -35670,7 +35677,8 @@ func (c *ClientWithResponses) SignInWithBodyWithResponse(ctx context.Context, co
 // email, a hundred from one address in fifteen minutes throttle the
 // address; either is refused before the password is checked. An
 // address (an IPv6 one with the rest of its /64) the member signed in
-// from within thirty days is not refused by the email's lock: its
+// from, or accepted their invitation from, within thirty days is not
+// refused by the email's lock: its
 // failures on the email are counted apart and lock it alone, after the
 // same five, so a stranger locking the email does not keep the member
 // out where they usually sign in.
