@@ -3,7 +3,6 @@ package access_test
 import (
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
@@ -161,7 +160,6 @@ func TestAMemberRenamesThemselvesAndChoosesALanguage(t *testing.T) {
 }
 
 func TestAProvisionedMemberIsActiveWithoutAPasswordAndNamedAfterTheirNameOrEmail(t *testing.T) {
-	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	for _, tc := range []struct{ name, email, display, want string }{
 		{"a name", "ada@example.com", " Ada Lovelace ", "Ada Lovelace"},
 		{"no name", "ada@example.com", "", "ada"},
