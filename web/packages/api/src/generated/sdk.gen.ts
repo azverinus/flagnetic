@@ -259,6 +259,9 @@ import type {
   GetWebhookDeliveryResponses,
   GetWebhookErrors,
   GetWebhookResponses,
+  ImportNewProjectData,
+  ImportNewProjectErrors,
+  ImportNewProjectResponses,
   InviteMemberData,
   InviteMemberErrors,
   InviteMemberResponses,
@@ -966,6 +969,60 @@ export const createProject = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Create a project from a project document
+ *
+ * Creates a project holding exactly the document: its environments (at
+ * least one), unit types, declared attributes, segments and flags with
+ * their configuration in every environment, besides the standard
+ * attributes every project has; no default environment or unit type is
+ * added. The document is sent as `application/json` or
+ * `application/yaml`, as `GET /projects/{project}/export` writes it, and
+ * its sections are all required. `key` and `name` replace the
+ * document's project key and name.
+ *
+ * The copy keeps every rule identifier and rollout salt the document
+ * names, so every unit is bucketed as in the original; a rule or a
+ * rollout without one is given one. An owner the document names by email
+ * owns the entity when they may own in the new project, which no member
+ * but an instance admin may yet; otherwise the importing member does and
+ * the answer warns `owner_replaced` with the address. Protection is
+ * bypassed in every environment, which take `protected` from the
+ * document.
+ *
+ * The import applies whole or not at all. A document that breaks a rule
+ * is refused 422 `invalid_document` with every fault found in `errors`,
+ * each pointing into the document; `schema_version_unsupported` names
+ * the versions this server reads. A key in use is 409 `already_exists`.
+ * With `dry_run` the whole import runs, every check the database makes
+ * included, and is rolled back: same answer, 200, nothing written.
+ *
+ * Every entity created is recorded as a direct write records it, then
+ * one `project.imported` entry, all with the request's identifier; each
+ * environment's ruleset moves on once. A body is accepted up to 32 MiB.
+ *
+ */
+export const importNewProject = <ThrowOnError extends boolean = false>(
+  options: Options<ImportNewProjectData, ThrowOnError>,
+): RequestResult<ImportNewProjectResponses, ImportNewProjectErrors, ThrowOnError> =>
+  (options.client ?? client).post<ImportNewProjectResponses, ImportNewProjectErrors, ThrowOnError>({
+    bodySerializer: null,
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/import",
     ...options,
     headers: {
       "Content-Type": "application/json",

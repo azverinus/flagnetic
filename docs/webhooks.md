@@ -162,6 +162,7 @@ Their `data` always has the same fields, null where one does not apply:
 
 | Type | Sent when |
 |---|---|
+| `project.imported` | a project was created or changed by an import of a project document; sent after the events of each entity the import wrote. `data` is `mode` (`create`), `source` (`document`) and `counts`, the entities created, updated and deleted by kind |
 | `webhook.disabled` | the platform disabled another subscription of the project, see [When a subscription keeps failing](#when-a-subscription-keeps-failing) |
 | `report.stale_flags` | the stale flags digest, weekly or on demand, see [The stale-flag digest](#the-stale-flag-digest) |
 | `ping` | a member tested a subscription |

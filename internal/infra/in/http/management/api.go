@@ -210,7 +210,8 @@ type Handlers struct {
 	ExportAuditEntries *appgovernance.ExportAuditEntries
 	StreamChanges      *appgovernance.StreamChanges
 
-	ExportProject *apptransfer.ExportProject
+	ExportProject    *apptransfer.ExportProject
+	ImportNewProject *apptransfer.ImportNewProject
 }
 
 // api serves every operation of the document.
@@ -240,7 +241,7 @@ func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer, opts Op
 	// The links invitations hand out carry their secret in the path the
 	// browser opens.
 	edge.SecretPath(invitationLinkPath + "{secret}")
-	HandlerWithOptions(strict, StdHTTPServerOptions{
+	HandlerWithOptions(rawBodies{ServerInterface: strict, a: a}, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
 		BaseRouter:       router{a},
 		ErrorHandlerFunc: invalidRequest,

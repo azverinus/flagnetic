@@ -265,6 +265,27 @@ func (c Configuration) Revert(f Flag, recorded Configuration, r Referents, w Wri
 	return c.write(recorded, f, recorded.Input(), r, Mint{}, w)
 }
 
+// Import returns the configuration of f made by w what a project document
+// says it is, whole, checked against r as a replace is. Unlike a replace it
+// keeps what the document says of rule identifiers and rollout salts, which
+// is what keeps a unit in its bucket in a copy of the project; a rule or a
+// rollout the document gives none is given one by m. An override is the
+// writer's: the document names no author.
+func (c Configuration) Import(f Flag, in ConfigurationInput, r Referents, m Mint, w Write) (Configuration, Changed, error) {
+	rules := make([]RuleInput, len(in.Rules))
+	basis := Configuration{Rules: make([]Rule, len(in.Rules))}
+	for i, ri := range in.Rules {
+		if ri.ID == nil {
+			ruleID := m.RuleID()
+			ri.ID = &ruleID
+		}
+		rules[i] = ri
+		basis.Rules[i] = Rule{ID: *ri.ID, Serve: Serve{Kind: ri.Serve.Kind, Experiment: ri.Serve.Experiment, Salt: ri.Serve.Salt}}
+	}
+	in.Rules = rules
+	return c.write(basis, f, in, r, m, w)
+}
+
 // errExperimentRulesChanged refuses a revert or a copy that would change
 // which rules serve which experiment.
 var errExperimentRulesChanged = apperrors.Conflict("experiment_rules_changed",

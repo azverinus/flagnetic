@@ -363,11 +363,30 @@ func DefaultsOf(p Project, ids IDs) ProjectDefaults {
 			CreatedAt: p.CreatedAt, UpdatedAt: p.CreatedAt, Version: 1,
 		})
 	}
+	d.Attributes = StandardAttributesOf(p, ids)
+	return d
+}
+
+// StandardAttributesOf returns the standard attributes p is created with,
+// whatever else it is created with.
+func StandardAttributesOf(p Project, ids IDs) []Attribute {
+	out := make([]Attribute, 0, len(standardAttributes))
 	for _, a := range standardAttributes {
-		d.Attributes = append(d.Attributes, Attribute{
+		out = append(out, Attribute{
 			ID: ids.Attribute(), Project: p.ID, Key: a.Key, Name: a.Name, Type: a.Type, Standard: true,
 			CreatedAt: p.CreatedAt, UpdatedAt: p.CreatedAt, Version: 1,
 		})
 	}
-	return d
+	return out
+}
+
+// StandardAttributeType returns the type of the standard attribute keyed
+// key, and whether there is one.
+func StandardAttributeType(key string) (AttributeType, bool) {
+	for _, a := range standardAttributes {
+		if a.Key == key {
+			return a.Type, true
+		}
+	}
+	return "", false
 }

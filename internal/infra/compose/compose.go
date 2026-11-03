@@ -232,6 +232,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	configuration := appflags.ConfigurationDeps{Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
 	owners := appaccess.NewOwnership(accessStore)
 	experimentStore := pgexperiments.NewStore(d.Pool)
+	flagImporter := appflags.NewImporter(appflags.ImporterDeps{
+		Tx: tx, Projects: flagStore, Environments: ws, Declarations: ws, Store: flagStore, Owners: owners, Recorder: flagRec,
+		Evaluations: eventStore,
+	})
 	experimentRec := appexperiments.NewRecorder(audit, d.Clock, d.IDs)
 	// Stale flags are judged from what the events context counts and the
 	// experiments context's running experiments.
@@ -577,6 +581,13 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		ExportProject: apptransfer.NewExportProject(apptransfer.ExportProjectDeps{
 			Snapshots: tx, Projects: ws, Workspace: ws, Flags: flagStore, Experiments: experimentStore,
 			Members: accessStore, History: auditLog,
+		}),
+		// An import writes through the contexts that own what it writes, in
+		// one unit of work, moving each environment's ruleset on once.
+		ImportNewProject: apptransfer.NewImportNewProject(apptransfer.ImportNewProjectDeps{
+			Tx: tx, Workspace: appworkspace.NewImporter(ws, rec), Flags: transferFlags{flagImporter},
+			Owners: transferOwners{members: accessStore, ownership: owners}, Rulesets: rulesets, Audit: audit,
+			Clock: d.Clock, IDs: d.IDs,
 		}),
 	}, reg, managementOptions)
 	// Every replica keeps the SDK keys it authenticated, dropped on a

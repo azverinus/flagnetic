@@ -554,6 +554,98 @@ paths:
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/Invalid"
+  /projects/import:
+    post:
+      operationId: importNewProject
+      summary: Create a project from a project document
+      description: |
+        Creates a project holding exactly the document: its environments (at
+        least one), unit types, declared attributes, segments and flags with
+        their configuration in every environment, besides the standard
+        attributes every project has; no default environment or unit type is
+        added. The document is sent as `application/json` or
+        `application/yaml`, as `GET /projects/{project}/export` writes it, and
+        its sections are all required. `key` and `name` replace the
+        document's project key and name.
+
+        The copy keeps every rule identifier and rollout salt the document
+        names, so every unit is bucketed as in the original; a rule or a
+        rollout without one is given one. An owner the document names by email
+        owns the entity when they may own in the new project, which no member
+        but an instance admin may yet; otherwise the importing member does and
+        the answer warns `owner_replaced` with the address. Protection is
+        bypassed in every environment, which take `protected` from the
+        document.
+
+        The import applies whole or not at all. A document that breaks a rule
+        is refused 422 `invalid_document` with every fault found in `errors`,
+        each pointing into the document; `schema_version_unsupported` names
+        the versions this server reads. A key in use is 409 `already_exists`.
+        With `dry_run` the whole import runs, every check the database makes
+        included, and is rolled back: same answer, 200, nothing written.
+
+        Every entity created is recorded as a direct write records it, then
+        one `project.imported` entry, all with the request's identifier; each
+        environment's ruleset moves on once. A body is accepted up to 32 MiB.
+      x-permission: instance_admin
+      x-max-body-bytes: 33554432
+      tags: [transfer]
+      parameters:
+        - name: key
+          in: query
+          description: The new project's key, replacing the document's.
+          schema:
+            type: string
+        - name: name
+          in: query
+          description: The new project's name, replacing the document's.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ImportDryRun"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              format: binary
+              description: A `ProjectDocument` as JSON.
+          application/yaml:
+            schema:
+              type: string
+              format: binary
+              description: A `ProjectDocument` as YAML.
+      responses:
+        "200":
+          description: The project the document would create, for a dry run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+        "201":
+          description: The project created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
+        "415":
+          description: "`unsupported_media_type`: the document is not sent as `application/json` or `application/yaml`."
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /projects/{project}:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -6221,6 +6313,13 @@ components:
       schema:
         type: string
         format: uuid
+    ImportDryRun:
+      name: dry_run
+      in: query
+      description: Run the whole import and roll it back, answering what it would have done.
+      schema:
+        type: boolean
+        default: false
     DocumentFormat:
       name: format
       in: query
@@ -10036,6 +10135,7 @@ components:
         - "sink.at_risk"
         - "sink.stopped"
         - "sink.data_lost"
+        - "project.imported"
         - "webhook.disabled"
         - "report.stale_flags"
         - "audit.entry"
@@ -10628,6 +10728,100 @@ components:
           type: string
           nullable: true
           description: Pass as `cursor` for the next page; null on the last.
+    ImportResult:
+      type: object
+      description: What an import did, or with a dry run what it would do.
+      required: [project, mode, source, dry_run, changes, warnings]
+      properties:
+        project:
+          $ref: "#/components/schemas/DocumentProject"
+        mode:
+          type: string
+          enum: [create]
+        source:
+          type: string
+          enum: [document]
+        dry_run:
+          type: boolean
+        changes:
+          $ref: "#/components/schemas/ImportChanges"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportWarning"
+    ImportChanges:
+      type: object
+      description: The keys of the entities an import created, updated and deleted, by kind. Standard attributes are never in it.
+      required: [environments, unit_types, attributes, segments, flags, experiments]
+      properties:
+        environments:
+          $ref: "#/components/schemas/ImportKindChanges"
+        unit_types:
+          $ref: "#/components/schemas/ImportKindChanges"
+        attributes:
+          $ref: "#/components/schemas/ImportKindChanges"
+        segments:
+          $ref: "#/components/schemas/ImportKindChanges"
+        flags:
+          $ref: "#/components/schemas/ImportKindChanges"
+        experiments:
+          $ref: "#/components/schemas/ImportKindChanges"
+    ImportKindChanges:
+      type: object
+      required: [created, updated, deleted]
+      properties:
+        created:
+          type: array
+          items:
+            type: string
+        updated:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportUpdate"
+        deleted:
+          type: array
+          items:
+            type: string
+    ImportUpdate:
+      type: object
+      required: [key, patch]
+      properties:
+        key:
+          type: string
+        patch:
+          type: array
+          description: An RFC 6902 JSON Patch turning the entity as it was into the entity as it is, over its entry of the document.
+          items:
+            $ref: "#/components/schemas/JsonPatchOperation"
+    JsonPatchOperation:
+      type: object
+      required: [op, path]
+      properties:
+        op:
+          type: string
+          enum: [add, remove, replace, move, copy, test]
+        path:
+          type: string
+        from:
+          type: string
+        value: {}
+    ImportWarning:
+      type: object
+      description: Something an import did differently from what the document asks, or could not do, without refusing it.
+      required: [code, pointer, detail]
+      properties:
+        code:
+          type: string
+          description: "Stable name of the warning, such as `owner_replaced`."
+        pointer:
+          type: string
+          description: A JSON Pointer into the document, empty for the document as a whole.
+        detail:
+          type: string
+        params:
+          type: object
+          additionalProperties: true
+          description: The values a client explains the warning with, such as the `email` of an owner replaced.
     ProjectDocument:
       type: object
       description: |
