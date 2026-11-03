@@ -21,6 +21,12 @@ var rawTables = map[events.EventType]string{
 	events.EventExposure:          "exposure_events",
 }
 
+// RawTable is the raw event table of typ.
+func RawTable(typ events.EventType) (string, bool) {
+	table, ok := rawTables[typ]
+	return table, ok
+}
+
 // partitionName is the name of table's partition of the UTC day of day.
 func partitionName(table string, day time.Time) string {
 	return table + "_p" + day.UTC().Format("20060102")

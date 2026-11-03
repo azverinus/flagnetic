@@ -83,6 +83,16 @@ func (s *Server) TickRollup(t testing.TB, name string) {
 	}
 }
 
+// AwaitHorizon returns once every transaction running in the database when it
+// was called has ended, except those a test holds open on purpose: a reader of
+// raw events reads only below the snapshot horizon, which any transaction of
+// another test holds back while it runs. What the test committed before the
+// call is then below the horizon.
+func (s *Server) AwaitHorizon(t testing.TB) {
+	t.Helper()
+	s.awaitHorizon(t)
+}
+
 func (s *Server) awaitHorizon(t testing.TB) {
 	t.Helper()
 	ctx := context.Background()

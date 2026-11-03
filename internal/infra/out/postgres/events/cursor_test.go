@@ -24,14 +24,14 @@ func TestABatchEndsAtItsGreatestTransactionByNumber(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DROP TABLE stream_by_number`) })
-	b, err := pgevents.Bound(t.Context(), pool, "stream_by_number", events.Cursor{}, 10)
+	b, err := pgevents.Bound(t.Context(), pool, "stream_by_number", pgevents.Scope{}, events.Cursor{}, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if b.Rows != 2 || b.To != (events.Cursor{XID: 10, Seq: 2}) {
 		t.Errorf("batch = %d rows to %+v, want 2 rows to transaction 10, seq 2", b.Rows, b.To)
 	}
-	b, err = pgevents.Bound(t.Context(), pool, "stream_by_number", b.To, 10)
+	b, err = pgevents.Bound(t.Context(), pool, "stream_by_number", pgevents.Scope{}, b.To, 10)
 	if err != nil {
 		t.Fatal(err)
 	}

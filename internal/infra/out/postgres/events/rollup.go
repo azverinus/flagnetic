@@ -22,11 +22,11 @@ import (
 // of transactions below the snapshot horizon, and the cursor of the last;
 // from itself when there is none.
 func (s *Store) ExposuresAfter(ctx context.Context, from events.Cursor, limit int) ([]events.ExposureRow, events.Cursor, error) {
-	b, err := bound(ctx, s.db(ctx), "exposure_events", from, limit)
+	b, err := Bound(ctx, s.db(ctx), "exposure_events", Scope{}, from, limit)
 	if err != nil || b.Rows == 0 {
 		return nil, b.To, err
 	}
-	where, args := b.where("r")
+	where, args := b.Where("r")
 	// The flag of an experiment deleted since is null; the rollup leaves the
 	// exposures of a deleted experiment out.
 	rows, err := s.db(ctx).Query(ctx, `SELECT r.project_id, r.environment_id, r.experiment_id, x.flag_id, r.unit_type, r.unit_id,
@@ -64,11 +64,11 @@ func (s *Store) ExposuresAfter(ctx context.Context, from events.Cursor, limit in
 // transactions below the snapshot horizon, and the cursor of the last; from
 // itself when there is none.
 func (s *Store) AliasesAfter(ctx context.Context, from events.Cursor, limit int) ([]events.AliasRow, events.Cursor, error) {
-	b, err := bound(ctx, s.db(ctx), "alias_events", from, limit)
+	b, err := Bound(ctx, s.db(ctx), "alias_events", Scope{}, from, limit)
 	if err != nil || b.Rows == 0 {
 		return nil, b.To, err
 	}
-	where, args := b.where("r")
+	where, args := b.Where("r")
 	rows, err := s.db(ctx).Query(ctx, `SELECT r.project_id, r.received_at FROM alias_events r WHERE `+where+` ORDER BY r.xid, r.seq`, args...)
 	if err != nil {
 		return nil, events.Cursor{}, fmt.Errorf("reading aliases to roll up: %w", err)
