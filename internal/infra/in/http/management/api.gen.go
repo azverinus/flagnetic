@@ -432,12 +432,15 @@ func (e HashCheckIndependenceVerdict) Valid() bool {
 // Defines values for ImportResultMode.
 const (
 	ImportResultModeCreate ImportResultMode = "create"
+	ImportResultModeMerge  ImportResultMode = "merge"
 )
 
 // Valid indicates whether the value is a known member of the ImportResultMode enum.
 func (e ImportResultMode) Valid() bool {
 	switch e {
 	case ImportResultModeCreate:
+		return true
+	case ImportResultModeMerge:
 		return true
 	default:
 		return false
@@ -1080,6 +1083,21 @@ func (e ListFlagsParamsSort) Valid() bool {
 	case ListFlagsParamsSortName:
 		return true
 	case ListFlagsParamsSortUpdated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImportProjectParamsMode.
+const (
+	ImportProjectParamsModeMerge ImportProjectParamsMode = "merge"
+)
+
+// Valid indicates whether the value is a known member of the ImportProjectParamsMode enum.
+func (e ImportProjectParamsMode) Valid() bool {
+	switch e {
+	case ImportProjectParamsModeMerge:
 		return true
 	default:
 		return false
@@ -4712,6 +4730,9 @@ type IfMatch = string
 // ImportDryRun defines model for ImportDryRun.
 type ImportDryRun = bool
 
+// ImportIfMatch defines model for ImportIfMatch.
+type ImportIfMatch = string
+
 // Limit defines model for Limit.
 type Limit = int
 
@@ -5466,6 +5487,28 @@ type RestoreFlagParams struct {
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
+// ImportProjectJSONBody defines parameters for ImportProject.
+type ImportProjectJSONBody = openapi_types.File
+
+// ImportProjectParams defines parameters for ImportProject.
+type ImportProjectParams struct {
+	// Mode How the document is applied; only `merge` is offered.
+	Mode ImportProjectParamsMode `form:"mode" json:"mode"`
+
+	// DryRun Run the whole import and roll it back, answering what it would have done.
+	DryRun *ImportDryRun `form:"dry_run,omitempty" json:"dry_run,omitempty"`
+
+	// IfMatch The state of the project this import is based on, as the `ETag` of a
+	// dry run or an export answered it. Optional: without it the import
+	// applies to the project as it is. With it, an import is refused
+	// `412 version_mismatch` when the project has changed since, judged
+	// under the project's lock before anything is written.
+	IfMatch *ImportIfMatch `json:"If-Match,omitempty"`
+}
+
+// ImportProjectParamsMode defines parameters for ImportProject.
+type ImportProjectParamsMode string
+
 // DeleteSegmentParams defines parameters for DeleteSegment.
 type DeleteSegmentParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
@@ -5729,6 +5772,9 @@ type CreateGrantJSONRequestBody = GrantCreate
 
 // CheckHashUniformityJSONRequestBody defines body for CheckHashUniformity for application/json ContentType.
 type CheckHashUniformityJSONRequestBody = HashCheckRequest
+
+// ImportProjectJSONRequestBody defines body for ImportProject for application/json ContentType.
+type ImportProjectJSONRequestBody = ImportProjectJSONBody
 
 // InviteProjectMemberJSONRequestBody defines body for InviteProjectMember for application/json ContentType.
 type InviteProjectMemberJSONRequestBody = ProjectInvitationCreate
@@ -9159,6 +9205,114 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
 	CheckHashUniformity(ctx context.Context, project ProjectKey, body CheckHashUniformityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportProjectWithBody Merge a project document into a project
+	//
+	// Merges the document into the project: every environment, unit type,
+	// attribute, segment and flag it names is created, or updated when it
+	// differs from what the project has, by key, and everything else is left
+	// as it is. A section the document lacks is left untouched, so a partial
+	// document is applied as it is. The document is sent as
+	// `application/json` or `application/yaml`, as
+	// `GET /projects/{project}/export` writes it.
+	//
+	// The project's key never changes; its name and description are written
+	// when the document has a `project`. A flag the document names is
+	// written whole, with the configurations the document gives it; the
+	// configuration in an environment the document does not give is left as
+	// it is. The configurations keep the rule identifiers and rollout salts
+	// the document names, so every unit stays in its bucket; a rule or a
+	// rollout without one is given one, unless it equals a rule of the
+	// project's configuration, which it then is. A new environment gives
+	// every flag its initial configuration unless the document configures
+	// it.
+	//
+	// An existing environment keeps whether it is protected: a document that
+	// differs is answered with the warning `protection_kept`. New
+	// environments take the document's value. An owner the document names by
+	// email owns a flag when they may own in the project; otherwise a new
+	// flag is owned by the importing member and an existing one keeps its
+	// owner, with the warning `owner_replaced`. An override keeps its author
+	// when the document leaves it as it was and is the importer's otherwise.
+	// Protection is bypassed in every environment, and only the owner of a
+	// project, never a project token, may import.
+	//
+	// Experiments cannot be imported yet: a document that has any is refused
+	// whole, `unsupported` at each. The import applies whole or not at all;
+	// a document that breaks a rule is 422 `invalid_document` with every fault
+	// found in `errors`, each pointing into the document.
+	//
+	// With `dry_run` the whole import runs, every check the database makes
+	// included, and is rolled back: same answer, nothing written. Every
+	// answer to a dry run carries an `ETag`, the identifier of the project's
+	// latest audit entry, which an import can send as `If-Match` to be
+	// refused when the project has moved since.
+	//
+	// Every entity that differs is written through the context that owns it
+	// and recorded as a direct write records it, then one `project.imported`
+	// entry, all with the request's identifier; an import that changes
+	// nothing writes nothing, records nothing and answers empty changes.
+	// Each environment whose ruleset changed moves on once. A body is
+	// accepted up to 32 MiB.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
+	ImportProjectWithBody(ctx context.Context, project ProjectKey, params *ImportProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportProject Merge a project document into a project
+	//
+	// Merges the document into the project: every environment, unit type,
+	// attribute, segment and flag it names is created, or updated when it
+	// differs from what the project has, by key, and everything else is left
+	// as it is. A section the document lacks is left untouched, so a partial
+	// document is applied as it is. The document is sent as
+	// `application/json` or `application/yaml`, as
+	// `GET /projects/{project}/export` writes it.
+	//
+	// The project's key never changes; its name and description are written
+	// when the document has a `project`. A flag the document names is
+	// written whole, with the configurations the document gives it; the
+	// configuration in an environment the document does not give is left as
+	// it is. The configurations keep the rule identifiers and rollout salts
+	// the document names, so every unit stays in its bucket; a rule or a
+	// rollout without one is given one, unless it equals a rule of the
+	// project's configuration, which it then is. A new environment gives
+	// every flag its initial configuration unless the document configures
+	// it.
+	//
+	// An existing environment keeps whether it is protected: a document that
+	// differs is answered with the warning `protection_kept`. New
+	// environments take the document's value. An owner the document names by
+	// email owns a flag when they may own in the project; otherwise a new
+	// flag is owned by the importing member and an existing one keeps its
+	// owner, with the warning `owner_replaced`. An override keeps its author
+	// when the document leaves it as it was and is the importer's otherwise.
+	// Protection is bypassed in every environment, and only the owner of a
+	// project, never a project token, may import.
+	//
+	// Experiments cannot be imported yet: a document that has any is refused
+	// whole, `unsupported` at each. The import applies whole or not at all;
+	// a document that breaks a rule is 422 `invalid_document` with every fault
+	// found in `errors`, each pointing into the document.
+	//
+	// With `dry_run` the whole import runs, every check the database makes
+	// included, and is rolled back: same answer, nothing written. Every
+	// answer to a dry run carries an `ETag`, the identifier of the project's
+	// latest audit entry, which an import can send as `If-Match` to be
+	// refused when the project has moved since.
+	//
+	// Every entity that differs is written through the context that owns it
+	// and recorded as a direct write records it, then one `project.imported`
+	// entry, all with the request's identifier; an import that changes
+	// nothing writes nothing, records nothing and answers empty changes.
+	// Each environment whose ruleset changed moves on once. A body is
+	// accepted up to 32 MiB.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
+	ImportProject(ctx context.Context, project ProjectKey, params *ImportProjectParams, body ImportProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// InviteProjectMemberWithBody Invite someone to a project
 	//
@@ -13865,6 +14019,134 @@ func (c *Client) CheckHashUniformityWithBody(ctx context.Context, project Projec
 // Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
 func (c *Client) CheckHashUniformity(ctx context.Context, project ProjectKey, body CheckHashUniformityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCheckHashUniformityRequest(c.Server, project, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportProjectWithBody Merge a project document into a project
+//
+// Merges the document into the project: every environment, unit type,
+// attribute, segment and flag it names is created, or updated when it
+// differs from what the project has, by key, and everything else is left
+// as it is. A section the document lacks is left untouched, so a partial
+// document is applied as it is. The document is sent as
+// `application/json` or `application/yaml`, as
+// `GET /projects/{project}/export` writes it.
+//
+// The project's key never changes; its name and description are written
+// when the document has a `project`. A flag the document names is
+// written whole, with the configurations the document gives it; the
+// configuration in an environment the document does not give is left as
+// it is. The configurations keep the rule identifiers and rollout salts
+// the document names, so every unit stays in its bucket; a rule or a
+// rollout without one is given one, unless it equals a rule of the
+// project's configuration, which it then is. A new environment gives
+// every flag its initial configuration unless the document configures
+// it.
+//
+// An existing environment keeps whether it is protected: a document that
+// differs is answered with the warning `protection_kept`. New
+// environments take the document's value. An owner the document names by
+// email owns a flag when they may own in the project; otherwise a new
+// flag is owned by the importing member and an existing one keeps its
+// owner, with the warning `owner_replaced`. An override keeps its author
+// when the document leaves it as it was and is the importer's otherwise.
+// Protection is bypassed in every environment, and only the owner of a
+// project, never a project token, may import.
+//
+// Experiments cannot be imported yet: a document that has any is refused
+// whole, `unsupported` at each. The import applies whole or not at all;
+// a document that breaks a rule is 422 `invalid_document` with every fault
+// found in `errors`, each pointing into the document.
+//
+// With `dry_run` the whole import runs, every check the database makes
+// included, and is rolled back: same answer, nothing written. Every
+// answer to a dry run carries an `ETag`, the identifier of the project's
+// latest audit entry, which an import can send as `If-Match` to be
+// refused when the project has moved since.
+//
+// Every entity that differs is written through the context that owns it
+// and recorded as a direct write records it, then one `project.imported`
+// entry, all with the request's identifier; an import that changes
+// nothing writes nothing, records nothing and answers empty changes.
+// Each environment whose ruleset changed moves on once. A body is
+// accepted up to 32 MiB.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
+func (c *Client) ImportProjectWithBody(ctx context.Context, project ProjectKey, params *ImportProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportProjectRequestWithBody(c.Server, project, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportProject Merge a project document into a project
+//
+// Merges the document into the project: every environment, unit type,
+// attribute, segment and flag it names is created, or updated when it
+// differs from what the project has, by key, and everything else is left
+// as it is. A section the document lacks is left untouched, so a partial
+// document is applied as it is. The document is sent as
+// `application/json` or `application/yaml`, as
+// `GET /projects/{project}/export` writes it.
+//
+// The project's key never changes; its name and description are written
+// when the document has a `project`. A flag the document names is
+// written whole, with the configurations the document gives it; the
+// configuration in an environment the document does not give is left as
+// it is. The configurations keep the rule identifiers and rollout salts
+// the document names, so every unit stays in its bucket; a rule or a
+// rollout without one is given one, unless it equals a rule of the
+// project's configuration, which it then is. A new environment gives
+// every flag its initial configuration unless the document configures
+// it.
+//
+// An existing environment keeps whether it is protected: a document that
+// differs is answered with the warning `protection_kept`. New
+// environments take the document's value. An owner the document names by
+// email owns a flag when they may own in the project; otherwise a new
+// flag is owned by the importing member and an existing one keeps its
+// owner, with the warning `owner_replaced`. An override keeps its author
+// when the document leaves it as it was and is the importer's otherwise.
+// Protection is bypassed in every environment, and only the owner of a
+// project, never a project token, may import.
+//
+// Experiments cannot be imported yet: a document that has any is refused
+// whole, `unsupported` at each. The import applies whole or not at all;
+// a document that breaks a rule is 422 `invalid_document` with every fault
+// found in `errors`, each pointing into the document.
+//
+// With `dry_run` the whole import runs, every check the database makes
+// included, and is rolled back: same answer, nothing written. Every
+// answer to a dry run carries an `ETag`, the identifier of the project's
+// latest audit entry, which an import can send as `If-Match` to be
+// refused when the project has moved since.
+//
+// Every entity that differs is written through the context that owns it
+// and recorded as a direct write records it, then one `project.imported`
+// entry, all with the request's identifier; an import that changes
+// nothing writes nothing, records nothing and answers empty changes.
+// Each environment whose ruleset changed moves on once. A body is
+// accepted up to 32 MiB.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
+func (c *Client) ImportProject(ctx context.Context, project ProjectKey, params *ImportProjectParams, body ImportProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportProjectRequest(c.Server, project, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -22230,6 +22512,103 @@ func NewCheckHashUniformityRequestWithBody(server string, project ProjectKey, co
 	return req, nil
 }
 
+// NewImportProjectRequest calls the generic ImportProject builder with application/json body
+func NewImportProjectRequest(server string, project ProjectKey, params *ImportProjectParams, body ImportProjectJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewImportProjectRequestWithBody(server, project, params, "application/json", bodyReader)
+}
+
+// NewImportProjectRequestWithBody constructs an http.Request for the ImportProject method, with any body, and a specified content type
+func NewImportProjectRequestWithBody(server string, project ProjectKey, params *ImportProjectParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/import", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "mode", params.Mode, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if params.DryRun != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "dry_run", *params.DryRun, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewInviteProjectMemberRequest calls the generic InviteProjectMember builder with application/json body
 func NewInviteProjectMemberRequest(server string, project ProjectKey, body InviteProjectMemberJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -27108,6 +27487,114 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
 	CheckHashUniformityWithResponse(ctx context.Context, project ProjectKey, body CheckHashUniformityJSONRequestBody, reqEditors ...RequestEditorFn) (*CheckHashUniformityResponse, error)
+
+	// ImportProjectWithBodyWithResponse Merge a project document into a project
+	//
+	// Merges the document into the project: every environment, unit type,
+	// attribute, segment and flag it names is created, or updated when it
+	// differs from what the project has, by key, and everything else is left
+	// as it is. A section the document lacks is left untouched, so a partial
+	// document is applied as it is. The document is sent as
+	// `application/json` or `application/yaml`, as
+	// `GET /projects/{project}/export` writes it.
+	//
+	// The project's key never changes; its name and description are written
+	// when the document has a `project`. A flag the document names is
+	// written whole, with the configurations the document gives it; the
+	// configuration in an environment the document does not give is left as
+	// it is. The configurations keep the rule identifiers and rollout salts
+	// the document names, so every unit stays in its bucket; a rule or a
+	// rollout without one is given one, unless it equals a rule of the
+	// project's configuration, which it then is. A new environment gives
+	// every flag its initial configuration unless the document configures
+	// it.
+	//
+	// An existing environment keeps whether it is protected: a document that
+	// differs is answered with the warning `protection_kept`. New
+	// environments take the document's value. An owner the document names by
+	// email owns a flag when they may own in the project; otherwise a new
+	// flag is owned by the importing member and an existing one keeps its
+	// owner, with the warning `owner_replaced`. An override keeps its author
+	// when the document leaves it as it was and is the importer's otherwise.
+	// Protection is bypassed in every environment, and only the owner of a
+	// project, never a project token, may import.
+	//
+	// Experiments cannot be imported yet: a document that has any is refused
+	// whole, `unsupported` at each. The import applies whole or not at all;
+	// a document that breaks a rule is 422 `invalid_document` with every fault
+	// found in `errors`, each pointing into the document.
+	//
+	// With `dry_run` the whole import runs, every check the database makes
+	// included, and is rolled back: same answer, nothing written. Every
+	// answer to a dry run carries an `ETag`, the identifier of the project's
+	// latest audit entry, which an import can send as `If-Match` to be
+	// refused when the project has moved since.
+	//
+	// Every entity that differs is written through the context that owns it
+	// and recorded as a direct write records it, then one `project.imported`
+	// entry, all with the request's identifier; an import that changes
+	// nothing writes nothing, records nothing and answers empty changes.
+	// Each environment whose ruleset changed moves on once. A body is
+	// accepted up to 32 MiB.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
+	ImportProjectWithBodyWithResponse(ctx context.Context, project ProjectKey, params *ImportProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportProjectResponse, error)
+
+	// ImportProjectWithResponse Merge a project document into a project
+	//
+	// Merges the document into the project: every environment, unit type,
+	// attribute, segment and flag it names is created, or updated when it
+	// differs from what the project has, by key, and everything else is left
+	// as it is. A section the document lacks is left untouched, so a partial
+	// document is applied as it is. The document is sent as
+	// `application/json` or `application/yaml`, as
+	// `GET /projects/{project}/export` writes it.
+	//
+	// The project's key never changes; its name and description are written
+	// when the document has a `project`. A flag the document names is
+	// written whole, with the configurations the document gives it; the
+	// configuration in an environment the document does not give is left as
+	// it is. The configurations keep the rule identifiers and rollout salts
+	// the document names, so every unit stays in its bucket; a rule or a
+	// rollout without one is given one, unless it equals a rule of the
+	// project's configuration, which it then is. A new environment gives
+	// every flag its initial configuration unless the document configures
+	// it.
+	//
+	// An existing environment keeps whether it is protected: a document that
+	// differs is answered with the warning `protection_kept`. New
+	// environments take the document's value. An owner the document names by
+	// email owns a flag when they may own in the project; otherwise a new
+	// flag is owned by the importing member and an existing one keeps its
+	// owner, with the warning `owner_replaced`. An override keeps its author
+	// when the document leaves it as it was and is the importer's otherwise.
+	// Protection is bypassed in every environment, and only the owner of a
+	// project, never a project token, may import.
+	//
+	// Experiments cannot be imported yet: a document that has any is refused
+	// whole, `unsupported` at each. The import applies whole or not at all;
+	// a document that breaks a rule is 422 `invalid_document` with every fault
+	// found in `errors`, each pointing into the document.
+	//
+	// With `dry_run` the whole import runs, every check the database makes
+	// included, and is rolled back: same answer, nothing written. Every
+	// answer to a dry run carries an `ETag`, the identifier of the project's
+	// latest audit entry, which an import can send as `If-Match` to be
+	// refused when the project has moved since.
+	//
+	// Every entity that differs is written through the context that owns it
+	// and recorded as a direct write records it, then one `project.imported`
+	// entry, all with the request's identifier; an import that changes
+	// nothing writes nothing, records nothing and answers empty changes.
+	// Each environment whose ruleset changed moves on once. A body is
+	// accepted up to 32 MiB.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
+	ImportProjectWithResponse(ctx context.Context, project ProjectKey, params *ImportProjectParams, body ImportProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportProjectResponse, error)
 
 	// InviteProjectMemberWithBodyWithResponse Invite someone to a project
 	//
@@ -38118,6 +38605,124 @@ func (r CheckHashUniformityResponse) ContentType() string {
 	return ""
 }
 
+// ImportProjectResponse200Headers the declared response headers of an HTTP 200 response for ImportProject
+type ImportProjectResponse200Headers struct {
+	ETag *string
+}
+
+// ImportProjectResponse401Headers the declared response headers of an HTTP 401 response for ImportProject
+type ImportProjectResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ImportProjectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ImportResult
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *RequestTooLarge
+	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
+	ApplicationproblemJSON415 *Problem
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ImportProjectResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ImportProjectResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ImportProjectResponse) GetJSON200() *ImportResult {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ImportProjectResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ImportProjectResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ImportProjectResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ImportProjectResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r ImportProjectResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r ImportProjectResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r ImportProjectResponse) GetApplicationproblemJSON413() *RequestTooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
+func (r ImportProjectResponse) GetApplicationproblemJSON415() *Problem {
+	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ImportProjectResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r ImportProjectResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportProjectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportProjectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ImportProjectResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // InviteProjectMemberResponse401Headers the declared response headers of an HTTP 401 response for InviteProjectMember
 type InviteProjectMemberResponse401Headers struct {
 	WWWAuthenticate *string
@@ -45478,6 +46083,126 @@ func (c *ClientWithResponses) CheckHashUniformityWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParseCheckHashUniformityResponse(rsp)
+}
+
+// ImportProjectWithBodyWithResponse Merge a project document into a project
+//
+// Merges the document into the project: every environment, unit type,
+// attribute, segment and flag it names is created, or updated when it
+// differs from what the project has, by key, and everything else is left
+// as it is. A section the document lacks is left untouched, so a partial
+// document is applied as it is. The document is sent as
+// `application/json` or `application/yaml`, as
+// `GET /projects/{project}/export` writes it.
+//
+// The project's key never changes; its name and description are written
+// when the document has a `project`. A flag the document names is
+// written whole, with the configurations the document gives it; the
+// configuration in an environment the document does not give is left as
+// it is. The configurations keep the rule identifiers and rollout salts
+// the document names, so every unit stays in its bucket; a rule or a
+// rollout without one is given one, unless it equals a rule of the
+// project's configuration, which it then is. A new environment gives
+// every flag its initial configuration unless the document configures
+// it.
+//
+// An existing environment keeps whether it is protected: a document that
+// differs is answered with the warning `protection_kept`. New
+// environments take the document's value. An owner the document names by
+// email owns a flag when they may own in the project; otherwise a new
+// flag is owned by the importing member and an existing one keeps its
+// owner, with the warning `owner_replaced`. An override keeps its author
+// when the document leaves it as it was and is the importer's otherwise.
+// Protection is bypassed in every environment, and only the owner of a
+// project, never a project token, may import.
+//
+// Experiments cannot be imported yet: a document that has any is refused
+// whole, `unsupported` at each. The import applies whole or not at all;
+// a document that breaks a rule is 422 `invalid_document` with every fault
+// found in `errors`, each pointing into the document.
+//
+// With `dry_run` the whole import runs, every check the database makes
+// included, and is rolled back: same answer, nothing written. Every
+// answer to a dry run carries an `ETag`, the identifier of the project's
+// latest audit entry, which an import can send as `If-Match` to be
+// refused when the project has moved since.
+//
+// Every entity that differs is written through the context that owns it
+// and recorded as a direct write records it, then one `project.imported`
+// entry, all with the request's identifier; an import that changes
+// nothing writes nothing, records nothing and answers empty changes.
+// Each environment whose ruleset changed moves on once. A body is
+// accepted up to 32 MiB.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
+func (c *ClientWithResponses) ImportProjectWithBodyWithResponse(ctx context.Context, project ProjectKey, params *ImportProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportProjectResponse, error) {
+	rsp, err := c.ImportProjectWithBody(ctx, project, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportProjectResponse(rsp)
+}
+
+// ImportProjectWithResponse Merge a project document into a project
+//
+// Merges the document into the project: every environment, unit type,
+// attribute, segment and flag it names is created, or updated when it
+// differs from what the project has, by key, and everything else is left
+// as it is. A section the document lacks is left untouched, so a partial
+// document is applied as it is. The document is sent as
+// `application/json` or `application/yaml`, as
+// `GET /projects/{project}/export` writes it.
+//
+// The project's key never changes; its name and description are written
+// when the document has a `project`. A flag the document names is
+// written whole, with the configurations the document gives it; the
+// configuration in an environment the document does not give is left as
+// it is. The configurations keep the rule identifiers and rollout salts
+// the document names, so every unit stays in its bucket; a rule or a
+// rollout without one is given one, unless it equals a rule of the
+// project's configuration, which it then is. A new environment gives
+// every flag its initial configuration unless the document configures
+// it.
+//
+// An existing environment keeps whether it is protected: a document that
+// differs is answered with the warning `protection_kept`. New
+// environments take the document's value. An owner the document names by
+// email owns a flag when they may own in the project; otherwise a new
+// flag is owned by the importing member and an existing one keeps its
+// owner, with the warning `owner_replaced`. An override keeps its author
+// when the document leaves it as it was and is the importer's otherwise.
+// Protection is bypassed in every environment, and only the owner of a
+// project, never a project token, may import.
+//
+// Experiments cannot be imported yet: a document that has any is refused
+// whole, `unsupported` at each. The import applies whole or not at all;
+// a document that breaks a rule is 422 `invalid_document` with every fault
+// found in `errors`, each pointing into the document.
+//
+// With `dry_run` the whole import runs, every check the database makes
+// included, and is rolled back: same answer, nothing written. Every
+// answer to a dry run carries an `ETag`, the identifier of the project's
+// latest audit entry, which an import can send as `If-Match` to be
+// refused when the project has moved since.
+//
+// Every entity that differs is written through the context that owns it
+// and recorded as a direct write records it, then one `project.imported`
+// entry, all with the request's identifier; an import that changes
+// nothing writes nothing, records nothing and answers empty changes.
+// Each environment whose ruleset changed moves on once. A body is
+// accepted up to 32 MiB.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
+func (c *ClientWithResponses) ImportProjectWithResponse(ctx context.Context, project ProjectKey, params *ImportProjectParams, body ImportProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportProjectResponse, error) {
+	rsp, err := c.ImportProject(ctx, project, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportProjectResponse(rsp)
 }
 
 // InviteProjectMemberWithBodyWithResponse Invite someone to a project
@@ -56008,6 +56733,118 @@ func ParseCheckHashUniformityResponse(rsp *http.Response) (*CheckHashUniformityR
 	return response, nil
 }
 
+// ParseImportProjectResponse parses an HTTP response from a ImportProjectWithResponse call
+func ParseImportProjectResponse(rsp *http.Response) (*ImportProjectResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportProjectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ImportResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest RequestTooLarge
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ImportProjectResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers ImportProjectResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseInviteProjectMemberResponse parses an HTTP response from a InviteProjectMemberWithResponse call
 func ParseInviteProjectMemberResponse(rsp *http.Response) (*InviteProjectMemberResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -59922,6 +60759,9 @@ type ServerInterface interface {
 	// CheckHashUniformity Check the hash's uniformity on real unit IDs
 	// (POST /projects/{project}/hash-check)
 	CheckHashUniformity(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// ImportProject Merge a project document into a project
+	// (POST /projects/{project}/import)
+	ImportProject(w http.ResponseWriter, r *http.Request, project ProjectKey, params ImportProjectParams)
 	// InviteProjectMember Invite someone to a project
 	// (POST /projects/{project}/invitations)
 	InviteProjectMember(w http.ResponseWriter, r *http.Request, project ProjectKey)
@@ -65741,6 +66581,82 @@ func (siw *ServerInterfaceWrapper) CheckHashUniformity(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
+// ImportProject operation middleware
+func (siw *ServerInterfaceWrapper) ImportProject(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ImportProjectParams
+
+	// ------------- Required query parameter "mode" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "mode", r.URL.Query(), &params.Mode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "mode"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "mode", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "dry_run" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "dry_run", r.URL.Query(), &params.DryRun, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "dry_run"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dry_run", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch ImportIfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ImportProject(w, r, project, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // InviteProjectMember operation middleware
 func (siw *ServerInterfaceWrapper) InviteProjectMember(w http.ResponseWriter, r *http.Request) {
 
@@ -67781,6 +68697,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}", wrapper.UpdateProject)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/me", wrapper.GetProjectMe)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/export", wrapper.ExportProject)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/import", wrapper.ImportProject)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments", wrapper.ListEnvironments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/environments", wrapper.CreateEnvironment)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.DeleteEnvironment)
@@ -80872,6 +81789,186 @@ func (response CheckHashUniformity422ApplicationProblemPlusJSONResponse) VisitCh
 	return err
 }
 
+type ImportProjectRequestObject struct {
+	Project  ProjectKey `json:"project"`
+	Params   ImportProjectParams
+	JSONBody *ImportProjectJSONRequestBody
+	Body     io.Reader
+}
+
+type ImportProjectResponseObject interface {
+	VisitImportProjectResponse(w http.ResponseWriter) error
+}
+
+type ImportProject200ResponseHeaders struct {
+	ETag *string
+}
+
+type ImportProject200JSONResponse struct {
+	Body    ImportResult
+	Headers ImportProject200ResponseHeaders
+}
+
+func (response ImportProject200JSONResponse) VisitImportProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportProject400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ImportProject400ApplicationProblemPlusJSONResponse) VisitImportProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportProject401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ImportProject401ApplicationProblemPlusJSONResponse) VisitImportProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportProject403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ImportProject403ApplicationProblemPlusJSONResponse) VisitImportProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportProject404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ImportProject404ApplicationProblemPlusJSONResponse) VisitImportProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportProject409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ImportProject409ApplicationProblemPlusJSONResponse) VisitImportProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportProject412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response ImportProject412ApplicationProblemPlusJSONResponse) VisitImportProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportProject413ApplicationProblemPlusJSONResponse struct {
+	RequestTooLargeApplicationProblemPlusJSONResponse
+}
+
+func (response ImportProject413ApplicationProblemPlusJSONResponse) VisitImportProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportProject415ApplicationProblemPlusJSONResponse Problem
+
+func (response ImportProject415ApplicationProblemPlusJSONResponse) VisitImportProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportProject422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response ImportProject422ApplicationProblemPlusJSONResponse) VisitImportProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type InviteProjectMemberRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Body    *InviteProjectMemberJSONRequestBody
@@ -85948,6 +87045,9 @@ type StrictServerInterface interface {
 	// CheckHashUniformity Check the hash's uniformity on real unit IDs
 	// (POST /projects/{project}/hash-check)
 	CheckHashUniformity(ctx context.Context, request CheckHashUniformityRequestObject) (CheckHashUniformityResponseObject, error)
+	// ImportProject Merge a project document into a project
+	// (POST /projects/{project}/import)
+	ImportProject(ctx context.Context, request ImportProjectRequestObject) (ImportProjectResponseObject, error)
 	// InviteProjectMember Invite someone to a project
 	// (POST /projects/{project}/invitations)
 	InviteProjectMember(ctx context.Context, request InviteProjectMemberRequestObject) (InviteProjectMemberResponseObject, error)
@@ -89689,6 +90789,46 @@ func (sh *strictHandler) CheckHashUniformity(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CheckHashUniformityResponseObject); ok {
 		if err := validResponse.VisitCheckHashUniformityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ImportProject operation middleware
+func (sh *strictHandler) ImportProject(w http.ResponseWriter, r *http.Request, project ProjectKey, params ImportProjectParams) {
+	var request ImportProjectRequestObject
+
+	request.Project = project
+	request.Params = params
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+
+		var body ImportProjectJSONRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+		request.JSONBody = &body
+
+	}
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/yaml") {
+		request.Body = r.Body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ImportProject(ctx, request.(ImportProjectRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ImportProject")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ImportProjectResponseObject); ok {
+		if err := validResponse.VisitImportProjectResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

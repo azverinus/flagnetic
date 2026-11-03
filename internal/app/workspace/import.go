@@ -3,32 +3,118 @@ package workspace
 import (
 	"context"
 
+	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/id"
+	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
 // ImportStore is what the import writes a project's declarations with.
 type ImportStore interface {
 	ProjectCreator
 	DeclarationKeys
+	ProjectUpdater
+	EnvironmentUpdater
+	UnitTypeUpdater
+	AttributeUpdater
 }
 
 // Importer writes the entities of a project document that the workspace
 // context owns. It is the import's port into the context: every method runs
 // the context's own validation, writes the entity and records the audit
 // entry a direct write records, in the unit of work the caller's context
-// carries, which also holds the project's row. It moves no ruleset on: the
+// carries, which also holds the project's row, so the version it reads of an
+// entity is the one its write is based on. It moves no ruleset on: the
 // import does that once per environment when it is done.
 type Importer struct {
-	store ImportStore
-	rec   Recorder
+	tx        Transactor
+	store     ImportStore
+	configure EnvironmentConfigurer
+	rec       Recorder
+	project   *UpdateProject
+	env       *UpdateEnvironment
+	unitType  *UpdateUnitType
+	attribute *UpdateAttribute
 }
 
 // NewImporter returns the importer writing to store and recording through
-// rec.
-func NewImporter(store ImportStore, rec Recorder) *Importer {
-	return &Importer{store: store, rec: rec}
+// rec, which has configure give an environment it creates in a project that
+// has flags a configuration of each.
+func NewImporter(tx Transactor, store ImportStore, configure EnvironmentConfigurer, rec Recorder) *Importer {
+	return &Importer{
+		tx: tx, store: store, configure: configure, rec: rec,
+		project:   NewUpdateProject(tx, store, rec),
+		env:       NewUpdateEnvironment(tx, store, rec),
+		unitType:  NewUpdateUnitType(tx, store, rec),
+		attribute: NewUpdateAttribute(tx, store, rec),
+	}
+}
+
+// UpdateProject changes a project's name and description as an ordinary
+// request does, and returns the project as it is, and whether that changed
+// anything.
+func (i *Importer) UpdateProject(ctx context.Context, project workspace.ProjectID, name, description string,
+	req governance.Request,
+) (workspace.Project, bool, error) {
+	before, err := i.store.LockProject(ctx, project)
+	if err != nil {
+		return workspace.Project{}, false, err
+	}
+	after, err := i.project.Handle(ctx, UpdateProjectCommand{
+		Project: project, Change: workspace.ProjectChange{Name: &name, Description: &description},
+		Expected: precondition.On(before.Version), Request: req,
+	})
+	return after, after.Version != before.Version, err
+}
+
+// UpdateEnvironment renames an environment as an ordinary request does, and
+// says whether that changed anything. Whether it is protected is not an
+// import's to change.
+func (i *Importer) UpdateEnvironment(ctx context.Context, project workspace.ProjectID, key, name string,
+	req governance.Request,
+) (bool, error) {
+	before, err := i.store.EnvironmentByKey(ctx, project, key, false)
+	if err != nil {
+		return false, notFound(err, "environment")
+	}
+	after, err := i.env.Handle(ctx, UpdateEnvironmentCommand{
+		Project: project, Key: key, Change: workspace.EnvironmentChange{Name: &name},
+		Expected: precondition.On(before.Version), Request: req,
+	})
+	return after.Version != before.Version, err
+}
+
+// UpdateUnitType renames a unit type or changes its description as an
+// ordinary request does, and says whether that changed anything.
+func (i *Importer) UpdateUnitType(ctx context.Context, project workspace.ProjectID, key, name, description string,
+	req governance.Request,
+) (bool, error) {
+	before, err := i.store.UnitTypeByKey(ctx, project, key, false)
+	if err != nil {
+		return false, notFound(err, "unit type")
+	}
+	after, err := i.unitType.Handle(ctx, UpdateUnitTypeCommand{
+		Project: project, Key: key, Change: workspace.UnitTypeChange{Name: &name, Description: &description},
+		Expected: precondition.On(before.Version), Request: req,
+	})
+	return after.Version != before.Version, err
+}
+
+// UpdateAttribute renames an attribute or changes its description as an
+// ordinary request does, and says whether that changed anything.
+func (i *Importer) UpdateAttribute(ctx context.Context, project workspace.ProjectID, key, name, description string,
+	req governance.Request,
+) (bool, error) {
+	before, err := i.store.AttributeByKey(ctx, project, key, false)
+	if err != nil {
+		return false, notFound(err, "attribute")
+	}
+	after, err := i.attribute.Handle(ctx, UpdateAttributeCommand{
+		Project: project, Key: key, Change: workspace.AttributeChange{Name: &name, Description: &description},
+		Expected: precondition.On(before.Version), Request: req,
+	})
+	return after.Version != before.Version, err
 }
 
 // CreateProject creates a project holding only what every project holds, the
@@ -56,9 +142,11 @@ func (i *Importer) CreateProject(ctx context.Context, key, name, description str
 
 // CreateEnvironment creates an environment of project at sortOrder,
 // protected or not as the document says: a new environment has nothing to
-// keep protected, so the document's value is taken.
+// keep protected, so the document's value is taken. Every flag the project
+// has is configured in it, switched off, as written by by, the member
+// importing.
 func (i *Importer) CreateEnvironment(ctx context.Context, project workspace.ProjectID, key, name string, protected bool,
-	sortOrder int, req governance.Request,
+	sortOrder int, by *access.MemberID, req governance.Request,
 ) (workspace.Environment, error) {
 	now := i.rec.clock.Now()
 	e, err := workspace.NewEnvironment(id.New[workspace.Environment](i.rec.ids), project, key, name, sortOrder, now)
@@ -67,6 +155,9 @@ func (i *Importer) CreateEnvironment(ctx context.Context, project workspace.Proj
 	}
 	e.Protected = protected
 	if err = i.store.CreateEnvironment(ctx, e); err != nil {
+		return workspace.Environment{}, err
+	}
+	if err = i.configure.ConfigureEnvironment(ctx, e, by); err != nil {
 		return workspace.Environment{}, err
 	}
 	err = i.rec.record(ctx, now, req, governance.Record{

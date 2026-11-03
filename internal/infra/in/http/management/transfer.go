@@ -7,6 +7,7 @@ import (
 	"mime"
 	"net/http"
 	"strconv"
+	"strings"
 
 	apptransfer "github.com/azverinus/flagnetic/internal/app/transfer"
 	"github.com/azverinus/flagnetic/internal/domain/transfer"
@@ -86,6 +87,21 @@ func (s rawBodies) ImportNewProject(w http.ResponseWriter, r *http.Request, para
 	}
 }
 
+func (s rawBodies) ImportProject(w http.ResponseWriter, r *http.Request, _ ProjectKey, params ImportProjectParams) {
+	res, err := s.a.importProject(r, params)
+	if err == nil {
+		err = res.VisitImportProjectResponse(w)
+	}
+	if err != nil {
+		s.a.edge.WriteError(w, r, httpError(err))
+	}
+}
+
+// ImportProject is never routed to: rawBodies serves the operation.
+func (a *api) ImportProject(context.Context, ImportProjectRequestObject) (ImportProjectResponseObject, error) {
+	return nil, errors.New("management: importProject reads its own body and is served by the raw route")
+}
+
 // ImportNewProject is never routed to: rawBodies serves the operation.
 func (a *api) ImportNewProject(context.Context, ImportNewProjectRequestObject) (ImportNewProjectResponseObject, error) {
 	return nil, errors.New("management: importNewProject reads its own body and is served by the raw route")
@@ -144,6 +160,37 @@ func (a *api) importNewProject(r *http.Request, params ImportNewProjectParams) (
 		return ImportNewProject200JSONResponse(importResultOut(res)), nil
 	}
 	return ImportNewProject201JSONResponse(importResultOut(res)), nil
+}
+
+func (a *api) importProject(r *http.Request, params ImportProjectParams) (ImportProjectResponseObject, error) {
+	ctx := r.Context()
+	// The generated route does not check the enum; a mode this server does
+	// not offer must not run as a merge.
+	if !params.Mode.Valid() {
+		return nil, flaghttp.InvalidRequest("mode must be merge")
+	}
+	d, err := readDocument(r)
+	if err != nil {
+		return nil, err
+	}
+	cmd := apptransfer.ImportIntoProjectCommand{
+		Project: projectID(ctx), Document: d, DryRun: params.DryRun != nil && *params.DryRun,
+		Caller: callerMember(ctx), Request: requestOf(ctx),
+	}
+	if params.IfMatch != nil {
+		tag := strings.Trim(strings.TrimSpace(*params.IfMatch), `"`)
+		cmd.IfMatch = &tag
+	}
+	res, err := a.h.ImportIntoProject.Handle(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	out := ImportProject200JSONResponse{Body: importResultOut(res)}
+	if res.DryRun && !res.Latest.IsZero() {
+		etag := `"` + res.Latest.String() + `"`
+		out.Headers.ETag = &etag
+	}
+	return out, nil
 }
 
 func importResultOut(r apptransfer.ImportResult) ImportResult {

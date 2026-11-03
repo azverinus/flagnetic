@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -20,6 +21,9 @@ type Mode string
 const (
 	// ModeCreate makes a new project of exactly the document.
 	ModeCreate Mode = "create"
+	// ModeMerge creates or updates what the document names in a project and
+	// leaves the rest.
+	ModeMerge Mode = "merge"
 )
 
 // Source is what an import read its changes from.
@@ -47,9 +51,16 @@ type Warning struct {
 	Params map[string]any
 }
 
-// WarningOwnerReplaced is the warning of an owner the document names who
-// may not own in the project.
-const WarningOwnerReplaced = "owner_replaced"
+// The warnings an import answers with.
+const (
+	// WarningOwnerReplaced is the warning of an owner the document names who
+	// may not own in the project.
+	WarningOwnerReplaced = "owner_replaced"
+	// WarningProtectionKept is the warning of an existing environment the
+	// document protects, or stops protecting, differently from the project:
+	// an import never changes that.
+	WarningProtectionKept = "protection_kept"
+)
 
 // PatchOperation is one operation of an RFC 6902 JSON Patch.
 type PatchOperation struct {
@@ -141,7 +152,7 @@ func CheckCreate(d Document) error {
 	f.uniqueKeys(d)
 	f.declarations(d)
 	f.configurations(d)
-	f.salts(d)
+	f.salts(d, nil)
 	if len(f) == 0 {
 		return nil
 	}
@@ -247,13 +258,22 @@ func sortedConfigurationKeys(m map[string]Configuration) []string {
 	return keys
 }
 
+// saltOwner is the rollout that has a salt: the rule of a flag, which the
+// same rule of the flag in another environment shares it with.
+type saltOwner struct{ flag, rule string }
+
 // salts refuses a rule identifier that is not a UUID, a salt that is not 16
 // lower-case letters and digits, and a salt shared by rollouts that are not
 // the same rule of one flag in several environments, which is what copying
 // a configuration makes.
-func (f *faults) salts(d Document) {
-	type owner struct{ flag, rule string }
-	owners := map[string]owner{}
+//
+// kept are the salts of rollouts the import leaves where they are, with the
+// rule that has each.
+func (f *faults) salts(d Document, kept map[string]saltOwner) {
+	owners := maps.Clone(kept)
+	if owners == nil {
+		owners = map[string]saltOwner{}
+	}
 	for i, fl := range d.Flags {
 		for _, env := range sortedConfigurationKeys(fl.Configurations) {
 			for j, r := range fl.Configurations[env].Rules {
@@ -273,7 +293,7 @@ func (f *faults) salts(d Document) {
 				// A rule without an identifier is a rule of its own; one with
 				// an identifier is the same rule whatever case its hexadecimal
 				// digits are written in.
-				who := owner{flag: fl.Key, rule: at}
+				who := saltOwner{flag: fl.Key, rule: at}
 				if ruleID, err := id.Parse[flags.Rule](r.ID); err == nil {
 					who.rule = ruleID.String()
 				}

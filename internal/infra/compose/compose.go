@@ -233,6 +233,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	configuration := appflags.ConfigurationDeps{Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
 	owners := appaccess.NewOwnership(accessStore)
 	experimentStore := pgexperiments.NewStore(d.Pool)
+	workspaceImporter := appworkspace.NewImporter(tx, ws, appflags.NewConfigureEnvironment(flagStore), rec)
 	flagImporter := appflags.NewImporter(appflags.ImporterDeps{
 		Tx: tx, Projects: flagStore, Environments: ws, Declarations: ws, Store: flagStore, Owners: owners, Recorder: flagRec,
 		Evaluations: eventStore,
@@ -602,7 +603,13 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		// An import writes through the contexts that own what it writes, in
 		// one unit of work, moving each environment's ruleset on once.
 		ImportNewProject: apptransfer.NewImportNewProject(apptransfer.ImportNewProjectDeps{
-			Tx: tx, Workspace: appworkspace.NewImporter(ws, rec), Flags: transferFlags{flagImporter},
+			Tx: tx, Workspace: workspaceImporter, Flags: transferFlags{flagImporter},
+			Owners: transferOwners{members: accessStore, ownership: owners}, Rulesets: rulesets, Audit: audit,
+			Clock: d.Clock, IDs: d.IDs,
+		}),
+		ImportIntoProject: apptransfer.NewImportIntoProject(apptransfer.ImportIntoProjectDeps{
+			Tx: tx, Projects: transferProjects{ws}, Workspace: ws, Flags: flagStore, Members: accessStore, History: auditLog,
+			WorkspaceImport: workspaceImporter, FlagsImport: transferFlags{flagImporter},
 			Owners: transferOwners{members: accessStore, ownership: owners}, Rulesets: rulesets, Audit: audit,
 			Clock: d.Clock, IDs: d.IDs,
 		}),

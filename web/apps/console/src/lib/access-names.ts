@@ -36,7 +36,8 @@ export type Permission =
   | "change_request.approve"
   | "webhook.manage"
   | "sink.manage"
-  | "project.delete";
+  | "project.delete"
+  | "project.import";
 
 /** Each permission as what it lets a member do, to complete "the permission to …". */
 const permissionNames: Record<Permission, MessageDescriptor> = {
@@ -62,6 +63,7 @@ const permissionNames: Record<Permission, MessageDescriptor> = {
   "webhook.manage": msg`manage webhook subscriptions`,
   "sink.manage": msg`manage sinks`,
   "project.delete": msg`delete the project`,
+  "project.import": msg`import a project document into the project`,
 };
 
 const roleNames: Record<string, MessageDescriptor> = {
