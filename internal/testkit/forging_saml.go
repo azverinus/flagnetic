@@ -167,6 +167,9 @@ func StartForgingSAMLIDP(t testing.TB) *ForgingSAMLIDP {
 	return f
 }
 
+// Close stops the provider answering, as an identity provider that went away.
+func (f *ForgingSAMLIDP) Close() { f.srv.Close() }
+
 // URL returns the address of path on the provider's own server.
 func (f *ForgingSAMLIDP) URL(path string) string { return f.srv.URL + path }
 

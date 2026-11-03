@@ -11,7 +11,9 @@ import (
 	"strings"
 	"time"
 
+	saml2 "github.com/russellhaering/gosaml2"
 	"github.com/russellhaering/gosaml2/types"
+	dsig "github.com/russellhaering/goxmldsig"
 
 	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
 	"github.com/azverinus/flagnetic/internal/domain/identity"
@@ -50,7 +52,17 @@ func (c *Client) VerifyResponse(cfg appidentity.SAMLConfig, response, requestID 
 	if err != nil {
 		return none, err
 	}
-	resp, err := sp.ValidateEncodedResponse(base64.StdEncoding.EncodeToString(raw))
+	encoded := base64.StdEncoding.EncodeToString(raw)
+	resp, err := sp.ValidateEncodedResponse(encoded)
+	var invalid saml2.ErrInvalidValue
+	if errors.As(err, &invalid) && invalid.Reason == saml2.ReasonExpired {
+		// The subject confirmation ended, perhaps within the skew of the
+		// identity provider's clock. The clock goes back only now: moved
+		// before, it would also make a certificate that was just issued, as
+		// one a rotation brings, not valid yet.
+		sp.Clock = dsig.NewFakeClockAt(cfg.Now.Add(-identity.ClockSkew))
+		resp, err = sp.ValidateEncodedResponse(encoded)
+	}
 	if err != nil {
 		return none, fmt.Errorf("verifying the response: %w", err)
 	}

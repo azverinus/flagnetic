@@ -67,10 +67,8 @@ var nameIDFormatURNs = map[string]string{
 	identity.NameIDTransient:    "urn:oasis:names:tc:SAML:2.0:nameid-format:transient",
 }
 
-// serviceProvider returns the gosaml2 service provider cfg describes. Its
-// clock runs the skew behind cfg.Now, so that what gosaml2 judges against it,
-// the validity of a certificate and of a subject confirmation, is judged
-// with the skew allowed.
+// serviceProvider returns the gosaml2 service provider cfg describes, judging
+// the validity of certificates and subject confirmations at cfg.Now.
 func serviceProvider(cfg appidentity.SAMLConfig) (*saml2.SAMLServiceProvider, error) {
 	block, _ := pem.Decode([]byte(cfg.SPCertificate))
 	if block == nil {
@@ -113,7 +111,7 @@ func serviceProvider(cfg appidentity.SAMLConfig) (*saml2.SAMLServiceProvider, er
 		NameIdFormat:                nameIDFormatURNs[cfg.NameIDFormat],
 		IDPCertificateStore:         &dsig.MemoryX509CertificateStore{Roots: roots},
 		SPKeyStore:                  dsig.TLSCertKeyStore(tls.Certificate{Certificate: [][]byte{block.Bytes}, PrivateKey: key}),
-		Clock:                       dsig.NewFakeClockAt(cfg.Now.Add(-identity.ClockSkew)),
+		Clock:                       dsig.NewFakeClockAt(cfg.Now),
 		// A response is a few kilobytes; a megabyte leaves room for the groups
 		// of a person in a large directory.
 		MaximumDecompressedBodySize: 1 << 20,

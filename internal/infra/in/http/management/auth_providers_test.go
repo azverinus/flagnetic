@@ -188,7 +188,7 @@ func TestAnAuthProviderIsRefusedForEachRuleItBreaks(t *testing.T) {
 	}{
 		"a slug starting with a digit": {func(b *management.AuthProviderCreate) { b.Slug = "1corp" }, "invalid_auth_provider", "/slug"},
 		"an uppercase slug":            {func(b *management.AuthProviderCreate) { b.Slug = "Corp" }, "invalid_auth_provider", "/slug"},
-		"another kind":                 {func(b *management.AuthProviderCreate) { b.Kind = "saml" }, "invalid_auth_provider", "/kind"},
+		"another kind":                 {func(b *management.AuthProviderCreate) { b.Kind = "ldap" }, "invalid_auth_provider", "/kind"},
 		"no domain":                    {func(b *management.AuthProviderCreate) { b.Domains = nil }, "invalid_auth_provider", "/domains"},
 		"an email as a domain":         {func(b *management.AuthProviderCreate) { b.Domains = []string{"a@example.com"} }, "invalid_auth_provider", "/domains/0"},
 		"a relative issuer":            {func(b *management.AuthProviderCreate) { b.Issuer = ptr("idp.example.com") }, "invalid_auth_provider", "/issuer"},
