@@ -1,6 +1,6 @@
 # Single sign-on
 
-Members sign in through an identity provider the instance admin has added as an [auth provider](access.md#auth-providers). This guide covers OpenID Connect: how to set a provider up, what a sign-in does, how a person is matched to a member, and what each error on the sign-in page means.
+Members sign in through an identity provider the instance admin has added as an [auth provider](access.md#auth-providers). This guide covers OpenID Connect and SAML: how to set a provider up, what a sign-in does, how a person is matched to a member, and what each error on the sign-in page means.
 
 ## Setting up an OIDC provider
 
@@ -43,17 +43,83 @@ Add a provider with slug `dex`, issuer `https://dex.example.com`, client ID `fla
 
 Create an OpenID Connect client in the realm, with **Client authentication** on and the standard flow enabled. Set **Valid redirect URIs** to `https://flags.example.com/sso/keycloak/callback`. The issuer is `https://keycloak.example.com/realms/<realm>`; the client secret is on the client's *Credentials* tab. Keycloak sets `email_verified` from the user's *Email verified* switch.
 
+## Setting up a SAML provider
+
+1. Set `FLAGNETIC_BASE_URL`, as for an OIDC provider.
+2. As an instance admin, add the provider with `POST /instance/auth-providers`: a `slug`, `kind: saml`, the `domains` it vouches for, and the identity provider's metadata, either as `idp_metadata_url` (fetched now) or pasted as `idp_metadata_xml`; give one of the two. The answer carries the three addresses to register at the identity provider:
+   - `entity_id`, the instance's entity ID for this provider (the audience of its assertions): `<base URL>/sso/<slug>/metadata`;
+   - `metadata_url`, where the instance serves its SAML metadata, which is the same address (`GET /sso/<slug>/metadata`, `application/samlmetadata+xml`), for an identity provider that imports metadata from a URL;
+   - `acs_url`, the assertion consumer service the identity provider posts its responses to: `<base URL>/sso/<slug>/acs`.
+3. Register the instance at the identity provider with those addresses, or by importing the metadata. Several identity providers insist on the entity ID and the ACS being entered by hand; they must be exactly as answered.
+4. Check it with `POST /instance/auth-providers/{slug}/test`, which reads the identity provider's metadata again (fetching it when it came from a URL) and answers what it found: `idp_entity_id`, `idp_sso_url` and the `idp_certificates` (their `sha256` and `not_after`). Nothing is stored.
+
+The provider appears as a button on the sign-in page, and `GET /sso/<slug>/start` begins a sign-in.
+
+### The identity provider's metadata
+
+The metadata is read when the provider is created and again whenever an edit names `idp_metadata_url` or `idp_metadata_xml`; naming one clears the other. The instance takes the entity ID, the single sign-on endpoint with the HTTP-Redirect binding and the signing certificates from it.
+
+- A metadata URL must be `https`, except on a loopback address (`422 insecure_url`); the document is at most 1 MiB, and one that cannot be fetched is `502 provider_unreachable` with the `failure`.
+- Metadata that cannot be used is `422 invalid_auth_provider` with a violation at the field it came from: `invalid_metadata` (not an EntityDescriptor of an identity provider, a DOCTYPE, a certificate that cannot be read, an http single sign-on address away from loopback), `no_redirect_binding` (the identity provider offers no HTTP-Redirect single sign-on service) or `no_signing_certificate`.
+- The `idp_certificates` are the certificates a response may be signed with. The instance does not refresh them yet: to follow the identity provider's rotation, edit the provider with the new metadata.
+
+### The instance's key pair
+
+Creating a SAML provider generates a key pair for it: an RSA-2048 key and a self-signed certificate valid for three years. The private key is sealed under the instance's secret key and never leaves the instance; the certificate is in the SP metadata. The instance signs its authentication requests with the key (`sign_requests`, default true: the HTTP-Redirect binding signs the query with RSA-SHA256) and decrypts encrypted assertions with it; an identity provider that encrypts assertions needs the certificate from the SP metadata.
+
+### Attributes, name identifiers and signing
+
+- `claims` names the assertion attributes the instance reads, as for an OIDC provider's claims: `email`, `name` and `groups` by default. An attribute is matched by its `Name` or its `FriendlyName`, and its first value counts. The email is the NameID when its format is `emailAddress`, otherwise the attribute named by `claims.email`.
+- The subject the sign-in links to an identity is the NameID. With a `transient` NameID it changes at each sign-in, so nothing stays linked: ask for `persistent`, `emailAddress` or `unspecified` instead.
+- `name_id_format` (`unspecified`, the default, `emailAddress`, `persistent` or `transient`) is the format the request asks for.
+- A SAML provider has no verification flag to read: the instance counts an email as verified only inside the provider's `domains`, which are also what decide linking by email and provisioning.
+- Fields of the other kind are refused: `issuer`, `client_id`, `client_secret`, `scopes` and `require_verified_email` belong to OIDC providers, `idp_metadata_url`, `idp_metadata_xml`, `sign_requests` and `name_id_format` to SAML ones (`422 invalid_auth_provider`, violation `not_for_kind`). The pasted document is never answered.
+
+### What the instance checks of a response
+
+The identity provider posts a SAML response to the ACS (at most 1 MiB; the address takes the cross-site POST an identity provider makes, and is bound by the attempt it answers instead). It is verified with [gosaml2](https://github.com/russellhaering/gosaml2) and refused unless:
+
+- the Response or the Assertion is signed by one of the provider's certificates, and every claim is read from the element the signature covers: an assertion wrapped beside a signed one, or an unsigned one, is not read;
+- it is from the identity provider's entity, addressed to the ACS (`Destination` and `Recipient`) and to the instance's entity ID (`Audience`), and its status is success;
+- it answers the request the attempt made: `InResponseTo` is the request's ID. A response nobody asked for is refused, so a sign-in cannot start at the identity provider;
+- its conditions and its subject confirmation hold, with two minutes of clock skew;
+- it holds one assertion, and that assertion was not accepted before: each is remembered until it could no longer be accepted;
+- an encrypted assertion uses RSA-OAEP key transport and AES-CBC or AES-GCM; `rsa-1_5` is refused, and so is any document with a DOCTYPE.
+
+A response that does not pass is `sso_failed`, and a response that says the identity provider refused the person is `idp_error`. The server's log record `single sign-on failed` carries the cause.
+
+An identity provider that starts the sign-in itself (IdP-initiated sign-in) and single logout are not offered.
+
+### Example: Keycloak
+
+Create a client of type SAML in the realm. **Client ID** is the `entity_id`; **Valid redirect URIs** and **Master SAML Processing URL** (or *Assertion Consumer Service POST Binding URL*) the `acs_url`. Turn on **Sign assertions**, set **Name ID format** to `username`, `email` or `persistent`, and add *User Property* mappers `email` (property `email`) and `name`, and a *Group list* mapper named `groups`. Keycloak does not need to verify the instance's requests, so **Client signature required** may stay off; to have it check them, upload the certificate of the SP metadata. The identity provider's metadata is `https://keycloak.example.com/realms/<realm>/protocol/saml/descriptor`.
+
+### Example: Entra ID
+
+In *Enterprise applications*, create an application and choose *Single sign-on*, *SAML*. Set **Identifier (Entity ID)** to the `entity_id` and **Reply URL (Assertion Consumer Service URL)** to the `acs_url`. Under *Attributes & claims*, set the **Unique User Identifier** (NameID) to `user.mail` with the format *Email address*, so the NameID is the email. The attribute names Entra ID sends are URIs; to read the name and the groups, give them in `claims`:
+
+- `name`: `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name`;
+- `groups`: `http://schemas.microsoft.com/ws/2008/06/identity/claims/groups` (add a groups claim first).
+
+Entra ID signs the assertion by default. Use the *App Federation Metadata Url* as `idp_metadata_url`. To have Entra ID encrypt assertions, upload the certificate of the SP metadata as a token encryption certificate.
+
+### Example: Okta
+
+Create a *SAML 2.0* app integration. Set **Single sign-on URL** to the `acs_url` and **Audience URI (SP Entity ID)** to the `entity_id`, **Name ID format** to `EmailAddress` and **Application username** to `Email`. Add attribute statements `email` (`user.email`), `name` (`user.displayName`) and, for groups, `groups` with a filter. Set `idp_metadata_url` to the *Metadata URL* of the *Sign On* tab. Okta signs the assertion; to have it encrypt, switch on **Assertion Encryption** with the certificate of the SP metadata.
+
 ## What a sign-in does
 
 1. The browser opens `/sso/<slug>/start?return_to=<path>`. The instance creates a sign-in attempt that lives ten minutes, sets the cookie `__Host-flagnetic_sso` (plain `flagnetic_sso` only where cookies cannot be `Secure`: on `localhost`, or when `FLAGNETIC_INSECURE_COOKIES` allows it) and sends the browser to the identity provider with a state, a nonce and a PKCE S256 challenge.
 2. The identity provider sends the browser back to `/sso/<slug>/callback`. The instance exchanges the code, verifies the ID token (signature, issuer, audience, expiry, nonce), and stores the verified claims on the attempt. **Nothing about any member changes yet.** An answer is taken once: a replayed one finds the attempt used.
 3. The browser is redirected to `/sso/complete/<attempt>`. The instance checks that the browser presents the attempt's cookie, in constant time, then, in one transaction, resolves the person to a member, provisions or links as the provider allows, opens the session and redirects to `return_to`. A completion from any other browser changes nothing: no member, no identity, no session.
 
-The session records the provider it opened through; `GET /me/sessions` answers `method: oidc` and the provider's slug.
+A SAML sign-in differs in its first two steps. The instance sends the browser to the identity provider's single sign-on endpoint with an AuthnRequest, by the HTTP-Redirect binding, whose ID the attempt remembers and whose `RelayState` is the attempt's state; the identity provider posts its response to `/sso/<slug>/acs`, where the instance verifies it as [above](#what-the-instance-checks-of-a-response) and stores the claims on the attempt. The attempt is taken once there too, so the same response posted again finds it used. Completion is the same.
+
+The session records the provider it opened through; `GET /me/sessions` answers `method: oidc` or `saml` and the provider's slug.
 
 `return_to` is honoured only when it is a path on the instance: one leading `/`, no backslash, no control or whitespace character, no scheme or host. Anything else, such as `//evil.example` or `https://evil.example`, is ignored and the sign-in lands on `/`.
 
-An unknown or disabled provider answers `404` on all three addresses. Disabling a provider keeps its members, identities and grants and stops its sign-ins.
+An unknown or disabled provider answers `404` on all its addresses, and so does an address of the other kind: the ACS and the metadata of an OIDC provider, the callback of a SAML one. Disabling a provider keeps its members, identities and grants and stops its sign-ins.
 
 A provider with identities cannot be deleted (`409 provider_in_use`, `used_by: ["identities"]`); disable it instead.
 
@@ -63,14 +129,14 @@ Every failure redirects to `/sign-in?error=<code>`:
 
 | Code | Meaning | What to do |
 |---|---|---|
-| `sso_failed` | The sign-in could not be verified: the state was unknown, used or expired, the token's signature, issuer, audience, expiry or nonce was wrong, the code exchange was refused (check the client secret), the provider could not be reached, or the attempt was gone when it was completed. | Try again. If it repeats, `POST …/test` the provider and read the server's log: a record `single sign-on failed` carries the cause. |
+| `sso_failed` | The sign-in could not be verified: the state was unknown, used or expired, the token's signature, issuer, audience, expiry or nonce was wrong, the code exchange was refused (check the client secret), a SAML response failed one of the [checks above](#what-the-instance-checks-of-a-response) (not signed by the provider's certificate, another audience or destination, not an answer to the request, expired, replayed, wrapped), the provider could not be reached, or the attempt was gone when it was completed. | Try again. If it repeats, `POST …/test` the provider and read the server's log: a record `single sign-on failed` carries the cause. |
 | `idp_error` | The identity provider refused the sign-in itself, for example the person denied access. | Ask the identity provider's administrator. |
-| `member_not_found` | No member matches the person: their email is outside the provider's domains or unverified, linking by email is off, provisioning is off, or they hold an invitation they have not accepted. | Add the domain, switch `link_by_email` or `auto_provision` on, or invite the person. |
+| `member_not_found` | No member matches the person: their email is outside the provider's domains or (OIDC) unverified, linking by email is off, provisioning is off, or they hold an invitation they have not accepted. | Add the domain, switch `link_by_email` or `auto_provision` on, or invite the person. |
 | `member_deactivated` | The member was deactivated. The failure is audited as `auth.sign_in_failed`. | An instance admin may reactivate them. |
 | `attempt_mismatch` | The browser completing the sign-in is not the one that started it. | Start again in the same browser. |
 
 ## Audit and metrics
 
-A first sign-in records `member.provisioned` or `identity.linked` (or both), and every sign-in `auth.signed_in` with its `method` (`oidc`) and `provider`; a refused sign-in of a known member (one the subject is linked to, or one holding an email the provider vouches for) records `auth.sign_in_failed` with the `reason`: the member's status when it refuses them (`deactivated`, `invited`), or `not_linked` for an active member when the provider does not link by email.
+A first sign-in records `member.provisioned` or `identity.linked` (or both), and every sign-in `auth.signed_in` with its `method` (`oidc` or `saml`) and `provider`; a refused sign-in of a known member (one the subject is linked to, or one holding an email the provider vouches for) records `auth.sign_in_failed` with the `reason`: the member's status when it refuses them (`deactivated`, `invited`), or `not_linked` for an active member when the provider does not link by email.
 
-`flagnetic_sso_sign_ins_total{kind,result}` counts sign-ins that ended, by `kind` (`oidc`) and `result`: `succeeded` or the code above.
+`flagnetic_sso_sign_ins_total{kind,result}` counts sign-ins that ended, by `kind` (`oidc` or `saml`, `unknown` when the sign-in failed before its provider was known) and `result`: `succeeded` or the code above.

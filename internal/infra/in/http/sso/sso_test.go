@@ -57,7 +57,7 @@ func (e env) create(t *testing.T, p provider) string {
 	testkit.RecordSecret(p.clientSecret)
 	body := management.AuthProviderCreate{
 		Slug: cmp.Or(p.slug, slug()), Kind: management.AuthProviderKindOidc, DisplayName: "Corporate SSO", Domains: p.domains,
-		Issuer: p.issuer, ClientId: p.clientID, ClientSecret: &p.clientSecret,
+		Issuer: &p.issuer, ClientId: &p.clientID, ClientSecret: &p.clientSecret,
 		LinkByEmail: &p.linkByEmail, AutoProvision: &p.autoProvision,
 	}
 	res, err := e.admin.CreateAuthProviderWithResponse(t.Context(), body)

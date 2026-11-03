@@ -29,12 +29,16 @@ const (
 	// completePrefix starts the path of the address that completes an attempt;
 	// it takes the place of a provider's slug, which therefore cannot be it.
 	completePrefix = "complete"
+	// maxACSBytes bounds the body of a SAML response posted to the ACS.
+	maxACSBytes = 1 << 20
 )
 
 // Handlers are the use cases the edge calls.
 type Handlers struct {
 	Start    *appidentity.StartSignIn
 	Callback *appidentity.CompleteCallback
+	ACS      *appidentity.CompleteACS
+	Metadata *appidentity.ServeMetadata
 	Complete *appidentity.CompleteSignIn
 }
 
@@ -59,7 +63,9 @@ type edge struct {
 // Mount serves the single sign-on addresses on s:
 //
 //	GET /sso/{provider}/start?return_to=   sends the browser to the provider
-//	GET /sso/{provider}/callback           takes the provider's answer
+//	GET /sso/{provider}/callback           takes an OIDC provider's answer
+//	POST /sso/{provider}/acs               takes a SAML provider's answer
+//	GET /sso/{provider}/metadata           serves the instance's SAML metadata
 //	GET /sso/complete/{attempt}            completes the sign-in in the browser that started it
 func Mount(s *flaghttp.Server, h Handlers, o Options) {
 	e := &edge{Server: s, h: h, o: o}
@@ -67,6 +73,11 @@ func Mount(s *flaghttp.Server, h Handlers, o Options) {
 	// /sso/complete/{attempt} overlap on /sso/complete/start, which the router
 	// cannot rank. The attempt in the address is a secret, never logged.
 	s.Handle("GET /sso/{first}/{second}", http.HandlerFunc(e.route))
+	// The identity provider's response arrives as a cross-site POST by design,
+	// so no check of the request's origin can apply to it: what binds it is
+	// the attempt it answers. It is a few kilobytes; a megabyte leaves room for
+	// the groups of a person in a large directory.
+	s.Handle("POST /sso/{provider}/acs", http.HandlerFunc(e.acs), flaghttp.MaxBodyBytes(maxACSBytes))
 	s.SecretPath("/sso/" + completePrefix + "/{attempt}")
 }
 
@@ -83,6 +94,8 @@ func (e *edge) route(w http.ResponseWriter, r *http.Request) {
 		e.start(w, r, first)
 	case second == "callback":
 		e.callback(w, r, first)
+	case second == "metadata":
+		e.metadata(w, r, first)
 	default:
 		e.WriteError(w, r, notFound)
 	}
@@ -128,6 +141,36 @@ func (e *edge) callback(w http.ResponseWriter, r *http.Request, slug string) {
 	http.Redirect(w, r, "/sso/"+completePrefix+"/"+url.PathEscape(token), http.StatusSeeOther)
 }
 
+func (e *edge) acs(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	if err := r.ParseForm(); err != nil {
+		e.refuse(w, r, &appidentity.SignInFailure{Code: appidentity.CodeSSOFailed, Cause: err})
+		return
+	}
+	token, err := e.h.ACS.Handle(r.Context(), appidentity.ACSCommand{
+		Slug: r.PathValue("provider"), RelayState: r.PostForm.Get("RelayState"), Response: r.PostForm.Get("SAMLResponse"),
+	})
+	if err != nil {
+		e.refuse(w, r, err)
+		return
+	}
+	http.Redirect(w, r, "/sso/"+completePrefix+"/"+url.PathEscape(token), http.StatusSeeOther)
+}
+
+func (e *edge) metadata(w http.ResponseWriter, r *http.Request, slug string) {
+	doc, err := e.h.Metadata.Handle(r.Context(), slug)
+	if err != nil {
+		if !apperrors.IsKind(err, apperrors.KindNotFound) {
+			e.Logger().ErrorContext(r.Context(), "serving SAML metadata", "provider", slug, "error", err)
+		}
+		e.WriteError(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/samlmetadata+xml")
+	_, _ = w.Write(doc) //nolint:gosec // generated XML, served as metadata and not as a page
+}
+
 func (e *edge) complete(w http.ResponseWriter, r *http.Request, token string) {
 	secure := e.secure(r)
 	name := attemptCookieName(secure)
@@ -147,7 +190,7 @@ func (e *edge) complete(w http.ResponseWriter, r *http.Request, token string) {
 		e.refuse(w, r, err)
 		return
 	}
-	e.o.Metrics.count("succeeded")
+	e.o.Metrics.count(string(res.Kind), "succeeded")
 	w.Header().Add("Set-Cookie", e.o.SessionCookie(res.Cookie.Reveal(), secure))
 	http.Redirect(w, r, res.ReturnTo, http.StatusSeeOther)
 }
@@ -162,13 +205,13 @@ func (e *edge) refuse(w http.ResponseWriter, r *http.Request, err error) {
 	var failure *appidentity.SignInFailure
 	switch {
 	case errors.As(err, &failure):
-		e.o.Metrics.count(string(failure.Code))
+		e.o.Metrics.count(string(failure.Kind), string(failure.Code))
 		e.Logger().WarnContext(r.Context(), "single sign-on failed", "code", failure.Code, "error", err)
 		redirectToSignIn(w, r, failure.Code)
 	case apperrors.IsKind(err, apperrors.KindNotFound):
 		e.WriteError(w, r, err)
 	default:
-		e.o.Metrics.count(string(appidentity.CodeSSOFailed))
+		e.o.Metrics.count("", string(appidentity.CodeSSOFailed))
 		e.Logger().ErrorContext(r.Context(), "single sign-on failed", "error", err)
 		redirectToSignIn(w, r, appidentity.CodeSSOFailed)
 	}

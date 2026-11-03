@@ -43,17 +43,17 @@ func (a ssoMembers) MemberByID(ctx context.Context, member identity.MemberID) (a
 	return recordOf(m), ok, err
 }
 
-func (a ssoMembers) ProvisionMember(ctx context.Context, email, displayName, provider, requestID string) (appidentity.MemberRecord, error) {
-	m, err := a.sso.ProvisionMember(ctx, email, displayName, provider, requestID)
+func (a ssoMembers) ProvisionMember(ctx context.Context, email, displayName string, kind identity.Kind, provider, requestID string) (appidentity.MemberRecord, error) {
+	m, err := a.sso.ProvisionMember(ctx, email, displayName, access.SignInMethod(kind), provider, requestID)
 	return recordOf(m), err
 }
 
 func (a ssoMembers) OpenSession(ctx context.Context, s appidentity.SessionRequest) (secret.String, error) {
 	return a.sso.OpenSession(ctx, appaccess.SSOSignIn{
-		Member: memberOf(s.Member), Provider: s.Provider, ClientIP: s.ClientIP, UserAgent: s.UserAgent, RequestID: s.RequestID,
+		Member: memberOf(s.Member), Method: access.SignInMethod(s.Kind), Provider: s.Provider, ClientIP: s.ClientIP, UserAgent: s.UserAgent, RequestID: s.RequestID,
 	})
 }
 
-func (a ssoMembers) RecordFailedSignIn(ctx context.Context, member appidentity.MemberRecord, provider, reason, requestID string) error {
-	return a.sso.RecordFailedSignIn(ctx, memberOf(member), provider, reason, requestID)
+func (a ssoMembers) RecordFailedSignIn(ctx context.Context, member appidentity.MemberRecord, kind identity.Kind, provider, reason, requestID string) error {
+	return a.sso.RecordFailedSignIn(ctx, memberOf(member), access.SignInMethod(kind), provider, reason, requestID)
 }

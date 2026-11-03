@@ -2,6 +2,7 @@ package management
 
 import (
 	"context"
+	"slices"
 
 	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
 	"github.com/azverinus/flagnetic/internal/domain/identity"
@@ -18,6 +19,24 @@ func (o Options) redirectURI(p identity.Provider) string {
 	return identity.RedirectURI(o.BaseURL, p.Slug)
 }
 
+// samlURLs returns the addresses a SAML provider is registered with at its
+// identity provider, empty while the instance has no public URL.
+func (o Options) samlURLs(p identity.Provider) (acs, entity string) {
+	if o.BaseURL == nil {
+		return "", ""
+	}
+	return identity.ACSURL(o.BaseURL, p.Slug), identity.MetadataURL(o.BaseURL, p.Slug)
+}
+
+func idpCertificatesOut(m identity.IDPMetadata) []IdPCertificate {
+	infos := m.CertificateInfos()
+	out := make([]IdPCertificate, len(infos))
+	for i, c := range infos {
+		out[i] = IdPCertificate{Sha256: c.SHA256, NotAfter: c.NotAfter}
+	}
+	return out
+}
+
 // authProviderOut returns p as the API answers it, never with its secret.
 func (a *api) authProviderOut(p identity.Provider) AuthProvider {
 	out := AuthProvider{
@@ -29,6 +48,19 @@ func (a *api) authProviderOut(p identity.Provider) AuthProvider {
 		out.Issuer, out.ClientId, out.ClientSecretSet = &o.Issuer, &o.ClientID, new(true)
 		out.Scopes, out.RequireVerifiedEmail = &o.Scopes, &o.RequireVerifiedEmail
 		out.Claims = &AuthProviderClaims{Email: o.Claims.Email, Name: o.Claims.Name, Groups: o.Claims.Groups}
+	}
+	if c := p.SAML; c != nil {
+		out.IdpEntityId, out.IdpSsoUrl = &c.IDP.EntityID, &c.IDP.SSOURL
+		out.IdpCertificates, out.IdpMetadataRefreshedAt = new(idpCertificatesOut(c.IDP)), &c.RefreshedAt
+		out.SignRequests, out.NameIdFormat = &c.SignRequests, new(SAMLNameIDFormat(c.NameIDFormat))
+		out.Claims = &AuthProviderClaims{Email: c.Claims.Email, Name: c.Claims.Name, Groups: c.Claims.Groups}
+		if c.MetadataURL != "" {
+			out.IdpMetadataUrl = &c.MetadataURL
+		}
+		if acs, entity := a.opts.samlURLs(p); acs != "" {
+			out.AcsUrl, out.EntityId, out.MetadataUrl = &acs, &entity, &entity
+		}
+		return out
 	}
 	if uri := a.opts.redirectURI(p); uri != "" {
 		out.RedirectUri = &uri
@@ -48,6 +80,9 @@ func (a *api) ListAuthProviders(ctx context.Context, _ ListAuthProvidersRequestO
 // CreateAuthProvider adds an auth provider.
 func (a *api) CreateAuthProvider(ctx context.Context, req CreateAuthProviderRequestObject) (CreateAuthProviderResponseObject, error) {
 	b := *req.Body
+	if err := identity.ForeignFields(identity.Kind(b.Kind), createdFields(b)); err != nil {
+		return nil, err
+	}
 	var claims AuthProviderClaimsPatch
 	if b.Claims != nil {
 		claims = *b.Claims
@@ -58,9 +93,15 @@ func (a *api) CreateAuthProvider(ctx context.Context, req CreateAuthProviderRequ
 			Slug: b.Slug, Kind: identity.Kind(b.Kind), DisplayName: b.DisplayName, Enabled: valueOr(b.Enabled, true),
 			Domains: b.Domains, LinkByEmail: valueOr(b.LinkByEmail, false), AutoProvision: valueOr(b.AutoProvision, false),
 			OIDC: identity.OIDCInput{
-				Issuer: b.Issuer, ClientID: b.ClientId, ClientSecret: secret.New(valueOf(b.ClientSecret)), Scopes: valueOr(b.Scopes, nil),
+				Issuer: valueOf(b.Issuer), ClientID: valueOf(b.ClientId), ClientSecret: secret.New(valueOf(b.ClientSecret)),
+				Scopes:               valueOr(b.Scopes, nil),
 				Claims:               identity.Claims{Email: valueOf(claims.Email), Name: valueOf(claims.Name), Groups: valueOf(claims.Groups)},
 				RequireVerifiedEmail: valueOr(b.RequireVerifiedEmail, true),
+			},
+			SAML: identity.SAMLInput{
+				MetadataURL: valueOf(b.IdpMetadataUrl), MetadataXML: valueOf(b.IdpMetadataXml), SignRequests: valueOr(b.SignRequests, true),
+				NameIDFormat: string(valueOr(b.NameIdFormat, "")),
+				Claims:       identity.Claims{Email: valueOf(claims.Email), Name: valueOf(claims.Name), Groups: valueOf(claims.Groups)},
 			},
 		},
 	})
@@ -68,6 +109,23 @@ func (a *api) CreateAuthProvider(ctx context.Context, req CreateAuthProviderRequ
 		return nil, err
 	}
 	return CreateAuthProvider201JSONResponse{Body: a.authProviderOut(p), Headers: CreateAuthProvider201ResponseHeaders{ETag: etag(p.Version)}}, nil
+}
+
+// createdFields names the properties of a provider's creation that belong to
+// one kind of provider only, which the body sets.
+func createdFields(b AuthProviderCreate) []string {
+	var out []string
+	for name, set := range map[string]bool{
+		"issuer": b.Issuer != nil, "client_id": b.ClientId != nil, "client_secret": b.ClientSecret != nil, "scopes": b.Scopes != nil,
+		"require_verified_email": b.RequireVerifiedEmail != nil, "idp_metadata_url": b.IdpMetadataUrl != nil,
+		"idp_metadata_xml": b.IdpMetadataXml != nil, "sign_requests": b.SignRequests != nil, "name_id_format": b.NameIdFormat != nil,
+	} {
+		if set {
+			out = append(out, name)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 // GetAuthProvider answers an auth provider.
@@ -89,6 +147,10 @@ func (a *api) UpdateAuthProvider(ctx context.Context, req UpdateAuthProviderRequ
 	change := identity.ProviderChange{
 		DisplayName: b.DisplayName, Domains: b.Domains, LinkByEmail: b.LinkByEmail, AutoProvision: b.AutoProvision,
 		Issuer: b.Issuer, ClientID: b.ClientId, Scopes: b.Scopes, RequireVerifiedEmail: b.RequireVerifiedEmail,
+		IDPMetadataURL: b.IdpMetadataUrl, IDPMetadataXML: b.IdpMetadataXml, SignRequests: b.SignRequests,
+	}
+	if b.NameIdFormat != nil {
+		change.NameIDFormat = new(string(*b.NameIdFormat))
 	}
 	if b.ClientSecret != nil {
 		change.ClientSecret = new(secret.New(*b.ClientSecret))
@@ -131,14 +193,19 @@ func (a *api) DisableAuthProvider(ctx context.Context, req DisableAuthProviderRe
 	return DisableAuthProvider200JSONResponse{Body: a.authProviderOut(p), Headers: DisableAuthProvider200ResponseHeaders{ETag: etag(p.Version)}}, nil
 }
 
-// TestAuthProvider answers what an auth provider's discovery document says.
+// TestAuthProvider answers what an auth provider's discovery document or
+// metadata says.
 func (a *api) TestAuthProvider(ctx context.Context, req TestAuthProviderRequestObject) (TestAuthProviderResponseObject, error) {
-	d, err := a.h.TestAuthProvider.Handle(ctx, req.Provider)
+	tested, err := a.h.TestAuthProvider.Handle(ctx, req.Provider)
 	if err != nil {
 		return nil, err
 	}
+	if m := tested.SAML; m != nil {
+		return TestAuthProvider200JSONResponse{IdpEntityId: &m.EntityID, IdpSsoUrl: &m.SSOURL, IdpCertificates: new(idpCertificatesOut(*m))}, nil
+	}
+	d := tested.OIDC
 	out := AuthProviderTest{
-		Issuer: d.Issuer, AuthorizationEndpoint: d.AuthorizationEndpoint, TokenEndpoint: d.TokenEndpoint, JwksUri: d.JWKSURI,
+		Issuer: &d.Issuer, AuthorizationEndpoint: &d.AuthorizationEndpoint, TokenEndpoint: &d.TokenEndpoint, JwksUri: &d.JWKSURI,
 	}
 	if d.UserinfoEndpoint != "" {
 		out.UserinfoEndpoint = &d.UserinfoEndpoint

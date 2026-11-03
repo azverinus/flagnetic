@@ -64,6 +64,10 @@ type Attempt struct {
 	StateHash    SecretHash
 	Nonce        string
 	CodeVerifier string
+	// RequestID is the ID of the AuthnRequest of a SAML sign-in, which the
+	// response must answer; the state is the request's RelayState, the nonce
+	// and the verifier are unused. Empty for OIDC.
+	RequestID string
 	// CookieHash binds the attempt to the browser that started it.
 	CookieHash SecretHash
 	// ReturnTo is where the browser lands after signing in, already validated.
@@ -114,4 +118,13 @@ func NewLoginAttempt(attemptID AttemptID, provider ProviderID, returnTo string, 
 		StateHash: HashSecret(s.State), Nonce: s.Nonce, CodeVerifier: s.CodeVerifier, CookieHash: HashSecret(s.Cookie),
 		ReturnTo: ValidReturnTo(returnTo), CreatedAt: now, ExpiresAt: now.Add(AttemptLifetime),
 	}
+}
+
+// NewSAMLLoginAttempt returns the attempt a browser starts to sign in through
+// a SAML provider at now: the state is the RelayState the identity provider
+// hands back, and requestID the AuthnRequest its response must answer.
+func NewSAMLLoginAttempt(attemptID AttemptID, provider ProviderID, returnTo, requestID string, s Secrets, now time.Time) Attempt {
+	a := NewLoginAttempt(attemptID, provider, returnTo, s, now)
+	a.Nonce, a.CodeVerifier, a.RequestID = "", "", requestID
+	return a
 }

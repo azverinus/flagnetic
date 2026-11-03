@@ -17,10 +17,13 @@ export const zSignInRequest = z.object({
 /**
  * The protocol the provider speaks.
  */
-export const zAuthProviderKind = z.enum(["oidc"]);
+export const zAuthProviderKind = z.enum(["oidc", "saml"]);
 
 /**
- * The claims of the provider's tokens that carry what the instance reads of a person.
+ * The claims of an OIDC provider's tokens, or the attributes of a SAML provider's assertions, that carry what
+ * the instance reads of a person. A SAML provider reads the email from the NameID when its format is
+ * `emailAddress`, else from the attribute named here.
+ *
  */
 export const zAuthProviderClaims = z.object({
   email: z.string(),
@@ -35,6 +38,19 @@ export const zAuthProviderClaimsPatch = z.object({
   email: z.string().optional(),
   name: z.string().optional(),
   groups: z.string().optional(),
+});
+
+/**
+ * The format of the subject identifier requested of a SAML identity provider.
+ */
+export const zSamlNameIdFormat = z.enum(["unspecified", "emailAddress", "persistent", "transient"]);
+
+/**
+ * A certificate a SAML identity provider's signatures are checked against.
+ */
+export const zIdPCertificate = z.object({
+  sha256: z.string(),
+  not_after: z.iso.datetime(),
 });
 
 export const zAuthProvider = z.object({
@@ -53,6 +69,16 @@ export const zAuthProvider = z.object({
   claims: zAuthProviderClaims.optional(),
   require_verified_email: z.boolean().optional(),
   redirect_uri: z.string().optional(),
+  idp_metadata_url: z.string().optional(),
+  idp_entity_id: z.string().optional(),
+  idp_sso_url: z.string().optional(),
+  idp_certificates: z.array(zIdPCertificate).optional(),
+  idp_metadata_refreshed_at: z.iso.datetime().optional(),
+  sign_requests: z.boolean().optional(),
+  name_id_format: zSamlNameIdFormat.optional(),
+  acs_url: z.string().optional(),
+  entity_id: z.string().optional(),
+  metadata_url: z.string().optional(),
   created_at: z.iso.datetime(),
   updated_at: z.iso.datetime(),
   version: z.coerce
@@ -69,6 +95,12 @@ export const zAuthProviderList = z.object({
   items: z.array(zAuthProvider),
 });
 
+/**
+ * A provider of kind `oidc` is created from `issuer`, `client_id`, `client_secret` and its optional OIDC
+ * fields; one of kind `saml` from `idp_metadata_url` or `idp_metadata_xml` and its optional SAML fields. A
+ * field of the other kind is refused 422.
+ *
+ */
 export const zAuthProviderCreate = z.object({
   slug: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
   kind: zAuthProviderKind,
@@ -77,11 +109,14 @@ export const zAuthProviderCreate = z.object({
   domains: z.array(z.string()),
   link_by_email: z.boolean().optional(),
   auto_provision: z.boolean().optional(),
-  issuer: z.string(),
-  client_id: z.string(),
+  issuer: z.string().optional(),
+  client_id: z.string().optional(),
   scopes: z.array(z.string()).optional(),
   claims: zAuthProviderClaimsPatch.optional(),
   require_verified_email: z.boolean().optional(),
+  idp_metadata_url: z.string().optional(),
+  sign_requests: z.boolean().optional(),
+  name_id_format: zSamlNameIdFormat.optional(),
 });
 
 /**
@@ -97,16 +132,24 @@ export const zAuthProviderPatch = z.object({
   scopes: z.array(z.string()).optional(),
   claims: zAuthProviderClaimsPatch.optional(),
   require_verified_email: z.boolean().optional(),
+  idp_metadata_url: z.string().optional(),
+  sign_requests: z.boolean().optional(),
+  name_id_format: zSamlNameIdFormat.optional(),
 });
 
 /**
- * What the provider's discovery document says.
+ * What the provider answers: the discovery document of an OIDC provider, the metadata of a SAML
+ * provider.
+ *
  */
 export const zAuthProviderTest = z.object({
-  issuer: z.string(),
-  authorization_endpoint: z.string(),
-  token_endpoint: z.string(),
-  jwks_uri: z.string(),
+  idp_entity_id: z.string().optional(),
+  idp_sso_url: z.string().optional(),
+  idp_certificates: z.array(zIdPCertificate).optional(),
+  issuer: z.string().optional(),
+  authorization_endpoint: z.string().optional(),
+  token_endpoint: z.string().optional(),
+  jwks_uri: z.string().optional(),
   userinfo_endpoint: z.string().optional(),
   scopes_supported: z.array(z.string()).optional(),
   code_challenge_methods_supported: z.array(z.string()).optional(),
@@ -293,9 +336,9 @@ export const zRoleList = z.object({
 });
 
 /**
- * How the member signed in; `local` is with their email and password, `oidc` through an OIDC auth provider, named by `provider`.
+ * How the member signed in; `local` is with their email and password, `oidc` through an OIDC auth provider and `saml` through a SAML one, named by `provider`.
  */
-export const zSessionMethod = z.enum(["local", "oidc"]);
+export const zSessionMethod = z.enum(["local", "oidc", "saml"]);
 
 /**
  * One device a member is signed in on.
@@ -2629,6 +2672,12 @@ export const zProjectDocument = z.object({
   experiments: z.array(zDocumentExperiment),
 });
 
+/**
+ * A provider of kind `oidc` is created from `issuer`, `client_id`, `client_secret` and its optional OIDC
+ * fields; one of kind `saml` from `idp_metadata_url` or `idp_metadata_xml` and its optional SAML fields. A
+ * field of the other kind is refused 422.
+ *
+ */
 export const zAuthProviderCreateWritable = z.object({
   slug: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
   kind: zAuthProviderKind,
@@ -2637,12 +2686,16 @@ export const zAuthProviderCreateWritable = z.object({
   domains: z.array(z.string()),
   link_by_email: z.boolean().optional(),
   auto_provision: z.boolean().optional(),
-  issuer: z.string(),
-  client_id: z.string(),
-  client_secret: z.string(),
+  issuer: z.string().optional(),
+  client_id: z.string().optional(),
+  client_secret: z.string().optional(),
   scopes: z.array(z.string()).optional(),
   claims: zAuthProviderClaimsPatch.optional(),
   require_verified_email: z.boolean().optional(),
+  idp_metadata_url: z.string().optional(),
+  idp_metadata_xml: z.string().optional(),
+  sign_requests: z.boolean().optional(),
+  name_id_format: zSamlNameIdFormat.optional(),
 });
 
 /**
@@ -2659,6 +2712,10 @@ export const zAuthProviderPatchWritable = z.object({
   scopes: z.array(z.string()).optional(),
   claims: zAuthProviderClaimsPatch.optional(),
   require_verified_email: z.boolean().optional(),
+  idp_metadata_url: z.string().optional(),
+  idp_metadata_xml: z.string().optional(),
+  sign_requests: z.boolean().optional(),
+  name_id_format: zSamlNameIdFormat.optional(),
 });
 
 /**

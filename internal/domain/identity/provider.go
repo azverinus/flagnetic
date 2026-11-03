@@ -30,6 +30,8 @@ type Kind string
 const (
 	// KindOIDC is an OpenID Connect provider, discovered from its issuer.
 	KindOIDC Kind = "oidc"
+	// KindSAML is a SAML 2.0 provider, configured from its metadata.
+	KindSAML Kind = "saml"
 )
 
 // Claims name the claims of an OIDC provider's tokens that carry what the
@@ -74,8 +76,9 @@ type Provider struct {
 	Domains       []string
 	LinkByEmail   bool
 	AutoProvision bool
-	// OIDC is set for a provider of kind OIDC.
+	// OIDC is set for a provider of kind OIDC, SAML for one of kind SAML.
 	OIDC      *OIDC
+	SAML      *SAML
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	Version   int64
@@ -91,8 +94,10 @@ type ProviderInput struct {
 	Domains       []string
 	LinkByEmail   bool
 	AutoProvision bool
-	// OIDC is what a provider of kind OIDC is configured with.
+	// OIDC is what a provider of kind OIDC is configured with, SAML what one
+	// of kind SAML is.
 	OIDC OIDCInput
+	SAML SAMLInput
 }
 
 // OIDCInput is the OIDC part of a provider's creation.
@@ -128,6 +133,13 @@ type ProviderChange struct {
 	Scopes               *[]string
 	Claims               *ClaimsChange
 	RequireVerifiedEmail *bool
+
+	// IDPMetadataURL and IDPMetadataXML replace where a SAML provider's
+	// metadata comes from; each clears the other.
+	IDPMetadataURL *string
+	IDPMetadataXML *string
+	SignRequests   *bool
+	NameIDFormat   *string
 }
 
 // reservedSlug is no provider's slug: /sso/complete/{attempt} completes a
@@ -151,14 +163,18 @@ var (
 	// starting or ending with a hyphen, with at least two labels.
 	domainPattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
-	errInsecureURL = apperrors.Invalid("insecure_url",
-		"the issuer must be https unless it is on a loopback address",
-		apperrors.Violation{Pointer: "/issuer", Code: "insecure_url", Detail: "the issuer must be https"})
+	errInsecureIssuer = insecureURL("/issuer", "the issuer must be https unless it is on a loopback address")
 )
+
+// insecureURL refuses an address that is http where it must be https.
+func insecureURL(pointer, detail string) error {
+	return apperrors.Invalid("insecure_url", detail, apperrors.Violation{Pointer: pointer, Code: "insecure_url", Detail: detail})
+}
 
 // errUnsupportedKind refuses a kind of provider the instance does not offer.
 var errUnsupportedKind = apperrors.Violation{
-	Pointer: "/kind", Code: "unsupported_kind", Detail: "the kind must be oidc", Params: map[string]any{"allowed": []string{string(KindOIDC)}},
+	Pointer: "/kind", Code: "unsupported_kind", Detail: "the kind must be oidc or saml",
+	Params: map[string]any{"allowed": []string{string(KindOIDC), string(KindSAML)}},
 }
 
 type violations []apperrors.Violation
@@ -186,7 +202,7 @@ func CheckProviderInput(in ProviderInput) (ProviderInput, error) {
 	} else if in.Slug == reservedSlug {
 		v.add("/slug", "reserved_slug", "the slug "+reservedSlug+" is reserved; the address that completes a sign-in is /sso/"+reservedSlug+"/…", nil)
 	}
-	if in.Kind != KindOIDC {
+	if in.Kind != KindOIDC && in.Kind != KindSAML {
 		v = append(v, errUnsupportedKind)
 	}
 	in.DisplayName = checkDisplayName(&v, in.DisplayName)
@@ -198,11 +214,19 @@ func CheckProviderInput(in ProviderInput) (ProviderInput, error) {
 		in.OIDC.Scopes = checkScopes(&v, in.OIDC.Scopes)
 		in.OIDC.Claims = checkClaims(&v, withDefaultClaims(in.OIDC.Claims))
 	}
+	if in.Kind == KindSAML {
+		in.SAML.MetadataURL, in.SAML.MetadataXML = checkMetadataSource(&v, in.SAML.MetadataURL, in.SAML.MetadataXML)
+		in.SAML.NameIDFormat = checkNameIDFormat(&v, in.SAML.NameIDFormat)
+		in.SAML.Claims = checkClaims(&v, withDefaultClaims(in.SAML.Claims))
+	}
 	if err := v.err(); err != nil {
 		return in, err
 	}
-	if in.Kind == KindOIDC {
+	switch in.Kind {
+	case KindOIDC:
 		return in, checkIssuerScheme(in.OIDC.Issuer)
+	case KindSAML:
+		return in, checkMetadataScheme(in.SAML.MetadataURL)
 	}
 	return in, nil
 }
@@ -211,6 +235,9 @@ func CheckProviderInput(in ProviderInput) (ProviderInput, error) {
 // p, in the order CheckProviderInput judges a creation, and the provider with
 // the change applied and normalized.
 func (p Provider) CheckChange(change ProviderChange) (Provider, error) {
+	if err := ForeignFields(p.Kind, change.given()); err != nil {
+		return p, err
+	}
 	var v violations
 	q := p.clone()
 	if change.DisplayName != nil {
@@ -260,6 +287,35 @@ func (p Provider) CheckChange(change ProviderChange) (Provider, error) {
 			o.RequireVerifiedEmail = *change.RequireVerifiedEmail
 		}
 	}
+	if s := q.SAML; s != nil {
+		if change.IDPMetadataURL != nil && change.IDPMetadataXML != nil {
+			v.add("/idp_metadata_xml", "metadata_conflict", "give the metadata as a URL or as a document, not both", nil)
+		} else if change.IDPMetadataURL != nil {
+			s.MetadataURL, s.MetadataXML = *change.IDPMetadataURL, ""
+		} else if change.IDPMetadataXML != nil {
+			s.MetadataURL, s.MetadataXML = "", *change.IDPMetadataXML
+		}
+		s.MetadataURL, s.MetadataXML = checkMetadataSource(&v, s.MetadataURL, s.MetadataXML)
+		if change.SignRequests != nil {
+			s.SignRequests = *change.SignRequests
+		}
+		if change.NameIDFormat != nil {
+			s.NameIDFormat = *change.NameIDFormat
+		}
+		s.NameIDFormat = checkNameIDFormat(&v, s.NameIDFormat)
+		if c := change.Claims; c != nil {
+			if c.Email != nil {
+				s.Claims.Email = *c.Email
+			}
+			if c.Name != nil {
+				s.Claims.Name = *c.Name
+			}
+			if c.Groups != nil {
+				s.Claims.Groups = *c.Groups
+			}
+		}
+		s.Claims = checkClaims(&v, s.Claims)
+	}
 	if err := v.err(); err != nil {
 		return p, err
 	}
@@ -268,7 +324,36 @@ func (p Provider) CheckChange(change ProviderChange) (Provider, error) {
 			return p, err
 		}
 	}
+	if q.SAML != nil {
+		if err := checkMetadataScheme(q.SAML.MetadataURL); err != nil {
+			return p, err
+		}
+	}
 	return q, nil
+}
+
+// given names the fields the change sets that belong to one kind of provider
+// only, as the API calls them, in alphabetical order.
+func (c ProviderChange) given() []string {
+	var out []string
+	for name, set := range map[string]bool{
+		"issuer": c.Issuer != nil, "client_id": c.ClientID != nil, "client_secret": c.ClientSecret != nil,
+		"scopes": c.Scopes != nil, "require_verified_email": c.RequireVerifiedEmail != nil,
+		"idp_metadata_url": c.IDPMetadataURL != nil, "idp_metadata_xml": c.IDPMetadataXML != nil,
+		"sign_requests": c.SignRequests != nil, "name_id_format": c.NameIDFormat != nil,
+	} {
+		if set {
+			out = append(out, name)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// MetadataChanged reports whether change names where the metadata comes from,
+// so the metadata must be read again.
+func (c ProviderChange) MetadataChanged() bool {
+	return c.IDPMetadataURL != nil || c.IDPMetadataXML != nil
 }
 
 // Same reports whether q configures the provider p does, apart from p's
@@ -278,8 +363,10 @@ func (p Provider) Same(q Provider) bool {
 		!slices.Equal(p.Domains, q.Domains) || (p.OIDC == nil) != (q.OIDC == nil) {
 		return false
 	}
-	if p.OIDC == nil {
-		return true
+	if p.SAML != nil {
+		a, b := p.SAML, q.SAML
+		return b != nil && a.MetadataURL == b.MetadataURL && a.MetadataXML == b.MetadataXML && a.SignRequests == b.SignRequests &&
+			a.NameIDFormat == b.NameIDFormat && a.Claims == b.Claims
 	}
 	a, b := p.OIDC, q.OIDC
 	return a.Issuer == b.Issuer && a.ClientID == b.ClientID && slices.Equal(a.Scopes, b.Scopes) && a.Claims == b.Claims &&
@@ -292,6 +379,11 @@ func (p Provider) clone() Provider {
 		o := *p.OIDC
 		o.Scopes = slices.Clone(o.Scopes)
 		p.OIDC = &o
+	}
+	if p.SAML != nil {
+		s := *p.SAML
+		s.IDP.Certificates = slices.Clone(s.IDP.Certificates)
+		p.SAML = &s
 	}
 	return p
 }
@@ -386,7 +478,7 @@ func checkIssuerScheme(issuer string) error {
 	if err != nil || u.Scheme != "http" || IsLoopbackHost(u.Hostname()) {
 		return nil
 	}
-	return errInsecureURL
+	return errInsecureIssuer
 }
 
 // IsLoopbackHost reports whether host is localhost or a loopback address.

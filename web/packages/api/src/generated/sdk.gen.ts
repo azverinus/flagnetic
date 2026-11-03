@@ -4513,11 +4513,17 @@ export const listAuthProviders = <ThrowOnError extends boolean = false>(
  * Adds an identity provider members can sign in through. It vouches only
  * for the email domains it names (`domains`, at least one, lowercased).
  * The client secret is sealed and never read back. The answer carries the
- * `redirect_uri` to register at the identity provider. Refused 422
+ * `redirect_uri` (OIDC) or the `acs_url`, `entity_id` and `metadata_url`
+ * (SAML) to register at the identity provider. A SAML provider's metadata
+ * is fetched or read now, and a key pair for the instance to present to it
+ * is generated and sealed; metadata that cannot be used is 422
+ * `invalid_auth_provider` (violation `no_redirect_binding` when the
+ * identity provider offers no HTTP-Redirect sign-on service), and one that
+ * cannot be fetched 502 `provider_unreachable`. Refused 422
  * `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
- * `insecure_url` for an `http` issuer other than on a loopback address;
- * private networks are allowed. A slug already in use is 409
- * `already_exists`. Audited `auth_provider.created`.
+ * `insecure_url` for an `http` issuer or metadata URL other than on a
+ * loopback address; private networks are allowed. A slug already in use is
+ * 409 `already_exists`. Audited `auth_provider.created`.
  *
  */
 export const createAuthProvider = <ThrowOnError extends boolean = false>(
@@ -4685,10 +4691,12 @@ export const disableAuthProvider = <ThrowOnError extends boolean = false>(
 /**
  * Test that an auth provider can be reached
  *
- * Fetches the provider's discovery document now, enabled or not, and
- * answers what it found. Refused 502 `provider_unreachable` with the
- * `failure` when the provider does not answer, answers anything but a
- * document, or names another issuer. Nothing is stored.
+ * Fetches the provider's discovery document now (OIDC), or fetches its
+ * metadata again and reads it, or reads the metadata pasted (SAML),
+ * enabled or not, and answers what it found. Refused 502
+ * `provider_unreachable` with the `failure` when the provider does not
+ * answer, answers anything but a document, names another issuer, or its
+ * metadata cannot be used. Nothing is stored.
  *
  */
 export const testAuthProvider = <ThrowOnError extends boolean = false>(

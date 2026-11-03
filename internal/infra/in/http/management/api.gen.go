@@ -81,12 +81,15 @@ func (e AttributeType) Valid() bool {
 // Defines values for AuthProviderKind.
 const (
 	AuthProviderKindOidc AuthProviderKind = "oidc"
+	AuthProviderKindSaml AuthProviderKind = "saml"
 )
 
 // Valid indicates whether the value is a known member of the AuthProviderKind enum.
 func (e AuthProviderKind) Valid() bool {
 	switch e {
 	case AuthProviderKindOidc:
+		return true
+	case AuthProviderKindSaml:
 		return true
 	default:
 		return false
@@ -591,6 +594,30 @@ func (e RoleName) Valid() bool {
 	}
 }
 
+// Defines values for SAMLNameIDFormat.
+const (
+	SAMLNameIDFormatEmailAddress SAMLNameIDFormat = "emailAddress"
+	SAMLNameIDFormatPersistent   SAMLNameIDFormat = "persistent"
+	SAMLNameIDFormatTransient    SAMLNameIDFormat = "transient"
+	SAMLNameIDFormatUnspecified  SAMLNameIDFormat = "unspecified"
+)
+
+// Valid indicates whether the value is a known member of the SAMLNameIDFormat enum.
+func (e SAMLNameIDFormat) Valid() bool {
+	switch e {
+	case SAMLNameIDFormatEmailAddress:
+		return true
+	case SAMLNameIDFormatPersistent:
+		return true
+	case SAMLNameIDFormatTransient:
+		return true
+	case SAMLNameIDFormatUnspecified:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SampleRatioSkippedReason.
 const (
 	SampleRatioSkippedReasonBelowMinimumSample SampleRatioSkippedReason = "below_minimum_sample"
@@ -682,6 +709,7 @@ func (e SdkKeyStatus) Valid() bool {
 const (
 	SessionMethodLocal SessionMethod = "local"
 	SessionMethodOidc  SessionMethod = "oidc"
+	SessionMethodSaml  SessionMethod = "saml"
 )
 
 // Valid indicates whether the value is a known member of the SessionMethod enum.
@@ -690,6 +718,8 @@ func (e SessionMethod) Valid() bool {
 	case SessionMethodLocal:
 		return true
 	case SessionMethodOidc:
+		return true
+	case SessionMethodSaml:
 		return true
 	default:
 		return false
@@ -1304,10 +1334,16 @@ type AuthMethods struct {
 
 // AuthProvider defines model for AuthProvider.
 type AuthProvider struct {
+	// AcsUrl SAML only: the address the identity provider posts its responses to, built from
+	// `FLAGNETIC_BASE_URL`; absent while the instance has none.
+	AcsUrl *string `json:"acs_url,omitempty"`
+
 	// AutoProvision Whether a sign-in whose email is in `domains` creates its member.
 	AutoProvision bool `json:"auto_provision"`
 
-	// Claims The claims of the provider's tokens that carry what the instance reads of a person.
+	// Claims The claims of an OIDC provider's tokens, or the attributes of a SAML provider's assertions, that carry what
+	// the instance reads of a person. A SAML provider reads the email from the NameID when its format is
+	// `emailAddress`, else from the attribute named here.
 	Claims   *AuthProviderClaims `json:"claims,omitempty"`
 	ClientId *string             `json:"client_id,omitempty"`
 
@@ -1319,9 +1355,28 @@ type AuthProvider struct {
 	DisplayName string `json:"display_name"`
 
 	// Domains The email domains the provider vouches for, lowercase.
-	Domains []string           `json:"domains"`
-	Enabled bool               `json:"enabled"`
-	Id      openapi_types.UUID `json:"id"`
+	Domains []string `json:"domains"`
+	Enabled bool     `json:"enabled"`
+
+	// EntityId SAML only: the instance's entity ID for the provider, which is its metadata address; absent while
+	// the instance has no `FLAGNETIC_BASE_URL`.
+	EntityId *string            `json:"entity_id,omitempty"`
+	Id       openapi_types.UUID `json:"id"`
+
+	// IdpCertificates SAML only: the certificates the identity provider signs with, read from its metadata.
+	IdpCertificates *[]IdPCertificate `json:"idp_certificates,omitempty"`
+
+	// IdpEntityId SAML only, read from the identity provider's metadata.
+	IdpEntityId *string `json:"idp_entity_id,omitempty"`
+
+	// IdpMetadataRefreshedAt SAML only: when the identity provider's metadata was last read.
+	IdpMetadataRefreshedAt *time.Time `json:"idp_metadata_refreshed_at,omitempty"`
+
+	// IdpMetadataUrl SAML only: where the identity provider's metadata is fetched from; absent when the metadata was pasted.
+	IdpMetadataUrl *string `json:"idp_metadata_url,omitempty"`
+
+	// IdpSsoUrl SAML only: the identity provider's HTTP-Redirect single sign-on address, read from its metadata.
+	IdpSsoUrl *string `json:"idp_sso_url,omitempty"`
 
 	// Issuer The OIDC provider's issuer URL.
 	Issuer *string `json:"issuer,omitempty"`
@@ -1332,7 +1387,13 @@ type AuthProvider struct {
 	// LinkByEmail Whether a sign-in whose email is in `domains` is linked to the existing member with that email.
 	LinkByEmail bool `json:"link_by_email"`
 
-	// RedirectUri The redirect URI to register at the identity provider, built from
+	// MetadataUrl SAML only: where the instance serves its metadata, to import into the identity provider.
+	MetadataUrl *string `json:"metadata_url,omitempty"`
+
+	// NameIdFormat The format of the subject identifier requested of a SAML identity provider.
+	NameIdFormat *SAMLNameIDFormat `json:"name_id_format,omitempty"`
+
+	// RedirectUri OIDC only: the redirect URI to register at the identity provider, built from
 	// `FLAGNETIC_BASE_URL`; absent while the instance has none.
 	RedirectUri *string `json:"redirect_uri,omitempty"`
 
@@ -1340,13 +1401,18 @@ type AuthProvider struct {
 	RequireVerifiedEmail *bool     `json:"require_verified_email,omitempty"`
 	Scopes               *[]string `json:"scopes,omitempty"`
 
+	// SignRequests SAML only: whether the authentication requests are signed.
+	SignRequests *bool `json:"sign_requests,omitempty"`
+
 	// Slug Names the provider in sign-in buttons and URLs; never changes.
 	Slug      string    `json:"slug"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Version   int64     `json:"version"`
 }
 
-// AuthProviderClaims The claims of the provider's tokens that carry what the instance reads of a person.
+// AuthProviderClaims The claims of an OIDC provider's tokens, or the attributes of a SAML provider's assertions, that carry what
+// the instance reads of a person. A SAML provider reads the email from the NameID when its format is
+// `emailAddress`, else from the attribute named here.
 type AuthProviderClaims struct {
 	// Email Default `email`.
 	Email string `json:"email"`
@@ -1365,14 +1431,16 @@ type AuthProviderClaimsPatch struct {
 	Name   *string `json:"name,omitempty"`
 }
 
-// AuthProviderCreate defines model for AuthProviderCreate.
+// AuthProviderCreate A provider of kind `oidc` is created from `issuer`, `client_id`, `client_secret` and its optional OIDC
+// fields; one of kind `saml` from `idp_metadata_url` or `idp_metadata_xml` and its optional SAML fields. A
+// field of the other kind is refused 422.
 type AuthProviderCreate struct {
 	// AutoProvision Default false.
 	AutoProvision *bool `json:"auto_provision,omitempty"`
 
 	// Claims The claims to rename; each absent one is left as it is.
 	Claims       *AuthProviderClaimsPatch `json:"claims,omitempty"`
-	ClientId     string                   `json:"client_id"`
+	ClientId     *string                  `json:"client_id,omitempty"`
 	ClientSecret *string                  `json:"client_secret,omitempty"`
 	DisplayName  string                   `json:"display_name"`
 	Domains      []string                 `json:"domains"`
@@ -1380,8 +1448,14 @@ type AuthProviderCreate struct {
 	// Enabled Default true.
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// Issuer `https`, or `http` on a loopback address.
-	Issuer string `json:"issuer"`
+	// IdpMetadataUrl SAML: where the identity provider's metadata is fetched from, `https` or `http` on a loopback address, at most 1 MiB. Exactly one of this and `idp_metadata_xml`.
+	IdpMetadataUrl *string `json:"idp_metadata_url,omitempty"`
+
+	// IdpMetadataXml SAML: the identity provider's metadata, pasted, at most 1 MiB.
+	IdpMetadataXml *string `json:"idp_metadata_xml,omitempty"`
+
+	// Issuer OIDC: `https`, or `http` on a loopback address.
+	Issuer *string `json:"issuer,omitempty"`
 
 	// Kind The protocol the provider speaks.
 	Kind AuthProviderKind `json:"kind"`
@@ -1389,12 +1463,18 @@ type AuthProviderCreate struct {
 	// LinkByEmail Default false.
 	LinkByEmail *bool `json:"link_by_email,omitempty"`
 
+	// NameIdFormat The format of the subject identifier requested of a SAML identity provider.
+	NameIdFormat *SAMLNameIDFormat `json:"name_id_format,omitempty"`
+
 	// RequireVerifiedEmail Default true.
 	RequireVerifiedEmail *bool `json:"require_verified_email,omitempty"`
 
 	// Scopes Default `openid`, `email` and `profile`.
 	Scopes *[]string `json:"scopes,omitempty"`
-	Slug   string    `json:"slug"`
+
+	// SignRequests SAML: whether the authentication requests are signed. Default true.
+	SignRequests *bool  `json:"sign_requests,omitempty"`
+	Slug         string `json:"slug"`
 }
 
 // AuthProviderKind The protocol the provider speaks.
@@ -1410,29 +1490,49 @@ type AuthProviderPatch struct {
 	AutoProvision *bool `json:"auto_provision,omitempty"`
 
 	// Claims The claims to rename; each absent one is left as it is.
-	Claims               *AuthProviderClaimsPatch `json:"claims,omitempty"`
-	ClientId             *string                  `json:"client_id,omitempty"`
-	ClientSecret         *string                  `json:"client_secret,omitempty"`
-	DisplayName          *string                  `json:"display_name,omitempty"`
-	Domains              *[]string                `json:"domains,omitempty"`
-	Issuer               *string                  `json:"issuer,omitempty"`
-	LinkByEmail          *bool                    `json:"link_by_email,omitempty"`
-	RequireVerifiedEmail *bool                    `json:"require_verified_email,omitempty"`
-	Scopes               *[]string                `json:"scopes,omitempty"`
+	Claims       *AuthProviderClaimsPatch `json:"claims,omitempty"`
+	ClientId     *string                  `json:"client_id,omitempty"`
+	ClientSecret *string                  `json:"client_secret,omitempty"`
+	DisplayName  *string                  `json:"display_name,omitempty"`
+	Domains      *[]string                `json:"domains,omitempty"`
+
+	// IdpMetadataUrl SAML: fetch the identity provider's metadata from here instead; the metadata is read again.
+	IdpMetadataUrl *string `json:"idp_metadata_url,omitempty"`
+
+	// IdpMetadataXml SAML: use this pasted metadata instead; it is read again.
+	IdpMetadataXml *string `json:"idp_metadata_xml,omitempty"`
+	Issuer         *string `json:"issuer,omitempty"`
+	LinkByEmail    *bool   `json:"link_by_email,omitempty"`
+
+	// NameIdFormat The format of the subject identifier requested of a SAML identity provider.
+	NameIdFormat         *SAMLNameIDFormat `json:"name_id_format,omitempty"`
+	RequireVerifiedEmail *bool             `json:"require_verified_email,omitempty"`
+	Scopes               *[]string         `json:"scopes,omitempty"`
+	SignRequests         *bool             `json:"sign_requests,omitempty"`
 }
 
-// AuthProviderTest What the provider's discovery document says.
+// AuthProviderTest What the provider answers: the discovery document of an OIDC provider, the metadata of a SAML
+// provider.
 type AuthProviderTest struct {
-	AuthorizationEndpoint string `json:"authorization_endpoint"`
+	AuthorizationEndpoint *string `json:"authorization_endpoint,omitempty"`
 
 	// CodeChallengeMethodsSupported Absent when the document does not list them; sign-in needs `S256`.
 	CodeChallengeMethodsSupported *[]string `json:"code_challenge_methods_supported,omitempty"`
-	Issuer                        string    `json:"issuer"`
-	JwksUri                       string    `json:"jwks_uri"`
+
+	// IdpCertificates SAML only.
+	IdpCertificates *[]IdPCertificate `json:"idp_certificates,omitempty"`
+
+	// IdpEntityId SAML only.
+	IdpEntityId *string `json:"idp_entity_id,omitempty"`
+
+	// IdpSsoUrl SAML only.
+	IdpSsoUrl *string `json:"idp_sso_url,omitempty"`
+	Issuer    *string `json:"issuer,omitempty"`
+	JwksUri   *string `json:"jwks_uri,omitempty"`
 
 	// ScopesSupported Absent when the document does not list them.
 	ScopesSupported *[]string `json:"scopes_supported,omitempty"`
-	TokenEndpoint   string    `json:"token_endpoint"`
+	TokenEndpoint   *string   `json:"token_endpoint,omitempty"`
 
 	// UserinfoEndpoint Absent when the provider offers none.
 	UserinfoEndpoint *string `json:"userinfo_endpoint,omitempty"`
@@ -2903,6 +3003,14 @@ type HashCheckRequest struct {
 	UnitIds []string `json:"unit_ids"`
 }
 
+// IdPCertificate A certificate a SAML identity provider's signatures are checked against.
+type IdPCertificate struct {
+	NotAfter time.Time `json:"not_after"`
+
+	// Sha256 The lowercase hex SHA-256 of the certificate.
+	Sha256 string `json:"sha256"`
+}
+
 // ImportChanges The keys of the entities an import created, updated and deleted, by kind. Standard attributes are never in it.
 type ImportChanges struct {
 	Attributes   ImportKindChanges `json:"attributes"`
@@ -3552,6 +3660,9 @@ type RuleInput struct {
 	Serve Serve `json:"serve"`
 }
 
+// SAMLNameIDFormat The format of the subject identifier requested of a SAML identity provider.
+type SAMLNameIDFormat string
+
 // SampleRatioAlertDetails defines model for SampleRatioAlertDetails.
 type SampleRatioAlertDetails struct {
 	ChiSquare float64 `json:"chi_square"`
@@ -3861,7 +3972,7 @@ type Session struct {
 	// LastSeenAt The session's last request, written at most once a minute.
 	LastSeenAt time.Time `json:"last_seen_at"`
 
-	// Method How the member signed in; `local` is with their email and password, `oidc` through an OIDC auth provider, named by `provider`.
+	// Method How the member signed in; `local` is with their email and password, `oidc` through an OIDC auth provider and `saml` through a SAML one, named by `provider`.
 	Method SessionMethod `json:"method"`
 
 	// Provider The slug of the auth provider the session opened through; absent for a local sign-in.
@@ -3876,7 +3987,7 @@ type SessionList struct {
 	Items []Session `json:"items"`
 }
 
-// SessionMethod How the member signed in; `local` is with their email and password, `oidc` through an OIDC auth provider, named by `provider`.
+// SessionMethod How the member signed in; `local` is with their email and password, `oidc` through an OIDC auth provider and `saml` through a SAML one, named by `provider`.
 type SessionMethod string
 
 // SessionRevocation defines model for SessionRevocation.
@@ -7111,11 +7222,17 @@ type ClientInterface interface {
 	// Adds an identity provider members can sign in through. It vouches only
 	// for the email domains it names (`domains`, at least one, lowercased).
 	// The client secret is sealed and never read back. The answer carries the
-	// `redirect_uri` to register at the identity provider. Refused 422
+	// `redirect_uri` (OIDC) or the `acs_url`, `entity_id` and `metadata_url`
+	// (SAML) to register at the identity provider. A SAML provider's metadata
+	// is fetched or read now, and a key pair for the instance to present to it
+	// is generated and sealed; metadata that cannot be used is 422
+	// `invalid_auth_provider` (violation `no_redirect_binding` when the
+	// identity provider offers no HTTP-Redirect sign-on service), and one that
+	// cannot be fetched 502 `provider_unreachable`. Refused 422
 	// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
-	// `insecure_url` for an `http` issuer other than on a loopback address;
-	// private networks are allowed. A slug already in use is 409
-	// `already_exists`. Audited `auth_provider.created`.
+	// `insecure_url` for an `http` issuer or metadata URL other than on a
+	// loopback address; private networks are allowed. A slug already in use is
+	// 409 `already_exists`. Audited `auth_provider.created`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -7127,11 +7244,17 @@ type ClientInterface interface {
 	// Adds an identity provider members can sign in through. It vouches only
 	// for the email domains it names (`domains`, at least one, lowercased).
 	// The client secret is sealed and never read back. The answer carries the
-	// `redirect_uri` to register at the identity provider. Refused 422
+	// `redirect_uri` (OIDC) or the `acs_url`, `entity_id` and `metadata_url`
+	// (SAML) to register at the identity provider. A SAML provider's metadata
+	// is fetched or read now, and a key pair for the instance to present to it
+	// is generated and sealed; metadata that cannot be used is 422
+	// `invalid_auth_provider` (violation `no_redirect_binding` when the
+	// identity provider offers no HTTP-Redirect sign-on service), and one that
+	// cannot be fetched 502 `provider_unreachable`. Refused 422
 	// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
-	// `insecure_url` for an `http` issuer other than on a loopback address;
-	// private networks are allowed. A slug already in use is 409
-	// `already_exists`. Audited `auth_provider.created`.
+	// `insecure_url` for an `http` issuer or metadata URL other than on a
+	// loopback address; private networks are allowed. A slug already in use is
+	// 409 `already_exists`. Audited `auth_provider.created`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -7199,10 +7322,12 @@ type ClientInterface interface {
 
 	// TestAuthProvider Test that an auth provider can be reached
 	//
-	// Fetches the provider's discovery document now, enabled or not, and
-	// answers what it found. Refused 502 `provider_unreachable` with the
-	// `failure` when the provider does not answer, answers anything but a
-	// document, or names another issuer. Nothing is stored.
+	// Fetches the provider's discovery document now (OIDC), or fetches its
+	// metadata again and reads it, or reads the metadata pasted (SAML),
+	// enabled or not, and answers what it found. Refused 502
+	// `provider_unreachable` with the `failure` when the provider does not
+	// answer, answers anything but a document, names another issuer, or its
+	// metadata cannot be used. Nothing is stored.
 	//
 	// Corresponds with POST /instance/auth-providers/{provider}/test (the `TestAuthProvider` operationId).
 	TestAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -10500,11 +10625,17 @@ func (c *Client) ListAuthProviders(ctx context.Context, reqEditors ...RequestEdi
 // Adds an identity provider members can sign in through. It vouches only
 // for the email domains it names (`domains`, at least one, lowercased).
 // The client secret is sealed and never read back. The answer carries the
-// `redirect_uri` to register at the identity provider. Refused 422
+// `redirect_uri` (OIDC) or the `acs_url`, `entity_id` and `metadata_url`
+// (SAML) to register at the identity provider. A SAML provider's metadata
+// is fetched or read now, and a key pair for the instance to present to it
+// is generated and sealed; metadata that cannot be used is 422
+// `invalid_auth_provider` (violation `no_redirect_binding` when the
+// identity provider offers no HTTP-Redirect sign-on service), and one that
+// cannot be fetched 502 `provider_unreachable`. Refused 422
 // `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
-// `insecure_url` for an `http` issuer other than on a loopback address;
-// private networks are allowed. A slug already in use is 409
-// `already_exists`. Audited `auth_provider.created`.
+// `insecure_url` for an `http` issuer or metadata URL other than on a
+// loopback address; private networks are allowed. A slug already in use is
+// 409 `already_exists`. Audited `auth_provider.created`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -10526,11 +10657,17 @@ func (c *Client) CreateAuthProviderWithBody(ctx context.Context, contentType str
 // Adds an identity provider members can sign in through. It vouches only
 // for the email domains it names (`domains`, at least one, lowercased).
 // The client secret is sealed and never read back. The answer carries the
-// `redirect_uri` to register at the identity provider. Refused 422
+// `redirect_uri` (OIDC) or the `acs_url`, `entity_id` and `metadata_url`
+// (SAML) to register at the identity provider. A SAML provider's metadata
+// is fetched or read now, and a key pair for the instance to present to it
+// is generated and sealed; metadata that cannot be used is 422
+// `invalid_auth_provider` (violation `no_redirect_binding` when the
+// identity provider offers no HTTP-Redirect sign-on service), and one that
+// cannot be fetched 502 `provider_unreachable`. Refused 422
 // `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
-// `insecure_url` for an `http` issuer other than on a loopback address;
-// private networks are allowed. A slug already in use is 409
-// `already_exists`. Audited `auth_provider.created`.
+// `insecure_url` for an `http` issuer or metadata URL other than on a
+// loopback address; private networks are allowed. A slug already in use is
+// 409 `already_exists`. Audited `auth_provider.created`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -10668,10 +10805,12 @@ func (c *Client) EnableAuthProvider(ctx context.Context, provider AuthProviderSl
 
 // TestAuthProvider Test that an auth provider can be reached
 //
-// Fetches the provider's discovery document now, enabled or not, and
-// answers what it found. Refused 502 `provider_unreachable` with the
-// `failure` when the provider does not answer, answers anything but a
-// document, or names another issuer. Nothing is stored.
+// Fetches the provider's discovery document now (OIDC), or fetches its
+// metadata again and reads it, or reads the metadata pasted (SAML),
+// enabled or not, and answers what it found. Refused 502
+// `provider_unreachable` with the `failure` when the provider does not
+// answer, answers anything but a document, names another issuer, or its
+// metadata cannot be used. Nothing is stored.
 //
 // Corresponds with POST /instance/auth-providers/{provider}/test (the `TestAuthProvider` operationId).
 func (c *Client) TestAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -25666,11 +25805,17 @@ type ClientWithResponsesInterface interface {
 	// Adds an identity provider members can sign in through. It vouches only
 	// for the email domains it names (`domains`, at least one, lowercased).
 	// The client secret is sealed and never read back. The answer carries the
-	// `redirect_uri` to register at the identity provider. Refused 422
+	// `redirect_uri` (OIDC) or the `acs_url`, `entity_id` and `metadata_url`
+	// (SAML) to register at the identity provider. A SAML provider's metadata
+	// is fetched or read now, and a key pair for the instance to present to it
+	// is generated and sealed; metadata that cannot be used is 422
+	// `invalid_auth_provider` (violation `no_redirect_binding` when the
+	// identity provider offers no HTTP-Redirect sign-on service), and one that
+	// cannot be fetched 502 `provider_unreachable`. Refused 422
 	// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
-	// `insecure_url` for an `http` issuer other than on a loopback address;
-	// private networks are allowed. A slug already in use is 409
-	// `already_exists`. Audited `auth_provider.created`.
+	// `insecure_url` for an `http` issuer or metadata URL other than on a
+	// loopback address; private networks are allowed. A slug already in use is
+	// 409 `already_exists`. Audited `auth_provider.created`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -25682,11 +25827,17 @@ type ClientWithResponsesInterface interface {
 	// Adds an identity provider members can sign in through. It vouches only
 	// for the email domains it names (`domains`, at least one, lowercased).
 	// The client secret is sealed and never read back. The answer carries the
-	// `redirect_uri` to register at the identity provider. Refused 422
+	// `redirect_uri` (OIDC) or the `acs_url`, `entity_id` and `metadata_url`
+	// (SAML) to register at the identity provider. A SAML provider's metadata
+	// is fetched or read now, and a key pair for the instance to present to it
+	// is generated and sealed; metadata that cannot be used is 422
+	// `invalid_auth_provider` (violation `no_redirect_binding` when the
+	// identity provider offers no HTTP-Redirect sign-on service), and one that
+	// cannot be fetched 502 `provider_unreachable`. Refused 422
 	// `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
-	// `insecure_url` for an `http` issuer other than on a loopback address;
-	// private networks are allowed. A slug already in use is 409
-	// `already_exists`. Audited `auth_provider.created`.
+	// `insecure_url` for an `http` issuer or metadata URL other than on a
+	// loopback address; private networks are allowed. A slug already in use is
+	// 409 `already_exists`. Audited `auth_provider.created`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -25762,10 +25913,12 @@ type ClientWithResponsesInterface interface {
 
 	// TestAuthProviderWithResponse Test that an auth provider can be reached
 	//
-	// Fetches the provider's discovery document now, enabled or not, and
-	// answers what it found. Refused 502 `provider_unreachable` with the
-	// `failure` when the provider does not answer, answers anything but a
-	// document, or names another issuer. Nothing is stored.
+	// Fetches the provider's discovery document now (OIDC), or fetches its
+	// metadata again and reads it, or reads the metadata pasted (SAML),
+	// enabled or not, and answers what it found. Refused 502
+	// `provider_unreachable` with the `failure` when the provider does not
+	// answer, answers anything but a document, names another issuer, or its
+	// metadata cannot be used. Nothing is stored.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -43701,11 +43854,17 @@ func (c *ClientWithResponses) ListAuthProvidersWithResponse(ctx context.Context,
 // Adds an identity provider members can sign in through. It vouches only
 // for the email domains it names (`domains`, at least one, lowercased).
 // The client secret is sealed and never read back. The answer carries the
-// `redirect_uri` to register at the identity provider. Refused 422
+// `redirect_uri` (OIDC) or the `acs_url`, `entity_id` and `metadata_url`
+// (SAML) to register at the identity provider. A SAML provider's metadata
+// is fetched or read now, and a key pair for the instance to present to it
+// is generated and sealed; metadata that cannot be used is 422
+// `invalid_auth_provider` (violation `no_redirect_binding` when the
+// identity provider offers no HTTP-Redirect sign-on service), and one that
+// cannot be fetched 502 `provider_unreachable`. Refused 422
 // `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
-// `insecure_url` for an `http` issuer other than on a loopback address;
-// private networks are allowed. A slug already in use is 409
-// `already_exists`. Audited `auth_provider.created`.
+// `insecure_url` for an `http` issuer or metadata URL other than on a
+// loopback address; private networks are allowed. A slug already in use is
+// 409 `already_exists`. Audited `auth_provider.created`.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -43723,11 +43882,17 @@ func (c *ClientWithResponses) CreateAuthProviderWithBodyWithResponse(ctx context
 // Adds an identity provider members can sign in through. It vouches only
 // for the email domains it names (`domains`, at least one, lowercased).
 // The client secret is sealed and never read back. The answer carries the
-// `redirect_uri` to register at the identity provider. Refused 422
+// `redirect_uri` (OIDC) or the `acs_url`, `entity_id` and `metadata_url`
+// (SAML) to register at the identity provider. A SAML provider's metadata
+// is fetched or read now, and a key pair for the instance to present to it
+// is generated and sealed; metadata that cannot be used is 422
+// `invalid_auth_provider` (violation `no_redirect_binding` when the
+// identity provider offers no HTTP-Redirect sign-on service), and one that
+// cannot be fetched 502 `provider_unreachable`. Refused 422
 // `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
-// `insecure_url` for an `http` issuer other than on a loopback address;
-// private networks are allowed. A slug already in use is 409
-// `already_exists`. Audited `auth_provider.created`.
+// `insecure_url` for an `http` issuer or metadata URL other than on a
+// loopback address; private networks are allowed. A slug already in use is
+// 409 `already_exists`. Audited `auth_provider.created`.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -43845,10 +44010,12 @@ func (c *ClientWithResponses) EnableAuthProviderWithResponse(ctx context.Context
 
 // TestAuthProviderWithResponse Test that an auth provider can be reached
 //
-// Fetches the provider's discovery document now, enabled or not, and
-// answers what it found. Refused 502 `provider_unreachable` with the
-// `failure` when the provider does not answer, answers anything but a
-// document, or names another issuer. Nothing is stored.
+// Fetches the provider's discovery document now (OIDC), or fetches its
+// metadata again and reads it, or reads the metadata pasted (SAML),
+// enabled or not, and answers what it found. Refused 502
+// `provider_unreachable` with the `failure` when the provider does not
+// answer, answers anything but a document, names another issuer, or its
+// metadata cannot be used. Nothing is stored.
 //
 // Returns a wrapper object for the known response body format(s).
 //

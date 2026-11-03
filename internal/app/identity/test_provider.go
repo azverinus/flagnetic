@@ -4,6 +4,8 @@ import (
 	"context"
 	"unicode/utf8"
 
+	"github.com/azverinus/flagnetic/internal/domain/identity"
+
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 )
 
@@ -30,32 +32,61 @@ type OIDCDiscoverer interface {
 	Discover(ctx context.Context, issuer string) (OIDCDiscovery, error)
 }
 
+// ProviderTested is what testing an auth provider found: the discovery
+// document of an OIDC provider, the metadata of a SAML one.
+type ProviderTested struct {
+	OIDC *OIDCDiscovery
+	SAML *identity.IDPMetadata
+}
+
 // TestProvider checks an auth provider can be reached.
 type TestProvider struct {
 	store      ProviderStore
 	discoverer OIDCDiscoverer
+	saml       SAMLMetadataReader
 }
 
 // NewTestProvider returns the query.
-func NewTestProvider(store ProviderStore, discoverer OIDCDiscoverer) *TestProvider {
-	return &TestProvider{store: store, discoverer: discoverer}
+func NewTestProvider(store ProviderStore, discoverer OIDCDiscoverer, saml SAMLMetadataReader) *TestProvider {
+	return &TestProvider{store: store, discoverer: discoverer, saml: saml}
 }
 
-// Handle fetches the discovery document of the provider with slug, enabled or
-// not, and answers what it found, or refuses provider_unreachable with why.
-// Nothing is stored.
-func (h *TestProvider) Handle(ctx context.Context, slug string) (OIDCDiscovery, error) {
+// Handle fetches the discovery document of the OIDC provider with slug, or
+// fetches again the metadata of the SAML provider, or reads the metadata
+// pasted, enabled or not, and answers what it found, or refuses
+// provider_unreachable with why. Nothing is stored.
+func (h *TestProvider) Handle(ctx context.Context, slug string) (ProviderTested, error) {
 	p, err := providerOf(ctx, h.store, slug)
 	if err != nil {
-		return OIDCDiscovery{}, err
+		return ProviderTested{}, err
+	}
+	if p.SAML != nil {
+		meta, samlErr := h.readMetadata(ctx, p.SAML)
+		if samlErr != nil {
+			return ProviderTested{}, apperrors.BadGateway("provider_unreachable",
+				"the identity provider's metadata could not be fetched or cannot be used").
+				WithCause(samlErr).WithExtension("failure", clip(samlErr.Error(), maxFailureBytes))
+		}
+		return ProviderTested{SAML: &meta}, nil
 	}
 	found, err := h.discoverer.Discover(ctx, p.OIDC.Issuer)
 	if err != nil {
-		return OIDCDiscovery{}, apperrors.BadGateway("provider_unreachable",
+		return ProviderTested{}, apperrors.BadGateway("provider_unreachable",
 			"the identity provider's discovery document could not be fetched or is not the issuer's").
 			WithCause(err).WithExtension("failure", clip(err.Error(), maxFailureBytes))
 	}
-	return found, nil
+	return ProviderTested{OIDC: &found}, nil
+}
+
+func (h *TestProvider) readMetadata(ctx context.Context, s *identity.SAML) (identity.IDPMetadata, error) {
+	raw := []byte(s.MetadataXML)
+	if s.MetadataURL != "" {
+		var err error
+		if raw, err = h.saml.Fetch(ctx, s.MetadataURL); err != nil {
+			return identity.IDPMetadata{}, err
+		}
+	}
+	return h.saml.Parse(raw)
 }
 
 // maxFailureBytes bounds the failure answered for an unreachable provider. The

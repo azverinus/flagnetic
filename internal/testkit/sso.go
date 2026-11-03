@@ -49,11 +49,22 @@ const maxHops = 20
 // holds.
 func (b *Browser) Visit(t testing.TB, rawURL string, opts VisitOptions) Visit {
 	t.Helper()
+	return b.visit(t, http.MethodGet, rawURL, nil, opts)
+}
+
+// Post submits form to rawURL as a page an identity provider served would,
+// then follows the redirects it answers like Visit.
+func (b *Browser) Post(t testing.TB, rawURL string, form url.Values, opts VisitOptions) Visit {
+	t.Helper()
+	return b.visit(t, http.MethodPost, rawURL, form, opts)
+}
+
+func (b *Browser) visit(t testing.TB, method, rawURL string, form url.Values, opts VisitOptions) Visit {
+	t.Helper()
 	client := &http.Client{
 		Jar: b.jar, Transport: b.HTTP.Transport,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
-	method, form := http.MethodGet, url.Values(nil)
 	u := b.resolve(t, rawURL, nil, opts)
 	for range maxHops {
 		if opts.Stop != nil && opts.Stop(u) {

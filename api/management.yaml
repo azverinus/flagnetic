@@ -5061,11 +5061,17 @@ paths:
         Adds an identity provider members can sign in through. It vouches only
         for the email domains it names (`domains`, at least one, lowercased).
         The client secret is sealed and never read back. The answer carries the
-        `redirect_uri` to register at the identity provider. Refused 422
+        `redirect_uri` (OIDC) or the `acs_url`, `entity_id` and `metadata_url`
+        (SAML) to register at the identity provider. A SAML provider's metadata
+        is fetched or read now, and a key pair for the instance to present to it
+        is generated and sealed; metadata that cannot be used is 422
+        `invalid_auth_provider` (violation `no_redirect_binding` when the
+        identity provider offers no HTTP-Redirect sign-on service), and one that
+        cannot be fetched 502 `provider_unreachable`. Refused 422
         `base_url_required` while the instance has no `FLAGNETIC_BASE_URL`, and
-        `insecure_url` for an `http` issuer other than on a loopback address;
-        private networks are allowed. A slug already in use is 409
-        `already_exists`. Audited `auth_provider.created`.
+        `insecure_url` for an `http` issuer or metadata URL other than on a
+        loopback address; private networks are allowed. A slug already in use is
+        409 `already_exists`. Audited `auth_provider.created`.
       x-permission: instance_admin
       tags: [instance]
       requestBody:
@@ -5247,10 +5253,12 @@ paths:
       operationId: testAuthProvider
       summary: Test that an auth provider can be reached
       description: |
-        Fetches the provider's discovery document now, enabled or not, and
-        answers what it found. Refused 502 `provider_unreachable` with the
-        `failure` when the provider does not answer, answers anything but a
-        document, or names another issuer. Nothing is stored.
+        Fetches the provider's discovery document now (OIDC), or fetches its
+        metadata again and reads it, or reads the metadata pasted (SAML),
+        enabled or not, and answers what it found. Refused 502
+        `provider_unreachable` with the `failure` when the provider does not
+        answer, answers anything but a document, names another issuer, or its
+        metadata cannot be used. Nothing is stored.
       x-permission: instance_admin
       tags: [instance]
       responses:
@@ -7030,10 +7038,13 @@ components:
     AuthProviderKind:
       type: string
       description: The protocol the provider speaks.
-      enum: [oidc]
+      enum: [oidc, saml]
     AuthProviderClaims:
       type: object
-      description: The claims of the provider's tokens that carry what the instance reads of a person.
+      description: |
+        The claims of an OIDC provider's tokens, or the attributes of a SAML provider's assertions, that carry what
+        the instance reads of a person. A SAML provider reads the email from the NameID when its format is
+        `emailAddress`, else from the attribute named here.
       required: [email, name, groups]
       properties:
         email:
@@ -7055,6 +7066,21 @@ components:
           type: string
         groups:
           type: string
+    SAMLNameIDFormat:
+      type: string
+      description: The format of the subject identifier requested of a SAML identity provider.
+      enum: [unspecified, emailAddress, persistent, transient]
+    IdPCertificate:
+      type: object
+      description: A certificate a SAML identity provider's signatures are checked against.
+      required: [sha256, not_after]
+      properties:
+        sha256:
+          type: string
+          description: The lowercase hex SHA-256 of the certificate.
+        not_after:
+          type: string
+          format: date-time
     AuthProvider:
       type: object
       required: [id, slug, kind, display_name, enabled, domains, link_by_email, auto_provision, created_at, updated_at, version]
@@ -7104,8 +7130,44 @@ components:
         redirect_uri:
           type: string
           description: |
-            The redirect URI to register at the identity provider, built from
+            OIDC only: the redirect URI to register at the identity provider, built from
             `FLAGNETIC_BASE_URL`; absent while the instance has none.
+        idp_metadata_url:
+          type: string
+          description: "SAML only: where the identity provider's metadata is fetched from; absent when the metadata was pasted."
+        idp_entity_id:
+          type: string
+          description: SAML only, read from the identity provider's metadata.
+        idp_sso_url:
+          type: string
+          description: "SAML only: the identity provider's HTTP-Redirect single sign-on address, read from its metadata."
+        idp_certificates:
+          type: array
+          description: "SAML only: the certificates the identity provider signs with, read from its metadata."
+          items:
+            $ref: "#/components/schemas/IdPCertificate"
+        idp_metadata_refreshed_at:
+          type: string
+          format: date-time
+          description: "SAML only: when the identity provider's metadata was last read."
+        sign_requests:
+          type: boolean
+          description: "SAML only: whether the authentication requests are signed."
+        name_id_format:
+          $ref: "#/components/schemas/SAMLNameIDFormat"
+        acs_url:
+          type: string
+          description: |
+            SAML only: the address the identity provider posts its responses to, built from
+            `FLAGNETIC_BASE_URL`; absent while the instance has none.
+        entity_id:
+          type: string
+          description: |
+            SAML only: the instance's entity ID for the provider, which is its metadata address; absent while
+            the instance has no `FLAGNETIC_BASE_URL`.
+        metadata_url:
+          type: string
+          description: "SAML only: where the instance serves its metadata, to import into the identity provider."
         created_at:
           type: string
           format: date-time
@@ -7125,7 +7187,11 @@ components:
             $ref: "#/components/schemas/AuthProvider"
     AuthProviderCreate:
       type: object
-      required: [slug, kind, display_name, domains, issuer, client_id, client_secret]
+      description: |
+        A provider of kind `oidc` is created from `issuer`, `client_id`, `client_secret` and its optional OIDC
+        fields; one of kind `saml` from `idp_metadata_url` or `idp_metadata_xml` and its optional SAML fields. A
+        field of the other kind is refused 422.
+      required: [slug, kind, display_name, domains]
       properties:
         slug:
           type: string
@@ -7149,7 +7215,7 @@ components:
           description: Default false.
         issuer:
           type: string
-          description: "`https`, or `http` on a loopback address."
+          description: "OIDC: `https`, or `http` on a loopback address."
         client_id:
           type: string
         client_secret:
@@ -7166,6 +7232,18 @@ components:
         require_verified_email:
           type: boolean
           description: Default true.
+        idp_metadata_url:
+          type: string
+          description: "SAML: where the identity provider's metadata is fetched from, `https` or `http` on a loopback address, at most 1 MiB. Exactly one of this and `idp_metadata_xml`."
+        idp_metadata_xml:
+          type: string
+          writeOnly: true
+          description: "SAML: the identity provider's metadata, pasted, at most 1 MiB."
+        sign_requests:
+          type: boolean
+          description: "SAML: whether the authentication requests are signed. Default true."
+        name_id_format:
+          $ref: "#/components/schemas/SAMLNameIDFormat"
     AuthProviderPatch:
       type: object
       description: The properties to change; each absent one is left as it is.
@@ -7196,11 +7274,34 @@ components:
           $ref: "#/components/schemas/AuthProviderClaimsPatch"
         require_verified_email:
           type: boolean
+        idp_metadata_url:
+          type: string
+          description: "SAML: fetch the identity provider's metadata from here instead; the metadata is read again."
+        idp_metadata_xml:
+          type: string
+          writeOnly: true
+          description: "SAML: use this pasted metadata instead; it is read again."
+        sign_requests:
+          type: boolean
+        name_id_format:
+          $ref: "#/components/schemas/SAMLNameIDFormat"
     AuthProviderTest:
       type: object
-      description: What the provider's discovery document says.
-      required: [issuer, authorization_endpoint, token_endpoint, jwks_uri]
+      description: |
+        What the provider answers: the discovery document of an OIDC provider, the metadata of a SAML
+        provider.
       properties:
+        idp_entity_id:
+          type: string
+          description: SAML only.
+        idp_sso_url:
+          type: string
+          description: SAML only.
+        idp_certificates:
+          type: array
+          description: SAML only.
+          items:
+            $ref: "#/components/schemas/IdPCertificate"
         issuer:
           type: string
         authorization_endpoint:
@@ -7553,10 +7654,10 @@ components:
             $ref: "#/components/schemas/Role"
     SessionMethod:
       type: string
-      enum: [local, oidc]
+      enum: [local, oidc, saml]
       description: >-
-        How the member signed in; `local` is with their email and password, `oidc` through an OIDC auth provider,
-        named by `provider`.
+        How the member signed in; `local` is with their email and password, `oidc` through an OIDC auth provider and
+        `saml` through a SAML one, named by `provider`.
     Session:
       type: object
       description: One device a member is signed in on.

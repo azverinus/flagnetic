@@ -90,6 +90,11 @@ type ProviderDeps struct {
 	Sealer Sealer
 	// BaseURL is the instance's public origin, nil when not configured.
 	BaseURL *url.URL
+	// SAML reads the metadata of SAML identity providers and SPKeys makes the
+	// key pairs the instance presents to them; both are unused until a SAML
+	// provider is written.
+	SAML   SAMLMetadataReader
+	SPKeys SPKeyGenerator
 	// References are what keeps a provider from being deleted.
 	References []ProviderReference
 }
@@ -135,6 +140,23 @@ func providerValues(p identity.Provider) map[string]any {
 		v["issuer"], v["client_id"], v["client_secret"] = o.Issuer, o.ClientID, redacted
 		v["scopes"], v["require_verified_email"] = o.Scopes, o.RequireVerifiedEmail
 		v["claims"] = map[string]any{"email": o.Claims.Email, "name": o.Claims.Name, "groups": o.Claims.Groups}
+	}
+	if c := p.SAML; c != nil {
+		v["idp_entity_id"], v["idp_sso_url"] = c.IDP.EntityID, c.IDP.SSOURL
+		v["sign_requests"], v["name_id_format"] = c.SignRequests, c.NameIDFormat
+		v["claims"] = map[string]any{"email": c.Claims.Email, "name": c.Claims.Name, "groups": c.Claims.Groups}
+		certs := make([]string, 0, len(c.IDP.Certificates))
+		for _, info := range c.IDP.CertificateInfos() {
+			certs = append(certs, info.SHA256)
+		}
+		v["idp_certificates"] = certs
+		// The pasted document is as large as a megabyte and its content is in
+		// the certificates and URL above; its audit value is that there is one.
+		if c.MetadataURL != "" {
+			v["idp_metadata_url"] = c.MetadataURL
+		} else {
+			v["idp_metadata_xml"] = "[pasted]"
+		}
 	}
 	return v
 }
@@ -218,12 +240,19 @@ func (h *CreateProvider) Handle(ctx context.Context, cmd CreateProviderCommand) 
 	if err != nil {
 		return identity.Provider{}, err
 	}
-	sealed, err := h.d.Sealer.Seal(secret.PurposeOIDCClientSecret, []byte(in.OIDC.ClientSecret.Reveal()))
-	if err != nil {
-		return identity.Provider{}, err
-	}
 	now := h.d.now()
-	p := identity.New(id.New[identity.Provider](h.d.IDs), in, sealed, now)
+	var p identity.Provider
+	if in.Kind == identity.KindSAML {
+		if p, err = h.newSAML(ctx, in, now); err != nil {
+			return identity.Provider{}, err
+		}
+	} else {
+		sealed, sealErr := h.d.Sealer.Seal(secret.PurposeOIDCClientSecret, []byte(in.OIDC.ClientSecret.Reveal()))
+		if sealErr != nil {
+			return identity.Provider{}, sealErr
+		}
+		p = identity.New(id.New[identity.Provider](h.d.IDs), in, sealed, now)
+	}
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		if txErr := h.d.Store.CreateProvider(ctx, p); txErr != nil {
 			return txErr
@@ -231,6 +260,20 @@ func (h *CreateProvider) Handle(ctx context.Context, cmd CreateProviderCommand) 
 		return h.d.record(ctx, now, cmd.Request, "auth_provider.created", nil, &p)
 	})
 	return p, err
+}
+
+// newSAML returns the SAML provider in names: its identity provider's metadata
+// read, a key pair generated and its private key sealed.
+func (h *CreateProvider) newSAML(ctx context.Context, in identity.ProviderInput, now time.Time) (identity.Provider, error) {
+	meta, err := readIDPMetadata(ctx, h.d.SAML, in.SAML.MetadataURL, in.SAML.MetadataXML)
+	if err != nil {
+		return identity.Provider{}, err
+	}
+	sp, err := sealSPKey(h.d.SPKeys, h.d.Sealer, now)
+	if err != nil {
+		return identity.Provider{}, err
+	}
+	return identity.NewSAML(id.New[identity.Provider](h.d.IDs), in, meta, sp, now), nil
 }
 
 // UpdateProviderCommand is an edit of the provider Slug, based on its version
@@ -266,6 +309,24 @@ func (h *UpdateProvider) Handle(ctx context.Context, cmd UpdateProviderCommand) 
 			return identity.Provider{}, err
 		}
 	}
+	// New metadata is read before the unit of work: a fetch must not hold the
+	// provider's row.
+	var meta *identity.IDPMetadata
+	if cmd.Change.MetadataChanged() {
+		current, err := providerOf(ctx, h.d.Store, cmd.Slug)
+		if err != nil {
+			return identity.Provider{}, err
+		}
+		checked, err := current.CheckChange(cmd.Change)
+		if err != nil {
+			return identity.Provider{}, err
+		}
+		read, err := readIDPMetadata(ctx, h.d.SAML, checked.SAML.MetadataURL, checked.SAML.MetadataXML)
+		if err != nil {
+			return identity.Provider{}, err
+		}
+		meta = &read
+	}
 	now := h.d.now()
 	var out identity.Provider
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
@@ -281,7 +342,10 @@ func (h *UpdateProvider) Handle(ctx context.Context, cmd UpdateProviderCommand) 
 		if err != nil {
 			return err
 		}
-		if sealed == "" && after.Same(before) {
+		if meta != nil && after.SAML != nil {
+			after = after.WithIDPMetadata(*meta, now)
+		}
+		if sealed == "" && meta == nil && after.Same(before) {
 			return nil
 		}
 		if sealed != "" {

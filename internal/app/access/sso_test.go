@@ -51,7 +51,7 @@ func TestSSOProvisionsNoMemberForAnAddressThatIsNoneOrIsTaken(t *testing.T) {
 
 	for name, email := range map[string]string{"not an address": "not-an-address", "a taken address": taken.Email} {
 		err := tx.Within(t.Context(), func(ctx context.Context) error {
-			_, err := sso.ProvisionMember(ctx, email, "Ada", "corp", "req")
+			_, err := sso.ProvisionMember(ctx, email, "Ada", access.SignInOIDC, "corp", "req")
 			return err
 		})
 		if err == nil {

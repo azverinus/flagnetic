@@ -70,7 +70,7 @@ func (s *SSO) MemberByID(ctx context.Context, member access.MemberID) (access.Me
 // ProvisionMember creates the active member a first sign-in through provider
 // asks for, without a password, and records member.provisioned with the new
 // member as its actor: they provisioned themself by signing in.
-func (s *SSO) ProvisionMember(ctx context.Context, email, displayName, provider, requestID string) (access.Member, error) {
+func (s *SSO) ProvisionMember(ctx context.Context, email, displayName string, method access.SignInMethod, provider, requestID string) (access.Member, error) {
 	now := s.clock.Now()
 	m, err := access.NewProvisionedMember(id.New[access.Member](s.ids), email, displayName, now)
 	if err != nil {
@@ -82,7 +82,7 @@ func (s *SSO) ProvisionMember(ctx context.Context, email, displayName, provider,
 	err = s.record(ctx, now, governance.Request{Actor: memberActor(m), ID: requestID}, governance.Record{
 		Action: "member.provisioned",
 		Entity: memberEntity(m),
-		After:  map[string]any{"email": m.Email, "display_name": m.DisplayName, "method": string(access.SignInOIDC), "provider": provider},
+		After:  map[string]any{"email": m.Email, "display_name": m.DisplayName, "method": string(method), "provider": provider},
 	})
 	return m, err
 }
@@ -90,6 +90,9 @@ func (s *SSO) ProvisionMember(ctx context.Context, email, displayName, provider,
 // SSOSignIn is one single sign-on opening a session.
 type SSOSignIn struct {
 	Member access.Member
+	// Method is the protocol of the auth provider the member signed in
+	// through.
+	Method access.SignInMethod
 	// Provider is the slug of the auth provider the member signed in through.
 	Provider string
 	// ClientIP and UserAgent describe the device signing in.
@@ -109,7 +112,7 @@ func (s *SSO) OpenSession(ctx context.Context, in SSOSignIn) (secret.String, err
 	}
 	now := s.clock.Now()
 	session, cookie := access.NewSession(id.New[access.Session](s.ids), access.NewSessionInput{
-		Member: in.Member.ID, Method: access.SignInOIDC, Provider: in.Provider, ClientIP: in.ClientIP, UserAgent: in.UserAgent,
+		Member: in.Member.ID, Method: in.Method, Provider: in.Provider, ClientIP: in.ClientIP, UserAgent: in.UserAgent,
 		Timeouts: settings.SessionTimeouts(), Now: now,
 	}, s.random, s.key)
 	if err = s.store.RecordSignIn(ctx, session.Member, now); err != nil {
@@ -122,14 +125,14 @@ func (s *SSO) OpenSession(ctx context.Context, in SSOSignIn) (secret.String, err
 		return secret.String{}, err
 	}
 	return cookie, s.record(ctx, now, governance.Request{Actor: memberActor(in.Member), ID: in.RequestID}, ssoRecord(
-		"auth.signed_in", in.Member, in.Provider, nil))
+		"auth.signed_in", in.Member, in.Method, in.Provider, nil))
 }
 
 // RecordFailedSignIn records auth.sign_in_failed for a member known to the
 // instance who could not sign in through provider, with reason.
-func (s *SSO) RecordFailedSignIn(ctx context.Context, member access.Member, provider, reason, requestID string) error {
+func (s *SSO) RecordFailedSignIn(ctx context.Context, member access.Member, method access.SignInMethod, provider, reason, requestID string) error {
 	return s.record(ctx, s.clock.Now(), governance.Request{Actor: memberActor(member), ID: requestID},
-		ssoRecord("auth.sign_in_failed", member, provider, map[string]any{"reason": reason}))
+		ssoRecord("auth.sign_in_failed", member, method, provider, map[string]any{"reason": reason}))
 }
 
 func (s *SSO) record(ctx context.Context, now time.Time, req governance.Request, r governance.Record) error {
@@ -142,9 +145,9 @@ func (s *SSO) record(ctx context.Context, now time.Time, req governance.Request,
 
 // ssoRecord is the audit record of action, a sign-in or a failed one, of m
 // through provider.
-func ssoRecord(action string, m access.Member, provider string, more map[string]any) governance.Record {
+func ssoRecord(action string, m access.Member, method access.SignInMethod, provider string, more map[string]any) governance.Record {
 	r := authRecord(action, m, more)
 	after := r.After.(map[string]any)
-	after["method"], after["provider"] = access.SignInOIDC, provider
+	after["method"], after["provider"] = method, provider
 	return r
 }

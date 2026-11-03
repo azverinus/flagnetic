@@ -19,18 +19,19 @@ func (s *Store) CreateAttempt(ctx context.Context, a identity.Attempt, now time.
 		return fmt.Errorf("deleting expired sign-in attempts: %w", err)
 	}
 	_, err := s.db(ctx).Exec(ctx, `
-		INSERT INTO sso_attempts (id, provider_id, intent, state_hash, nonce, code_verifier, cookie_hash, return_to, created_at, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		a.ID.Bytes(), a.Provider.Bytes(), string(a.Intent), a.StateHash[:], a.Nonce, a.CodeVerifier, a.CookieHash[:], a.ReturnTo,
-		a.CreatedAt, a.ExpiresAt)
+		INSERT INTO sso_attempts (id, provider_id, intent, state_hash, nonce, code_verifier, saml_request_id, cookie_hash, return_to,
+		                          created_at, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		a.ID.Bytes(), a.Provider.Bytes(), string(a.Intent), a.StateHash[:], a.Nonce, a.CodeVerifier, nonEmpty(a.RequestID),
+		a.CookieHash[:], a.ReturnTo, a.CreatedAt, a.ExpiresAt)
 	if err != nil {
 		return fmt.Errorf("creating a sign-in attempt: %w", err)
 	}
 	return nil
 }
 
-const attemptColumns = `id, provider_id, intent, state_hash, nonce, code_verifier, cookie_hash, return_to, created_at, expires_at,
-	callback_at, completion_hash, subject, email, email_verified, display_name`
+const attemptColumns = `id, provider_id, intent, state_hash, nonce, code_verifier, saml_request_id, cookie_hash, return_to, created_at,
+	expires_at, callback_at, completion_hash, subject, email, email_verified, display_name`
 
 func scanAttempt(row pgx.Row) (identity.Attempt, error) {
 	var (
@@ -40,15 +41,16 @@ func scanAttempt(row pgx.Row) (identity.Attempt, error) {
 		state, cookie         []byte
 		completion            []byte
 		subject, email, name  *string
+		requestID             *string
 		verified              *bool
 	)
-	err := row.Scan(&attemptID, &providerID, &intent, &state, &a.Nonce, &a.CodeVerifier, &cookie, &a.ReturnTo, &a.CreatedAt,
+	err := row.Scan(&attemptID, &providerID, &intent, &state, &a.Nonce, &a.CodeVerifier, &requestID, &cookie, &a.ReturnTo, &a.CreatedAt,
 		&a.ExpiresAt, &a.CallbackAt, &completion, &subject, &email, &verified, &name)
 	if err != nil {
 		return a, err
 	}
 	a.ID, a.Provider, a.Intent = id.FromBytes[identity.Attempt](attemptID), id.FromBytes[identity.Provider](providerID), identity.Intent(intent)
-	a.StateHash, a.CookieHash = identity.SecretHash(state), identity.SecretHash(cookie)
+	a.StateHash, a.CookieHash, a.RequestID = identity.SecretHash(state), identity.SecretHash(cookie), deref(requestID)
 	a.CreatedAt, a.ExpiresAt = a.CreatedAt.UTC(), a.ExpiresAt.UTC()
 	if completion != nil {
 		h := identity.SecretHash(completion)
