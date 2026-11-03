@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -62,9 +61,21 @@ type forgedCode struct {
 	nonce, challenge, redirect string
 }
 
-// forgedRedirectHosts are the hosts a forging provider sends a browser back
-// to: the public addresses the tests serve an instance at.
-var forgedRedirectHosts = []string{"localhost:8080", "flags.example.com"}
+// forgedRedirectOrigins are the origins a forging provider sends a browser
+// back to: the public addresses the tests serve an instance at.
+var forgedRedirectOrigins = []string{"http://localhost:8080", "https://flags.example.com", "http://flags.example.com"}
+
+// forgedOrigin returns the listed origin that origin names. The redirect is
+// built from the listed value, so nothing a request carried decides where the
+// browser goes but the path, under an origin the tests serve.
+func forgedOrigin(origin string) (string, bool) {
+	for _, known := range forgedRedirectOrigins {
+		if known == origin {
+			return known, true
+		}
+	}
+	return "", false
+}
 
 // StartForgingIDP starts a forging provider that ends with the test.
 func StartForgingIDP(t testing.TB) *ForgingIDP {
@@ -157,8 +168,13 @@ func jwk(k *rsa.PublicKey, kid string) map[string]string {
 func (f *ForgingIDP) authorize(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	back, err := url.Parse(q.Get("redirect_uri"))
-	if err != nil || q.Get("client_id") != f.ClientID || back.User != nil || !slices.Contains(forgedRedirectHosts, back.Host) ||
+	if err != nil || q.Get("client_id") != f.ClientID || back.User != nil ||
 		!strings.HasPrefix(back.Path, "/sso/") || !strings.HasSuffix(back.Path, "/callback") {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	origin, ok := forgedOrigin(back.Scheme + "://" + back.Host)
+	if !ok {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
@@ -177,8 +193,7 @@ func (f *ForgingIDP) authorize(w http.ResponseWriter, r *http.Request) {
 		f.mu.Unlock()
 		out.Set("code", code)
 	}
-	back.RawQuery = out.Encode()
-	http.Redirect(w, r, back.String(), http.StatusFound) //nolint:gosec // a test provider redirects where the client it serves asked
+	http.Redirect(w, r, origin+back.EscapedPath()+"?"+out.Encode(), http.StatusFound)
 }
 
 func (f *ForgingIDP) token(w http.ResponseWriter, r *http.Request) {
