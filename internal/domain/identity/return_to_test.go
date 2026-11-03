@@ -1,7 +1,10 @@
 package identity_test
 
 import (
+	"crypto/rand"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/identity"
 )
@@ -37,5 +40,25 @@ func TestReturnToKeepsOnlyAPathOnThisSite(t *testing.T) {
 				t.Errorf("ValidReturnTo(%q) = %q, want %q", tc.in, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestAnExhaustedSourceOfRandomnessIsAProgrammingError(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("drawing a token from an empty source did not panic")
+		}
+	}()
+	identity.NewToken(strings.NewReader(""))
+}
+
+func TestALoginAttemptLivesTenMinutesAndReturnsToAValidatedPath(t *testing.T) {
+	now := time.Date(2026, 1, 1, 9, 0, 0, 0, time.UTC)
+	a := identity.NewLoginAttempt(identity.AttemptID{}, identity.ProviderID{}, "https://evil.com", identity.NewSecrets(rand.Reader), now)
+	if a.ReturnTo != "/" || a.Intent != identity.IntentLogin || !a.Live(now.Add(9*time.Minute)) || a.Live(now.Add(identity.AttemptLifetime)) {
+		t.Errorf("attempt = %+v", a)
+	}
+	if !identity.HashSecret("x").Equal(identity.HashSecret("x")) || identity.HashSecret("x").Equal(identity.HashSecret("y")) {
+		t.Error("secret hashes do not compare as the values do")
 	}
 }
