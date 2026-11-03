@@ -265,6 +265,9 @@ import type {
   InviteMemberData,
   InviteMemberErrors,
   InviteMemberResponses,
+  InviteProjectMemberData,
+  InviteProjectMemberErrors,
+  InviteProjectMemberResponses,
   KillFlagData,
   KillFlagErrors,
   KillFlagResponses,
@@ -3761,6 +3764,55 @@ export const deleteGrant = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Invite someone to a project
+ *
+ * Invites a person who has no account to the instance with one of the
+ * built-in roles in the project, which accepting the invitation grants
+ * them, by hand, made by the member who invited. The invitation is
+ * answered with its one-time link as on `POST /members`: it is shown
+ * this once. A role holding a permission the caller lacks in the
+ * project is refused `role_not_allowed`, naming it in `permission`; a
+ * role that is none of the built-in ones `invalid_grant`.
+ *
+ * An email the instance holds, whatever its case, is refused
+ * `already_exists`: grant that member a role instead. The exception is
+ * a member still invited whose latest invitation is to this project,
+ * who is invited again: the fresh link replaces the old one and
+ * carries the new role.
+ *
+ * The grant is dropped, and the invitation still activates the person,
+ * when the caller loses `grant.manage` in the project or is
+ * deactivated before it is accepted; the audit log records
+ * `invitation.grant_revoked` with the reason `inviter_lost_permission`
+ * or `inviter_deactivated`. Only a member invites: a project token
+ * never holds `grant.manage`.
+ *
+ */
+export const inviteProjectMember = <ThrowOnError extends boolean = false>(
+  options: Options<InviteProjectMemberData, ThrowOnError>,
+): RequestResult<InviteProjectMemberResponses, InviteProjectMemberErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    InviteProjectMemberResponses,
+    InviteProjectMemberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/invitations",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
  * The tokens of a project
  *
  * Every token of the project, the newest first, revoked and expired ones included, by their hint.
@@ -4028,6 +4080,14 @@ export const listMembers = <ThrowOnError extends boolean = false>(
  * `/invitations/<secret>`; it expires after seven days. An email the
  * instance holds, whatever its case, is refused `already_exists`.
  *
+ * The invitation may carry a `grant` of a built-in role in a project,
+ * which accepting it makes by hand, in the name of the instance admin
+ * who invited. An unknown project, or a role that is none of the
+ * built-in ones, is refused `invalid_grant`. The grant is dropped when
+ * its inviter is deactivated or demoted from instance admin without
+ * holding `grant.manage` in the project before it is accepted; the
+ * invitation still activates the person.
+ *
  */
 export const inviteMember = <ThrowOnError extends boolean = false>(
   options: Options<InviteMemberData, ThrowOnError>,
@@ -4155,7 +4215,14 @@ export const reactivateMember = <ThrowOnError extends boolean = false>(
 /**
  * Replace an invited member's link
  *
- * Issues a fresh invitation, answered with its one-time link as on invitation, and kills every earlier link of the member. A member who is not invited is refused `member_not_invited`.
+ * Issues a fresh invitation, answered with its one-time link as on
+ * invitation, and kills every earlier link of the member. A member who
+ * is not invited is refused `member_not_invited`. The fresh invitation
+ * keeps the project and role of the one it replaces only while the
+ * member who issued that one still holds `grant.manage` in the project;
+ * otherwise it grants nothing, and the audit log records
+ * `invitation.grant_revoked`.
+ *
  */
 export const reissueInvitation = <ThrowOnError extends boolean = false>(
   options: Options<ReissueInvitationData, ThrowOnError>,

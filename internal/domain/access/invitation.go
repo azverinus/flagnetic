@@ -4,10 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"io"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
@@ -46,6 +48,85 @@ type Invitation struct {
 	// expired: accepted, replaced by another, or consumed when its member was
 	// deactivated. Nil while it is open.
 	ConsumedAt *time.Time
+	// InvitedBy is the member who issued the invitation; zero when none
+	// did, such as one issued again to a member reactivated.
+	InvitedBy MemberID
+	// Grant is the role in a project that accepting makes; nil when the
+	// invitation brings the member to the instance alone, or once it was
+	// dropped.
+	Grant *InvitationGrant
+}
+
+// InvitationGrant is the role in a project that an invitation, once
+// accepted, makes the member hold.
+type InvitationGrant struct {
+	Project workspace.ProjectID
+	Role    RoleName
+}
+
+// NewInvitationGrant returns the grant of role in project; role is one of
+// the built-in ones, or the refusal names pointer, where the request holds it.
+func NewInvitationGrant(project workspace.ProjectID, role RoleName, pointer string) (InvitationGrant, error) {
+	if _, ok := RoleNamed(role); !ok {
+		return InvitationGrant{}, UnknownRoleError(pointer)
+	}
+	return InvitationGrant{Project: project, Role: role}, nil
+}
+
+// UnknownProjectError refuses an invitation's grant in a project the instance
+// does not hold, at pointer.
+func UnknownProjectError(pointer string) error {
+	return apperrors.Invalid("invalid_grant", "the grant is not valid", apperrors.Violation{
+		Pointer: pointer, Code: "unknown_project", Detail: "no project has this key",
+	})
+}
+
+// IssuedBy returns i as issued by inviter, bringing grant (none when nil)
+// with it.
+func (i Invitation) IssuedBy(inviter MemberID, grant *InvitationGrant) Invitation {
+	i.InvitedBy, i.Grant = inviter, grant
+	return i
+}
+
+// WithoutGrant returns i with its grant dropped: it still activates its
+// member, and grants nothing.
+func (i Invitation) WithoutGrant() Invitation {
+	i.Grant = nil
+	return i
+}
+
+// GrantDropReason is why an invitation's grant was dropped.
+type GrantDropReason string
+
+// The reasons an invitation's grant is dropped.
+const (
+	// GrantDropInviterLostPermission is an inviter who no longer holds
+	// grant.manage in the project.
+	GrantDropInviterLostPermission GrantDropReason = "inviter_lost_permission"
+	// GrantDropInviterDeactivated is an inviter who was deactivated.
+	GrantDropInviterDeactivated GrantDropReason = "inviter_deactivated"
+)
+
+// GrantDrop reports whether the grant of an invitation issued by inviter to a
+// project must be dropped, and why, given held, the grants inviter holds in
+// that project. An invitation never grants more than its inviter may hand
+// out, so it is dropped once its inviter is deactivated or no longer holds
+// grant.manage there; an instance admin holds it in every project, so
+// their invitations are not dropped for lack of a grant. The same rule
+// decides whether an invitation issued again keeps its grant.
+func GrantDrop(inviter Member, held []Grant) (GrantDropReason, bool) {
+	switch {
+	case inviter.Status == MemberDeactivated:
+		return GrantDropInviterDeactivated, true
+	case inviter.InstanceAdmin:
+		return "", false
+	}
+	for _, g := range held {
+		if role, ok := RoleNamed(g.Role); ok && slices.Contains(role.Permissions, PermGrantManage) {
+			return "", false
+		}
+	}
+	return GrantDropInviterLostPermission, true
 }
 
 // NewInvitedMember returns a member invited to the instance, who holds no

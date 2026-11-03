@@ -3,6 +3,7 @@ package management_test
 import (
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -156,6 +157,12 @@ func matrix(t *testing.T) []matrixRow {
 				// Removed again, so the next cell can grant it anew.
 				do(c.DeleteGrantWithResponse(t.Context(), p.Key, res.JSON201.Id.String()))
 			}
+			return res.StatusCode(), res.Body
+		}},
+		{"grant.manage", "inviteProjectMember", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
+			res := do(c.InviteProjectMemberWithResponse(t.Context(), p.Key, management.ProjectInvitationCreate{
+				Email: strings.ToLower(projectKey()) + "@example.com", DisplayName: "Matrix", Role: "viewer",
+			}))
 			return res.StatusCode(), res.Body
 		}},
 		{"project_token.manage", "listProjectTokens", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {

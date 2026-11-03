@@ -207,10 +207,16 @@ func (s *Store) LockInstanceAdmins(ctx context.Context) error {
 
 // LockMember returns the member, locked until the transaction ends, and
 // whether they hold a password; ErrNotFound when none has the identifier.
+// The lock excludes every other LockMember of the member but not a row
+// merely referring to them: a change to a member never removes them, and a
+// unit of work holding a member while it waits on rows another holds (an
+// inviter deactivated waits on the invitations they issued) would otherwise
+// deadlock with that other inserting a row naming the member (accepting one
+// of those invitations makes a grant created by the inviter).
 func (s *Store) LockMember(ctx context.Context, member access.MemberID) (access.Member, bool, error) {
 	dest, m := scanMember()
 	var holdsPassword bool
-	err := s.db(ctx).QueryRow(ctx, `SELECT `+memberColumns+`, m.password_hash IS NOT NULL FROM members m WHERE m.id = $1 FOR UPDATE`,
+	err := s.db(ctx).QueryRow(ctx, `SELECT `+memberColumns+`, m.password_hash IS NOT NULL FROM members m WHERE m.id = $1 FOR NO KEY UPDATE`,
 		member.Bytes()).Scan(append(dest, &holdsPassword)...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return access.Member{}, false, appaccess.ErrNotFound

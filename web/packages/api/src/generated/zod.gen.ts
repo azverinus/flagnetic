@@ -159,9 +159,27 @@ export const zPasswordChange = z.object({
   new_password: z.string(),
 });
 
+/**
+ * The role in a project the invitation grants once accepted. An
+ * unknown project or a role that is none of the built-in ones is
+ * refused `invalid_grant`.
+ *
+ */
+export const zInvitationGrantCreate = z.object({
+  project: z.string(),
+  role: z.string(),
+});
+
 export const zMemberInvite = z.object({
   email: z.string(),
   display_name: z.string(),
+  grant: zInvitationGrantCreate.optional(),
+});
+
+export const zProjectInvitationCreate = z.object({
+  email: z.string(),
+  display_name: z.string(),
+  role: z.string(),
 });
 
 /**
@@ -178,12 +196,23 @@ export const zMemberInvitation = z.object({
 });
 
 /**
+ * The project an invitation grants a role in. Absent once the invitation's grant was dropped.
+ */
+export const zInvitationProject = z.object({
+  key: z.string(),
+  name: z.string(),
+});
+
+/**
  * What an invitation's link opens.
  */
 export const zInvitation = z.object({
   email: z.string(),
   display_name: z.string(),
   expires_at: z.iso.datetime(),
+  project: zInvitationProject.optional(),
+  role: z.string().optional(),
+  invited_by: z.string().optional(),
 });
 
 export const zInvitationAcceptance = z.object({
@@ -4096,6 +4125,17 @@ export const zDeleteGrantPath = z.object({
  * Removed.
  */
 export const zDeleteGrantResponse = z.void();
+
+export const zInviteProjectMemberBody = zProjectInvitationCreate;
+
+export const zInviteProjectMemberPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The member invited, with their invitation.
+ */
+export const zInviteProjectMemberResponse = zMemberInvitation;
 
 export const zListProjectTokensPath = z.object({
   project: z.string(),

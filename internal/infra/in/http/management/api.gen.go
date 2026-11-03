@@ -2947,11 +2947,37 @@ type Invitation struct {
 	// Email The invited member's email with all but the first character of its local part hidden, such as `g***@example.com`.
 	Email     string    `json:"email"`
 	ExpiresAt time.Time `json:"expires_at"`
+
+	// InvitedBy The display name of the member who issued the invitation; absent when none did.
+	InvitedBy *string `json:"invited_by,omitempty"`
+
+	// Project The project an invitation grants a role in. Absent once the invitation's grant was dropped.
+	Project *InvitationProject `json:"project,omitempty"`
+
+	// Role The built-in role accepting grants in `project`; absent with it.
+	Role *string `json:"role,omitempty"`
 }
 
 // InvitationAcceptance defines model for InvitationAcceptance.
 type InvitationAcceptance struct {
 	Password string `json:"password"`
+}
+
+// InvitationGrantCreate The role in a project the invitation grants once accepted. An
+// unknown project or a role that is none of the built-in ones is
+// refused `invalid_grant`.
+type InvitationGrantCreate struct {
+	// Project The project's key.
+	Project string `json:"project"`
+
+	// Role One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`.
+	Role string `json:"role"`
+}
+
+// InvitationProject The project an invitation grants a role in. Absent once the invitation's grant was dropped.
+type InvitationProject struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
 }
 
 // IssuedInvitation An invitation just issued. Its link is shown this once.
@@ -3070,6 +3096,11 @@ type MemberInvite struct {
 
 	// Email One address of the form name@domain, at most 254 characters.
 	Email string `json:"email"`
+
+	// Grant The role in a project the invitation grants once accepted. An
+	// unknown project or a role that is none of the built-in ones is
+	// refused `invalid_grant`.
+	Grant *InvitationGrantCreate `json:"grant,omitempty"`
 }
 
 // MemberList defines model for MemberList.
@@ -3261,6 +3292,18 @@ type ProjectDocument struct {
 
 // ProjectDocumentSchemaVersion defines model for ProjectDocument.SchemaVersion.
 type ProjectDocumentSchemaVersion int
+
+// ProjectInvitationCreate defines model for ProjectInvitationCreate.
+type ProjectInvitationCreate struct {
+	// DisplayName Not blank, at most 200 characters.
+	DisplayName string `json:"display_name"`
+
+	// Email One address of the form name@domain, at most 254 characters.
+	Email string `json:"email"`
+
+	// Role One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`, each a role the caller holds every permission of in the project.
+	Role string `json:"role"`
+}
 
 // ProjectList defines model for ProjectList.
 type ProjectList struct {
@@ -5687,6 +5730,9 @@ type CreateGrantJSONRequestBody = GrantCreate
 // CheckHashUniformityJSONRequestBody defines body for CheckHashUniformity for application/json ContentType.
 type CheckHashUniformityJSONRequestBody = HashCheckRequest
 
+// InviteProjectMemberJSONRequestBody defines body for InviteProjectMember for application/json ContentType.
+type InviteProjectMemberJSONRequestBody = ProjectInvitationCreate
+
 // CreateSegmentJSONRequestBody defines body for CreateSegment for application/json ContentType.
 type CreateSegmentJSONRequestBody = SegmentCreate
 
@@ -7334,6 +7380,14 @@ type ClientInterface interface {
 	// `/invitations/<secret>`; it expires after seven days. An email the
 	// instance holds, whatever its case, is refused `already_exists`.
 	//
+	// The invitation may carry a `grant` of a built-in role in a project,
+	// which accepting it makes by hand, in the name of the instance admin
+	// who invited. An unknown project, or a role that is none of the
+	// built-in ones, is refused `invalid_grant`. The grant is dropped when
+	// its inviter is deactivated or demoted from instance admin without
+	// holding `grant.manage` in the project before it is accepted; the
+	// invitation still activates the person.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /members (the `InviteMember` operationId).
@@ -7347,6 +7401,14 @@ type ClientInterface interface {
 	// request's origin when it is not set, followed by
 	// `/invitations/<secret>`; it expires after seven days. An email the
 	// instance holds, whatever its case, is refused `already_exists`.
+	//
+	// The invitation may carry a `grant` of a built-in role in a project,
+	// which accepting it makes by hand, in the name of the instance admin
+	// who invited. An unknown project, or a role that is none of the
+	// built-in ones, is refused `invalid_grant`. The grant is dropped when
+	// its inviter is deactivated or demoted from instance admin without
+	// holding `grant.manage` in the project before it is accepted; the
+	// invitation still activates the person.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -7397,7 +7459,13 @@ type ClientInterface interface {
 
 	// ReissueInvitation Replace an invited member's link
 	//
-	// Issues a fresh invitation, answered with its one-time link as on invitation, and kills every earlier link of the member. A member who is not invited is refused `member_not_invited`.
+	// Issues a fresh invitation, answered with its one-time link as on
+	// invitation, and kills every earlier link of the member. A member who
+	// is not invited is refused `member_not_invited`. The fresh invitation
+	// keeps the project and role of the one it replaces only while the
+	// member who issued that one still holds `grant.manage` in the project;
+	// otherwise it grants nothing, and the audit log records
+	// `invitation.grant_revoked`.
 	//
 	// Corresponds with POST /members/{member}/invitation (the `ReissueInvitation` operationId).
 	ReissueInvitation(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -9092,6 +9160,62 @@ type ClientInterface interface {
 	// Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
 	CheckHashUniformity(ctx context.Context, project ProjectKey, body CheckHashUniformityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// InviteProjectMemberWithBody Invite someone to a project
+	//
+	// Invites a person who has no account to the instance with one of the
+	// built-in roles in the project, which accepting the invitation grants
+	// them, by hand, made by the member who invited. The invitation is
+	// answered with its one-time link as on `POST /members`: it is shown
+	// this once. A role holding a permission the caller lacks in the
+	// project is refused `role_not_allowed`, naming it in `permission`; a
+	// role that is none of the built-in ones `invalid_grant`.
+	//
+	// An email the instance holds, whatever its case, is refused
+	// `already_exists`: grant that member a role instead. The exception is
+	// a member still invited whose latest invitation is to this project,
+	// who is invited again: the fresh link replaces the old one and
+	// carries the new role.
+	//
+	// The grant is dropped, and the invitation still activates the person,
+	// when the caller loses `grant.manage` in the project or is
+	// deactivated before it is accepted; the audit log records
+	// `invitation.grant_revoked` with the reason `inviter_lost_permission`
+	// or `inviter_deactivated`. Only a member invites: a project token
+	// never holds `grant.manage`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/invitations (the `InviteProjectMember` operationId).
+	InviteProjectMemberWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// InviteProjectMember Invite someone to a project
+	//
+	// Invites a person who has no account to the instance with one of the
+	// built-in roles in the project, which accepting the invitation grants
+	// them, by hand, made by the member who invited. The invitation is
+	// answered with its one-time link as on `POST /members`: it is shown
+	// this once. A role holding a permission the caller lacks in the
+	// project is refused `role_not_allowed`, naming it in `permission`; a
+	// role that is none of the built-in ones `invalid_grant`.
+	//
+	// An email the instance holds, whatever its case, is refused
+	// `already_exists`: grant that member a role instead. The exception is
+	// a member still invited whose latest invitation is to this project,
+	// who is invited again: the fresh link replaces the old one and
+	// carries the new role.
+	//
+	// The grant is dropped, and the invitation still activates the person,
+	// when the caller loses `grant.manage` in the project or is
+	// deactivated before it is accepted; the audit log records
+	// `invitation.grant_revoked` with the reason `inviter_lost_permission`
+	// or `inviter_deactivated`. Only a member invites: a project token
+	// never holds `grant.manage`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/invitations (the `InviteProjectMember` operationId).
+	InviteProjectMember(ctx context.Context, project ProjectKey, body InviteProjectMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetProjectMe What the caller holds in a project
 	//
 	// The caller's grants in the project and their effective permissions
@@ -10731,6 +10855,14 @@ func (c *Client) ListMembers(ctx context.Context, params *ListMembersParams, req
 // `/invitations/<secret>`; it expires after seven days. An email the
 // instance holds, whatever its case, is refused `already_exists`.
 //
+// The invitation may carry a `grant` of a built-in role in a project,
+// which accepting it makes by hand, in the name of the instance admin
+// who invited. An unknown project, or a role that is none of the
+// built-in ones, is refused `invalid_grant`. The grant is dropped when
+// its inviter is deactivated or demoted from instance admin without
+// holding `grant.manage` in the project before it is accepted; the
+// invitation still activates the person.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /members (the `InviteMember` operationId).
@@ -10754,6 +10886,14 @@ func (c *Client) InviteMemberWithBody(ctx context.Context, contentType string, b
 // request's origin when it is not set, followed by
 // `/invitations/<secret>`; it expires after seven days. An email the
 // instance holds, whatever its case, is refused `already_exists`.
+//
+// The invitation may carry a `grant` of a built-in role in a project,
+// which accepting it makes by hand, in the name of the instance admin
+// who invited. An unknown project, or a role that is none of the
+// built-in ones, is refused `invalid_grant`. The grant is dropped when
+// its inviter is deactivated or demoted from instance admin without
+// holding `grant.manage` in the project before it is accepted; the
+// invitation still activates the person.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -10854,7 +10994,13 @@ func (c *Client) DeactivateMember(ctx context.Context, member MemberID, reqEdito
 
 // ReissueInvitation Replace an invited member's link
 //
-// Issues a fresh invitation, answered with its one-time link as on invitation, and kills every earlier link of the member. A member who is not invited is refused `member_not_invited`.
+// Issues a fresh invitation, answered with its one-time link as on
+// invitation, and kills every earlier link of the member. A member who
+// is not invited is refused `member_not_invited`. The fresh invitation
+// keeps the project and role of the one it replaces only while the
+// member who issued that one still holds `grant.manage` in the project;
+// otherwise it grants nothing, and the audit log records
+// `invitation.grant_revoked`.
 //
 // Corresponds with POST /members/{member}/invitation (the `ReissueInvitation` operationId).
 func (c *Client) ReissueInvitation(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -13719,6 +13865,82 @@ func (c *Client) CheckHashUniformityWithBody(ctx context.Context, project Projec
 // Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
 func (c *Client) CheckHashUniformity(ctx context.Context, project ProjectKey, body CheckHashUniformityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCheckHashUniformityRequest(c.Server, project, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// InviteProjectMemberWithBody Invite someone to a project
+//
+// Invites a person who has no account to the instance with one of the
+// built-in roles in the project, which accepting the invitation grants
+// them, by hand, made by the member who invited. The invitation is
+// answered with its one-time link as on `POST /members`: it is shown
+// this once. A role holding a permission the caller lacks in the
+// project is refused `role_not_allowed`, naming it in `permission`; a
+// role that is none of the built-in ones `invalid_grant`.
+//
+// An email the instance holds, whatever its case, is refused
+// `already_exists`: grant that member a role instead. The exception is
+// a member still invited whose latest invitation is to this project,
+// who is invited again: the fresh link replaces the old one and
+// carries the new role.
+//
+// The grant is dropped, and the invitation still activates the person,
+// when the caller loses `grant.manage` in the project or is
+// deactivated before it is accepted; the audit log records
+// `invitation.grant_revoked` with the reason `inviter_lost_permission`
+// or `inviter_deactivated`. Only a member invites: a project token
+// never holds `grant.manage`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/invitations (the `InviteProjectMember` operationId).
+func (c *Client) InviteProjectMemberWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInviteProjectMemberRequestWithBody(c.Server, project, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// InviteProjectMember Invite someone to a project
+//
+// Invites a person who has no account to the instance with one of the
+// built-in roles in the project, which accepting the invitation grants
+// them, by hand, made by the member who invited. The invitation is
+// answered with its one-time link as on `POST /members`: it is shown
+// this once. A role holding a permission the caller lacks in the
+// project is refused `role_not_allowed`, naming it in `permission`; a
+// role that is none of the built-in ones `invalid_grant`.
+//
+// An email the instance holds, whatever its case, is refused
+// `already_exists`: grant that member a role instead. The exception is
+// a member still invited whose latest invitation is to this project,
+// who is invited again: the fresh link replaces the old one and
+// carries the new role.
+//
+// The grant is dropped, and the invitation still activates the person,
+// when the caller loses `grant.manage` in the project or is
+// deactivated before it is accepted; the audit log records
+// `invitation.grant_revoked` with the reason `inviter_lost_permission`
+// or `inviter_deactivated`. Only a member invites: a project token
+// never holds `grant.manage`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/invitations (the `InviteProjectMember` operationId).
+func (c *Client) InviteProjectMember(ctx context.Context, project ProjectKey, body InviteProjectMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInviteProjectMemberRequest(c.Server, project, body)
 	if err != nil {
 		return nil, err
 	}
@@ -22008,6 +22230,53 @@ func NewCheckHashUniformityRequestWithBody(server string, project ProjectKey, co
 	return req, nil
 }
 
+// NewInviteProjectMemberRequest calls the generic InviteProjectMember builder with application/json body
+func NewInviteProjectMemberRequest(server string, project ProjectKey, body InviteProjectMemberJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewInviteProjectMemberRequestWithBody(server, project, "application/json", bodyReader)
+}
+
+// NewInviteProjectMemberRequestWithBody constructs an http.Request for the InviteProjectMember method, with any body, and a specified content type
+func NewInviteProjectMemberRequestWithBody(server string, project ProjectKey, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/invitations", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetProjectMeRequest constructs an http.Request for the GetProjectMe method
 func NewGetProjectMeRequest(server string, project ProjectKey) (*http.Request, error) {
 	var err error
@@ -24938,6 +25207,14 @@ type ClientWithResponsesInterface interface {
 	// `/invitations/<secret>`; it expires after seven days. An email the
 	// instance holds, whatever its case, is refused `already_exists`.
 	//
+	// The invitation may carry a `grant` of a built-in role in a project,
+	// which accepting it makes by hand, in the name of the instance admin
+	// who invited. An unknown project, or a role that is none of the
+	// built-in ones, is refused `invalid_grant`. The grant is dropped when
+	// its inviter is deactivated or demoted from instance admin without
+	// holding `grant.manage` in the project before it is accepted; the
+	// invitation still activates the person.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /members (the `InviteMember` operationId).
@@ -24951,6 +25228,14 @@ type ClientWithResponsesInterface interface {
 	// request's origin when it is not set, followed by
 	// `/invitations/<secret>`; it expires after seven days. An email the
 	// instance holds, whatever its case, is refused `already_exists`.
+	//
+	// The invitation may carry a `grant` of a built-in role in a project,
+	// which accepting it makes by hand, in the name of the instance admin
+	// who invited. An unknown project, or a role that is none of the
+	// built-in ones, is refused `invalid_grant`. The grant is dropped when
+	// its inviter is deactivated or demoted from instance admin without
+	// holding `grant.manage` in the project before it is accepted; the
+	// invitation still activates the person.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -25005,7 +25290,13 @@ type ClientWithResponsesInterface interface {
 
 	// ReissueInvitationWithResponse Replace an invited member's link
 	//
-	// Issues a fresh invitation, answered with its one-time link as on invitation, and kills every earlier link of the member. A member who is not invited is refused `member_not_invited`.
+	// Issues a fresh invitation, answered with its one-time link as on
+	// invitation, and kills every earlier link of the member. A member who
+	// is not invited is refused `member_not_invited`. The fresh invitation
+	// keeps the project and role of the one it replaces only while the
+	// member who issued that one still holds `grant.manage` in the project;
+	// otherwise it grants nothing, and the audit log records
+	// `invitation.grant_revoked`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -26817,6 +27108,62 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
 	CheckHashUniformityWithResponse(ctx context.Context, project ProjectKey, body CheckHashUniformityJSONRequestBody, reqEditors ...RequestEditorFn) (*CheckHashUniformityResponse, error)
+
+	// InviteProjectMemberWithBodyWithResponse Invite someone to a project
+	//
+	// Invites a person who has no account to the instance with one of the
+	// built-in roles in the project, which accepting the invitation grants
+	// them, by hand, made by the member who invited. The invitation is
+	// answered with its one-time link as on `POST /members`: it is shown
+	// this once. A role holding a permission the caller lacks in the
+	// project is refused `role_not_allowed`, naming it in `permission`; a
+	// role that is none of the built-in ones `invalid_grant`.
+	//
+	// An email the instance holds, whatever its case, is refused
+	// `already_exists`: grant that member a role instead. The exception is
+	// a member still invited whose latest invitation is to this project,
+	// who is invited again: the fresh link replaces the old one and
+	// carries the new role.
+	//
+	// The grant is dropped, and the invitation still activates the person,
+	// when the caller loses `grant.manage` in the project or is
+	// deactivated before it is accepted; the audit log records
+	// `invitation.grant_revoked` with the reason `inviter_lost_permission`
+	// or `inviter_deactivated`. Only a member invites: a project token
+	// never holds `grant.manage`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/invitations (the `InviteProjectMember` operationId).
+	InviteProjectMemberWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*InviteProjectMemberResponse, error)
+
+	// InviteProjectMemberWithResponse Invite someone to a project
+	//
+	// Invites a person who has no account to the instance with one of the
+	// built-in roles in the project, which accepting the invitation grants
+	// them, by hand, made by the member who invited. The invitation is
+	// answered with its one-time link as on `POST /members`: it is shown
+	// this once. A role holding a permission the caller lacks in the
+	// project is refused `role_not_allowed`, naming it in `permission`; a
+	// role that is none of the built-in ones `invalid_grant`.
+	//
+	// An email the instance holds, whatever its case, is refused
+	// `already_exists`: grant that member a role instead. The exception is
+	// a member still invited whose latest invitation is to this project,
+	// who is invited again: the fresh link replaces the old one and
+	// carries the new role.
+	//
+	// The grant is dropped, and the invitation still activates the person,
+	// when the caller loses `grant.manage` in the project or is
+	// deactivated before it is accepted; the audit log records
+	// `invitation.grant_revoked` with the reason `inviter_lost_permission`
+	// or `inviter_deactivated`. Only a member invites: a project token
+	// never holds `grant.manage`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/invitations (the `InviteProjectMember` operationId).
+	InviteProjectMemberWithResponse(ctx context.Context, project ProjectKey, body InviteProjectMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*InviteProjectMemberResponse, error)
 
 	// GetProjectMeWithResponse What the caller holds in a project
 	//
@@ -37771,6 +38118,89 @@ func (r CheckHashUniformityResponse) ContentType() string {
 	return ""
 }
 
+// InviteProjectMemberResponse401Headers the declared response headers of an HTTP 401 response for InviteProjectMember
+type InviteProjectMemberResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type InviteProjectMemberResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *MemberInvitation
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *InviteProjectMemberResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r InviteProjectMemberResponse) GetJSON201() *MemberInvitation {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r InviteProjectMemberResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r InviteProjectMemberResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r InviteProjectMemberResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r InviteProjectMemberResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r InviteProjectMemberResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r InviteProjectMemberResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r InviteProjectMemberResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r InviteProjectMemberResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r InviteProjectMemberResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // GetProjectMeResponse401Headers the declared response headers of an HTTP 401 response for GetProjectMe
 type GetProjectMeResponse401Headers struct {
 	WWWAuthenticate *string
@@ -42404,6 +42834,14 @@ func (c *ClientWithResponses) ListMembersWithResponse(ctx context.Context, param
 // `/invitations/<secret>`; it expires after seven days. An email the
 // instance holds, whatever its case, is refused `already_exists`.
 //
+// The invitation may carry a `grant` of a built-in role in a project,
+// which accepting it makes by hand, in the name of the instance admin
+// who invited. An unknown project, or a role that is none of the
+// built-in ones, is refused `invalid_grant`. The grant is dropped when
+// its inviter is deactivated or demoted from instance admin without
+// holding `grant.manage` in the project before it is accepted; the
+// invitation still activates the person.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /members (the `InviteMember` operationId).
@@ -42423,6 +42861,14 @@ func (c *ClientWithResponses) InviteMemberWithBodyWithResponse(ctx context.Conte
 // request's origin when it is not set, followed by
 // `/invitations/<secret>`; it expires after seven days. An email the
 // instance holds, whatever its case, is refused `already_exists`.
+//
+// The invitation may carry a `grant` of a built-in role in a project,
+// which accepting it makes by hand, in the name of the instance admin
+// who invited. An unknown project, or a role that is none of the
+// built-in ones, is refused `invalid_grant`. The grant is dropped when
+// its inviter is deactivated or demoted from instance admin without
+// holding `grant.manage` in the project before it is accepted; the
+// invitation still activates the person.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -42507,7 +42953,13 @@ func (c *ClientWithResponses) DeactivateMemberWithResponse(ctx context.Context, 
 
 // ReissueInvitationWithResponse Replace an invited member's link
 //
-// Issues a fresh invitation, answered with its one-time link as on invitation, and kills every earlier link of the member. A member who is not invited is refused `member_not_invited`.
+// Issues a fresh invitation, answered with its one-time link as on
+// invitation, and kills every earlier link of the member. A member who
+// is not invited is refused `member_not_invited`. The fresh invitation
+// keeps the project and role of the one it replaces only while the
+// member who issued that one still holds `grant.manage` in the project;
+// otherwise it grants nothing, and the audit log records
+// `invitation.grant_revoked`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -45026,6 +45478,74 @@ func (c *ClientWithResponses) CheckHashUniformityWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParseCheckHashUniformityResponse(rsp)
+}
+
+// InviteProjectMemberWithBodyWithResponse Invite someone to a project
+//
+// Invites a person who has no account to the instance with one of the
+// built-in roles in the project, which accepting the invitation grants
+// them, by hand, made by the member who invited. The invitation is
+// answered with its one-time link as on `POST /members`: it is shown
+// this once. A role holding a permission the caller lacks in the
+// project is refused `role_not_allowed`, naming it in `permission`; a
+// role that is none of the built-in ones `invalid_grant`.
+//
+// An email the instance holds, whatever its case, is refused
+// `already_exists`: grant that member a role instead. The exception is
+// a member still invited whose latest invitation is to this project,
+// who is invited again: the fresh link replaces the old one and
+// carries the new role.
+//
+// The grant is dropped, and the invitation still activates the person,
+// when the caller loses `grant.manage` in the project or is
+// deactivated before it is accepted; the audit log records
+// `invitation.grant_revoked` with the reason `inviter_lost_permission`
+// or `inviter_deactivated`. Only a member invites: a project token
+// never holds `grant.manage`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/invitations (the `InviteProjectMember` operationId).
+func (c *ClientWithResponses) InviteProjectMemberWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*InviteProjectMemberResponse, error) {
+	rsp, err := c.InviteProjectMemberWithBody(ctx, project, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseInviteProjectMemberResponse(rsp)
+}
+
+// InviteProjectMemberWithResponse Invite someone to a project
+//
+// Invites a person who has no account to the instance with one of the
+// built-in roles in the project, which accepting the invitation grants
+// them, by hand, made by the member who invited. The invitation is
+// answered with its one-time link as on `POST /members`: it is shown
+// this once. A role holding a permission the caller lacks in the
+// project is refused `role_not_allowed`, naming it in `permission`; a
+// role that is none of the built-in ones `invalid_grant`.
+//
+// An email the instance holds, whatever its case, is refused
+// `already_exists`: grant that member a role instead. The exception is
+// a member still invited whose latest invitation is to this project,
+// who is invited again: the fresh link replaces the old one and
+// carries the new role.
+//
+// The grant is dropped, and the invitation still activates the person,
+// when the caller loses `grant.manage` in the project or is
+// deactivated before it is accepted; the audit log records
+// `invitation.grant_revoked` with the reason `inviter_lost_permission`
+// or `inviter_deactivated`. Only a member invites: a project token
+// never holds `grant.manage`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/invitations (the `InviteProjectMember` operationId).
+func (c *ClientWithResponses) InviteProjectMemberWithResponse(ctx context.Context, project ProjectKey, body InviteProjectMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*InviteProjectMemberResponse, error) {
+	rsp, err := c.InviteProjectMember(ctx, project, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseInviteProjectMemberResponse(rsp)
 }
 
 // GetProjectMeWithResponse What the caller holds in a project
@@ -55488,6 +56008,80 @@ func ParseCheckHashUniformityResponse(rsp *http.Response) (*CheckHashUniformityR
 	return response, nil
 }
 
+// ParseInviteProjectMemberResponse parses an HTTP response from a InviteProjectMemberWithResponse call
+func ParseInviteProjectMemberResponse(rsp *http.Response) (*InviteProjectMemberResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &InviteProjectMemberResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest MemberInvitation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers InviteProjectMemberResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseGetProjectMeResponse parses an HTTP response from a GetProjectMeWithResponse call
 func ParseGetProjectMeResponse(rsp *http.Response) (*GetProjectMeResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -59328,6 +59922,9 @@ type ServerInterface interface {
 	// CheckHashUniformity Check the hash's uniformity on real unit IDs
 	// (POST /projects/{project}/hash-check)
 	CheckHashUniformity(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// InviteProjectMember Invite someone to a project
+	// (POST /projects/{project}/invitations)
+	InviteProjectMember(w http.ResponseWriter, r *http.Request, project ProjectKey)
 	// GetProjectMe What the caller holds in a project
 	// (GET /projects/{project}/me)
 	GetProjectMe(w http.ResponseWriter, r *http.Request, project ProjectKey)
@@ -65144,6 +65741,32 @@ func (siw *ServerInterfaceWrapper) CheckHashUniformity(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
+// InviteProjectMember operation middleware
+func (siw *ServerInterfaceWrapper) InviteProjectMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.InviteProjectMember(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetProjectMe operation middleware
 func (siw *ServerInterfaceWrapper) GetProjectMe(w http.ResponseWriter, r *http.Request) {
 
@@ -67243,6 +67866,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/grants", wrapper.ListGrants)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/grants", wrapper.CreateGrant)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/grants/{grant}", wrapper.DeleteGrant)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/invitations", wrapper.InviteProjectMember)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/tokens", wrapper.ListProjectTokens)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/tokens", wrapper.CreateProjectToken)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/tokens/{token}", wrapper.RevokeProjectToken)
@@ -80248,6 +80872,112 @@ func (response CheckHashUniformity422ApplicationProblemPlusJSONResponse) VisitCh
 	return err
 }
 
+type InviteProjectMemberRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Body    *InviteProjectMemberJSONRequestBody
+}
+
+type InviteProjectMemberResponseObject interface {
+	VisitInviteProjectMemberResponse(w http.ResponseWriter) error
+}
+
+type InviteProjectMember201JSONResponse MemberInvitation
+
+func (response InviteProjectMember201JSONResponse) VisitInviteProjectMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteProjectMember401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response InviteProjectMember401ApplicationProblemPlusJSONResponse) VisitInviteProjectMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteProjectMember403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response InviteProjectMember403ApplicationProblemPlusJSONResponse) VisitInviteProjectMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteProjectMember404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response InviteProjectMember404ApplicationProblemPlusJSONResponse) VisitInviteProjectMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteProjectMember409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response InviteProjectMember409ApplicationProblemPlusJSONResponse) VisitInviteProjectMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteProjectMember422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response InviteProjectMember422ApplicationProblemPlusJSONResponse) VisitInviteProjectMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetProjectMeRequestObject struct {
 	Project ProjectKey `json:"project"`
 }
@@ -85218,6 +85948,9 @@ type StrictServerInterface interface {
 	// CheckHashUniformity Check the hash's uniformity on real unit IDs
 	// (POST /projects/{project}/hash-check)
 	CheckHashUniformity(ctx context.Context, request CheckHashUniformityRequestObject) (CheckHashUniformityResponseObject, error)
+	// InviteProjectMember Invite someone to a project
+	// (POST /projects/{project}/invitations)
+	InviteProjectMember(ctx context.Context, request InviteProjectMemberRequestObject) (InviteProjectMemberResponseObject, error)
 	// GetProjectMe What the caller holds in a project
 	// (GET /projects/{project}/me)
 	GetProjectMe(ctx context.Context, request GetProjectMeRequestObject) (GetProjectMeResponseObject, error)
@@ -88956,6 +89689,39 @@ func (sh *strictHandler) CheckHashUniformity(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CheckHashUniformityResponseObject); ok {
 		if err := validResponse.VisitCheckHashUniformityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// InviteProjectMember operation middleware
+func (sh *strictHandler) InviteProjectMember(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request InviteProjectMemberRequestObject
+
+	request.Project = project
+
+	var body InviteProjectMemberJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.InviteProjectMember(ctx, request.(InviteProjectMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "InviteProjectMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(InviteProjectMemberResponseObject); ok {
+		if err := validResponse.VisitInviteProjectMemberResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

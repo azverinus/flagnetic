@@ -109,6 +109,24 @@ func (s *Store) CreateGrant(ctx context.Context, g access.Grant) error {
 	return err
 }
 
+// CreateGrantUnlessHeld stores g, unless the member holds the role in the
+// project from the same source already, and reports whether it did.
+func (s *Store) CreateGrantUnlessHeld(ctx context.Context, g access.Grant) (bool, error) {
+	var createdBy any
+	if !g.CreatedBy.IsZero() {
+		createdBy = g.CreatedBy.Bytes()
+	}
+	tag, err := s.db(ctx).Exec(ctx, `
+		INSERT INTO grants (id, project_id, member_id, role, source, created_by, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (project_id, member_id, role, source) DO NOTHING`,
+		g.ID.Bytes(), g.Project.Bytes(), g.Member.Bytes(), string(g.Role), string(g.Source), createdBy, g.CreatedAt)
+	if err != nil {
+		return false, fmt.Errorf("making a grant: %w", err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
 // DeleteGrant removes the grant of project with the identifier and returns
 // it; ErrNotFound when the project holds none.
 func (s *Store) DeleteGrant(ctx context.Context, project workspace.ProjectID, grant access.GrantID) (access.Grant, error) {

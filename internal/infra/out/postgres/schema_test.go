@@ -97,6 +97,7 @@ func TestEveryTableOfAProjectGoesWithIt(t *testing.T) {
 	// Kept after the project is gone, on purpose.
 	kept := map[string]string{
 		"audit_entries": "a deleted project's audit entries stay, read through the instance log by the project's id",
+		"invitations":   "an invitation outlives the project it granted a role in: its project is cleared and it still activates its member",
 		// Raw events are partitioned by day: retention drops whole days
 		// rather than deleting from every partition at once.
 		"evaluation_summary_events": "dropped with its partitions by retention",

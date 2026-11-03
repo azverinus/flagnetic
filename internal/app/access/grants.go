@@ -14,6 +14,7 @@ import (
 
 // GrantStore keeps the grants of projects.
 type GrantStore interface {
+	InvitationGrantStore
 	// LockMember returns the member, locked until the unit of work ends,
 	// and whether they hold a password; ErrNotFound when none has the
 	// identifier.
@@ -157,7 +158,9 @@ func NewDeleteGrant(tx Transactor, store GrantStore, audit AuditLog, c clock.Clo
 // grant of a role holding a permission the caller lacks in the project is
 // refused role_not_allowed, so nobody narrows access beyond their own
 // reach; an unknown grant is ErrGrantNotFound. Removing the last owner
-// grant is allowed: an instance admin can always step in.
+// grant is allowed: an instance admin can always step in. A member left
+// without grant.manage in the project loses the grant of each invitation
+// they issued to it, recorded as invitation.grant_revoked.
 func (h *DeleteGrant) Handle(ctx context.Context, cmd DeleteGrantCommand) error {
 	return h.tx.Within(ctx, func(ctx context.Context) error {
 		grant, err := h.store.LockGrant(ctx, cmd.Project.ID, cmd.Grant)
@@ -180,7 +183,12 @@ func (h *DeleteGrant) Handle(ctx context.Context, cmd DeleteGrantCommand) error 
 		if _, err = h.store.DeleteGrant(ctx, cmd.Project.ID, cmd.Grant); err != nil {
 			return err
 		}
-		return recordAll(ctx, h.audit, h.ids, h.clock.Now(), cmd.Request, grantRecord("grant.deleted", cmd.Project, grant, member, true))
+		dropped, err := dropInvitationGrants(ctx, h.store, member, cmd.Project.ID)
+		if err != nil {
+			return err
+		}
+		return recordAll(ctx, h.audit, h.ids, h.clock.Now(), cmd.Request,
+			append([]governance.Record{grantRecord("grant.deleted", cmd.Project, grant, member, true)}, dropped...)...)
 	})
 }
 

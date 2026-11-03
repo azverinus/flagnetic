@@ -2,10 +2,12 @@ package management
 
 import (
 	"context"
+	"errors"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 )
@@ -94,9 +96,20 @@ func (a *api) ReactivateMember(ctx context.Context, req ReactivateMemberRequestO
 
 // InviteMember invites someone and answers their one-time link.
 func (a *api) InviteMember(ctx context.Context, req InviteMemberRequestObject) (InviteMemberResponseObject, error) {
-	res, err := a.h.InviteMember.Handle(ctx, appaccess.InviteMemberCommand{
-		Email: req.Body.Email, DisplayName: req.Body.DisplayName, Request: requestOf(ctx),
-	})
+	cmd := appaccess.InviteMemberCommand{
+		Caller: callerOf(ctx), Email: req.Body.Email, DisplayName: req.Body.DisplayName, Request: requestOf(ctx),
+	}
+	if g := req.Body.Grant; g != nil {
+		p, err := a.h.FindProject.Handle(ctx, g.Project)
+		if errors.Is(err, appworkspace.ErrNotFound) {
+			return nil, access.UnknownProjectError("/grant/project")
+		}
+		if err != nil {
+			return nil, err
+		}
+		cmd.Grant = &access.InvitationGrant{Project: p.ID, Role: access.RoleName(g.Role)}
+	}
+	res, err := a.h.InviteMember.Handle(ctx, cmd)
 	if err != nil {
 		return nil, err
 	}

@@ -4224,6 +4224,58 @@ paths:
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/Invalid"
+  /projects/{project}/invitations:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    post:
+      operationId: inviteProjectMember
+      summary: Invite someone to a project
+      description: |
+        Invites a person who has no account to the instance with one of the
+        built-in roles in the project, which accepting the invitation grants
+        them, by hand, made by the member who invited. The invitation is
+        answered with its one-time link as on `POST /members`: it is shown
+        this once. A role holding a permission the caller lacks in the
+        project is refused `role_not_allowed`, naming it in `permission`; a
+        role that is none of the built-in ones `invalid_grant`.
+
+        An email the instance holds, whatever its case, is refused
+        `already_exists`: grant that member a role instead. The exception is
+        a member still invited whose latest invitation is to this project,
+        who is invited again: the fresh link replaces the old one and
+        carries the new role.
+
+        The grant is dropped, and the invitation still activates the person,
+        when the caller loses `grant.manage` in the project or is
+        deactivated before it is accepted; the audit log records
+        `invitation.grant_revoked` with the reason `inviter_lost_permission`
+        or `inviter_deactivated`. Only a member invites: a project token
+        never holds `grant.manage`.
+      x-permission: grant.manage
+      tags: [grants]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInvitationCreate"
+      responses:
+        "201":
+          description: The member invited, with their invitation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberInvitation"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /projects/{project}/tokens:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -4554,6 +4606,14 @@ paths:
         request's origin when it is not set, followed by
         `/invitations/<secret>`; it expires after seven days. An email the
         instance holds, whatever its case, is refused `already_exists`.
+
+        The invitation may carry a `grant` of a built-in role in a project,
+        which accepting it makes by hand, in the name of the instance admin
+        who invited. An unknown project, or a role that is none of the
+        built-in ones, is refused `invalid_grant`. The grant is dropped when
+        its inviter is deactivated or demoted from instance admin without
+        holding `grant.manage` in the project before it is accepted; the
+        invitation still activates the person.
       x-permission: instance_admin
       tags: [members]
       requestBody:
@@ -4696,7 +4756,14 @@ paths:
     post:
       operationId: reissueInvitation
       summary: Replace an invited member's link
-      description: Issues a fresh invitation, answered with its one-time link as on invitation, and kills every earlier link of the member. A member who is not invited is refused `member_not_invited`.
+      description: |
+        Issues a fresh invitation, answered with its one-time link as on
+        invitation, and kills every earlier link of the member. A member who
+        is not invited is refused `member_not_invited`. The fresh invitation
+        keeps the project and role of the one it replaces only while the
+        member who issued that one still holds `grant.manage` in the project;
+        otherwise it grants nothing, and the audit log records
+        `invitation.grant_revoked`.
       x-permission: instance_admin
       tags: [members]
       responses:
@@ -7017,6 +7084,35 @@ components:
         display_name:
           type: string
           description: Not blank, at most 200 characters.
+        grant:
+          $ref: "#/components/schemas/InvitationGrantCreate"
+    InvitationGrantCreate:
+      type: object
+      description: |
+        The role in a project the invitation grants once accepted. An
+        unknown project or a role that is none of the built-in ones is
+        refused `invalid_grant`.
+      required: [project, role]
+      properties:
+        project:
+          type: string
+          description: The project's key.
+        role:
+          type: string
+          description: One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`.
+    ProjectInvitationCreate:
+      type: object
+      required: [email, display_name, role]
+      properties:
+        email:
+          type: string
+          description: One address of the form name@domain, at most 254 characters.
+        display_name:
+          type: string
+          description: Not blank, at most 200 characters.
+        role:
+          type: string
+          description: One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`, each a role the caller holds every permission of in the project.
     IssuedInvitation:
       type: object
       description: An invitation just issued. Its link is shown this once.
@@ -7049,6 +7145,23 @@ components:
         expires_at:
           type: string
           format: date-time
+        project:
+          $ref: "#/components/schemas/InvitationProject"
+        role:
+          type: string
+          description: The built-in role accepting grants in `project`; absent with it.
+        invited_by:
+          type: string
+          description: The display name of the member who issued the invitation; absent when none did.
+    InvitationProject:
+      type: object
+      description: The project an invitation grants a role in. Absent once the invitation's grant was dropped.
+      required: [key, name]
+      properties:
+        key:
+          type: string
+        name:
+          type: string
     InvitationAcceptance:
       type: object
       required: [password]
