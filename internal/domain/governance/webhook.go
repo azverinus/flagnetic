@@ -78,6 +78,7 @@ var catalogue = []EventType{
 	{EventSinkAtRisk, "A sink's oldest undelivered row came within the loss warning of the edge of retention."},
 	{EventSinkStopped, "A sink stopped itself after consecutive dead letters; it delivers nothing until it is resumed."},
 	{EventSinkDataLost, "Retention dropped rows a sink had not delivered; a gap records them."},
+	{"project.imported", "A project's configuration was created or changed by an import of a project document."},
 	{"webhook.disabled", "Another subscription of the project was disabled by the platform after failing persistently."},
 	{"report.stale_flags", "The stale flags digest, sent weekly or on demand."},
 	{EventAuditEntry, "Every audit entry, for export. `*` does not match it."},

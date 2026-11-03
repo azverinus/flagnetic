@@ -429,6 +429,66 @@ func (e HashCheckIndependenceVerdict) Valid() bool {
 	}
 }
 
+// Defines values for ImportResultMode.
+const (
+	ImportResultModeCreate ImportResultMode = "create"
+)
+
+// Valid indicates whether the value is a known member of the ImportResultMode enum.
+func (e ImportResultMode) Valid() bool {
+	switch e {
+	case ImportResultModeCreate:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImportResultSource.
+const (
+	ImportResultSourceDocument ImportResultSource = "document"
+)
+
+// Valid indicates whether the value is a known member of the ImportResultSource enum.
+func (e ImportResultSource) Valid() bool {
+	switch e {
+	case ImportResultSourceDocument:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for JsonPatchOperationOp.
+const (
+	JsonPatchOperationOpAdd     JsonPatchOperationOp = "add"
+	JsonPatchOperationOpCopy    JsonPatchOperationOp = "copy"
+	JsonPatchOperationOpMove    JsonPatchOperationOp = "move"
+	JsonPatchOperationOpRemove  JsonPatchOperationOp = "remove"
+	JsonPatchOperationOpReplace JsonPatchOperationOp = "replace"
+	JsonPatchOperationOpTest    JsonPatchOperationOp = "test"
+)
+
+// Valid indicates whether the value is a known member of the JsonPatchOperationOp enum.
+func (e JsonPatchOperationOp) Valid() bool {
+	switch e {
+	case JsonPatchOperationOpAdd:
+		return true
+	case JsonPatchOperationOpCopy:
+		return true
+	case JsonPatchOperationOpMove:
+		return true
+	case JsonPatchOperationOpRemove:
+		return true
+	case JsonPatchOperationOpReplace:
+		return true
+	case JsonPatchOperationOpTest:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Lifetime.
 const (
 	LifetimePermanent Lifetime = "permanent"
@@ -2822,6 +2882,61 @@ type HashCheckRequest struct {
 	UnitIds []string `json:"unit_ids"`
 }
 
+// ImportChanges The keys of the entities an import created, updated and deleted, by kind. Standard attributes are never in it.
+type ImportChanges struct {
+	Attributes   ImportKindChanges `json:"attributes"`
+	Environments ImportKindChanges `json:"environments"`
+	Experiments  ImportKindChanges `json:"experiments"`
+	Flags        ImportKindChanges `json:"flags"`
+	Segments     ImportKindChanges `json:"segments"`
+	UnitTypes    ImportKindChanges `json:"unit_types"`
+}
+
+// ImportKindChanges defines model for ImportKindChanges.
+type ImportKindChanges struct {
+	Created []string       `json:"created"`
+	Deleted []string       `json:"deleted"`
+	Updated []ImportUpdate `json:"updated"`
+}
+
+// ImportResult What an import did, or with a dry run what it would do.
+type ImportResult struct {
+	// Changes The keys of the entities an import created, updated and deleted, by kind. Standard attributes are never in it.
+	Changes  ImportChanges      `json:"changes"`
+	DryRun   bool               `json:"dry_run"`
+	Mode     ImportResultMode   `json:"mode"`
+	Project  DocumentProject    `json:"project"`
+	Source   ImportResultSource `json:"source"`
+	Warnings []ImportWarning    `json:"warnings"`
+}
+
+// ImportResultMode defines model for ImportResult.Mode.
+type ImportResultMode string
+
+// ImportResultSource defines model for ImportResult.Source.
+type ImportResultSource string
+
+// ImportUpdate defines model for ImportUpdate.
+type ImportUpdate struct {
+	Key string `json:"key"`
+
+	// Patch An RFC 6902 JSON Patch turning the entity as it was into the entity as it is, over its entry of the document.
+	Patch []JsonPatchOperation `json:"patch"`
+}
+
+// ImportWarning Something an import did differently from what the document asks, or could not do, without refusing it.
+type ImportWarning struct {
+	// Code Stable name of the warning, such as `owner_replaced`.
+	Code   string `json:"code"`
+	Detail string `json:"detail"`
+
+	// Params The values a client explains the warning with, such as the `email` of an owner replaced.
+	Params *map[string]interface{} `json:"params,omitempty"`
+
+	// Pointer A JSON Pointer into the document, empty for the document as a whole.
+	Pointer string `json:"pointer"`
+}
+
 // Invitation What an invitation's link opens.
 type Invitation struct {
 	DisplayName string `json:"display_name"`
@@ -2843,6 +2958,17 @@ type IssuedInvitation struct {
 	// Url The one-time link to pass on to the invited person.
 	Url string `json:"url"`
 }
+
+// JsonPatchOperation defines model for JsonPatchOperation.
+type JsonPatchOperation struct {
+	From  *string              `json:"from,omitempty"`
+	Op    JsonPatchOperationOp `json:"op"`
+	Path  string               `json:"path"`
+	Value interface{}          `json:"value,omitempty"`
+}
+
+// JsonPatchOperationOp defines model for JsonPatchOperation.Op.
+type JsonPatchOperationOp string
 
 // Key Names the entity in URLs, SDK calls and rules, and never changes.
 type Key = string
@@ -4534,6 +4660,9 @@ type GrantID = string
 // IfMatch defines model for IfMatch.
 type IfMatch = string
 
+// ImportDryRun defines model for ImportDryRun.
+type ImportDryRun = bool
+
 // Limit defines model for Limit.
 type Limit = int
 
@@ -4715,6 +4844,21 @@ type ListMembersParams struct {
 
 	// Q Text found, whatever its case, in the member's email or display name.
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
+}
+
+// ImportNewProjectJSONBody defines parameters for ImportNewProject.
+type ImportNewProjectJSONBody = openapi_types.File
+
+// ImportNewProjectParams defines parameters for ImportNewProject.
+type ImportNewProjectParams struct {
+	// Key The new project's key, replacing the document's.
+	Key *string `form:"key,omitempty" json:"key,omitempty"`
+
+	// Name The new project's name, replacing the document's.
+	Name *string `form:"name,omitempty" json:"name,omitempty"`
+
+	// DryRun Run the whole import and roll it back, answering what it would have done.
+	DryRun *ImportDryRun `form:"dry_run,omitempty" json:"dry_run,omitempty"`
 }
 
 // DeleteProjectParams defines parameters for DeleteProject.
@@ -5446,6 +5590,9 @@ type UpdateMemberJSONRequestBody = MemberPatch
 
 // CreateProjectJSONRequestBody defines body for CreateProject for application/json ContentType.
 type CreateProjectJSONRequestBody = ProjectCreate
+
+// ImportNewProjectJSONRequestBody defines body for ImportNewProject for application/json ContentType.
+type ImportNewProjectJSONRequestBody = ImportNewProjectJSONBody
 
 // UpdateProjectJSONRequestBody defines body for UpdateProject for application/json ContentType.
 type UpdateProjectJSONRequestBody = ProjectPatch
@@ -7319,6 +7466,78 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects (the `CreateProject` operationId).
 	CreateProject(ctx context.Context, body CreateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportNewProjectWithBody Create a project from a project document
+	//
+	// Creates a project holding exactly the document: its environments (at
+	// least one), unit types, declared attributes, segments and flags with
+	// their configuration in every environment, besides the standard
+	// attributes every project has; no default environment or unit type is
+	// added. The document is sent as `application/json` or
+	// `application/yaml`, as `GET /projects/{project}/export` writes it, and
+	// its sections are all required. `key` and `name` replace the
+	// document's project key and name.
+	//
+	// The copy keeps every rule identifier and rollout salt the document
+	// names, so every unit is bucketed as in the original; a rule or a
+	// rollout without one is given one. An owner the document names by email
+	// owns the entity when they may own in the new project, which no member
+	// but an instance admin may yet; otherwise the importing member does and
+	// the answer warns `owner_replaced` with the address. Protection is
+	// bypassed in every environment, which take `protected` from the
+	// document.
+	//
+	// The import applies whole or not at all. A document that breaks a rule
+	// is refused 422 `invalid_document` with every fault found in `errors`,
+	// each pointing into the document; `schema_version_unsupported` names
+	// the versions this server reads. A key in use is 409 `already_exists`.
+	// With `dry_run` the whole import runs, every check the database makes
+	// included, and is rolled back: same answer, 200, nothing written.
+	//
+	// Every entity created is recorded as a direct write records it, then
+	// one `project.imported` entry, all with the request's identifier; each
+	// environment's ruleset moves on once. A body is accepted up to 32 MiB.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/import (the `ImportNewProject` operationId).
+	ImportNewProjectWithBody(ctx context.Context, params *ImportNewProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportNewProject Create a project from a project document
+	//
+	// Creates a project holding exactly the document: its environments (at
+	// least one), unit types, declared attributes, segments and flags with
+	// their configuration in every environment, besides the standard
+	// attributes every project has; no default environment or unit type is
+	// added. The document is sent as `application/json` or
+	// `application/yaml`, as `GET /projects/{project}/export` writes it, and
+	// its sections are all required. `key` and `name` replace the
+	// document's project key and name.
+	//
+	// The copy keeps every rule identifier and rollout salt the document
+	// names, so every unit is bucketed as in the original; a rule or a
+	// rollout without one is given one. An owner the document names by email
+	// owns the entity when they may own in the new project, which no member
+	// but an instance admin may yet; otherwise the importing member does and
+	// the answer warns `owner_replaced` with the address. Protection is
+	// bypassed in every environment, which take `protected` from the
+	// document.
+	//
+	// The import applies whole or not at all. A document that breaks a rule
+	// is refused 422 `invalid_document` with every fault found in `errors`,
+	// each pointing into the document; `schema_version_unsupported` names
+	// the versions this server reads. A key in use is 409 `already_exists`.
+	// With `dry_run` the whole import runs, every check the database makes
+	// included, and is rolled back: same answer, 200, nothing written.
+	//
+	// Every entity created is recorded as a direct write records it, then
+	// one `project.imported` entry, all with the request's identifier; each
+	// environment's ruleset moves on once. A body is accepted up to 32 MiB.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/import (the `ImportNewProject` operationId).
+	ImportNewProject(ctx context.Context, params *ImportNewProjectParams, body ImportNewProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteProject Delete a project
 	//
@@ -10785,6 +11004,98 @@ func (c *Client) CreateProjectWithBody(ctx context.Context, contentType string, 
 // Corresponds with POST /projects (the `CreateProject` operationId).
 func (c *Client) CreateProject(ctx context.Context, body CreateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateProjectRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportNewProjectWithBody Create a project from a project document
+//
+// Creates a project holding exactly the document: its environments (at
+// least one), unit types, declared attributes, segments and flags with
+// their configuration in every environment, besides the standard
+// attributes every project has; no default environment or unit type is
+// added. The document is sent as `application/json` or
+// `application/yaml`, as `GET /projects/{project}/export` writes it, and
+// its sections are all required. `key` and `name` replace the
+// document's project key and name.
+//
+// The copy keeps every rule identifier and rollout salt the document
+// names, so every unit is bucketed as in the original; a rule or a
+// rollout without one is given one. An owner the document names by email
+// owns the entity when they may own in the new project, which no member
+// but an instance admin may yet; otherwise the importing member does and
+// the answer warns `owner_replaced` with the address. Protection is
+// bypassed in every environment, which take `protected` from the
+// document.
+//
+// The import applies whole or not at all. A document that breaks a rule
+// is refused 422 `invalid_document` with every fault found in `errors`,
+// each pointing into the document; `schema_version_unsupported` names
+// the versions this server reads. A key in use is 409 `already_exists`.
+// With `dry_run` the whole import runs, every check the database makes
+// included, and is rolled back: same answer, 200, nothing written.
+//
+// Every entity created is recorded as a direct write records it, then
+// one `project.imported` entry, all with the request's identifier; each
+// environment's ruleset moves on once. A body is accepted up to 32 MiB.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/import (the `ImportNewProject` operationId).
+func (c *Client) ImportNewProjectWithBody(ctx context.Context, params *ImportNewProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportNewProjectRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportNewProject Create a project from a project document
+//
+// Creates a project holding exactly the document: its environments (at
+// least one), unit types, declared attributes, segments and flags with
+// their configuration in every environment, besides the standard
+// attributes every project has; no default environment or unit type is
+// added. The document is sent as `application/json` or
+// `application/yaml`, as `GET /projects/{project}/export` writes it, and
+// its sections are all required. `key` and `name` replace the
+// document's project key and name.
+//
+// The copy keeps every rule identifier and rollout salt the document
+// names, so every unit is bucketed as in the original; a rule or a
+// rollout without one is given one. An owner the document names by email
+// owns the entity when they may own in the new project, which no member
+// but an instance admin may yet; otherwise the importing member does and
+// the answer warns `owner_replaced` with the address. Protection is
+// bypassed in every environment, which take `protected` from the
+// document.
+//
+// The import applies whole or not at all. A document that breaks a rule
+// is refused 422 `invalid_document` with every fault found in `errors`,
+// each pointing into the document; `schema_version_unsupported` names
+// the versions this server reads. A key in use is 409 `already_exists`.
+// With `dry_run` the whole import runs, every check the database makes
+// included, and is rolled back: same answer, 200, nothing written.
+//
+// Every entity created is recorded as a direct write records it, then
+// one `project.imported` entry, all with the request's identifier; each
+// environment's ruleset moves on once. A body is accepted up to 32 MiB.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/import (the `ImportNewProject` operationId).
+func (c *Client) ImportNewProject(ctx context.Context, params *ImportNewProjectParams, body ImportNewProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportNewProjectRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -16604,6 +16915,97 @@ func NewCreateProjectRequestWithBody(server string, contentType string, body io.
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewImportNewProjectRequest calls the generic ImportNewProject builder with application/json body
+func NewImportNewProjectRequest(server string, params *ImportNewProjectParams, body ImportNewProjectJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewImportNewProjectRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewImportNewProjectRequestWithBody constructs an http.Request for the ImportNewProject method, with any body, and a specified content type
+func NewImportNewProjectRequestWithBody(server string, params *ImportNewProjectParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/import")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Key != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "key", *params.Key, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Name != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "name", *params.Name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.DryRun != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "dry_run", *params.DryRun, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
@@ -24687,6 +25089,78 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /projects (the `CreateProject` operationId).
 	CreateProjectWithResponse(ctx context.Context, body CreateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateProjectResponse, error)
 
+	// ImportNewProjectWithBodyWithResponse Create a project from a project document
+	//
+	// Creates a project holding exactly the document: its environments (at
+	// least one), unit types, declared attributes, segments and flags with
+	// their configuration in every environment, besides the standard
+	// attributes every project has; no default environment or unit type is
+	// added. The document is sent as `application/json` or
+	// `application/yaml`, as `GET /projects/{project}/export` writes it, and
+	// its sections are all required. `key` and `name` replace the
+	// document's project key and name.
+	//
+	// The copy keeps every rule identifier and rollout salt the document
+	// names, so every unit is bucketed as in the original; a rule or a
+	// rollout without one is given one. An owner the document names by email
+	// owns the entity when they may own in the new project, which no member
+	// but an instance admin may yet; otherwise the importing member does and
+	// the answer warns `owner_replaced` with the address. Protection is
+	// bypassed in every environment, which take `protected` from the
+	// document.
+	//
+	// The import applies whole or not at all. A document that breaks a rule
+	// is refused 422 `invalid_document` with every fault found in `errors`,
+	// each pointing into the document; `schema_version_unsupported` names
+	// the versions this server reads. A key in use is 409 `already_exists`.
+	// With `dry_run` the whole import runs, every check the database makes
+	// included, and is rolled back: same answer, 200, nothing written.
+	//
+	// Every entity created is recorded as a direct write records it, then
+	// one `project.imported` entry, all with the request's identifier; each
+	// environment's ruleset moves on once. A body is accepted up to 32 MiB.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/import (the `ImportNewProject` operationId).
+	ImportNewProjectWithBodyWithResponse(ctx context.Context, params *ImportNewProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportNewProjectResponse, error)
+
+	// ImportNewProjectWithResponse Create a project from a project document
+	//
+	// Creates a project holding exactly the document: its environments (at
+	// least one), unit types, declared attributes, segments and flags with
+	// their configuration in every environment, besides the standard
+	// attributes every project has; no default environment or unit type is
+	// added. The document is sent as `application/json` or
+	// `application/yaml`, as `GET /projects/{project}/export` writes it, and
+	// its sections are all required. `key` and `name` replace the
+	// document's project key and name.
+	//
+	// The copy keeps every rule identifier and rollout salt the document
+	// names, so every unit is bucketed as in the original; a rule or a
+	// rollout without one is given one. An owner the document names by email
+	// owns the entity when they may own in the new project, which no member
+	// but an instance admin may yet; otherwise the importing member does and
+	// the answer warns `owner_replaced` with the address. Protection is
+	// bypassed in every environment, which take `protected` from the
+	// document.
+	//
+	// The import applies whole or not at all. A document that breaks a rule
+	// is refused 422 `invalid_document` with every fault found in `errors`,
+	// each pointing into the document; `schema_version_unsupported` names
+	// the versions this server reads. A key in use is 409 `already_exists`.
+	// With `dry_run` the whole import runs, every check the database makes
+	// included, and is rolled back: same answer, 200, nothing written.
+	//
+	// Every entity created is recorded as a direct write records it, then
+	// one `project.imported` entry, all with the request's identifier; each
+	// environment's ruleset moves on once. A body is accepted up to 32 MiB.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/import (the `ImportNewProject` operationId).
+	ImportNewProjectWithResponse(ctx context.Context, params *ImportNewProjectParams, body ImportNewProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportNewProjectResponse, error)
+
 	// DeleteProjectWithResponse Delete a project
 	//
 	// Deletes the project and everything in it at once: its environments,
@@ -30300,6 +30774,110 @@ func (r CreateProjectResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CreateProjectResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ImportNewProjectResponse401Headers the declared response headers of an HTTP 401 response for ImportNewProject
+type ImportNewProjectResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ImportNewProjectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ImportResult
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *ImportResult
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *RequestTooLarge
+	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
+	ApplicationproblemJSON415 *Problem
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ImportNewProjectResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ImportNewProjectResponse) GetJSON200() *ImportResult {
+	return r.JSON200
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r ImportNewProjectResponse) GetJSON201() *ImportResult {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ImportNewProjectResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ImportNewProjectResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ImportNewProjectResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r ImportNewProjectResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r ImportNewProjectResponse) GetApplicationproblemJSON413() *RequestTooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
+func (r ImportNewProjectResponse) GetApplicationproblemJSON415() *Problem {
+	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ImportNewProjectResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r ImportNewProjectResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportNewProjectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportNewProjectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ImportNewProjectResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -42067,6 +42645,90 @@ func (c *ClientWithResponses) CreateProjectWithResponse(ctx context.Context, bod
 	return ParseCreateProjectResponse(rsp)
 }
 
+// ImportNewProjectWithBodyWithResponse Create a project from a project document
+//
+// Creates a project holding exactly the document: its environments (at
+// least one), unit types, declared attributes, segments and flags with
+// their configuration in every environment, besides the standard
+// attributes every project has; no default environment or unit type is
+// added. The document is sent as `application/json` or
+// `application/yaml`, as `GET /projects/{project}/export` writes it, and
+// its sections are all required. `key` and `name` replace the
+// document's project key and name.
+//
+// The copy keeps every rule identifier and rollout salt the document
+// names, so every unit is bucketed as in the original; a rule or a
+// rollout without one is given one. An owner the document names by email
+// owns the entity when they may own in the new project, which no member
+// but an instance admin may yet; otherwise the importing member does and
+// the answer warns `owner_replaced` with the address. Protection is
+// bypassed in every environment, which take `protected` from the
+// document.
+//
+// The import applies whole or not at all. A document that breaks a rule
+// is refused 422 `invalid_document` with every fault found in `errors`,
+// each pointing into the document; `schema_version_unsupported` names
+// the versions this server reads. A key in use is 409 `already_exists`.
+// With `dry_run` the whole import runs, every check the database makes
+// included, and is rolled back: same answer, 200, nothing written.
+//
+// Every entity created is recorded as a direct write records it, then
+// one `project.imported` entry, all with the request's identifier; each
+// environment's ruleset moves on once. A body is accepted up to 32 MiB.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/import (the `ImportNewProject` operationId).
+func (c *ClientWithResponses) ImportNewProjectWithBodyWithResponse(ctx context.Context, params *ImportNewProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportNewProjectResponse, error) {
+	rsp, err := c.ImportNewProjectWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportNewProjectResponse(rsp)
+}
+
+// ImportNewProjectWithResponse Create a project from a project document
+//
+// Creates a project holding exactly the document: its environments (at
+// least one), unit types, declared attributes, segments and flags with
+// their configuration in every environment, besides the standard
+// attributes every project has; no default environment or unit type is
+// added. The document is sent as `application/json` or
+// `application/yaml`, as `GET /projects/{project}/export` writes it, and
+// its sections are all required. `key` and `name` replace the
+// document's project key and name.
+//
+// The copy keeps every rule identifier and rollout salt the document
+// names, so every unit is bucketed as in the original; a rule or a
+// rollout without one is given one. An owner the document names by email
+// owns the entity when they may own in the new project, which no member
+// but an instance admin may yet; otherwise the importing member does and
+// the answer warns `owner_replaced` with the address. Protection is
+// bypassed in every environment, which take `protected` from the
+// document.
+//
+// The import applies whole or not at all. A document that breaks a rule
+// is refused 422 `invalid_document` with every fault found in `errors`,
+// each pointing into the document; `schema_version_unsupported` names
+// the versions this server reads. A key in use is 409 `already_exists`.
+// With `dry_run` the whole import runs, every check the database makes
+// included, and is rolled back: same answer, 200, nothing written.
+//
+// Every entity created is recorded as a direct write records it, then
+// one `project.imported` entry, all with the request's identifier; each
+// environment's ruleset moves on once. A body is accepted up to 32 MiB.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/import (the `ImportNewProject` operationId).
+func (c *ClientWithResponses) ImportNewProjectWithResponse(ctx context.Context, params *ImportNewProjectParams, body ImportNewProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportNewProjectResponse, error) {
+	rsp, err := c.ImportNewProject(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportNewProjectResponse(rsp)
+}
+
 // DeleteProjectWithResponse Delete a project
 //
 // Deletes the project and everything in it at once: its environments,
@@ -48368,6 +49030,101 @@ func ParseCreateProjectResponse(rsp *http.Response) (*CreateProjectResponse, err
 		response.Headers201 = &headers
 	case rsp.StatusCode == 401:
 		var headers CreateProjectResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseImportNewProjectResponse parses an HTTP response from a ImportNewProjectWithResponse call
+func ParseImportNewProjectResponse(rsp *http.Response) (*ImportNewProjectResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportNewProjectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ImportResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest ImportResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest RequestTooLarge
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ImportNewProjectResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -58328,6 +59085,9 @@ type ServerInterface interface {
 	// CreateProject Create a project
 	// (POST /projects)
 	CreateProject(w http.ResponseWriter, r *http.Request)
+	// ImportNewProject Create a project from a project document
+	// (POST /projects/import)
+	ImportNewProject(w http.ResponseWriter, r *http.Request, params ImportNewProjectParams)
 	// DeleteProject Delete a project
 	// (DELETE /projects/{project})
 	DeleteProject(w http.ResponseWriter, r *http.Request, project ProjectKey, params DeleteProjectParams)
@@ -59988,6 +60748,65 @@ func (siw *ServerInterfaceWrapper) CreateProject(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateProject(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ImportNewProject operation middleware
+func (siw *ServerInterfaceWrapper) ImportNewProject(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ImportNewProjectParams
+
+	// ------------- Optional query parameter "key" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "key", r.URL.Query(), &params.Key, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "key"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "key", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "name" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "name", r.URL.Query(), &params.Name, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "name"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "dry_run" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "dry_run", r.URL.Query(), &params.DryRun, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "dry_run"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dry_run", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ImportNewProject(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -66327,6 +67146,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/roles", wrapper.ListRoles)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects", wrapper.ListProjects)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects", wrapper.CreateProject)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/import", wrapper.ImportNewProject)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}", wrapper.DeleteProject)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}", wrapper.GetProject)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}", wrapper.UpdateProject)
@@ -70122,6 +70942,157 @@ type CreateProject422ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response CreateProject422ApplicationProblemPlusJSONResponse) VisitCreateProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportNewProjectRequestObject struct {
+	Params   ImportNewProjectParams
+	JSONBody *ImportNewProjectJSONRequestBody
+	Body     io.Reader
+}
+
+type ImportNewProjectResponseObject interface {
+	VisitImportNewProjectResponse(w http.ResponseWriter) error
+}
+
+type ImportNewProject200JSONResponse ImportResult
+
+func (response ImportNewProject200JSONResponse) VisitImportNewProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportNewProject201JSONResponse ImportResult
+
+func (response ImportNewProject201JSONResponse) VisitImportNewProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportNewProject400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ImportNewProject400ApplicationProblemPlusJSONResponse) VisitImportNewProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportNewProject401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ImportNewProject401ApplicationProblemPlusJSONResponse) VisitImportNewProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportNewProject403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ImportNewProject403ApplicationProblemPlusJSONResponse) VisitImportNewProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportNewProject409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ImportNewProject409ApplicationProblemPlusJSONResponse) VisitImportNewProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportNewProject413ApplicationProblemPlusJSONResponse struct {
+	RequestTooLargeApplicationProblemPlusJSONResponse
+}
+
+func (response ImportNewProject413ApplicationProblemPlusJSONResponse) VisitImportNewProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportNewProject415ApplicationProblemPlusJSONResponse Problem
+
+func (response ImportNewProject415ApplicationProblemPlusJSONResponse) VisitImportNewProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportNewProject422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response ImportNewProject422ApplicationProblemPlusJSONResponse) VisitImportNewProjectResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -84004,6 +84975,9 @@ type StrictServerInterface interface {
 	// CreateProject Create a project
 	// (POST /projects)
 	CreateProject(ctx context.Context, request CreateProjectRequestObject) (CreateProjectResponseObject, error)
+	// ImportNewProject Create a project from a project document
+	// (POST /projects/import)
+	ImportNewProject(ctx context.Context, request ImportNewProjectRequestObject) (ImportNewProjectResponseObject, error)
 	// DeleteProject Delete a project
 	// (DELETE /projects/{project})
 	DeleteProject(ctx context.Context, request DeleteProjectRequestObject) (DeleteProjectResponseObject, error)
@@ -85583,6 +86557,45 @@ func (sh *strictHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateProjectResponseObject); ok {
 		if err := validResponse.VisitCreateProjectResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ImportNewProject operation middleware
+func (sh *strictHandler) ImportNewProject(w http.ResponseWriter, r *http.Request, params ImportNewProjectParams) {
+	var request ImportNewProjectRequestObject
+
+	request.Params = params
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+
+		var body ImportNewProjectJSONRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+		request.JSONBody = &body
+
+	}
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/yaml") {
+		request.Body = r.Body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ImportNewProject(ctx, request.(ImportNewProjectRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ImportNewProject")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ImportNewProjectResponseObject); ok {
+		if err := validResponse.VisitImportNewProjectResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

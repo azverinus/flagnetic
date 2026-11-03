@@ -2811,6 +2811,7 @@ export type WebhookEventType =
   | "sink.at_risk"
   | "sink.stopped"
   | "sink.data_lost"
+  | "project.imported"
   | "webhook.disabled"
   | "report.stale_flags"
   | "audit.entry"
@@ -3304,6 +3305,72 @@ export type WebhookDeliveryList = {
 };
 
 /**
+ * What an import did, or with a dry run what it would do.
+ */
+export type ImportResult = {
+  project: DocumentProject;
+  mode: "create";
+  source: "document";
+  dry_run: boolean;
+  changes: ImportChanges;
+  warnings: Array<ImportWarning>;
+};
+
+/**
+ * The keys of the entities an import created, updated and deleted, by kind. Standard attributes are never in it.
+ */
+export type ImportChanges = {
+  environments: ImportKindChanges;
+  unit_types: ImportKindChanges;
+  attributes: ImportKindChanges;
+  segments: ImportKindChanges;
+  flags: ImportKindChanges;
+  experiments: ImportKindChanges;
+};
+
+export type ImportKindChanges = {
+  created: Array<string>;
+  updated: Array<ImportUpdate>;
+  deleted: Array<string>;
+};
+
+export type ImportUpdate = {
+  key: string;
+  /**
+   * An RFC 6902 JSON Patch turning the entity as it was into the entity as it is, over its entry of the document.
+   */
+  patch: Array<JsonPatchOperation>;
+};
+
+export type JsonPatchOperation = {
+  op: "add" | "remove" | "replace" | "move" | "copy" | "test";
+  path: string;
+  from?: string;
+  value?: unknown;
+};
+
+/**
+ * Something an import did differently from what the document asks, or could not do, without refusing it.
+ */
+export type ImportWarning = {
+  /**
+   * Stable name of the warning, such as `owner_replaced`.
+   */
+  code: string;
+  /**
+   * A JSON Pointer into the document, empty for the document as a whole.
+   */
+  pointer: string;
+  detail: string;
+  /**
+   * The values a client explains the warning with, such as the `email` of an owner replaced.
+   */
+  params?: {
+    [key: string]: unknown;
+  };
+};
+
+/**
  * A project's whole configuration, versioned apart from this API: it
  * has its own `schema_version`, a server imports every version it ever
  * exported, and within a version a document changes only additively
@@ -3683,6 +3750,11 @@ export type AuditKillSwitch = boolean;
  * A change request's identifier; lists the entries its application wrote.
  */
 export type AuditChangeRequest = string;
+
+/**
+ * Run the whole import and roll it back, answering what it would have done.
+ */
+export type ImportDryRun = boolean;
 
 /**
  * The document's encoding, JSON unless `yaml` is asked for.
@@ -4621,6 +4693,88 @@ export type CreateProjectResponses = {
 };
 
 export type CreateProjectResponse = CreateProjectResponses[keyof CreateProjectResponses];
+
+export type ImportNewProjectData = {
+  /**
+   * A `ProjectDocument` as JSON.
+   */
+  body: Blob | File;
+  path?: never;
+  query?: {
+    /**
+     * The new project's key, replacing the document's.
+     */
+    key?: string;
+    /**
+     * The new project's name, replacing the document's.
+     */
+    name?: string;
+    /**
+     * Run the whole import and roll it back, answering what it would have done.
+     */
+    dry_run?: boolean;
+  };
+  url: "/projects/import";
+};
+
+export type ImportNewProjectErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `request_too_large`: the body is larger than the operation accepts; one that checks a password accepts 8 KiB.
+   */
+  413: Problem;
+  /**
+   * `unsupported_media_type`: the document is not sent as `application/json` or `application/yaml`.
+   */
+  415: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type ImportNewProjectError = ImportNewProjectErrors[keyof ImportNewProjectErrors];
+
+export type ImportNewProjectResponses = {
+  /**
+   * The project the document would create, for a dry run.
+   */
+  200: ImportResult;
+  /**
+   * The project created.
+   */
+  201: ImportResult;
+};
+
+export type ImportNewProjectResponse = ImportNewProjectResponses[keyof ImportNewProjectResponses];
 
 export type DeleteProjectData = {
   body?: never;

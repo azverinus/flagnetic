@@ -79,6 +79,15 @@ type configurationChange struct {
 func writeConfiguration(ctx context.Context, d ConfigurationDeps, cmd ConfigurationCommand,
 	change func(ctx context.Context, f flags.Flag, before flags.Configuration, now time.Time) (configurationChange, error),
 ) (flags.EnvironmentConfiguration, error) {
+	return writeConfigurationOf(ctx, d, cmd, flags.Flag.CanConfigure, change)
+}
+
+// writeConfigurationOf is writeConfiguration for a flag that configurable
+// lets be configured, which is every flag but an archived one unless the
+// write is an import's.
+func writeConfigurationOf(ctx context.Context, d ConfigurationDeps, cmd ConfigurationCommand, configurable func(flags.Flag) error,
+	change func(ctx context.Context, f flags.Flag, before flags.Configuration, now time.Time) (configurationChange, error),
+) (flags.EnvironmentConfiguration, error) {
 	now := d.Recorder.now()
 	var out flags.EnvironmentConfiguration
 	err := d.Tx.Within(ctx, func(ctx context.Context) error {
@@ -89,7 +98,7 @@ func writeConfiguration(ctx context.Context, d ConfigurationDeps, cmd Configurat
 		if err != nil {
 			return err
 		}
-		if err = f.CanConfigure(); err != nil {
+		if err = configurable(f); err != nil {
 			return err
 		}
 		ch, err := change(ctx, f, before.Configuration, now)

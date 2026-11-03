@@ -4280,6 +4280,10 @@ msgstr "Project"
 msgid "Project created"
 msgstr "Project created"
 
+#: src/lib/audit.ts
+msgid "Project imported"
+msgstr "Project imported"
+
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "Project not found"
 msgstr "Project not found"

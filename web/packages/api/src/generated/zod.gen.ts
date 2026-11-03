@@ -2005,6 +2005,7 @@ export const zWebhookEventType = z.enum([
   "sink.at_risk",
   "sink.stopped",
   "sink.data_lost",
+  "project.imported",
   "webhook.disabled",
   "report.stale_flags",
   "audit.entry",
@@ -2353,10 +2354,62 @@ export const zWebhookDeliveryList = z.object({
   next_cursor: z.string().nullable(),
 });
 
+export const zJsonPatchOperation = z.object({
+  op: z.enum(["add", "remove", "replace", "move", "copy", "test"]),
+  path: z.string(),
+  from: z.string().optional(),
+  value: z.unknown().optional(),
+});
+
+export const zImportUpdate = z.object({
+  key: z.string(),
+  patch: z.array(zJsonPatchOperation),
+});
+
+export const zImportKindChanges = z.object({
+  created: z.array(z.string()),
+  updated: z.array(zImportUpdate),
+  deleted: z.array(z.string()),
+});
+
+/**
+ * The keys of the entities an import created, updated and deleted, by kind. Standard attributes are never in it.
+ */
+export const zImportChanges = z.object({
+  environments: zImportKindChanges,
+  unit_types: zImportKindChanges,
+  attributes: zImportKindChanges,
+  segments: zImportKindChanges,
+  flags: zImportKindChanges,
+  experiments: zImportKindChanges,
+});
+
+/**
+ * Something an import did differently from what the document asks, or could not do, without refusing it.
+ */
+export const zImportWarning = z.object({
+  code: z.string(),
+  pointer: z.string(),
+  detail: z.string(),
+  params: z.record(z.string(), z.unknown()).optional(),
+});
+
 export const zDocumentProject = z.object({
   key: z.string(),
   name: z.string(),
   description: z.string().optional(),
+});
+
+/**
+ * What an import did, or with a dry run what it would do.
+ */
+export const zImportResult = z.object({
+  project: zDocumentProject,
+  mode: z.enum(["create"]),
+  source: z.enum(["document"]),
+  dry_run: z.boolean(),
+  changes: zImportChanges,
+  warnings: z.array(zImportWarning),
 });
 
 export const zDocumentEnvironment = z.object({
@@ -2613,6 +2666,11 @@ export const zAuditKillSwitch = z.boolean();
 export const zAuditChangeRequest = z.uuid();
 
 /**
+ * Run the whole import and roll it back, answering what it would have done.
+ */
+export const zImportDryRun = z.boolean().default(false);
+
+/**
  * The document's encoding, JSON unless `yaml` is asked for.
  */
 export const zDocumentFormat = z.enum(["json", "yaml"]).default("json");
@@ -2848,6 +2906,22 @@ export const zCreateProjectBody = zProjectCreate;
  * The project created.
  */
 export const zCreateProjectResponse = zProject;
+
+/**
+ * A `ProjectDocument` as JSON.
+ */
+export const zImportNewProjectBody = z.string();
+
+export const zImportNewProjectQuery = z.object({
+  key: z.string().optional(),
+  name: z.string().optional(),
+  dry_run: z.boolean().optional().default(false),
+});
+
+/**
+ * The project the document would create, for a dry run.
+ */
+export const zImportNewProjectResponse = zImportResult;
 
 export const zDeleteProjectHeaders = z.object({
   "If-Match": z.string().optional(),

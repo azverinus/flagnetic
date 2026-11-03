@@ -88,6 +88,7 @@ export function auditQueryOf(search: AuditSearch): NonNullable<ListAuditEntriesD
 const actionLabels: Record<string, MessageDescriptor> = {
   "project.created": msg`Project created`,
   "project.updated": msg`Project updated`,
+  "project.imported": msg`Project imported`,
   "environment.created": msg`Environment created`,
   "environment.updated": msg`Environment updated`,
   "environment.deleted": msg`Environment deleted`,
