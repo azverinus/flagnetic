@@ -333,19 +333,11 @@ var (
 	})
 )
 
-// LinkLocal reports whether a is a link-local address, where cloud metadata
-// services answer: a ClickHouse or object storage sink may reach loopback and
-// private addresses, in a cluster's own network, and never these.
-func LinkLocal(a netip.Addr) bool {
-	a = a.Unmap()
-	return a.IsLinkLocalUnicast() || a.IsLinkLocalMulticast()
-}
-
 // CheckNotLinkLocal refuses a target any of whose addresses is link-local
 // (link_local_target), naming pointer. No setting lifts it.
 func CheckNotLinkLocal(addrs []netip.Addr, pointer string) error {
 	for _, a := range addrs {
-		if LinkLocal(a) {
+		if governance.AddressLinkLocal(a) {
 			return apperrors.Invalid("link_local_target",
 				"the target resolves to a link-local address, where cloud metadata services answer",
 				apperrors.Violation{Pointer: pointer, Code: "link_local_target", Detail: "the target is a link-local address"})

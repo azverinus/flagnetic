@@ -376,16 +376,11 @@ func TestTheSameSinkIsTheSameInputAnyMapOrder(t *testing.T) {
 }
 
 func TestOnlyLinkLocalAddressesAreRefusedToTheKindsThatMayReachPrivateOnes(t *testing.T) {
-	for addr, refused := range map[string]bool{
-		"169.254.169.254": true, "fe80::1": true, "::ffff:169.254.169.254": true, "ff02::1": true,
-		"127.0.0.1": false, "10.0.0.5": false, "::1": false, "93.184.216.34": false,
-	} {
-		if got := sinks.LinkLocal(netip.MustParseAddr(addr)); got != refused {
-			t.Errorf("LinkLocal(%s) = %t, want %t", addr, got, refused)
-		}
-	}
 	if err := sinks.CheckNotLinkLocal([]netip.Addr{netip.MustParseAddr("10.0.0.1"), netip.MustParseAddr("169.254.0.1")}, "/clickhouse/url"); err == nil {
 		t.Error("a name resolving to a link-local address was accepted")
+	}
+	if err := sinks.CheckNotLinkLocal([]netip.Addr{netip.MustParseAddr("10.0.0.1"), netip.MustParseAddr("127.0.0.1"), netip.MustParseAddr("::1")}, "/clickhouse/url"); err != nil {
+		t.Errorf("private and loopback addresses = %v", err)
 	}
 	if err := sinks.CheckNotLinkLocal(nil, "/clickhouse/url"); err != nil {
 		t.Errorf("a name that does not resolve = %v", err)
