@@ -253,6 +253,9 @@ func TestADocumentThatBreaksARuleIsRefusedWholeAtThePointerOfEachFault(t *testin
 		{"a unit type and an attribute sharing a key", func(d map[string]any) {
 			d["attributes"] = append(d["attributes"].([]any), map[string]any{"key": "user", "type": "string", "name": "User"})
 		}, "/attributes/1/key", "duplicate"},
+		{"a unit type keyed as a standard attribute", func(d map[string]any) {
+			d["unit_types"] = append(d["unit_types"].([]any), map[string]any{"key": "platform", "name": "Platform"})
+		}, "/unit_types/1/key", "duplicate"},
 		{"a standard attribute of another type", func(d map[string]any) {
 			d["attributes"] = append(d["attributes"].([]any), map[string]any{"key": "app_version", "type": "string", "name": "App version"})
 		}, "/attributes/1/type", "type_immutable"},
@@ -318,6 +321,10 @@ func TestEveryFaultOfADocumentIsReportedAtOnce(t *testing.T) {
 		d["environments"].([]any)[0].(map[string]any)["name"] = ""
 		configurationIn(d, 1)["rules"].([]any)[0].(map[string]any)["serve"].(map[string]any)["variation"] = "maybe"
 		d["flags"].([]any)[0].(map[string]any)["key"] = "1bad"
+		// Faults the document shows alone come with those of its entities.
+		c := d["flags"].([]any)[0].(map[string]any)["configurations"].(map[string]any)
+		c["qa"] = c["production"]
+		d["unit_types"] = append(d["unit_types"].([]any), d["unit_types"].([]any)[0])
 	})
 	res := importJSON(t, admin, management.ImportNewProjectParams{}, doc)
 	problem := assertProblem(t, "faulty document", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid_document")
@@ -325,7 +332,10 @@ func TestEveryFaultOfADocumentIsReportedAtOnce(t *testing.T) {
 	for _, v := range *problem.Errors {
 		found = append(found, v.Pointer)
 	}
-	for _, want := range []string{"/environments/0/name", "/flags/0/key", "/flags/1/configurations/production/rules/0/serve/variation"} {
+	for _, want := range []string{
+		"/unit_types/1/key", "/flags/0/configurations/qa",
+		"/environments/0/name", "/flags/0/key", "/flags/1/configurations/production/rules/0/serve/variation",
+	} {
 		if !slices.Contains(found, want) {
 			t.Errorf("errors = %v, want %s among them", found, want)
 		}

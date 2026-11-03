@@ -198,13 +198,17 @@ func mapKeys[T any](in []T, key func(T) string) []string {
 	return out
 }
 
-// declarations refuses an attribute whose key a unit type has, since a rule
-// names either by its key alone, and a standard attribute declared as
-// another type than SDKs send it as.
+// declarations refuses an attribute whose key a unit type has, and a unit
+// type keyed as a standard attribute every project has, since a rule names
+// either by its key alone; and a standard attribute declared as another
+// type than SDKs send it as.
 func (f *faults) declarations(d Document) {
 	units := map[string]bool{}
-	for _, u := range d.UnitTypes {
+	for i, u := range d.UnitTypes {
 		units[u.Key] = true
+		if _, standard := workspace.StandardAttributeType(u.Key); standard {
+			f.add(Pointer("unit_types", i, "key"), "duplicate", "a standard attribute every project has has this key; a key means one thing", nil)
+		}
 	}
 	for i, a := range d.Attributes {
 		if units[a.Key] {
@@ -266,15 +270,24 @@ func (f *faults) salts(d Document) {
 					f.add(at+"/serve/salt", "invalid_value", "a salt is 16 lower-case letters and digits", nil)
 					continue
 				}
-				who := owner{flag: fl.Key, rule: r.ID}
-				if r.ID == "" {
-					// A rule without an identifier is a rule of its own.
-					who.rule = at
+				// A rule without an identifier is a rule of its own; one with
+				// an identifier is the same rule whatever case its hexadecimal
+				// digits are written in.
+				who := owner{flag: fl.Key, rule: at}
+				if ruleID, err := id.Parse[flags.Rule](r.ID); err == nil {
+					who.rule = ruleID.String()
 				}
-				if first, taken := owners[r.Serve.Salt]; taken && first != who {
+				first, taken := owners[r.Serve.Salt]
+				if !taken {
+					// The first rollout with a salt owns it; a later one that
+					// is refused does not take it over, or the same rule
+					// further on would be refused too.
+					owners[r.Serve.Salt] = who
+					continue
+				}
+				if first != who {
 					f.add(at+"/serve/salt", "duplicate", "another rollout has this salt; only the same rule of a flag in another environment may share it", nil)
 				}
-				owners[r.Serve.Salt] = who
 			}
 		}
 	}

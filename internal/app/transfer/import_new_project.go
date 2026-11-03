@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
@@ -65,7 +66,9 @@ var errDryRun = errors.New("transfer: a dry run ends in a rollback")
 // as a document, then each entity is written through the context that owns
 // it in one unit of work, in the order they name each other, each recording
 // its own audit entry, followed by one entry for the import. Every fault of
-// the document is reported at once, with a pointer into it. The unit of work
+// the document is reported at once, with a pointer into it: an entity the
+// document check refuses is not written, and the others are, so that their
+// contexts judge them too, in a unit of work that is then rolled back. The unit of work
 // bypasses protection in every environment: a project made from a document
 // has no ruleset to review. With a dry run the whole unit of work runs, so
 // every check the database makes is made, and is then rolled back.
@@ -113,32 +116,53 @@ type importRun struct {
 	changes  transfer.Changes
 	warnings []transfer.Warning
 	faults   []apperrors.Violation
+	// refused are the pointers of the faults the document check found: the
+	// entities under them are not written, since writing them would only
+	// break what the check already refused, such as a key being unique.
+	refused []string
 	// environments are the environments created, by key.
 	environments map[string]workspace.Environment
 	// flags are the flags created, by key.
 	flags map[string]bool
 }
 
-// checkDocument refuses the document for what it alone says, and the
-// project for what the workspace context says of it, together, so a single
-// answer reports both.
+// checkDocument finds the faults of what the document alone says, and of
+// the project for what the workspace context says of it. They are reported
+// with the faults the contexts find in the entities, unless there is no
+// project to write the entities into: then it refuses the document at once.
 func (r *importRun) checkDocument() error {
-	var violations []apperrors.Violation
 	if err := transfer.CheckCreate(r.doc); err != nil {
-		if e, ok := apperrors.From(err); ok {
-			violations = append(violations, e.Violations...)
+		e, ok := apperrors.From(err)
+		if !ok {
+			return err
 		}
+		r.faults = append(r.faults, e.Violations...)
 	}
+	for _, v := range r.faults {
+		r.refused = append(r.refused, v.Pointer)
+	}
+	var project []apperrors.Violation
 	if p := r.doc.Project; p != nil {
 		_, err := workspace.NewProject(id.New[workspace.Project](r.h.d.IDs), p.Key, p.Name, p.Description, r.h.d.Clock.Now())
 		if e, ok := apperrors.From(err); ok {
-			violations = append(violations, e.Under("/project").Violations...)
+			project = e.Under("/project").Violations
 		}
 	}
-	if len(violations) == 0 {
+	if r.doc.Project != nil && len(project) == 0 {
 		return nil
 	}
-	return apperrors.Invalid("invalid_document", "the project document is not valid", violations...)
+	return apperrors.Invalid("invalid_document", "the project document is not valid", append(r.faults, project...)...)
+}
+
+// isRefused reports whether the document check refused the entity at
+// pointer, or a part of it.
+func (r *importRun) isRefused(pointer string) bool {
+	for _, p := range r.refused {
+		if p == pointer || strings.HasPrefix(p, pointer+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 // fault records err, a refusal of the entity at pointer, and goes on with
@@ -166,6 +190,11 @@ func (r *importRun) apply(ctx context.Context) (ImportResult, error) {
 	d := r.doc
 	req := r.cmd.Request
 	p, err := r.h.d.Workspace.CreateProject(ctx, d.Project.Key, d.Project.Name, d.Project.Description, req)
+	if e, ok := apperrors.From(err); ok && e.Kind == apperrors.KindConflict && len(r.faults) > 0 {
+		// A document that is refused is refused for what it is, whichever
+		// project it would have been written as.
+		return ImportResult{}, apperrors.Invalid("invalid_document", "the project document is not valid", r.faults...)
+	}
 	if err != nil {
 		return ImportResult{}, err
 	}
@@ -198,6 +227,9 @@ func (r *importRun) declare(ctx context.Context) error {
 	w, req, project := r.h.d.Workspace, r.cmd.Request, r.project.ID
 	r.environments = make(map[string]workspace.Environment, len(r.doc.Environments))
 	for i, e := range r.doc.Environments {
+		if r.isRefused("/environments/" + strconv.Itoa(i)) {
+			continue
+		}
 		created, err := w.CreateEnvironment(ctx, project, e.Key, e.Name, e.Protected, i+1, req)
 		if ferr := r.fault(err, "/environments/"+strconv.Itoa(i)); ferr != nil {
 			return ferr
@@ -208,6 +240,9 @@ func (r *importRun) declare(ctx context.Context) error {
 		}
 	}
 	for i, u := range r.doc.UnitTypes {
+		if r.isRefused("/unit_types/" + strconv.Itoa(i)) {
+			continue
+		}
 		_, err := w.CreateUnitType(ctx, project, u.Key, u.Name, u.Description, req)
 		if ferr := r.fault(err, "/unit_types/"+strconv.Itoa(i)); ferr != nil {
 			return ferr
@@ -217,7 +252,7 @@ func (r *importRun) declare(ctx context.Context) error {
 		}
 	}
 	for i, a := range r.doc.Attributes {
-		if _, standard := workspace.StandardAttributeType(a.Key); standard {
+		if _, standard := workspace.StandardAttributeType(a.Key); standard || r.isRefused("/attributes/"+strconv.Itoa(i)) {
 			continue
 		}
 		_, err := w.CreateAttribute(ctx, project, a.Key, a.Name, a.Description, workspace.AttributeType(a.Type), req)
@@ -233,6 +268,9 @@ func (r *importRun) declare(ctx context.Context) error {
 
 func (r *importRun) createSegments(ctx context.Context) error {
 	for i, s := range r.doc.Segments {
+		if r.isRefused("/segments/" + strconv.Itoa(i)) {
+			continue
+		}
 		err := r.h.d.Flags.CreateSegment(ctx, SegmentImport{
 			Project: r.project.ID, Key: s.Key, Name: s.Name, Description: s.Description, Private: s.Private,
 			Conditions: transfer.FlagConditions(s.Conditions), Request: r.cmd.Request,
@@ -255,6 +293,11 @@ func (r *importRun) createFlags(ctx context.Context) error {
 	r.flags = make(map[string]bool, len(r.doc.Flags))
 	for i, f := range r.doc.Flags {
 		at := "/flags/" + strconv.Itoa(i)
+		if r.isRefused(at + "/key") {
+			// Another flag of the document has the key. A fault the check
+			// found in a configuration skips that configuration alone.
+			continue
+		}
 		owner, err := r.ownerOf(ctx, f.Owner, at+"/owner")
 		if err != nil {
 			return err
@@ -290,15 +333,16 @@ func (r *importRun) configureFlags(ctx context.Context) error {
 		if !r.flags[f.Key] {
 			continue
 		}
-		for _, env := range r.doc.Environments {
+		for j, env := range r.doc.Environments {
 			c, configured := f.Configurations[env.Key]
-			if !configured || r.environments[env.Key].ID.IsZero() {
+			at := transfer.Pointer("flags", i, "configurations", env.Key)
+			if !configured || r.environments[env.Key].ID.IsZero() || r.isRefused(transfer.Pointer("environments", j)) || r.isRefused(at) {
 				continue
 			}
 			err := r.h.d.Flags.WriteConfiguration(ctx, ConfigurationImport{
 				Project: r.project.ID, Flag: f.Key, Environment: env.Key, Input: c.Input(), Caller: r.cmd.Caller, Request: r.cmd.Request,
 			})
-			if ferr := r.fault(err, transfer.Pointer("flags", i, "configurations", env.Key)); ferr != nil {
+			if ferr := r.fault(err, at); ferr != nil {
 				return ferr
 			}
 		}

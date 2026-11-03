@@ -101,6 +101,16 @@ func TestAnAttributeSharingAUnitTypesKeyOrRetypingAStandardOneIsRefused(t *testi
 	}
 }
 
+func TestAUnitTypeKeyedAsAStandardAttributeIsRefused(t *testing.T) {
+	d := creating()
+	d.UnitTypes = append(d.UnitTypes, transfer.UnitType{Key: "platform", Name: "Platform"})
+	got := faultsOf(t, d)
+	want := [][2]string{{"/unit_types/1/key", "duplicate"}}
+	if !slices.Equal(got, want) {
+		t.Errorf("faults = %v, want %v", got, want)
+	}
+}
+
 func TestAConfigurationForAnEnvironmentTheDocumentLacksIsRefusedWithItsKey(t *testing.T) {
 	d := creating()
 	d.Flags = []transfer.Flag{flagWith("a", map[string][]transfer.Rule{"production": nil, "stagin/g": nil})}
@@ -155,6 +165,32 @@ func TestASaltIsSharedOnlyByTheSameRuleOfAFlagInAnotherEnvironment(t *testing.T)
 		{"/flags/2/configurations/production/rules/0/serve/salt", "duplicate"},
 		{"/flags/2/configurations/staging/rules/0/serve/salt", "duplicate"},
 	}
+	if !slices.Equal(got, want) {
+		t.Errorf("faults = %v, want %v", got, want)
+	}
+}
+
+func TestASaltBelongsToTheFirstRolloutThatHasIt(t *testing.T) {
+	const (
+		salt  = "abcdefghij012345"
+		ruleA = "0192f3a0-0000-7000-8000-0000000000b1"
+		ruleB = "0192f3a0-0000-7000-8000-0000000000b2"
+	)
+	d := creating()
+	d.Environments = append(d.Environments,
+		transfer.Environment{Key: "qa", Name: "QA"}, transfer.Environment{Key: "staging", Name: "Staging"})
+	d.Flags = []transfer.Flag{
+		// The rule in staging is the rule in production, its identifier
+		// written in upper case; only the other rule in qa takes a salt that
+		// is not its own.
+		flagWith("a", map[string][]transfer.Rule{
+			"production": {rollout(ruleA, salt)},
+			"qa":         {rollout(ruleB, salt)},
+			"staging":    {rollout("0192F3A0-0000-7000-8000-0000000000B1", salt)},
+		}),
+	}
+	got := faultsOf(t, d)
+	want := [][2]string{{"/flags/0/configurations/qa/rules/0/serve/salt", "duplicate"}}
 	if !slices.Equal(got, want) {
 		t.Errorf("faults = %v, want %v", got, want)
 	}
