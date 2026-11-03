@@ -154,6 +154,9 @@ import type {
   EnableInstanceWebhookData,
   EnableInstanceWebhookErrors,
   EnableInstanceWebhookResponses,
+  EnableSinkData,
+  EnableSinkErrors,
+  EnableSinkResponses,
   EnableWebhookData,
   EnableWebhookErrors,
   EnableWebhookResponses,
@@ -476,6 +479,12 @@ import type {
   TestInstanceWebhookData,
   TestInstanceWebhookErrors,
   TestInstanceWebhookResponses,
+  TestSinkConfigData,
+  TestSinkConfigErrors,
+  TestSinkConfigResponses,
+  TestSinkData,
+  TestSinkErrors,
+  TestSinkResponses,
   TestWebhookData,
   TestWebhookErrors,
   TestWebhookResponses,
@@ -5297,6 +5306,39 @@ export const createSink = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Test a sink's configuration before saving it
+ *
+ * Checks a configuration as creating a sink would, then calls its target
+ * and answers whether it works, why not, and what is wrong with it that
+ * does not stop delivery. Nothing is stored, created at the target or
+ * audited: a ClickHouse test never creates tables, and says so in its
+ * warnings. A webhook sink is called with a signature made from a
+ * secret drawn for the test and thrown away. The target's own words are
+ * never answered, only the failure's class, status and code. Saving a
+ * sink is never blocked by its test.
+ *
+ */
+export const testSinkConfig = <ThrowOnError extends boolean = false>(
+  options: Options<TestSinkConfigData, ThrowOnError>,
+): RequestResult<TestSinkConfigResponses, TestSinkConfigErrors, ThrowOnError> =>
+  (options.client ?? client).post<TestSinkConfigResponses, TestSinkConfigErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/test",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
  * Delete a sink
  *
  * The sink goes, and nothing more is sent to its target.
@@ -5365,6 +5407,77 @@ export const updateSink = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/sinks/{sink}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Enable a sink
+ *
+ * Calls the sink's target first and refuses with `sink_not_ready`, naming
+ * the failure by `class`, `status` and `code`, when it does not answer
+ * or cannot take a batch; a ClickHouse sink with `create_tables` also
+ * creates its tables. Then every event kind the sink exports gets a
+ * stream that starts at the horizon: what the project receives from now
+ * on. `start_from`, a time still within retention (`out_of_retention`
+ * otherwise), starts the streams this call creates at the first event
+ * received at or after it, which backfills them; a stream the sink
+ * already has keeps its place, so enabling a sink again continues where
+ * it stopped. A sink that is already enabled is answered as it is, with
+ * nothing probed or recorded. Enabling a stopped sink leaves it stopped
+ * until it is resumed. It takes no `If-Match`.
+ *
+ */
+export const enableSink = <ThrowOnError extends boolean = false>(
+  options: Options<EnableSinkData, ThrowOnError>,
+): RequestResult<EnableSinkResponses, EnableSinkErrors, ThrowOnError> =>
+  (options.client ?? client).post<EnableSinkResponses, EnableSinkErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/enable",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Test a saved sink
+ *
+ * Calls the target of the stored sink, or, when the body carries a
+ * sub-object of the sink's kind, of the sink with that configuration, in
+ * which `***` or no secret takes the stored one: a change is checked
+ * against the credentials already held. Answers whether it works, why
+ * not by class, status and code, and what is wrong that does not stop
+ * delivery. Testing the stored configuration also creates a ClickHouse
+ * sink's tables when it has `create_tables`, and stores what it found as
+ * the sink's `warnings`. Audited as `sink.tested`. The target's own words
+ * are never answered.
+ *
+ */
+export const testSink = <ThrowOnError extends boolean = false>(
+  options: Options<TestSinkData, ThrowOnError>,
+): RequestResult<TestSinkResponses, TestSinkErrors, ThrowOnError> =>
+  (options.client ?? client).post<TestSinkResponses, TestSinkErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/test",
     ...options,
     headers: {
       "Content-Type": "application/json",

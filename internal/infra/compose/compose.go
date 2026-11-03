@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"fmt"
+	mrand "math/rand/v2"
 	"net"
 	"strings"
 	"time"
@@ -50,6 +51,7 @@ import (
 	pgidentity "github.com/azverinus/flagnetic/internal/infra/out/postgres/identity"
 	pgsinks "github.com/azverinus/flagnetic/internal/infra/out/postgres/sinks"
 	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
+	outsinks "github.com/azverinus/flagnetic/internal/infra/out/sinks"
 	"github.com/azverinus/flagnetic/internal/infra/out/webhook"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
@@ -100,6 +102,14 @@ type Options struct {
 	// WebhookTick is how often the replica fans the outbox out and sends the
 	// webhook deliveries that are due.
 	WebhookTick time.Duration
+	// SinkFault lets a test lose a sink stream's commit; nil in production.
+	SinkFault *pgsinks.Fault
+	// SinkTick is how often the replica looks for sink streams that are due
+	// and delivers their next batch.
+	SinkTick time.Duration
+	// SinkLagWarning is how old the oldest event a sink has not delivered
+	// may be before the sink is lagging.
+	SinkLagWarning time.Duration
 	// WebhookSecretOverlap is how long a webhook subscription's rotated
 	// secret signs beside the new one.
 	WebhookSecretOverlap time.Duration
@@ -220,10 +230,18 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	}
 	// A sink's secret is sealed under the same key, its target resolved by the
 	// same resolver and judged by the webhook subscriptions' policy.
+	sinkStore := pgsinks.NewStore(d.Pool).WithFault(o.SinkFault)
+	sinkTargets := outsinks.NewTargets(o.WebhookTargets, net.DefaultResolver)
 	sinks := appsinks.Deps{
-		Tx: tx, Store: pgsinks.NewStore(d.Pool), Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
-		Sealer: o.Keyring, Resolver: net.DefaultResolver, Targets: o.WebhookTargets, SecretOverlap: o.WebhookSecretOverlap,
+		Tx: tx, Store: sinkStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
+		Sealer: o.Keyring, Resolver: net.DefaultResolver, TargetPolicy: o.WebhookTargets, SecretOverlap: o.WebhookSecretOverlap,
+		Rows: sinkStore, Targets: sinkTargets, Opener: o.Keyring, Retention: o.EventsRetention, LagWarning: o.SinkLagWarning,
 	}
+	sinkMetrics := worker.NewSinkMetrics(reg)
+	sinkDelivery := appsinks.NewDeliver(appsinks.DeliverDeps{
+		Tx: tx, Store: sinkStore, Rows: sinkStore, Targets: sinkTargets, Opener: o.Keyring, Audit: audit, Clock: d.Clock,
+		IDs: d.IDs, Observer: sinkMetrics, Random: mrand.Float64,
+	})
 	deliveryRequests := appgovernance.DeliveryRequestDeps{
 		Tx: tx, Webhooks: webhookStore, Deliveries: webhookStore, Queue: outbox, Clock: d.Clock, IDs: d.IDs,
 	}
@@ -570,9 +588,12 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		EnableWebhook:         appgovernance.NewEnableWebhook(webhooks),
 		RotateWebhookSecret:   appgovernance.NewRotateWebhookSecret(webhooks),
 
-		ListSinks:        appsinks.NewListSinks(sinks.Store),
+		ListSinks:        appsinks.NewListSinks(sinks),
 		CreateSink:       appsinks.NewCreate(sinks),
-		GetSink:          appsinks.NewGetSink(sinks.Store),
+		GetSink:          appsinks.NewGetSink(sinks),
+		EnableSink:       appsinks.NewEnable(sinks),
+		TestSinkConfig:   appsinks.NewTestConfig(sinks),
+		TestSink:         appsinks.NewTest(sinks),
 		UpdateSink:       appsinks.NewUpdate(sinks),
 		DeleteSink:       appsinks.NewDelete(sinks),
 		RotateSinkSecret: appsinks.NewRotateSecret(sinks),
@@ -663,6 +684,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 				Tx: tx, Store: deliveryLog, Sender: webhook.NewSender(o.WebhookTargets),
 				Opener: o.Keyring, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, Audit: audit, Outbox: outbox,
 			}), o.WebhookTick, edge.Logger(), reg),
+			worker.SinkDelivery(sinkDelivery, o.SinkTick, edge.Logger()),
 			worker.WebhookRetention(appgovernance.NewRunWebhookRetention(tx, deliveryLog, d.Clock), reg),
 			worker.StaleFlagDigest(appgovernance.NewRunDigestRound(digest, o.DigestSlot).Handle),
 			worker.ProjectPurge(appworkspace.NewPurgeDeletedProjects(tx, ws)),

@@ -267,6 +267,39 @@ func WriteJSONLines(w io.Writer, rows []Row) error {
 	return nil
 }
 
+// webhookEnvelope is the body of a call to a webhook sink.
+type webhookEnvelope struct {
+	SchemaVersion int    `json:"schema_version"`
+	SinkID        string `json:"sink_id"`
+	ProjectKey    string `json:"project_key"`
+	DeliveryID    string `json:"delivery_id"`
+	// EventKind is the kind of the rows, or "test" for a call that carries
+	// none and only shows the receiver answers.
+	EventKind string `json:"event_kind"`
+	Sample    bool   `json:"sample"`
+	Events    []any  `json:"events"`
+}
+
+// WebhookBody encodes the body of a call to a webhook sink: the envelope, then
+// the rows as the export schema lays them out, with no HTML escaping. The
+// envelope changes only additively, as the rows do.
+func WebhookBody(sink ID, projectKey, deliveryID, eventKind string, sample bool, rows []Row) ([]byte, error) {
+	env := webhookEnvelope{
+		SchemaVersion: SchemaVersion, SinkID: sink.String(), ProjectKey: projectKey, DeliveryID: deliveryID,
+		EventKind: eventKind, Sample: sample, Events: make([]any, len(rows)),
+	}
+	for i, r := range rows {
+		env.Events[i] = r.wire()
+	}
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(env); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(b.Bytes(), []byte("\n")), nil
+}
+
 // SampleRows returns the SampleCount rows of kind that a sample sends,
 // marked as samples by their IDs, sample-1 to sample-10, and their keys, and
 // received at now; none for a kind no sink exports.

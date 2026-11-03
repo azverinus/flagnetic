@@ -41,9 +41,17 @@ export type Problem = {
    */
   used_by?: Array<string>;
   /**
-   * Why a system the server asked did not answer as needed, for `provider_unreachable`; for `smtp_failed` the step that failed, `connection`, `tls`, `authentication` or `rejected`.
+   * Why a system the server asked did not answer as needed, for `provider_unreachable`; for `smtp_failed` the step that failed, `connection`, `tls`, `authentication` or `rejected`; for `sink_not_ready` the failure class of the target's check, such as `connect` or `status`.
    */
   failure?: string;
+  /**
+   * The HTTP status the target answered, for `sink_not_ready`, when it answered.
+   */
+  failure_status?: number;
+  /**
+   * The target's own error code, for `sink_not_ready`, when it speaks one, such as a ClickHouse exception or an S3 error code.
+   */
+  failure_code?: string;
   errors?: Array<Violation>;
 };
 
@@ -3243,6 +3251,51 @@ export type SinkWebhookInput = {
   headers?: {
     [key: string]: string;
   };
+};
+
+export type SinkEnable = {
+  /**
+   * Where the streams this call creates start, a time within retention:
+   * the first event received at or after it is the first delivered.
+   * Absent, they start at the horizon. A stream the sink already has
+   * keeps its place.
+   *
+   */
+  start_from?: string;
+};
+
+/**
+ * The configuration to test in place of the stored one: the sub-object of
+ * the sink's kind, which replaces it whole. Nothing is stored.
+ *
+ */
+export type SinkTest = {
+  clickhouse?: SinkClickHouseInput;
+  object_storage?: SinkObjectStorageInput;
+  webhook?: SinkWebhookInput;
+};
+
+export type SinkTestResult = {
+  /**
+   * Whether the target answered and can take a batch.
+   */
+  ok: boolean;
+  /**
+   * Why not, when it did not.
+   */
+  class: SinkFailureClass | null;
+  /**
+   * The HTTP status the target answered, when it did.
+   */
+  status: number | null;
+  /**
+   * The protocol's own error code, when the target speaks one.
+   */
+  code: string | null;
+  /**
+   * What is wrong with the target that does not stop delivery, such as a column missing from a table.
+   */
+  warnings: Array<string>;
 };
 
 export type SinkCreate = {
@@ -14182,6 +14235,65 @@ export type CreateSinkResponses = {
 
 export type CreateSinkResponse = CreateSinkResponses[keyof CreateSinkResponses];
 
+export type TestSinkConfigData = {
+  body: SinkCreate;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks/test";
+};
+
+export type TestSinkConfigErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type TestSinkConfigError = TestSinkConfigErrors[keyof TestSinkConfigErrors];
+
+export type TestSinkConfigResponses = {
+  /**
+   * What the test found; a target that fails is a 200 with `ok` false.
+   */
+  200: SinkTestResult;
+};
+
+export type TestSinkConfigResponse = TestSinkConfigResponses[keyof TestSinkConfigResponses];
+
 export type DeleteSinkData = {
   body?: never;
   headers?: {
@@ -14392,6 +14504,132 @@ export type UpdateSinkResponses = {
 };
 
 export type UpdateSinkResponse = UpdateSinkResponses[keyof UpdateSinkResponses];
+
+export type EnableSinkData = {
+  body?: SinkEnable;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The sink's identifier.
+     */
+    sink: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks/{sink}/enable";
+};
+
+export type EnableSinkErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type EnableSinkError = EnableSinkErrors[keyof EnableSinkErrors];
+
+export type EnableSinkResponses = {
+  /**
+   * The sink as it is now.
+   */
+  200: Sink;
+};
+
+export type EnableSinkResponse = EnableSinkResponses[keyof EnableSinkResponses];
+
+export type TestSinkData = {
+  body?: SinkTest;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The sink's identifier.
+     */
+    sink: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks/{sink}/test";
+};
+
+export type TestSinkErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type TestSinkError = TestSinkErrors[keyof TestSinkErrors];
+
+export type TestSinkResponses = {
+  /**
+   * What the test found; a target that fails is a 200 with `ok` false.
+   */
+  200: SinkTestResult;
+};
+
+export type TestSinkResponse = TestSinkResponses[keyof TestSinkResponses];
 
 export type RotateSinkSecretData = {
   body?: never;

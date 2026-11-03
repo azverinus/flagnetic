@@ -108,6 +108,11 @@ type Config struct {
 	// WebhookTick is how often a replica fans the outbox out to webhook
 	// subscriptions and sends the deliveries that are due.
 	WebhookTick time.Duration
+	// SinkTick is how often a replica looks for sink streams due to flush.
+	SinkTick time.Duration
+	// SinkLagWarning is how old the oldest undelivered event of a sink may
+	// be before the sink is lagging.
+	SinkLagWarning time.Duration
 	// WebhookSecretOverlap is how long the secret a rotation replaced keeps
 	// signing beside the new one.
 	WebhookSecretOverlap time.Duration
@@ -545,6 +550,26 @@ func Settings() []Setting {
 				"An event reaches a receiver about this long after its change at the earliest.",
 			Example: "5s",
 			apply:   durationSetting(func(c *Config, d time.Duration) { c.WebhookTick = d }),
+		},
+		{
+			Name:    "FLAGNETIC_SINK_TICK",
+			Key:     "sink_tick",
+			Default: "1s",
+			Unit:    "duration",
+			Description: "How often a replica looks for sink streams that are due and delivers their next batch. " +
+				"A stream still waits its sink's `flush_interval` between batches once it has caught up, and goes on at once while batches are full.",
+			Example: "1s",
+			apply:   durationSetting(func(c *Config, d time.Duration) { c.SinkTick = d }),
+		},
+		{
+			Name:    "FLAGNETIC_SINK_LAG_WARNING",
+			Key:     "sink_lag_warning",
+			Default: "15m",
+			Unit:    "duration",
+			Description: "How old the oldest event a sink has not delivered may be before the sink's health is `lagging`. " +
+				"A long transaction anywhere in the database holds every sink back, and shows as lag.",
+			Example: "15m",
+			apply:   durationSetting(func(c *Config, d time.Duration) { c.SinkLagWarning = d }),
 		},
 		{
 			Name:    "FLAGNETIC_WEBHOOK_SECRET_OVERLAP",
