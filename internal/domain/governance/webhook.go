@@ -314,9 +314,29 @@ func CheckTargetAddresses(addrs []netip.Addr, policy TargetPolicy) error {
 // reach without the operator's leave: loopback, private, link-local,
 // unspecified or multicast, written as IPv4 or IPv4-mapped IPv6 alike.
 func TargetAddressRefused(a netip.Addr) bool {
+	return AddressUnreachable(a) || AddressPrivateOrLoopback(a) || AddressLinkLocal(a)
+}
+
+// AddressUnreachable reports whether a is an address nothing is ever called
+// at, whatever the operator allows: not an address at all, unspecified, or
+// multicast.
+func AddressUnreachable(a netip.Addr) bool {
 	a = a.Unmap()
-	return !a.IsValid() || a.IsLoopback() || a.IsPrivate() || a.IsUnspecified() || a.IsLinkLocalUnicast() ||
-		a.IsMulticast()
+	return !a.IsValid() || a.IsUnspecified() || a.IsMulticast()
+}
+
+// AddressPrivateOrLoopback reports whether a is on the deployment's own host
+// or private network, where a cluster's own services live.
+func AddressPrivateOrLoopback(a netip.Addr) bool {
+	a = a.Unmap()
+	return a.IsLoopback() || a.IsPrivate()
+}
+
+// AddressLinkLocal reports whether a is a link-local address, where cloud
+// metadata services answer.
+func AddressLinkLocal(a netip.Addr) bool {
+	a = a.Unmap()
+	return a.IsLinkLocalUnicast() || a.IsLinkLocalMulticast()
 }
 
 // webhookSecretLength is the bytes of randomness in a subscription's secret.
