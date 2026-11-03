@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -62,9 +61,23 @@ type forgedCode struct {
 	nonce, challenge, redirect string
 }
 
-// forgedRedirectHosts are the hosts a forging provider sends a browser back
-// to: the public addresses the tests serve an instance at.
-var forgedRedirectHosts = []string{"localhost:8080", "flags.example.com"}
+// forgedRedirect returns where a forging provider sends a browser back to:
+// the callback path and query under the one of the public addresses the tests
+// serve an instance at that origin names, and false for any other origin. Each
+// address is written out in the concatenation that builds the target, so
+// nothing a request carries decides the host the browser is sent to.
+func forgedRedirect(origin, path, query string) (string, bool) {
+	path = strings.TrimPrefix(path, "/")
+	switch origin {
+	case "http://localhost:8080":
+		return "http://localhost:8080/" + path + "?" + query, true
+	case "https://flags.example.com":
+		return "https://flags.example.com/" + path + "?" + query, true
+	case "http://flags.example.com":
+		return "http://flags.example.com/" + path + "?" + query, true
+	}
+	return "", false
+}
 
 // StartForgingIDP starts a forging provider that ends with the test.
 func StartForgingIDP(t testing.TB) *ForgingIDP {
@@ -157,8 +170,15 @@ func jwk(k *rsa.PublicKey, kid string) map[string]string {
 func (f *ForgingIDP) authorize(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	back, err := url.Parse(q.Get("redirect_uri"))
-	if err != nil || q.Get("client_id") != f.ClientID || back.User != nil || !slices.Contains(forgedRedirectHosts, back.Host) ||
+	if err != nil || q.Get("client_id") != f.ClientID || back.User != nil ||
 		!strings.HasPrefix(back.Path, "/sso/") || !strings.HasSuffix(back.Path, "/callback") {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	// An origin the tests do not serve is refused before the attempt's state
+	// is taken, so a refused request leaves a denial or a code unspent.
+	origin := back.Scheme + "://" + back.Host
+	if _, ok := forgedRedirect(origin, back.Path, ""); !ok {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
@@ -177,8 +197,8 @@ func (f *ForgingIDP) authorize(w http.ResponseWriter, r *http.Request) {
 		f.mu.Unlock()
 		out.Set("code", code)
 	}
-	back.RawQuery = out.Encode()
-	http.Redirect(w, r, back.String(), http.StatusFound) //nolint:gosec // a test provider redirects where the client it serves asked
+	target, _ := forgedRedirect(origin, back.EscapedPath(), out.Encode())
+	http.Redirect(w, r, target, http.StatusFound)
 }
 
 func (f *ForgingIDP) token(w http.ResponseWriter, r *http.Request) {
