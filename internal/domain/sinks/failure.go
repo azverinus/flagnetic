@@ -92,9 +92,11 @@ func TransientStatus(status int) bool {
 }
 
 // failureOfStatus classifies an answer of status carrying code, and whether it
-// is a failure at all. Anything but a 2xx is one: a redirect is followed by no
-// sink, a busy or broken target (transient, or refusing on the grounds of code)
-// is a status unless refusing, and any other answer is a rejection.
+// is a failure at all. Anything but a 2xx is one: a 3xx is a redirect, which no
+// sink follows; an answer whose code says the target refuses the call
+// (refusing) is a rejection whatever its status, since a retry cannot cure it;
+// otherwise a busy or broken target's status (TransientStatus) is a status
+// failure, which a retry may cure, and any other answer is a rejection.
 func failureOfStatus(status int, code string, refusing bool) (Failure, bool) {
 	switch {
 	case status >= 200 && status < 300:

@@ -128,11 +128,11 @@ func TestTheAddressesACallMayNotBeMadeToDependOnTheKind(t *testing.T) {
 		{"169.254.169.254", true, false, true},
 		{"::ffff:169.254.169.254", true, false, true},
 		{"fe80::1", true, false, true},
-		{"0.0.0.0", true, false, true},
-		{"::", true, false, true},
-		{"224.0.0.1", true, false, true},
-		{"239.1.1.1", true, false, true},
-		{"ff02::1", true, false, true},
+		{"0.0.0.0", true, true, true},
+		{"::", true, true, true},
+		{"224.0.0.1", true, true, true},
+		{"239.1.1.1", true, true, true},
+		{"ff02::1", true, true, true},
 	} {
 		a := netip.MustParseAddr(tc.addr)
 		if got := sinks.KindWebhook.AddressRefused(a, strict); got != tc.webhook {
@@ -149,7 +149,9 @@ func TestTheAddressesACallMayNotBeMadeToDependOnTheKind(t *testing.T) {
 			}
 		}
 	}
-	if !sinks.KindClickHouse.AddressRefused(netip.Addr{}, strict) {
-		t.Error("the zero address is not refused")
+	for _, k := range sinks.Kinds {
+		if !k.AddressRefused(netip.Addr{}, lifted) {
+			t.Errorf("%s: the zero address is not refused", k)
+		}
 	}
 }

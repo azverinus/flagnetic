@@ -29,16 +29,20 @@ func (k Kind) CallTimeout() time.Duration {
 }
 
 // AddressRefused reports whether a call of a sink of kind k may not be made to
-// a, whatever name it was reached by. A webhook sink is held to the
-// subscriptions' policy: nothing outside the public internet unless the
-// operator allows private networks. A ClickHouse or object storage sink may
-// reach loopback and private addresses, in a cluster's own network, but never
-// a link-local one, where cloud metadata services answer, and no setting
-// lifts that; an address nothing is called at, unspecified or multicast, stays
-// refused to them too.
+// a, whatever name it was reached by. An address nothing is called at,
+// unspecified or multicast, is refused to every kind whatever the operator
+// allows: no receiver, warehouse or bucket listens there. A webhook sink is
+// held to the subscriptions' policy: nothing outside the public internet
+// unless the operator allows private networks. A ClickHouse or object storage
+// sink may reach loopback and private addresses, in a cluster's own network,
+// but never a link-local one, where cloud metadata services answer, and no
+// setting lifts that.
 func (k Kind) AddressRefused(a netip.Addr, policy governance.TargetPolicy) bool {
+	if governance.AddressUnreachable(a) {
+		return true
+	}
 	if k == KindWebhook {
 		return !policy.AllowPrivateNetworks && governance.TargetAddressRefused(a)
 	}
-	return governance.AddressUnreachable(a) || governance.AddressLinkLocal(a)
+	return governance.AddressLinkLocal(a)
 }

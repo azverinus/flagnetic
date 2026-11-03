@@ -70,15 +70,35 @@ func TestAWebhookSinkIsRefusedLoopbackUnlessTheOperatorAllowsPrivateNetworks(t *
 	}
 }
 
-func TestAWebhookSinkIsRefusedAPrivateNameOnEveryDialWhateverItResolvedToBefore(t *testing.T) {
-	srv, _ := target(t, ok)
+func TestAWebhookSinkIsRefusedANamePointedAtAPrivateAddress(t *testing.T) {
+	srv, calls := target(t, ok)
 	_, port, _ := net.SplitHostPort(srv.Listener.Addr().String())
-	names := resolver{"hooks.example": {netip.MustParseAddr("93.184.216.34")}}
-	c := sinks.NewClient(domain.KindWebhook, sinks.Options{Resolver: names})
-	names["hooks.example"] = []netip.Addr{netip.MustParseAddr("10.0.0.5")}
-	_, err := call(t, c, "http://hooks.example:"+port)
+	names := resolver{"hooks.example": {netip.MustParseAddr("10.0.0.5"), netip.MustParseAddr("127.0.0.1")}}
+	_, err := call(t, sinks.NewClient(domain.KindWebhook, sinks.Options{Resolver: names}), "http://hooks.example:"+port)
 	if got := sinks.ClassifyError(err); got.Class != domain.ClassRefusedTarget {
-		t.Errorf("a name pointed at a private address: %v, class %q", err, got.Class)
+		t.Errorf("a name pointed at private addresses: %v, class %q", err, got.Class)
+	}
+	if calls.Load() != 0 {
+		t.Errorf("the receiver was called %d times", calls.Load())
+	}
+}
+
+func TestANameIsJudgedAgainOnEveryDialWhateverItResolvedToBefore(t *testing.T) {
+	srv, calls := target(t, ok)
+	_, port, _ := net.SplitHostPort(srv.Listener.Addr().String())
+	names := resolver{"warehouse.example": {netip.MustParseAddr("127.0.0.1")}}
+	c := sinks.NewClient(domain.KindClickHouse, sinks.Options{Resolver: names})
+	if res, err := call(t, c, "http://warehouse.example:"+port); err != nil || res.StatusCode != http.StatusNoContent {
+		t.Fatalf("the name pointed at loopback: %v, %v", res, err)
+	}
+	names["warehouse.example"] = []netip.Addr{netip.MustParseAddr("169.254.169.254")}
+	c.CloseIdleConnections()
+	_, err := call(t, c, "http://warehouse.example:"+port)
+	if got := sinks.ClassifyError(err); got.Class != domain.ClassRefusedTarget {
+		t.Errorf("the name pointed at a link-local address afterwards: %v, class %q", err, got.Class)
+	}
+	if calls.Load() != 1 {
+		t.Errorf("the target was called %d times, want once", calls.Load())
 	}
 }
 
