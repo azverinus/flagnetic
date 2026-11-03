@@ -70,6 +70,9 @@ func (f delivering) create(t *testing.T, body management.SinkCreate) (management
 
 func (f delivering) enable(t *testing.T, sink management.Sink, body management.SinkEnable) management.Sink {
 	t.Helper()
+	// A stream starts at the horizon: what was committed before the call is
+	// below it only once the transactions running meanwhile have ended.
+	f.srv.AwaitHorizon(t)
 	res := do(f.p.admin.EnableSinkWithResponse(t.Context(), f.p.key, sink.Id, body))
 	if res.JSON200 == nil {
 		t.Fatalf("POST enable = %d: %s", res.StatusCode(), res.Body)
@@ -107,6 +110,9 @@ func (f delivering) patch(t *testing.T, sink management.Sink, body management.Si
 // every attempt it started has been recorded.
 func tick(t *testing.T, srv *testkit.Server) {
 	t.Helper()
+	// A stream reads only below the snapshot horizon, which a transaction of
+	// another test holds back while it runs.
+	srv.AwaitHorizon(t)
 	if err := srv.Tick(t, worker.SinkDeliveryName); err != nil {
 		t.Fatalf("sink delivery round: %v", err)
 	}
@@ -813,6 +819,7 @@ func TestEventKindsAddedOrRemovedOnAnEnabledSinkAddOrDropItsStreams(t *testing.T
 	created, secret := f.enabled(t, webhook(r, "exposure"))
 	f.post(t, f.alias(1))
 
+	f.srv.AwaitHorizon(t)
 	added := f.patch(t, created, management.SinkPatch{EventKinds: &[]string{"exposure", "alias"}})
 	if len(added.Streams) != 2 || streamOf(added, "alias") == nil {
 		t.Fatalf("streams after adding alias %+v, want exposure and alias", added.Streams)

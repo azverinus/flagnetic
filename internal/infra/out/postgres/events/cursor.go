@@ -231,7 +231,10 @@ func OldestAfter(ctx context.Context, db pgxtx.DB, table string, scope Scope, fr
 func Tail(ctx context.Context, db pgxtx.DB, table string) (events.Cursor, error) {
 	var xid *string
 	var seq *int64
-	err := db.QueryRow(ctx, `SELECT xid::text, seq FROM `+pgx.Identifier{table}.Sanitize()+`
+	// The column is named for its text apart from its own: an output column
+	// called xid would be what ORDER BY xid sorts by, as text, where "999"
+	// comes after "1000".
+	err := db.QueryRow(ctx, `SELECT xid::text AS xid_text, seq FROM `+pgx.Identifier{table}.Sanitize()+`
 		WHERE xid < pg_snapshot_xmin(pg_current_snapshot()) ORDER BY xid DESC, seq DESC LIMIT 1`).Scan(&xid, &seq)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return events.Cursor{}, nil
@@ -253,7 +256,7 @@ func Before(ctx context.Context, db pgxtx.DB, table string, scope Scope, from ti
 	}
 	var xid string
 	var seq int64
-	err = db.QueryRow(ctx, `SELECT xid::text, seq FROM `+pgx.Identifier{table}.Sanitize()+`
+	err = db.QueryRow(ctx, `SELECT xid::text AS xid_text, seq FROM `+pgx.Identifier{table}.Sanitize()+`
 		WHERE received_at >= $1`+where+` ORDER BY xid, seq LIMIT 1`, append([]any{from}, scoped...)...).Scan(&xid, &seq)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return events.Cursor{}, false, nil
