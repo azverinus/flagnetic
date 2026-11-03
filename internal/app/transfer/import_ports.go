@@ -24,14 +24,36 @@ type WorkspaceImport interface {
 	// CreateProject creates a project holding only the standard
 	// attributes; a key in use is already_exists.
 	CreateProject(ctx context.Context, key, name, description string, req governance.Request) (workspace.Project, error)
+	// UpdateProject writes the project's name and description and returns
+	// the project as it is, and whether that changed anything.
+	UpdateProject(ctx context.Context, project workspace.ProjectID, name, description string, req governance.Request,
+	) (workspace.Project, bool, error)
 	// CreateEnvironment creates an environment at sortOrder, protected or
-	// not.
+	// not, configuring every flag the project has in it, as written by by.
 	CreateEnvironment(ctx context.Context, project workspace.ProjectID, key, name string, protected bool, sortOrder int,
-		req governance.Request) (workspace.Environment, error)
+		by *access.MemberID, req governance.Request) (workspace.Environment, error)
+	// UpdateEnvironment writes an environment's name, and says whether that
+	// changed anything. Whether it is protected is never an import's to
+	// change.
+	UpdateEnvironment(ctx context.Context, project workspace.ProjectID, key, name string, req governance.Request) (bool, error)
 	CreateUnitType(ctx context.Context, project workspace.ProjectID, key, name, description string,
 		req governance.Request) (workspace.UnitType, error)
+	UpdateUnitType(ctx context.Context, project workspace.ProjectID, key, name, description string, req governance.Request) (bool, error)
 	CreateAttribute(ctx context.Context, project workspace.ProjectID, key, name, description string,
 		typ workspace.AttributeType, req governance.Request) (workspace.Attribute, error)
+	// UpdateAttribute writes an attribute's name and description; its type
+	// never changes.
+	UpdateAttribute(ctx context.Context, project workspace.ProjectID, key, name, description string, req governance.Request) (bool, error)
+}
+
+// Effect is what a write of an import port did: whether it changed anything,
+// and whether the ordinary write would have moved a ruleset on, which the
+// import does once per environment when it is done. A write to a segment or
+// to a flag's definition moves every environment's on, a write of a
+// configuration its own environment's.
+type Effect struct {
+	Changed  bool
+	Rulesets bool
 }
 
 // SegmentImport is a segment to create.
@@ -72,14 +94,45 @@ type ConfigurationImport struct {
 	Request     governance.Request
 }
 
+// SegmentUpdate is the values a segment is to have.
+type SegmentUpdate struct {
+	Project           workspace.ProjectID
+	Key               string
+	Name, Description string
+	Private           bool
+	Conditions        []flags.Condition
+	Request           governance.Request
+}
+
+// FlagUpdate is the definition a flag is to have. Owner is the member who is
+// to own it, nil to leave the owner as it is.
+type FlagUpdate struct {
+	Project           workspace.ProjectID
+	Key               string
+	Name, Description string
+	Owner             *access.MemberID
+	Tags              []string
+	Lifetime          flags.Lifetime
+	ExpectedRemovalAt *time.Time
+	AutomaticExposure bool
+	Variations        *[]flags.VariationInput
+	Request           governance.Request
+}
+
 // FlagsImport writes what the flags context owns, as WorkspaceImport does.
 type FlagsImport interface {
-	CreateSegment(ctx context.Context, in SegmentImport) error
-	CreateFlag(ctx context.Context, in FlagImport) error
+	CreateSegment(ctx context.Context, in SegmentImport) (Effect, error)
+	UpdateSegment(ctx context.Context, in SegmentUpdate) (Effect, error)
+	CreateFlag(ctx context.Context, in FlagImport) (Effect, error)
+	UpdateFlag(ctx context.Context, in FlagUpdate) (Effect, error)
 	// ArchiveFlag archives the flag keyed key; its configuration can still
 	// be written.
-	ArchiveFlag(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error
-	WriteConfiguration(ctx context.Context, in ConfigurationImport) error
+	ArchiveFlag(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) (Effect, error)
+	// RestoreFlag brings an archived flag back.
+	RestoreFlag(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) (Effect, error)
+	// WriteConfiguration writes the configuration whole; one the flag has
+	// already is not written.
+	WriteConfiguration(ctx context.Context, in ConfigurationImport) (Effect, error)
 }
 
 // Owners resolves the owners a document names, who are email addresses.
@@ -87,6 +140,13 @@ type Owners interface {
 	// OwnerByEmail returns the member with email, whatever its case, who
 	// may own in project, and whether there is one.
 	OwnerByEmail(ctx context.Context, project workspace.ProjectID, email string) (access.MemberID, bool, error)
+}
+
+// ProjectLocker locks a project's row for the unit of work, which an import
+// holds from before it reads what the project has until it commits.
+type ProjectLocker interface {
+	// LockProject returns the project, and whether there is one.
+	LockProject(ctx context.Context, project workspace.ProjectID) (workspace.Project, bool, error)
 }
 
 // Rulesets marks the rulesets an import changed, in its unit of work.

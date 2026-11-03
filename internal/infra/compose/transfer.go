@@ -7,11 +7,13 @@ import (
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	apptransfer "github.com/azverinus/flagnetic/internal/app/transfer"
+	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
-	"github.com/azverinus/flagnetic/internal/shared/precondition"
+	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
 )
 
 // transferFlags gives the transfer context the import port of the flags
@@ -20,35 +22,81 @@ type transferFlags struct{ importer *appflags.Importer }
 
 var _ apptransfer.FlagsImport = transferFlags{}
 
-func (f transferFlags) CreateSegment(ctx context.Context, in apptransfer.SegmentImport) error {
-	_, err := f.importer.CreateSegment(ctx, appflags.CreateSegmentCommand{
+func effectOf(e appflags.Effect) apptransfer.Effect {
+	return apptransfer.Effect{Changed: e.Changed, Rulesets: e.Rulesets}
+}
+
+func (f transferFlags) CreateSegment(ctx context.Context, in apptransfer.SegmentImport) (apptransfer.Effect, error) {
+	e, err := f.importer.CreateSegment(ctx, appflags.CreateSegmentCommand{
 		Project: in.Project, Key: in.Key, Name: in.Name, Description: in.Description, Private: in.Private,
 		Conditions: in.Conditions, Request: in.Request,
 	})
-	return err
+	return effectOf(e), err
 }
 
-func (f transferFlags) CreateFlag(ctx context.Context, in apptransfer.FlagImport) error {
-	_, err := f.importer.CreateFlag(ctx, appflags.CreateFlagCommand{
+func (f transferFlags) UpdateSegment(ctx context.Context, in apptransfer.SegmentUpdate) (apptransfer.Effect, error) {
+	e, err := f.importer.UpdateSegment(ctx, in.Project, in.Key, flags.SegmentChange{
+		Name: &in.Name, Description: &in.Description, Private: &in.Private, Conditions: &in.Conditions,
+	}, in.Request)
+	return effectOf(e), err
+}
+
+func (f transferFlags) CreateFlag(ctx context.Context, in apptransfer.FlagImport) (apptransfer.Effect, error) {
+	e, err := f.importer.CreateFlag(ctx, appflags.CreateFlagCommand{
 		Project: in.Project, Key: in.Key, Type: in.Type, Name: in.Name, Description: in.Description, Owner: in.Owner,
 		Caller: in.Caller, Tags: in.Tags, Lifetime: in.Lifetime, ExpectedRemovalAt: in.ExpectedRemovalAt,
 		AutomaticExposure: in.AutomaticExposure, Variations: in.Variations, Request: in.Request,
 	})
-	return err
+	return effectOf(e), err
 }
 
-func (f transferFlags) ArchiveFlag(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error {
-	// The flag was created by this import and is at its first version.
-	return f.importer.ArchiveFlag(ctx, appflags.FlagCommand{Project: project, Key: key, Expected: precondition.On(1), Request: req})
+func (f transferFlags) UpdateFlag(ctx context.Context, in apptransfer.FlagUpdate) (apptransfer.Effect, error) {
+	change := flags.FlagChange{
+		Name: &in.Name, Description: &in.Description, Tags: &in.Tags, ExpectedRemovalAt: in.ExpectedRemovalAt,
+		AutomaticExposure: &in.AutomaticExposure, Variations: in.Variations,
+	}
+	// A document that gives no lifetime leaves it as it is.
+	if in.Lifetime != "" {
+		change.Lifetime = &in.Lifetime
+	}
+	e, err := f.importer.UpdateFlag(ctx, appflags.UpdateFlagCommand{
+		Project: in.Project, Key: in.Key, Change: change, Owner: in.Owner, Request: in.Request,
+	})
+	return effectOf(e), err
 }
 
-func (f transferFlags) WriteConfiguration(ctx context.Context, in apptransfer.ConfigurationImport) error {
-	return f.importer.WriteConfiguration(ctx, appflags.ImportConfigurationCommand{
+func (f transferFlags) ArchiveFlag(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) (apptransfer.Effect, error) {
+	e, err := f.importer.ArchiveFlag(ctx, project, key, req)
+	return effectOf(e), err
+}
+
+func (f transferFlags) RestoreFlag(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) (apptransfer.Effect, error) {
+	e, err := f.importer.RestoreFlag(ctx, project, key, req)
+	return effectOf(e), err
+}
+
+func (f transferFlags) WriteConfiguration(ctx context.Context, in apptransfer.ConfigurationImport) (apptransfer.Effect, error) {
+	e, err := f.importer.WriteConfiguration(ctx, appflags.ImportConfigurationCommand{
 		Configuration: appflags.ConfigurationCommand{
 			Project: in.Project, Flag: in.Flag, Environment: in.Environment, Caller: in.Caller, Request: in.Request,
 		},
 		Input: in.Input,
 	})
+	return effectOf(e), err
+}
+
+// transferProjects gives the transfer context the project row lock of the
+// workspace context.
+type transferProjects struct{ projects *pgworkspace.Store }
+
+var _ apptransfer.ProjectLocker = transferProjects{}
+
+func (p transferProjects) LockProject(ctx context.Context, project workspace.ProjectID) (workspace.Project, bool, error) {
+	locked, err := p.projects.LockProject(ctx, project)
+	if errors.Is(err, appworkspace.ErrNotFound) {
+		return workspace.Project{}, false, nil
+	}
+	return locked, err == nil, err
 }
 
 // transferOwners gives the transfer context the owners the access context

@@ -33,6 +33,7 @@ func TestTheCatalogAssignsEachPermissionItsScope(t *testing.T) {
 		{Name: "webhook.manage", Scope: access.ScopeProjectAdmin},
 		{Name: "sink.manage", Scope: access.ScopeProjectAdmin},
 		{Name: "project.delete", Scope: access.ScopeProjectAdmin, MembersOnly: true},
+		{Name: "project.import", Scope: access.ScopeProjectAdmin, MembersOnly: true},
 	}
 	if got := access.Catalog(); !slices.Equal(got, want) {
 		t.Errorf("catalog = %+v, want %+v", got, want)
@@ -46,7 +47,7 @@ func TestTheBuiltInRolesHoldThePermissionsRowByRow(t *testing.T) {
 		access.RoleMaintainer: {"project.read", "environment.manage", "declaration.manage", "flag.edit", "flag.archive",
 			"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage", "experiment.edit", "experiment.delete", "change_request.propose", "change_request.approve", "webhook.manage", "sink.manage"},
 		access.RoleOwner: {"project.read", "project.update", "environment.manage", "environment.protect", "declaration.manage",
-			"grant.manage", "project_token.manage", "flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage", "experiment.edit", "experiment.delete", "change_request.propose", "change_request.approve", "webhook.manage", "sink.manage", "project.delete"},
+			"grant.manage", "project_token.manage", "flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage", "experiment.edit", "experiment.delete", "change_request.propose", "change_request.approve", "webhook.manage", "sink.manage", "project.delete", "project.import"},
 	}
 	for _, r := range access.Roles() {
 		got := slices.Clone(r.Permissions)
@@ -63,7 +64,7 @@ func TestEffectivePermissionsAreTheUnionOfGrantsNarrowedByScopes(t *testing.T) {
 	ids := newIDs()
 	mobile, web := id.New[workspace.Project](ids), id.New[workspace.Project](ids)
 	all := []access.Permission{"project.read", "project.update", "environment.manage", "environment.protect", "declaration.manage",
-		"grant.manage", "project_token.manage", "flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage", "experiment.edit", "experiment.delete", "change_request.propose", "change_request.approve", "webhook.manage", "sink.manage", "project.delete"}
+		"grant.manage", "project_token.manage", "flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage", "experiment.edit", "experiment.delete", "change_request.propose", "change_request.approve", "webhook.manage", "sink.manage", "project.delete", "project.import"}
 
 	for name, tc := range map[string]struct {
 		caller access.Caller
@@ -85,7 +86,7 @@ func TestEffectivePermissionsAreTheUnionOfGrantsNarrowedByScopes(t *testing.T) {
 			[]access.Permission{"project.read"}},
 		"an owner's admin token never holds a flags permission": {tokenCaller(t, false, access.ScopeProjectAdmin),
 			[]access.RoleName{access.RoleOwner},
-			[]access.Permission{"project.read", "project.update", "environment.manage", "environment.protect", "grant.manage", "project_token.manage", "sdk_key.manage", "webhook.manage", "sink.manage", "project.delete"}},
+			[]access.Permission{"project.read", "project.update", "environment.manage", "environment.protect", "grant.manage", "project_token.manage", "sdk_key.manage", "webhook.manage", "sink.manage", "project.delete", "project.import"}},
 		"a project token holds its role but never changes who has access": {projectTokenCaller(mobile, access.RoleOwner), nil,
 			[]access.Permission{"project.read", "project.update", "environment.manage", "declaration.manage", "flag.edit", "flag.archive",
 				"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete",

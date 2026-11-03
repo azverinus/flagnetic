@@ -2886,6 +2886,10 @@ msgstr "Hypothesis changed."
 msgid "I have stored it somewhere safe"
 msgstr "I have stored it somewhere safe"
 
+#: src/lib/access-names.ts
+msgid "import a project document into the project"
+msgstr "import a project document into the project"
+
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "in {environment}"
 msgstr "in {environment}"

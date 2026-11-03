@@ -211,8 +211,9 @@ type Handlers struct {
 	ExportAuditEntries *appgovernance.ExportAuditEntries
 	StreamChanges      *appgovernance.StreamChanges
 
-	ExportProject    *apptransfer.ExportProject
-	ImportNewProject *apptransfer.ImportNewProject
+	ExportProject     *apptransfer.ExportProject
+	ImportNewProject  *apptransfer.ImportNewProject
+	ImportIntoProject *apptransfer.ImportIntoProject
 }
 
 // api serves every operation of the document.

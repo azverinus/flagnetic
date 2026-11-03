@@ -262,6 +262,9 @@ import type {
   ImportNewProjectData,
   ImportNewProjectErrors,
   ImportNewProjectResponses,
+  ImportProjectData,
+  ImportProjectErrors,
+  ImportProjectResponses,
   InviteMemberData,
   InviteMemberErrors,
   InviteMemberResponses,
@@ -1174,6 +1177,78 @@ export const exportProject = <ThrowOnError extends boolean = false>(
     ],
     url: "/projects/{project}/export",
     ...options,
+  });
+
+/**
+ * Merge a project document into a project
+ *
+ * Merges the document into the project: every environment, unit type,
+ * attribute, segment and flag it names is created, or updated when it
+ * differs from what the project has, by key, and everything else is left
+ * as it is. A section the document lacks is left untouched, so a partial
+ * document is applied as it is. The document is sent as
+ * `application/json` or `application/yaml`, as
+ * `GET /projects/{project}/export` writes it.
+ *
+ * The project's key never changes; its name and description are written
+ * when the document has a `project`. A flag the document names is
+ * written whole, with the configurations the document gives it; the
+ * configuration in an environment the document does not give is left as
+ * it is. The configurations keep the rule identifiers and rollout salts
+ * the document names, so every unit stays in its bucket; a rule or a
+ * rollout without one is given one, unless it equals a rule of the
+ * project's configuration, which it then is. A new environment gives
+ * every flag its initial configuration unless the document configures
+ * it.
+ *
+ * An existing environment keeps whether it is protected: a document that
+ * differs is answered with the warning `protection_kept`. New
+ * environments take the document's value. An owner the document names by
+ * email owns a flag when they may own in the project; otherwise a new
+ * flag is owned by the importing member and an existing one keeps its
+ * owner, with the warning `owner_replaced`. An override keeps its author
+ * when the document leaves it as it was and is the importer's otherwise.
+ * Protection is bypassed in every environment, and only the owner of a
+ * project, never a project token, may import.
+ *
+ * Experiments cannot be imported yet: a document that has any is refused
+ * whole, `unsupported` at each. The import applies whole or not at all;
+ * a document that breaks a rule is 422 `invalid_document` with every fault
+ * found in `errors`, each pointing into the document.
+ *
+ * With `dry_run` the whole import runs, every check the database makes
+ * included, and is rolled back: same answer, nothing written. Every
+ * answer to a dry run carries an `ETag`, the identifier of the project's
+ * latest audit entry, which an import can send as `If-Match` to be
+ * refused when the project has moved since.
+ *
+ * Every entity that differs is written through the context that owns it
+ * and recorded as a direct write records it, then one `project.imported`
+ * entry, all with the request's identifier; an import that changes
+ * nothing writes nothing, records nothing and answers empty changes.
+ * Each environment whose ruleset changed moves on once. A body is
+ * accepted up to 32 MiB.
+ *
+ */
+export const importProject = <ThrowOnError extends boolean = false>(
+  options: Options<ImportProjectData, ThrowOnError>,
+): RequestResult<ImportProjectResponses, ImportProjectErrors, ThrowOnError> =>
+  (options.client ?? client).post<ImportProjectResponses, ImportProjectErrors, ThrowOnError>({
+    bodySerializer: null,
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/import",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**
