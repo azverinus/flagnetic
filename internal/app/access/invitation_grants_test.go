@@ -34,6 +34,7 @@ type invitationGrants struct {
 	deactivate *appaccess.DeactivateMember
 	update     *appaccess.UpdateMember
 	deleteG    *appaccess.DeleteGrant
+	reissue    *appaccess.ReissueInvitation
 }
 
 func newInvitationGrants(t *testing.T) invitationGrants {
@@ -58,6 +59,7 @@ func newInvitationGrants(t *testing.T) invitationGrants {
 		deactivate: appaccess.NewDeactivateMember(tx, store, audit, c, ids),
 		update:     appaccess.NewUpdateMember(tx, store, audit, c, ids),
 		deleteG:    appaccess.NewDeleteGrant(tx, store, audit, c, ids),
+		reissue:    appaccess.NewReissueInvitation(tx, store, audit, c, ids, rand.Reader),
 	}
 }
 
@@ -183,4 +185,74 @@ func TestAnInvitationIssuedWhileItsInviterLosesTheRightToGrantNeverGrants(t *tes
 			t.Fatalf("round %d: the invited member holds %v in the project, want nothing", round, held)
 		}
 	}
+}
+
+// A reissue carries the grant along only while the member who invited may
+// still hand it out, whatever the way they lost the right, and an invited
+// member with no invitation of record is issued one granting nothing.
+func TestAReissueCarriesTheGrantOnlyWhileItsInviterMayHandItOut(t *testing.T) {
+	g := newInvitationGrants(t)
+	req := governance.Request{Actor: cli}
+	granted := func(t *testing.T, invited appaccess.InvitedMember) []access.Grant {
+		t.Helper()
+		if err := g.acceptAs(t, invited); err != nil {
+			t.Fatal(err)
+		}
+		held, err := g.store.MemberGrants(t.Context(), invited.Member.ID, g.project)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return held
+	}
+
+	t.Run("the inviter still holds it", func(t *testing.T) {
+		inviter, _ := g.owner(t)
+		invited, err := g.inviteBy(t, inviter)
+		if err != nil {
+			t.Fatal(err)
+		}
+		again, err := g.reissue.Handle(t.Context(), invited.Member.ID, req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		testkit.RecordSecret(again.Invitation.Secret.Reveal())
+		if held := granted(t, again); len(held) != 1 || held[0].CreatedBy != inviter.Member.ID {
+			t.Errorf("grants = %v, want the one made by the inviter", held)
+		}
+	})
+
+	t.Run("the inviter lost it without the invitation being told", func(t *testing.T) {
+		inviter, grant := g.owner(t)
+		invited, err := g.inviteBy(t, inviter)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The grant goes behind the use cases' back, so no drop was recorded.
+		if _, err = g.store.DeleteGrant(t.Context(), g.project, grant); err != nil {
+			t.Fatal(err)
+		}
+		again, err := g.reissue.Handle(t.Context(), invited.Member.ID, req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		testkit.RecordSecret(again.Invitation.Secret.Reveal())
+		if again.Invitation.Grant != nil || again.Invitation.InvitedBy != inviter.Member.ID {
+			t.Errorf("reissued invitation = %+v, want the same inviter and no grant", again.Invitation.Invitation)
+		}
+		if held := granted(t, again); len(held) != 0 {
+			t.Errorf("grants = %v, want none", held)
+		}
+	})
+
+	t.Run("no invitation of record", func(t *testing.T) {
+		m := testkit.NewMember(t, g.pool, testkit.WithStatus(access.MemberInvited))
+		again, err := g.reissue.Handle(t.Context(), m.ID, req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		testkit.RecordSecret(again.Invitation.Secret.Reveal())
+		if again.Invitation.Grant != nil || !again.Invitation.InvitedBy.IsZero() {
+			t.Errorf("reissued invitation = %+v, want neither grant nor inviter", again.Invitation.Invitation)
+		}
+	})
 }
