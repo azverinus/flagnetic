@@ -651,3 +651,29 @@ func TestMergeRefusesWhatIsNotADocumentAndAnUnknownProject(t *testing.T) {
 		t.Errorf("an unknown project = %d: %s", res.StatusCode(), res.Body)
 	}
 }
+
+func TestAMergeDeclaresAndRenamesUnitTypesAndAttributes(t *testing.T) {
+	f := exportedProject(t)
+	k := f.project.Key
+	doc := exported(t, f.admin, k)
+	doc["unit_types"] = append(doc["unit_types"].([]any), map[string]any{"key": "account", "name": "Account", "description": "A billing account."})
+	doc["attributes"] = append(doc["attributes"].([]any), map[string]any{"key": "region", "type": "string", "name": "Region", "description": ""})
+	entry(t, doc, "unit_types", "device")["name"] = "Hardware"
+	entry(t, doc, "attributes", "plan")["description"] = "The plan, renamed."
+
+	r := mustMerge(t, f.admin, k, doc)
+	assertJSON(t, "unit types", []any{r.Changes.UnitTypes.Created, keysOfUpdates(r.Changes.UnitTypes.Updated)}, `[["account"], ["device"]]`)
+	assertJSON(t, "attributes", []any{r.Changes.Attributes.Created, keysOfUpdates(r.Changes.Attributes.Updated)}, `[["region"], ["plan"]]`)
+	after := exported(t, f.admin, k)
+	if entry(t, after, "unit_types", "device")["name"] != "Hardware" || entry(t, after, "attributes", "plan")["description"] != "The plan, renamed." {
+		t.Error("a declaration was not renamed")
+	}
+	assertJSON(t, "unit types", keysOf(after, "unit_types"), `["account", "anonymous", "device", "user"]`)
+
+	// A key a unit type and an attribute would share is refused.
+	bad := exported(t, f.admin, k)
+	bad["unit_types"] = append(bad["unit_types"].([]any), map[string]any{"key": "tenant", "name": "Tenant"})
+	bad["attributes"] = append(bad["attributes"].([]any), map[string]any{"key": "tenant", "type": "string", "name": "Tenant"})
+	res := mergeInto(t, f.admin, k, bad)
+	assertProblem(t, "a key shared by a unit type and an attribute", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid_document")
+}
