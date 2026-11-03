@@ -307,7 +307,7 @@ func (h *DeactivateMember) Handle(ctx context.Context, member access.MemberID, r
 			if err != nil {
 				return access.Member{}, nil, err
 			}
-			if _, err := h.store.ConsumeInvitations(ctx, member, now); err != nil {
+			if _, err = h.store.ConsumeInvitations(ctx, member, now); err != nil {
 				return access.Member{}, nil, err
 			}
 			dropped, err := dropInvitationGrants(ctx, h.store, after, workspace.ProjectID{})

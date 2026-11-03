@@ -83,9 +83,9 @@ func (h *InviteToProject) Handle(ctx context.Context, cmd InviteToProjectCommand
 	origin := invitationOrigin{InvitedBy: creatorOf(cmd.Caller), Grant: &grant}
 	var res InvitedMember
 	err = h.tx.Within(ctx, func(ctx context.Context) error {
-		member, action, err := h.memberToInvite(ctx, invited, cmd.Project)
-		if err != nil {
-			return err
+		member, action, inviteErr := h.memberToInvite(ctx, invited, cmd.Project)
+		if inviteErr != nil {
+			return inviteErr
 		}
 		issued, err := issueInvitation(ctx, h.store, h.ids, h.random, member.ID, now, origin)
 		if err != nil {
