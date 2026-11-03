@@ -61,18 +61,20 @@ type forgedCode struct {
 	nonce, challenge, redirect string
 }
 
-// forgedRedirectOrigins are the origins a forging provider sends a browser
-// back to: the public addresses the tests serve an instance at.
-var forgedRedirectOrigins = []string{"http://localhost:8080", "https://flags.example.com", "http://flags.example.com"}
-
-// forgedOrigin returns the listed origin that origin names. The redirect is
-// built from the listed value, so nothing a request carried decides where the
-// browser goes but the path, under an origin the tests serve.
-func forgedOrigin(origin string) (string, bool) {
-	for _, known := range forgedRedirectOrigins {
-		if known == origin {
-			return known, true
-		}
+// forgedRedirect returns where a forging provider sends a browser back to:
+// the callback path and query under the one of the public addresses the tests
+// serve an instance at that origin names, and false for any other origin. Each
+// address is written out in the concatenation that builds the target, so
+// nothing a request carries decides the host the browser is sent to.
+func forgedRedirect(origin, path, query string) (string, bool) {
+	path = strings.TrimPrefix(path, "/")
+	switch origin {
+	case "http://localhost:8080":
+		return "http://localhost:8080/" + path + "?" + query, true
+	case "https://flags.example.com":
+		return "https://flags.example.com/" + path + "?" + query, true
+	case "http://flags.example.com":
+		return "http://flags.example.com/" + path + "?" + query, true
 	}
 	return "", false
 }
@@ -173,8 +175,10 @@ func (f *ForgingIDP) authorize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	origin, ok := forgedOrigin(back.Scheme + "://" + back.Host)
-	if !ok {
+	// An origin the tests do not serve is refused before the attempt's state
+	// is taken, so a refused request leaves a denial or a code unspent.
+	origin := back.Scheme + "://" + back.Host
+	if _, ok := forgedRedirect(origin, back.Path, ""); !ok {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
@@ -193,7 +197,8 @@ func (f *ForgingIDP) authorize(w http.ResponseWriter, r *http.Request) {
 		f.mu.Unlock()
 		out.Set("code", code)
 	}
-	http.Redirect(w, r, origin+back.EscapedPath()+"?"+out.Encode(), http.StatusFound)
+	target, _ := forgedRedirect(origin, back.EscapedPath(), out.Encode())
+	http.Redirect(w, r, target, http.StatusFound)
 }
 
 func (f *ForgingIDP) token(w http.ResponseWriter, r *http.Request) {
