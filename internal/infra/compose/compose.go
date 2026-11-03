@@ -50,6 +50,7 @@ import (
 	pgidentity "github.com/azverinus/flagnetic/internal/infra/out/postgres/identity"
 	pgsinks "github.com/azverinus/flagnetic/internal/infra/out/postgres/sinks"
 	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
+	"github.com/azverinus/flagnetic/internal/infra/out/saml"
 	"github.com/azverinus/flagnetic/internal/infra/out/webhook"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
@@ -338,8 +339,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// key. Each context that holds something referring to a provider adds its
 	// own check to References.
 	identityStore := pgidentity.NewStore(d.Pool)
+	samlClient := saml.NewClient()
 	authProviders := appidentity.ProviderDeps{
-		Tx: tx, Store: identityStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Sealer: o.Keyring, BaseURL: o.BaseURL,
+		Tx: tx, Store: identityStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Sealer: o.Keyring, BaseURL: o.BaseURL, SAML: samlClient, SPKeys: samlClient,
 		References: []appidentity.ProviderReference{identityStore},
 	}
 	managementOptions := o.Options
@@ -350,10 +352,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	oidcClient := oidc.NewClient()
 	signIn := appidentity.SignInDeps{
 		Tx: tx, Providers: identityStore, Attempts: identityStore, Identities: identityStore, Members: ssoMembers{sso: ssoAccess},
-		OIDC: oidcClient, Opener: o.Keyring, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, BaseURL: o.BaseURL,
+		OIDC: oidcClient, SAML: samlClient, Replays: identityStore, Opener: o.Keyring, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, BaseURL: o.BaseURL,
 	}
 	sso.Mount(edge, sso.Handlers{
-		Start: appidentity.NewStartSignIn(signIn), Callback: appidentity.NewCompleteCallback(signIn),
+		Start: appidentity.NewStartSignIn(signIn), Callback: appidentity.NewCompleteCallback(signIn), ACS: appidentity.NewCompleteACS(signIn), Metadata: appidentity.NewServeMetadata(signIn),
 		Complete: appidentity.NewCompleteSignIn(signIn),
 	}, sso.Options{
 		SecureCookies: managementOptions.SecureCookies, SessionCookie: management.SessionCookieHeader, Metrics: sso.NewMetrics(reg),
@@ -367,7 +369,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		DeleteAuthProvider:       appidentity.NewDeleteProvider(authProviders),
 		EnableAuthProvider:       appidentity.NewEnableProvider(authProviders),
 		DisableAuthProvider:      appidentity.NewDisableProvider(authProviders),
-		TestAuthProvider:         appidentity.NewTestProvider(identityStore, oidc.NewDiscoverer()),
+		TestAuthProvider:         appidentity.NewTestProvider(identityStore, oidc.NewDiscoverer(), samlClient),
 		AuthenticateToken:        appaccess.NewAuthenticateToken(accessStore, tokenUses, d.Clock),
 		AuthenticateSession:      appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey),
 		SignIn: appaccess.NewSignIn(appaccess.SignInDeps{

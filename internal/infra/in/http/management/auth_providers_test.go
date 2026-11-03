@@ -24,7 +24,7 @@ func providerSlug() string { return "p" + strings.ToLower(rand.Text()[:12]) }
 func corporate(slug string) management.AuthProviderCreate {
 	return management.AuthProviderCreate{
 		Slug: slug, Kind: management.AuthProviderKindOidc, DisplayName: "Corporate SSO", Domains: []string{"example.com"},
-		Issuer: "https://idp.example.com/realms/corp", ClientId: "flagnetic", ClientSecret: ptr("client-secret-" + rand.Text()),
+		Issuer: ptr("https://idp.example.com/realms/corp"), ClientId: ptr("flagnetic"), ClientSecret: ptr("client-secret-" + rand.Text()),
 	}
 }
 
@@ -99,7 +99,7 @@ func TestCreatingAnAuthProviderAnswersItWithoutItsSecretAndWithTheRedirectURIToR
 		p.Version != 1 {
 		t.Errorf("created %+v", p)
 	}
-	if p.Issuer == nil || *p.Issuer != body.Issuer || p.ClientId == nil || *p.ClientId != "flagnetic" ||
+	if p.Issuer == nil || *p.Issuer != *body.Issuer || p.ClientId == nil || *p.ClientId != "flagnetic" ||
 		p.ClientSecretSet == nil || !*p.ClientSecretSet || p.RequireVerifiedEmail == nil || !*p.RequireVerifiedEmail {
 		t.Errorf("OIDC part %+v", p)
 	}
@@ -126,7 +126,7 @@ func TestCreatingAnAuthProviderAnswersItWithoutItsSecretAndWithTheRedirectURIToR
 
 	e, before, after := providerEntry(t, srv, "auth_provider.created", p)
 	if e.ProjectId != nil || e.Entity.Key != slug || before != nil || after["client_secret"] != "[redacted]" ||
-		after["issuer"] != body.Issuer {
+		after["issuer"] != *body.Issuer {
 		t.Errorf("auth_provider.created = project %v, entity %+v, before %v, after %v", e.ProjectId, e.Entity, before, after)
 	}
 }
@@ -191,11 +191,11 @@ func TestAnAuthProviderIsRefusedForEachRuleItBreaks(t *testing.T) {
 		"another kind":                 {func(b *management.AuthProviderCreate) { b.Kind = "saml" }, "invalid_auth_provider", "/kind"},
 		"no domain":                    {func(b *management.AuthProviderCreate) { b.Domains = nil }, "invalid_auth_provider", "/domains"},
 		"an email as a domain":         {func(b *management.AuthProviderCreate) { b.Domains = []string{"a@example.com"} }, "invalid_auth_provider", "/domains/0"},
-		"a relative issuer":            {func(b *management.AuthProviderCreate) { b.Issuer = "idp.example.com" }, "invalid_auth_provider", "/issuer"},
+		"a relative issuer":            {func(b *management.AuthProviderCreate) { b.Issuer = ptr("idp.example.com") }, "invalid_auth_provider", "/issuer"},
 		"no client secret":             {func(b *management.AuthProviderCreate) { b.ClientSecret = nil }, "invalid_auth_provider", "/client_secret"},
-		"a plain http issuer":          {func(b *management.AuthProviderCreate) { b.Issuer = "http://idp.example.com" }, "insecure_url", "/issuer"},
+		"a plain http issuer":          {func(b *management.AuthProviderCreate) { b.Issuer = ptr("http://idp.example.com") }, "insecure_url", "/issuer"},
 		"a plain http issuer on a private network": {
-			func(b *management.AuthProviderCreate) { b.Issuer = "http://10.0.0.5:8080" }, "insecure_url", "/issuer",
+			func(b *management.AuthProviderCreate) { b.Issuer = ptr("http://10.0.0.5:8080") }, "insecure_url", "/issuer",
 		},
 	} {
 		body := corporate(providerSlug())
@@ -210,7 +210,7 @@ func TestAnAuthProviderIsRefusedForEachRuleItBreaks(t *testing.T) {
 	// The same rules judge a loopback http issuer and a private https one fit.
 	for _, issuer := range []string{"http://localhost:5556/dex", "http://127.0.0.1:8080", "http://[::1]:8080", "https://10.0.0.5/realms/a"} {
 		body := corporate(providerSlug())
-		body.Issuer = issuer
+		body.Issuer = ptr(issuer)
 		createProvider(t, admin, body)
 	}
 }
@@ -401,7 +401,7 @@ func TestTestingAnAuthProviderAnswersWhatItsDiscoveryDocumentSays(t *testing.T) 
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	slug := providerSlug()
 	body := corporate(slug)
-	body.Issuer, body.ClientId, body.Enabled = dex.Issuer, dex.ClientID, ptr(false)
+	body.Issuer, body.ClientId, body.Enabled = ptr(dex.Issuer), ptr(dex.ClientID), ptr(false)
 	createProvider(t, admin, body)
 
 	res := do(admin.TestAuthProviderWithResponse(t.Context(), slug))
@@ -409,8 +409,8 @@ func TestTestingAnAuthProviderAnswersWhatItsDiscoveryDocumentSays(t *testing.T) 
 		t.Fatalf("POST .../test = %d: %s", res.StatusCode(), res.Body)
 	}
 	d := res.JSON200
-	if d.Issuer != dex.Issuer || d.AuthorizationEndpoint != dex.Issuer+"/auth" || d.TokenEndpoint != dex.Issuer+"/token" ||
-		d.JwksUri != dex.Issuer+"/keys" || d.UserinfoEndpoint == nil || *d.UserinfoEndpoint != dex.Issuer+"/userinfo" {
+	if d.Issuer == nil || *d.Issuer != dex.Issuer || *d.AuthorizationEndpoint != dex.Issuer+"/auth" || *d.TokenEndpoint != dex.Issuer+"/token" ||
+		*d.JwksUri != dex.Issuer+"/keys" || d.UserinfoEndpoint == nil || *d.UserinfoEndpoint != dex.Issuer+"/userinfo" {
 		t.Errorf("found %+v", d)
 	}
 	if d.CodeChallengeMethodsSupported == nil || !slices.Contains(*d.CodeChallengeMethodsSupported, "S256") {
@@ -460,7 +460,7 @@ func TestTestingAnAuthProviderThatCannotBeReachedIsABadGatewaySayingWhy(t *testi
 	} {
 		slug := providerSlug()
 		body := corporate(slug)
-		body.Issuer = issuer
+		body.Issuer = ptr(issuer)
 		createProvider(t, admin, body)
 		res := do(admin.TestAuthProviderWithResponse(t.Context(), slug))
 		assertProblem(t, name, res.StatusCode(), res.Body, http.StatusBadGateway, "provider_unreachable")
@@ -503,7 +503,7 @@ func TestTestingAnAuthProviderFollowsThreeRedirectsAndNeverToPlainHTTPAwayFromLo
 		t.Helper()
 		slug := providerSlug()
 		body := corporate(slug)
-		body.Issuer = issuer
+		body.Issuer = ptr(issuer)
 		createProvider(t, admin, body)
 		return do(admin.TestAuthProviderWithResponse(t.Context(), slug))
 	}

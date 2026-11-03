@@ -6,9 +6,6 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 )
 
-// kindOIDC is the kind of the sign-ins counted here.
-const kindOIDC = "oidc"
-
 // Metrics counts sign-ins as flagnetic_sso_sign_ins_total{kind,result}.
 type Metrics struct {
 	signIns *prometheus.CounterVec
@@ -25,8 +22,13 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 	return &Metrics{signIns: signIns}
 }
 
-func (m *Metrics) count(result string) {
+// count counts a sign-in through a provider of kind; "unknown" when it failed
+// before the provider was.
+func (m *Metrics) count(kind string, result string) {
+	if kind == "" {
+		kind = "unknown"
+	}
 	if m != nil {
-		m.signIns.WithLabelValues(kindOIDC, result).Inc()
+		m.signIns.WithLabelValues(kind, result).Inc()
 	}
 }

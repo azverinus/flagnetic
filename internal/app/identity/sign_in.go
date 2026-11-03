@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/netip"
 	"net/url"
+	"slices"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -40,6 +41,9 @@ const (
 type SignInFailure struct {
 	Code  FailureCode
 	Cause error
+	// Kind is the protocol of the provider the sign-in was through, empty
+	// when it failed before the provider was known.
+	Kind identity.Kind
 }
 
 func (f *SignInFailure) Error() string {
@@ -52,6 +56,16 @@ func (f *SignInFailure) Error() string {
 func (f *SignInFailure) Unwrap() error { return f.Cause }
 
 func fail(code FailureCode, cause error) error { return &SignInFailure{Code: code, Cause: cause} }
+
+// inKind names kind as the protocol of the sign-in err ends, if err is a
+// failure that does not say yet.
+func inKind(kind identity.Kind, err error) error {
+	var f *SignInFailure
+	if errors.As(err, &f) && f.Kind == "" {
+		f.Kind = kind
+	}
+	return err
+}
 
 // AttemptStore keeps sign-in attempts.
 type AttemptStore interface {
@@ -98,18 +112,20 @@ type Members interface {
 	MemberByID(ctx context.Context, member identity.MemberID) (MemberRecord, bool, error)
 	// ProvisionMember creates an active member without a password and records
 	// that provider provisioned them.
-	ProvisionMember(ctx context.Context, email, displayName, provider, requestID string) (MemberRecord, error)
+	ProvisionMember(ctx context.Context, email, displayName string, kind identity.Kind, provider, requestID string) (MemberRecord, error)
 	// OpenSession opens a session of member signed in through provider and
 	// returns the value of its cookie.
 	OpenSession(ctx context.Context, s SessionRequest) (secret.String, error)
 	// RecordFailedSignIn records that member could not sign in through
 	// provider, and why.
-	RecordFailedSignIn(ctx context.Context, member MemberRecord, provider, reason, requestID string) error
+	RecordFailedSignIn(ctx context.Context, member MemberRecord, kind identity.Kind, provider, reason, requestID string) error
 }
 
 // SessionRequest asks for the session of a member who signed in.
 type SessionRequest struct {
-	Member    MemberRecord
+	Member MemberRecord
+	// Kind is the protocol of the provider, Provider its slug.
+	Kind      identity.Kind
 	Provider  string
 	ClientIP  netip.Addr
 	UserAgent string
@@ -150,6 +166,8 @@ type SignInDeps struct {
 	Identities LinkStore
 	Members    Members
 	OIDC       OIDCClient
+	SAML       SAMLClient
+	Replays    ReplayStore
 	Opener     Opener
 	Audit      AuditLog
 	Clock      clock.Clock
@@ -161,14 +179,15 @@ type SignInDeps struct {
 
 func (d SignInDeps) now() time.Time { return d.Clock.Now().UTC().Truncate(time.Microsecond) }
 
-// enabledProvider returns the enabled provider with slug; a disabled one is
+// enabledProvider returns the enabled provider with slug and one of kinds,
+// every kind when none is named; a disabled one, or one of another kind, is
 // not found, so its endpoints answer as unknown ones do.
-func (d SignInDeps) enabledProvider(ctx context.Context, slug string) (identity.Provider, error) {
+func (d SignInDeps) enabledProvider(ctx context.Context, slug string, kinds ...identity.Kind) (identity.Provider, error) {
 	p, err := providerOf(ctx, d.Providers, slug)
 	if err != nil {
 		return p, err
 	}
-	if !p.Enabled || p.OIDC == nil {
+	if !p.Enabled || (len(kinds) > 0 && !slices.Contains(kinds, p.Kind)) {
 		return p, errProviderNotFound
 	}
 	return p, nil
@@ -215,10 +234,14 @@ type Started struct {
 // Handle creates an attempt bound to a new cookie and answers the provider's
 // authorization address. A disabled or unknown provider is not found; one the
 // instance cannot reach is SignInFailure sso_failed.
-func (h *StartSignIn) Handle(ctx context.Context, cmd StartCommand) (Started, error) {
+func (h *StartSignIn) Handle(ctx context.Context, cmd StartCommand) (started Started, err error) {
 	p, err := h.d.enabledProvider(ctx, cmd.Slug)
 	if err != nil {
 		return Started{}, err
+	}
+	defer func() { err = inKind(p.Kind, err) }()
+	if p.Kind == identity.KindSAML {
+		return h.startSAML(ctx, p, cmd.ReturnTo)
 	}
 	cfg, err := h.d.oidcConfig(p)
 	if err != nil {
@@ -259,11 +282,12 @@ type CallbackCommand struct {
 // browser completes the sign-in with. The attempt is answered once: a state
 // seen again, unknown or expired is SignInFailure sso_failed, and an answer
 // that does not verify ends the attempt.
-func (h *CompleteCallback) Handle(ctx context.Context, cmd CallbackCommand) (string, error) {
-	p, err := h.d.enabledProvider(ctx, cmd.Slug)
+func (h *CompleteCallback) Handle(ctx context.Context, cmd CallbackCommand) (token string, err error) {
+	p, err := h.d.enabledProvider(ctx, cmd.Slug, identity.KindOIDC)
 	if err != nil {
 		return "", err
 	}
+	defer func() { err = inKind(p.Kind, err) }()
 	attempt, err := h.d.Attempts.TakeCallback(ctx, identity.HashSecret(cmd.State), h.d.now())
 	if errors.Is(err, ErrNotFound) {
 		return "", fail(CodeSSOFailed, errors.New("the state names no live attempt"))
@@ -288,7 +312,7 @@ func (h *CompleteCallback) Handle(ctx context.Context, cmd CallbackCommand) (str
 	if err != nil {
 		return "", h.end(ctx, attempt, fail(CodeSSOFailed, err))
 	}
-	token := identity.NewToken(h.d.Random)
+	token = identity.NewToken(h.d.Random)
 	if err = h.d.Attempts.StoreClaims(ctx, attempt.ID, identity.HashSecret(token), claims); err != nil {
 		return "", err
 	}
@@ -322,6 +346,8 @@ type SignedIn struct {
 	// Cookie is the value of the session cookie.
 	Cookie   secret.String
 	ReturnTo string
+	// Kind is the protocol of the provider the member signed in through.
+	Kind identity.Kind
 }
 
 // unresolved refuses a person no rule lets in; completion turns it into a
@@ -349,7 +375,7 @@ func (u *unresolved) Unwrap() error { return u.err }
 // resolves the verified person to a member, provisions or links as the
 // provider allows, and opens the session. A person who matches no member who
 // may sign in is SignInFailure member_not_found or member_deactivated.
-func (h *CompleteSignIn) Handle(ctx context.Context, cmd CompleteCommand) (SignedIn, error) {
+func (h *CompleteSignIn) Handle(ctx context.Context, cmd CompleteCommand) (signed SignedIn, err error) {
 	now := h.d.now()
 	attempt, err := h.d.Attempts.TakeCompletion(ctx, identity.HashSecret(cmd.Token))
 	if errors.Is(err, ErrNotFound) {
@@ -371,7 +397,8 @@ func (h *CompleteSignIn) Handle(ctx context.Context, cmd CompleteCommand) (Signe
 	if err != nil {
 		return SignedIn{}, err
 	}
-	var out SignedIn
+	defer func() { err = inKind(p.Kind, err) }()
+	out := SignedIn{Kind: p.Kind}
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		var txErr error
 		out.Cookie, txErr = h.signIn(ctx, p, *attempt.Claims, cmd)
@@ -405,7 +432,7 @@ func (h *CompleteSignIn) refuse(ctx context.Context, p identity.Provider, u *unr
 		reason = reasonNotLinked
 	}
 	if err := h.d.Tx.Within(context.WithoutCancel(ctx), func(ctx context.Context) error {
-		return h.d.Members.RecordFailedSignIn(ctx, u.member, p.Slug, reason, requestID)
+		return h.d.Members.RecordFailedSignIn(ctx, u.member, p.Kind, p.Slug, reason, requestID)
 	}); err != nil {
 		return errors.Join(refusal, err)
 	}
@@ -452,7 +479,7 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 	now := h.d.now()
 	switch res.Action {
 	case identity.Provision:
-		if member, err = h.d.Members.ProvisionMember(ctx, claims.Email, claims.MemberName(), p.Slug, cmd.RequestID); err != nil {
+		if member, err = h.d.Members.ProvisionMember(ctx, claims.Email, claims.MemberName(), p.Kind, p.Slug, cmd.RequestID); err != nil {
 			return secret.String{}, err
 		}
 		fallthrough
@@ -471,7 +498,7 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 		return secret.String{}, err
 	}
 	return h.d.Members.OpenSession(ctx, SessionRequest{
-		Member: member, Provider: p.Slug, ClientIP: cmd.ClientIP, UserAgent: cmd.UserAgent, RequestID: cmd.RequestID,
+		Member: member, Kind: p.Kind, Provider: p.Slug, ClientIP: cmd.ClientIP, UserAgent: cmd.UserAgent, RequestID: cmd.RequestID,
 	})
 }
 

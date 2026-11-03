@@ -34,6 +34,9 @@ const (
 	// PurposeSMTPPassword seals the password the instance authenticates to
 	// its SMTP server with.
 	PurposeSMTPPassword Purpose = "smtp password"
+	// PurposeSAMLSPKey seals the private keys the instance presents to SAML
+	// identity providers.
+	PurposeSAMLSPKey Purpose = "saml sp key"
 )
 
 // Use names a key derived from the secret key for something other than

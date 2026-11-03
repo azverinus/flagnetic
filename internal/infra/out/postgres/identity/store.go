@@ -33,7 +33,9 @@ var errSlugTaken = apperrors.Conflict("already_exists", "an auth provider with t
 
 const providerColumns = `id, slug, kind, display_name, enabled, domains, link_by_email, auto_provision, oidc_issuer,
 	oidc_client_id, oidc_client_secret_sealed, oidc_scopes, oidc_email_claim, oidc_name_claim, oidc_groups_claim,
-	oidc_require_verified_email, created_at, updated_at, version`
+	oidc_require_verified_email, saml_metadata_url, saml_metadata_xml, saml_idp_entity_id, saml_idp_sso_url,
+	saml_idp_certificates, saml_metadata_refreshed_at, saml_sign_requests, saml_name_id_format, saml_email_attribute,
+	saml_name_attribute, saml_groups_attribute, saml_sp_certificate, saml_sp_key_sealed, created_at, updated_at, version`
 
 func scanProvider(row pgx.Row) (identity.Provider, error) {
 	var (
@@ -45,11 +47,21 @@ func scanProvider(row pgx.Row) (identity.Provider, error) {
 		emailClaim, nameClaim    *string
 		groupsClaim              *string
 		requireVerified          *bool
+		samlURL, samlXML         *string
+		samlEntity, samlSSO      *string
+		samlCerts                []string
+		samlRefreshed            *time.Time
+		samlSign                 *bool
+		samlFormat               *string
+		samlEmail, samlName      *string
+		samlGroups               *string
+		samlSPCert, samlSPKey    *string
 		createdAt, updatedAt     time.Time
 	)
 	if err := row.Scan(&pid, &p.Slug, &kind, &p.DisplayName, &p.Enabled, &p.Domains, &p.LinkByEmail, &p.AutoProvision,
-		&issuer, &clientID, &sealed, &scopes, &emailClaim, &nameClaim, &groupsClaim, &requireVerified, &createdAt,
-		&updatedAt, &p.Version); err != nil {
+		&issuer, &clientID, &sealed, &scopes, &emailClaim, &nameClaim, &groupsClaim, &requireVerified, &samlURL, &samlXML,
+		&samlEntity, &samlSSO, &samlCerts, &samlRefreshed, &samlSign, &samlFormat, &samlEmail, &samlName, &samlGroups,
+		&samlSPCert, &samlSPKey, &createdAt, &updatedAt, &p.Version); err != nil {
 		return p, err
 	}
 	p.ID, p.Kind = id.FromBytes[identity.Provider](pid), identity.Kind(kind)
@@ -61,7 +73,30 @@ func scanProvider(row pgx.Row) (identity.Provider, error) {
 			RequireVerifiedEmail: *requireVerified,
 		}
 	}
+	if p.Kind == identity.KindSAML {
+		p.SAML = &identity.SAML{
+			MetadataURL: deref(samlURL), MetadataXML: deref(samlXML),
+			IdP:         identity.IdPMetadata{EntityID: *samlEntity, SSOURL: *samlSSO, Certificates: samlCerts},
+			RefreshedAt: samlRefreshed.UTC(), SignRequests: *samlSign, NameIDFormat: *samlFormat,
+			Claims:        identity.Claims{Email: *samlEmail, Name: *samlName, Groups: *samlGroups},
+			SPCertificate: *samlSPCert, SealedSPKey: *samlSPKey,
+		}
+	}
 	return p, nil
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func nonEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func (s *Store) list(ctx context.Context, where string) ([]identity.Provider, error) {
@@ -135,14 +170,27 @@ func oidcArgs(p identity.Provider) []any {
 		o.RequireVerifiedEmail}
 }
 
+// samlArgs are a provider's SAML columns as query arguments, nulls for a
+// provider of another kind.
+func samlArgs(p identity.Provider) []any {
+	c := p.SAML
+	if c == nil {
+		return make([]any, 13)
+	}
+	return []any{nonEmpty(c.MetadataURL), nonEmpty(c.MetadataXML), c.IdP.EntityID, c.IdP.SSOURL, c.IdP.Certificates, c.RefreshedAt,
+		c.SignRequests, c.NameIDFormat, c.Claims.Email, c.Claims.Name, c.Claims.Groups, c.SPCertificate, c.SealedSPKey}
+}
+
 // CreateProvider stores p, answering a taken slug as a conflict.
 func (s *Store) CreateProvider(ctx context.Context, p identity.Provider) error {
 	args := append([]any{p.ID.Bytes(), p.Slug, string(p.Kind), p.DisplayName, p.Enabled, p.Domains, p.LinkByEmail,
 		p.AutoProvision}, oidcArgs(p)...)
+	args = append(args, samlArgs(p)...)
 	args = append(args, p.CreatedAt, p.UpdatedAt, p.Version)
 	_, err := s.db(ctx).Exec(ctx, `
 		INSERT INTO auth_providers (`+providerColumns+`)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`, args...)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,
+		        $26, $27, $28, $29, $30, $31, $32)`, args...)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "auth_providers_slug_key" {
 		return errSlugTaken.WithCause(err)
@@ -157,13 +205,18 @@ func (s *Store) CreateProvider(ctx context.Context, p identity.Provider) error {
 // kind and enabled flag.
 func (s *Store) UpdateProvider(ctx context.Context, p identity.Provider) error {
 	args := append([]any{p.ID.Bytes(), p.DisplayName, p.Domains, p.LinkByEmail, p.AutoProvision}, oidcArgs(p)...)
+	args = append(args, samlArgs(p)...)
 	args = append(args, p.UpdatedAt, p.Version)
 	_, err := s.db(ctx).Exec(ctx, `
 		UPDATE auth_providers
 		SET display_name = $2, domains = $3, link_by_email = $4, auto_provision = $5, oidc_issuer = $6,
 		    oidc_client_id = $7, oidc_client_secret_sealed = $8, oidc_scopes = $9, oidc_email_claim = $10,
-		    oidc_name_claim = $11, oidc_groups_claim = $12, oidc_require_verified_email = $13, updated_at = $14,
-		    version = $15
+		    oidc_name_claim = $11, oidc_groups_claim = $12, oidc_require_verified_email = $13,
+		    saml_metadata_url = $14, saml_metadata_xml = $15, saml_idp_entity_id = $16, saml_idp_sso_url = $17,
+		    saml_idp_certificates = $18, saml_metadata_refreshed_at = $19, saml_sign_requests = $20,
+		    saml_name_id_format = $21, saml_email_attribute = $22, saml_name_attribute = $23,
+		    saml_groups_attribute = $24, saml_sp_certificate = $25, saml_sp_key_sealed = $26, updated_at = $27,
+		    version = $28
 		WHERE id = $1`, args...)
 	if err != nil {
 		return fmt.Errorf("updating an auth provider: %w", err)

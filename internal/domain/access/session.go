@@ -30,6 +30,8 @@ const (
 	SignInLocal SignInMethod = "local"
 	// SignInOIDC is signing in through an OIDC auth provider.
 	SignInOIDC SignInMethod = "oidc"
+	// SignInSAML is signing in through a SAML auth provider.
+	SignInSAML SignInMethod = "saml"
 )
 
 // SessionTimeouts end a session: after Idle without a request, and after

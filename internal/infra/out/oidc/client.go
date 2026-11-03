@@ -14,6 +14,7 @@ import (
 
 	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
 	"github.com/azverinus/flagnetic/internal/domain/identity"
+	"github.com/azverinus/flagnetic/internal/infra/out/idphttp"
 )
 
 const (
@@ -43,11 +44,10 @@ type discovered struct {
 
 var _ appidentity.OIDCClient = (*Client)(nil)
 
-// NewClient returns a client whose requests to providers time out, follow a
-// few redirects at most, never downgrade to plain http away from a loopback
-// address and read no more than a megabyte of an answer.
+// NewClient returns a client that makes its requests to providers as
+// idphttp's client does.
 func NewClient() *Client {
-	return &Client{http: newHTTPClient(), now: time.Now, cache: map[string]discovered{}}
+	return &Client{http: idphttp.NewClient(), now: time.Now, cache: map[string]discovered{}}
 }
 
 // provider returns the discovered provider of issuer, from the replica's
