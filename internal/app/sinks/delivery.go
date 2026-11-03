@@ -162,10 +162,10 @@ type Probed struct {
 
 // Target is the end of one kind of sink: the system a batch is delivered to.
 type Target interface {
-	// Probe shows whether the target answers and can take a batch. A target
-	// that needs preparing, such as tables to create, is prepared when
-	// prepare is set.
-	Probe(ctx context.Context, c Call, prepare bool) Probed
+	// Probe shows whether the target answers and can take a batch, with a
+	// call made at now. A target that needs preparing, such as tables to
+	// create, is prepared when prepare is set.
+	Probe(ctx context.Context, c Call, now time.Time, prepare bool) Probed
 	// Deliver sends d and returns why it failed; nil when the target
 	// acknowledged it.
 	Deliver(ctx context.Context, c Call, d Delivery) *sinks.Failure
@@ -290,21 +290,30 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 	if err != nil {
 		return Failed, fmt.Errorf("resolving the sink's environments: %w", err)
 	}
-	if !named {
-		// Every environment the sink names is gone: it exports nothing, and
-		// must not read the project's other environments instead.
-		return h.idle(ctx, ref, token, c.Sink)
-	}
 	batch, in := sinks.Batch{From: due.Stream.Cursor}, due.Inflight
 	if in != nil {
+		// The batch in flight keeps the environments it was filtered to, so
+		// it finishes even once they are gone: its rows are then passed.
 		batch.To = in.To
 		scope.Environments = in.Environments
 	} else {
+		if !named {
+			// Every environment the sink names is gone: it exports nothing,
+			// and must not read the project's other environments instead.
+			return h.idle(ctx, ref, token, c.Sink)
+		}
 		if batch, err = h.d.Rows.NextBatch(ctx, ref.Kind, scope, due.Stream.Cursor, c.Sink.BatchSize); err != nil {
 			return Failed, fmt.Errorf("choosing a batch: %w", err)
 		}
 		if batch.To == due.Stream.Cursor {
-			return h.idle(ctx, ref, token, c.Sink)
+			// Nothing to send, perhaps because a transaction still open holds
+			// the horizon back: the stream's lag is told all the same, since
+			// that is when it grows.
+			res, idleErr := h.idle(ctx, ref, token, c.Sink)
+			if res == Idled {
+				h.observeLag(ctx, ref, scope, due.Stream.Cursor)
+			}
+			return res, idleErr
 		}
 		if batch.Rows == 0 {
 			// The rows past the cursor are other projects' or other

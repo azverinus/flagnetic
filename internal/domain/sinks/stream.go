@@ -11,7 +11,8 @@ import (
 // not empty, of those environments. It is part of the bound a batch is chosen
 // by and of the lag, never only of the read, so that a stream's cursor moves
 // past the rows it will never send. A sink naming environments whose every
-// one is gone has no scope: see Sink.Reads.
+// one is gone has no scope, since an empty list would read the whole project:
+// it reads nothing until it is edited.
 type Scope struct {
 	Project      workspace.ProjectID
 	Environments []workspace.EnvironmentID

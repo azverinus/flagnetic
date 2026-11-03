@@ -188,11 +188,17 @@ func (h *Update) update(ctx context.Context, cmd UpdateCommand, sealed string, n
 		return after, err
 	}
 	// An enabled sink's streams follow the event kinds it exports: one added
-	// starts at the horizon, its history being a replay; one removed goes.
+	// starts at the horizon, its history being a replay; one removed goes. A
+	// disabled sink gains no stream until it is enabled, which places it, but
+	// loses one removed all the same, so that a batch it still has in flight
+	// of a kind no longer exported is not resent.
 	if after.Enabled {
-		if err = h.d.syncStreams(ctx, before, after.EventKinds, nil, now); err != nil {
-			return after, err
-		}
+		err = h.d.syncStreams(ctx, before, after.EventKinds, nil, now)
+	} else {
+		err = h.d.dropStreams(ctx, before, after.EventKinds)
+	}
+	if err != nil {
+		return after, err
 	}
 	if changed(before.Input, after.Input) || !draft.KeepsSecret {
 		if err = h.d.record(ctx, now, cmd.Request, "sink.updated", &before, &after); err != nil {

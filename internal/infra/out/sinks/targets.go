@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -45,9 +46,11 @@ var _ appsinks.Target = (*Webhook)(nil)
 func NewWebhook(client *http.Client) *Webhook { return &Webhook{client: client} }
 
 // Probe shows whether the receiver answers a signed call that carries no
-// events with a 2xx. A webhook receiver has nothing to prepare.
-func (w *Webhook) Probe(ctx context.Context, c appsinks.Call, _ bool) appsinks.Probed {
-	return appsinks.Probed{Failure: w.Deliver(ctx, c, appsinks.Delivery{ID: "test_" + uuid.NewString(), Test: true})}
+// events with a 2xx. The call is signed at now, as a batch is, so that a
+// receiver refusing a stale timestamp accepts it. A webhook receiver has
+// nothing to prepare.
+func (w *Webhook) Probe(ctx context.Context, c appsinks.Call, now time.Time, _ bool) appsinks.Probed {
+	return appsinks.Probed{Failure: w.Deliver(ctx, c, appsinks.Delivery{ID: "test_" + uuid.NewString(), Test: true, Now: now})}
 }
 
 // Deliver posts the batch, signed, and answers why the receiver did not

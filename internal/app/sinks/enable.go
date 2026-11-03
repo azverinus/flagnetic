@@ -45,7 +45,7 @@ func (d Deps) probe(ctx context.Context, s sinks.Sink, secrets []string, prepare
 	if err != nil {
 		return Probed{}, err
 	}
-	probed := target.Probe(ctx, Call{Sink: s, ProjectKey: projectKey, Secrets: secrets}, prepare)
+	probed := target.Probe(ctx, Call{Sink: s, ProjectKey: projectKey, Secrets: secrets}, d.now(), prepare)
 	if probed.Warnings == nil {
 		probed.Warnings = []string{}
 	}
@@ -139,10 +139,6 @@ func (d Deps) syncStreams(ctx context.Context, s sinks.Sink, kinds []sinks.Event
 	for _, st := range s.Streams {
 		have[st.EventKind] = true
 	}
-	wanted := map[sinks.EventKind]bool{}
-	for _, k := range want {
-		wanted[k] = true
-	}
 	var (
 		scope    sinks.Scope
 		named    bool
@@ -170,6 +166,16 @@ func (d Deps) syncStreams(ctx context.Context, s sinks.Sink, kinds []sinks.Event
 			return err
 		}
 	}
+	return d.dropStreams(ctx, s, kinds)
+}
+
+// dropStreams drops the streams of s of the event kinds it no longer exports
+// (kinds, all of them when none). s carries the streams it has.
+func (d Deps) dropStreams(ctx context.Context, s sinks.Sink, kinds []sinks.EventKind) error {
+	wanted := map[sinks.EventKind]bool{}
+	for _, k := range (sinks.Input{EventKinds: kinds}).StreamKinds() {
+		wanted[k] = true
+	}
 	for _, st := range s.Streams {
 		if !wanted[st.EventKind] {
 			if err := d.Store.DeleteStream(ctx, s.ID, st.EventKind); err != nil {
@@ -183,15 +189,23 @@ func (d Deps) syncStreams(ctx context.Context, s sinks.Sink, kinds []sinks.Event
 // start returns where a new stream of kind begins reading: just before the
 // first row received at or after from, or at the horizon when it is nil or
 // nothing was received since.
+//
+// The first row received since from is found among the rows committed, so a
+// transaction still open with a lower transaction ID would commit behind it
+// and never be read. The start is therefore never past the horizon, which is
+// read first: every transaction still open when the first row is looked for
+// has an ID at or above that horizon, so a stream starting no later reads it.
 func (d Deps) start(ctx context.Context, kind sinks.EventKind, scope sinks.Scope, named bool, from *time.Time) (events.Cursor, error) {
-	if from != nil && named {
-		at, ok, err := d.Rows.Before(ctx, kind, scope, *from)
-		if err != nil {
-			return events.Cursor{}, fmt.Errorf("finding where %s starts: %w", kind, err)
-		}
-		if ok {
-			return at, nil
-		}
+	tail, err := d.Rows.Tail(ctx, kind)
+	if err != nil || from == nil || !named {
+		return tail, err
 	}
-	return d.Rows.Tail(ctx, kind)
+	at, ok, err := d.Rows.Before(ctx, kind, scope, *from)
+	if err != nil {
+		return events.Cursor{}, fmt.Errorf("finding where %s starts: %w", kind, err)
+	}
+	if !ok || tail.XID < at.XID || (tail.XID == at.XID && tail.Seq < at.Seq) {
+		return tail, nil
+	}
+	return at, nil
 }

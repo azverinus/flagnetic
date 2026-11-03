@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -189,6 +190,13 @@ func TestAWebhookSinkDeliversWhatArrivesAfterItIsEnabledSignedAndInOrder(t *test
 	}
 	if call := calls[0]; call.Verifies("another secret") {
 		t.Error("the signature verifies under another secret")
+	}
+	// A receiver refuses a call signed at a time far from its own clock, so
+	// every call is signed now, the check enabling the sink made included.
+	for _, call := range r.Calls() {
+		if got, want := call.Header.Get("X-Flagnetic-Timestamp"), strconv.FormatInt(f.clock.Now().Unix(), 10); got != want {
+			t.Errorf("X-Flagnetic-Timestamp = %q, want %q: the time of the call", got, want)
+		}
 	}
 
 	got := f.sink(t, created)
@@ -387,6 +395,10 @@ func TestALateIngestCommitIsNotSkippedByASinkThatReadPastIt(t *testing.T) {
 	tick(t, f.srv)
 	if lag := f.sink(t, created).LagSeconds; lag == nil || *lag < 60 {
 		t.Errorf("lag_seconds = %v behind a transaction held open for a minute, want at least 60", lag)
+	}
+	series := `flagnetic_sink_lag_seconds{event_kind="exposure",sink="` + created.Id.String() + `"}`
+	if lag := testkit.Metric(t, f.srv.Scrape(t), series); lag < 60 {
+		t.Errorf("%s = %v behind a transaction held open for a minute, want at least 60", series, lag)
 	}
 
 	release()
@@ -717,6 +729,70 @@ func TestASinkStartsAtTheTimeItWasAskedToAndOnlyItsNewStreamsDo(t *testing.T) {
 	}
 }
 
+func TestASinkStartedFromATimeReadsATransactionStillOpenWhenItWasEnabled(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t)
+	created, secret := f.create(t, webhook(r, "exposure"))
+	start := f.clock.Now()
+
+	// An older transaction is still open when a younger one commits, and the
+	// sink is enabled from before both: the first row it can see is the
+	// younger one's, which must not leave the older one behind its start.
+	written, release := f.srv.HoldNextIngest(t)
+	held := f.exposure("u-1", "true", start)
+	first := make(chan answer, 1)
+	go func() { first <- postEvents(t, f.srv, f.server, f.envelope(t, held)) }()
+	<-written
+	after := f.exposure("u-2", "true", start)
+	f.post(t, after)
+	f.enable(t, created, management.SinkEnable{StartFrom: ptr(start.Add(-time.Minute))})
+
+	release()
+	if a := <-first; a.status != http.StatusAccepted {
+		t.Fatalf("the held batch = %d: %s", a.status, a.body)
+	}
+	tick(t, f.srv)
+	calls := batchCalls(r)
+	if len(calls) != 1 {
+		t.Fatalf("the receiver got %d calls, want 1", len(calls))
+	}
+	if got, want := idsOf(decodeBatch(t, calls[0], secret).Events), []string{eventIDOf(held), eventIDOf(after)}; !slices.Equal(got, want) {
+		t.Errorf("events %v, want %v: the transaction open at the enabling too", got, want)
+	}
+}
+
+func TestABatchInFlightIsPassedOnceTheEnvironmentsItWasFilteredToAreGone(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t, testkit.Reply{}, testkit.Reply{Status: http.StatusInternalServerError})
+	body := webhook(r, "exposure")
+	body.Environments = &[]string{"staging"}
+	created, _ := f.enabled(t, body)
+	f.postIn(t, "staging", f.exposure("u-1", "true", f.clock.Now()))
+	tick(t, f.srv)
+	if s := f.sink(t, created); s.Health != management.SinkHealthFailing {
+		t.Fatalf("health = %s after a 500, want failing", s.Health)
+	}
+
+	got := do(f.p.admin.GetEnvironmentWithResponse(t.Context(), f.p.key, "staging"))
+	etag := got.HTTPResponse.Header.Get("ETag")
+	if res := do(f.p.admin.DeleteEnvironmentWithResponse(t.Context(), f.p.key, "staging", &management.DeleteEnvironmentParams{IfMatch: &etag})); res.StatusCode() != http.StatusNoContent {
+		t.Fatalf("DELETE …/environments/staging = %d: %s", res.StatusCode(), res.Body)
+	}
+	f.clock.Advance(2 * time.Second)
+	tick(t, f.srv)
+
+	s := f.sink(t, created)
+	if st := streamOf(s, "exposure"); s.Health != management.SinkHealthHealthy || st == nil || st.LastFailure != nil {
+		t.Errorf("sink once its environment is gone %+v, want the batch in flight passed and the sink healthy", s)
+	}
+	if n := len(batchCalls(r)); n != 1 {
+		t.Errorf("the receiver got %d calls, want only the failed one: the rows went with their environment", n)
+	}
+	if n := testkit.Metric(t, f.srv.Scrape(t), `flagnetic_sink_rows_skipped_total{reason="environment_deleted"}`); n != 1 {
+		t.Errorf("rows skipped = %v, want the row of the deleted environment", n)
+	}
+}
+
 func TestASinkCannotStartFurtherBackThanEventsAreKept(t *testing.T) {
 	f := startDelivering(t)
 	r := testkit.StartReceiver(t)
@@ -757,6 +833,58 @@ func TestEventKindsAddedOrRemovedOnAnEnabledSinkAddOrDropItsStreams(t *testing.T
 	removed := f.patch(t, created, management.SinkPatch{EventKinds: &[]string{"alias"}})
 	if len(removed.Streams) != 1 || removed.Streams[0].EventKind != "alias" {
 		t.Errorf("streams after removing exposure %+v, want alias alone", removed.Streams)
+	}
+
+	// Disabled in the same edit, the sink still drops the stream of a kind
+	// removed, and gains none for a kind added until it is enabled.
+	both := f.patch(t, created, management.SinkPatch{EventKinds: &[]string{"exposure", "alias"}})
+	if len(both.Streams) != 2 {
+		t.Fatalf("streams after adding exposure back %+v, want two", both.Streams)
+	}
+	disabled := f.patch(t, created, management.SinkPatch{Enabled: ptr(false), EventKinds: &[]string{"exposure"}})
+	if len(disabled.Streams) != 1 || disabled.Streams[0].EventKind != "exposure" {
+		t.Errorf("streams after disabling the sink and removing alias %+v, want exposure alone", disabled.Streams)
+	}
+	widened := f.patch(t, created, management.SinkPatch{EventKinds: &[]string{"exposure", "alias"}})
+	if len(widened.Streams) != 1 || widened.Streams[0].EventKind != "exposure" {
+		t.Errorf("streams after adding alias to a disabled sink %+v, want exposure alone", widened.Streams)
+	}
+}
+
+func TestARejectedBatchIsCountedAndResentUnchanged(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t, testkit.Reply{}, testkit.Reply{Status: http.StatusBadRequest}, testkit.Reply{Status: http.StatusBadRequest}, testkit.Reply{})
+	created, secret := f.enabled(t, webhook(r, "exposure"))
+	e1 := f.exposure("u-1", "true", f.clock.Now())
+	f.post(t, e1)
+
+	tick(t, f.srv)
+	f.clock.Advance(2 * time.Second)
+	tick(t, f.srv)
+	s := f.sink(t, created)
+	if lf := streamOf(s, "exposure").LastFailure; s.Health != management.SinkHealthFailing || lf == nil ||
+		lf.Class != management.SinkFailureClass("rejected") || lf.Status == nil || *lf.Status != 400 {
+		t.Fatalf("sink after two rejections %+v, want failing with class rejected and 400", s)
+	}
+	f.clock.Advance(3 * time.Second)
+	tick(t, f.srv)
+
+	series := `flagnetic_sink_batches_total{event_kind="exposure",result="rejected",sink="` + created.Id.String() + `"}`
+	if got := testkit.Metric(t, f.srv.Scrape(t), series); got != 2 {
+		t.Errorf("%s = %v, want 2", series, got)
+	}
+	calls := batchCalls(r)
+	if len(calls) != 3 {
+		t.Fatalf("the receiver got %d calls, want the two rejected and the one acknowledged", len(calls))
+	}
+	first := decodeBatch(t, calls[0], secret)
+	for _, c := range calls[1:] {
+		if b := decodeBatch(t, c, secret); b.DeliveryID != first.DeliveryID || !slices.Equal(idsOf(b.Events), []string{eventIDOf(e1)}) {
+			t.Errorf("resend %+v, want the rejected batch under its delivery ID: none is set aside yet", b)
+		}
+	}
+	if s := f.sink(t, created); s.Health != management.SinkHealthHealthy || s.DeadLetters != 0 {
+		t.Errorf("sink once the batch was acknowledged %+v, want healthy with no dead letter", s)
 	}
 }
 
