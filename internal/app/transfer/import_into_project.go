@@ -660,8 +660,11 @@ func (r *mergeRun) archiveFlags(ctx context.Context) error {
 			continue
 		}
 		effect, err := r.h.d.FlagsImport.ArchiveFlag(ctx, r.project.ID, fl.Key, r.req)
+		if ferr := r.fault(err, transfer.Pointer("flags", i)); ferr != nil {
+			return ferr
+		}
 		if err != nil {
-			return err
+			continue
 		}
 		if created[fl.Key] {
 			r.took(effect)

@@ -283,3 +283,20 @@ func TestARolloutSaltOfAnUntouchedConfigurationIsNotReusedByAnotherFlag(t *testi
 		t.Errorf("a salt released by the document: faults = %v, want none", got)
 	}
 }
+
+func TestARolloutSaltARuleKeepsIsNotReusedByAnotherFlag(t *testing.T) {
+	// The rule of checkout written without its identifier and salt is the
+	// project's rule, and keeps its salt, so another flag may not take it.
+	checkout := clone(t, existing()).Flags[0]
+	prod := checkout.Configurations["production"]
+	prod.Rules[0].ID, prod.Rules[0].Serve.Salt = "", ""
+	checkout.Configurations = map[string]transfer.Configuration{"production": prod}
+	d := transfer.Document{SchemaVersion: transfer.Version, Flags: []transfer.Flag{
+		checkout,
+		flagWith("other", map[string][]transfer.Rule{"production": {rollout(ruleB, "abcdefghij012345")}}),
+	}}
+	want := [][2]string{{"/flags/1/configurations/production/rules/0/serve/salt", "duplicate"}}
+	if got := mergeFaultsOf(t, d); !slices.Equal(got, want) {
+		t.Errorf("faults = %v, want %v", got, want)
+	}
+}

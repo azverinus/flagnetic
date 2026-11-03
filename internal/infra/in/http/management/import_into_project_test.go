@@ -68,8 +68,8 @@ func assertNothingChanged(t *testing.T, r management.ImportResult) {
 	}
 }
 
-// configurationOf returns the configuration of the flag in env of a document
-// read as generic JSON.
+// documentConfigurationOf returns the configuration of the flag in env of a
+// document read as generic JSON.
 func documentConfigurationOf(d map[string]any, flag, env string) map[string]any {
 	for _, f := range d["flags"].([]any) {
 		if m := f.(map[string]any); m["key"] == flag {
@@ -175,6 +175,37 @@ func TestAMergeUpsertsWhatTheDocumentNamesAndLeavesTheRest(t *testing.T) {
 	moved := bumped(t, "the merge", before, rulesetVersions(t, f.project))
 	slices.Sort(moved)
 	assertJSON(t, "environments moved on", moved, `["canary", "development", "production", "qa", "staging"]`)
+}
+
+func TestAConfigurationMovesItsOwnEnvironmentOnAndArchivingAFlagEveryOne(t *testing.T) {
+	f := exportedProject(t)
+	k := f.project.Key
+	doc := exported(t, f.admin, k)
+	documentConfigurationOf(doc, "banner_text", "staging")["fallthrough"] = "b"
+	before := rulesetVersions(t, f.project)
+	mustMerge(t, f.admin, k, doc)
+	after := rulesetVersions(t, f.project)
+	assertJSON(t, "environments moved on by a configuration", bumped(t, "a configuration", before, after), `["staging"]`)
+
+	// A flag the document archives or restores is archived or restored, and
+	// counts as updated.
+	known := len(auditActions(t, f.admin, k))
+	entry(t, doc, "flags", "old_flag")["archived"] = false
+	entry(t, doc, "flags", "banner_text")["archived"] = true
+	before = after
+	r := mustMerge(t, f.admin, k, doc)
+	assertJSON(t, "flags", []any{r.Changes.Flags.Created, keysOfUpdates(r.Changes.Flags.Updated)}, `[[], ["banner_text", "old_flag"]]`)
+	actions := auditActions(t, f.admin, k)
+	written := slices.Sorted(slices.Values(actions[:len(actions)-known]))
+	assertJSON(t, "entries", written, `["flag.archived", "flag.restored", "project.imported"]`)
+	if got := bumped(t, "an archival", before, rulesetVersions(t, f.project)); len(got) != len(before) {
+		t.Errorf("environments moved on by an archival = %v, want every one", got)
+	}
+	again := exported(t, f.admin, k)
+	if entry(t, again, "flags", "old_flag")["archived"] != false || entry(t, again, "flags", "banner_text")["archived"] != true {
+		t.Error("the archival was not applied")
+	}
+	assertNothingChanged(t, mustMerge(t, f.admin, k, doc))
 }
 
 func keysOfUpdates(us []management.ImportUpdate) []string {
@@ -447,6 +478,9 @@ func TestADryRunsETagIsTheProjectsStateAndAnImportBasedOnAnOldOneIsRefusedWhole(
 
 	// Without the header it applies to the project as it is, and a request
 	// that is not valid is judged before the state.
+	if res := mergeBody(t, f.admin, k, "application/json", []byte(`{`), mergeOptions{ifMatch: tag}); res.StatusCode() != http.StatusBadRequest {
+		t.Errorf("a malformed document on an old state = %d: %s, want 400", res.StatusCode(), res.Body)
+	}
 	if res := mergeInto(t, f.admin, k, doc); res.JSON200 == nil {
 		t.Fatalf("an import without If-Match = %d: %s", res.StatusCode(), res.Body)
 	}
@@ -606,6 +640,12 @@ func TestMergeRefusesWhatIsNotADocumentAndAnUnknownProject(t *testing.T) {
 	}
 	if res := mergeInto(t, f.admin, k, map[string]any{"schema_version": 1, "colour": "red"}); res.StatusCode() != http.StatusUnprocessableEntity {
 		t.Errorf("an unknown field = %d: %s", res.StatusCode(), res.Body)
+	}
+	// Only a merge is offered: another mode is not run as one.
+	for _, mode := range []management.ImportProjectParamsMode{"replace", "upsert"} {
+		params := management.ImportProjectParams{Mode: mode, DryRun: ptr(true)}
+		res := do(f.admin.ImportProjectWithBodyWithResponse(t.Context(), k, &params, "application/json", strings.NewReader(`{"schema_version": 1}`)))
+		assertProblem(t, "mode "+string(mode), res.StatusCode(), res.Body, http.StatusBadRequest, "invalid_request")
 	}
 	if res := mergeInto(t, f.admin, projectKey(), map[string]any{"schema_version": 1}); res.StatusCode() != http.StatusNotFound {
 		t.Errorf("an unknown project = %d: %s", res.StatusCode(), res.Body)

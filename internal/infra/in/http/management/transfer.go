@@ -164,6 +164,11 @@ func (a *api) importNewProject(r *http.Request, params ImportNewProjectParams) (
 
 func (a *api) importProject(r *http.Request, params ImportProjectParams) (ImportProjectResponseObject, error) {
 	ctx := r.Context()
+	// The generated route does not check the enum; a mode this server does
+	// not offer must not run as a merge.
+	if !params.Mode.Valid() {
+		return nil, flaghttp.InvalidRequest("mode must be merge")
+	}
 	d, err := readDocument(r)
 	if err != nil {
 		return nil, err

@@ -259,11 +259,31 @@ func CheckMerge(d, current Document) error {
 	f.declarations(d)
 	f.mergedConfigurations(d, current)
 	f.types(d, current)
-	f.salts(d, keptSalts(d, current))
+	// The salts are judged as the merge writes them: a rule the document
+	// gives without its salt keeps the one the project's rule has, which no
+	// other rollout may then take.
+	f.salts(adoptedConfigurations(d, current), keptSalts(d, current))
 	if len(f) == 0 {
 		return nil
 	}
 	return apperrors.Invalid(invalidDocument, invalidDocumentDetail, f...)
+}
+
+// adoptedConfigurations returns d with the configurations it gives as
+// Effective leaves them, and no other: each rule in its place, with the
+// identifier and salt it adopts from the project's.
+func adoptedConfigurations(d, current Document) Document {
+	eff := Effective(current, d)
+	out := d
+	out.Flags = slices.Clone(d.Flags)
+	for i, f := range d.Flags {
+		named := make(map[string]Configuration, len(f.Configurations))
+		for env := range f.Configurations {
+			named[env] = eff.Flags[i].Configurations[env]
+		}
+		out.Flags[i].Configurations = named
+	}
+	return out
 }
 
 // mergedConfigurations refuses a configuration for an environment that
