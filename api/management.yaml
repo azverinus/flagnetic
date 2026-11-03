@@ -831,6 +831,122 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /projects/{project}/import:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    post:
+      operationId: importProject
+      summary: Merge a project document into a project
+      description: |
+        Merges the document into the project: every environment, unit type,
+        attribute, segment and flag it names is created, or updated when it
+        differs from what the project has, by key, and everything else is left
+        as it is. A section the document lacks is left untouched, so a partial
+        document is applied as it is. The document is sent as
+        `application/json` or `application/yaml`, as
+        `GET /projects/{project}/export` writes it.
+
+        The project's key never changes; its name and description are written
+        when the document has a `project`. A flag the document names is
+        written whole, with the configurations the document gives it; the
+        configuration in an environment the document does not give is left as
+        it is. The configurations keep the rule identifiers and rollout salts
+        the document names, so every unit stays in its bucket; a rule or a
+        rollout without one is given one, unless it equals a rule of the
+        project's configuration, which it then is. A new environment gives
+        every flag its initial configuration unless the document configures
+        it.
+
+        An existing environment keeps whether it is protected: a document that
+        differs is answered with the warning `protection_kept`. New
+        environments take the document's value. An owner the document names by
+        email owns a flag when they may own in the project; otherwise a new
+        flag is owned by the importing member and an existing one keeps its
+        owner, with the warning `owner_replaced`. An override keeps its author
+        when the document leaves it as it was and is the importer's otherwise.
+        Protection is bypassed in every environment, and only the owner of a
+        project, never a project token, may import.
+
+        Experiments cannot be imported yet: a document that has any is refused
+        whole, `unsupported` at each. The import applies whole or not at all;
+        a document that breaks a rule is 422 `invalid_document` with every fault
+        found in `errors`, each pointing into the document.
+
+        With `dry_run` the whole import runs, every check the database makes
+        included, and is rolled back: same answer, nothing written. Every
+        answer to a dry run carries an `ETag`, the identifier of the project's
+        latest audit entry, which an import can send as `If-Match` to be
+        refused when the project has moved since.
+
+        Every entity that differs is written through the context that owns it
+        and recorded as a direct write records it, then one `project.imported`
+        entry, all with the request's identifier; an import that changes
+        nothing writes nothing, records nothing and answers empty changes.
+        Each environment whose ruleset changed moves on once. A body is
+        accepted up to 32 MiB.
+      x-permission: project.import
+      x-max-body-bytes: 33554432
+      tags: [transfer]
+      parameters:
+        - name: mode
+          in: query
+          required: true
+          description: How the document is applied; only `merge` is offered.
+          schema:
+            type: string
+            enum: [merge]
+        - $ref: "#/components/parameters/ImportDryRun"
+        - $ref: "#/components/parameters/ImportIfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              format: binary
+              description: A `ProjectDocument` as JSON.
+          application/yaml:
+            schema:
+              type: string
+              format: binary
+              description: A `ProjectDocument` as YAML.
+      responses:
+        "200":
+          description: What the import did, or with a dry run would do.
+          headers:
+            ETag:
+              schema:
+                type: string
+              description: |
+                On a dry run, the identifier of the project's latest audit
+                entry, quoted; absent for a project that has none, and on an
+                import that was applied.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
+        "415":
+          description: "`unsupported_media_type`: the document is not sent as `application/json` or `application/yaml`."
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /projects/{project}/environments:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -5861,6 +5977,46 @@ paths:
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/Invalid"
+  /projects/{project}/sinks/test:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    post:
+      operationId: testSinkConfig
+      summary: Test a sink's configuration before saving it
+      description: |
+        Checks a configuration as creating a sink would, then calls its target
+        and answers whether it works, why not, and what is wrong with it that
+        does not stop delivery. Nothing is stored, created at the target or
+        audited: a ClickHouse test never creates tables, and says so in its
+        warnings. A webhook sink is called with a signature made from a
+        secret drawn for the test and thrown away. The target's own words are
+        never answered, only the failure's class, status and code. Saving a
+        sink is never blocked by its test.
+      x-permission: sink.manage
+      tags: [sinks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SinkCreate"
+      responses:
+        "200":
+          description: What the test found; a target that fails is a 200 with `ok` false.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SinkTestResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /projects/{project}/sinks/{sink}:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -5956,6 +6112,96 @@ paths:
           $ref: "#/components/responses/VersionMismatch"
         "428":
           $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/sinks/{sink}/enable:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/SinkID"
+    post:
+      operationId: enableSink
+      summary: Enable a sink
+      description: |
+        Calls the sink's target first and refuses with `sink_not_ready`, naming
+        the failure by `class`, `status` and `code`, when it does not answer
+        or cannot take a batch; a ClickHouse sink with `create_tables` also
+        creates its tables. Then every event kind the sink exports gets a
+        stream that starts at the horizon: what the project receives from now
+        on. `start_from`, a time still within retention (`out_of_retention`
+        otherwise), starts the streams this call creates at the first event
+        received at or after it, which backfills them; a stream the sink
+        already has keeps its place, so enabling a sink again continues where
+        it stopped. A sink that is already enabled is answered as it is, with
+        nothing probed or recorded. Enabling a stopped sink leaves it stopped
+        until it is resumed. It takes no `If-Match`.
+      x-permission: sink.manage
+      tags: [sinks]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SinkEnable"
+      responses:
+        "200":
+          description: The sink as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sink"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/sinks/{sink}/test:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/SinkID"
+    post:
+      operationId: testSink
+      summary: Test a saved sink
+      description: |
+        Calls the target of the stored sink, or, when the body carries a
+        sub-object of the sink's kind, of the sink with that configuration, in
+        which `***` or no secret takes the stored one: a change is checked
+        against the credentials already held. Answers whether it works, why
+        not by class, status and code, and what is wrong that does not stop
+        delivery. Testing the stored configuration also creates a ClickHouse
+        sink's tables when it has `create_tables`, and stores what it found as
+        the sink's `warnings`. Audited as `sink.tested`. The target's own words
+        are never answered.
+      x-permission: sink.manage
+      tags: [sinks]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SinkTest"
+      responses:
+        "200":
+          description: What the test found; a target that fails is a 200 with `ok` false.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SinkTestResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /projects/{project}/sinks/{sink}/rotate-secret:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -6388,6 +6634,17 @@ components:
       schema:
         type: string
         format: uuid
+    ImportIfMatch:
+      name: If-Match
+      in: header
+      description: |
+        The state of the project this import is based on, as the `ETag` of a
+        dry run or an export answered it. Optional: without it the import
+        applies to the project as it is. With it, an import is refused
+        `412 version_mismatch` when the project has changed since, judged
+        under the project's lock before anything is written.
+      schema:
+        type: string
     ImportDryRun:
       name: dry_run
       in: query
@@ -6743,7 +7000,13 @@ components:
             type: string
         failure:
           type: string
-          description: Why a system the server asked did not answer as needed, for `provider_unreachable`; for `smtp_failed` the step that failed, `connection`, `tls`, `authentication` or `rejected`.
+          description: Why a system the server asked did not answer as needed, for `provider_unreachable`; for `smtp_failed` the step that failed, `connection`, `tls`, `authentication` or `rejected`; for `sink_not_ready` the failure class of the target's check, such as `connect` or `status`.
+        failure_status:
+          type: integer
+          description: The HTTP status the target answered, for `sink_not_ready`, when it answered.
+        failure_code:
+          type: string
+          description: The target's own error code, for `sink_not_ready`, when it speaks one, such as a ClickHouse exception or an S3 error code.
         errors:
           type: array
           items:
@@ -10804,6 +11067,54 @@ components:
           type: object
           additionalProperties:
             type: string
+    SinkEnable:
+      type: object
+      properties:
+        start_from:
+          type: string
+          format: date-time
+          description: |
+            Where the streams this call creates start, a time within retention:
+            the first event received at or after it is the first delivered.
+            Absent, they start at the horizon. A stream the sink already has
+            keeps its place.
+    SinkTest:
+      type: object
+      description: |
+        The configuration to test in place of the stored one: the sub-object of
+        the sink's kind, which replaces it whole. Nothing is stored.
+      properties:
+        clickhouse:
+          $ref: "#/components/schemas/SinkClickHouseInput"
+        object_storage:
+          $ref: "#/components/schemas/SinkObjectStorageInput"
+        webhook:
+          $ref: "#/components/schemas/SinkWebhookInput"
+    SinkTestResult:
+      type: object
+      required: [ok, class, status, code, warnings]
+      properties:
+        ok:
+          type: boolean
+          description: Whether the target answered and can take a batch.
+        class:
+          allOf:
+            - $ref: "#/components/schemas/SinkFailureClass"
+          nullable: true
+          description: Why not, when it did not.
+        status:
+          type: integer
+          nullable: true
+          description: The HTTP status the target answered, when it did.
+        code:
+          type: string
+          nullable: true
+          description: The protocol's own error code, when the target speaks one.
+        warnings:
+          type: array
+          description: What is wrong with the target that does not stop delivery, such as a column missing from a table.
+          items:
+            type: string
     SinkCreate:
       type: object
       required: [name, kind]
@@ -10956,7 +11267,7 @@ components:
           $ref: "#/components/schemas/DocumentProject"
         mode:
           type: string
-          enum: [create]
+          enum: [create, merge]
         source:
           type: string
           enum: [document]

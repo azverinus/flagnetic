@@ -269,11 +269,12 @@ func (c Configuration) Revert(f Flag, recorded Configuration, r Referents, w Wri
 // says it is, whole, checked against r as a replace is. Unlike a replace it
 // keeps what the document says of rule identifiers and rollout salts, which
 // is what keeps a unit in its bucket in a copy of the project; a rule or a
-// rollout the document gives none is given one by m. An override is the
-// writer's: the document names no author.
+// rollout the document gives none is given one by m. The document names no
+// author of an override: one left as it was keeps its author, any other is
+// the writer's.
 func (c Configuration) Import(f Flag, in ConfigurationInput, r Referents, m Mint, w Write) (Configuration, Changed, error) {
 	rules := make([]RuleInput, len(in.Rules))
-	basis := Configuration{Rules: make([]Rule, len(in.Rules))}
+	basis := Configuration{Overrides: c.Overrides, Rules: make([]Rule, len(in.Rules))}
 	for i, ri := range in.Rules {
 		if ri.ID == nil {
 			ruleID := m.RuleID()

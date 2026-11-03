@@ -112,6 +112,8 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		},
 		AuditExportMaxEntries: cfg.AuditExportMaxEntries,
 		WebhookTick:           cfg.WebhookTick,
+		SinkTick:              cfg.SinkTick,
+		SinkLagWarning:        cfg.SinkLagWarning,
 		WebhookSecretOverlap:  cfg.WebhookSecretOverlap,
 		Options:               management.Options{BaseURL: cfg.BaseURL, InsecureCookies: cfg.InsecureCookies},
 	})

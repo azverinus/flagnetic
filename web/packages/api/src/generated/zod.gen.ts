@@ -793,6 +793,8 @@ export const zProblem = z.object({
   references: z.array(zReference).optional(),
   used_by: z.array(z.string()).optional(),
   failure: z.string().optional(),
+  failure_status: z.int().optional(),
+  failure_code: z.string().optional(),
   errors: z.array(zViolation).optional(),
 });
 
@@ -2343,6 +2345,29 @@ export const zSinkWebhookInput = z.object({
   headers: z.record(z.string(), z.string()).optional(),
 });
 
+export const zSinkEnable = z.object({
+  start_from: z.iso.datetime().optional(),
+});
+
+/**
+ * The configuration to test in place of the stored one: the sub-object of
+ * the sink's kind, which replaces it whole. Nothing is stored.
+ *
+ */
+export const zSinkTest = z.object({
+  clickhouse: zSinkClickHouseInput.optional(),
+  object_storage: zSinkObjectStorageInput.optional(),
+  webhook: zSinkWebhookInput.optional(),
+});
+
+export const zSinkTestResult = z.object({
+  ok: z.boolean(),
+  class: zSinkFailureClass.nullable(),
+  status: z.int().nullable(),
+  code: z.string().nullable(),
+  warnings: z.array(z.string()),
+});
+
 export const zSinkCreate = z.object({
   name: z.string(),
   kind: z.string(),
@@ -2478,7 +2503,7 @@ export const zDocumentProject = z.object({
  */
 export const zImportResult = z.object({
   project: zDocumentProject,
-  mode: z.enum(["create"]),
+  mode: z.enum(["create", "merge"]),
   source: z.enum(["document"]),
   dry_run: z.boolean(),
   changes: zImportChanges,
@@ -2751,6 +2776,16 @@ export const zAuditKillSwitch = z.boolean();
  * A change request's identifier; lists the entries its application wrote.
  */
 export const zAuditChangeRequest = z.uuid();
+
+/**
+ * The state of the project this import is based on, as the `ETag` of a
+ * dry run or an export answered it. Optional: without it the import
+ * applies to the project as it is. With it, an import is refused
+ * `412 version_mismatch` when the project has changed since, judged
+ * under the project's lock before anything is written.
+ *
+ */
+export const zImportIfMatch = z.string();
 
 /**
  * Run the whole import and roll it back, answering what it would have done.
@@ -3070,6 +3105,29 @@ export const zExportProjectQuery = z.object({
  *
  */
 export const zExportProjectResponse = zProjectDocument;
+
+/**
+ * A `ProjectDocument` as JSON.
+ */
+export const zImportProjectBody = z.string();
+
+export const zImportProjectHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zImportProjectPath = z.object({
+  project: z.string(),
+});
+
+export const zImportProjectQuery = z.object({
+  mode: z.enum(["merge"]),
+  dry_run: z.boolean().optional().default(false),
+});
+
+/**
+ * What the import did, or with a dry run would do.
+ */
+export const zImportProjectResponse = zImportResult;
 
 export const zListEnvironmentsPath = z.object({
   project: z.string(),
@@ -4698,6 +4756,17 @@ export const zCreateSinkPath = z.object({
  */
 export const zCreateSinkResponse = zSinkWithSecret;
 
+export const zTestSinkConfigBody = zSinkCreate;
+
+export const zTestSinkConfigPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * What the test found; a target that fails is a 200 with `ok` false.
+ */
+export const zTestSinkConfigResponse = zSinkTestResult;
+
 export const zDeleteSinkHeaders = z.object({
   "If-Match": z.string().optional(),
 });
@@ -4737,6 +4806,30 @@ export const zUpdateSinkPath = z.object({
  * The sink as it is now.
  */
 export const zUpdateSinkResponse = zSink;
+
+export const zEnableSinkBody = zSinkEnable;
+
+export const zEnableSinkPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+});
+
+/**
+ * The sink as it is now.
+ */
+export const zEnableSinkResponse = zSink;
+
+export const zTestSinkBody = zSinkTest;
+
+export const zTestSinkPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+});
+
+/**
+ * What the test found; a target that fails is a 200 with `ok` false.
+ */
+export const zTestSinkResponse = zSinkTestResult;
 
 export const zRotateSinkSecretPath = z.object({
   project: z.string(),

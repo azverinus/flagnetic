@@ -1,5 +1,7 @@
 package sinks
 
+import "time"
+
 // Health is how a sink stands, read from its state on every read.
 type Health string
 
@@ -22,15 +24,32 @@ const (
 	HealthHealthy Health = "healthy"
 )
 
-// Health returns how s stands: disabled, stopped or healthy, until the
-// streams that judge the rest exist.
-func (s Sink) Health() Health {
+// Health returns how s stands, judged from the state the store read with it:
+// disabled or stopped, a stream that failed its last call, a dead letter
+// waiting, the oldest undelivered row older than lagWarning, or none of these.
+func (s Sink) Health(lagWarning time.Duration) Health {
 	switch {
 	case !s.Enabled:
 		return HealthDisabled
 	case s.StoppedAt != nil:
 		return HealthStopped
+	case s.Failing():
+		return HealthFailing
+	case s.DeadLetters > 0:
+		return HealthDegraded
+	case s.Lag != nil && *s.Lag > lagWarning:
+		return HealthLagging
 	default:
 		return HealthHealthy
 	}
+}
+
+// Failing reports whether any stream of s failed its last call.
+func (s Sink) Failing() bool {
+	for _, st := range s.Streams {
+		if st.Failing() {
+			return true
+		}
+	}
+	return false
 }

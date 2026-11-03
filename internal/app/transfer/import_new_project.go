@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"strconv"
-	"strings"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
@@ -57,10 +56,11 @@ type ImportResult struct {
 	DryRun   bool
 	Changes  transfer.Changes
 	Warnings []transfer.Warning
+	// Latest is the newest audit entry of the project before the import, the
+	// zero identifier when it has none or there was no project yet: the state
+	// a later import can name as the one it is based on.
+	Latest governance.EntryID
 }
-
-// errDryRun ends the unit of work of a dry run, which rolls it back.
-var errDryRun = errors.New("transfer: a dry run ends in a rollback")
 
 // Handle creates the project, whole or not at all: the document is checked
 // as a document, then each entity is written through the context that owns
@@ -84,14 +84,17 @@ func (h *ImportNewProject) Handle(ctx context.Context, cmd ImportNewProjectComma
 		}
 		d.Project = &project
 	}
-	run := &importRun{h: h, cmd: cmd, doc: d}
-	if err := run.checkDocument(); err != nil {
+	imp := &importRun{
+		h: h, cmd: cmd, doc: d,
+		run: run{owners: h.d.Owners, audit: h.d.Audit, clock: h.d.Clock, ids: h.d.IDs, req: cmd.Request, caller: cmd.Caller},
+	}
+	if err := imp.checkDocument(); err != nil {
 		return ImportResult{}, err
 	}
 	var res ImportResult
 	err := h.d.Tx.Within(protection.BypassEverywhere(ctx), func(ctx context.Context) error {
 		var err error
-		if res, err = run.apply(ctx); err != nil {
+		if res, err = imp.apply(ctx); err != nil {
 			return err
 		}
 		if cmd.DryRun {
@@ -108,18 +111,11 @@ func (h *ImportNewProject) Handle(ctx context.Context, cmd ImportNewProjectComma
 
 // importRun is one import of a document into a new project.
 type importRun struct {
+	run
 	h   *ImportNewProject
 	cmd ImportNewProjectCommand
 	doc transfer.Document
 
-	project  workspace.Project
-	changes  transfer.Changes
-	warnings []transfer.Warning
-	faults   []apperrors.Violation
-	// refused are the pointers of the faults the document check found: the
-	// entities under them are not written, since writing them would only
-	// break what the check already refused, such as a key being unique.
-	refused []string
 	// environments are the environments created, by key.
 	environments map[string]workspace.Environment
 	// flags are the flags created, by key.
@@ -131,15 +127,8 @@ type importRun struct {
 // with the faults the contexts find in the entities, unless there is no
 // project to write the entities into: then it refuses the document at once.
 func (r *importRun) checkDocument() error {
-	if err := transfer.CheckCreate(r.doc); err != nil {
-		e, ok := apperrors.From(err)
-		if !ok {
-			return err
-		}
-		r.faults = append(r.faults, e.Violations...)
-	}
-	for _, v := range r.faults {
-		r.refused = append(r.refused, v.Pointer)
+	if err := r.refuse(transfer.CheckCreate(r.doc)); err != nil {
+		return err
 	}
 	var project []apperrors.Violation
 	if p := r.doc.Project; p != nil {
@@ -154,37 +143,6 @@ func (r *importRun) checkDocument() error {
 	return apperrors.Invalid("invalid_document", "the project document is not valid", append(r.faults, project...)...)
 }
 
-// isRefused reports whether the document check refused the entity at
-// pointer, or a part of it.
-func (r *importRun) isRefused(pointer string) bool {
-	for _, p := range r.refused {
-		if p == pointer || strings.HasPrefix(p, pointer+"/") {
-			return true
-		}
-	}
-	return false
-}
-
-// fault records err, a refusal of the entity at pointer, and goes on with
-// the rest of the document so that every fault is reported; it returns any
-// other error, which ends the import. A refusal is a fault the document
-// has: invalid, with its violations pointing into the entity.
-func (r *importRun) fault(err error, pointer string) error {
-	if err == nil {
-		return nil
-	}
-	e, ok := apperrors.From(err)
-	if !ok || e.Kind != apperrors.KindInvalid {
-		return err
-	}
-	if len(e.Violations) == 0 {
-		r.faults = append(r.faults, apperrors.Violation{Pointer: pointer, Code: e.Code, Detail: e.Detail})
-		return nil
-	}
-	r.faults = append(r.faults, e.Under(pointer).Violations...)
-	return nil
-}
-
 // apply writes the document in the unit of work ctx carries.
 func (r *importRun) apply(ctx context.Context) (ImportResult, error) {
 	d := r.doc
@@ -193,7 +151,7 @@ func (r *importRun) apply(ctx context.Context) (ImportResult, error) {
 	if e, ok := apperrors.From(err); ok && e.Kind == apperrors.KindConflict && len(r.faults) > 0 {
 		// A document that is refused is refused for what it is, whichever
 		// project it would have been written as.
-		return ImportResult{}, apperrors.Invalid("invalid_document", "the project document is not valid", r.faults...)
+		return ImportResult{}, r.invalid()
 	}
 	if err != nil {
 		return ImportResult{}, err
@@ -206,7 +164,7 @@ func (r *importRun) apply(ctx context.Context) (ImportResult, error) {
 		}
 	}
 	if len(r.faults) > 0 {
-		return ImportResult{}, apperrors.Invalid("invalid_document", "the project document is not valid", r.faults...)
+		return ImportResult{}, r.invalid()
 	}
 	// Every environment now serves what it did not, so each moves on once,
 	// whatever number of entities were written.
@@ -215,7 +173,7 @@ func (r *importRun) apply(ctx context.Context) (ImportResult, error) {
 			return ImportResult{}, err
 		}
 	}
-	err = r.record(ctx)
+	err = r.record(ctx, transfer.ModeCreate)
 	return ImportResult{
 		Project: *d.Project, Mode: transfer.ModeCreate, Source: transfer.SourceDocument, Changes: r.changes, Warnings: r.warnings,
 	}, err
@@ -230,7 +188,7 @@ func (r *importRun) declare(ctx context.Context) error {
 		if r.isRefused("/environments/" + strconv.Itoa(i)) {
 			continue
 		}
-		created, err := w.CreateEnvironment(ctx, project, e.Key, e.Name, e.Protected, i+1, req)
+		created, err := w.CreateEnvironment(ctx, project, e.Key, e.Name, e.Protected, i+1, r.cmd.Caller, req)
 		if ferr := r.fault(err, "/environments/"+strconv.Itoa(i)); ferr != nil {
 			return ferr
 		}
@@ -271,7 +229,7 @@ func (r *importRun) createSegments(ctx context.Context) error {
 		if r.isRefused("/segments/" + strconv.Itoa(i)) {
 			continue
 		}
-		err := r.h.d.Flags.CreateSegment(ctx, SegmentImport{
+		_, err := r.h.d.Flags.CreateSegment(ctx, SegmentImport{
 			Project: r.project.ID, Key: s.Key, Name: s.Name, Description: s.Description, Private: s.Private,
 			Conditions: transfer.FlagConditions(s.Conditions), Request: r.cmd.Request,
 		})
@@ -302,7 +260,7 @@ func (r *importRun) createFlags(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		err = r.h.d.Flags.CreateFlag(ctx, FlagImport{
+		_, err = r.h.d.Flags.CreateFlag(ctx, FlagImport{
 			Project: r.project.ID, Key: f.Key, Type: flags.Type(f.Type), Name: f.Name, Description: f.Description,
 			Owner: owner, Caller: r.cmd.Caller, Tags: f.Tags, Lifetime: flags.Lifetime(f.Lifetime),
 			ExpectedRemovalAt: f.ExpectedRemovalAt, AutomaticExposure: f.AutomaticExposure, Variations: f.VariationInputs(),
@@ -317,7 +275,7 @@ func (r *importRun) createFlags(ctx context.Context) error {
 		r.flags[f.Key] = true
 		r.changes.Flags.Created = append(r.changes.Flags.Created, f.Key)
 		if f.Archived {
-			if err = r.h.d.Flags.ArchiveFlag(ctx, r.project.ID, f.Key, r.cmd.Request); err != nil {
+			if _, err = r.h.d.Flags.ArchiveFlag(ctx, r.project.ID, f.Key, r.cmd.Request); err != nil {
 				return err
 			}
 		}
@@ -339,7 +297,7 @@ func (r *importRun) configureFlags(ctx context.Context) error {
 			if !configured || r.environments[env.Key].ID.IsZero() || r.isRefused(transfer.Pointer("environments", j)) || r.isRefused(at) {
 				continue
 			}
-			err := r.h.d.Flags.WriteConfiguration(ctx, ConfigurationImport{
+			_, err := r.h.d.Flags.WriteConfiguration(ctx, ConfigurationImport{
 				Project: r.project.ID, Flag: f.Key, Environment: env.Key, Input: c.Input(), Caller: r.cmd.Caller, Request: r.cmd.Request,
 			})
 			if ferr := r.fault(err, at); ferr != nil {
@@ -348,40 +306,4 @@ func (r *importRun) configureFlags(ctx context.Context) error {
 		}
 	}
 	return nil
-}
-
-// ownerOf returns the member to own an entity whose owner the document
-// names as email. Members do not travel, so the address resolves only to
-// someone who may own in the project now; otherwise the importing member
-// owns it, and the import says so. A document that names no owner is the
-// importer's.
-func (r *importRun) ownerOf(ctx context.Context, email, pointer string) (*access.MemberID, error) {
-	if email != "" {
-		member, ok, err := r.h.d.Owners.OwnerByEmail(ctx, r.project.ID, email)
-		if err != nil {
-			return nil, err
-		}
-		if ok {
-			return &member, nil
-		}
-		r.warnings = append(r.warnings, transfer.Warning{
-			Code: transfer.WarningOwnerReplaced, Pointer: pointer, Params: map[string]any{"email": email},
-			Detail: "the owner " + email + " cannot own in this project, so the importing member owns it",
-		})
-	}
-	return r.cmd.Caller, nil
-}
-
-// record writes the entry saying what the import did, after the entries of
-// each entity it wrote.
-func (r *importRun) record(ctx context.Context) error {
-	entry, err := governance.NewEntry(id.New[governance.Entry](r.h.d.IDs), r.h.d.Clock.Now(), r.cmd.Request, governance.Record{
-		Project: r.project.ID, Action: "project.imported",
-		Entity: governance.Entity{Kind: "project", ID: r.project.ID.String(), Key: r.project.Key},
-		After:  map[string]any{"mode": transfer.ModeCreate, "source": transfer.SourceDocument, "counts": r.changes.Counts()},
-	})
-	if err != nil {
-		return err
-	}
-	return r.h.d.Audit.Record(ctx, entry)
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/sinks"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
-	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
 	pgsinks "github.com/azverinus/flagnetic/internal/infra/out/postgres/sinks"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -31,9 +30,9 @@ func startSinkRows(t *testing.T) sinkRows {
 }
 
 // scope is the whole project, or only the environments given.
-func (f sinkRows) scope(t *testing.T, environments ...string) pgevents.Scope {
+func (f sinkRows) scope(t *testing.T, environments ...string) sinks.Scope {
 	t.Helper()
-	s := pgevents.Scope{Project: f.p.projectID(t)}
+	s := sinks.Scope{Project: f.p.projectID(t)}
 	for _, e := range environments {
 		s.Environments = append(s.Environments, f.p.environmentID(t, e))
 	}
@@ -43,12 +42,12 @@ func (f sinkRows) scope(t *testing.T, environments ...string) pgevents.Scope {
 // readAll reads the stream of kind in scope from its start in batches of at
 // most size rows, once the transactions running have ended, until none is
 // left, and answers the batches' sizes, the rows and how many were skipped.
-func (f sinkRows) readAll(t *testing.T, kind sinks.EventKind, scope pgevents.Scope, size int) (batches []int, rows []sinks.Row, skipped int) {
+func (f sinkRows) readAll(t *testing.T, kind sinks.EventKind, scope sinks.Scope, size int) (batches []int, rows []sinks.Row, skipped int) {
 	t.Helper()
 	return readStream(t, f.srv, f.store, kind, scope, events.Cursor{}, size)
 }
 
-func readStream(t *testing.T, srv *testkit.Server, store *pgsinks.Store, kind sinks.EventKind, scope pgevents.Scope, from events.Cursor, size int) (batches []int, rows []sinks.Row, skipped int) {
+func readStream(t *testing.T, srv *testkit.Server, store *pgsinks.Store, kind sinks.EventKind, scope sinks.Scope, from events.Cursor, size int) (batches []int, rows []sinks.Row, skipped int) {
 	t.Helper()
 	srv.AwaitHorizon(t)
 	for {
@@ -250,7 +249,7 @@ func TestARowOfADeletedEnvironmentIsPassedAndCounted(t *testing.T) {
 		t.Fatalf("DELETE …/environments/staging = %d: %s", res.StatusCode(), res.Body)
 	}
 
-	batches, rows, skipped := f.readAll(t, sinks.EventExposure, pgevents.Scope{Project: staging.Project}, 10)
+	batches, rows, skipped := f.readAll(t, sinks.EventExposure, sinks.Scope{Project: staging.Project}, 10)
 	if got := unitsOf(rows); !slices.Equal(got, []string{"p-1"}) || skipped != 2 || !slices.Equal(batches, []int{3}) {
 		t.Errorf("rows = %v, %d skipped in %v, want p-1 and the two of the deleted environment skipped, the batch still passing all three", got, skipped, batches)
 	}
@@ -303,7 +302,7 @@ func TestEverySummaryRowIsExportedWithItsSourceAndRemoteEvaluationsGetStableRepo
 	if err := f.srv.Tick(t, worker.RemoteEvaluationCountsName); err != nil {
 		t.Fatal(err)
 	}
-	scope := pgevents.Scope{Project: f.p.projectID(t)}
+	scope := sinks.Scope{Project: f.p.projectID(t)}
 
 	_, first, _ := readStream(t, f.srv, store, sinks.EventEvaluationSummary, scope, events.Cursor{}, 2)
 	_, again, _ := readStream(t, f.srv, store, sinks.EventEvaluationSummary, scope, events.Cursor{}, 10)
@@ -345,7 +344,7 @@ func TestEverySummaryRowIsExportedWithItsSourceAndRemoteEvaluationsGetStableRepo
 func TestAReadThatCannotBeDoneIsAnErrorAndNeverAnEmptyBatch(t *testing.T) {
 	f := startSinkRows(t)
 	scope := f.scope(t)
-	b := pgevents.Batch{To: events.Cursor{XID: 1, Seq: 1}}
+	b := sinks.Batch{To: events.Cursor{XID: 1, Seq: 1}}
 	if _, err := f.store.NextBatch(t.Context(), "click", scope, events.Cursor{}, 1); err == nil {
 		t.Error("a batch of an event kind that has no raw table = nil error, want one")
 	}

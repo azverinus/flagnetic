@@ -225,6 +225,51 @@ func OldestAfter(ctx context.Context, db pgxtx.DB, table string, scope Scope, fr
 	return at.UTC(), true, nil
 }
 
+// Tail returns the position of the last row of table below the snapshot
+// horizon, the zero position when there is none: where a stream that is to
+// read what happens from now on begins.
+func Tail(ctx context.Context, db pgxtx.DB, table string) (events.Cursor, error) {
+	var xid *string
+	var seq *int64
+	// The column is named for its text apart from its own: an output column
+	// called xid would be what ORDER BY xid sorts by, as text, where "999"
+	// comes after "1000".
+	err := db.QueryRow(ctx, `SELECT xid::text AS xid_text, seq FROM `+pgx.Identifier{table}.Sanitize()+`
+		WHERE xid < pg_snapshot_xmin(pg_current_snapshot()) ORDER BY xid DESC, seq DESC LIMIT 1`).Scan(&xid, &seq)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return events.Cursor{}, nil
+	}
+	if err != nil {
+		return events.Cursor{}, fmt.Errorf("reading the last row of %s: %w", table, err)
+	}
+	return cursorOf(*xid, *seq)
+}
+
+// Before returns the position just before the first row of table in scope
+// received at or after from, in the order a stream reads them; ok is false
+// when there is none. A row's sequence number is its own, so the position
+// one before it names no other row, and a read past it starts at the row.
+func Before(ctx context.Context, db pgxtx.DB, table string, scope Scope, from time.Time) (at events.Cursor, ok bool, err error) {
+	where, scoped := scope.Where("", 2)
+	if where != "" {
+		where = " AND " + where
+	}
+	var xid string
+	var seq int64
+	err = db.QueryRow(ctx, `SELECT xid::text AS xid_text, seq FROM `+pgx.Identifier{table}.Sanitize()+`
+		WHERE received_at >= $1`+where+` ORDER BY xid, seq LIMIT 1`, append([]any{from}, scoped...)...).Scan(&xid, &seq)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return events.Cursor{}, false, nil
+	}
+	if err != nil {
+		return events.Cursor{}, false, fmt.Errorf("finding the first row of %s received at %s: %w", table, from.Format(time.RFC3339), err)
+	}
+	if at, err = cursorOf(xid, seq-1); err != nil {
+		return events.Cursor{}, false, err
+	}
+	return at, true, nil
+}
+
 // ExposuresReadThrough reports whether the exposures stream has read every
 // exposure received at or before at: the oldest one it has not read, when any,
 // was received after.

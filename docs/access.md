@@ -30,6 +30,7 @@ Every operation of the management API declares the one thing it needs in the Ope
 | `webhook.manage` | creating, reading, editing, enabling and deleting a project's webhook subscriptions, rotating their secrets, testing them, reading and redelivering their deliveries, and sending the stale-flag digest now | `project:admin` | |
 | `sink.manage` | creating, reading, editing and deleting a project's sinks, and rotating a webhook sink's secret; reading needs it too, since a sink's configuration names internal hosts, buckets and URLs that may carry tokens | `project:admin` | |
 | `project.delete` | deleting a project with everything in it, from a signed-in session only | `project:admin` | ✓ |
+| `project.import` | merging a project document into a project, in every environment whether it is protected or not | `project:admin` | ✓ |
 
 A permission marked members only changes who has access to a project or whose review a change needs, so no project token exercises it, whatever its role (see [Project tokens](#project-tokens)): a pipeline cannot unprotect an environment, write it and protect it again, nor approve the change it proposed. A project token whose role holds `change_request.approve` is refused deciding a change request with `403 token_cannot_approve`, which says why more plainly than the permission it lacks.
 
@@ -78,6 +79,7 @@ A role is a fixed list of permissions. The four built-in roles are the same on e
 | `webhook.manage` | | | ✓ | ✓ |
 | `sink.manage` | | | ✓ | ✓ |
 | `project.delete` | | | | ✓ |
+| `project.import` | | | | ✓ |
 
 `GET /roles` lists every role with its permissions, so a client can explain which roles hold a permission a caller lacks. Later releases add permissions as features arrive and write them into the built-in roles.
 
@@ -116,7 +118,7 @@ A personal access token (`fn_pat_…`) acts for the member who created it, with 
 
 ### Project tokens
 
-A project token (`fn_prj_…`) belongs to a project rather than to a person, for a pipeline. An owner creates it holding one built-in role in the project, fixed for its life (`/projects/{project}/tokens`). Its permissions are its role's narrowed by its scopes, minus `grant.manage`, `project_token.manage`, `environment.protect`, `change_request.approve` and `project.delete`: whatever its role, a project token never changes who has access to the project, which environments are protected, nor decides a change request, and never deletes the project. It reaches its own project and `GET /me` alone (`403 forbidden` anywhere else, the project list included), never carries `instance:admin`, and keeps working when the member who created it leaves. The console's project tokens screen, shown to an owner, lists them with their role, scopes, expiry, creator and last use, creates one showing its value once, and revokes one.
+A project token (`fn_prj_…`) belongs to a project rather than to a person, for a pipeline. An owner creates it holding one built-in role in the project, fixed for its life (`/projects/{project}/tokens`). Its permissions are its role's narrowed by its scopes, minus `grant.manage`, `project_token.manage`, `environment.protect`, `change_request.approve`, `project.delete` and `project.import`: whatever its role, a project token never changes who has access to the project, which environments are protected, nor decides a change request, never deletes the project, and never imports a document, which writes protected environments without a review. It reaches its own project and `GET /me` alone (`403 forbidden` anywhere else, the project list included), never carries `instance:admin`, and keeps working when the member who created it leaves. The console's project tokens screen, shown to an owner, lists them with their role, scopes, expiry, creator and last use, creates one showing its value once, and revokes one.
 
 ### Only a session creates a credential
 

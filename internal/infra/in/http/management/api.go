@@ -198,6 +198,9 @@ type Handlers struct {
 	UpdateSink       *appsinks.Update
 	DeleteSink       *appsinks.Delete
 	RotateSinkSecret *appsinks.RotateSecret
+	EnableSink       *appsinks.Enable
+	TestSinkConfig   *appsinks.TestConfig
+	TestSink         *appsinks.Test
 
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment
@@ -211,8 +214,9 @@ type Handlers struct {
 	ExportAuditEntries *appgovernance.ExportAuditEntries
 	StreamChanges      *appgovernance.StreamChanges
 
-	ExportProject    *apptransfer.ExportProject
-	ImportNewProject *apptransfer.ImportNewProject
+	ExportProject     *apptransfer.ExportProject
+	ImportNewProject  *apptransfer.ImportNewProject
+	ImportIntoProject *apptransfer.ImportIntoProject
 }
 
 // api serves every operation of the document.

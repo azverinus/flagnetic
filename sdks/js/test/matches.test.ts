@@ -65,6 +65,7 @@ describe("RE2 semantics", () => {
     ["\\pL", "\u044f", true],
     ["\\p{Greek}", "\u03a3", true],
     ["\\p{greek}", "\u03a3", true], // names match in canonical form
+    ["\\p{Old_Italic}", "\u{10300}", true], // a script named in several words
     ["\\p{Uppercase_Letter}", "A", true], // category aliases
     ["\\p{Lu}", "a", false],
     ["(?i)\\p{Lu}", "a", true], // closed under folding
@@ -119,7 +120,6 @@ describe("refused patterns are inconsistent_ruleset", () => {
     ["trailing backslash", "a\\"],
     ["hex escape too big", "\\x{110000}"],
     ["unknown Unicode class", "\\p{Nope}"],
-    ["a script name Go cannot reach", "\\p{Old_Italic}"],
     ["empty Unicode class name", "\\p{}"],
     ["unterminated Unicode class", "\\p{Greek"],
   ])("%s: %j", (_, pattern) => {

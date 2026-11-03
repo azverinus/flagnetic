@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"time"
 
+	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/sinks"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -41,6 +42,8 @@ type Store interface {
 	LockProject(ctx context.Context, project workspace.ProjectID) error
 	// EnvironmentKeys returns the keys of project's environments.
 	EnvironmentKeys(ctx context.Context, project workspace.ProjectID) ([]string, error)
+	// ProjectKey returns the key of project.
+	ProjectKey(ctx context.Context, project workspace.ProjectID) (string, error)
 	// Sinks returns project's sinks, the oldest first.
 	Sinks(ctx context.Context, project workspace.ProjectID) ([]sinks.Sink, error)
 	// Sink returns project's sink with sink, or ErrNotFound.
@@ -55,6 +58,12 @@ type Store interface {
 	// RotateSecret stores s's secrets and version, read under the project's
 	// lock.
 	RotateSecret(ctx context.Context, s sinks.Sink) error
+	// CreateStream starts the stream of kind of sink at the position at.
+	CreateStream(ctx context.Context, sink sinks.ID, kind sinks.EventKind, at events.Cursor, now time.Time) error
+	// DeleteStream drops the stream of kind of sink with its position.
+	DeleteStream(ctx context.Context, sink sinks.ID, kind sinks.EventKind) error
+	// SaveWarnings stores what the last check of sink's target found wrong.
+	SaveWarnings(ctx context.Context, sink sinks.ID, warnings []string) error
 }
 
 // Resolver resolves a target's host name to its addresses.
@@ -77,11 +86,23 @@ type Deps struct {
 	Random   io.Reader
 	Sealer   Sealer
 	Resolver Resolver
-	// Targets is what the operator allows a webhook sink's target to be.
-	Targets governance.TargetPolicy
+	// TargetPolicy is what the operator allows a webhook sink's target to be.
+	TargetPolicy governance.TargetPolicy
 	// SecretOverlap is how long a rotated webhook secret signs beside the
 	// new one.
 	SecretOverlap time.Duration
+	// Rows, Targets and Opener serve enabling and testing a sink: the
+	// positions its streams start at, the target it is checked against, and
+	// its secrets.
+	Rows    Rows
+	Targets Targets
+	Opener  Opener
+	// LagWarning is how old the oldest undelivered row may be before a sink
+	// is lagging.
+	LagWarning time.Duration
+	// Retention is how long raw events are kept, which a sink cannot start
+	// further back than.
+	Retention time.Duration
 }
 
 // resolveTimeout bounds how long a write waits for a target's name to
@@ -130,7 +151,7 @@ func (d Deps) check(ctx context.Context, project workspace.ProjectID, draft sink
 	if err != nil {
 		return draft, err
 	}
-	return sinks.Check(draft, append(environments, kept...), d.Targets)
+	return sinks.Check(draft, append(environments, kept...), d.TargetPolicy)
 }
 
 // keptEnvironments returns the environments of s that change leaves as they
@@ -155,12 +176,12 @@ func (d Deps) checkTarget(ctx context.Context, kind sinks.Kind, config sinks.Con
 		return nil
 	}
 	webhook := kind == sinks.KindWebhook
-	if webhook && d.Targets.AllowPrivateNetworks {
+	if webhook && d.TargetPolicy.AllowPrivateNetworks {
 		return nil
 	}
 	check := func(addrs []netip.Addr) error {
 		if webhook {
-			return webhookAddresses(addrs, d.Targets)
+			return webhookAddresses(addrs, d.TargetPolicy)
 		}
 		return sinks.CheckNotLinkLocal(addrs, sinks.TargetPointer(kind))
 	}
@@ -260,6 +281,18 @@ func (d Deps) record(ctx context.Context, now time.Time, req governance.Request,
 		r.After = values(*after)
 	}
 	entry, err := governance.NewEntry(id.New[governance.Entry](d.IDs), now, req, r)
+	if err != nil {
+		return err
+	}
+	return d.Audit.Record(ctx, entry)
+}
+
+// recordDoc writes the audit entry of action on s, whose entry holds after as
+// it is: for an action that changes no sink, such as a test.
+func (d Deps) recordDoc(ctx context.Context, now time.Time, req governance.Request, action string, s sinks.Sink, after map[string]any) error {
+	entry, err := governance.NewEntry(id.New[governance.Entry](d.IDs), now, req, governance.Record{
+		Project: s.Project, Action: action, Entity: governance.Entity{Kind: "sink", ID: s.ID.String(), Key: s.Name}, After: after,
+	})
 	if err != nil {
 		return err
 	}

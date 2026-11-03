@@ -154,6 +154,9 @@ import type {
   EnableInstanceWebhookData,
   EnableInstanceWebhookErrors,
   EnableInstanceWebhookResponses,
+  EnableSinkData,
+  EnableSinkErrors,
+  EnableSinkResponses,
   EnableWebhookData,
   EnableWebhookErrors,
   EnableWebhookResponses,
@@ -262,6 +265,9 @@ import type {
   ImportNewProjectData,
   ImportNewProjectErrors,
   ImportNewProjectResponses,
+  ImportProjectData,
+  ImportProjectErrors,
+  ImportProjectResponses,
   InviteMemberData,
   InviteMemberErrors,
   InviteMemberResponses,
@@ -473,6 +479,12 @@ import type {
   TestInstanceWebhookData,
   TestInstanceWebhookErrors,
   TestInstanceWebhookResponses,
+  TestSinkConfigData,
+  TestSinkConfigErrors,
+  TestSinkConfigResponses,
+  TestSinkData,
+  TestSinkErrors,
+  TestSinkResponses,
   TestWebhookData,
   TestWebhookErrors,
   TestWebhookResponses,
@@ -1174,6 +1186,78 @@ export const exportProject = <ThrowOnError extends boolean = false>(
     ],
     url: "/projects/{project}/export",
     ...options,
+  });
+
+/**
+ * Merge a project document into a project
+ *
+ * Merges the document into the project: every environment, unit type,
+ * attribute, segment and flag it names is created, or updated when it
+ * differs from what the project has, by key, and everything else is left
+ * as it is. A section the document lacks is left untouched, so a partial
+ * document is applied as it is. The document is sent as
+ * `application/json` or `application/yaml`, as
+ * `GET /projects/{project}/export` writes it.
+ *
+ * The project's key never changes; its name and description are written
+ * when the document has a `project`. A flag the document names is
+ * written whole, with the configurations the document gives it; the
+ * configuration in an environment the document does not give is left as
+ * it is. The configurations keep the rule identifiers and rollout salts
+ * the document names, so every unit stays in its bucket; a rule or a
+ * rollout without one is given one, unless it equals a rule of the
+ * project's configuration, which it then is. A new environment gives
+ * every flag its initial configuration unless the document configures
+ * it.
+ *
+ * An existing environment keeps whether it is protected: a document that
+ * differs is answered with the warning `protection_kept`. New
+ * environments take the document's value. An owner the document names by
+ * email owns a flag when they may own in the project; otherwise a new
+ * flag is owned by the importing member and an existing one keeps its
+ * owner, with the warning `owner_replaced`. An override keeps its author
+ * when the document leaves it as it was and is the importer's otherwise.
+ * Protection is bypassed in every environment, and only the owner of a
+ * project, never a project token, may import.
+ *
+ * Experiments cannot be imported yet: a document that has any is refused
+ * whole, `unsupported` at each. The import applies whole or not at all;
+ * a document that breaks a rule is 422 `invalid_document` with every fault
+ * found in `errors`, each pointing into the document.
+ *
+ * With `dry_run` the whole import runs, every check the database makes
+ * included, and is rolled back: same answer, nothing written. Every
+ * answer to a dry run carries an `ETag`, the identifier of the project's
+ * latest audit entry, which an import can send as `If-Match` to be
+ * refused when the project has moved since.
+ *
+ * Every entity that differs is written through the context that owns it
+ * and recorded as a direct write records it, then one `project.imported`
+ * entry, all with the request's identifier; an import that changes
+ * nothing writes nothing, records nothing and answers empty changes.
+ * Each environment whose ruleset changed moves on once. A body is
+ * accepted up to 32 MiB.
+ *
+ */
+export const importProject = <ThrowOnError extends boolean = false>(
+  options: Options<ImportProjectData, ThrowOnError>,
+): RequestResult<ImportProjectResponses, ImportProjectErrors, ThrowOnError> =>
+  (options.client ?? client).post<ImportProjectResponses, ImportProjectErrors, ThrowOnError>({
+    bodySerializer: null,
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/import",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**
@@ -5230,6 +5314,39 @@ export const createSink = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Test a sink's configuration before saving it
+ *
+ * Checks a configuration as creating a sink would, then calls its target
+ * and answers whether it works, why not, and what is wrong with it that
+ * does not stop delivery. Nothing is stored, created at the target or
+ * audited: a ClickHouse test never creates tables, and says so in its
+ * warnings. A webhook sink is called with a signature made from a
+ * secret drawn for the test and thrown away. The target's own words are
+ * never answered, only the failure's class, status and code. Saving a
+ * sink is never blocked by its test.
+ *
+ */
+export const testSinkConfig = <ThrowOnError extends boolean = false>(
+  options: Options<TestSinkConfigData, ThrowOnError>,
+): RequestResult<TestSinkConfigResponses, TestSinkConfigErrors, ThrowOnError> =>
+  (options.client ?? client).post<TestSinkConfigResponses, TestSinkConfigErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/test",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
  * Delete a sink
  *
  * The sink goes, and nothing more is sent to its target.
@@ -5298,6 +5415,77 @@ export const updateSink = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/sinks/{sink}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Enable a sink
+ *
+ * Calls the sink's target first and refuses with `sink_not_ready`, naming
+ * the failure by `class`, `status` and `code`, when it does not answer
+ * or cannot take a batch; a ClickHouse sink with `create_tables` also
+ * creates its tables. Then every event kind the sink exports gets a
+ * stream that starts at the horizon: what the project receives from now
+ * on. `start_from`, a time still within retention (`out_of_retention`
+ * otherwise), starts the streams this call creates at the first event
+ * received at or after it, which backfills them; a stream the sink
+ * already has keeps its place, so enabling a sink again continues where
+ * it stopped. A sink that is already enabled is answered as it is, with
+ * nothing probed or recorded. Enabling a stopped sink leaves it stopped
+ * until it is resumed. It takes no `If-Match`.
+ *
+ */
+export const enableSink = <ThrowOnError extends boolean = false>(
+  options: Options<EnableSinkData, ThrowOnError>,
+): RequestResult<EnableSinkResponses, EnableSinkErrors, ThrowOnError> =>
+  (options.client ?? client).post<EnableSinkResponses, EnableSinkErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/enable",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Test a saved sink
+ *
+ * Calls the target of the stored sink, or, when the body carries a
+ * sub-object of the sink's kind, of the sink with that configuration, in
+ * which `***` or no secret takes the stored one: a change is checked
+ * against the credentials already held. Answers whether it works, why
+ * not by class, status and code, and what is wrong that does not stop
+ * delivery. Testing the stored configuration also creates a ClickHouse
+ * sink's tables when it has `create_tables`, and stores what it found as
+ * the sink's `warnings`. Audited as `sink.tested`. The target's own words
+ * are never answered.
+ *
+ */
+export const testSink = <ThrowOnError extends boolean = false>(
+  options: Options<TestSinkData, ThrowOnError>,
+): RequestResult<TestSinkResponses, TestSinkErrors, ThrowOnError> =>
+  (options.client ?? client).post<TestSinkResponses, TestSinkErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/test",
     ...options,
     headers: {
       "Content-Type": "application/json",
