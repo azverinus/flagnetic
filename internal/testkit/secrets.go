@@ -90,6 +90,7 @@ func FindSecretsInAudit(ctx context.Context, pool *pgxpool.Pool, secrets []strin
 		return nil
 	}
 	log := pggovernance.NewAuditLog(pool)
+	needles := withEscapedForms(secrets)
 	var (
 		leaks []string
 		after governance.EntryID
@@ -103,7 +104,7 @@ func FindSecretsInAudit(ctx context.Context, pool *pgxpool.Pool, secrets []strin
 			return fmt.Errorf("reading the audit log: %w", err)
 		}
 		for _, e := range page {
-			if field := fieldHolding(e, secrets); field != "" {
+			if field := fieldHolding(e, needles); field != "" {
 				leaks = append(leaks, fmt.Sprintf("entry %s (%s) holds a secret value in %s", e.ID, e.Action, field))
 			}
 		}
@@ -118,18 +119,36 @@ func FindSecretsInAudit(ctx context.Context, pool *pgxpool.Pool, secrets []strin
 	return nil
 }
 
+// withEscapedForms returns secrets and each one as it reads inside a JSON
+// string, computed once: a package's tests record thousands of secrets and
+// leave as many entries, so escaping per entry and field made the sweep too
+// slow for the time the package allows it under the race detector.
+func withEscapedForms(secrets []string) []string {
+	out := make([]string, 0, 2*len(secrets))
+	for _, s := range secrets {
+		out = append(out, s)
+		if esc := escaped(s); esc != s {
+			out = append(out, esc)
+		}
+	}
+	return out
+}
+
 // fieldHolding returns the name of the first field of e holding one of
-// secrets, or "" when none does. Before and after are searched as the JSON
-// they are, for the secret itself and in its escaped form.
-func fieldHolding(e governance.Entry, secrets []string) string {
+// needles, or "" when none does. Before and after are searched as the JSON
+// they are, so needles holds each secret itself and in its escaped form.
+func fieldHolding(e governance.Entry, needles []string) string {
 	fields := []struct{ name, value string }{
 		{"actor id", e.Actor.ID}, {"actor name", e.Actor.Name}, {"actor member", e.Actor.MemberID},
 		{"action", e.Action}, {"entity kind", e.Entity.Kind}, {"entity id", e.Entity.ID}, {"entity key", e.Entity.Key},
 		{"request", e.RequestID}, {"before", rawJSON(e.Before)}, {"after", rawJSON(e.After)},
 	}
 	for _, f := range fields {
-		for _, s := range secrets {
-			if strings.Contains(f.value, s) || strings.Contains(f.value, escaped(s)) {
+		if f.value == "" {
+			continue
+		}
+		for _, n := range needles {
+			if strings.Contains(f.value, n) {
 				return f.name
 			}
 		}
