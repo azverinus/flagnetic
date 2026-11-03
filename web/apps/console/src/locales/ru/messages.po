@@ -5100,6 +5100,10 @@ msgstr "Вход…"
 msgid "Signs until <0/>"
 msgstr "Подписывает до <0/>"
 
+#: src/lib/webhooks.ts
+msgid "Sinks"
+msgstr "Приёмники данных"
+
 #: src/components/app-shell.tsx
 msgid "Skip to content"
 msgstr "Перейти к содержимому"
