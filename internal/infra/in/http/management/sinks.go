@@ -89,6 +89,67 @@ func (a *api) UpdateSink(ctx context.Context, req UpdateSinkRequestObject) (Upda
 	return UpdateSink200JSONResponse{Body: sinkOut(s), Headers: UpdateSink200ResponseHeaders{ETag: etag(s.Version)}}, nil
 }
 
+// EnableSink enables a sink once its target passes the check.
+func (a *api) EnableSink(ctx context.Context, req EnableSinkRequestObject) (EnableSinkResponseObject, error) {
+	cmd := appsinks.EnableCommand{
+		Project: projectID(ctx), Sink: id.FromBytes[sinks.Sink](req.Sink), Request: requestOf(ctx),
+	}
+	if req.Body != nil && req.Body.StartFrom != nil {
+		cmd.StartFrom = req.Body.StartFrom
+	}
+	s, err := a.h.EnableSink.Handle(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	return EnableSink200JSONResponse{Body: sinkOut(s), Headers: EnableSink200ResponseHeaders{ETag: etag(s.Version)}}, nil
+}
+
+// TestSinkConfig tests a configuration that is not saved.
+func (a *api) TestSinkConfig(ctx context.Context, req TestSinkConfigRequestObject) (TestSinkConfigResponseObject, error) {
+	b := *req.Body
+	draft := sinks.Draft{Input: sinks.Input{
+		Name: b.Name, Kind: sinks.Kind(b.Kind), EventKinds: eventKindsIn(b.EventKinds),
+		Environments: valueOr(b.Environments, nil), BatchSize: explicit(b.BatchSize),
+		FlushInterval: flushOf(explicit(b.FlushInterval)),
+	}}
+	config, secret := configIn(b.Clickhouse, b.ObjectStorage, b.Webhook)
+	if config != nil {
+		draft.Config = *config
+	}
+	if draft.Kind == sinks.KindClickHouse || draft.Kind == sinks.KindObjectStorage {
+		draft.Secret = secret
+	}
+	result, err := a.h.TestSinkConfig.Handle(ctx, appsinks.TestConfigCommand{Project: projectID(ctx), Draft: draft})
+	if err != nil {
+		return nil, err
+	}
+	return TestSinkConfig200JSONResponse(testResultOut(result)), nil
+}
+
+// TestSink tests a saved sink, or an edit of its configuration.
+func (a *api) TestSink(ctx context.Context, req TestSinkRequestObject) (TestSinkResponseObject, error) {
+	cmd := appsinks.TestCommand{Project: projectID(ctx), Sink: id.FromBytes[sinks.Sink](req.Sink), Request: requestOf(ctx)}
+	if b := req.Body; b != nil {
+		cmd.Config, cmd.Secret = configIn(b.Clickhouse, b.ObjectStorage, b.Webhook)
+	}
+	result, err := a.h.TestSink.Handle(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	return TestSink200JSONResponse(testResultOut(result)), nil
+}
+
+// testResultOut answers what a test found.
+func testResultOut(t appsinks.Tested) SinkTestResult {
+	out := SinkTestResult{Ok: t.OK, Warnings: nonNilStrings(t.Warnings)}
+	if t.Failure != nil {
+		r := t.Failure.Report()
+		class := SinkFailureClass(r.Class)
+		out.Class, out.Status, out.Code = &class, r.Status, r.Code
+	}
+	return out
+}
+
 // DeleteSink deletes a sink.
 func (a *api) DeleteSink(ctx context.Context, req DeleteSinkRequestObject) (DeleteSinkResponseObject, error) {
 	expected, err := ifMatch(req.Params.IfMatch)
@@ -227,9 +288,20 @@ func sinkOut(s sinks.Sink) Sink {
 		Id: openapi_types.UUID(s.ID.Bytes()), Name: s.Name, Kind: SinkKind(s.Kind),
 		EventKinds: make([]SinkEventKind, len(s.EventKinds)), Environments: nonNilStrings(s.Environments),
 		BatchSize: s.BatchSize, FlushInterval: int(s.FlushInterval / time.Second), Enabled: s.Enabled,
-		Health: SinkHealth(s.Health()), AtRisk: s.AtRiskSince != nil, StoppedAt: s.StoppedAt,
-		Warnings: nonNilStrings(s.Warnings), Streams: []SinkStream{}, CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt,
-		Version: s.Version,
+		Health: SinkHealth(s.Status), AtRisk: s.AtRiskSince != nil, StoppedAt: s.StoppedAt,
+		DeadLetters: s.DeadLetters, Gaps: s.Gaps, Warnings: nonNilStrings(s.Warnings), Streams: make([]SinkStream, len(s.Streams)),
+		CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt, Version: s.Version,
+	}
+	if s.Lag != nil {
+		seconds := int64(s.Lag.Seconds())
+		out.LagSeconds = &seconds
+	}
+	for i, st := range s.Streams {
+		out.Streams[i] = SinkStream{EventKind: SinkEventKind(st.EventKind), LastDeliveredAt: st.LastDeliveredAt}
+		if f := st.LastFailure; f != nil {
+			r := f.Report()
+			out.Streams[i].LastFailure = &SinkFailure{Class: SinkFailureClass(r.Class), Status: r.Status, Code: r.Code, At: f.At}
+		}
 	}
 	for i, k := range s.EventKinds {
 		out.EventKinds[i] = SinkEventKind(k)

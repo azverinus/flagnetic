@@ -25,6 +25,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgdelivery "github.com/azverinus/flagnetic/internal/infra/out/postgres/delivery"
 	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
+	pgsinks "github.com/azverinus/flagnetic/internal/infra/out/postgres/sinks"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
@@ -45,7 +46,14 @@ type Server struct {
 	background func()
 	pool       *pgxpool.Pool
 	hold       *pgevents.IngestHold
+	sinkFault  *pgsinks.Fault
 }
+
+// LoseNextSinkCommit makes the next batch a sink's target acknowledges go
+// unrecorded, as a replica dying between the acknowledgement and the commit of
+// the stream's cursor would: the stream sends the same batch again, under the
+// same delivery ID, once its lease has run out.
+func (s *Server) LoseNextSinkCommit() { s.sinkFault.LoseNextCommit() }
 
 // CloseBackground ends the work the replica's use cases started on their
 // own, such as ruleset loads nobody waits for, as stopping the replica
@@ -306,14 +314,17 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		c = clock.System{}
 	}
 	hold := pgevents.NewIngestHold()
+	sinkFault := &pgsinks.Fault{}
 	background := compose.Management(h, compose.NewDeps(o.pool, c), reg, compose.Options{
 		Keyring: secret.NewKeyring(secret.New(SecretKey)), PasswordHashConcurrency: defaultHashConcurrency, Options: o.web,
-		RulesetLoadFault: o.fault, IngestHold: hold, RateLimits: limits,
+		RulesetLoadFault: o.fault, IngestHold: hold, SinkFault: sinkFault, RateLimits: limits,
 		EventsRetention:       time.Duration(cfg.EventsRetentionDays) * 24 * time.Hour,
 		EventsPartitionsAhead: cfg.EventsPartitionsAhead,
 		SDKInventoryRetention: time.Duration(cfg.SDKInventoryRetentionDays) * 24 * time.Hour,
 		WebhookTargets:        o.targets,
 		WebhookTick:           cfg.WebhookTick,
+		SinkTick:              cfg.SinkTick,
+		SinkLagWarning:        cfg.SinkLagWarning,
 		WebhookSecretOverlap:  cfg.WebhookSecretOverlap,
 		AuditExportMaxEntries: cmp.Or(o.auditExportMax, cfg.AuditExportMaxEntries),
 		Schedule: compose.Schedule{
@@ -349,7 +360,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	}
 	return &Server{
 		URL: srv.URL, Logs: logs, edge: h, metrics: metrics.Handler(reg), runner: runner, listeners: listeners,
-		background: background.Close, pool: o.pool, hold: hold,
+		background: background.Close, pool: o.pool, hold: hold, sinkFault: sinkFault,
 	}
 }
 

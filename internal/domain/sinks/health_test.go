@@ -18,8 +18,63 @@ func TestASinkIsDisabledBeforeItIsAnythingElse(t *testing.T) {
 		"an enabled sink":                  {sinks.Sink{Input: sinks.Input{Enabled: true}}, sinks.HealthHealthy},
 		"a stopped sink":                   {sinks.Sink{Input: sinks.Input{Enabled: true}, StoppedAt: &stopped}, sinks.HealthStopped},
 	} {
-		if got := tc.sink.Health(); got != tc.want {
+		if got := tc.sink.Health(15 * time.Minute); got != tc.want {
 			t.Errorf("%s: health = %s, want %s", name, got, tc.want)
 		}
+	}
+}
+
+func TestAnEnabledSinkIsJudgedFromItsStreamsDeadLettersAndLag(t *testing.T) {
+	over, under := 16*time.Minute, 14*time.Minute
+	enabled := func(change func(*sinks.Sink)) sinks.Sink {
+		s := sinks.Sink{Input: sinks.Input{Enabled: true}}
+		change(&s)
+		return s
+	}
+	failing := []sinks.Stream{{EventKind: sinks.EventExposure}, {EventKind: sinks.EventAlias, ConsecutiveFailures: 1}}
+	for name, tc := range map[string]struct {
+		sink sinks.Sink
+		want sinks.Health
+	}{
+		"a stream failing": {enabled(func(s *sinks.Sink) { s.Streams = failing }), sinks.HealthFailing},
+		"failing before degraded and lagging": {
+			enabled(func(s *sinks.Sink) { s.Streams, s.DeadLetters, s.Lag = failing, 1, &over }), sinks.HealthFailing,
+		},
+		"a dead letter waiting":       {enabled(func(s *sinks.Sink) { s.DeadLetters, s.Lag = 1, &over }), sinks.HealthDegraded},
+		"lag over the warning":        {enabled(func(s *sinks.Sink) { s.Lag = &over }), sinks.HealthLagging},
+		"lag under the warning":       {enabled(func(s *sinks.Sink) { s.Lag = &under }), sinks.HealthHealthy},
+		"lag at the warning":          {enabled(func(s *sinks.Sink) { s.Lag = ptr(15 * time.Minute) }), sinks.HealthHealthy},
+		"a disabled sink that failed": {sinks.Sink{Streams: failing}, sinks.HealthDisabled},
+		"streams that all delivered":  {enabled(func(s *sinks.Sink) { s.Streams = failing[:1] }), sinks.HealthHealthy},
+	} {
+		if got := tc.sink.Health(15 * time.Minute); got != tc.want {
+			t.Errorf("%s: health = %s, want %s", name, got, tc.want)
+		}
+	}
+}
+
+func ptr[T any](v T) *T { return &v }
+
+func TestBackoffDoublesFromASecondToFiveMinutesWithinItsSpread(t *testing.T) {
+	for failures, want := range map[int]time.Duration{
+		1: time.Second, 2: 2 * time.Second, 3: 4 * time.Second, 5: 16 * time.Second, 9: 256 * time.Second,
+		10: 5 * time.Minute, 11: 5 * time.Minute, 500: 5 * time.Minute,
+	} {
+		for name, tc := range map[string]struct {
+			random float64
+			factor float64
+		}{"lowest": {0, 0.8}, "middle": {0.5, 1}, "highest": {0.999999, 1.2}} {
+			got := sinks.Backoff(failures, func() float64 { return tc.random })
+			low, high := time.Duration(float64(want)*tc.factor*0.999), time.Duration(float64(want)*tc.factor*1.001)
+			if high > 5*time.Minute {
+				low, high = min(low, 5*time.Minute), 5*time.Minute
+			}
+			if got < low || got > high {
+				t.Errorf("failures %d, %s jitter: backoff = %s, want %s to %s", failures, name, got, low, high)
+			}
+		}
+	}
+	if got := sinks.Backoff(0, func() float64 { return 0.5 }); got != time.Second {
+		t.Errorf("backoff before any failure = %s, want the first second", got)
 	}
 }

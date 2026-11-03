@@ -230,3 +230,59 @@ func TestRowIDsListsTheIDsInOrder(t *testing.T) {
 		t.Errorf("RowIDs = %v, want x,y,z", got)
 	}
 }
+
+func TestAWebhookBodyIsTheEnvelopeAroundTheRowsAsTheSchemaLaysThemOut(t *testing.T) {
+	sink := id.MustParse[sinks.Sink]("0195f6b0-0000-7000-8000-0000000000aa")
+	rows := []sinks.Row{sinks.ExposureRow{EventID: "e-1", ProjectKey: "shop", UnitID: "<b>&", ReceivedAt: time.UnixMilli(1000)}}
+
+	body, err := sinks.WebhookBody(sink, "shop", "dlv_abc", "exposure", false, rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		SchemaVersion int              `json:"schema_version"`
+		SinkID        string           `json:"sink_id"`
+		ProjectKey    string           `json:"project_key"`
+		DeliveryID    string           `json:"delivery_id"`
+		EventKind     string           `json:"event_kind"`
+		Sample        bool             `json:"sample"`
+		Events        []map[string]any `json:"events"`
+	}
+	if err = json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("%v: %s", err, body)
+	}
+	if got.SchemaVersion != 1 || got.SinkID != sink.String() || got.ProjectKey != "shop" || got.DeliveryID != "dlv_abc" ||
+		got.EventKind != "exposure" || got.Sample || len(got.Events) != 1 || got.Events[0]["event_id"] != "e-1" ||
+		got.Events[0]["received_at"] != float64(1000) {
+		t.Errorf("envelope %+v, want the sink, delivery and rows as given", got)
+	}
+	if !strings.Contains(string(body), `"unit_id":"<b>&"`) {
+		t.Errorf("body %s, want the unit as it was sent, not HTML-escaped", body)
+	}
+	if strings.HasSuffix(string(body), "\n") {
+		t.Error("the body ends in a newline: what is signed is the bytes sent")
+	}
+
+	empty, err := sinks.WebhookBody(sink, "shop", "test_x", "test", false, nil)
+	if err != nil || !strings.Contains(string(empty), `"events":[]`) {
+		t.Errorf("a call with no events = %s, %v, want an empty array, never null", empty, err)
+	}
+}
+
+func TestASinkCannotStartBeforeTheEdgeOfRetention(t *testing.T) {
+	now, retention := time.Date(2026, 11, 3, 10, 0, 0, 0, time.UTC), 30*24*time.Hour
+	for name, tc := range map[string]struct {
+		from time.Time
+		out  bool
+	}{
+		"now":             {now, false},
+		"the edge itself": {now.Add(-retention), false},
+		"just before":     {now.Add(-retention - time.Nanosecond), true},
+		"long before":     {now.Add(-400 * 24 * time.Hour), true},
+		"the future":      {now.Add(time.Hour), false},
+	} {
+		if got := sinks.OutOfRetention(tc.from, now, retention); got != tc.out {
+			t.Errorf("%s: out of retention = %v, want %v", name, got, tc.out)
+		}
+	}
+}

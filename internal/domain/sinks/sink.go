@@ -111,6 +111,23 @@ type Sink struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	Version   int64
+
+	// What follows is read with the sink and never stored on it.
+
+	// Streams are its streams, one per event kind it exports, in the order
+	// the API lists them; none before it is first enabled.
+	Streams []Stream
+	// DeadLetters is how many dead letters wait to be redelivered or
+	// discarded.
+	DeadLetters int
+	// Gaps is how many gaps have not been dismissed.
+	Gaps int
+	// Lag is the age of the oldest row a stream has not delivered; nil while
+	// the sink is disabled.
+	Lag *time.Duration
+	// Status is how the sink stands, judged from the above by the use case
+	// that read it, with the operator's tolerance of lag.
+	Status Health
 }
 
 // Input is what a member chooses of a sink.

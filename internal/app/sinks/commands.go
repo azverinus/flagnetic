@@ -90,7 +90,7 @@ func (h *Create) create(ctx context.Context, cmd CreateCommand, draft sinks.Draf
 	if err = h.d.record(ctx, now, cmd.Request, "sink.created", nil, &s); err != nil {
 		return s, err
 	}
-	return sinkOf(ctx, h.d.Store, cmd.Project, s.ID)
+	return h.d.read(ctx, cmd.Project, s.ID)
 }
 
 // UpdateCommand is an edit of the sink Sink of Project, based on its version
@@ -113,8 +113,9 @@ type Update struct{ d Deps }
 func NewUpdate(d Deps) *Update { return &Update{d: d} }
 
 // Handle applies the change, which replaces a configuration whole, checking
-// a new target as creation does, and records sink.updated; an edit that
-// changes nothing stores and records nothing.
+// a new target as creation does, and records sink.updated, and sink.disabled
+// when it disables the sink; an edit that changes nothing stores and records
+// nothing.
 func (h *Update) Handle(ctx context.Context, cmd UpdateCommand) (sinks.Sink, error) {
 	seen, err := sinkOf(ctx, h.d.Store, cmd.Project, cmd.Sink)
 	if err != nil {
@@ -175,7 +176,7 @@ func (h *Update) update(ctx context.Context, cmd UpdateCommand, sealed string, n
 		return before, err
 	}
 	if draft.KeepsSecret && draft.Same(before.Input) {
-		return before, nil
+		return h.d.judged(ctx, before)
 	}
 	after := before
 	after.Input = draft.Input
@@ -186,10 +187,31 @@ func (h *Update) update(ctx context.Context, cmd UpdateCommand, sealed string, n
 	if err = h.d.Store.Update(ctx, after); err != nil {
 		return after, err
 	}
-	if err = h.d.record(ctx, now, cmd.Request, "sink.updated", &before, &after); err != nil {
-		return after, err
+	// An enabled sink's streams follow the event kinds it exports: one added
+	// starts at the horizon, its history being a replay; one removed goes.
+	if after.Enabled {
+		if err = h.d.syncStreams(ctx, before, after.EventKinds, nil, now); err != nil {
+			return after, err
+		}
 	}
-	return sinkOf(ctx, h.d.Store, cmd.Project, cmd.Sink)
+	if changed(before.Input, after.Input) || !draft.KeepsSecret {
+		if err = h.d.record(ctx, now, cmd.Request, "sink.updated", &before, &after); err != nil {
+			return after, err
+		}
+	}
+	if before.Enabled && !after.Enabled {
+		if err = h.d.record(ctx, now, cmd.Request, "sink.disabled", &before, &after); err != nil {
+			return after, err
+		}
+	}
+	return h.d.read(ctx, cmd.Project, cmd.Sink)
+}
+
+// changed reports whether an edit changed anything of a sink but whether it
+// is enabled, which is audited as an action of its own.
+func changed(before, after sinks.Input) bool {
+	before.Enabled, after.Enabled = false, false
+	return !before.Same(after)
 }
 
 // DeleteCommand asks for the sink Sink of Project to go, based on its
@@ -275,7 +297,7 @@ func (h *RotateSecret) Handle(ctx context.Context, cmd RotateCommand) (Created, 
 		if txErr = h.d.record(ctx, now, cmd.Request, "sink.secret_rotated", &before, &after); txErr != nil {
 			return txErr
 		}
-		out.Sink, txErr = sinkOf(ctx, h.d.Store, cmd.Project, cmd.Sink)
+		out.Sink, txErr = h.d.read(ctx, cmd.Project, cmd.Sink)
 		return txErr
 	})
 	return out, err

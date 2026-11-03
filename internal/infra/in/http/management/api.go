@@ -198,6 +198,9 @@ type Handlers struct {
 	UpdateSink       *appsinks.Update
 	DeleteSink       *appsinks.Delete
 	RotateSinkSecret *appsinks.RotateSecret
+	EnableSink       *appsinks.Enable
+	TestSinkConfig   *appsinks.TestConfig
+	TestSink         *appsinks.Test
 
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment

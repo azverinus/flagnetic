@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -22,10 +23,33 @@ import (
 )
 
 // Store is the repository of sinks.
-type Store struct{ pool *pgxpool.Pool }
+type Store struct {
+	pool  *pgxpool.Pool
+	fault *Fault
+}
 
 // NewStore returns the repository on pool.
 func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
+
+// WithFault returns the repository with a fault a test can arm; nil is none,
+// as in production.
+func (s *Store) WithFault(f *Fault) *Store {
+	c := *s
+	c.fault = f
+	return &c
+}
+
+// Fault loses the commit of a stream's cursor, as a replica dying between a
+// target's acknowledgement and the commit would: the target has the batch,
+// the stream does not know, and sends it again under the same delivery ID
+// once the lease runs out.
+type Fault struct{ lose atomic.Bool }
+
+// LoseNextCommit makes the next acknowledged batch go unrecorded.
+func (f *Fault) LoseNextCommit() { f.lose.Store(true) }
+
+// loses reports whether the commit about to be made is the one lost, once.
+func (f *Fault) loses() bool { return f != nil && f.lose.CompareAndSwap(true, false) }
 
 func (s *Store) db(ctx context.Context) pgxtx.DB { return pgxtx.Querier(ctx, s.pool) }
 
@@ -42,6 +66,19 @@ func (s *Store) LockProject(ctx context.Context, project workspace.ProjectID) er
 	}
 	projectrow.MarkHeld(ctx, project)
 	return nil
+}
+
+// ProjectKey returns the key of project.
+func (s *Store) ProjectKey(ctx context.Context, project workspace.ProjectID) (string, error) {
+	var key string
+	err := s.db(ctx).QueryRow(ctx, `SELECT key FROM projects WHERE id = $1`, project.Bytes()).Scan(&key)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", appsinks.ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("reading a project's key: %w", err)
+	}
+	return key, nil
 }
 
 // EnvironmentKeys returns the keys of project's environments.
@@ -203,13 +240,17 @@ func (s *Store) Sinks(ctx context.Context, project workspace.ProjectID) ([]sinks
 	defer rows.Close()
 	out := []sinks.Sink{}
 	for rows.Next() {
-		v, err := scanSink(rows)
-		if err != nil {
-			return nil, fmt.Errorf("reading a sink: %w", err)
+		v, scanErr := scanSink(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("reading a sink: %w", scanErr)
 		}
 		out = append(out, v)
 	}
-	return out, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	return out, s.withStreams(ctx, out)
 }
 
 // Sink returns project's sink with sink, or appsinks.ErrNotFound.
@@ -222,7 +263,11 @@ func (s *Store) Sink(ctx context.Context, project workspace.ProjectID, sink sink
 	if err != nil {
 		return v, fmt.Errorf("reading a sink: %w", err)
 	}
-	return v, nil
+	list := []sinks.Sink{v}
+	if err = s.withStreams(ctx, list); err != nil {
+		return v, err
+	}
+	return list[0], nil
 }
 
 func kindNames(kinds []sinks.EventKind) []string {
@@ -268,8 +313,8 @@ func nonNil(s []string) []string {
 }
 
 // Update stores what an edit changes of v, which its caller read under the
-// project's lock. Its creator and its webhook secret overlap are left to the
-// operations that change them.
+// project's lock, and the warnings of its last check. Its creator and its
+// webhook secret overlap are left to the operations that change them.
 func (s *Store) Update(ctx context.Context, v sinks.Sink) error {
 	config, err := encodeConfig(v.Kind, v.Config)
 	if err != nil {
@@ -278,10 +323,10 @@ func (s *Store) Update(ctx context.Context, v sinks.Sink) error {
 	_, err = s.db(ctx).Exec(ctx, `
 		UPDATE sinks
 		SET name = $3, config = $4, secret_sealed = $5, event_kinds = $6, environments = $7, batch_size = $8,
-		    flush_interval_seconds = $9, enabled = $10, updated_at = $11, version = $12
+		    flush_interval_seconds = $9, enabled = $10, warnings = $11, updated_at = $12, version = $13
 		WHERE project_id = $1 AND id = $2`,
 		v.Project.Bytes(), v.ID.Bytes(), v.Name, config, v.SealedSecret, kindNames(v.EventKinds), nonNil(v.Environments),
-		v.BatchSize, int(v.FlushInterval/time.Second), v.Enabled, v.UpdatedAt, v.Version)
+		v.BatchSize, int(v.FlushInterval/time.Second), v.Enabled, nonNil(v.Warnings), v.UpdatedAt, v.Version)
 	if err != nil {
 		return fmt.Errorf("updating a sink: %w", err)
 	}
