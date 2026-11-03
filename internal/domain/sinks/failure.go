@@ -1,7 +1,6 @@
 package sinks
 
 import (
-	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -89,7 +88,7 @@ func (f Failure) Report() Report {
 // broken rather than unwilling: a request timeout, too many requests, or a
 // server error.
 func TransientStatus(status int) bool {
-	return status == http.StatusRequestTimeout || status == http.StatusTooManyRequests || status >= 500
+	return status == 408 || status == 429 || status >= 500
 }
 
 // failureOfStatus classifies an answer of status carrying code, and whether it

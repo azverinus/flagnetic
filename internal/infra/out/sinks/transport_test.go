@@ -154,7 +154,7 @@ func TestEachKindIsBoundedByItsOwnTimeout(t *testing.T) {
 }
 
 func TestATransportErrorIsReducedToAClassWithoutItsText(t *testing.T) {
-	open, _ := target(t, func(w http.ResponseWriter, r *http.Request) { <-r.Context().Done() })
+	open, _ := target(t, func(_ http.ResponseWriter, r *http.Request) { <-r.Context().Done() })
 	tlsServer := httptest.NewTLSServer(http.HandlerFunc(ok))
 	t.Cleanup(tlsServer.Close)
 	closed, err := net.Listen("tcp", "127.0.0.1:0")
