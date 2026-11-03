@@ -264,9 +264,9 @@ export const zRoleList = z.object({
 });
 
 /**
- * How the member signed in; `local` is with their email and password.
+ * How the member signed in; `local` is with their email and password, `oidc` through an OIDC auth provider, named by `provider`.
  */
-export const zSessionMethod = z.enum(["local"]);
+export const zSessionMethod = z.enum(["local", "oidc"]);
 
 /**
  * One device a member is signed in on.
@@ -274,6 +274,7 @@ export const zSessionMethod = z.enum(["local"]);
 export const zSession = z.object({
   id: z.uuid(),
   method: zSessionMethod,
+  provider: z.string().optional(),
   client_ip: z.string().nullable(),
   user_agent: z.string(),
   created_at: z.iso.datetime(),

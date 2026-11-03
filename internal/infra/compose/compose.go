@@ -35,6 +35,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/in/http/console"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/sso"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/infra/out/mail"
 	"github.com/azverinus/flagnetic/internal/infra/out/oidc"
@@ -335,9 +336,24 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	identityStore := pgidentity.NewStore(d.Pool)
 	authProviders := appidentity.ProviderDeps{
 		Tx: tx, Store: identityStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Sealer: o.Keyring, BaseURL: o.BaseURL,
+		References: []appidentity.ProviderReference{identityStore},
 	}
 	managementOptions := o.Options
 	managementOptions.Clock = d.Clock
+	// Signing in through an auth provider: the identity context decides who
+	// signs in, the access context opens the session.
+	ssoAccess := appaccess.NewSSO(accessStore, settings, audit, d.Clock, d.IDs, rand.Reader, sessionKey)
+	oidcClient := oidc.NewClient()
+	signIn := appidentity.SignInDeps{
+		Tx: tx, Providers: identityStore, Attempts: identityStore, Identities: identityStore, Members: ssoMembers{sso: ssoAccess},
+		OIDC: oidcClient, Opener: o.Keyring, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, BaseURL: o.BaseURL,
+	}
+	sso.Mount(edge, sso.Handlers{
+		Start: appidentity.NewStartSignIn(signIn), Callback: appidentity.NewCompleteCallback(signIn),
+		Complete: appidentity.NewCompleteSignIn(signIn),
+	}, sso.Options{
+		SecureCookies: managementOptions.SecureCookies, SessionCookie: management.SessionCookieHeader, Metrics: sso.NewMetrics(reg),
+	})
 	management.Mount(edge, management.Handlers{
 		ListAuthProviders:        appidentity.NewListProviders(identityStore),
 		ListEnabledAuthProviders: appidentity.NewListEnabledProviders(identityStore),

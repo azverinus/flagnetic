@@ -105,6 +105,19 @@ func (s *Store) Provider(ctx context.Context, slug string) (identity.Provider, e
 	return s.one(ctx, "", slug)
 }
 
+// ProviderByID returns the provider with the identifier, or
+// appidentity.ErrNotFound.
+func (s *Store) ProviderByID(ctx context.Context, provider identity.ProviderID) (identity.Provider, error) {
+	p, err := scanProvider(s.db(ctx).QueryRow(ctx, `SELECT `+providerColumns+` FROM auth_providers WHERE id = $1`, provider.Bytes()))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return p, appidentity.ErrNotFound
+	}
+	if err != nil {
+		return p, fmt.Errorf("reading an auth provider: %w", err)
+	}
+	return p, nil
+}
+
 // LockProvider is Provider, locking the provider's row until the unit of work
 // ends.
 func (s *Store) LockProvider(ctx context.Context, slug string) (identity.Provider, error) {

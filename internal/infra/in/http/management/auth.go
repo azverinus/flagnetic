@@ -88,6 +88,10 @@ func (o Options) secureCookies(scheme, host string) bool {
 	return scheme == "https" || (!o.InsecureCookies && !isLocalhost(host))
 }
 
+// SecureCookies is secureCookies for the single sign-on edge, which sets the
+// session cookie under the same rule as signing in with a password.
+func (o Options) SecureCookies(scheme, host string) bool { return o.secureCookies(scheme, host) }
+
 // console returns the URL the console is reached at, for a request whose
 // scheme and host are these: the base URL when configured, since a proxy in
 // front may rewrite what the request says, and the request's own origin
@@ -116,11 +120,17 @@ func isLocalhost(host string) bool {
 // sessionCookie returns the Set-Cookie value carrying value, or clearing
 // the cookie when value is "".
 func sessionCookie(ctx context.Context, value string) string {
-	// Secure is decided per request: off only on localhost, or when an
-	// operator allowed it for a trial without TLS.
+	return SessionCookieHeader(value, browserOf(ctx).secureCookies)
+}
+
+// SessionCookieHeader returns the Set-Cookie value carrying value as the
+// session cookie, or clearing the cookie when value is "". Secure is decided
+// per request: off only on localhost, or when an operator allowed it for a
+// trial without TLS.
+func SessionCookieHeader(value string, secure bool) string {
 	c := http.Cookie{ //nolint:gosec // see above
 		Name: SessionCookie, Value: value, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode,
-		Secure: browserOf(ctx).secureCookies,
+		Secure: secure,
 	}
 	if value == "" {
 		c.MaxAge = -1

@@ -111,6 +111,10 @@ func sessionList(views []appaccess.SessionView) SessionList {
 			Id: openapi_types.UUID(v.ID.Bytes()), Method: SessionMethod(v.Method), UserAgent: v.UserAgent,
 			CreatedAt: v.CreatedAt, LastSeenAt: v.LastSeenAt, ExpiresAt: v.End, Current: v.Current,
 		}
+		if v.Provider != "" {
+			provider := v.Provider
+			items[i].Provider = &provider
+		}
 		if v.ClientIP.IsValid() {
 			ip := v.ClientIP.String()
 			items[i].ClientIp = &ip

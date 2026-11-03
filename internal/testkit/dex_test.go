@@ -27,7 +27,7 @@ func TestDexServesItsDiscoveryDocumentAndAuthenticatesItsUsersWithTheirGroups(t 
 	// their groups are Dex's.
 	ada := dex.Users[0]
 	form := url.Values{"grant_type": {"password"}, "username": {ada.Email}, "password": {ada.Password},
-		"scope": {"openid email groups"}, "client_id": {dex.ClientID}}
+		"scope": {"openid email groups"}, "client_id": {dex.ClientID}, "client_secret": {dex.ClientSecret}}
 	tok, err := http.Post(dex.Issuer+"/token", "application/x-www-form-urlencoded", strings.NewReader(form.Encode())) //nolint:noctx // a test
 	if err != nil {
 		t.Fatal(err)
