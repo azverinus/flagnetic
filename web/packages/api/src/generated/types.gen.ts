@@ -323,6 +323,39 @@ export type MemberInvite = {
    * Not blank, at most 200 characters.
    */
   display_name: string;
+  grant?: InvitationGrantCreate;
+};
+
+/**
+ * The role in a project the invitation grants once accepted. An
+ * unknown project or a role that is none of the built-in ones is
+ * refused `invalid_grant`.
+ *
+ */
+export type InvitationGrantCreate = {
+  /**
+   * The project's key.
+   */
+  project: string;
+  /**
+   * One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`.
+   */
+  role: string;
+};
+
+export type ProjectInvitationCreate = {
+  /**
+   * One address of the form name@domain, at most 254 characters.
+   */
+  email: string;
+  /**
+   * Not blank, at most 200 characters.
+   */
+  display_name: string;
+  /**
+   * One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`, each a role the caller holds every permission of in the project.
+   */
+  role: string;
 };
 
 /**
@@ -351,6 +384,23 @@ export type Invitation = {
   email: string;
   display_name: string;
   expires_at: string;
+  project?: InvitationProject;
+  /**
+   * The built-in role accepting grants in `project`; absent with it.
+   */
+  role?: string;
+  /**
+   * The display name of the member who issued the invitation; absent when none did.
+   */
+  invited_by?: string;
+};
+
+/**
+ * The project an invitation grants a role in. Absent once the invitation's grant was dropped.
+ */
+export type InvitationProject = {
+  key: string;
+  name: string;
 };
 
 export type InvitationAcceptance = {
@@ -11103,6 +11153,66 @@ export type DeleteGrantResponses = {
 };
 
 export type DeleteGrantResponse = DeleteGrantResponses[keyof DeleteGrantResponses];
+
+export type InviteProjectMemberData = {
+  body: ProjectInvitationCreate;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/invitations";
+};
+
+export type InviteProjectMemberErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type InviteProjectMemberError = InviteProjectMemberErrors[keyof InviteProjectMemberErrors];
+
+export type InviteProjectMemberResponses = {
+  /**
+   * The member invited, with their invitation.
+   */
+  201: MemberInvitation;
+};
+
+export type InviteProjectMemberResponse =
+  InviteProjectMemberResponses[keyof InviteProjectMemberResponses];
 
 export type ListProjectTokensData = {
   body?: never;

@@ -396,6 +396,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		DeactivateMember:  appaccess.NewDeactivateMember(tx, accessStore, audit, d.Clock, d.IDs),
 		ReactivateMember:  appaccess.NewReactivateMember(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
 		InviteMember:      appaccess.NewInviteMember(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
+		InviteToProject:   appaccess.NewInviteToProject(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
 		ReissueInvitation: appaccess.NewReissueInvitation(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
 		GetInvitation:     appaccess.NewGetInvitation(accessStore, d.Clock),
 		AcceptInvitation: appaccess.NewAcceptInvitation(appaccess.AcceptInvitationDeps{

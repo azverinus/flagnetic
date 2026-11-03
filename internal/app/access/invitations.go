@@ -29,16 +29,24 @@ type IssuedInvitation struct {
 	Secret secret.String
 }
 
+// invitationOrigin is who issues an invitation, and the role in a project it
+// grants once accepted, if any.
+type invitationOrigin struct {
+	InvitedBy access.MemberID
+	Grant     *access.InvitationGrant
+}
+
 // issueInvitation consumes every open invitation of member and issues a
-// fresh one, in the unit of work ctx carries: a member has one link at a
-// time, and replacing it kills the old one.
+// fresh one from origin, in the unit of work ctx carries: a member has one
+// link at a time, and replacing it kills the old one.
 func issueInvitation(ctx context.Context, store InvitationStore, ids *id.Source, random io.Reader, member access.MemberID,
-	now time.Time,
+	now time.Time, origin invitationOrigin,
 ) (IssuedInvitation, error) {
 	if _, err := store.ConsumeInvitations(ctx, member, now); err != nil {
 		return IssuedInvitation{}, err
 	}
 	inv, s := access.NewInvitation(id.New[access.Invitation](ids), member, now, random)
+	inv = inv.IssuedBy(origin.InvitedBy, origin.Grant)
 	if err := store.CreateInvitation(ctx, inv); err != nil {
 		return IssuedInvitation{}, err
 	}
@@ -76,18 +84,30 @@ func NewInviteMember(tx Transactor, store InviteStore, audit AuditLog, c clock.C
 
 // InviteMemberCommand names the person to invite.
 type InviteMemberCommand struct {
+	// Caller is the instance admin inviting.
+	Caller      access.Caller
 	Email       string
 	DisplayName string
-	Request     governance.Request
+	// Grant is the role in a project the person is invited with, if any.
+	Grant   *access.InvitationGrant
+	Request governance.Request
 }
 
 // Handle creates an invited member and their invitation, recording
-// member.invited; an email the instance holds is refused already_exists.
+// member.invited; an email the instance holds is refused already_exists. An
+// instance admin may hold every permission in a project, so the invitation
+// may carry any role of it; a role that is none of the built-in ones is
+// refused invalid_grant.
 func (h *InviteMember) Handle(ctx context.Context, cmd InviteMemberCommand) (InvitedMember, error) {
 	now := h.clock.Now()
 	m, err := access.NewInvitedMember(id.New[access.Member](h.ids), cmd.Email, cmd.DisplayName, now)
 	if err != nil {
 		return InvitedMember{}, err
+	}
+	if g := cmd.Grant; g != nil {
+		if _, err = access.NewInvitationGrant(g.Project, g.Role, "/grant/role"); err != nil {
+			return InvitedMember{}, err
+		}
 	}
 	var res InvitedMember
 	err = h.tx.Within(ctx, func(ctx context.Context) error {
@@ -95,7 +115,8 @@ func (h *InviteMember) Handle(ctx context.Context, cmd InviteMemberCommand) (Inv
 			return err
 		}
 		var issued IssuedInvitation
-		if issued, err = issueInvitation(ctx, h.store, h.ids, h.random, m.ID, now); err != nil {
+		origin := invitationOrigin{InvitedBy: creatorOf(cmd.Caller), Grant: cmd.Grant}
+		if issued, err = issueInvitation(ctx, h.store, h.ids, h.random, m.ID, now, origin); err != nil {
 			return err
 		}
 		res.Invitation = &issued
@@ -114,19 +135,31 @@ func (h *InviteMember) Handle(ctx context.Context, cmd InviteMemberCommand) (Inv
 }
 
 // invitationRecord is the audit record of action issuing inv to m, naming
-// when it expires and never its secret.
+// when it expires, who issued it and the role in a project it grants, and
+// never its secret. It belongs to the project the invitation grants in.
 func invitationRecord(action string, m access.Member, inv IssuedInvitation, after map[string]any) governance.Record {
 	if after == nil {
 		after = map[string]any{}
 	}
 	after["invitation_expires_at"] = inv.ExpiresAt.UTC().Format(time.RFC3339)
-	return governance.Record{Action: action, Entity: memberEntity(m), After: after}
+	r := governance.Record{Action: action, Entity: memberEntity(m), After: after}
+	if !inv.InvitedBy.IsZero() {
+		after["invited_by"] = inv.InvitedBy.String()
+	}
+	if g := inv.Grant; g != nil {
+		r.Project, after["role"] = g.Project, g.Role
+	}
+	return r
 }
 
 // ReissueStore is what reissuing an invitation needs.
 type ReissueStore interface {
 	InvitationStore
+	InvitationGrantStore
 	MemberDirectory
+	// MemberByID returns the member with the identifier; ErrNotFound when
+	// none has it.
+	MemberByID(ctx context.Context, member access.MemberID) (access.Member, error)
 	// LockMember returns the member, locked until the unit of work ends,
 	// and whether they hold a password; ErrNotFound when none has the
 	// identifier.
@@ -151,7 +184,10 @@ func NewReissueInvitation(tx Transactor, store ReissueStore, audit AuditLog, c c
 
 // Handle issues the member a fresh invitation, which kills every earlier
 // one, recording member.invitation_reissued. A member who is not invited is
-// refused member_not_invited.
+// refused member_not_invited. The fresh invitation is issued by whoever
+// issued the last one, and keeps its grant only while that member still
+// holds grant.manage in its project: a grant lost since is dropped and
+// recorded as invitation.grant_revoked, so reissuing never widens access.
 func (h *ReissueInvitation) Handle(ctx context.Context, member access.MemberID, req governance.Request) (InvitedMember, error) {
 	var res InvitedMember
 	err := h.tx.Within(ctx, func(ctx context.Context) error {
@@ -166,12 +202,17 @@ func (h *ReissueInvitation) Handle(ctx context.Context, member access.MemberID, 
 			return access.ErrMemberNotInvited
 		}
 		now := h.clock.Now()
-		issued, err := issueInvitation(ctx, h.store, h.ids, h.random, m.ID, now)
+		origin, revoked, err := carriedOrigin(ctx, h.store, m)
+		if err != nil {
+			return err
+		}
+		issued, err := issueInvitation(ctx, h.store, h.ids, h.random, m.ID, now, origin)
 		if err != nil {
 			return err
 		}
 		res.Invitation = &issued
-		if err = recordAll(ctx, h.audit, h.ids, now, req, invitationRecord("member.invitation_reissued", m, issued, nil)); err != nil {
+		if err = recordAll(ctx, h.audit, h.ids, now, req,
+			append(revoked, invitationRecord("member.invitation_reissued", m, issued, nil))...); err != nil {
 			return err
 		}
 		res.Member, err = viewOf(ctx, h.store, m.ID)
@@ -188,6 +229,9 @@ type InvitationReader interface {
 	// InvitationByHash returns the invitation and its member; ErrNotFound
 	// when no invitation has the hash.
 	InvitationByHash(ctx context.Context, hash access.InvitationHash) (access.Invitation, access.Member, error)
+	// InvitationDetails returns what the page of the invitation shows
+	// besides its member; ErrNotFound when none has the identifier.
+	InvitationDetails(ctx context.Context, invitation access.InvitationID) (InvitationDetails, error)
 }
 
 // InvitationView is what the page an invitation opens shows.
@@ -196,6 +240,29 @@ type InvitationView struct {
 	MaskedEmail string
 	DisplayName string
 	ExpiresAt   time.Time
+	// Grant is the role in a project accepting makes the member hold; nil
+	// when the invitation grants nothing, or no longer does.
+	Grant *InvitationGrantView
+	// InvitedBy is the display name of the member who issued the invitation;
+	// "" when none did.
+	InvitedBy string
+}
+
+// InvitationGrantView is the role in a project an invitation grants.
+type InvitationGrantView struct {
+	ProjectKey  string
+	ProjectName string
+	Role        access.RoleName
+}
+
+// InvitationDetails are what an invitation's page shows besides its member.
+type InvitationDetails struct {
+	// ProjectKey and ProjectName name the project the invitation grants a
+	// role in; "" when it grants none.
+	ProjectKey  string
+	ProjectName string
+	// InvitedBy is the display name of whoever issued the invitation.
+	InvitedBy string
 }
 
 // GetInvitation answers what an invitation's link opens, before anyone is
@@ -217,7 +284,20 @@ func (h *GetInvitation) Handle(ctx context.Context, s secret.String) (Invitation
 	if err != nil {
 		return InvitationView{}, err
 	}
-	return InvitationView{MaskedEmail: access.MaskEmail(m.Email), DisplayName: m.DisplayName, ExpiresAt: inv.ExpiresAt}, nil
+	details, err := h.store.InvitationDetails(ctx, inv.ID)
+	if errors.Is(err, ErrNotFound) {
+		return InvitationView{}, access.ErrInvitationGone
+	}
+	if err != nil {
+		return InvitationView{}, err
+	}
+	view := InvitationView{
+		MaskedEmail: access.MaskEmail(m.Email), DisplayName: m.DisplayName, ExpiresAt: inv.ExpiresAt, InvitedBy: details.InvitedBy,
+	}
+	if g := inv.Grant; g != nil && details.ProjectKey != "" {
+		view.Grant = &InvitationGrantView{ProjectKey: details.ProjectKey, ProjectName: details.ProjectName, Role: g.Role}
+	}
+	return view, nil
 }
 
 // openInvitation returns the invitation s opens and its member, when it can
@@ -250,6 +330,12 @@ type AcceptStore interface {
 	// work ends, and its member; ErrNotFound when none has the hash.
 	LockInvitationByHash(ctx context.Context, hash access.InvitationHash) (access.Invitation, access.Member, error)
 	SaveMember(ctx context.Context, m access.Member, at time.Time) error
+	// MemberByID returns the member with the identifier; ErrNotFound when
+	// none has it.
+	MemberByID(ctx context.Context, member access.MemberID) (access.Member, error)
+	// CreateGrantUnlessHeld stores g, unless the member holds the role in
+	// the project from the same source already, and reports whether it did.
+	CreateGrantUnlessHeld(ctx context.Context, g access.Grant) (bool, error)
 	SetPasswordHash(ctx context.Context, member access.MemberID, hash string, at time.Time) error
 	RecordSignIn(ctx context.Context, member access.MemberID, at time.Time) error
 	knownSourceRecorder
@@ -298,7 +384,9 @@ type AcceptInvitationCommand struct {
 
 // Handle sets the member's first password, makes them active, consumes
 // their invitations and opens a session, recording
-// member.invitation_accepted and auth.signed_in. The attempt counts as a
+// member.invitation_accepted and auth.signed_in. An invitation that still
+// grants a role in a project makes the grant, by hand and by the member who
+// invited, and records grant.created in the project's log for that member. The attempt counts as a
 // failure of its source before the secret is looked up, so a source
 // hammering acceptance is throttled with its sign-ins; a throttled source is refused
 // rate_limited before anything else. A secret that opens no invitation
@@ -392,6 +480,9 @@ func (h *AcceptInvitation) join(ctx context.Context, cmd AcceptInvitationCommand
 	if _, err := h.d.Store.ConsumeInvitations(ctx, m.ID, now); err != nil {
 		return SignInResult{}, err
 	}
+	if err := h.grant(ctx, inv, joined, cmd.RequestID, now); err != nil {
+		return SignInResult{}, err
+	}
 	if err := h.d.Store.ReleaseAttempt(ctx, reserved); err != nil {
 		return SignInResult{}, err
 	}
@@ -417,4 +508,30 @@ func (h *AcceptInvitation) join(ctx context.Context, cmd AcceptInvitationCommand
 			Before: map[string]any{"status": m.Status}, After: map[string]any{"status": joined.Status},
 		},
 		authRecord("auth.signed_in", joined, nil))
+}
+
+// grant makes the grant inv carries for joined, the member it activates, by
+// hand and by the member who invited them, who is the actor of its audit
+// record. A member who holds the role by hand already is left as they are.
+func (h *AcceptInvitation) grant(ctx context.Context, inv access.Invitation, joined access.Member, requestID string, now time.Time,
+) error {
+	if inv.Grant == nil {
+		return nil
+	}
+	inviter, err := h.d.Store.MemberByID(ctx, inv.InvitedBy)
+	if err != nil {
+		return err
+	}
+	g, err := access.NewGrant(id.New[access.Grant](h.d.IDs), access.NewGrantInput{
+		Project: inv.Grant.Project, Member: joined, Role: inv.Grant.Role, CreatedBy: inviter.ID, Now: now,
+	})
+	if err != nil {
+		return err
+	}
+	made, err := h.d.Store.CreateGrantUnlessHeld(ctx, g)
+	if err != nil || !made {
+		return err
+	}
+	return recordAll(ctx, h.d.Audit, h.d.IDs, now, governance.Request{Actor: memberActor(inviter), ID: requestID},
+		grantRecord("grant.created", ProjectRef{ID: g.Project}, g, joined, false))
 }

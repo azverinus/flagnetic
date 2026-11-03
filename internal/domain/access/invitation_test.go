@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
@@ -104,5 +105,72 @@ func TestOnlyInvitationsLongPastUseArePurged(t *testing.T) {
 	cut := access.InvitationCutoffsAt(now)
 	if want := now.Add(-30 * 24 * time.Hour); !cut.EndedBy.Equal(want) {
 		t.Errorf("cutoff = %v, want %v", cut.EndedBy, want)
+	}
+}
+
+func TestAnInvitationCarriesOneGrantOfABuiltInRole(t *testing.T) {
+	project := id.New[workspace.Project](newIDs())
+	grant, err := access.NewInvitationGrant(project, access.RoleDeveloper, "/role")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inviter := id.New[access.Member](newIDs())
+	inv, _ := access.NewInvitation(id.New[access.Invitation](newIDs()), id.New[access.Member](newIDs()), now, rand.Reader)
+	if inv.Grant != nil || !inv.InvitedBy.IsZero() {
+		t.Fatalf("a new invitation = %+v, want neither grant nor inviter", inv)
+	}
+	issued := inv.IssuedBy(inviter, &grant)
+	if issued.InvitedBy != inviter || issued.Grant == nil || *issued.Grant != grant {
+		t.Errorf("issued invitation = %+v, want %s's grant of %+v", issued, inviter, grant)
+	}
+
+	_, err = access.NewInvitationGrant(project, "admin", "/grant/role")
+	if e, ok := apperrors.From(err); !ok || e.Code != "invalid_grant" || e.Violations[0].Pointer != "/grant/role" {
+		t.Errorf("a role that is none of the built-in ones: err = %v, want invalid_grant at /grant/role", err)
+	}
+}
+
+func TestAnInvitationWithoutItsGrantStillActivatesItsMember(t *testing.T) {
+	project := id.New[workspace.Project](newIDs())
+	grant, _ := access.NewInvitationGrant(project, access.RoleViewer, "/role")
+	inviter := id.New[access.Member](newIDs())
+	inv, _ := access.NewInvitation(id.New[access.Invitation](newIDs()), id.New[access.Member](newIDs()), now, rand.Reader)
+	dropped := inv.IssuedBy(inviter, &grant).WithoutGrant()
+	if dropped.Grant != nil || dropped.InvitedBy != inviter {
+		t.Errorf("dropped = %+v, want no grant and the inviter still named", dropped)
+	}
+	if !dropped.Open(now, access.Member{Status: access.MemberInvited}) {
+		t.Error("an invitation whose grant was dropped is no longer open")
+	}
+}
+
+func TestAnInvitationsGrantIsDroppedWhenItsInviterLosesTheRightToGrantIt(t *testing.T) {
+	project := id.New[workspace.Project](newIDs())
+	grantOf := func(role access.RoleName) access.Grant {
+		return access.Grant{Project: project, Role: role, Source: access.GrantManual}
+	}
+	active := access.Member{Status: access.MemberActive}
+	admin := access.Member{Status: access.MemberActive, InstanceAdmin: true}
+
+	for name, tc := range map[string]struct {
+		inviter access.Member
+		held    []access.Grant
+		reason  access.GrantDropReason
+		dropped bool
+	}{
+		"an owner":                          {active, []access.Grant{grantOf(access.RoleOwner)}, "", false},
+		"an owner among other roles":        {active, []access.Grant{grantOf(access.RoleViewer), grantOf(access.RoleOwner)}, "", false},
+		"an instance admin holding nothing": {admin, nil, "", false},
+		"demoted to maintainer":             {active, []access.Grant{grantOf(access.RoleMaintainer)}, access.GrantDropInviterLostPermission, true},
+		"no grant left":                     {active, nil, access.GrantDropInviterLostPermission, true},
+		"a deactivated owner":               {access.Member{Status: access.MemberDeactivated}, []access.Grant{grantOf(access.RoleOwner)}, access.GrantDropInviterDeactivated, true},
+		"a deactivated instance admin":      {access.Member{Status: access.MemberDeactivated, InstanceAdmin: true}, nil, access.GrantDropInviterDeactivated, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			reason, dropped := access.GrantDrop(tc.inviter, tc.held)
+			if dropped != tc.dropped || reason != tc.reason {
+				t.Errorf("GrantDrop = %q, %t; want %q, %t", reason, dropped, tc.reason, tc.dropped)
+			}
+		})
 	}
 }

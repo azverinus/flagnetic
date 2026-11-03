@@ -8,6 +8,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
@@ -173,17 +174,23 @@ func keepAnInstanceAdmin(ctx context.Context, store MemberChanger, before, after
 	return access.KeepAnInstanceAdmin(before, after, others)
 }
 
+// UpdateMemberStore is what editing a member needs.
+type UpdateMemberStore interface {
+	MemberChanger
+	InvitationGrantStore
+}
+
 // UpdateMember edits a member for an instance admin.
 type UpdateMember struct {
 	tx    Transactor
-	store MemberChanger
+	store UpdateMemberStore
 	audit AuditLog
 	clock clock.Clock
 	ids   *id.Source
 }
 
 // NewUpdateMember returns the handler.
-func NewUpdateMember(tx Transactor, store MemberChanger, audit AuditLog, c clock.Clock, ids *id.Source) *UpdateMember {
+func NewUpdateMember(tx Transactor, store UpdateMemberStore, audit AuditLog, c clock.Clock, ids *id.Source) *UpdateMember {
 	return &UpdateMember{tx: tx, store: store, audit: audit, clock: c, ids: ids}
 }
 
@@ -198,14 +205,25 @@ type UpdateMemberCommand struct {
 // or display name, and member.promoted or member.demoted for a changed
 // instance admin switch; an edit changing nothing records nothing.
 // Demoting the last active instance admin is refused last_instance_admin.
+// Demoting an instance admin drops the grant of each invitation they issued
+// to a project they hold no grant.manage in, recording
+// invitation.grant_revoked, since they no longer hold it everywhere.
 func (h *UpdateMember) Handle(ctx context.Context, cmd UpdateMemberCommand) (MemberView, error) {
 	return changeMember(ctx, h.tx, h.store, h.audit, h.clock, h.ids, cmd.Request, cmd.Member,
-		func(_ context.Context, before access.Member, _ bool, _ time.Time) (access.Member, []governance.Record, error) {
+		func(ctx context.Context, before access.Member, _ bool, _ time.Time) (access.Member, []governance.Record, error) {
 			after, err := before.Edited(cmd.Change)
 			if err != nil {
 				return access.Member{}, nil, err
 			}
-			return after, memberEdited(before, after), nil
+			records := memberEdited(before, after)
+			if before.InstanceAdmin && !after.InstanceAdmin {
+				dropped, err := dropInvitationGrants(ctx, h.store, after, workspace.ProjectID{})
+				if err != nil {
+					return access.Member{}, nil, err
+				}
+				records = append(records, dropped...)
+			}
+			return after, records, nil
 		})
 }
 
@@ -248,6 +266,7 @@ type DeactivationStore interface {
 	// the member created belong to their projects and stay.
 	RevokePersonalTokens(ctx context.Context, member access.MemberID, at time.Time) (int, error)
 	InvitationStore
+	InvitationGrantStore
 }
 
 // DeactivateMember offboards a member.
@@ -267,7 +286,9 @@ func NewDeactivateMember(tx Transactor, store DeactivationStore, audit AuditLog,
 // Handle deactivates the member and, in the same unit of work, revokes
 // every session and personal access token they hold and consumes their open
 // invitations, recording member.deactivated with how many sessions and
-// tokens it revoked. A deactivated member
+// tokens it revoked. The invitations they issued lose their grants,
+// recorded as invitation.grant_revoked, and still activate whoever accepts
+// them. A deactivated member
 // is left as they are; the last active instance admin is refused
 // last_instance_admin.
 func (h *DeactivateMember) Handle(ctx context.Context, member access.MemberID, req governance.Request) (MemberView, error) {
@@ -289,11 +310,15 @@ func (h *DeactivateMember) Handle(ctx context.Context, member access.MemberID, r
 			if _, err := h.store.ConsumeInvitations(ctx, member, now); err != nil {
 				return access.Member{}, nil, err
 			}
-			return after, []governance.Record{{
+			dropped, err := dropInvitationGrants(ctx, h.store, after, workspace.ProjectID{})
+			if err != nil {
+				return access.Member{}, nil, err
+			}
+			return after, append([]governance.Record{{
 				Action: "member.deactivated", Entity: memberEntity(after),
 				Before: map[string]any{"status": before.Status},
 				After:  map[string]any{"status": after.Status, "sessions_revoked": sessions, "tokens_revoked": tokens},
-			}}, nil
+			}}, dropped...), nil
 		})
 }
 
@@ -339,7 +364,7 @@ func (h *ReactivateMember) Handle(ctx context.Context, member access.MemberID, r
 			if after.Status != access.MemberInvited {
 				return after, []governance.Record{record}, nil
 			}
-			inv, err := issueInvitation(ctx, h.store, h.ids, h.random, member, now)
+			inv, err := issueInvitation(ctx, h.store, h.ids, h.random, member, now, invitationOrigin{})
 			if err != nil {
 				return access.Member{}, nil, err
 			}

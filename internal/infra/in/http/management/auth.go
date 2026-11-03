@@ -186,7 +186,15 @@ func (a *api) GetInvitation(ctx context.Context, req GetInvitationRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	return GetInvitation200JSONResponse{Email: v.MaskedEmail, DisplayName: v.DisplayName, ExpiresAt: v.ExpiresAt}, nil
+	out := GetInvitation200JSONResponse{Email: v.MaskedEmail, DisplayName: v.DisplayName, ExpiresAt: v.ExpiresAt}
+	if v.InvitedBy != "" {
+		out.InvitedBy = &v.InvitedBy
+	}
+	if g := v.Grant; g != nil {
+		role := string(g.Role)
+		out.Project, out.Role = &InvitationProject{Key: g.ProjectKey, Name: g.ProjectName}, &role
+	}
+	return out, nil
 }
 
 // AcceptInvitation sets the invited member's first password, opens a

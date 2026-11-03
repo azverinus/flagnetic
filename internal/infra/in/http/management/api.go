@@ -58,6 +58,7 @@ type Handlers struct {
 	DeactivateMember    *appaccess.DeactivateMember
 	ReactivateMember    *appaccess.ReactivateMember
 	InviteMember        *appaccess.InviteMember
+	InviteToProject     *appaccess.InviteToProject
 	ReissueInvitation   *appaccess.ReissueInvitation
 	GetInvitation       *appaccess.GetInvitation
 	AcceptInvitation    *appaccess.AcceptInvitation

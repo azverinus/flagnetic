@@ -69,6 +69,19 @@ func (a *api) DeleteGrant(ctx context.Context, req DeleteGrantRequestObject) (De
 	return DeleteGrant204Response{}, nil
 }
 
+// InviteProjectMember invites someone to the project with a role and
+// answers their one-time link.
+func (a *api) InviteProjectMember(ctx context.Context, req InviteProjectMemberRequestObject) (InviteProjectMemberResponseObject, error) {
+	res, err := a.h.InviteToProject.Handle(ctx, appaccess.InviteToProjectCommand{
+		Caller: callerOf(ctx), Project: projectRefOf(ctx), Email: req.Body.Email, DisplayName: req.Body.DisplayName,
+		Role: access.RoleName(req.Body.Role), Request: requestOf(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return InviteProjectMember201JSONResponse(memberInvitationOf(ctx, res)), nil
+}
+
 func grantOf(g access.Grant) Grant {
 	out := Grant{
 		Id: openapi_types.UUID(g.ID.Bytes()), Member: openapi_types.UUID(g.Member.Bytes()), Role: RoleName(g.Role),
