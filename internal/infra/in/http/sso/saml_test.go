@@ -254,6 +254,45 @@ func TestAssertionTimesAreJudgedWithTwoMinutesOfSkew(t *testing.T) {
 	}
 }
 
+func TestAnAssertionFromAProviderWhoseClockIsAheadWithinTheSkewIsAccepted(t *testing.T) {
+	idp := testkit.StartForgingSAMLIDP(t)
+	// The forging provider starts an assertion's validity a minute before its
+	// clock, so two and a half minutes ahead starts it a minute and a half
+	// after the instance's: within the skew.
+	idp.Now = func() time.Time { return time.Now().Add(150 * time.Second) }
+	e := start(t)
+	p := e.createSAML(t, idp, nil)
+
+	b, v := e.samlSignIn(t, idp, p.Slug, "", samlPerson(uniqueEmail()))
+
+	if signedIn(t, b) == nil {
+		t.Errorf("an assertion valid from within the skew was refused: %s", v.URL)
+	}
+}
+
+func TestAResponseNoAttemptAskedForOpensNoSessionAndCreatesNoMember(t *testing.T) {
+	idp := testkit.StartForgingSAMLIDP(t)
+	e := start(t)
+	p := e.createSAML(t, idp, nil)
+	email := uniqueEmail()
+	a := samlPerson(email)
+	a.Fault = testkit.SAMLNoInResponseTo
+	b := testkit.NewBrowser(t, e.srv.URL)
+
+	for name, relayState := range map[string]string{"without a relay state": "", "with an unknown relay state": "unknown"} {
+		t.Run(name, func(t *testing.T) {
+			// A response the identity provider sends of its own accord: no
+			// AuthnRequest, so no attempt, preceded it.
+			form := idp.Respond(t, testkit.SAMLRequest{Issuer: *p.EntityId, ACS: *p.AcsUrl, RelayState: relayState}, a)
+
+			wantError(t, b.Post(t, *p.AcsUrl, form, e.opts()), b, "sso_failed")
+			if n := e.memberCount(t, email); n != 0 {
+				t.Errorf("%d members created by an unsolicited response", n)
+			}
+		})
+	}
+}
+
 func TestAnAssertionAcceptedOnceIsRefusedAgainWhateverTheRequest(t *testing.T) {
 	idp := testkit.StartForgingSAMLIDP(t)
 	e := start(t)
@@ -295,16 +334,20 @@ func TestAnEncryptedAssertionIsDecryptedWithAnyOfTheSupportedEncryptions(t *test
 	for name, tc := range map[string]struct {
 		encryption testkit.SAMLEncryption
 		ok         bool
+		// cause is what the logged reason of a refusal holds.
+		cause string
 	}{
-		"AES-128-CBC with RSA-OAEP": {testkit.SAMLAES128CBC, true},
-		"AES-256-GCM with RSA-OAEP": {testkit.SAMLAES256GCM, true},
-		"RSA 1.5 key transport":     {testkit.SAMLRSA15, false},
+		"AES-128-CBC with RSA-OAEP": {testkit.SAMLAES128CBC, true, ""},
+		"AES-256-GCM with RSA-OAEP": {testkit.SAMLAES256GCM, true, ""},
+		"RSA 1.5 key transport":     {testkit.SAMLRSA15, false, "RSA 1.5"},
+		"Triple DES with RSA-OAEP":  {testkit.SAMLTripleDES, false, "Triple DES"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			p := e.createSAML(t, idp, nil)
 			email := uniqueEmail()
 			a := samlPerson(email)
 			a.Encryption = tc.encryption
+			before := len(e.srv.Logs.Find("single sign-on failed"))
 
 			b, v := e.samlSignIn(t, idp, p.Slug, "", a)
 
@@ -315,8 +358,12 @@ func TestAnEncryptedAssertionIsDecryptedWithAnyOfTheSupportedEncryptions(t *test
 				return
 			}
 			wantError(t, v, b, "sso_failed")
+			logged := e.srv.Logs.Find("single sign-on failed")
+			if len(logged) != before+1 || !strings.Contains(fmt.Sprint(logged[len(logged)-1].Attrs["error"]), tc.cause) {
+				t.Errorf("the refusal was logged as %v, want its cause to hold %q", logged[before:], tc.cause)
+			}
 			if n := e.memberCount(t, email); n != 0 {
-				t.Errorf("%d members created through RSA 1.5 key transport", n)
+				t.Errorf("%d members created through %s", n, name)
 			}
 		})
 	}

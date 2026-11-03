@@ -24,6 +24,10 @@ const (
 	// methodRSA15 is the key transport that makes a decryption oracle of the
 	// instance's key; no identity provider needs it, since RSA-OAEP exists.
 	methodRSA15 = types.MethodRSAv1_5
+	// methodTripleDES is a data encryption gosaml2 decrypts but the instance
+	// does not accept: its 64-bit blocks are open to birthday attacks, and an
+	// identity provider that encrypts can use AES-CBC or AES-GCM.
+	methodTripleDES = types.MethodTripleDESCBC
 	// nameIDEmail is the format of a NameID that is an email address.
 	nameIDEmail = "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"
 )
@@ -38,9 +42,14 @@ const (
 // signature covers. What it leaves to its caller is checked here: that the
 // answer is to the request this attempt made, the audience, the conditions
 // with the clock skew, that exactly one assertion speaks, and that nothing
-// uses RSA 1.5 key transport.
+// uses RSA 1.5 key transport or Triple DES encryption.
 func (c *Client) VerifyResponse(cfg appidentity.SAMLConfig, response, requestID string) (appidentity.SAMLAssertion, error) {
 	var none appidentity.SAMLAssertion
+	// An empty request ID would let an assertion that answers no request, an
+	// unsolicited one, pass for the answer to it.
+	if requestID == "" {
+		return none, errors.New("the attempt made no request for a response to answer")
+	}
 	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(response))
 	if err != nil || len(raw) == 0 {
 		return none, errors.New("the response is not base64")
@@ -168,8 +177,8 @@ func attributeValue(s *types.AttributeStatement, name string) string {
 
 // inspect refuses a response before it is verified when it is not to be
 // trusted whatever its signature: a DOCTYPE or a processing instruction, which
-// can declare or expand entities; RSA 1.5 key transport in an encryption
-// method. It answers ErrIDPRefused for a response that carries no assertion
+// can declare or expand entities; RSA 1.5 key transport or Triple DES in an
+// encryption method. It answers ErrIDPRefused for a response that carries no assertion
 // and a status that is not success, which the identity provider uses to say
 // the person did not authenticate; no signature is asked of it, since it
 // grants nothing.
@@ -200,8 +209,11 @@ func inspect(raw []byte) error {
 		case xml.StartElement:
 			depth++
 			for _, a := range t.Attr {
-				if a.Value == methodRSA15 {
+				switch a.Value {
+				case methodRSA15:
 					return errors.New("the response uses RSA 1.5 key transport, which is refused")
+				case methodTripleDES:
+					return errors.New("the response uses Triple DES encryption, which is refused")
 				}
 			}
 			switch {

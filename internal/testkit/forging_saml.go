@@ -6,6 +6,7 @@ import (
 	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/des" //nolint:gosec // Triple DES, which the instance refuses, has to be built to be refused
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1" //nolint:gosec // RSA-OAEP's own digest, the one SAML service providers default to
@@ -77,6 +78,9 @@ const (
 	SAMLAES256GCM
 	// SAMLRSA15 encrypts with AES-128-CBC, the key sent by RSA 1.5, which the instance refuses.
 	SAMLRSA15
+	// SAMLTripleDES encrypts with Triple DES in CBC mode, the key sent by RSA-OAEP, which the
+	// instance refuses.
+	SAMLTripleDES
 )
 
 // SAMLAssertion is what a ForgingSAMLIDP asserts of a person, and what it
@@ -499,12 +503,20 @@ func encryptAssertion(t testing.TB, assertion *etree.Element, a SAMLAssertion) *
 		t.Fatal(err)
 	}
 	keySize, dataMethod := 16, "http://www.w3.org/2001/04/xmlenc#aes128-cbc"
-	if a.Encryption == SAMLAES256GCM {
+	switch a.Encryption {
+	case SAMLAES256GCM:
 		keySize, dataMethod = 32, "http://www.w3.org/2009/xmlenc11#aes256-gcm"
+	case SAMLTripleDES:
+		keySize, dataMethod = 24, "http://www.w3.org/2001/04/xmlenc#tripledes-cbc"
 	}
 	key := make([]byte, keySize)
 	_, _ = rand.Read(key)
-	c, err := aes.NewCipher(key)
+	var c cipher.Block
+	if a.Encryption == SAMLTripleDES {
+		c, err = des.NewTripleDESCipher(key) //nolint:gosec // the encryption the instance refuses has to be built to be refused
+	} else {
+		c, err = aes.NewCipher(key)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -518,12 +530,13 @@ func encryptAssertion(t testing.TB, assertion *etree.Element, a SAMLAssertion) *
 		_, _ = rand.Read(nonce)
 		cipherText = g.Seal(nonce, nonce, plain, nil)
 	} else {
-		pad := aes.BlockSize - len(plain)%aes.BlockSize
+		size := c.BlockSize()
+		pad := size - len(plain)%size
 		padded := append(plain, bytes.Repeat([]byte{byte(pad)}, pad)...)
-		iv := make([]byte, aes.BlockSize)
+		iv := make([]byte, size)
 		_, _ = rand.Read(iv)
 		cipherText = append(iv, make([]byte, len(padded))...)
-		cipher.NewCBCEncrypter(c, iv).CryptBlocks(cipherText[aes.BlockSize:], padded)
+		cipher.NewCBCEncrypter(c, iv).CryptBlocks(cipherText[size:], padded)
 	}
 	var wrappedKey []byte
 	transport := "http://www.w3.org/2001/04/xmlenc#rsa-oaep-mgf1p"
