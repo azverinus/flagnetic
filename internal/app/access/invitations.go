@@ -9,6 +9,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
@@ -333,6 +334,9 @@ type AcceptStore interface {
 	// MemberByID returns the member with the identifier; ErrNotFound when
 	// none has it.
 	MemberByID(ctx context.Context, member access.MemberID) (access.Member, error)
+	// MemberGrants returns the grants member holds in project, oldest
+	// first.
+	MemberGrants(ctx context.Context, member access.MemberID, project workspace.ProjectID) ([]access.Grant, error)
 	// CreateGrantUnlessHeld stores g, unless the member holds the role in
 	// the project from the same source already, and reports whether it did.
 	CreateGrantUnlessHeld(ctx context.Context, g access.Grant) (bool, error)
@@ -513,6 +517,11 @@ func (h *AcceptInvitation) join(ctx context.Context, cmd AcceptInvitationCommand
 // grant makes the grant inv carries for joined, the member it activates, by
 // hand and by the member who invited them, who is the actor of its audit
 // record. A member who holds the role by hand already is left as they are.
+// An inviter who may no longer hand the grant out makes none, and the drop
+// is recorded as invitation.grant_revoked by the member joining: losing
+// grant.manage drops the grants of the invitations committed by then, but
+// one issued while its inviter was losing it commits after that drop, so the
+// rule is applied once more where the grant would be made.
 func (h *AcceptInvitation) grant(ctx context.Context, inv access.Invitation, joined access.Member, requestID string, now time.Time,
 ) error {
 	if inv.Grant == nil {
@@ -521,6 +530,14 @@ func (h *AcceptInvitation) grant(ctx context.Context, inv access.Invitation, joi
 	inviter, err := h.d.Store.MemberByID(ctx, inv.InvitedBy)
 	if err != nil {
 		return err
+	}
+	held, err := h.d.Store.MemberGrants(ctx, inviter.ID, inv.Grant.Project)
+	if err != nil {
+		return err
+	}
+	if reason, drop := access.GrantDrop(inviter, held); drop {
+		return recordAll(ctx, h.d.Audit, h.d.IDs, now, governance.Request{Actor: memberActor(joined), ID: requestID},
+			grantRevokedRecord(inv, joined, reason))
 	}
 	g, err := access.NewGrant(id.New[access.Grant](h.d.IDs), access.NewGrantInput{
 		Project: inv.Grant.Project, Member: joined, Role: inv.Grant.Role, CreatedBy: inviter.ID, Now: now,
