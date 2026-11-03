@@ -82,6 +82,28 @@ func TestASinkEventsDataIsWhatItsTypeNamesAndNothingTheEntryHappenedToCarry(t *t
 	}
 }
 
+func TestASinkEventsObjectThatIsNotAnObjectIsNull(t *testing.T) {
+	events := governance.DeriveEvents(sinkEntry("sink.failing", governance.SinkDeliveryActor, map[string]any{
+		"sink": "warehouse", "event_kind": "exposure", "failure": "the target's own words",
+	}))
+
+	data := dataOf(t, events, "sink.failing")
+
+	if data["sink"] != nil || data["failure"] != nil {
+		t.Errorf("sink %#v, failure %#v, want both null", data["sink"], data["failure"])
+	}
+}
+
+func TestASinkEventsAbsentObjectIsNull(t *testing.T) {
+	events := governance.DeriveEvents(sinkEntry("sink.stopped", governance.SinkDeliveryActor, map[string]any{"sink": sinkRef("webhook")}))
+
+	data := dataOf(t, events, "sink.stopped")
+
+	if failure, present := data["failure"]; !present || failure != nil {
+		t.Errorf("failure %#v (present %v), want null", failure, present)
+	}
+}
+
 func TestASinkEventsDataHasEveryFieldOfItsTypeEvenWhenTheEntryLacksOne(t *testing.T) {
 	for _, tc := range []struct {
 		typ  string

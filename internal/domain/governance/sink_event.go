@@ -57,20 +57,25 @@ func sinkEvent(typ string, after any) Derived {
 	doc := mapOf(after)
 	data := make(map[string]any, len(sinkEventFields[typ]))
 	for _, field := range sinkEventFields[typ] {
-		data[field] = doc[field]
-		if keys, object := sinkEventObjects[field]; object {
-			data[field] = completeObject(mapOf(doc[field]), keys)
+		keys, object := sinkEventObjects[field]
+		if !object {
+			data[field] = doc[field]
+			continue
+		}
+		// A field that should hold an object but holds anything else is
+		// null, never passed through: whatever it held is not the object's
+		// fields, so it is not the receiver's to read. An untyped nil keeps
+		// it null to anyone reading data before it is encoded too.
+		data[field] = nil
+		if m := mapOf(doc[field]); m != nil {
+			data[field] = completeObject(m, keys)
 		}
 	}
 	return Derived{typ, data}
 }
 
-// completeObject returns the fields keys of m, null where m lacks one; nil
-// when m is nil.
+// completeObject returns the fields keys of m, null where m lacks one.
 func completeObject(m map[string]any, keys []string) map[string]any {
-	if m == nil {
-		return nil
-	}
 	out := make(map[string]any, len(keys))
 	for _, k := range keys {
 		out[k] = m[k]

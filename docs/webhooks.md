@@ -137,7 +137,7 @@ The `audit_entry_id` of `change_request.applied` is the entry of the change the 
 
 ### Sinks
 
-A sink that needs attention tells the project's subscriptions once, when it starts needing it, and not again until it has recovered and needs it anew. There is no event for recovering: the sink's health says when it delivers again. The audit entry of each is recorded by the system, `sink_delivery` for the first three and `event_retention` for the last, and the envelope's `entity` is the sink. The `environment` is null.
+A sink that is failing, stopped or at risk tells the project's subscriptions once, when it starts needing attention, and not again until it has recovered and needs it anew. Lost data is told once for each gap: every partition retention drops records one gap per stream of the sink that had not delivered its rows. There is no event for recovering: the sink's health says when it delivers again. The audit entry of each is recorded by the system, `sink_delivery` for the first three and `event_retention` for the last, and the envelope's `entity` is the sink. The `environment` is null.
 
 | Type | Sent when |
 |---|---|
