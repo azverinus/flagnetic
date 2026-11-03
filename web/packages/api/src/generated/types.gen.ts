@@ -443,9 +443,9 @@ export type RoleList = {
 };
 
 /**
- * How the member signed in; `local` is with their email and password.
+ * How the member signed in; `local` is with their email and password, `oidc` through an OIDC auth provider, named by `provider`.
  */
-export type SessionMethod = "local";
+export type SessionMethod = "local" | "oidc";
 
 /**
  * One device a member is signed in on.
@@ -453,6 +453,10 @@ export type SessionMethod = "local";
 export type Session = {
   id: string;
   method: SessionMethod;
+  /**
+   * The slug of the auth provider the session opened through; absent for a local sign-in.
+   */
+  provider?: string;
   /**
    * The address the session opened from.
    */

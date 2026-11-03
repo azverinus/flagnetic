@@ -24,9 +24,13 @@ type SessionHash [sha256.Size]byte
 // SignInMethod is how a member proved who they are when a session opened.
 type SignInMethod string
 
-// SignInLocal is signing in with an email and a password. Identity
-// providers join it with single sign-on.
-const SignInLocal SignInMethod = "local"
+// The ways a member signs in.
+const (
+	// SignInLocal is signing in with an email and a password.
+	SignInLocal SignInMethod = "local"
+	// SignInOIDC is signing in through an OIDC auth provider.
+	SignInOIDC SignInMethod = "oidc"
+)
 
 // SessionTimeouts end a session: after Idle without a request, and after
 // Absolute in all, whichever comes first.
@@ -56,6 +60,9 @@ type Session struct {
 	Hash   SessionHash
 	Member MemberID
 	Method SignInMethod
+	// Provider is the slug of the auth provider a single sign-on session
+	// opened through; empty for a local one.
+	Provider string
 	// ClientIP and UserAgent describe the device the session opened on, so
 	// a member notices a session they do not recognise.
 	ClientIP   netip.Addr
@@ -72,6 +79,7 @@ type Session struct {
 type NewSessionInput struct {
 	Member    MemberID
 	Method    SignInMethod
+	Provider  string
 	ClientIP  netip.Addr
 	UserAgent string
 	Timeouts  SessionTimeouts
@@ -94,7 +102,7 @@ func NewSession(sessionID SessionID, in NewSessionInput, random io.Reader, key [
 		ua = truncateUTF8(ua, maxUserAgentBytes)
 	}
 	s := Session{
-		ID: sessionID, Hash: sha256.Sum256(raw), Member: in.Member, Method: in.Method,
+		ID: sessionID, Hash: sha256.Sum256(raw), Member: in.Member, Method: in.Method, Provider: in.Provider,
 		ClientIP: in.ClientIP, UserAgent: ua, CreatedAt: in.Now, LastSeenAt: in.Now,
 		ExpiresAt: in.Now.Add(in.Timeouts.Absolute),
 	}

@@ -2,7 +2,6 @@ package management
 
 import (
 	"context"
-	"strings"
 
 	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
 	"github.com/azverinus/flagnetic/internal/domain/identity"
@@ -16,7 +15,7 @@ func (o Options) redirectURI(p identity.Provider) string {
 	if o.BaseURL == nil {
 		return ""
 	}
-	return strings.TrimSuffix(o.BaseURL.String(), "/") + "/sso/" + p.Slug + "/callback"
+	return identity.RedirectURI(o.BaseURL, p.Slug)
 }
 
 // authProviderOut returns p as the API answers it, never with its secret.

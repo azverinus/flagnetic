@@ -217,3 +217,12 @@ func TestEnablingAndDisablingMoveTheVersionOnlyWhenTheyChangeTheProvider(t *test
 		t.Errorf("enabled = %+v %v", on, changed)
 	}
 }
+
+func TestTheSlugThatNamesTheCompletionAddressIsReserved(t *testing.T) {
+	in := validInput()
+	in.Slug = "complete"
+	_, err := identity.CheckProviderInput(in)
+	if code, pointers := problemOf(t, err); code != "invalid_auth_provider" || !slices.Equal(pointers, []string{"/slug"}) {
+		t.Errorf("slug complete = %v, %v", code, pointers)
+	}
+}

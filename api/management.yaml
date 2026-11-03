@@ -7177,8 +7177,10 @@ components:
             $ref: "#/components/schemas/Role"
     SessionMethod:
       type: string
-      enum: [local]
-      description: How the member signed in; `local` is with their email and password.
+      enum: [local, oidc]
+      description: >-
+        How the member signed in; `local` is with their email and password, `oidc` through an OIDC auth provider,
+        named by `provider`.
     Session:
       type: object
       description: One device a member is signed in on.
@@ -7189,6 +7191,9 @@ components:
           format: uuid
         method:
           $ref: "#/components/schemas/SessionMethod"
+        provider:
+          type: string
+          description: The slug of the auth provider the session opened through; absent for a local sign-in.
         client_ip:
           type: string
           nullable: true

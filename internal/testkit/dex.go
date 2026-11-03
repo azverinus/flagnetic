@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -29,9 +30,9 @@ type Dex struct {
 	// Issuer is the address Dex's discovery document is served under; it is
 	// plain http on a loopback address.
 	Issuer string
-	// ClientID is the public client: PKCE alone protects its code exchange, and
-	// Dex accepts any loopback address as its redirect URI.
-	ClientID string
+	// ClientID and ClientSecret are the credentials of the client Dex is
+	// configured with; it uses PKCE besides.
+	ClientID, ClientSecret string
 	// Users are the people Dex knows, all with verified emails.
 	Users []DexUser
 }
@@ -44,7 +45,32 @@ var DexUsers = []DexUser{
 }
 
 // dexClientID is the id of the client Dex is configured with.
-const dexClientID = "flagnetic"
+const (
+	dexClientID     = "flagnetic"
+	dexClientSecret = "dex-client-secret" //nolint:gosec // a test credential
+)
+
+// DexPublicURL is the public address of the instance Dex's redirect URIs are
+// registered for.
+const DexPublicURL = "http://localhost:8080"
+
+// dexSlugs is how many provider slugs Dex has a redirect URI registered for.
+const dexSlugs = 64
+
+var nextDexSlug atomic.Int64
+
+// DexSlug returns a provider slug that Dex's client has the redirect URI
+// registered for, under DexPublicURL, a new one at each call: Dex lists the
+// redirect URIs of its client exactly, and the container is started once per
+// package.
+func DexSlug(t testing.TB) string {
+	t.Helper()
+	n := nextDexSlug.Add(1)
+	if n > dexSlugs {
+		t.Fatalf("more than %d providers signed in through Dex in one package", dexSlugs)
+	}
+	return fmt.Sprintf("dex-%d", n)
+}
 
 var dex struct {
 	once      sync.Once
@@ -75,7 +101,7 @@ func runDex() (*Dex, testcontainers.Container, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 	const configPath = "/etc/dex/config.yaml"
-	d := &Dex{ClientID: dexClientID, Users: DexUsers}
+	d := &Dex{ClientID: dexClientID, ClientSecret: dexClientSecret, Users: DexUsers}
 	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
 			Image:        dexImage,
@@ -118,7 +144,10 @@ func dexConfig(d *Dex) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "issuer: %s\nstorage:\n  type: memory\nweb:\n  http: 0.0.0.0:5556\nenablePasswordDB: true\n", d.Issuer)
 	b.WriteString("oauth2:\n  skipApprovalScreen: true\n  passwordConnector: local\n")
-	fmt.Fprintf(&b, "staticClients:\n  - id: %s\n    name: Flagnetic\n    public: true\n    redirectURIs:\n      - http://localhost/callback\n", d.ClientID)
+	fmt.Fprintf(&b, "staticClients:\n  - id: %s\n    secret: %s\n    name: Flagnetic\n    redirectURIs:\n", d.ClientID, d.ClientSecret)
+	for i := 1; i <= dexSlugs; i++ {
+		fmt.Fprintf(&b, "      - %s/sso/dex-%d/callback\n", DexPublicURL, i)
+	}
 	b.WriteString("staticPasswords:\n")
 	for i, u := range d.Users {
 		// The hash is bcrypt of the user's password, as Dex asks for.

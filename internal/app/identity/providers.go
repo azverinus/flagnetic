@@ -55,6 +55,8 @@ type ProviderStore interface {
 	EnabledProviders(ctx context.Context) ([]identity.Provider, error)
 	// Provider returns the provider with slug, or ErrNotFound.
 	Provider(ctx context.Context, slug string) (identity.Provider, error)
+	// ProviderByID returns the provider with the identifier, or ErrNotFound.
+	ProviderByID(ctx context.Context, provider identity.ProviderID) (identity.Provider, error)
 	// LockProvider is Provider, locking the provider's row until the unit of
 	// work ctx carries ends.
 	LockProvider(ctx context.Context, slug string) (identity.Provider, error)

@@ -158,3 +158,21 @@ func TestAMemberRenamesThemselvesAndChoosesALanguage(t *testing.T) {
 		}
 	}
 }
+
+func TestAProvisionedMemberIsActiveWithoutAPasswordAndNamedAfterTheirNameOrEmail(t *testing.T) {
+	for _, tc := range []struct{ name, email, display, want string }{
+		{"a name", "ada@example.com", " Ada Lovelace ", "Ada Lovelace"},
+		{"no name", "ada@example.com", "", "ada"},
+		{"a name over the bound", "ada@example.com", strings.Repeat("é", 300), strings.Repeat("é", 200)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m, err := access.NewProvisionedMember(access.MemberID{}, tc.email, tc.display, now)
+			if err != nil || m.DisplayName != tc.want || m.Status != access.MemberActive || m.InstanceAdmin || !m.CreatedAt.Equal(now) {
+				t.Errorf("NewProvisionedMember = %+v, %v; want an active member named %q", m, err, tc.want)
+			}
+		})
+	}
+	if _, err := access.NewProvisionedMember(access.MemberID{}, "not-an-email", "x", now); err == nil {
+		t.Error("an address without an at sign was accepted")
+	}
+}

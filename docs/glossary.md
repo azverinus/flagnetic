@@ -84,6 +84,10 @@ _Avoid_: team, directory group, role group
 The link between a member and a subject at an auth provider, created the first time a sign-in through it resolves to that member, or when the member links it while signed in; unlinked by the member or an instance admin while another way in remains.
 _Avoid_: external account, federated identity, SSO identity
 
+**Sign-in attempt**:
+One browser's trip through an auth provider, from the start of a sign-in to its completion, kept for ten minutes and used once. The provider's answer is verified and its claims stored on the attempt, and nothing about any member changes until the browser that started the attempt completes it.
+_Avoid_: SSO session, login flow, handshake
+
 **Auth method**:
 One way a member can authenticate in a browser: their password or one of their identities. It is usable when local login accepts the password for their email, or the identity's auth provider is enabled; nothing removes a member's last usable one.
 _Avoid_: login method, sign-in option, credential (the password alone)

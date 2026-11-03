@@ -76,6 +76,26 @@ func NewInstanceAdmin(memberID MemberID, email, displayName string, now time.Tim
 	}, nil
 }
 
+// NewProvisionedMember returns the active member a single sign-on creates on
+// a person's first sign-in. They hold no password: the identity provider is
+// how they sign in. Without a display name, or with one over the bound, the
+// member is named after what fits of it or of their email.
+func NewProvisionedMember(memberID MemberID, email, displayName string, now time.Time) (Member, error) {
+	email = strings.TrimSpace(email)
+	local, err := checkEmail(email)
+	if err != nil {
+		return Member{}, err
+	}
+	displayName = strings.TrimSpace(displayName)
+	if displayName == "" {
+		displayName = local
+	}
+	if utf8.RuneCountInString(displayName) > maxDisplayNameLength {
+		displayName = string([]rune(displayName)[:maxDisplayNameLength])
+	}
+	return Member{ID: memberID, Email: email, DisplayName: displayName, Status: MemberActive, CreatedAt: now}, nil
+}
+
 // checkEmail accepts one address of the form local@domain without spaces and
 // returns its local part. Whether the address receives mail is not judged:
 // that would take sending some.

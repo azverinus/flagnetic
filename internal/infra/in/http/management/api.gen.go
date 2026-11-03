@@ -678,12 +678,15 @@ func (e SdkKeyStatus) Valid() bool {
 // Defines values for SessionMethod.
 const (
 	SessionMethodLocal SessionMethod = "local"
+	SessionMethodOidc  SessionMethod = "oidc"
 )
 
 // Valid indicates whether the value is a known member of the SessionMethod enum.
 func (e SessionMethod) Valid() bool {
 	switch e {
 	case SessionMethodLocal:
+		return true
+	case SessionMethodOidc:
 		return true
 	default:
 		return false
@@ -3791,8 +3794,11 @@ type Session struct {
 	// LastSeenAt The session's last request, written at most once a minute.
 	LastSeenAt time.Time `json:"last_seen_at"`
 
-	// Method How the member signed in; `local` is with their email and password.
+	// Method How the member signed in; `local` is with their email and password, `oidc` through an OIDC auth provider, named by `provider`.
 	Method SessionMethod `json:"method"`
+
+	// Provider The slug of the auth provider the session opened through; absent for a local sign-in.
+	Provider *string `json:"provider,omitempty"`
 
 	// UserAgent At most 256 bytes of the browser's User-Agent at sign-in.
 	UserAgent string `json:"user_agent"`
@@ -3803,7 +3809,7 @@ type SessionList struct {
 	Items []Session `json:"items"`
 }
 
-// SessionMethod How the member signed in; `local` is with their email and password.
+// SessionMethod How the member signed in; `local` is with their email and password, `oidc` through an OIDC auth provider, named by `provider`.
 type SessionMethod string
 
 // SessionRevocation defines model for SessionRevocation.

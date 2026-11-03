@@ -39,8 +39,12 @@ var _ appidentity.OIDCDiscoverer = (*Discoverer)(nil)
 // redirects at most, never downgrade to plain http away from a loopback
 // address, and read no more than a megabyte of an answer. It connects to
 // private networks: only an instance admin names a provider.
-func NewDiscoverer() *Discoverer {
-	return &Discoverer{client: &http.Client{
+func NewDiscoverer() *Discoverer { return &Discoverer{client: newHTTPClient()} }
+
+// newHTTPClient returns the client every request to an identity provider is
+// made with.
+func newHTTPClient() *http.Client {
+	return &http.Client{
 		Timeout: discoveryTimeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) > maxRedirects {
@@ -52,7 +56,7 @@ func NewDiscoverer() *Discoverer {
 			return nil
 		},
 		Transport: capped{http.DefaultTransport},
-	}}
+	}
 }
 
 // capped limits the bodies of the answers of the transport it wraps.

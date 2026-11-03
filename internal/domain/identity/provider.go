@@ -130,6 +130,10 @@ type ProviderChange struct {
 	RequireVerifiedEmail *bool
 }
 
+// reservedSlug is no provider's slug: /sso/complete/{attempt} completes a
+// sign-in where /sso/{provider}/start would name a provider.
+const reservedSlug = "complete"
+
 const (
 	maxDisplayNameLength = 200
 	maxClientIDLength    = 512
@@ -179,6 +183,8 @@ func CheckProviderInput(in ProviderInput) (ProviderInput, error) {
 	in.Slug = strings.TrimSpace(in.Slug)
 	if !slugPattern.MatchString(in.Slug) {
 		v.add("/slug", "invalid_slug", "a slug starts with a lowercase letter and has 1 to 64 lowercase letters, digits, hyphens and underscores", nil)
+	} else if in.Slug == reservedSlug {
+		v.add("/slug", "reserved_slug", "the slug "+reservedSlug+" is reserved; the address that completes a sign-in is /sso/"+reservedSlug+"/…", nil)
 	}
 	if in.Kind != KindOIDC {
 		v = append(v, errUnsupportedKind)

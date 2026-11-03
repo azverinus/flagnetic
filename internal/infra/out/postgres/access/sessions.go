@@ -20,17 +20,21 @@ func (s *Store) CreateSession(ctx context.Context, sess access.Session) error {
 	if sess.ClientIP.IsValid() {
 		ip = &sess.ClientIP
 	}
+	var provider *string
+	if sess.Provider != "" {
+		provider = &sess.Provider
+	}
 	_, err := s.db(ctx).Exec(ctx, `
-		INSERT INTO sessions (id, secret_hash, member_id, method, client_ip, user_agent, created_at, last_seen_at, expires_at, revoked_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		sess.ID.Bytes(), sess.Hash[:], sess.Member.Bytes(), string(sess.Method), ip, sess.UserAgent,
+		INSERT INTO sessions (id, secret_hash, member_id, method, provider, client_ip, user_agent, created_at, last_seen_at, expires_at, revoked_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		sess.ID.Bytes(), sess.Hash[:], sess.Member.Bytes(), string(sess.Method), provider, ip, sess.UserAgent,
 		sess.CreatedAt, sess.LastSeenAt, sess.ExpiresAt, sess.RevokedAt)
 	return err
 }
 
 // sessionColumns are the columns scanSession reads, prefixed by the
 // sessions table's alias s.
-const sessionColumns = `s.id, s.secret_hash, s.member_id, s.method, s.client_ip, s.user_agent, s.created_at, s.last_seen_at, s.expires_at, s.revoked_at`
+const sessionColumns = `s.id, s.secret_hash, s.member_id, s.method, s.provider, s.client_ip, s.user_agent, s.created_at, s.last_seen_at, s.expires_at, s.revoked_at`
 
 // scanSession returns a scan target of sessionColumns and the session it
 // fills.
@@ -39,15 +43,20 @@ func scanSession() ([]any, func() access.Session) {
 		sess              access.Session
 		sessionID, member [16]byte
 		method            string
+		provider          *string
 		ip                *netip.Addr
 		secret            []byte
 	)
 	dest := []any{
-		&sessionID, &secret, &member, &method, &ip, &sess.UserAgent, &sess.CreatedAt, &sess.LastSeenAt, &sess.ExpiresAt, &sess.RevokedAt,
+		&sessionID, &secret, &member, &method, &provider, &ip, &sess.UserAgent, &sess.CreatedAt, &sess.LastSeenAt, &sess.ExpiresAt, &sess.RevokedAt,
 	}
 	fill := func() access.Session {
 		sess.ID, sess.Hash, sess.Method = id.FromBytes[access.Session](sessionID), access.SessionHash(secret), access.SignInMethod(method)
 		sess.Member = id.FromBytes[access.Member](member)
+		sess.Provider = ""
+		if provider != nil {
+			sess.Provider = *provider
+		}
 		sess.ClientIP = netip.Addr{}
 		if ip != nil {
 			sess.ClientIP = *ip
