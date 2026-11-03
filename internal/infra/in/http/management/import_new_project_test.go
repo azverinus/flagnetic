@@ -281,6 +281,10 @@ func TestADocumentThatBreaksARuleIsRefusedWholeAtThePointerOfEachFault(t *testin
 		{"no environment", func(d map[string]any) { d["environments"] = []any{} }, "/environments", "invalid_value"},
 		{"a section missing", func(d map[string]any) { delete(d, "segments") }, "/segments", "required"},
 		{"an invalid project key", func(d map[string]any) { d["project"].(map[string]any)["key"] = "Not A Key" }, "/project/key", "invalid_key"},
+		{"an invalid environment", func(d map[string]any) { d["environments"].([]any)[0].(map[string]any)["key"] = "Not A Key" }, "/environments/0/key", "invalid_key"},
+		{"an invalid unit type", func(d map[string]any) { d["unit_types"].([]any)[0].(map[string]any)["name"] = "" }, "/unit_types/0/name", "invalid_name"},
+		{"an invalid attribute", func(d map[string]any) { d["attributes"].([]any)[0].(map[string]any)["type"] = "bogus" }, "/attributes/0/type", "invalid_type"},
+		{"an invalid segment", func(d map[string]any) { d["segments"].([]any)[0].(map[string]any)["key"] = "Bad Key" }, "/segments/0/key", "invalid_key"},
 		{"an invalid flag", func(d map[string]any) { d["flags"].([]any)[0].(map[string]any)["key"] = "1bad" }, "/flags/0/key", "invalid_key"},
 		{"an experiment", func(d map[string]any) { d["experiments"] = []any{map[string]any{"key": "e"}} }, "/experiments/0", "unsupported"},
 	}
