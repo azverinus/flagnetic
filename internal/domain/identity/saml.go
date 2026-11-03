@@ -29,10 +29,10 @@ var nameIDFormats = []string{NameIDUnspecified, NameIDEmailAddress, NameIDPersis
 // maxMetadataBytes bounds an identity provider's metadata, fetched or pasted.
 const maxMetadataBytes = 1 << 20
 
-// IdPMetadata is what an identity provider's metadata says that the instance
+// IDPMetadata is what an identity provider's metadata says that the instance
 // uses: who it is, where a browser is sent, and the certificates its
 // signatures are checked against.
-type IdPMetadata struct {
+type IDPMetadata struct {
 	EntityID string
 	// SSOURL is the identity provider's HTTP-Redirect single sign-on endpoint.
 	SSOURL string
@@ -49,7 +49,7 @@ type CertificateInfo struct {
 
 // CertificateInfos describes the certificates of m, in order; one that cannot
 // be read is left out.
-func (m IdPMetadata) CertificateInfos() []CertificateInfo {
+func (m IDPMetadata) CertificateInfos() []CertificateInfo {
 	out := make([]CertificateInfo, 0, len(m.Certificates))
 	for _, p := range m.Certificates {
 		block, _ := pem.Decode([]byte(p))
@@ -83,7 +83,7 @@ type SAML struct {
 	MetadataURL string
 	MetadataXML string
 	// IdP is what the metadata said when it was last read, at RefreshedAt.
-	IdP         IdPMetadata
+	IDP         IDPMetadata
 	RefreshedAt time.Time
 	// SignRequests is whether AuthnRequests are signed with the instance's
 	// key.
@@ -120,23 +120,29 @@ type SPKey struct {
 
 // NewSAML returns the provider in names, of kind SAML, as its first version
 // made at now. in must have passed CheckProviderInput.
-func NewSAML(providerID ProviderID, in ProviderInput, idp IdPMetadata, sp SPKey, now time.Time) Provider {
+func NewSAML(providerID ProviderID, in ProviderInput, idp IDPMetadata, sp SPKey, now time.Time) Provider {
 	p := New(providerID, in, "", now)
 	p.OIDC = nil
 	p.SAML = &SAML{
-		MetadataURL: in.SAML.MetadataURL, MetadataXML: in.SAML.MetadataXML, IdP: idp, RefreshedAt: now,
+		MetadataURL: in.SAML.MetadataURL, MetadataXML: in.SAML.MetadataXML, IDP: idp, RefreshedAt: now,
 		SignRequests: in.SAML.SignRequests, NameIDFormat: in.SAML.NameIDFormat, Claims: in.SAML.Claims,
 		SPCertificate: sp.CertificatePEM, SealedSPKey: sp.SealedKey,
 	}
 	return p
 }
 
-// WithIdPMetadata returns p with what its identity provider's metadata says
+// WithIDPMetadata returns p with what its identity provider's metadata says
 // replaced by idp, read at now.
-func (p Provider) WithIdPMetadata(idp IdPMetadata, now time.Time) Provider {
+func (p Provider) WithIDPMetadata(idp IDPMetadata, now time.Time) Provider {
 	p = p.clone()
-	p.SAML.IdP, p.SAML.RefreshedAt = idp, now
+	p.SAML.IDP, p.SAML.RefreshedAt = idp, now
 	return p
+}
+
+// IsSecureIDPURL reports whether u is where an identity provider may be
+// talked to: https, or http on a loopback address.
+func IsSecureIDPURL(u *url.URL) bool {
+	return u.Scheme == "https" || (u.Scheme == "http" && IsLoopbackHost(u.Hostname()))
 }
 
 // MetadataURL is where the instance serves its SAML metadata for the

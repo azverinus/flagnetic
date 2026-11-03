@@ -110,14 +110,14 @@ func newSAMLProvider(t *testing.T) identity.Provider {
 		t.Fatal(err)
 	}
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	idp := identity.IdPMetadata{EntityID: "https://idp.example.com", SSOURL: "https://idp.example.com/sso", Certificates: []string{"pem"}}
+	idp := identity.IDPMetadata{EntityID: "https://idp.example.com", SSOURL: "https://idp.example.com/sso", Certificates: []string{"pem"}}
 	return identity.NewSAML(identity.ProviderID{}, in, idp, identity.SPKey{CertificatePEM: "cert", SealedKey: "sealed"}, now)
 }
 
 func TestAnEditToWhereTheMetadataComesFromClearsTheOtherSource(t *testing.T) {
 	p := newSAMLProvider(t)
 	xml := "<EntityDescriptor/>"
-	got, err := p.CheckChange(identity.ProviderChange{IdPMetadataXML: &xml})
+	got, err := p.CheckChange(identity.ProviderChange{IDPMetadataXML: &xml})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,11 +125,11 @@ func TestAnEditToWhereTheMetadataComesFromClearsTheOtherSource(t *testing.T) {
 		t.Errorf("source after pasting = %q, %q", got.SAML.MetadataURL, got.SAML.MetadataXML)
 	}
 	fetched := "https://idp.example.com/other"
-	back, err := got.CheckChange(identity.ProviderChange{IdPMetadataURL: &fetched})
+	back, err := got.CheckChange(identity.ProviderChange{IDPMetadataURL: &fetched})
 	if err != nil || back.SAML.MetadataURL != fetched || back.SAML.MetadataXML != "" {
 		t.Errorf("source after fetching again = %+v, %v", back.SAML, err)
 	}
-	if _, err = p.CheckChange(identity.ProviderChange{IdPMetadataURL: &fetched, IdPMetadataXML: &xml}); err == nil {
+	if _, err = p.CheckChange(identity.ProviderChange{IDPMetadataURL: &fetched, IDPMetadataXML: &xml}); err == nil {
 		t.Error("an edit naming both sources was accepted")
 	}
 	if p.SAML.MetadataURL == "" {

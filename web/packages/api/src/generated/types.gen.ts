@@ -70,10 +70,13 @@ export type SignInRequest = {
 /**
  * The protocol the provider speaks.
  */
-export type AuthProviderKind = "oidc";
+export type AuthProviderKind = "oidc" | "saml";
 
 /**
- * The claims of the provider's tokens that carry what the instance reads of a person.
+ * The claims of an OIDC provider's tokens, or the attributes of a SAML provider's assertions, that carry what
+ * the instance reads of a person. A SAML provider reads the email from the NameID when its format is
+ * `emailAddress`, else from the attribute named here.
+ *
  */
 export type AuthProviderClaims = {
   /**
@@ -97,6 +100,22 @@ export type AuthProviderClaimsPatch = {
   email?: string;
   name?: string;
   groups?: string;
+};
+
+/**
+ * The format of the subject identifier requested of a SAML identity provider.
+ */
+export type SamlNameIdFormat = "unspecified" | "emailAddress" | "persistent" | "transient";
+
+/**
+ * A certificate a SAML identity provider's signatures are checked against.
+ */
+export type IdPCertificate = {
+  /**
+   * The lowercase hex SHA-256 of the certificate.
+   */
+  sha256: string;
+  not_after: string;
 };
 
 export type AuthProvider = {
@@ -139,11 +158,52 @@ export type AuthProvider = {
    */
   require_verified_email?: boolean;
   /**
-   * The redirect URI to register at the identity provider, built from
+   * OIDC only: the redirect URI to register at the identity provider, built from
    * `FLAGNETIC_BASE_URL`; absent while the instance has none.
    *
    */
   redirect_uri?: string;
+  /**
+   * SAML only: where the identity provider's metadata is fetched from; absent when the metadata was pasted.
+   */
+  idp_metadata_url?: string;
+  /**
+   * SAML only, read from the identity provider's metadata.
+   */
+  idp_entity_id?: string;
+  /**
+   * SAML only: the identity provider's HTTP-Redirect single sign-on address, read from its metadata.
+   */
+  idp_sso_url?: string;
+  /**
+   * SAML only: the certificates the identity provider signs with, read from its metadata.
+   */
+  idp_certificates?: Array<IdPCertificate>;
+  /**
+   * SAML only: when the identity provider's metadata was last read.
+   */
+  idp_metadata_refreshed_at?: string;
+  /**
+   * SAML only: whether the authentication requests are signed.
+   */
+  sign_requests?: boolean;
+  name_id_format?: SamlNameIdFormat;
+  /**
+   * SAML only: the address the identity provider posts its responses to, built from
+   * `FLAGNETIC_BASE_URL`; absent while the instance has none.
+   *
+   */
+  acs_url?: string;
+  /**
+   * SAML only: the instance's entity ID for the provider, which is its metadata address; absent while
+   * the instance has no `FLAGNETIC_BASE_URL`.
+   *
+   */
+  entity_id?: string;
+  /**
+   * SAML only: where the instance serves its metadata, to import into the identity provider.
+   */
+  metadata_url?: string;
   created_at: string;
   updated_at: string;
   version: number;
@@ -153,6 +213,12 @@ export type AuthProviderList = {
   items: Array<AuthProvider>;
 };
 
+/**
+ * A provider of kind `oidc` is created from `issuer`, `client_id`, `client_secret` and its optional OIDC
+ * fields; one of kind `saml` from `idp_metadata_url` or `idp_metadata_xml` and its optional SAML fields. A
+ * field of the other kind is refused 422.
+ *
+ */
 export type AuthProviderCreate = {
   slug: string;
   kind: AuthProviderKind;
@@ -171,10 +237,10 @@ export type AuthProviderCreate = {
    */
   auto_provision?: boolean;
   /**
-   * `https`, or `http` on a loopback address.
+   * OIDC: `https`, or `http` on a loopback address.
    */
-  issuer: string;
-  client_id: string;
+  issuer?: string;
+  client_id?: string;
   /**
    * Default `openid`, `email` and `profile`.
    */
@@ -184,6 +250,15 @@ export type AuthProviderCreate = {
    * Default true.
    */
   require_verified_email?: boolean;
+  /**
+   * SAML: where the identity provider's metadata is fetched from, `https` or `http` on a loopback address, at most 1 MiB. Exactly one of this and `idp_metadata_xml`.
+   */
+  idp_metadata_url?: string;
+  /**
+   * SAML: whether the authentication requests are signed. Default true.
+   */
+  sign_requests?: boolean;
+  name_id_format?: SamlNameIdFormat;
 };
 
 /**
@@ -199,16 +274,36 @@ export type AuthProviderPatch = {
   scopes?: Array<string>;
   claims?: AuthProviderClaimsPatch;
   require_verified_email?: boolean;
+  /**
+   * SAML: fetch the identity provider's metadata from here instead; the metadata is read again.
+   */
+  idp_metadata_url?: string;
+  sign_requests?: boolean;
+  name_id_format?: SamlNameIdFormat;
 };
 
 /**
- * What the provider's discovery document says.
+ * What the provider answers: the discovery document of an OIDC provider, the metadata of a SAML
+ * provider.
+ *
  */
 export type AuthProviderTest = {
-  issuer: string;
-  authorization_endpoint: string;
-  token_endpoint: string;
-  jwks_uri: string;
+  /**
+   * SAML only.
+   */
+  idp_entity_id?: string;
+  /**
+   * SAML only.
+   */
+  idp_sso_url?: string;
+  /**
+   * SAML only.
+   */
+  idp_certificates?: Array<IdPCertificate>;
+  issuer?: string;
+  authorization_endpoint?: string;
+  token_endpoint?: string;
+  jwks_uri?: string;
   /**
    * Absent when the provider offers none.
    */
@@ -493,9 +588,9 @@ export type RoleList = {
 };
 
 /**
- * How the member signed in; `local` is with their email and password, `oidc` through an OIDC auth provider, named by `provider`.
+ * How the member signed in; `local` is with their email and password, `oidc` through an OIDC auth provider and `saml` through a SAML one, named by `provider`.
  */
-export type SessionMethod = "local" | "oidc";
+export type SessionMethod = "local" | "oidc" | "saml";
 
 /**
  * One device a member is signed in on.
@@ -3681,6 +3776,12 @@ export type DocumentDecision = {
   note?: string;
 };
 
+/**
+ * A provider of kind `oidc` is created from `issuer`, `client_id`, `client_secret` and its optional OIDC
+ * fields; one of kind `saml` from `idp_metadata_url` or `idp_metadata_xml` and its optional SAML fields. A
+ * field of the other kind is refused 422.
+ *
+ */
 export type AuthProviderCreateWritable = {
   slug: string;
   kind: AuthProviderKind;
@@ -3699,11 +3800,11 @@ export type AuthProviderCreateWritable = {
    */
   auto_provision?: boolean;
   /**
-   * `https`, or `http` on a loopback address.
+   * OIDC: `https`, or `http` on a loopback address.
    */
-  issuer: string;
-  client_id: string;
-  client_secret: string;
+  issuer?: string;
+  client_id?: string;
+  client_secret?: string;
   /**
    * Default `openid`, `email` and `profile`.
    */
@@ -3713,6 +3814,19 @@ export type AuthProviderCreateWritable = {
    * Default true.
    */
   require_verified_email?: boolean;
+  /**
+   * SAML: where the identity provider's metadata is fetched from, `https` or `http` on a loopback address, at most 1 MiB. Exactly one of this and `idp_metadata_xml`.
+   */
+  idp_metadata_url?: string;
+  /**
+   * SAML: the identity provider's metadata, pasted, at most 1 MiB.
+   */
+  idp_metadata_xml?: string;
+  /**
+   * SAML: whether the authentication requests are signed. Default true.
+   */
+  sign_requests?: boolean;
+  name_id_format?: SamlNameIdFormat;
 };
 
 /**
@@ -3729,6 +3843,16 @@ export type AuthProviderPatchWritable = {
   scopes?: Array<string>;
   claims?: AuthProviderClaimsPatch;
   require_verified_email?: boolean;
+  /**
+   * SAML: fetch the identity provider's metadata from here instead; the metadata is read again.
+   */
+  idp_metadata_url?: string;
+  /**
+   * SAML: use this pasted metadata instead; it is read again.
+   */
+  idp_metadata_xml?: string;
+  sign_requests?: boolean;
+  name_id_format?: SamlNameIdFormat;
 };
 
 /**

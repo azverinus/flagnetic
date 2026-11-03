@@ -40,7 +40,7 @@ func NewClient() *Client { return &Client{http: idphttp.NewClient()} }
 // a loopback address.
 func (c *Client) Fetch(ctx context.Context, rawURL string) ([]byte, error) {
 	u, err := url.Parse(rawURL)
-	if err != nil || (u.Scheme != "https" && !(u.Scheme == "http" && identity.IsLoopbackHost(u.Hostname()))) {
+	if err != nil || !identity.IsSecureIDPURL(u) {
 		return nil, errors.New("the metadata URL is not https")
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
@@ -86,7 +86,7 @@ func serviceProvider(cfg appidentity.SAMLConfig) (*saml2.SAMLServiceProvider, er
 		return nil, errors.New("the instance's key is not an RSA key")
 	}
 	var roots []*x509.Certificate
-	for _, p := range cfg.IdPCertificates {
+	for _, p := range cfg.IDPCertificates {
 		b, _ := pem.Decode([]byte(p))
 		if b == nil {
 			continue
@@ -101,8 +101,8 @@ func serviceProvider(cfg appidentity.SAMLConfig) (*saml2.SAMLServiceProvider, er
 		return nil, errors.New("the provider has no identity provider certificate")
 	}
 	return &saml2.SAMLServiceProvider{
-		IdentityProviderSSOURL:      cfg.IdPSSOURL,
-		IdentityProviderIssuer:      cfg.IdPEntityID,
+		IdentityProviderSSOURL:      cfg.IDPSSOURL,
+		IdentityProviderIssuer:      cfg.IDPEntityID,
 		ServiceProviderIssuer:       cfg.EntityID,
 		AudienceURI:                 cfg.EntityID,
 		AssertionConsumerServiceURL: cfg.ACSURL,

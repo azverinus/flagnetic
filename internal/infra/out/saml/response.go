@@ -169,7 +169,7 @@ func attributeValue(s *types.AttributeStatement, name string) string {
 // inspect refuses a response before it is verified when it is not to be
 // trusted whatever its signature: a DOCTYPE or a processing instruction, which
 // can declare or expand entities; RSA 1.5 key transport in an encryption
-// method. It answers ErrIdPRefused for a response that carries no assertion
+// method. It answers ErrIDPRefused for a response that carries no assertion
 // and a status that is not success, which the identity provider uses to say
 // the person did not authenticate; no signature is asked of it, since it
 // grants nothing.
@@ -227,7 +227,7 @@ func inspect(raw []byte) error {
 		}
 	}
 	if failedStatus && !assertionSeen {
-		return appidentity.ErrIdPRefused
+		return appidentity.ErrIDPRefused
 	}
 	return nil
 }

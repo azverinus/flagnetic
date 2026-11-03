@@ -142,11 +142,11 @@ func providerValues(p identity.Provider) map[string]any {
 		v["claims"] = map[string]any{"email": o.Claims.Email, "name": o.Claims.Name, "groups": o.Claims.Groups}
 	}
 	if c := p.SAML; c != nil {
-		v["idp_entity_id"], v["idp_sso_url"] = c.IdP.EntityID, c.IdP.SSOURL
+		v["idp_entity_id"], v["idp_sso_url"] = c.IDP.EntityID, c.IDP.SSOURL
 		v["sign_requests"], v["name_id_format"] = c.SignRequests, c.NameIDFormat
 		v["claims"] = map[string]any{"email": c.Claims.Email, "name": c.Claims.Name, "groups": c.Claims.Groups}
-		certs := make([]string, 0, len(c.IdP.Certificates))
-		for _, info := range c.IdP.CertificateInfos() {
+		certs := make([]string, 0, len(c.IDP.Certificates))
+		for _, info := range c.IDP.CertificateInfos() {
 			certs = append(certs, info.SHA256)
 		}
 		v["idp_certificates"] = certs
@@ -265,7 +265,7 @@ func (h *CreateProvider) Handle(ctx context.Context, cmd CreateProviderCommand) 
 // newSAML returns the SAML provider in names: its identity provider's metadata
 // read, a key pair generated and its private key sealed.
 func (h *CreateProvider) newSAML(ctx context.Context, in identity.ProviderInput, now time.Time) (identity.Provider, error) {
-	meta, err := readIdPMetadata(ctx, h.d.SAML, in.SAML.MetadataURL, in.SAML.MetadataXML)
+	meta, err := readIDPMetadata(ctx, h.d.SAML, in.SAML.MetadataURL, in.SAML.MetadataXML)
 	if err != nil {
 		return identity.Provider{}, err
 	}
@@ -311,7 +311,7 @@ func (h *UpdateProvider) Handle(ctx context.Context, cmd UpdateProviderCommand) 
 	}
 	// New metadata is read before the unit of work: a fetch must not hold the
 	// provider's row.
-	var meta *identity.IdPMetadata
+	var meta *identity.IDPMetadata
 	if cmd.Change.MetadataChanged() {
 		current, err := providerOf(ctx, h.d.Store, cmd.Slug)
 		if err != nil {
@@ -321,7 +321,7 @@ func (h *UpdateProvider) Handle(ctx context.Context, cmd UpdateProviderCommand) 
 		if err != nil {
 			return identity.Provider{}, err
 		}
-		read, err := readIdPMetadata(ctx, h.d.SAML, checked.SAML.MetadataURL, checked.SAML.MetadataXML)
+		read, err := readIDPMetadata(ctx, h.d.SAML, checked.SAML.MetadataURL, checked.SAML.MetadataXML)
 		if err != nil {
 			return identity.Provider{}, err
 		}
@@ -343,7 +343,7 @@ func (h *UpdateProvider) Handle(ctx context.Context, cmd UpdateProviderCommand) 
 			return err
 		}
 		if meta != nil && after.SAML != nil {
-			after = after.WithIdPMetadata(*meta, now)
+			after = after.WithIDPMetadata(*meta, now)
 		}
 		if sealed == "" && meta == nil && after.Same(before) {
 			return nil

@@ -168,7 +168,7 @@ func (e *edge) metadata(w http.ResponseWriter, r *http.Request, slug string) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/samlmetadata+xml")
-	_, _ = w.Write(doc)
+	_, _ = w.Write(doc) //nolint:gosec // generated XML, served as metadata and not as a page
 }
 
 func (e *edge) complete(w http.ResponseWriter, r *http.Request, token string) {

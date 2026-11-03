@@ -134,10 +134,10 @@ type ProviderChange struct {
 	Claims               *ClaimsChange
 	RequireVerifiedEmail *bool
 
-	// IdPMetadataURL and IdPMetadataXML replace where a SAML provider's
+	// IDPMetadataURL and IDPMetadataXML replace where a SAML provider's
 	// metadata comes from; each clears the other.
-	IdPMetadataURL *string
-	IdPMetadataXML *string
+	IDPMetadataURL *string
+	IDPMetadataXML *string
 	SignRequests   *bool
 	NameIDFormat   *string
 }
@@ -288,12 +288,12 @@ func (p Provider) CheckChange(change ProviderChange) (Provider, error) {
 		}
 	}
 	if s := q.SAML; s != nil {
-		if change.IdPMetadataURL != nil && change.IdPMetadataXML != nil {
+		if change.IDPMetadataURL != nil && change.IDPMetadataXML != nil {
 			v.add("/idp_metadata_xml", "metadata_conflict", "give the metadata as a URL or as a document, not both", nil)
-		} else if change.IdPMetadataURL != nil {
-			s.MetadataURL, s.MetadataXML = *change.IdPMetadataURL, ""
-		} else if change.IdPMetadataXML != nil {
-			s.MetadataURL, s.MetadataXML = "", *change.IdPMetadataXML
+		} else if change.IDPMetadataURL != nil {
+			s.MetadataURL, s.MetadataXML = *change.IDPMetadataURL, ""
+		} else if change.IDPMetadataXML != nil {
+			s.MetadataURL, s.MetadataXML = "", *change.IDPMetadataXML
 		}
 		s.MetadataURL, s.MetadataXML = checkMetadataSource(&v, s.MetadataURL, s.MetadataXML)
 		if change.SignRequests != nil {
@@ -339,7 +339,7 @@ func (c ProviderChange) given() []string {
 	for name, set := range map[string]bool{
 		"issuer": c.Issuer != nil, "client_id": c.ClientID != nil, "client_secret": c.ClientSecret != nil,
 		"scopes": c.Scopes != nil, "require_verified_email": c.RequireVerifiedEmail != nil,
-		"idp_metadata_url": c.IdPMetadataURL != nil, "idp_metadata_xml": c.IdPMetadataXML != nil,
+		"idp_metadata_url": c.IDPMetadataURL != nil, "idp_metadata_xml": c.IDPMetadataXML != nil,
 		"sign_requests": c.SignRequests != nil, "name_id_format": c.NameIDFormat != nil,
 	} {
 		if set {
@@ -353,7 +353,7 @@ func (c ProviderChange) given() []string {
 // MetadataChanged reports whether change names where the metadata comes from,
 // so the metadata must be read again.
 func (c ProviderChange) MetadataChanged() bool {
-	return c.IdPMetadataURL != nil || c.IdPMetadataXML != nil
+	return c.IDPMetadataURL != nil || c.IDPMetadataXML != nil
 }
 
 // Same reports whether q configures the provider p does, apart from p's
@@ -382,7 +382,7 @@ func (p Provider) clone() Provider {
 	}
 	if p.SAML != nil {
 		s := *p.SAML
-		s.IdP.Certificates = slices.Clone(s.IdP.Certificates)
+		s.IDP.Certificates = slices.Clone(s.IDP.Certificates)
 		p.SAML = &s
 	}
 	return p

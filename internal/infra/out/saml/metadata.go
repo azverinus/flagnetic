@@ -32,8 +32,8 @@ const (
 
 // Parse reads an identity provider's entity ID, HTTP-Redirect single sign-on
 // endpoint and signing certificates from its metadata document.
-func (c *Client) Parse(raw []byte) (identity.IdPMetadata, error) {
-	var none identity.IdPMetadata
+func (c *Client) Parse(raw []byte) (identity.IDPMetadata, error) {
+	var none identity.IDPMetadata
 	if err := refuseDangerousXML(raw); err != nil {
 		return none, &identity.MetadataError{Code: "invalid_metadata", Detail: err.Error()}
 	}
@@ -45,7 +45,7 @@ func (c *Client) Parse(raw []byte) (identity.IdPMetadata, error) {
 	if doc.EntityID == "" || idp == nil {
 		return none, &identity.MetadataError{Code: "invalid_metadata", Detail: "the metadata describes no identity provider with an entity ID"}
 	}
-	meta := identity.IdPMetadata{EntityID: strings.TrimSpace(doc.EntityID)}
+	meta := identity.IDPMetadata{EntityID: strings.TrimSpace(doc.EntityID)}
 	for _, s := range idp.SingleSignOnServices {
 		if s.Binding != bindingRedirect {
 			continue
@@ -56,8 +56,7 @@ func (c *Client) Parse(raw []byte) (identity.IdPMetadata, error) {
 	if meta.SSOURL == "" {
 		return none, &identity.MetadataError{Code: "no_redirect_binding", Detail: "the identity provider offers no single sign-on service with the HTTP-Redirect binding"}
 	}
-	if u, err := url.Parse(meta.SSOURL); err != nil || u.Host == "" ||
-		(u.Scheme != "https" && !(u.Scheme == "http" && identity.IsLoopbackHost(u.Hostname()))) {
+	if u, err := url.Parse(meta.SSOURL); err != nil || u.Host == "" || !identity.IsSecureIDPURL(u) {
 		return none, &identity.MetadataError{Code: "invalid_metadata", Detail: "the single sign-on address is not https"}
 	}
 	for _, kd := range idp.KeyDescriptors {

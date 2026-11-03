@@ -36,7 +36,7 @@ type OIDCDiscoverer interface {
 // document of an OIDC provider, the metadata of a SAML one.
 type ProviderTested struct {
 	OIDC *OIDCDiscovery
-	SAML *identity.IdPMetadata
+	SAML *identity.IDPMetadata
 }
 
 // TestProvider checks an auth provider can be reached.
@@ -78,12 +78,12 @@ func (h *TestProvider) Handle(ctx context.Context, slug string) (ProviderTested,
 	return ProviderTested{OIDC: &found}, nil
 }
 
-func (h *TestProvider) readMetadata(ctx context.Context, s *identity.SAML) (identity.IdPMetadata, error) {
+func (h *TestProvider) readMetadata(ctx context.Context, s *identity.SAML) (identity.IDPMetadata, error) {
 	raw := []byte(s.MetadataXML)
 	if s.MetadataURL != "" {
 		var err error
 		if raw, err = h.saml.Fetch(ctx, s.MetadataURL); err != nil {
-			return identity.IdPMetadata{}, err
+			return identity.IDPMetadata{}, err
 		}
 	}
 	return h.saml.Parse(raw)

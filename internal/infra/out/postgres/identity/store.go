@@ -76,7 +76,7 @@ func scanProvider(row pgx.Row) (identity.Provider, error) {
 	if p.Kind == identity.KindSAML {
 		p.SAML = &identity.SAML{
 			MetadataURL: deref(samlURL), MetadataXML: deref(samlXML),
-			IdP:         identity.IdPMetadata{EntityID: *samlEntity, SSOURL: *samlSSO, Certificates: samlCerts},
+			IDP:         identity.IDPMetadata{EntityID: *samlEntity, SSOURL: *samlSSO, Certificates: samlCerts},
 			RefreshedAt: samlRefreshed.UTC(), SignRequests: *samlSign, NameIDFormat: *samlFormat,
 			Claims:        identity.Claims{Email: *samlEmail, Name: *samlName, Groups: *samlGroups},
 			SPCertificate: *samlSPCert, SealedSPKey: *samlSPKey,
@@ -177,7 +177,7 @@ func samlArgs(p identity.Provider) []any {
 	if c == nil {
 		return make([]any, 13)
 	}
-	return []any{nonEmpty(c.MetadataURL), nonEmpty(c.MetadataXML), c.IdP.EntityID, c.IdP.SSOURL, c.IdP.Certificates, c.RefreshedAt,
+	return []any{nonEmpty(c.MetadataURL), nonEmpty(c.MetadataXML), c.IDP.EntityID, c.IDP.SSOURL, c.IDP.Certificates, c.RefreshedAt,
 		c.SignRequests, c.NameIDFormat, c.Claims.Email, c.Claims.Name, c.Claims.Groups, c.SPCertificate, c.SealedSPKey}
 }
 

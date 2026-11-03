@@ -28,7 +28,7 @@ func (o Options) samlURLs(p identity.Provider) (acs, entity string) {
 	return identity.ACSURL(o.BaseURL, p.Slug), identity.MetadataURL(o.BaseURL, p.Slug)
 }
 
-func idpCertificatesOut(m identity.IdPMetadata) []IdPCertificate {
+func idpCertificatesOut(m identity.IDPMetadata) []IdPCertificate {
 	infos := m.CertificateInfos()
 	out := make([]IdPCertificate, len(infos))
 	for i, c := range infos {
@@ -50,8 +50,8 @@ func (a *api) authProviderOut(p identity.Provider) AuthProvider {
 		out.Claims = &AuthProviderClaims{Email: o.Claims.Email, Name: o.Claims.Name, Groups: o.Claims.Groups}
 	}
 	if c := p.SAML; c != nil {
-		out.IdpEntityId, out.IdpSsoUrl = &c.IdP.EntityID, &c.IdP.SSOURL
-		out.IdpCertificates, out.IdpMetadataRefreshedAt = new(idpCertificatesOut(c.IdP)), &c.RefreshedAt
+		out.IdpEntityId, out.IdpSsoUrl = &c.IDP.EntityID, &c.IDP.SSOURL
+		out.IdpCertificates, out.IdpMetadataRefreshedAt = new(idpCertificatesOut(c.IDP)), &c.RefreshedAt
 		out.SignRequests, out.NameIdFormat = &c.SignRequests, new(SAMLNameIDFormat(c.NameIDFormat))
 		out.Claims = &AuthProviderClaims{Email: c.Claims.Email, Name: c.Claims.Name, Groups: c.Claims.Groups}
 		if c.MetadataURL != "" {
@@ -147,7 +147,7 @@ func (a *api) UpdateAuthProvider(ctx context.Context, req UpdateAuthProviderRequ
 	change := identity.ProviderChange{
 		DisplayName: b.DisplayName, Domains: b.Domains, LinkByEmail: b.LinkByEmail, AutoProvision: b.AutoProvision,
 		Issuer: b.Issuer, ClientID: b.ClientId, Scopes: b.Scopes, RequireVerifiedEmail: b.RequireVerifiedEmail,
-		IdPMetadataURL: b.IdpMetadataUrl, IdPMetadataXML: b.IdpMetadataXml, SignRequests: b.SignRequests,
+		IDPMetadataURL: b.IdpMetadataUrl, IDPMetadataXML: b.IdpMetadataXml, SignRequests: b.SignRequests,
 	}
 	if b.NameIdFormat != nil {
 		change.NameIDFormat = new(string(*b.NameIdFormat))

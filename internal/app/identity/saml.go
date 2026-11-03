@@ -12,9 +12,9 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
-// ErrIdPRefused is what verifying a SAML response fails with when the identity
+// ErrIDPRefused is what verifying a SAML response fails with when the identity
 // provider answered that the sign-in failed, rather than with an assertion.
-var ErrIdPRefused = errors.New("the identity provider refused the sign-in")
+var ErrIDPRefused = errors.New("the identity provider refused the sign-in")
 
 // SAMLConfig is what the instance presents to a SAML identity provider as a
 // service provider, and what it trusts of it.
@@ -24,12 +24,12 @@ type SAMLConfig struct {
 	EntityID string
 	// ACSURL is where the identity provider posts its response.
 	ACSURL string
-	// IdPEntityID is the identity provider's, IdPSSOURL its HTTP-Redirect
-	// single sign-on endpoint and IdPCertificates, PEM encoded, the
+	// IDPEntityID is the identity provider's, IDPSSOURL its HTTP-Redirect
+	// single sign-on endpoint and IDPCertificates, PEM encoded, the
 	// certificates its signatures are checked against.
-	IdPEntityID     string
-	IdPSSOURL       string
-	IdPCertificates []string
+	IDPEntityID     string
+	IDPSSOURL       string
+	IDPCertificates []string
 	SignRequests    bool
 	NameIDFormat    string
 	Claims          identity.Claims
@@ -63,7 +63,7 @@ type SAMLClient interface {
 	// ACS: that it was signed by one of the identity provider's certificates,
 	// is from its entity, is addressed to the ACS and the audience, answers
 	// the request with requestID, and is within its validity. It decrypts an
-	// encrypted assertion with the instance's key. ErrIdPRefused when the
+	// encrypted assertion with the instance's key. ErrIDPRefused when the
 	// identity provider answered that the sign-in failed.
 	VerifyResponse(cfg SAMLConfig, response, requestID string) (SAMLAssertion, error)
 	// Metadata returns the instance's SAML metadata for the provider, to import
@@ -78,7 +78,7 @@ type SAMLMetadataReader interface {
 	// Parse reads the identity provider's entity ID, HTTP-Redirect single
 	// sign-on endpoint and signing certificates from a metadata document; an
 	// *identity.MetadataError says why it cannot be used.
-	Parse(raw []byte) (identity.IdPMetadata, error)
+	Parse(raw []byte) (identity.IDPMetadata, error)
 }
 
 // SPKeyGenerator makes the key pair the instance presents to an identity
@@ -96,17 +96,17 @@ type ReplayStore interface {
 	RecordAssertion(ctx context.Context, provider identity.ProviderID, assertionID string, expires, now time.Time) (bool, error)
 }
 
-// readIdPMetadata returns the metadata of an identity provider, fetched from
+// readIDPMetadata returns the metadata of an identity provider, fetched from
 // metadataURL or else read from the pasted metadataXML. A provider that cannot
 // be reached is provider_unreachable; metadata that cannot be used is an
 // invalid_auth_provider naming the field it came from.
-func readIdPMetadata(ctx context.Context, r SAMLMetadataReader, metadataURL, metadataXML string) (identity.IdPMetadata, error) {
+func readIDPMetadata(ctx context.Context, r SAMLMetadataReader, metadataURL, metadataXML string) (identity.IDPMetadata, error) {
 	raw, field := []byte(metadataXML), "/idp_metadata_xml"
 	if metadataURL != "" {
 		var err error
 		field = "/idp_metadata_url"
 		if raw, err = r.Fetch(ctx, metadataURL); err != nil {
-			return identity.IdPMetadata{}, apperrors.BadGateway("provider_unreachable", "the identity provider's metadata could not be fetched").
+			return identity.IDPMetadata{}, apperrors.BadGateway("provider_unreachable", "the identity provider's metadata could not be fetched").
 				WithCause(err).WithExtension("failure", clip(err.Error(), maxFailureBytes))
 		}
 	}
@@ -148,7 +148,7 @@ func (d SignInDeps) samlConfig(p identity.Provider, now time.Time) (SAMLConfig, 
 	s := p.SAML
 	return SAMLConfig{
 		EntityID: identity.MetadataURL(d.BaseURL, p.Slug), ACSURL: identity.ACSURL(d.BaseURL, p.Slug),
-		IdPEntityID: s.IdP.EntityID, IdPSSOURL: s.IdP.SSOURL, IdPCertificates: s.IdP.Certificates,
+		IDPEntityID: s.IDP.EntityID, IDPSSOURL: s.IDP.SSOURL, IDPCertificates: s.IDP.Certificates,
 		SignRequests: s.SignRequests, NameIDFormat: s.NameIDFormat, Claims: s.Claims,
 		SPCertificate: s.SPCertificate, SPKey: secret.New(string(key)), Now: now,
 	}, nil
@@ -240,7 +240,7 @@ func (h *CompleteACS) Handle(ctx context.Context, cmd ACSCommand) (token string,
 		return "", h.end(ctx, attempt, fail(CodeSSOFailed, err))
 	}
 	assertion, err := h.d.SAML.VerifyResponse(cfg, cmd.Response, attempt.RequestID)
-	if errors.Is(err, ErrIdPRefused) {
+	if errors.Is(err, ErrIDPRefused) {
 		return "", h.end(ctx, attempt, fail(CodeIDPError, err))
 	}
 	if err != nil {

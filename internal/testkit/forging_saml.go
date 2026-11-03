@@ -23,7 +23,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -141,7 +140,6 @@ type ForgingSAMLIDP struct {
 	key, otherKey   *rsa.PrivateKey
 	cert, otherCert []byte // DER
 	srv             *httptest.Server
-	mu              sync.Mutex
 }
 
 // StartForgingSAMLIDP starts a forging provider that ends with the test.
@@ -445,7 +443,9 @@ func (f *ForgingSAMLIDP) assertion(now time.Time, a SAMLAssertion, issuer, audie
 func (f *ForgingSAMLIDP) signWith(t testing.TB, el *etree.Element, key *rsa.PrivateKey, der []byte) *etree.Element {
 	t.Helper()
 	ctx := dsig.NewDefaultSigningContext(dsig.TLSCertKeyStore(tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}))
-	ctx.SetSignatureMethod(dsig.RSASHA256SignatureMethod)
+	if err := ctx.SetSignatureMethod(dsig.RSASHA256SignatureMethod); err != nil {
+		t.Fatal(err)
+	}
 	// Exclusive canonicalization, which every identity provider signs with: the
 	// default includes the namespaces in scope, which differ once the element
 	// sits in a response.
@@ -529,7 +529,7 @@ func encryptAssertion(t testing.TB, assertion *etree.Element, a SAMLAssertion) *
 	transport := "http://www.w3.org/2001/04/xmlenc#rsa-oaep-mgf1p"
 	if a.Encryption == SAMLRSA15 {
 		transport = "http://www.w3.org/2001/04/xmlenc#rsa-1_5"
-		wrappedKey, err = rsa.EncryptPKCS1v15(rand.Reader, pub, key)
+		wrappedKey, err = rsa.EncryptPKCS1v15(rand.Reader, pub, key) //nolint:staticcheck // the key transport the instance refuses has to be built to be refused
 	} else {
 		wrappedKey, err = rsa.EncryptOAEP(sha1.New(), rand.Reader, pub, key, nil) //nolint:gosec // the digest SAML service providers default to
 	}
