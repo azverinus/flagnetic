@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -59,6 +61,10 @@ type ForgingIDP struct {
 type forgedCode struct {
 	nonce, challenge, redirect string
 }
+
+// forgedRedirectHosts are the hosts a forging provider sends a browser back
+// to: the public addresses the tests serve an instance at.
+var forgedRedirectHosts = []string{"localhost:8080", "flags.example.com"}
 
 // StartForgingIDP starts a forging provider that ends with the test.
 func StartForgingIDP(t testing.TB) *ForgingIDP {
@@ -151,7 +157,8 @@ func jwk(k *rsa.PublicKey, kid string) map[string]string {
 func (f *ForgingIDP) authorize(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	back, err := url.Parse(q.Get("redirect_uri"))
-	if err != nil || q.Get("client_id") != f.ClientID {
+	if err != nil || q.Get("client_id") != f.ClientID || back.User != nil || !slices.Contains(forgedRedirectHosts, back.Host) ||
+		!strings.HasPrefix(back.Path, "/sso/") || !strings.HasSuffix(back.Path, "/callback") {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
