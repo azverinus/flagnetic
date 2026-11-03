@@ -1,6 +1,7 @@
 package sdk_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"slices"
@@ -338,5 +339,35 @@ func TestEverySummaryRowIsExportedWithItsSourceAndRemoteEvaluationsGetStableRepo
 	}
 	if len(remote) != 2 || remote[0] == remote[1] {
 		t.Errorf("remote report IDs = %v, want two distinct ones", remote)
+	}
+}
+
+func TestAReadThatCannotBeDoneIsAnErrorAndNeverAnEmptyBatch(t *testing.T) {
+	f := startSinkRows(t)
+	scope := f.scope(t)
+	b := pgevents.Batch{To: events.Cursor{XID: 1, Seq: 1}}
+	if _, err := f.store.NextBatch(t.Context(), "click", scope, events.Cursor{}, 1); err == nil {
+		t.Error("a batch of an event kind that has no raw table = nil error, want one")
+	}
+	if _, _, err := f.store.OldestUnread(t.Context(), "click", scope, events.Cursor{}); err == nil {
+		t.Error("the oldest unread row of an event kind that has no raw table = nil error, want one")
+	}
+	if _, err := f.store.ReadBatch(t.Context(), "click", scope, b); err == nil {
+		t.Error("rows of an event kind that has no raw table = nil error, want one")
+	}
+
+	// The database cannot be reached: each read says so.
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	for _, kind := range sinks.EventKinds {
+		if _, err := f.store.NextBatch(ctx, kind, scope, events.Cursor{}, 1); err == nil {
+			t.Errorf("a %s batch with the context ended = nil error, want one", kind)
+		}
+		if _, _, err := f.store.OldestUnread(ctx, kind, scope, events.Cursor{}); err == nil {
+			t.Errorf("the oldest unread %s with the context ended = nil error, want one", kind)
+		}
+		if _, err := f.store.ReadBatch(ctx, kind, scope, b); err == nil {
+			t.Errorf("%s rows with the context ended = nil error, want one", kind)
+		}
 	}
 }
