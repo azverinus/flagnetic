@@ -532,7 +532,7 @@ func encryptAssertion(t testing.TB, assertion *etree.Element, a SAMLAssertion) *
 	} else {
 		size := c.BlockSize()
 		pad := size - len(plain)%size
-		padded := append(plain, bytes.Repeat([]byte{byte(pad)}, pad)...)
+		padded := append(plain, bytes.Repeat([]byte{byte(pad)}, pad)...) //nolint:gosec // pad is at most the block size, 16
 		iv := make([]byte, size)
 		_, _ = rand.Read(iv)
 		cipherText = append(iv, make([]byte, len(padded))...)
