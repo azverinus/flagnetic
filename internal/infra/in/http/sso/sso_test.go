@@ -365,6 +365,67 @@ func TestACompletionPresentingAnotherAttemptsCookieChangesNothing(t *testing.T) 
 	}
 }
 
+func TestACompletionFromAnotherBrowserLinksNoExistingMember(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	slug := e.forged(t, idp, func(p *provider) { p.linkByEmail, p.autoProvision = true, false })
+	m := testkit.NewMember(t, testkit.Pool(t))
+	idp.NextClaims(map[string]any{"email": m.Email, "sub": "subject-" + m.Email})
+	victim := testkit.NewBrowser(t, e.srv.URL)
+	o := e.opts()
+	o.Stop = func(u *url.URL) bool { return strings.HasPrefix(u.Path, "/sso/complete/") }
+	held := e.signIn(t, victim, slug, "", o)
+	if !strings.HasPrefix(held.URL.Path, "/sso/complete/") {
+		t.Fatalf("the sign-in reached %s before completing", held.URL)
+	}
+
+	attacker := testkit.NewBrowser(t, e.srv.URL)
+	wantError(t, attacker.Visit(t, held.URL.String(), testkit.VisitOptions{}), attacker, "attempt_mismatch")
+
+	if n := len(e.audited(t, "identity.linked", "member_email", m.Email)); n != 0 {
+		t.Errorf("%d identities linked to an existing member by a completion from another browser", n)
+	}
+	// Every session a sign-in opens records auth.signed_in with it.
+	if n := len(e.audited(t, "auth.signed_in", "email", m.Email)); n != 0 {
+		t.Errorf("%d sessions opened by a completion from another browser", n)
+	}
+}
+
+func TestAnAnswerOfTheProviderOpenedInAnotherBrowserSignsNobodyIn(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	slug := e.forged(t, idp, nil)
+	email := uniqueEmail()
+	idp.NextClaims(map[string]any{"email": email})
+	victim := testkit.NewBrowser(t, e.srv.URL)
+	o := e.opts()
+	var callback string
+	o.Stop = func(u *url.URL) bool {
+		if strings.HasSuffix(u.Path, "/callback") {
+			callback = u.String()
+			return true
+		}
+		return false
+	}
+	e.signIn(t, victim, slug, "", o)
+	if callback == "" {
+		t.Fatal("the provider never answered")
+	}
+
+	// Another browser opens the provider's answer before the victim does.
+	attacker := testkit.NewBrowser(t, e.srv.URL)
+	wantError(t, attacker.Visit(t, callback, testkit.VisitOptions{}), attacker, "attempt_mismatch")
+
+	if n := e.memberCount(t, email); n != 0 {
+		t.Errorf("%d members provisioned by an answer opened in another browser", n)
+	}
+	// The answer is spent, and with it the attempt.
+	wantError(t, victim.Visit(t, callback, testkit.VisitOptions{}), victim, "sso_failed")
+	if n := e.memberCount(t, email); n != 0 {
+		t.Errorf("%d members provisioned after the answer was spent", n)
+	}
+}
+
 func TestAnAttemptExpiresAfterTenMinutes(t *testing.T) {
 	idp := testkit.StartForgingIDP(t)
 	c := testkit.Clock()
@@ -429,21 +490,25 @@ func TestAnEmailIsLinkedToAnExistingMemberOnlyWhenTheProviderVouchesForIt(t *tes
 		claims   map[string]any
 		userInfo map[string]any
 		want     string // "" for a sign-in
+		// failed is the reason auth.sign_in_failed records for the member, ""
+		// when a refusal records none: the provider does not vouch for the
+		// email, so the person is not known as the member.
+		failed string
 	}{
-		{"a verified email in the domains", func(p *provider) { p.linkByEmail = true }, nil, nil, ""},
-		{"linking by email off", func(*provider) {}, nil, nil, "member_not_found"},
-		{"an unverified email", func(p *provider) { p.linkByEmail = true }, map[string]any{"email_verified": false}, nil, "member_not_found"},
-		{"a verification the token does not state", func(p *provider) { p.linkByEmail = true }, map[string]any{"email_verified": nil}, nil, "member_not_found"},
-		{"a verification stated as a string", func(p *provider) { p.linkByEmail = true }, map[string]any{"email_verified": "true"}, nil, "member_not_found"},
+		{"a verified email in the domains", func(p *provider) { p.linkByEmail = true }, nil, nil, "", ""},
+		{"linking by email off", func(*provider) {}, nil, nil, "member_not_found", "not_linked"},
+		{"an unverified email", func(p *provider) { p.linkByEmail = true }, map[string]any{"email_verified": false}, nil, "member_not_found", ""},
+		{"a verification the token does not state", func(p *provider) { p.linkByEmail = true }, map[string]any{"email_verified": nil}, nil, "member_not_found", ""},
+		{"a verification stated as a string", func(p *provider) { p.linkByEmail = true }, map[string]any{"email_verified": "true"}, nil, "member_not_found", ""},
 		{"an unverified email where verification is not required", func(p *provider) { p.linkByEmail, p.requireVerifiedEmail = true, ptr(false) },
-			map[string]any{"email_verified": false}, nil, ""},
-		{"an email outside the domains", func(p *provider) { p.linkByEmail, p.domains = true, []string{"corp.example.net"} }, nil, nil, "member_not_found"},
+			map[string]any{"email_verified": false}, nil, "", ""},
+		{"an email outside the domains", func(p *provider) { p.linkByEmail, p.domains = true, []string{"corp.example.net"} }, nil, nil, "member_not_found", ""},
 		{"an email only UserInfo holds", func(p *provider) { p.linkByEmail = true }, map[string]any{"email": nil},
-			map[string]any{"sub": "subject-1", "email": "{email}", "email_verified": true}, ""},
+			map[string]any{"sub": "subject-1", "email": "{email}", "email_verified": true}, "", ""},
 		{"a UserInfo email the token's verification does not vouch for", func(p *provider) { p.linkByEmail = true },
-			map[string]any{"email": nil, "email_verified": true}, map[string]any{"sub": "subject-1", "email": "{email}"}, "member_not_found"},
+			map[string]any{"email": nil, "email_verified": true}, map[string]any{"sub": "subject-1", "email": "{email}"}, "member_not_found", ""},
 		{"a UserInfo answer for another subject", func(p *provider) { p.linkByEmail = true }, map[string]any{"email": nil},
-			map[string]any{"sub": "someone-else", "email": "{email}", "email_verified": true}, "member_not_found"},
+			map[string]any{"sub": "someone-else", "email": "{email}", "email_verified": true}, "member_not_found", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			slug := e.forged(t, idp, func(p *provider) { p.autoProvision = false; tc.change(p) })
@@ -472,6 +537,13 @@ func TestAnEmailIsLinkedToAnExistingMemberOnlyWhenTheProviderVouchesForIt(t *tes
 
 			if tc.want != "" {
 				wantError(t, v, b, tc.want)
+				failed := e.audited(t, "auth.sign_in_failed", "email", m.Email)
+				switch {
+				case tc.failed == "" && len(failed) != 0:
+					t.Errorf("auth.sign_in_failed recorded for a member the provider does not vouch for: %v", failed)
+				case tc.failed != "" && (len(failed) != 1 || failed[0]["provider"] != slug || failed[0]["reason"] != tc.failed):
+					t.Errorf("auth.sign_in_failed = %v, want one with reason %s", failed, tc.failed)
+				}
 				return
 			}
 			me := signedIn(t, b)
@@ -494,6 +566,10 @@ func TestAnInvitedMemberDoesNotSignInThroughAProvider(t *testing.T) {
 	b := testkit.NewBrowser(t, e.srv.URL)
 
 	wantError(t, e.signIn(t, b, slug, "", e.opts()), b, "member_not_found")
+	failed := e.audited(t, "auth.sign_in_failed", "email", invited.Email)
+	if len(failed) != 1 || failed[0]["method"] != "oidc" || failed[0]["provider"] != slug || failed[0]["reason"] != "invited" {
+		t.Errorf("auth.sign_in_failed = %v", failed)
+	}
 }
 
 func TestADeactivatedMemberCannotSignInAndTheFailureIsAudited(t *testing.T) {

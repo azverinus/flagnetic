@@ -329,7 +329,16 @@ type SignedIn struct {
 type unresolved struct {
 	err    error
 	member MemberRecord
+	// known is whether the person is that member: linked to them, or holding their
+	// email where the provider vouches for it. A member merely named by an
+	// email the provider does not vouch for is not known, so nobody can fill a
+	// member's audit trail with refusals by claiming their address.
+	known bool
 }
+
+// reasonNotLinked is why an active member could not sign in: the subject is
+// not linked to them and the provider does not link by email.
+const reasonNotLinked = "not_linked"
 
 func (u *unresolved) Error() string { return u.err.Error() }
 func (u *unresolved) Unwrap() error { return u.err }
@@ -380,17 +389,27 @@ func (h *CompleteSignIn) Handle(ctx context.Context, cmd CompleteCommand) (Signe
 }
 
 // refuse returns the failure for a person no rule lets in, recording the
-// failed sign-in of a member the instance holds.
+// failed sign-in of a member the instance knows them as. The reason is the
+// member's status when it is what refuses them, as a password sign-in
+// records it, and not_linked for an active member.
 func (h *CompleteSignIn) refuse(ctx context.Context, p identity.Provider, u *unresolved, requestID string) error {
+	refusal := fail(CodeMemberNotFound, u.err)
 	if errors.Is(u.err, identity.ErrMemberDeactivated) {
-		if err := h.d.Tx.Within(context.WithoutCancel(ctx), func(ctx context.Context) error {
-			return h.d.Members.RecordFailedSignIn(ctx, u.member, p.Slug, string(identity.MemberDeactivated), requestID)
-		}); err != nil {
-			return errors.Join(fail(CodeMemberDeactivated, u.err), err)
-		}
-		return fail(CodeMemberDeactivated, u.err)
+		refusal = fail(CodeMemberDeactivated, u.err)
 	}
-	return fail(CodeMemberNotFound, u.err)
+	if !u.known {
+		return refusal
+	}
+	reason := string(u.member.Status)
+	if u.member.Status == identity.MemberActive {
+		reason = reasonNotLinked
+	}
+	if err := h.d.Tx.Within(context.WithoutCancel(ctx), func(ctx context.Context) error {
+		return h.d.Members.RecordFailedSignIn(ctx, u.member, p.Slug, reason, requestID)
+	}); err != nil {
+		return errors.Join(refusal, err)
+	}
+	return refusal
 }
 
 // signIn resolves the person claims describe, and makes every change the
@@ -427,7 +446,8 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 	}
 	res, err := identity.Resolve(in)
 	if err != nil {
-		return secret.String{}, &unresolved{err: err, member: member}
+		known := in.Linked != nil || (in.ByEmail != nil && p.Vouches(claims))
+		return secret.String{}, &unresolved{err: err, member: member, known: known}
 	}
 	now := h.d.now()
 	switch res.Action {

@@ -71,6 +71,6 @@ Every failure redirects to `/sign-in?error=<code>`:
 
 ## Audit and metrics
 
-A first sign-in records `member.provisioned` or `identity.linked` (or both), and every sign-in `auth.signed_in` with its `method` (`oidc`) and `provider`; a refused sign-in of a known member records `auth.sign_in_failed`.
+A first sign-in records `member.provisioned` or `identity.linked` (or both), and every sign-in `auth.signed_in` with its `method` (`oidc`) and `provider`; a refused sign-in of a known member (one the subject is linked to, or one holding an email the provider vouches for) records `auth.sign_in_failed` with the `reason`: the member's status when it refuses them (`deactivated`, `invited`), or `not_linked` for an active member when the provider does not link by email.
 
 `flagnetic_sso_sign_ins_total{kind,result}` counts sign-ins that ended, by `kind` (`oidc`) and `result`: `succeeded` or the code above.

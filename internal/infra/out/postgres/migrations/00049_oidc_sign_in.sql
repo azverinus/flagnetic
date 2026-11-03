@@ -39,8 +39,8 @@ CREATE INDEX sso_attempts_provider ON sso_attempts (provider_id);
 CREATE INDEX sso_attempts_expiry ON sso_attempts (expires_at);
 
 -- Identities: the subject an identity provider knows a member by. A subject
--- belongs to one member, and a member may hold one at each provider and
--- several at different ones.
+-- belongs to one member; a member may hold several, at one provider or at
+-- different ones.
 CREATE TABLE identities (
     id            uuid        PRIMARY KEY,
     provider_id   uuid        NOT NULL REFERENCES auth_providers (id),
