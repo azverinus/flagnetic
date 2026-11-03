@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/js/v0.1.1...sdks/js/v0.1.2) (2026-11-03)
+
+
+### Dependencies
+
+* resolve minimatch 11.0.1 in the console and the JavaScript SDK ([#202](https://github.com/azverinus/flagnetic/issues/202)) ([169cbb0](https://github.com/azverinus/flagnetic/commit/169cbb04c916c60c1b187ff3a3c311377dcae0f1))
+* **sdk-js:** Bump the sdk-js group in /sdks/js with 2 updates ([#197](https://github.com/azverinus/flagnetic/issues/197)) ([b4ea002](https://github.com/azverinus/flagnetic/commit/b4ea00207e2e18ce52729430ad0fcf54fd030b23))
+
 ## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/js/v0.1.0...sdks/js/v0.1.1) (2026-10-29)
 
 
