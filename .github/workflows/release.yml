@@ -224,7 +224,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.release-please.outputs.sdk_python_tag }}
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: astral-sh/setup-uv@v10.3.3
       - name: Version equals the tag
         env:
           FLAGNETIC_RELEASE_VERSION: ${{ needs.release-please.outputs.sdk_python_version }}
