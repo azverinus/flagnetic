@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/azverinus/flagnetic/internal/domain/events"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
 )
 
@@ -23,9 +24,9 @@ type Batch struct {
 	Rows int
 }
 
-// where is the condition selecting the batch's rows of the table aliased
+// Where is the condition selecting the batch's rows of the table aliased
 // alias, its arguments numbered from $1.
-func (b Batch) where(alias string) (string, []any) {
+func (b Batch) Where(alias string) (string, []any) {
 	c := alias + ".xid, " + alias + ".seq"
 	return `(` + c + `) > ($1::text::xid8, $2) AND (` + c + `) <= ($3::text::xid8, $4)`,
 		[]any{xidText(b.From), b.From.Seq, xidText(b.To), b.To.Seq}
@@ -33,14 +34,51 @@ func (b Batch) where(alias string) (string, []any) {
 
 func xidText(c events.Cursor) string { return strconv.FormatUint(c.XID, 10) }
 
-// bound returns the next batch of at most limit rows of table past from, of
-// transactions below the snapshot horizon: every transaction with a smaller ID
+// Scope narrows a stream to the rows of one project and, when Environments
+// is not empty, of those environments. A rollup reads the whole table, so
+// its cursor passes every project's rows; a sink's stream reads one
+// project's, and its cursor moves past the rows it will never send, so the
+// scope is part of the bound and of the lag, never only of the read. The zero
+// Scope is the whole table.
+type Scope struct {
+	Project      workspace.ProjectID
+	Environments []workspace.EnvironmentID
+}
+
+// Where is the condition selecting the rows of the table aliased alias, empty
+// for it itself, that are in the scope, its arguments numbered from first;
+// it is empty for the whole table.
+func (sc Scope) Where(alias string, first int) (string, []any) {
+	if sc.Project.IsZero() {
+		return "", nil
+	}
+	if alias != "" {
+		alias += "."
+	}
+	cond, args := alias+"project_id = $"+strconv.Itoa(first), []any{sc.Project.Bytes()}
+	if len(sc.Environments) > 0 {
+		ids := make([][16]byte, len(sc.Environments))
+		for i, e := range sc.Environments {
+			ids[i] = e.Bytes()
+		}
+		cond += " AND " + alias + "environment_id = ANY($" + strconv.Itoa(first+1) + "::uuid[])"
+		args = append(args, ids)
+	}
+	return cond, args
+}
+
+// Bound returns the next batch of at most limit rows of table in scope past
+// from, of transactions below the snapshot horizon: every transaction with a smaller ID
 // has ended, and every later one gets a larger ID, so no row can commit
 // behind the batch's end however long another transaction stays open. An
 // insert's transaction ID is taken when it first writes, so an ingest that
 // began before the horizon but writes after it still lands past every cursor.
-func bound(ctx context.Context, db pgxtx.DB, table string, from events.Cursor, limit int) (Batch, error) {
+func Bound(ctx context.Context, db pgxtx.DB, table string, scope Scope, from events.Cursor, limit int) (Batch, error) {
 	b := Batch{From: from, To: from}
+	where, scoped := scope.Where("", 4)
+	if where != "" {
+		where = " AND " + where
+	}
 	// The end is chosen by the xid8 column, never by its text: "10" sorts
 	// before "9" as text, and a cursor stopped short would read rows again.
 	var (
@@ -50,11 +88,11 @@ func bound(ctx context.Context, db pgxtx.DB, table string, from events.Cursor, l
 	err := db.QueryRow(ctx, `
 		WITH b AS (
 			SELECT xid, seq FROM `+pgx.Identifier{table}.Sanitize()+`
-			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < pg_snapshot_xmin(pg_current_snapshot())
+			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < pg_snapshot_xmin(pg_current_snapshot())`+where+`
 			ORDER BY xid, seq LIMIT $3)
 		SELECT count(*), (SELECT b.xid::text FROM b ORDER BY b.xid DESC, b.seq DESC LIMIT 1),
 			(SELECT b.seq FROM b ORDER BY b.xid DESC, b.seq DESC LIMIT 1)
-		FROM b`, xidText(from), from.Seq, limit).Scan(&b.Rows, &toXID, &toSeq)
+		FROM b`, append([]any{xidText(from), from.Seq, limit}, scoped...)...).Scan(&b.Rows, &toXID, &toSeq)
 	if err != nil {
 		return Batch{}, fmt.Errorf("choosing a batch of %s: %w", table, err)
 	}
@@ -149,13 +187,24 @@ func (s *Store) OldestUnread(ctx context.Context, stream events.Stream) (at time
 	if err != nil {
 		return time.Time{}, false, err
 	}
-	err = s.db(ctx).QueryRow(ctx, `SELECT received_at FROM `+pgx.Identifier{table}.Sanitize()+`
-		WHERE (xid, seq) > ($1::text::xid8, $2) ORDER BY xid, seq LIMIT 1`, xidText(from), from.Seq).Scan(&at)
+	return OldestAfter(ctx, s.db(ctx), table, Scope{}, from)
+}
+
+// OldestAfter returns when the first row of table in scope past from was
+// received, held back by the horizon or not; ok is false when there is none.
+func OldestAfter(ctx context.Context, db pgxtx.DB, table string, scope Scope, from events.Cursor) (at time.Time, ok bool, err error) {
+	where, scoped := scope.Where("", 3)
+	if where != "" {
+		where = " AND " + where
+	}
+	err = db.QueryRow(ctx, `SELECT received_at FROM `+pgx.Identifier{table}.Sanitize()+`
+		WHERE (xid, seq) > ($1::text::xid8, $2)`+where+` ORDER BY xid, seq LIMIT 1`,
+		append([]any{xidText(from), from.Seq}, scoped...)...).Scan(&at)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return time.Time{}, false, nil
 	}
 	if err != nil {
-		return time.Time{}, false, fmt.Errorf("reading the oldest row %s has not read: %w", stream, err)
+		return time.Time{}, false, fmt.Errorf("reading the oldest row of %s not read: %w", table, err)
 	}
 	return at.UTC(), true, nil
 }

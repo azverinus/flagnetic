@@ -21,11 +21,11 @@ import (
 // last; from itself when there is none. Each row names the project's flag of
 // its key as it is now, none when the project has no such flag any more.
 func (s *Store) SummariesAfter(ctx context.Context, from events.Cursor, limit int) ([]events.SummaryRow, events.Cursor, error) {
-	b, err := bound(ctx, s.db(ctx), "evaluation_summary_events", from, limit)
+	b, err := Bound(ctx, s.db(ctx), "evaluation_summary_events", Scope{}, from, limit)
 	if err != nil || b.Rows == 0 {
 		return nil, b.To, err
 	}
-	where, args := b.where("r")
+	where, args := b.Where("r")
 	// A summary's rows are stored by one transaction, so they are read one
 	// after the other, and only the first batch's cursor can fall among
 	// them: a summary is first in a batch at its smallest seq there, unless
