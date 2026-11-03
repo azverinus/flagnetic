@@ -6,7 +6,6 @@ import (
 	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/des" //nolint:gosec // Triple DES, which the instance refuses, has to be built to be refused
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1" //nolint:gosec // RSA-OAEP's own digest, the one SAML service providers default to
@@ -78,7 +77,7 @@ const (
 	SAMLAES256GCM
 	// SAMLRSA15 encrypts with AES-128-CBC, the key sent by RSA 1.5, which the instance refuses.
 	SAMLRSA15
-	// SAMLTripleDES encrypts with Triple DES in CBC mode, the key sent by RSA-OAEP, which the
+	// SAMLTripleDES names Triple DES in CBC mode as the encryption, the key sent by RSA-OAEP, which the
 	// instance refuses.
 	SAMLTripleDES
 )
@@ -507,16 +506,13 @@ func encryptAssertion(t testing.TB, assertion *etree.Element, a SAMLAssertion) *
 	case SAMLAES256GCM:
 		keySize, dataMethod = 32, "http://www.w3.org/2009/xmlenc11#aes256-gcm"
 	case SAMLTripleDES:
-		keySize, dataMethod = 24, "http://www.w3.org/2001/04/xmlenc#tripledes-cbc"
+		// Only the algorithm it names is Triple DES: the instance refuses it
+		// before decrypting, so the data is AES like the rest.
+		dataMethod = "http://www.w3.org/2001/04/xmlenc#tripledes-cbc"
 	}
 	key := make([]byte, keySize)
 	_, _ = rand.Read(key)
-	var c cipher.Block
-	if a.Encryption == SAMLTripleDES {
-		c, err = des.NewTripleDESCipher(key) //nolint:gosec // the encryption the instance refuses has to be built to be refused
-	} else {
-		c, err = aes.NewCipher(key)
-	}
+	c, err := aes.NewCipher(key)
 	if err != nil {
 		t.Fatal(err)
 	}
