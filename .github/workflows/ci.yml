@@ -639,7 +639,7 @@ jobs:
         if: env.SDK_PYTHON == 'true'
         with:
           python-version: 3.x
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: astral-sh/setup-uv@v10.3.3
         if: env.SDK_PYTHON == 'true'
       # Its own `up`, seeded again with new keys: the smokes before it end
       # by revoking theirs. The smoke writes its kill-switch line to the job
