@@ -5100,6 +5100,10 @@ msgstr ""
 msgid "Signs until <0/>"
 msgstr ""
 
+#: src/lib/webhooks.ts
+msgid "Sinks"
+msgstr ""
+
 #: src/components/app-shell.tsx
 msgid "Skip to content"
 msgstr ""

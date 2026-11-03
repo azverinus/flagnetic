@@ -62,6 +62,9 @@ func DeriveEvents(e Entry) []Derived {
 		if typ, ok := alertEventType(e.Action, before, after); ok {
 			out = append(out, Derived{typ, beforeAfter})
 		}
+	case EventSinkFailing, EventSinkAtRisk, EventSinkStopped, EventSinkDataLost:
+		// A health event's action is its type.
+		out = append(out, sinkEvent(e.Action, after))
 	case "change_request.opened", "change_request.approved", "change_request.rejected", "change_request.applied",
 		"change_request.cancelled", "change_request.superseded", "change_request.schedule_failed":
 		out = append(out, changeRequestEvents(e.Action, after)...)

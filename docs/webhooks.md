@@ -135,6 +135,29 @@ The `audit_entry_id` of `change_request.applied` is the entry of the change the 
 | `sdk_key.created` | an SDK key was created; its value is never sent | `before`, `after` |
 | `sdk_key.revoked` | an SDK key was revoked | `before`, `after` |
 
+### Sinks
+
+A sink that is failing, stopped or at risk tells the project's subscriptions once, when it starts needing attention, and not again until it has recovered and needs it anew. Lost data is told once for each gap: every partition retention drops records one gap per stream of the sink that had not delivered its rows. There is no event for recovering: the sink's health says when it delivers again. The audit entry of each is recorded by the system, `sink_delivery` for the first three and `event_retention` for the last, and the envelope's `entity` is the sink. The `environment` is null.
+
+| Type | Sent when |
+|---|---|
+| `sink.failing` | a sink's deliveries started failing; sent for the first stream to fail, and again only after every stream of the sink has delivered since |
+| `sink.at_risk` | a sink has an undelivered row within `FLAGNETIC_EVENTS_LOSS_WARNING_HOURS` of the edge of retention, disabled and stopped sinks included |
+| `sink.stopped` | a sink stopped itself after consecutive dead letters on one stream; it delivers nothing until it is resumed |
+| `sink.data_lost` | retention dropped rows a sink had not delivered; the gap records them |
+
+Their `data` always has the same fields, null where one does not apply:
+
+| Field | In | Meaning |
+|---|---|---|
+| `sink` | all | the sink: `id`, `name` and `kind` (`clickhouse`, `object_storage` or `webhook`) |
+| `event_kind` | all | the event kind of the stream concerned: `exposure`, `alias` or `evaluation_summary`; for `sink.at_risk` the stream with the worst lag |
+| `failure` | `sink.failing`, `sink.stopped` | why the last attempt failed: `class`, the HTTP `status` when there was one, the protocol's own error `code` when the target speaks one, and `at`; never the target's own words |
+| `consecutive_dead_letters` | `sink.stopped` | the dead letters in a row that stopped the sink |
+| `lag_seconds` | `sink.at_risk` | the age of the oldest undelivered row |
+| `loss_warning_hours` | `sink.at_risk` | the loss warning that was reached |
+| `gap` | `sink.data_lost` | the gap retention left |
+
 ### Platform
 
 | Type | Sent when |

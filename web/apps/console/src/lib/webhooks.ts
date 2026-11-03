@@ -313,6 +313,8 @@ export function eventGroupName(i18n: I18n, entity: string): string {
       return i18n._(msg`Grants`);
     case "sdk_key":
       return i18n._(msg`SDK keys`);
+    case "sink":
+      return i18n._(msg`Sinks`);
     case "webhook":
       return i18n._(msg`Webhooks`);
     case "report":
