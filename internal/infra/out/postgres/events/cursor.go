@@ -73,6 +73,11 @@ func (sc Scope) Where(alias string, first int) (string, []any) {
 // behind the batch's end however long another transaction stays open. An
 // insert's transaction ID is taken when it first writes, so an ingest that
 // began before the horizon but writes after it still lands past every cursor.
+//
+// A batch with fewer than limit rows holds every row in scope below the
+// horizon, so it ends at the table's last row there, in scope or not: a
+// stream of one project passes the other projects' rows then, even with no
+// row of its own to read, rather than scanning them again on every call.
 func Bound(ctx context.Context, db pgxtx.DB, table string, scope Scope, from events.Cursor, limit int) (Batch, error) {
 	b := Batch{From: from, To: from}
 	where, scoped := scope.Where("", 4)
@@ -81,22 +86,33 @@ func Bound(ctx context.Context, db pgxtx.DB, table string, scope Scope, from eve
 	}
 	// The end is chosen by the xid8 column, never by its text: "10" sorts
 	// before "9" as text, and a cursor stopped short would read rows again.
+	// Both parts read one statement's snapshot, so they share its horizon: no
+	// row in scope can fall between the last one counted and the table's last.
 	var (
-		toXID *string
-		toSeq *int64
+		toXID, endXID *string
+		toSeq, endSeq *int64
 	)
+	tbl := pgx.Identifier{table}.Sanitize()
 	err := db.QueryRow(ctx, `
 		WITH b AS (
-			SELECT xid, seq FROM `+pgx.Identifier{table}.Sanitize()+`
+			SELECT xid, seq FROM `+tbl+`
 			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < pg_snapshot_xmin(pg_current_snapshot())`+where+`
-			ORDER BY xid, seq LIMIT $3)
+			ORDER BY xid, seq LIMIT $3),
+		e AS (
+			SELECT xid, seq FROM `+tbl+`
+			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < pg_snapshot_xmin(pg_current_snapshot())
+			ORDER BY xid DESC, seq DESC LIMIT 1)
 		SELECT count(*), (SELECT b.xid::text FROM b ORDER BY b.xid DESC, b.seq DESC LIMIT 1),
-			(SELECT b.seq FROM b ORDER BY b.xid DESC, b.seq DESC LIMIT 1)
-		FROM b`, append([]any{xidText(from), from.Seq, limit}, scoped...)...).Scan(&b.Rows, &toXID, &toSeq)
+			(SELECT b.seq FROM b ORDER BY b.xid DESC, b.seq DESC LIMIT 1),
+			(SELECT e.xid::text FROM e), (SELECT e.seq FROM e)
+		FROM b`, append([]any{xidText(from), from.Seq, limit}, scoped...)...).Scan(&b.Rows, &toXID, &toSeq, &endXID, &endSeq)
 	if err != nil {
 		return Batch{}, fmt.Errorf("choosing a batch of %s: %w", table, err)
 	}
-	if b.Rows == 0 {
+	if b.Rows < limit {
+		toXID, toSeq = endXID, endSeq
+	}
+	if toXID == nil {
 		return b, nil
 	}
 	if b.To, err = cursorOf(*toXID, *toSeq); err != nil {

@@ -2,17 +2,18 @@ package sinks
 
 import (
 	"bytes"
+	"crypto/sha1" //nolint:gosec // a name-based UUID is defined over SHA-1; nothing secret rests on it
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/azverinus/flagnetic/internal/domain/events"
+	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
 // SchemaVersion is the version of the export schema every row carries. Within
@@ -28,8 +29,8 @@ const SampleCount = 10
 // it, flat, with the keys of its project and environment in place of the
 // platform's own IDs, which are never exported.
 type Row interface {
-	// ID is what tells the row from every other of its event kind: an
-	// event's ID, or a summary row's report ID.
+	// ID is the row's event ID, or a summary row's report ID, which the rows
+	// of one SDK report share: what a delivery ID is computed over.
 	ID() string
 	// wire is the row as the schema lays it out, in the order of its columns.
 	wire() any
@@ -193,8 +194,11 @@ func (r SummaryRow) wire() any {
 }
 
 // reportNamespace is the namespace of the report IDs of rows that have no
-// event ID. It is part of the export schema and never changes.
-var reportNamespace = uuid.MustParse("7d4f8c1e-2a6b-4e5d-9c3f-0b1a8e6d5c42")
+// event ID, the UUID 7d4f8c1e-2a6b-4e5d-9c3f-0b1a8e6d5c42. It is part of the
+// export schema and never changes.
+var reportNamespace = [16]byte{
+	0x7d, 0x4f, 0x8c, 0x1e, 0x2a, 0x6b, 0x4e, 0x5d, 0x9c, 0x3f, 0x0b, 0x1a, 0x8e, 0x6d, 0x5c, 0x42,
+}
 
 // ReportID is the report ID of an evaluation the server answered itself: a
 // name-based UUID (version 5) of reportNamespace over the decimal transaction
@@ -203,7 +207,14 @@ var reportNamespace = uuid.MustParse("7d4f8c1e-2a6b-4e5d-9c3f-0b1a8e6d5c42")
 // one flag, variation and reason that two rows hold are never folded into
 // one where a table deduplicates on the report ID.
 func ReportID(xid uint64, seq int64) string {
-	return uuid.NewSHA1(reportNamespace, []byte(strconv.FormatUint(xid, 10)+":"+strconv.FormatInt(seq, 10))).String()
+	h := sha1.New() //nolint:gosec // see the import
+	h.Write(reportNamespace[:])
+	h.Write([]byte(strconv.FormatUint(xid, 10) + ":" + strconv.FormatInt(seq, 10)))
+	var u [16]byte
+	copy(u[:], h.Sum(nil))
+	u[6] = u[6]&0x0f | 0x50 // version 5
+	u[8] = u[8]&0x3f | 0x80 // the variant of RFC 9562
+	return id.FromBytes[struct{}](u).String()
 }
 
 // RowIDs lists the IDs of rows, in their order.
@@ -258,8 +269,11 @@ func WriteJSONLines(w io.Writer, rows []Row) error {
 
 // SampleRows returns the SampleCount rows of kind that a sample sends,
 // marked as samples by their IDs, sample-1 to sample-10, and their keys, and
-// received at now.
+// received at now; none for a kind no sink exports.
 func SampleRows(kind EventKind, projectKey string, now time.Time) []Row {
+	if !slices.Contains(EventKinds, kind) {
+		return nil
+	}
 	rows := make([]Row, SampleCount)
 	for i := range rows {
 		n := "sample-" + strconv.Itoa(i+1)
@@ -276,7 +290,7 @@ func SampleRows(kind EventKind, projectKey string, now time.Time) []Row {
 				ToUnitType: "sample", ToUnitID: "sample", Platform: "sample", SDKName: "sample", SDKVersion: "sample",
 				OccurredAt: now, ReceivedAt: now,
 			}
-		default:
+		case EventEvaluationSummary:
 			rows[i] = SummaryRow{
 				ReportID: n, ProjectKey: projectKey, EnvironmentKey: "sample", FlagKey: "sample", VariationKey: "sample",
 				EvaluationReason: "experiment", Count: 1, WindowStart: now, WindowEnd: now, SDKName: "sample",

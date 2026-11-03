@@ -28,8 +28,9 @@ func rawTable(kind sinks.EventKind) (string, error) {
 
 // NextBatch returns the next batch of at most limit rows of the stream of
 // kind in scope past from, of transactions below the snapshot horizon. The
-// rows of other projects and environments are not in it, and the cursor
-// passes them with the batch that follows.
+// rows of other projects and environments are not in it; a batch short of
+// limit, empty or not, ends past them at the horizon, so the stream's cursor
+// passes them.
 func (s *Store) NextBatch(ctx context.Context, kind sinks.EventKind, scope pgevents.Scope, from events.Cursor, limit int) (pgevents.Batch, error) {
 	table, err := rawTable(kind)
 	if err != nil {

@@ -179,6 +179,12 @@ func TestJSONLinesIsOneRowPerLineAndLeavesHTMLAlone(t *testing.T) {
 	}
 }
 
+func TestAKindNoSinkExportsHasNoSampleRows(t *testing.T) {
+	if rows := sinks.SampleRows("test", "shop", rowTime); rows != nil {
+		t.Errorf("samples of an unknown kind = %v, want none", rows)
+	}
+}
+
 func TestTenSampleRowsOfEachKindAreMarkedAsSamples(t *testing.T) {
 	for _, kind := range sinks.EventKinds {
 		rows := sinks.SampleRows(kind, "shop", rowTime)

@@ -1,6 +1,7 @@
 package sdk_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"slices"
 	"strings"
@@ -43,13 +44,12 @@ func (f sinkRows) scope(t *testing.T, environments ...string) pgevents.Scope {
 // left, and answers the batches' sizes, the rows and how many were skipped.
 func (f sinkRows) readAll(t *testing.T, kind sinks.EventKind, scope pgevents.Scope, size int) (batches []int, rows []sinks.Row, skipped int) {
 	t.Helper()
-	return readStream(t, f.srv, f.store, kind, scope, size)
+	return readStream(t, f.srv, f.store, kind, scope, events.Cursor{}, size)
 }
 
-func readStream(t *testing.T, srv *testkit.Server, store *pgsinks.Store, kind sinks.EventKind, scope pgevents.Scope, size int) (batches []int, rows []sinks.Row, skipped int) {
+func readStream(t *testing.T, srv *testkit.Server, store *pgsinks.Store, kind sinks.EventKind, scope pgevents.Scope, from events.Cursor, size int) (batches []int, rows []sinks.Row, skipped int) {
 	t.Helper()
 	srv.AwaitHorizon(t)
-	from := events.Cursor{}
 	for {
 		b, err := store.NextBatch(t.Context(), kind, scope, from, size)
 		if err != nil {
@@ -113,7 +113,17 @@ func TestASinkReadsAnExposureAsItsExportSchemaSaysAndEndsABatchAtItsSize(t *test
 func TestASinkReadsAnAliasWithAnAbsentPlatformAsAnEmptyString(t *testing.T) {
 	f := startSinkRows(t)
 	now := f.clock.Now()
-	f.post(t, aliasEvent(eventID(now, 90)))
+	// An SDK that names no platform.
+	body, err := json.Marshal(map[string]any{
+		"schema_version": 1, "sent_at": now.Format(time.RFC3339Nano),
+		"sdk": map[string]any{"name": "flagnetic-dart", "version": "1.0.0"}, "events": []any{aliasEvent(eventID(now, 90))},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res := batchResult(t, f.srv, f.server, body); res.Accepted != 1 {
+		t.Fatalf("batch = %+v, want the alias accepted", res)
+	}
 
 	_, rows, _ := f.readAll(t, sinks.EventAlias, f.scope(t), 10)
 	if len(rows) != 1 {
@@ -121,7 +131,7 @@ func TestASinkReadsAnAliasWithAnAbsentPlatformAsAnEmptyString(t *testing.T) {
 	}
 	want := sinks.AliasRow{
 		EventID: eventID(now, 90), ProjectKey: f.p.key, EnvironmentKey: "production", FromUnitType: "anonymous",
-		FromUnitID: "d-8f1c", ToUnitType: "user", ToUnitID: "u-1001", Platform: "linux", SDKName: "flagnetic-dart",
+		FromUnitID: "d-8f1c", ToUnitType: "user", ToUnitID: "u-1001", Platform: "", SDKName: "flagnetic-dart",
 		SDKVersion: "1.0.0", OccurredAt: protocolTime, ReceivedAt: now,
 	}
 	if rows[0] != want {
@@ -143,6 +153,40 @@ func TestASinkNeverReadsAnotherProjectsRows(t *testing.T) {
 	_, rows, _ = other.readAll(t, sinks.EventExposure, other.scope(t), 10)
 	if got := unitsOf(rows); !slices.Equal(got, []string{"other-1"}) {
 		t.Errorf("the other project's rows = %v, want its own", got)
+	}
+}
+
+func TestASinksCursorPassesOtherProjectsRowsWithNoRowOfItsOwn(t *testing.T) {
+	mine, other := startSinkRows(t), startSinkRows(t)
+	now := mine.clock.Now()
+	mine.post(t, mine.exposure("mine-1", "true", now))
+	mine.srv.AwaitHorizon(t)
+	first, err := mine.store.NextBatch(t.Context(), sinks.EventExposure, mine.scope(t), events.Cursor{}, 10)
+	if err != nil || first.Rows != 1 {
+		t.Fatalf("first batch = %+v (%v), want this project's row", first, err)
+	}
+	other.post(t, other.exposure("other-1", "true", now), other.exposure("other-2", "true", now))
+	mine.srv.AwaitHorizon(t)
+
+	b, err := mine.store.NextBatch(t.Context(), sinks.EventExposure, mine.scope(t), first.To, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	passed, err := other.store.NextBatch(t.Context(), sinks.EventExposure, other.scope(t), events.Cursor{}, 10)
+	if err != nil || passed.Rows != 2 {
+		t.Fatalf("the other project's batch = %+v (%v), want its two rows", passed, err)
+	}
+	if notBefore := b.To.XID > passed.To.XID || b.To.XID == passed.To.XID && b.To.Seq >= passed.To.Seq; b.Rows != 0 || !notBefore {
+		t.Errorf("batch with no row of its own = %+v, want none read and the cursor past the other project's rows at %+v", b, passed.To)
+	}
+	page, err := mine.store.ReadBatch(t.Context(), sinks.EventExposure, mine.scope(t), b)
+	if err != nil || len(page.Rows) != 0 || page.Skipped != 0 {
+		t.Errorf("rows of the passing batch = %+v (%v), want none", page, err)
+	}
+	mine.post(t, mine.exposure("mine-2", "true", now))
+	_, rows, _ := readStream(t, mine.srv, mine.store, sinks.EventExposure, mine.scope(t), b.To, 10)
+	if got := unitsOf(rows); !slices.Equal(got, []string{"mine-2"}) {
+		t.Errorf("rows past the passing batch = %v, want the next of this project", got)
 	}
 }
 
@@ -233,16 +277,18 @@ func TestAnIngestTransactionHeldOpenIsNeverSkipped(t *testing.T) {
 	if err != nil || b.Rows != 0 {
 		t.Fatalf("batch while the transaction is open = %+v (%v), want none: nothing past it is read", b, err)
 	}
-	// Lag shows what the horizon holds back.
+	// Lag counts the rows the horizon holds back: the held row is not
+	// committed yet, but the one committed after it is.
 	if _, ok, err := f.store.OldestUnread(t.Context(), sinks.EventExposure, scope, events.Cursor{}); err != nil || !ok {
-		t.Errorf("oldest unread while held = %v (%v), want the held row's age", ok, err)
+		t.Errorf("oldest unread while held = %v (%v), want the row committed after the held one", ok, err)
 	}
 
 	release()
 	if a := <-held; a.status != http.StatusAccepted {
 		t.Fatalf("the held batch = %d: %s", a.status, a.body)
 	}
-	_, rows, _ := f.readAll(t, sinks.EventExposure, scope, 1)
+	// Read on from where the empty batch ended, as a stream would.
+	_, rows, _ := readStream(t, f.srv, f.store, sinks.EventExposure, scope, b.To, 1)
 	if got := unitsOf(rows); !slices.Equal(got, []string{"held", "after"}) {
 		t.Errorf("rows after the commit = %v, want the held one first and none skipped", got)
 	}
@@ -258,8 +304,8 @@ func TestEverySummaryRowIsExportedWithItsSourceAndRemoteEvaluationsGetStableRepo
 	}
 	scope := pgevents.Scope{Project: f.p.projectID(t)}
 
-	_, first, _ := readStream(t, f.srv, store, sinks.EventEvaluationSummary, scope, 2)
-	_, again, _ := readStream(t, f.srv, store, sinks.EventEvaluationSummary, scope, 10)
+	_, first, _ := readStream(t, f.srv, store, sinks.EventEvaluationSummary, scope, events.Cursor{}, 2)
+	_, again, _ := readStream(t, f.srv, store, sinks.EventEvaluationSummary, scope, events.Cursor{}, 10)
 	if len(first) != 4 || len(again) != 4 {
 		t.Fatalf("rows = %d then %d, want the two of the SDK's summary and the two flags the server answered", len(first), len(again))
 	}
