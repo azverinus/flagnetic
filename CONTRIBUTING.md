@@ -15,8 +15,11 @@ You need:
 - Node.js 22 or newer and [pnpm](https://pnpm.io) (the version in `web/package.json`), for the console in `web/` and the JavaScript SDK in `sdks/js/` (`task sdk-js:check`)
 
 ```bash
-task check   # lint, tests and vulnerability scan: what CI runs
+task pr:check   # the CI checks that apply to what your branch changes
+task check      # every CI check on the whole repository: complete but slow
 ```
+
+`task pr:check` is what to run before pushing. It looks at the files changed since the merge base with `origin/main` and runs the checks CI runs for them: tidy `go.mod` and current generated code in every Go module, lint, the tests of the changed packages and of the packages depending on them (with the race detector), the guard tests that read the whole tree, the coverage floors, `govulncheck`, and the steps of the console and SDK jobs whose paths changed (`task pr:check -- --plan` lists them without running anything). It does not replace CI: CodeQL, the Docker build, the other PostgreSQL versions, the browser suites and the oldest Go release run there only. When several checkouts share a machine, the heavy steps wait for each other under one lock (`PR_CHECK_P` and `PR_CHECK_PARALLEL` set how many packages and tests run at once; the header of `.github/scripts/pr-check.sh` lists the settings), and the tests share one PostgreSQL container, `flagnetic-pr-check-postgres`, which `docker rm -f` removes.
 
 Set `DATABASE_URL` to an existing PostgreSQL to skip testcontainers.
 
@@ -41,7 +44,7 @@ A permission arrives with the first operation that needs it:
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md). In short: domain rules in `internal/domain` as plain Go, use cases in `internal/app`, adapters in `internal/infra`, dependencies pointing inwards and enforced by the linter.
 
-The repository holds several Go modules: the server at the root, and the modules published for other programs to import (the evaluator and the Go SDKs), each with its own `go.mod` and version. The committed `go.work` ties them together, so a change across modules builds and tests in one checkout, and `task check` runs every check once per module. A new module joins with its `use` line in `go.work`: CI reads the list from there and checks the module on the oldest and the newest supported Go release.
+The repository holds several Go modules: the server at the root, and the modules published for other programs to import (the evaluator and the Go SDKs), each with its own `go.mod` and version. The committed `go.work` ties them together, so a change across modules builds and tests in one checkout, and `task check` and `task pr:check` run their Go checks once per module. A new module joins with its `use` line in `go.work`: CI reads the list from there and checks the module on the oldest and the newest supported Go release.
 
 The Python SDK in `sdks/python` is built and checked with [uv](https://docs.astral.sh/uv/) (it fetches the Python it needs): `uv sync`, then `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy` and `uv run pytest` in that directory, which CI runs on the oldest and the newest supported Python. Its regular expression engine takes case folding and Unicode classes from Go's tables; after a Go release that changes them, regenerate with `go run ./sdks/python/scripts/_unicode_tables > sdks/python/src/flagnetic/_eval/_re2/unicode_tables.py`, which CI compares.
 
@@ -54,7 +57,7 @@ Every change comes with tests at the seam that shows the behaviour:
 - an API behaviour: an acceptance test through the generated client;
 - an evaluation change: a fixture in `conformance/fixtures` first, then the code in every evaluator.
 
-A test package that needs PostgreSQL calls `testkit.Main` from its `TestMain`: it gets one schema of its own with the migrations applied. After its tests, and before a test's own database is dropped, the test kit reads every audit entry written there and fails if one holds a secret value the tests created or received: a token value, a password or any other secret. The test kit's helpers and its API client record them; a test that obtains a secret another way records it with `testkit.RecordSecret`. CI runs the tests on the oldest and the newest supported PostgreSQL and checks a coverage floor per layer (`.testcoverage.yml`); `task check` runs the same check locally.
+A test package that needs PostgreSQL calls `testkit.Main` from its `TestMain`: it gets one schema of its own with the migrations applied. After its tests, and before a test's own database is dropped, the test kit reads every audit entry written there and fails if one holds a secret value the tests created or received: a token value, a password or any other secret. The test kit's helpers and its API client record them; a test that obtains a secret another way records it with `testkit.RecordSecret`. CI runs the tests on the oldest and the newest supported PostgreSQL and checks a coverage floor per layer (`.testcoverage.yml`); `task pr:check` runs the same check locally for the packages you changed.
 
 ## Commits
 
@@ -66,7 +69,7 @@ A test package that needs PostgreSQL calls `testkit.Main` from its `TestMain`: i
 
 - Keep one concern per pull request. Large work is split into a **stack** of small pull requests, each based on the previous one; the maintainers use [git-spice](https://abhinav.github.io/git-spice/) (`gs branch create`, `gs stack submit`), but any tool or plain branches work.
 - Pull requests are **squash-merged**: the title becomes the single commit on `main`, so it must be a Conventional Commit subject (CI checks it). Mark breaking changes with `!` (`feat(api)!: ...`) and explain them in the description.
-- `task check` passes locally; CI must be green. The check to watch is **`ci-ok`**: it needs every job of the `ci` workflow and fails when any of them failed or was cancelled, while a job that was skipped does not hold it. A new job in `ci.yml` goes into the `needs` of `ci-ok` too; `task lint` and CI fail otherwise. The pull request title, sign-off and CodeQL checks run in their own workflows beside it.
+- `task pr:check` passes locally; CI must be green. The check to watch is **`ci-ok`**: it needs every job of the `ci` workflow and fails when any of them failed or was cancelled, while a job that was skipped does not hold it. A new job in `ci.yml` goes into the `needs` of `ci-ok` too; `task lint` and CI fail otherwise. The pull request title, sign-off and CodeQL checks run in their own workflows beside it.
 - Update `docs/` when users would notice the change. Do not edit `CHANGELOG.md`: it is generated.
 - API changes start in `api/*.yaml`, with the regenerated code committed alongside.
 

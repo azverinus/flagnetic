@@ -9,12 +9,16 @@ Flagnetic: self-hosted, open-source feature flags and experiments. One Go binary
 ## Commands
 
 ```bash
-task            # list tasks
-task check      # what CI runs on every push: lint, tests, vulnerability scan
-task lint       # golangci-lint in every module of go.work, including the layer rules
-task test       # go test -race in every module (starts PostgreSQL through testcontainers unless DATABASE_URL is set)
-task build      # bin/flagnetic, with the console built and embedded
+task                 # list tasks
+task pr:check        # before every push: the CI checks that apply to your branch's changes
+task pr:check -- --plan   # the same, showing what would run and running nothing
+task check           # every CI check on the whole repository: complete but slow, for changes that reach everywhere
+task lint            # golangci-lint in every module of go.work, including the layer rules
+task test            # go test -race in every module (starts PostgreSQL through testcontainers unless DATABASE_URL is set)
+task build           # bin/flagnetic, with the console built and embedded
 ```
+
+`task pr:check` compares the working tree with the merge base with `origin/main`, committed or not, and runs what CI would run for those files: tidy and generated code in every module, lint, the tests of the changed packages, of the packages that depend on them and of the guard tests that read the whole tree, the coverage floors of the changed packages, `govulncheck`, and the console and SDK steps whose paths changed. Its heavy steps queue behind a lock shared by every checkout on the machine, so several checkouts do not run them at once, and the tests share one PostgreSQL container. Commit before you run it: it checks the working tree, but CI sees only what you push. A step that cannot run for lack of a tool is reported as not run, not as passed.
 
 Requires Go (the toolchain in `go.mod` is fetched automatically), Docker for PostgreSQL in tests, [Task](https://taskfile.dev), [jq](https://jqlang.org) for the check scripts, Node.js with pnpm for the console in `web/`, Dart for the Dart SDK in `sdks/dart/`, and Flutter for the Flutter package in `sdks/flutter/`.
 
@@ -32,4 +36,4 @@ Requires Go (the toolchain in `go.mod` is fetched automatically), Docker for Pos
 
 ## Before you finish
 
-Run `task check`. If you changed `api/`, run `task generate` and include the generated files. If you changed behaviour users see, update `docs/`.
+Run `task pr:check` and fix what it reports; never lower a coverage floor or skip a check to pass it. Run the whole `task check` only when the change reaches everywhere (a shared kit, a migration, generated code across contexts). If you changed `api/`, run `task generate` and include the generated files. If you changed behaviour users see, update `docs/`.

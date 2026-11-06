@@ -1,8 +1,11 @@
 # Developer commands. Install Task (https://taskfile.dev), then `task` lists them.
 #
-# `task check` runs locally what CI runs on every pull request. Tests start a
-# PostgreSQL through testcontainers unless DATABASE_URL is set; `task db:up`
-# gives you a long-lived one instead (copy .env.example to .env).
+# `task pr:check` runs locally the checks CI will run for the changes of your
+# branch, and is what to run before every push. `task check` runs every check
+# of CI on the whole repository: complete but slow, for changes that reach
+# everywhere. Tests start a PostgreSQL through testcontainers unless
+# DATABASE_URL is set; `task db:up` gives you a long-lived one instead (copy
+# .env.example to .env), and `task pr:check` shares one container between runs.
 version: "3"
 
 dotenv: [".env"]
@@ -144,8 +147,18 @@ tasks:
 
   # --- Checks (what CI runs) ---
 
+  pr:check:
+    desc: Run the CI checks that apply to this branch's changes (--plan shows them without running; see .github/scripts/pr-check.sh)
+    env:
+      GOLANGCI_LINT: '{{.GOLANGCI_LINT}}'
+      GOVULNCHECK: '{{.GOVULNCHECK}}'
+      ACTIONLINT: '{{.ACTIONLINT}}'
+      GO_TEST_COVERAGE: '{{.GO_TEST_COVERAGE}}'
+    cmds:
+      - .github/scripts/pr-check.sh {{.CLI_ARGS}}
+
   check:
-    desc: Run every CI check locally (lint, tests, vulnerabilities, tidy, the console, the Dart SDK and the Flutter package)
+    desc: Run every CI check on the whole repository, slowly (lint, console, Dart, JavaScript and Flutter SDKs, tests, coverage, vulnerabilities, tidy)
     cmds:
       - task: lint
       - task: web:check
@@ -174,6 +187,22 @@ tasks:
       - dart format --output=none --set-exit-if-changed .
       - flutter analyze --fatal-infos
       - flutter test
+
+  sdk-python:check:
+    desc: Lint, type-check and test the Python SDK
+    dir: sdks/python
+    cmds:
+      - uv sync --locked --extra openfeature
+      - uv run ruff check .
+      - uv run ruff format --check .
+      - uv run mypy
+      - uv run pytest
+
+  sdk-ruby:check:
+    desc: Lint and test the Ruby gems
+    cmds:
+      - cd sdks/ruby && bundle install && bundle exec rubocop && bundle exec rake test
+      - cd sdks/ruby-openfeature && bundle install && bundle exec rubocop && bundle exec rake test
 
   lint:
     desc: Lint the Go code of every module (layer rules included) and the CI workflows
