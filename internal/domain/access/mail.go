@@ -10,11 +10,14 @@ const (
 	// MailTest is the mail an instance admin sends themselves to try the
 	// SMTP settings.
 	MailTest MailKind = "test"
+	// MailPasswordReset carries the link a member asked for to set a new
+	// password.
+	MailPasswordReset MailKind = "password_reset"
 )
 
 // MailKinds are every kind of mail the instance sends; each has a template
 // in every language of MailLocales.
-var MailKinds = []MailKind{MailTest}
+var MailKinds = []MailKind{MailTest, MailPasswordReset}
 
 // MailLocales are the languages mail is written in, the console's.
 var MailLocales = []string{"en", "ru"}

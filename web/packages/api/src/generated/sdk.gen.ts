@@ -433,6 +433,9 @@ import type {
   ReplaySinkData,
   ReplaySinkErrors,
   ReplaySinkResponses,
+  RequestPasswordResetData,
+  RequestPasswordResetErrors,
+  RequestPasswordResetResponses,
   RestoreFlagData,
   RestoreFlagErrors,
   RestoreFlagResponses,
@@ -697,6 +700,44 @@ export const acceptInvitation = <ThrowOnError extends boolean = false>(
 ): RequestResult<AcceptInvitationResponses, AcceptInvitationErrors, ThrowOnError> =>
   (options.client ?? client).post<AcceptInvitationResponses, AcceptInvitationErrors, ThrowOnError>({
     url: "/auth/invitations/{secret}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Ask for a password reset by mail
+ *
+ * For a member who forgot their password. Answers `202 Accepted` at
+ * once whoever the email belongs to, whether or not anything comes of
+ * it, so the answer reveals nothing about which addresses exist. The
+ * lookup, the issuing and the mail happen after the answer.
+ *
+ * A password reset is mailed, to the member in their language,
+ * only when the instance has an SMTP server and self-service password
+ * reset is on in the auth settings, the email belongs to an active
+ * member who holds a password, and no self-service reset was issued
+ * for them in the last 5 minutes (a reset counts when it was issued,
+ * even if its mail could not be sent). The link opens
+ * `/password-reset/{secret}` in the console, works once and expires
+ * after an hour; completing it is `POST /auth/password-reset/{secret}`.
+ * A reset issued is audited `password.reset_requested`.
+ *
+ * The body must be sent as `application/json`, at most 8 KiB;
+ * anything else is refused `unsupported_media_type`.
+ *
+ */
+export const requestPasswordReset = <ThrowOnError extends boolean = false>(
+  options: Options<RequestPasswordResetData, ThrowOnError>,
+): RequestResult<RequestPasswordResetResponses, RequestPasswordResetErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RequestPasswordResetResponses,
+    RequestPasswordResetErrors,
+    ThrowOnError
+  >({
+    url: "/auth/password-reset",
     ...options,
     headers: {
       "Content-Type": "application/json",

@@ -15,7 +15,7 @@ import (
 const AuthSettingsChannel = "auth_settings"
 
 const authSettingsColumns = `session_idle_timeout_seconds, session_absolute_timeout_seconds, token_max_lifetime_seconds,
-	token_expiry_required, password_min_length`
+	token_expiry_required, password_min_length, self_service_password_reset`
 
 // AuthSettings returns the instance's auth settings as stored.
 func (s *Store) AuthSettings(ctx context.Context) (access.AuthSettings, error) {
@@ -34,7 +34,8 @@ func (s *Store) readAuthSettings(ctx context.Context, query string) (access.Auth
 		idle, absolute, lifetime int64
 		out                      access.AuthSettings
 	)
-	err := s.db(ctx).QueryRow(ctx, query).Scan(&idle, &absolute, &lifetime, &out.TokenExpiryRequired, &out.PasswordMinLength)
+	err := s.db(ctx).QueryRow(ctx, query).Scan(&idle, &absolute, &lifetime, &out.TokenExpiryRequired, &out.PasswordMinLength,
+		&out.SelfServicePasswordReset)
 	if err != nil {
 		return access.AuthSettings{}, fmt.Errorf("reading the auth settings: %w", err)
 	}
@@ -51,12 +52,13 @@ func (s *Store) SaveAuthSettings(ctx context.Context, settings access.AuthSettin
 	_, err := s.db(ctx).Exec(ctx, `
 		WITH saved AS (
 			UPDATE auth_settings SET session_idle_timeout_seconds = $1, session_absolute_timeout_seconds = $2,
-				token_max_lifetime_seconds = $3, token_expiry_required = $4, password_min_length = $5
+				token_max_lifetime_seconds = $3, token_expiry_required = $4, password_min_length = $5,
+				self_service_password_reset = $6
 			RETURNING 1
 		)
-		SELECT pg_notify($6, '') FROM saved`,
+		SELECT pg_notify($7, '') FROM saved`,
 		int64(settings.SessionIdleTimeout/time.Second), int64(settings.SessionAbsoluteTimeout/time.Second),
-		int64(settings.TokenMaxLifetime/time.Second), settings.TokenExpiryRequired, settings.PasswordMinLength,
+		int64(settings.TokenMaxLifetime/time.Second), settings.TokenExpiryRequired, settings.PasswordMinLength, settings.SelfServicePasswordReset,
 		AuthSettingsChannel)
 	if err != nil {
 		return fmt.Errorf("saving the auth settings: %w", err)

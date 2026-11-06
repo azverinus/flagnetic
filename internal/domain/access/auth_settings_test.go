@@ -13,6 +13,7 @@ func TestAFreshInstanceHasTheDefaultAuthSettings(t *testing.T) {
 	want := access.AuthSettings{
 		SessionIdleTimeout: 24 * time.Hour, SessionAbsoluteTimeout: 30 * 24 * time.Hour,
 		TokenMaxLifetime: 365 * 24 * time.Hour, TokenExpiryRequired: false, PasswordMinLength: 12,
+		SelfServicePasswordReset: true,
 	}
 	if access.DefaultAuthSettings != want {
 		t.Errorf("defaults = %+v, want %+v", access.DefaultAuthSettings, want)

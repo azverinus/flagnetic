@@ -97,6 +97,22 @@ func (s *Store) ConsumePasswordResets(ctx context.Context, member access.MemberI
 	return int(tag.RowsAffected()), nil
 }
 
+// LatestSelfServicePasswordReset returns when the latest password reset member
+// asked for was issued, whether or not it is still open; false when they
+// never asked. One an instance admin issued does not count.
+func (s *Store) LatestSelfServicePasswordReset(ctx context.Context, member access.MemberID) (time.Time, bool, error) {
+	var at *time.Time
+	err := s.db(ctx).QueryRow(ctx, `SELECT max(created_at) FROM password_resets WHERE member_id = $1 AND issued_by IS NULL`,
+		member.Bytes()).Scan(&at)
+	if err != nil {
+		return time.Time{}, false, fmt.Errorf("reading when a member last asked for a password reset: %w", err)
+	}
+	if at == nil {
+		return time.Time{}, false, nil
+	}
+	return *at, true, nil
+}
+
 // PurgePasswordResets deletes at most limit password resets consumed or
 // expired at or before the cutoff.
 func (s *Store) PurgePasswordResets(ctx context.Context, cut access.PasswordResetCutoffs, limit int) (int, error) {

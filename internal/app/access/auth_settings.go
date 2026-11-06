@@ -108,5 +108,6 @@ func authSettingsRecord(s access.AuthSettings) map[string]any {
 		"token_max_lifetime_seconds":       int64(s.TokenMaxLifetime / time.Second),
 		"token_expiry_required":            s.TokenExpiryRequired,
 		"password_min_length":              s.PasswordMinLength,
+		"self_service_password_reset":      s.SelfServicePasswordReset,
 	}
 }

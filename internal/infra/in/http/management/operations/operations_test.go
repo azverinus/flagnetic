@@ -157,3 +157,17 @@ func TestAnOperationsOwnBodyLimitIsRead(t *testing.T) {
 		t.Errorf("a body limit nobody declared = %d, want 0", got)
 	}
 }
+
+func TestTheOperationsAcceptingOnlyJSONAreRead(t *testing.T) {
+	doc := "paths:\n  /auth/password-reset:\n    post:\n      operationId: requestPasswordReset\n      x-permission: public\n      x-json-only: true\n" +
+		"  /auth/sign-out:\n    post:\n      operationId: signOut\n      x-permission: member\n"
+	ops, err := Read([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for pattern, want := range map[string]bool{"POST /auth/password-reset": true, "POST /auth/sign-out": false} {
+		if got := ops[pattern].JSONOnly; got != want {
+			t.Errorf("%s: JSON only = %v, want %v", pattern, got, want)
+		}
+	}
+}

@@ -72,7 +72,7 @@ func newPostman(t *testing.T, settings access.SMTPChange, m appaccess.Mailer) po
 	return postman{
 		Postman: appaccess.NewPostman(appaccess.PostmanDeps{
 			Settings: store, Opener: keyring, Mailer: m, Counter: count, After: postgres.AfterCommit{}, Clock: c,
-			Logger: logs.Logger(), DefaultLocale: "en",
+			Logger: logs.Logger(), Background: appaccess.NewBackground(logs.Logger()), DefaultLocale: "en",
 		}),
 		store: store, tx: tx, logs: logs, count: count,
 	}

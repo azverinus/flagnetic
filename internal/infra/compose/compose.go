@@ -345,10 +345,11 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	if err != nil {
 		panic(fmt.Sprintf("compose: the mail templates: %v", err)) // the templates are embedded, so only a broken build fails
 	}
+	background := appaccess.NewBackground(edge.Logger())
 	postman := appaccess.NewPostman(appaccess.PostmanDeps{
 		Settings: smtpSettings, Opener: o.Keyring, Mailer: mail.NewSender(renderer, o.MailRootCAs),
 		Counter: mail.NewMetrics(reg), After: postgres.AfterCommit{}, Clock: d.Clock, Logger: edge.Logger(),
-		DefaultLocale: o.DefaultLocale,
+		Background: background, DefaultLocale: o.DefaultLocale,
 	})
 	publicURL := ""
 	if o.BaseURL != nil {
@@ -446,8 +447,13 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 			Random: rand.Reader, Key: sessionKey,
 		}),
-		IssueReset: appaccess.NewIssuePasswordReset(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
-		GetReset:   appaccess.NewGetPasswordReset(accessStore, d.Clock),
+		RequestReset: appaccess.NewRequestPasswordReset(appaccess.RequestPasswordResetDeps{
+			Tx: tx, Store: accessStore, Settings: settings, SMTP: smtpSettings, Postman: postman, Background: background,
+			Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, Logger: edge.Logger(), ConsoleURL: publicURL,
+		}),
+		ResetAvailable: appaccess.NewPasswordResetAvailable(settings, smtpSettings),
+		IssueReset:     appaccess.NewIssuePasswordReset(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
+		GetReset:       appaccess.NewGetPasswordReset(accessStore, d.Clock),
 		CompleteReset: appaccess.NewCompletePasswordReset(appaccess.CompletePasswordResetDeps{
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 			Random: rand.Reader, Key: sessionKey,
@@ -747,10 +753,11 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			changeHub.Close()
 			rulesetCache.Close()
 			guardPool.Close()
-			// The mails the requests caused leave with the replica.
+			// The mails the requests caused, and the password resets they asked
+			// for, leave with the replica.
 			mailCtx, stopWaiting := context.WithTimeout(context.Background(), appaccess.MailBound)
 			defer stopWaiting()
-			postman.Wait(mailCtx)
+			background.Wait(mailCtx)
 			// The requests are done: what they counted since the last round
 			// is written now rather than lost with the replica.
 			ctx, cancel := context.WithTimeout(context.Background(), finalFlushBound)

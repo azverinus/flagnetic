@@ -5,11 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
-	"github.com/azverinus/flagnetic/internal/pkg/safego"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
@@ -102,6 +100,8 @@ type PostmanDeps struct {
 	After    AfterCommit
 	Clock    clock.Clock
 	Logger   *slog.Logger
+	// Background runs the sends; the replica waits on it when it stops.
+	Background *Background
 	// DefaultLocale is the language of a mail whose recipient has not chosen
 	// one (FLAGNETIC_DEFAULT_LOCALE).
 	DefaultLocale string
@@ -112,15 +112,7 @@ type PostmanDeps struct {
 // background, so a slow or failing relay never delays or undoes the change
 // that caused it. A mail in flight when the replica dies is lost: every
 // mail has a cheap human retry.
-type Postman struct {
-	d  PostmanDeps
-	wg sync.WaitGroup
-	// mu orders each mail's place in wg before Wait begins: once waiting is
-	// set, a mail still goes out but is not awaited, since adding to an empty
-	// wait group while it is being waited on is not allowed.
-	mu      sync.Mutex
-	waiting bool
-}
+type Postman struct{ d PostmanDeps }
 
 // NewPostman returns the service.
 func NewPostman(d PostmanDeps) *Postman { return &Postman{d: d} }
@@ -141,29 +133,11 @@ func (p *Postman) Queue(ctx context.Context, m Mail) {
 		m.At = p.d.Clock.Now()
 	}
 	p.d.After.AfterCommit(ctx, func(committed context.Context) {
-		// Counted once the change has committed, not when queued: a change
+		// Started once the change has committed, not when queued: a change
 		// that rolls back sends nothing and has nothing to await. The mail
 		// outlives the request that caused it.
-		done := p.track()
-		bg, cancel := context.WithTimeout(context.WithoutCancel(committed), MailBound)
-		safego.Go(bg, "mail "+string(m.Kind), p.d.Logger, func(ctx context.Context) {
-			defer done()
-			defer cancel()
-			p.sendInBackground(ctx, m)
-		})
+		p.d.Background.Go(committed, "mail "+string(m.Kind), MailBound, func(ctx context.Context) { p.sendInBackground(ctx, m) })
 	})
-}
-
-// track counts a mail Wait awaits and returns what ends it, or nothing to
-// end once Wait has begun.
-func (p *Postman) track() (done func()) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.waiting {
-		return func() {}
-	}
-	p.wg.Add(1)
-	return p.wg.Done
 }
 
 func (p *Postman) sendInBackground(ctx context.Context, m Mail) {
@@ -221,22 +195,9 @@ func failureOf(err error) string {
 }
 
 // Wait returns once every mail queued so far has been sent or has failed,
-// or ctx ends. A replica stopping calls it after its requests are done, so
-// the mails they caused leave with it.
-func (p *Postman) Wait(ctx context.Context) {
-	p.mu.Lock()
-	p.waiting = true
-	p.mu.Unlock()
-	done := make(chan struct{})
-	go func() {
-		p.wg.Wait()
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-ctx.Done():
-	}
-}
+// or ctx ends: it waits on the background the mails are sent in, with
+// whatever else runs there.
+func (p *Postman) Wait(ctx context.Context) { p.d.Background.Wait(ctx) }
 
 // TestMailData is what the test mail's template reads.
 type TestMailData struct {

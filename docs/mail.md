@@ -1,6 +1,6 @@
 # Mail
 
-An instance admin configures one SMTP server, and the instance sends its mail through it: today a test mail to whoever asks for one, and later the invitations and password resets that would otherwise be shown as links. Mail is optional. Without an SMTP server nothing is mailed and every link is shown to the admin who made it.
+An instance admin configures one SMTP server, and the instance sends its mail through it: a test mail to whoever asks for one and the password reset a member asks for, and later the invitations that would otherwise be shown as links. Mail is optional. Without an SMTP server nothing is mailed and every link is shown to the admin who made it.
 
 ## Configuring the SMTP server
 
@@ -42,6 +42,15 @@ Both secure modes require TLS 1.2 or later and verify the server's certificate a
   - `rejected`: the server refused the sender, the recipient or the mail.
 
 The answer never carries the password.
+
+## What is mailed
+
+| Kind | Sent to | When |
+|---|---|---|
+| `test` | the instance admin who asks | `POST /instance/smtp/test`; the one mail sent while the caller waits. |
+| `password_reset` | a member | They ask for a reset with `POST /auth/password-reset`, the instance lets them (`self_service_password_reset`), and none was issued for them in the last 5 minutes; see [Asking for a password reset by mail](access.md#asking-for-a-password-reset-by-mail). It carries a link to `FLAGNETIC_BASE_URL/password-reset/<secret>` that works once for an hour, and when it expires in UTC. |
+
+A password reset an instance admin issues is never mailed: its link is shown to them once.
 
 ## Languages
 

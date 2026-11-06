@@ -28,6 +28,12 @@ const PasswordResetLifetime = time.Hour
 // does not grow forever while a recent link can still be looked into.
 const PasswordResetRetention = 30 * 24 * time.Hour
 
+// PasswordResetInterval is how long a member waits between two password
+// resets they asked for, counted from the issuing and not from the mail, so
+// a request repeated for an address cannot flood its inbox nor, while the
+// mail fails, the relay.
+const PasswordResetInterval = 5 * time.Minute
+
 const resetSecretLength = 32
 
 // PasswordReset is the one-time link that lets an active member set a new
@@ -82,6 +88,21 @@ func ParsePasswordResetSecret(value string) (PasswordResetHash, bool) {
 // check only makes certain no link outlives either.
 func (r PasswordReset) Open(now time.Time, holder Member) bool {
 	return r.ConsumedAt == nil && now.Before(r.ExpiresAt) && holder.Status == MemberActive
+}
+
+// SelfServicePasswordResetDue reports whether a member may be issued a
+// password reset they asked for at now, when their latest was issued at last
+// (nil for a member who never asked).
+func SelfServicePasswordResetDue(last *time.Time, now time.Time) bool {
+	return last == nil || !now.Before(last.Add(PasswordResetInterval))
+}
+
+// CanAskForPasswordReset reports whether a request for a password reset of m
+// leads to one: only an active member who holds a password has one to
+// forget. An invited member has an invitation, a deactivated one no way in,
+// and one who signs in through a provider only no password.
+func CanAskForPasswordReset(m Member, holdsPassword bool) bool {
+	return m.Status == MemberActive && holdsPassword
 }
 
 // ErrPasswordResetGone answers a password reset that cannot be completed,
