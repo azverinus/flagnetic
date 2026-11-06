@@ -15,7 +15,7 @@ import (
 
 var _ appidentity.SCIMTokenStore = (*Store)(nil)
 
-const scimTokenColumns = `t.id, t.provider_id, p.slug, t.hint, t.expires_at, t.revoked_at, t.created_at, t.last_used_at`
+const scimRowColumns = `t.id, t.provider_id, p.slug, t.hint, t.expires_at, t.revoked_at, t.created_at, t.last_used_at`
 
 func scanSCIMToken(row pgx.Row, extra ...any) (appidentity.SCIMTokenRecord, error) {
 	var (
@@ -52,7 +52,7 @@ func (s *Store) CreateSCIMToken(ctx context.Context, t identity.SCIMToken, seale
 // SCIMTokens returns every SCIM token, the newest first.
 func (s *Store) SCIMTokens(ctx context.Context) ([]appidentity.SCIMTokenRecord, error) {
 	rows, err := s.db(ctx).Query(ctx, `
-		SELECT `+scimTokenColumns+` FROM scim_tokens t JOIN auth_providers p ON p.id = t.provider_id
+		SELECT `+scimRowColumns+` FROM scim_tokens t JOIN auth_providers p ON p.id = t.provider_id
 		ORDER BY t.created_at DESC, t.id DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("listing SCIM tokens: %w", err)
@@ -75,7 +75,7 @@ func (s *Store) RevokeSCIMToken(ctx context.Context, token identity.SCIMTokenID,
 		WITH revoked AS (
 			UPDATE scim_tokens SET revoked_at = $2 WHERE id = $1 AND revoked_at IS NULL RETURNING *
 		)
-		SELECT `+scimTokenColumns+` FROM revoked t JOIN auth_providers p ON p.id = t.provider_id`, token.Bytes(), at))
+		SELECT `+scimRowColumns+` FROM revoked t JOIN auth_providers p ON p.id = t.provider_id`, token.Bytes(), at))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return r, appidentity.ErrNotFound
 	}
@@ -88,7 +88,7 @@ func (s *Store) RevokeSCIMToken(ctx context.Context, token identity.SCIMTokenID,
 // UnrevokedSCIMTokens returns every token not revoked, with its sealed hash.
 func (s *Store) UnrevokedSCIMTokens(ctx context.Context) ([]appidentity.SealedSCIMToken, error) {
 	rows, err := s.db(ctx).Query(ctx, `
-		SELECT `+scimTokenColumns+`, t.token_hash_sealed, p.enabled
+		SELECT `+scimRowColumns+`, t.token_hash_sealed, p.enabled
 		FROM scim_tokens t JOIN auth_providers p ON p.id = t.provider_id WHERE t.revoked_at IS NULL`)
 	if err != nil {
 		return nil, fmt.Errorf("reading the live SCIM tokens: %w", err)

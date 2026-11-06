@@ -192,35 +192,40 @@ func (h *CreateSCIMUser) Handle(ctx context.Context, req SCIMRequest, attrs iden
 	provider := req.provider()
 	var out ProvisionedMember
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		held, found, err := h.d.Members.ByEmail(ctx, email)
-		if err != nil {
-			return err
-		}
-		if !found {
-			out, err = h.d.Members.Provision(ctx, ProvisionUser{
-				Provider: provider, Email: email, DisplayName: attrs.Name(email), ExternalID: externalID, Request: req.governance(),
-			})
-		} else {
-			p, perr := providerOf(ctx, h.d.Providers, req.Caller.ProviderSlug)
-			if perr != nil {
-				return perr
-			}
-			if !p.VouchesForEmail(email) {
-				return ErrEmailTaken
-			}
-			out, err = h.d.Members.Adopt(ctx, AdoptUser{
-				Provider: provider, Member: held.ID, Email: email, DisplayName: attrs.Name(email), ExternalID: externalID, Request: req.governance(),
-			})
-		}
-		if err != nil {
-			return err
+		var txErr error
+		if out, txErr = h.provisionOrAdopt(ctx, req, attrs, email, externalID); txErr != nil {
+			return txErr
 		}
 		if attrs.Active != nil && !*attrs.Active {
-			out, err = h.d.Members.SetActive(ctx, SetUserActive{Provider: provider, Member: out.ID, Active: false, Request: req.governance()})
+			out, txErr = h.d.Members.SetActive(ctx, SetUserActive{Provider: provider, Member: out.ID, Active: false, Request: req.governance()})
 		}
-		return err
+		return txErr
 	})
 	return out, err
+}
+
+// provisionOrAdopt creates the member holding no email yet, and adopts the one
+// that does when the provider may take them over.
+func (h *CreateSCIMUser) provisionOrAdopt(ctx context.Context, req SCIMRequest, attrs identity.UserAttributes, email, externalID string) (ProvisionedMember, error) {
+	held, found, err := h.d.Members.ByEmail(ctx, email)
+	if err != nil {
+		return ProvisionedMember{}, err
+	}
+	if !found {
+		return h.d.Members.Provision(ctx, ProvisionUser{
+			Provider: req.provider(), Email: email, DisplayName: attrs.Name(email), ExternalID: externalID, Request: req.governance(),
+		})
+	}
+	p, err := providerOf(ctx, h.d.Providers, req.Caller.ProviderSlug)
+	if err != nil {
+		return ProvisionedMember{}, err
+	}
+	if !p.VouchesForEmail(email) {
+		return ProvisionedMember{}, ErrEmailTaken
+	}
+	return h.d.Members.Adopt(ctx, AdoptUser{
+		Provider: req.provider(), Member: held.ID, Email: email, DisplayName: attrs.Name(email), ExternalID: externalID, Request: req.governance(),
+	})
 }
 
 func externalIDOf(externalID *string) (string, error) {
@@ -299,12 +304,13 @@ func (h *PatchSCIMUser) Handle(ctx context.Context, req SCIMRequest, member iden
 	}
 	var out ProvisionedMember
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
+		var txErr error
 		if patch.RemoveDisplayName {
 			// A member without a name is named after their email, as a new
 			// one is.
-			current, err := h.d.Members.Get(ctx, req.Caller.ProviderSlug, member)
-			if err != nil {
-				return err
+			var current ProvisionedMember
+			if current, txErr = h.d.Members.Get(ctx, req.Caller.ProviderSlug, member); txErr != nil {
+				return txErr
 			}
 			email := current.Email
 			if patch.Email != nil {
@@ -312,9 +318,8 @@ func (h *PatchSCIMUser) Handle(ctx context.Context, req SCIMRequest, member iden
 			}
 			cmd.DisplayName = &email
 		}
-		var err error
-		out, err = applyUserChange(ctx, h.d, req, cmd, patch.Active)
-		return err
+		out, txErr = applyUserChange(ctx, h.d, req, cmd, patch.Active)
+		return txErr
 	})
 	return out, err
 }

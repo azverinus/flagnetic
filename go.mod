@@ -16,6 +16,7 @@ require (
 	github.com/prometheus/client_golang v1.25.0
 	github.com/russellhaering/gosaml2 v0.12.0
 	github.com/russellhaering/goxmldsig v1.6.1
+	github.com/scim2/filter-parser/v2 v2.3.1
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/mailpit v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.44.0
@@ -82,7 +83,6 @@ require (
 	github.com/prometheus/procfs v0.22.0 // indirect
 	github.com/q-uint/parser v0.3.1 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
-	github.com/scim2/filter-parser/v2 v2.3.1 // indirect
 	github.com/sethvargo/go-retry v0.5.0 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.6 // indirect
 	github.com/sirupsen/logrus v1.10.2 // indirect

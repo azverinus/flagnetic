@@ -415,8 +415,8 @@ func TestDeactivatingAUserEndsItsTokensAndResetsAndReactivatingRestoresIt(t *tes
 	if reset.JSON201 == nil {
 		t.Fatalf("issuing a reset = %d: %s", reset.StatusCode(), reset.Body)
 	}
-	if res, err := personal.GetMeWithResponse(t.Context()); err != nil || res.JSON200 == nil {
-		t.Fatalf("the member's token before = %v, %d", err, res.StatusCode())
+	if before, beforeErr := personal.GetMeWithResponse(t.Context()); beforeErr != nil || before.JSON200 == nil {
+		t.Fatalf("the member's token before = %v, %d", beforeErr, before.StatusCode())
 	}
 
 	// Okta's deactivation: no path, an object.
@@ -572,8 +572,8 @@ func TestAProviderWithTokensOrProvisionedMembersIsNotDeleted(t *testing.T) {
 	if r, err := e.browser.RevokeScimTokenWithResponse(t.Context(), created.Token.Id.String()); err != nil || r.StatusCode() != http.StatusNoContent {
 		t.Fatalf("revoking: %v, %d", err, r.StatusCode())
 	}
-	if res := remove(withToken); res.StatusCode() != http.StatusNoContent {
-		t.Errorf("deleting a provider whose tokens are revoked = %d, want 204: %s", res.StatusCode(), res.Body)
+	if deleted := remove(withToken); deleted.StatusCode() != http.StatusNoContent {
+		t.Errorf("deleting a provider whose tokens are revoked = %d, want 204: %s", deleted.StatusCode(), deleted.Body)
 	}
 
 	withMember := e.provider(t)

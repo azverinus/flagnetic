@@ -2,7 +2,6 @@ package scim_test
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"encoding/json"
 	"io"
@@ -86,23 +85,6 @@ func (e env) createToken(t *testing.T, body management.ScimTokenCreate) manageme
 	}
 	testkit.RecordSecret(res.JSON201.Value)
 	return *res.JSON201
-}
-
-// client returns a generated client of the SCIM API presenting token.
-func (e env) client(t *testing.T, token string) *scim.ClientWithResponses {
-	t.Helper()
-	opts := []scim.ClientOption{}
-	if token != "" {
-		opts = append(opts, scim.WithRequestEditorFn(func(_ context.Context, r *http.Request) error {
-			r.Header.Set("Authorization", "Bearer "+token)
-			return nil
-		}))
-	}
-	c, err := scim.NewClientWithResponses(e.srv.URL+scim.BaseURL, opts...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return c
 }
 
 // reply is what the SCIM API answered a raw request.

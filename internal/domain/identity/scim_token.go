@@ -16,7 +16,7 @@ import (
 type SCIMTokenID = id.Of[SCIMToken]
 
 const (
-	scimTokenPrefix     = "fn_scim_"
+	scimTokenPrefix     = "fn_scim_" //nolint:gosec // a prefix, not a credential
 	scimTokenBodyLength = 40
 	scimHintBodyLength  = 4
 )
