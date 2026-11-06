@@ -57,7 +57,7 @@ The credential a member or a script presents to the management API as a bearer t
 _Avoid_: API key, access key, bearer token, SDK key (reserved for SDKs)
 
 **SCIM token**:
-The credential an identity provider presents to `/scim/v2` to provision and deprovision members. Instance-wide, several may coexist for rotation; its value is shown once and stored only as a hash. It may be bound to the one auth provider that IdP signs members in through, the only provider at which the `externalId`s it writes link a sign-in and whose group mappings the SCIM groups it writes feed. One bound to no provider links nothing and its groups grant nothing.
+The credential an identity provider presents to `/scim/v2` to provision and deprovision members. Each belongs, for life, to one auth provider, and reaches only that provider's provisioned members and SCIM groups; several may coexist for rotation. Its value is shown once and stored only as a hash. A disabled provider's SCIM tokens are refused.
 _Avoid_: SCIM secret, provisioning key
 
 **Session**:
@@ -79,6 +79,10 @@ _Avoid_: group sync, role mapping, SSO rule
 **SCIM group**:
 A group an identity provider pushes through `/scim/v2/Groups`, with the members SCIM provisions. It belongs to the auth provider its SCIM token is bound to, and its name is matched against that provider's group mappings alone, so joining, leaving, renaming or deleting it changes the roles its members hold without waiting for their next sign-in. A SCIM group no mapping names is kept and grants nothing.
 _Avoid_: team, directory group, role group
+
+**Provisioned member**:
+A member an identity provider created or adopted through SCIM. Their email, name and whether they are active follow that provider, and nobody changes them by hand; an instance admin is never adopted.
+_Avoid_: managed user, SCIM user, synced member
 
 **Identity**:
 The link between a member and a subject at an auth provider, created the first time a sign-in through it resolves to that member, or when the member links it while signed in; unlinked by the member or an instance admin while another way in remains.

@@ -18,6 +18,7 @@ The issuer, and every endpoint its discovery document names, must be `https`, ex
 A provider vouches only for the email domains it names. A domain is the part of the address after the `@`, compared whatever its case; a subdomain is not its parent (`mail.example.com` is not `example.com`).
 
 - A person whose identity is already linked signs in whatever their email says: the link is the proof.
+- So does a person whose subject is the `externalId` of a member the provider [provisioned through SCIM](scim.md#signing-in): the directory named them itself, so the sign-in is linked to that member, at this provider only, with `link_by_email` and `auto_provision` off.
 - Otherwise the email must be in one of the provider's domains, and verified (the provider's `email_verified` claim is exactly `true`) unless `require_verified_email` is switched off.
 - With `link_by_email` on, an **active** member holding the email is then linked to the person and signed in. With it off, they are not found.
 - With `auto_provision` on, an email no member holds creates a new **active** member, named after the `name` claim or else the email, with no password.
