@@ -610,3 +610,29 @@ func memberID(t *testing.T, e env, email string) string {
 	}
 	return res.JSON200.Items[0].Id.String()
 }
+
+func TestLinkingAtAProviderThatCannotBeReachedIsBadGateway(t *testing.T) {
+	e := start(t)
+	// Nothing listens at the issuer: creating a provider does not ask it.
+	slug := e.create(t, provider{issuer: "http://127.0.0.1:1", clientID: "client", clientSecret: "secret-of-the-client", domains: []string{"example.com"}})
+	m := e.passwordMember(t)
+
+	res, err := m.b.LinkMyIdentityWithResponse(t.Context(), slug, management.IdentityLinkStart{})
+
+	if err != nil || res.StatusCode() != http.StatusBadGateway || !strings.Contains(string(res.Body), `"provider_unreachable"`) {
+		t.Errorf("linking at an unreachable provider = %v, %v: %s", res.StatusCode(), err, res.Body)
+	}
+	if m.b.Cookie("flagnetic_sso") != "" {
+		t.Error("an attempt cookie was set for a link that could not start")
+	}
+}
+
+func TestUnlinkingAnIdentityOfAnUnknownMemberIsNotFound(t *testing.T) {
+	e := start(t)
+
+	res, err := e.admin.UnlinkMemberIdentityWithResponse(t.Context(), "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002")
+
+	if err != nil || res.StatusCode() != http.StatusNotFound {
+		t.Errorf("unlinking an identity of an unknown member = %v, %v", res.StatusCode(), err)
+	}
+}

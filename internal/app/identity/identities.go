@@ -1,6 +1,7 @@
 package identity
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"time"
@@ -58,29 +59,28 @@ func (h *CompleteSignIn) link(ctx context.Context, p identity.Provider, attempt 
 	}
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		m, found, lockErr := h.d.Members.LockMember(ctx, member)
-		if lockErr != nil {
-			return lockErr
-		}
-		if !found || m.Status != identity.MemberActive {
-			return fail(CodeAttemptMismatch, errors.New("the member who started the link cannot sign in"))
+		if lockErr != nil || !found || m.Status != identity.MemberActive {
+			// A member who cannot sign in holds no session, so this is a race
+			// with their deactivation: nothing is linked.
+			return cmp.Or(lockErr, errors.New("the member who started the link cannot sign in"))
 		}
 		claims := *attempt.Claims
-		existing, err := h.d.Identities.IdentityBySubject(ctx, p.ID, claims.Subject)
+		existing, lookupErr := h.d.Identities.IdentityBySubject(ctx, p.ID, claims.Subject)
 		switch {
-		case err == nil && existing.Member == member:
+		case lookupErr == nil && existing.Member == member:
 			// Linked already, by this very member: nothing changes.
 			return nil
-		case err == nil:
+		case lookupErr == nil:
 			return ErrIdentityLinked
-		case !errors.Is(err, ErrNotFound):
-			return err
+		case !errors.Is(lookupErr, ErrNotFound):
+			return lookupErr
 		}
 		now := h.d.now()
 		linked := identity.Identity{
 			ID: id.New[identity.Identity](h.d.IDs), Provider: p.ID, Subject: claims.Subject, Member: member, LinkedAt: now,
 		}
-		if err = h.d.Identities.CreateIdentity(ctx, linked); err != nil {
-			return err
+		if createErr := h.d.Identities.CreateIdentity(ctx, linked); createErr != nil {
+			return createErr
 		}
 		return h.recordLinked(ctx, now, p, linked, m, cmd.RequestID)
 	})
@@ -88,10 +88,6 @@ func (h *CompleteSignIn) link(ctx context.Context, p identity.Provider, attempt 
 	case errors.Is(err, ErrIdentityLinked):
 		return SignedIn{}, fail(CodeIdentityLinked, err)
 	case err != nil:
-		var f *SignInFailure
-		if errors.As(err, &f) {
-			return SignedIn{}, err
-		}
 		return SignedIn{}, fail(CodeSSOFailed, err)
 	}
 	return SignedIn{Kind: p.Kind, ReturnTo: attempt.ReturnTo, Linked: true}, nil
