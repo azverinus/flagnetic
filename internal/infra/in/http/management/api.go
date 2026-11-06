@@ -206,6 +206,8 @@ type Handlers struct {
 	EnableSink       *appsinks.Enable
 	TestSinkConfig   *appsinks.TestConfig
 	TestSink         *appsinks.Test
+	SampleSink       *appsinks.Sample
+	ReplaySink       *appsinks.Replay
 
 	ResumeSink              *appsinks.ResumeSink
 	ListSinkDeadLetters     *appsinks.ListDeadLetters

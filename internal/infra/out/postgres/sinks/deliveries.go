@@ -30,7 +30,8 @@ func cursorOf(text string, seq int64) (events.Cursor, error) {
 // streamColumns are a stream's as the API and the worker read them.
 const streamColumns = `ss.sink_id, ss.event_kind, ss.cursor_xid::text, ss.cursor_seq, ss.last_delivered_at,
 	ss.consecutive_failures, ss.last_failure_class, ss.last_failure_status, ss.last_failure_code, ss.last_failure_at,
-	ss.inflight_xid::text, ss.inflight_seq, ss.inflight_environments, ss.inflight_rejections`
+	ss.inflight_xid::text, ss.inflight_seq, ss.inflight_environments, ss.inflight_rejections,
+	ss.replay_stop_xid::text, ss.replay_stop_seq, ss.replay_resume_xid::text, ss.replay_resume_seq`
 
 type streamRow struct {
 	sink       sinks.ID
@@ -52,9 +53,11 @@ func scanStream(row pgx.Row) (streamRow, error) {
 		environments             [][16]byte
 		failures                 int
 		inflightRejections       int
+		stopXID, resumeXID       *string
+		stopSeq, resumeSeq       *int64
 	)
 	if err := row.Scan(&sk, &kind, &cursorXID, &cursorSeq, &delivered, &failures, &class, &failStatus, &code, &failedAt,
-		&inflightXID, &inflightSeq, &environments, &inflightRejections); err != nil {
+		&inflightXID, &inflightSeq, &environments, &inflightRejections, &stopXID, &stopSeq, &resumeXID, &resumeSeq); err != nil {
 		return r, err
 	}
 	r.sink = id.FromBytes[sinks.Sink](sk)
@@ -84,6 +87,23 @@ func scanStream(row pgx.Row) (streamRow, error) {
 		r.inflight = &in
 	}
 	r.rejections = inflightRejections
+	if stopXID != nil {
+		// The table ties each position's two columns together but not the
+		// stop to the resume position; a row with one and not the other is
+		// reported rather than read as a replay half set.
+		if resumeXID == nil {
+			return r, errors.New("reading a stream: a replay stop without a resume position")
+		}
+		stop, stopErr := cursorOf(*stopXID, *stopSeq)
+		if stopErr != nil {
+			return r, stopErr
+		}
+		resume, resumeErr := cursorOf(*resumeXID, *resumeSeq)
+		if resumeErr != nil {
+			return r, resumeErr
+		}
+		r.stream.Stop, r.stream.Resume = &stop, &resume
+	}
 	return r, nil
 }
 
@@ -121,6 +141,48 @@ func (s *Store) withStreams(ctx context.Context, list []sinks.Sink) error {
 		list[i].Streams = streams
 	}
 	return s.withDeadLetters(ctx, list)
+}
+
+// LockStream reads the stream of kind of sink for update, holding it against
+// the delivery worker's writes until the unit of work ends.
+func (s *Store) LockStream(ctx context.Context, sink sinks.ID, kind sinks.EventKind) (sinks.Stream, error) {
+	row := s.db(ctx).QueryRow(ctx, `SELECT `+streamColumns+` FROM sink_streams ss WHERE ss.sink_id = $1 AND ss.event_kind = $2 FOR UPDATE`,
+		sink.Bytes(), string(kind))
+	r, err := scanStream(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sinks.Stream{}, appsinks.ErrNotFound
+	}
+	if err != nil {
+		return sinks.Stream{}, fmt.Errorf("locking a stream: %w", err)
+	}
+	return r.stream, nil
+}
+
+// Replay puts the stream of kind of sink as plan has it. The position it reads
+// on from is stored as pending and applied by the worker as it leases the
+// stream; the batch in flight and the lease are dropped now, so that a send
+// under way records nothing over the replay. The plan carries the position to
+// return to, which the caller read from the stream under lock.
+func (s *Store) Replay(ctx context.Context, sink sinks.ID, kind sinks.EventKind, plan sinks.ReplayPlan, now time.Time) error {
+	var stopXID, resumeXID *string
+	var stopSeq, resumeSeq *int64
+	if plan.Stop != nil {
+		sx, rx := xid(*plan.Stop), xid(*plan.Resume)
+		stopXID, stopSeq, resumeXID, resumeSeq = &sx, &plan.Stop.Seq, &rx, &plan.Resume.Seq
+	}
+	_, err := s.db(ctx).Exec(ctx, `
+		UPDATE sink_streams SET
+		    pending_cursor_xid = $3::text::xid8, pending_cursor_seq = $4,
+		    replay_stop_xid = $5::text::xid8, replay_stop_seq = $6,
+		    replay_resume_xid = $7::text::xid8, replay_resume_seq = $8,
+		    inflight_xid = NULL, inflight_seq = NULL, inflight_environments = NULL, inflight_rejections = 0,
+		    lease_token = NULL, lease_until = NULL, next_attempt_at = $9
+		WHERE sink_id = $1 AND event_kind = $2`,
+		sink.Bytes(), string(kind), xid(plan.Cursor), plan.Cursor.Seq, stopXID, stopSeq, resumeXID, resumeSeq, now)
+	if err != nil {
+		return fmt.Errorf("replaying a stream: %w", err)
+	}
+	return nil
 }
 
 // CreateStream starts the stream of kind of sink at the position at, due now.
@@ -169,7 +231,9 @@ func (s *Store) Claim(ctx context.Context, token appsinks.LeaseToken, now, until
 		    LIMIT $2
 		    FOR UPDATE OF ss SKIP LOCKED
 		)
-		UPDATE sink_streams ss SET lease_token = $5, lease_until = $3
+		UPDATE sink_streams ss SET lease_token = $5, lease_until = $3,
+		    cursor_xid = coalesce(ss.pending_cursor_xid, ss.cursor_xid), cursor_seq = coalesce(ss.pending_cursor_seq, ss.cursor_seq),
+		    pending_cursor_xid = NULL, pending_cursor_seq = NULL
 		FROM due WHERE ss.sink_id = due.sink_id AND ss.event_kind = due.event_kind
 		RETURNING `+streamColumns, now, limit, until, busyIDs, token.String())
 	if err != nil {
@@ -314,17 +378,31 @@ func (s *Store) Ack(ctx context.Context, stream appsinks.StreamRef, token appsin
 	if delivered > 0 && s.fault.loses() {
 		return true, nil
 	}
+	// A bounded replay that the batch reaches the end of is over: the cursor
+	// goes back to where the replay was to return to, not to the batch's end.
 	tag, err := s.db(ctx).Exec(ctx, `
-		UPDATE sink_streams SET
-		    cursor_xid = $4::text::xid8, cursor_seq = $5,
+		WITH s AS (
+		    SELECT sink_id, event_kind,
+		        coalesce(replay_stop_xid IS NOT NULL AND ($4::text::xid8, $5::bigint) >= (replay_stop_xid, replay_stop_seq), false) AS over
+		    FROM sink_streams
+		    WHERE sink_id = $1 AND event_kind = $2 AND lease_token = $3
+		    FOR UPDATE)
+		UPDATE sink_streams ss SET
+		    cursor_xid = CASE WHEN s.over THEN ss.replay_resume_xid ELSE $4::text::xid8 END,
+		    cursor_seq = CASE WHEN s.over THEN ss.replay_resume_seq ELSE $5::bigint END,
+		    replay_stop_xid = CASE WHEN s.over THEN NULL ELSE ss.replay_stop_xid END,
+		    replay_stop_seq = CASE WHEN s.over THEN NULL ELSE ss.replay_stop_seq END,
+		    replay_resume_xid = CASE WHEN s.over THEN NULL ELSE ss.replay_resume_xid END,
+		    replay_resume_seq = CASE WHEN s.over THEN NULL ELSE ss.replay_resume_seq END,
 		    inflight_xid = NULL, inflight_seq = NULL, inflight_environments = NULL, inflight_rejections = 0,
 		    lease_token = NULL, lease_until = NULL, next_attempt_at = $6,
 		    consecutive_failures = 0,
 		    consecutive_dead_letters = CASE WHEN $7::bigint > 0 THEN 0 ELSE consecutive_dead_letters END,
 		    last_failure_class = NULL, last_failure_status = NULL, last_failure_code = NULL, last_failure_at = NULL,
-		    last_delivered_at = CASE WHEN $7::bigint > 0 THEN $8::timestamptz ELSE last_delivered_at END,
-		    delivered_total = delivered_total + $7::bigint
-		WHERE sink_id = $1 AND event_kind = $2 AND lease_token = $3`,
+		    last_delivered_at = CASE WHEN $7::bigint > 0 THEN $8::timestamptz ELSE ss.last_delivered_at END,
+		    delivered_total = ss.delivered_total + $7::bigint
+		FROM s
+		WHERE ss.sink_id = s.sink_id AND ss.event_kind = s.event_kind`,
 		stream.Sink.Bytes(), string(stream.Kind), token.String(), xid(to), to.Seq, next, int64(delivered), now)
 	if err != nil {
 		return false, fmt.Errorf("recording a delivery: %w", err)

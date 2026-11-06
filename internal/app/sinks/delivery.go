@@ -86,7 +86,8 @@ type DeliveryStore interface {
 	// Claim leases to token, until until, the streams due by now of sinks
 	// that are enabled or still have a batch in flight and are not stopped,
 	// leaving out those of the sinks busy, the longest due first, at most
-	// limit streams.
+	// limit streams. A replay a stream has waiting is applied as it is
+	// leased: its cursor is the position the replay set.
 	Claim(ctx context.Context, token LeaseToken, now, until time.Time, limit int, busy []sinks.ID) ([]ClaimedSink, error)
 	// Renew pushes the lease token holds on stream out to until and reports
 	// the state of its sink.
@@ -98,7 +99,9 @@ type DeliveryStore interface {
 	// Ack moves stream's cursor to to, clears its batch in flight and its
 	// failures, ends its run of dead letters when it delivered rows (passing
 	// rows of other projects is no delivery), counts delivered rows and
-	// schedules its next attempt for next, releasing the lease.
+	// schedules its next attempt for next, releasing the lease. A bounded
+	// replay that to reaches the end of is over: the cursor goes to where
+	// the replay returns to instead.
 	Ack(ctx context.Context, stream StreamRef, token LeaseToken, to events.Cursor, delivered int, next, now time.Time) (held bool, err error)
 	// Fail records a failed attempt of stream: one more consecutive failure,
 	// the failure, a rejection counted when rejected, the next attempt at
@@ -151,7 +154,9 @@ type Rows interface {
 	// environments with keys, every environment when none; ok is false when
 	// the sink names some and none exists any more.
 	Scope(ctx context.Context, project workspace.ProjectID, keys []string) (scope sinks.Scope, ok bool, err error)
-	NextBatch(ctx context.Context, kind sinks.EventKind, scope sinks.Scope, from events.Cursor, limit int) (sinks.Batch, error)
+	// NextBatch returns the next batch of at most limit rows past from, not
+	// reaching past until when it is not nil.
+	NextBatch(ctx context.Context, kind sinks.EventKind, scope sinks.Scope, from events.Cursor, limit int, until *events.Cursor) (sinks.Batch, error)
 	ReadBatch(ctx context.Context, kind sinks.EventKind, scope sinks.Scope, b sinks.Batch) (sinks.Page, error)
 	OldestUnread(ctx context.Context, kind sinks.EventKind, scope sinks.Scope, from events.Cursor) (at time.Time, ok bool, err error)
 	// Tail returns the position of the last row of kind below the snapshot
@@ -160,6 +165,9 @@ type Rows interface {
 	// Before returns the position just before the first row of kind in scope
 	// received at or after from; ok is false when there is none.
 	Before(ctx context.Context, kind sinks.EventKind, scope sinks.Scope, from time.Time) (at events.Cursor, ok bool, err error)
+	// Last returns the position of the last row of kind in scope received at
+	// or before to, below the horizon; ok is false when there is none.
+	Last(ctx context.Context, kind sinks.EventKind, scope sinks.Scope, to time.Time) (at events.Cursor, ok bool, err error)
 }
 
 // Call is what a target is called with.
@@ -353,8 +361,13 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 			// and must not read the project's other environments instead.
 			return h.idle(ctx, ref, token, c.Sink)
 		}
-		if batch, err = h.d.Rows.NextBatch(ctx, ref.Kind, scope, due.Stream.Cursor, c.Sink.BatchSize); err != nil {
+		if batch, err = h.d.Rows.NextBatch(ctx, ref.Kind, scope, due.Stream.Cursor, c.Sink.BatchSize, due.Stream.Stop); err != nil {
 			return Failed, fmt.Errorf("choosing a batch: %w", err)
+		}
+		if batch.To == due.Stream.Cursor && due.Stream.Stop != nil {
+			// No row is left up to the end of a bounded replay, perhaps
+			// because retention dropped the last ones: it is over.
+			return h.ack(ctx, ref, token, c, due, sinks.Batch{From: batch.From, To: *due.Stream.Stop}, 0, 0, scope)
 		}
 		if batch.To == due.Stream.Cursor {
 			// Nothing to send, perhaps because a transaction still open holds
@@ -362,14 +375,14 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 			// that is when it grows.
 			res, idleErr := h.idle(ctx, ref, token, c.Sink)
 			if res == Idled {
-				h.observeLag(ctx, ref, scope, due.Stream.Cursor)
+				h.observeLag(ctx, ref, scope, due.Stream.Live())
 			}
 			return res, idleErr
 		}
 		if batch.Rows == 0 {
 			// The rows past the cursor are other projects' or other
 			// environments': the stream passes them.
-			return h.ack(ctx, ref, token, c, batch, 0, 0, scope)
+			return h.ack(ctx, ref, token, c, due, batch, 0, 0, scope)
 		}
 		in = &Inflight{To: batch.To, Environments: scope.Environments}
 		held, beginErr := h.d.Store.Begin(ctx, ref, token, *in)
@@ -390,7 +403,7 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 	// which it is by the rows its range holds, but are never sent.
 	batch.Rows = len(page.Rows) + page.Skipped
 	if len(page.Rows) == 0 {
-		return h.ack(ctx, ref, token, c, batch, 0, page.Skipped, scope)
+		return h.ack(ctx, ref, token, c, due, batch, 0, page.Skipped, scope)
 	}
 	secrets, err := h.secrets(c.Sink, h.now())
 	if err != nil {
@@ -423,7 +436,7 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 	})
 	if failure == nil {
 		h.d.Observer.Batch(ref.Sink, ref.Kind, ResultAck)
-		return h.ack(ctx, ref, token, c, batch, len(page.Rows), page.Skipped, scope)
+		return h.ack(ctx, ref, token, c, due, batch, len(page.Rows), page.Skipped, scope)
 	}
 	rejected := failure.Class == sinks.ClassRejected
 	if rejected {
@@ -470,7 +483,7 @@ func next(now time.Time, s sinks.Sink, rows int) time.Time {
 	return now.Add(s.FlushInterval)
 }
 
-func (h *Deliver) ack(ctx context.Context, ref StreamRef, token LeaseToken, c ClaimedSink, b sinks.Batch, delivered, skipped int, scope sinks.Scope) (Result, error) {
+func (h *Deliver) ack(ctx context.Context, ref StreamRef, token LeaseToken, c ClaimedSink, due Due, b sinks.Batch, delivered, skipped int, scope sinks.Scope) (Result, error) {
 	now := h.now()
 	held, err := h.d.Store.Ack(ctx, ref, token, b.To, delivered, next(now, c.Sink, b.Rows), now)
 	switch {
@@ -484,7 +497,13 @@ func (h *Deliver) ack(ctx context.Context, ref StreamRef, token LeaseToken, c Cl
 	if skipped > 0 {
 		h.d.Observer.RowsSkipped(SkipEnvironmentDeleted, skipped)
 	}
-	h.observeLag(ctx, ref, scope, b.To)
+	// During a bounded replay the lag is the live stream's, which the replay
+	// does not move.
+	from := b.To
+	if due.Stream.Resume != nil {
+		from = *due.Stream.Resume
+	}
+	h.observeLag(ctx, ref, scope, from)
 	return Acked, nil
 }
 
@@ -531,7 +550,7 @@ func (h *Deliver) fail(ctx context.Context, ref StreamRef, token LeaseToken, c C
 	case !held:
 		return LeaseLost, nil
 	}
-	h.observeLag(ctx, ref, scope, due.Stream.Cursor)
+	h.observeLag(ctx, ref, scope, due.Stream.Live())
 	return Failed, nil
 }
 

@@ -2415,6 +2415,28 @@ export const zSinkTestResult = z.object({
   warnings: z.array(z.string()),
 });
 
+export const zSinkSample = z.object({
+  event_kinds: z.array(z.string()).optional(),
+});
+
+export const zSinkSampleKindResult = z.object({
+  event_kind: z.string(),
+  ok: z.boolean(),
+  class: zSinkFailureClass.nullable(),
+  status: z.int().nullable(),
+  code: z.string().nullable(),
+});
+
+export const zSinkSampleResult = z.object({
+  results: z.array(zSinkSampleKindResult),
+});
+
+export const zSinkReplay = z.object({
+  from: z.iso.datetime(),
+  to: z.iso.datetime().optional(),
+  event_kinds: z.array(z.string()).optional(),
+});
+
 export const zSinkCreate = z.object({
   name: z.string(),
   kind: z.string(),
@@ -4962,6 +4984,30 @@ export const zTestSinkPath = z.object({
  * What the test found; a target that fails is a 200 with `ok` false.
  */
 export const zTestSinkResponse = zSinkTestResult;
+
+export const zSampleSinkBody = zSinkSample;
+
+export const zSampleSinkPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+});
+
+/**
+ * What each event kind's sample found, in the order the kinds are listed.
+ */
+export const zSampleSinkResponse = zSinkSampleResult;
+
+export const zReplaySinkBody = zSinkReplay;
+
+export const zReplaySinkPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+});
+
+/**
+ * The sink as it is now.
+ */
+export const zReplaySinkResponse = zSink;
 
 export const zRotateSinkSecretPath = z.object({
   project: z.string(),
