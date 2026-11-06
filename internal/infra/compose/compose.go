@@ -111,6 +111,10 @@ type Options struct {
 	// SinkLagWarning is how old the oldest event a sink has not delivered
 	// may be before the sink is lagging.
 	SinkLagWarning time.Duration
+	// SinkRejectionAttempts is how many times a target must reject a batch
+	// for it to be set aside as a dead letter, and SinkStopAfterDeadLetters
+	// how many dead letters in a row on one stream stop the sink.
+	SinkRejectionAttempts, SinkStopAfterDeadLetters int
 	// WebhookSecretOverlap is how long a webhook subscription's rotated
 	// secret signs beside the new one.
 	WebhookSecretOverlap time.Duration
@@ -237,11 +241,14 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Tx: tx, Store: sinkStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
 		Sealer: o.Keyring, Resolver: net.DefaultResolver, TargetPolicy: o.WebhookTargets, SecretOverlap: o.WebhookSecretOverlap,
 		Rows: sinkStore, Targets: sinkTargets, Opener: o.Keyring, Retention: o.EventsRetention, LagWarning: o.SinkLagWarning,
+		DeadLetters: sinkStore,
 	}
-	sinkMetrics := worker.NewSinkMetrics(reg)
+	sinkMetrics := worker.NewSinkMetrics(reg, sinkStore)
+	sinks.Observer = sinkMetrics
 	sinkDelivery := appsinks.NewDeliver(appsinks.DeliverDeps{
 		Tx: tx, Store: sinkStore, Rows: sinkStore, Targets: sinkTargets, Opener: o.Keyring, Audit: audit, Clock: d.Clock,
 		IDs: d.IDs, Observer: sinkMetrics, Random: mrand.Float64,
+		RejectionAttempts: o.SinkRejectionAttempts, StopAfterDeadLetters: o.SinkStopAfterDeadLetters,
 	})
 	deliveryRequests := appgovernance.DeliveryRequestDeps{
 		Tx: tx, Webhooks: webhookStore, Deliveries: webhookStore, Queue: outbox, Clock: d.Clock, IDs: d.IDs,
@@ -603,6 +610,11 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		UpdateSink:       appsinks.NewUpdate(sinks),
 		DeleteSink:       appsinks.NewDelete(sinks),
 		RotateSinkSecret: appsinks.NewRotateSecret(sinks),
+
+		ResumeSink:              appsinks.NewResumeSink(sinks),
+		ListSinkDeadLetters:     appsinks.NewListDeadLetters(sinks),
+		RedeliverSinkDeadLetter: appsinks.NewRedeliverDeadLetter(sinks),
+		DiscardSinkDeadLetter:   appsinks.NewDiscardDeadLetter(sinks),
 
 		ListSegments: appflags.NewListSegments(tx, flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),

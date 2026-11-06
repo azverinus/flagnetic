@@ -28,7 +28,7 @@ Every operation of the management API declares the one thing it needs in the Ope
 | `change_request.propose` | proposing changes as change requests: creating them, editing, rebasing, opening, cancelling and applying one's own, copying any | `flags:write` | |
 | `change_request.approve` | deciding change requests: approving and rejecting another's, and cancelling or applying another's | `flags:write` | ✓ |
 | `webhook.manage` | creating, reading, editing, enabling and deleting a project's webhook subscriptions, rotating their secrets, testing them, reading and redelivering their deliveries, and sending the stale-flag digest now | `project:admin` | |
-| `sink.manage` | creating, reading, editing and deleting a project's sinks, and rotating a webhook sink's secret; reading needs it too, since a sink's configuration names internal hosts, buckets and URLs that may carry tokens | `project:admin` | |
+| `sink.manage` | creating, reading, editing and deleting a project's sinks, rotating a webhook sink's secret, resuming a stopped sink, and listing, redelivering and discarding its dead letters; reading needs it too, since a sink's configuration names internal hosts, buckets and URLs that may carry tokens | `project:admin` | |
 | `project.delete` | deleting a project with everything in it, from a signed-in session only | `project:admin` | ✓ |
 | `project.import` | merging a project document into a project, in every environment whether it is protected or not | `project:admin` | ✓ |
 

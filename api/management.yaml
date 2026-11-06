@@ -6267,6 +6267,125 @@ paths:
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/Invalid"
+  /projects/{project}/sinks/{sink}/resume:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/SinkID"
+    post:
+      operationId: resumeSink
+      summary: Resume a stopped sink
+      description: |
+        A sink stops itself when `FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS`
+        batches in a row of one stream were set aside as dead letters. This
+        starts it again where it was: every stream keeps its place and its
+        batch in flight, the count of consecutive dead letters is cleared and
+        each stream is due now. Dead letters stay and are not redelivered; the
+        sink is `degraded` while any waits. Editing a sink never resumes it. A
+        sink that is not stopped is answered as it is, with nothing changed or
+        recorded. Audited as `sink.resumed`. It takes no `If-Match`.
+      x-permission: sink.manage
+      tags: [sinks]
+      responses:
+        "200":
+          description: The sink as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sink"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/sinks/{sink}/dead-letters:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/SinkID"
+    get:
+      operationId: listSinkDeadLetters
+      summary: A sink's dead letters
+      description: |
+        The batches the target rejected `FLAGNETIC_SINK_REJECTION_ATTEMPTS`
+        times and the sink set aside to deliver the next, oldest first, in
+        every status; a discarded one is gone. Not paginated.
+      x-permission: sink.manage
+      tags: [sinks]
+      responses:
+        "200":
+          description: The sink's dead letters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SinkDeadLetterList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/sinks/{sink}/dead-letters/{deadLetter}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/SinkID"
+      - $ref: "#/components/parameters/DeadLetterID"
+    delete:
+      operationId: discardSinkDeadLetter
+      summary: Discard a dead letter
+      description: |
+        The dead letter goes, whatever its status, and stops counting towards
+        the sink being `degraded`. Its rows are not delivered. Audited as
+        `sink.dead_letter_discarded`.
+      x-permission: sink.manage
+      tags: [sinks]
+      responses:
+        "204":
+          description: Discarded.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/SinkID"
+      - $ref: "#/components/parameters/DeadLetterID"
+    post:
+      operationId: redeliverSinkDeadLetter
+      summary: Redeliver a dead letter
+      description: |
+        Reads the rows of the dead letter that are still stored and sends them
+        to the target now, inside this request, under a delivery ID of its
+        own: the dead letter's and its attempt's, so a repeat is another
+        delivery. The sink's streams, cursors and health are not touched. When
+        the target acknowledges, the dead letter is `redelivered`; when it
+        does not, this still answers 200 with the dead letter, still
+        `pending`, its `attempts` and `last_failure` updated. It may be
+        repeated. Refused `rows_expired` when retention dropped every row of
+        it. Audited as `sink.dead_letter_redelivered`; the target's own words
+        are never answered.
+      x-permission: sink.manage
+      tags: [sinks]
+      responses:
+        "200":
+          description: The dead letter after the attempt.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SinkDeadLetter"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /webhooks:
     get:
       operationId: listInstanceWebhooks
@@ -6752,6 +6871,14 @@ components:
       in: path
       required: true
       description: The sink's identifier.
+      schema:
+        type: string
+        format: uuid
+    DeadLetterID:
+      name: deadLetter
+      in: path
+      required: true
+      description: The dead letter's identifier.
       schema:
         type: string
         format: uuid
@@ -11212,6 +11339,57 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Sink"
+    SinkDeadLetterStatus:
+      type: string
+      enum: [pending, redelivered, expired]
+      description: |
+        `pending` waits to be redelivered or discarded; `redelivered` was
+        acknowledged by the target after a redelivery; `expired` lost every
+        row to retention.
+    SinkDeadLetter:
+      type: object
+      description: |
+        A batch of one event kind the target rejected, set aside so the stream
+        could go on. Cursors are never exposed: the batch is told by how many
+        rows it held and when the first and the last of them were received.
+      required: [id, event_kind, rows, first_received_at, last_received_at, attempts, last_failure, status, created_at, redelivered_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_kind:
+          $ref: "#/components/schemas/SinkEventKind"
+        rows:
+          type: integer
+          description: How many rows the batch held when it was set aside, those of deleted environments included.
+        first_received_at:
+          type: string
+          format: date-time
+        last_received_at:
+          type: string
+          format: date-time
+        attempts:
+          type: integer
+          description: How many times the target rejected the batch, redeliveries included.
+        last_failure:
+          $ref: "#/components/schemas/SinkFailure"
+        status:
+          $ref: "#/components/schemas/SinkDeadLetterStatus"
+        created_at:
+          type: string
+          format: date-time
+        redelivered_at:
+          type: string
+          format: date-time
+          nullable: true
+    SinkDeadLetterList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SinkDeadLetter"
     WebhookDeliveryStatus:
       type: string
       description: |

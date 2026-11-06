@@ -145,6 +145,9 @@ import type {
   DisableAuthProviderData,
   DisableAuthProviderErrors,
   DisableAuthProviderResponses,
+  DiscardSinkDeadLetterData,
+  DiscardSinkDeadLetterErrors,
+  DiscardSinkDeadLetterResponses,
   DismissDiscoveredAttributeData,
   DismissDiscoveredAttributeErrors,
   DismissDiscoveredAttributeResponses,
@@ -355,6 +358,9 @@ import type {
   ListSegmentUsagesData,
   ListSegmentUsagesErrors,
   ListSegmentUsagesResponses,
+  ListSinkDeadLettersData,
+  ListSinkDeadLettersErrors,
+  ListSinkDeadLettersResponses,
   ListSinksData,
   ListSinksErrors,
   ListSinksResponses,
@@ -391,6 +397,9 @@ import type {
   RedeliverInstanceWebhookDeliveryData,
   RedeliverInstanceWebhookDeliveryErrors,
   RedeliverInstanceWebhookDeliveryResponses,
+  RedeliverSinkDeadLetterData,
+  RedeliverSinkDeadLetterErrors,
+  RedeliverSinkDeadLetterResponses,
   RedeliverWebhookDeliveryData,
   RedeliverWebhookDeliveryErrors,
   RedeliverWebhookDeliveryResponses,
@@ -409,6 +418,9 @@ import type {
   RestoreFlagData,
   RestoreFlagErrors,
   RestoreFlagResponses,
+  ResumeSinkData,
+  ResumeSinkErrors,
+  ResumeSinkResponses,
   RevertFlagConfigurationData,
   RevertFlagConfigurationErrors,
   RevertFlagConfigurationResponses,
@@ -5548,6 +5560,126 @@ export const rotateSinkSecret = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/sinks/{sink}/rotate-secret",
+    ...options,
+  });
+
+/**
+ * Resume a stopped sink
+ *
+ * A sink stops itself when `FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS`
+ * batches in a row of one stream were set aside as dead letters. This
+ * starts it again where it was: every stream keeps its place and its
+ * batch in flight, the count of consecutive dead letters is cleared and
+ * each stream is due now. Dead letters stay and are not redelivered; the
+ * sink is `degraded` while any waits. Editing a sink never resumes it. A
+ * sink that is not stopped is answered as it is, with nothing changed or
+ * recorded. Audited as `sink.resumed`. It takes no `If-Match`.
+ *
+ */
+export const resumeSink = <ThrowOnError extends boolean = false>(
+  options: Options<ResumeSinkData, ThrowOnError>,
+): RequestResult<ResumeSinkResponses, ResumeSinkErrors, ThrowOnError> =>
+  (options.client ?? client).post<ResumeSinkResponses, ResumeSinkErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/resume",
+    ...options,
+  });
+
+/**
+ * A sink's dead letters
+ *
+ * The batches the target rejected `FLAGNETIC_SINK_REJECTION_ATTEMPTS`
+ * times and the sink set aside to deliver the next, oldest first, in
+ * every status; a discarded one is gone. Not paginated.
+ *
+ */
+export const listSinkDeadLetters = <ThrowOnError extends boolean = false>(
+  options: Options<ListSinkDeadLettersData, ThrowOnError>,
+): RequestResult<ListSinkDeadLettersResponses, ListSinkDeadLettersErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListSinkDeadLettersResponses,
+    ListSinkDeadLettersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/dead-letters",
+    ...options,
+  });
+
+/**
+ * Discard a dead letter
+ *
+ * The dead letter goes, whatever its status, and stops counting towards
+ * the sink being `degraded`. Its rows are not delivered. Audited as
+ * `sink.dead_letter_discarded`.
+ *
+ */
+export const discardSinkDeadLetter = <ThrowOnError extends boolean = false>(
+  options: Options<DiscardSinkDeadLetterData, ThrowOnError>,
+): RequestResult<DiscardSinkDeadLetterResponses, DiscardSinkDeadLetterErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DiscardSinkDeadLetterResponses,
+    DiscardSinkDeadLetterErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/dead-letters/{deadLetter}",
+    ...options,
+  });
+
+/**
+ * Redeliver a dead letter
+ *
+ * Reads the rows of the dead letter that are still stored and sends them
+ * to the target now, inside this request, under a delivery ID of its
+ * own: the dead letter's and its attempt's, so a repeat is another
+ * delivery. The sink's streams, cursors and health are not touched. When
+ * the target acknowledges, the dead letter is `redelivered`; when it
+ * does not, this still answers 200 with the dead letter, still
+ * `pending`, its `attempts` and `last_failure` updated. It may be
+ * repeated. Refused `rows_expired` when retention dropped every row of
+ * it. Audited as `sink.dead_letter_redelivered`; the target's own words
+ * are never answered.
+ *
+ */
+export const redeliverSinkDeadLetter = <ThrowOnError extends boolean = false>(
+  options: Options<RedeliverSinkDeadLetterData, ThrowOnError>,
+): RequestResult<RedeliverSinkDeadLetterResponses, RedeliverSinkDeadLetterErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RedeliverSinkDeadLetterResponses,
+    RedeliverSinkDeadLetterErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver",
     ...options,
   });
 

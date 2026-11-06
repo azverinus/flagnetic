@@ -202,6 +202,11 @@ type Handlers struct {
 	TestSinkConfig   *appsinks.TestConfig
 	TestSink         *appsinks.Test
 
+	ResumeSink              *appsinks.ResumeSink
+	ListSinkDeadLetters     *appsinks.ListDeadLetters
+	RedeliverSinkDeadLetter *appsinks.RedeliverDeadLetter
+	DiscardSinkDeadLetter   *appsinks.DiscardDeadLetter
+
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment
 	CreateSegment     *appflags.CreateSegment

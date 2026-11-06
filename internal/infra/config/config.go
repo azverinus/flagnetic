@@ -113,6 +113,12 @@ type Config struct {
 	// SinkLagWarning is how old the oldest undelivered event of a sink may
 	// be before the sink is lagging.
 	SinkLagWarning time.Duration
+	// SinkRejectionAttempts is how many times a target must reject a batch
+	// for the sink to set it aside as a dead letter.
+	SinkRejectionAttempts int
+	// SinkStopAfterDeadLetters is how many dead letters in a row on one
+	// stream stop its sink.
+	SinkStopAfterDeadLetters int
 	// WebhookSecretOverlap is how long the secret a rotation replaced keeps
 	// signing beside the new one.
 	WebhookSecretOverlap time.Duration
@@ -570,6 +576,26 @@ func Settings() []Setting {
 				"A long transaction anywhere in the database holds every sink back, and shows as lag.",
 			Example: "15m",
 			apply:   durationSetting(func(c *Config, d time.Duration) { c.SinkLagWarning = d }),
+		},
+		{
+			Name:    "FLAGNETIC_SINK_REJECTION_ATTEMPTS",
+			Key:     "sink_rejection_attempts",
+			Default: "5",
+			Unit:    "attempts",
+			Description: "How many times a sink's target must reject one batch before the sink sets it aside as a dead letter and goes on with the next. " +
+				"Only a rejection counts: a target that is down or busy is retried without limit, with a growing wait, and the batch keeps its place.",
+			Example: "3",
+			apply:   wholeNumber(func(c *Config, n int) { c.SinkRejectionAttempts = n }),
+		},
+		{
+			Name:    "FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS",
+			Key:     "sink_stop_after_dead_letters",
+			Default: "3",
+			Unit:    "dead letters",
+			Description: "How many dead letters in a row on one stream stop its sink, so that a target that keeps refusing is not fed the rest of the event store. " +
+				"A batch the target acknowledges ends the run. A stopped sink delivers nothing until a member resumes it.",
+			Example: "5",
+			apply:   wholeNumber(func(c *Config, n int) { c.SinkStopAfterDeadLetters = n }),
 		},
 		{
 			Name:    "FLAGNETIC_WEBHOOK_SECRET_OVERLAP",
