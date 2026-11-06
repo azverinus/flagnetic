@@ -172,7 +172,7 @@ A member signed in with a password links a provider to their account, so they ca
 - `DELETE /me/identities/<identity>` (a session only) unlinks an identity of the caller. An instance admin unlinks a member's with `DELETE /members/<member>/identities/<identity>` and lists them with `GET /members/<member>/identities`, for example to undo a wrong link. Recorded as `identity.unlinked`.
 - **The last way in stays.** Unlinking an identity, or removing the password with `DELETE /me/password` (a session only, recorded as `password.removed`; [Access](access.md#your-own-account) covers it), is refused `409 last_auth_method` when no other usable way in would remain. A usable way in is a password, or an identity at an enabled provider: an identity at a disabled provider is listed but signs nobody in, so unlinking it is always allowed. A deactivated member signs in nowhere, so an instance admin may unlink their last identity.
 
-Where a link fails the browser lands on `/settings?error=<code>`: `identity_linked` when the subject is linked to another member, `attempt_mismatch` for a browser or session that did not start the link, `sso_failed` or `idp_error` as at sign-in.
+Where a link fails after the instance has identified its attempt, the browser lands on `/settings?error=<code>` (a state or completion token it cannot identify, or a provider disabled meanwhile, ends as a sign-in's failure does): `identity_linked` when the subject is linked to another member, `attempt_mismatch` for a browser or session that did not start the link, `sso_failed` or `idp_error` as at sign-in.
 
 ## Sign-in errors
 
