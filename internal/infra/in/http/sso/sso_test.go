@@ -50,6 +50,8 @@ type provider struct {
 	domains                        []string
 	linkByEmail, autoProvision     bool
 	requireVerifiedEmail           *bool
+	// scopes are the scopes asked of the provider; its default when empty.
+	scopes []string
 }
 
 func (e env) create(t *testing.T, p provider) string {
@@ -59,6 +61,9 @@ func (e env) create(t *testing.T, p provider) string {
 		Slug: cmp.Or(p.slug, slug()), Kind: management.AuthProviderKindOidc, DisplayName: "Corporate SSO", Domains: p.domains,
 		Issuer: &p.issuer, ClientId: &p.clientID, ClientSecret: &p.clientSecret,
 		LinkByEmail: &p.linkByEmail, AutoProvision: &p.autoProvision,
+	}
+	if len(p.scopes) > 0 {
+		body.Scopes = &p.scopes
 	}
 	res, err := e.admin.CreateAuthProviderWithResponse(t.Context(), body)
 	if err != nil || res.JSON201 == nil {

@@ -102,6 +102,7 @@ func (c *Client) VerifyResponse(cfg appidentity.SAMLConfig, response, requestID 
 	}
 	if attributes != nil {
 		claims.Name = attributeValue(attributes, cfg.Claims.Name)
+		claims.Groups, claims.HasGroups = attributeValues(attributes, cfg.Claims.Groups)
 	}
 	return appidentity.SAMLAssertion{ID: assertion.ID, ValidUntil: validUntil, Claims: claims}, nil
 }
@@ -173,6 +174,29 @@ func attributeValue(s *types.AttributeStatement, name string) string {
 		}
 	}
 	return ""
+}
+
+// attributeValues returns the values of every attribute named name, by its
+// name or its friendly name, trimmed and without the blank ones; found is
+// whether the assertion has such an attribute at all, which may hold no
+// value, as a directory says a person is in no group.
+func attributeValues(s *types.AttributeStatement, name string) (values []string, found bool) {
+	values = []string{}
+	for _, attr := range s.Attributes {
+		if attr.Name != name && attr.FriendlyName != name {
+			continue
+		}
+		found = true
+		for _, v := range attr.Values {
+			if value := strings.TrimSpace(v.Value); value != "" {
+				values = append(values, value)
+			}
+		}
+	}
+	if !found {
+		return nil, false
+	}
+	return values, true
 }
 
 // inspect refuses a response before it is verified when it is not to be

@@ -73,7 +73,7 @@ An email domain an instance admin sends to one auth provider: a password is no w
 _Avoid_: SSO-only domain, domain lock, forced SSO
 
 **Group mapping**:
-An auth provider's rule that a group in the identity provider's directory makes a grant of a role in one project, or instance admin. Every sign-in through the provider, and every change to a SCIM group, grants what the member's groups map to and takes away what they no longer do; the member's groups are those their last sign-in through the provider claimed together with their SCIM groups from that provider. A grant made by hand or by another provider is never touched, and the mapping's grant sits beside it.
+An auth provider's rule that a group in the identity provider's directory makes a grant of a role in one project, or instance admin. Every sign-in through the provider, and every change to a SCIM group, grants what the member's groups map to and takes away what they no longer do; the member's groups are those their last sign-in through the provider claimed together with their SCIM groups from that provider. Replacing a provider's group mappings does the same at once for every member the provider knows. A grant made by hand or by another provider is never touched, and the mapping's grant sits beside it.
 _Avoid_: group sync, role mapping, SSO rule
 
 **SCIM group**:

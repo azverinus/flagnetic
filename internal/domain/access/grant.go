@@ -16,9 +16,19 @@ type GrantID = id.Of[Grant]
 // so grants from several sources sit side by side.
 type GrantSource string
 
-// GrantManual is a grant made by hand, by a member managing the project's
-// grants.
-const GrantManual GrantSource = "manual"
+// The sources of a grant.
+const (
+	// GrantManual is a grant made by hand, by a member managing the project's
+	// grants.
+	GrantManual GrantSource = "manual"
+	// GrantSSO is a grant made by an auth provider's group mapping.
+	GrantSSO GrantSource = "sso"
+)
+
+// ErrSSOSourced refuses removing by hand what a provider's group mapping
+// granted: the directory owns it, and it goes when the person leaves the
+// group or the mapping is removed.
+var ErrSSOSourced = apperrors.Conflict("sso_sourced", "an auth provider's group mapping granted this; change the mapping or the directory instead")
 
 // Grant is one role held by one member in one project. A member may hold
 // several in a project; their permissions there are the union.
@@ -28,6 +38,9 @@ type Grant struct {
 	Member  MemberID
 	Role    RoleName
 	Source  GrantSource
+	// Provider is the slug of the auth provider whose group mapping made an
+	// `sso` grant; "" for a manual one.
+	Provider string
 	// CreatedBy is the member who made the grant; zero when none did.
 	CreatedBy MemberID
 	CreatedAt time.Time
@@ -84,4 +97,10 @@ func CheckGrantorCap(held []Permission, role Role) error {
 		}
 	}
 	return nil
+}
+
+// NewSSOGrant returns the grant of a built-in role in project that the group
+// mappings of the auth provider with slug provider made to member.
+func NewSSOGrant(grantID GrantID, project workspace.ProjectID, member MemberID, role RoleName, provider string, now time.Time) Grant {
+	return Grant{ID: grantID, Project: project, Member: member, Role: role, Source: GrantSSO, Provider: provider, CreatedAt: now}
 }

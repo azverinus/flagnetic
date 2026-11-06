@@ -192,12 +192,18 @@ func (c *Client) userInfo(ctx context.Context, p *gooidc.Provider, token *oauth2
 // standard ones.
 var identityClaims = identity.Claims{Email: "email", Name: "name"}
 
-// readClaims reads the email, its verification and the name from claims under
-// the names c gives. A verification counts only as the JSON boolean true: a
-// string, a number or a missing claim does not vouch for the address.
+// readClaims reads the email, its verification, the name and the groups from
+// claims under the names c gives. A verification counts only as the JSON
+// boolean true: a string, a number or a missing claim does not vouch for the
+// address. The groups count only as a list of strings; any other claim, or
+// none, leaves HasGroups false.
 func readClaims(claims map[string]any, c identity.Claims) identity.VerifiedClaims {
 	email, _ := claims[c.Email].(string)
 	name, _ := claims[c.Name].(string)
 	verified, _ := claims["email_verified"].(bool)
-	return identity.VerifiedClaims{Email: email, EmailVerified: verified && email != "", Name: name}
+	out := identity.VerifiedClaims{Email: email, EmailVerified: verified && email != "", Name: name}
+	if c.Groups != "" {
+		out.Groups, out.HasGroups = identity.ParseGroupsClaim(claims[c.Groups])
+	}
+	return out
 }

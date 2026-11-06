@@ -217,6 +217,52 @@ export type AuthProvider = {
   version: number;
 };
 
+/**
+ * What members of a directory group are granted: a role in a project, or
+ * instance admin.
+ *
+ */
+export type GroupMapping = {
+  /**
+   * The directory group, matched exactly as the provider claims it. Not blank.
+   */
+  group: string;
+  /**
+   * The key of the project the role is granted in. Sent with `role`, never with `instance_admin`.
+   */
+  project?: string;
+  /**
+   * One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`.
+   */
+  role?: string;
+  /**
+   * Makes the members of the group instance admins. Sent alone, and only as `true`.
+   */
+  instance_admin?: boolean;
+};
+
+export type GroupMappings = {
+  items: Array<GroupMapping>;
+};
+
+/**
+ * What running the mappings for every member the provider knows did.
+ */
+export type GroupMappingsRun = {
+  /**
+   * The grants made, and the members made instance admin.
+   */
+  granted: number;
+  /**
+   * The grants removed, and the members who are no longer instance admin.
+   */
+  revoked: number;
+  /**
+   * The members who stay instance admin although the mappings no longer make them one, because they are the last active instance admin.
+   */
+  kept_instance_admin: number;
+};
+
 export type AuthProviderList = {
   items: Array<AuthProvider>;
 };
@@ -989,9 +1035,19 @@ export type Grant = {
   id: string;
   member: string;
   role: RoleName;
-  source: "manual";
   /**
-   * The member who made the grant.
+   * `manual` for a grant made by hand, `sso` for one an auth provider's
+   * group mapping made, which is removed only by the provider and refused
+   * `sso_sourced` by hand. Grants of several sources sit side by side.
+   *
+   */
+  source: "manual" | "sso";
+  /**
+   * The slug of the auth provider whose group mapping made an `sso` grant; null otherwise.
+   */
+  provider: string | null;
+  /**
+   * The member who made the grant; null for an `sso` grant.
    */
   created_by: string | null;
   created_at: string;
@@ -1187,7 +1243,7 @@ export type AttributePatch = {
   description?: Description;
 };
 
-export type ActorKind = "member" | "token" | "cli" | "system";
+export type ActorKind = "member" | "token" | "cli" | "system" | "sso";
 
 /**
  * Who changed what, when, from which value to which. Secrets are never recorded; a token appears by its hint.
@@ -11465,6 +11521,10 @@ export type DeleteGrantErrors = {
    */
   404: Problem;
   /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
    * The request is well formed but breaks a rule; `errors` names each field to fix.
    */
   422: Problem;
@@ -13108,6 +13168,120 @@ export type DisableAuthProviderResponses = {
 
 export type DisableAuthProviderResponse =
   DisableAuthProviderResponses[keyof DisableAuthProviderResponses];
+
+export type GetAuthProviderGroupMappingsData = {
+  body?: never;
+  path: {
+    /**
+     * The auth provider's slug.
+     */
+    provider: string;
+  };
+  query?: never;
+  url: "/instance/auth-providers/{provider}/group-mappings";
+};
+
+export type GetAuthProviderGroupMappingsErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetAuthProviderGroupMappingsError =
+  GetAuthProviderGroupMappingsErrors[keyof GetAuthProviderGroupMappingsErrors];
+
+export type GetAuthProviderGroupMappingsResponses = {
+  /**
+   * The group mappings.
+   */
+  200: GroupMappings;
+};
+
+export type GetAuthProviderGroupMappingsResponse =
+  GetAuthProviderGroupMappingsResponses[keyof GetAuthProviderGroupMappingsResponses];
+
+export type ReplaceAuthProviderGroupMappingsData = {
+  body: GroupMappings;
+  path: {
+    /**
+     * The auth provider's slug.
+     */
+    provider: string;
+  };
+  query?: never;
+  url: "/instance/auth-providers/{provider}/group-mappings";
+};
+
+export type ReplaceAuthProviderGroupMappingsErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type ReplaceAuthProviderGroupMappingsError =
+  ReplaceAuthProviderGroupMappingsErrors[keyof ReplaceAuthProviderGroupMappingsErrors];
+
+export type ReplaceAuthProviderGroupMappingsResponses = {
+  /**
+   * What running the mappings did.
+   */
+  200: GroupMappingsRun;
+};
+
+export type ReplaceAuthProviderGroupMappingsResponse =
+  ReplaceAuthProviderGroupMappingsResponses[keyof ReplaceAuthProviderGroupMappingsResponses];
 
 export type TestAuthProviderData = {
   body?: never;

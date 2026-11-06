@@ -242,15 +242,19 @@ func memberEdited(before, after access.Member) []governance.Record {
 		records = append(records, governance.Record{Action: "member.updated", Entity: memberEntity(after), Before: was, After: is})
 	}
 	if before.InstanceAdmin != after.InstanceAdmin {
-		action := "member.demoted"
-		if after.InstanceAdmin {
-			action = "member.promoted"
+		record := governance.Record{
+			Action: "member.demoted", Entity: memberEntity(after),
+			Before: map[string]any{"instance_admin": true, "source": access.GrantManual},
+			After:  map[string]any{"instance_admin": false},
 		}
-		records = append(records, governance.Record{
-			Action: action, Entity: memberEntity(after),
-			Before: map[string]any{"instance_admin": before.InstanceAdmin},
-			After:  map[string]any{"instance_admin": after.InstanceAdmin},
-		})
+		if after.InstanceAdmin {
+			record = governance.Record{
+				Action: "member.promoted", Entity: memberEntity(after),
+				Before: map[string]any{"instance_admin": false},
+				After:  map[string]any{"instance_admin": true, "source": access.GrantManual},
+			}
+		}
+		records = append(records, record)
 	}
 	return records
 }

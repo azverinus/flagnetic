@@ -85,6 +85,8 @@ type Handlers struct {
 	EnableAuthProvider       *appidentity.EnableProvider
 	DisableAuthProvider      *appidentity.DisableProvider
 	TestAuthProvider         *appidentity.TestProvider
+	GetGroupMappings         *appidentity.GetGroupMappings
+	ReplaceGroupMappings     *appidentity.ReplaceGroupMappings
 
 	FindProject   *appworkspace.FindProject
 	ListProjects  *appworkspace.ListProjects

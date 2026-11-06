@@ -591,3 +591,39 @@ func TestSAMLProvidersAreOfferedOnTheSignInPage(t *testing.T) {
 	}
 	t.Errorf("providers = %+v, want %s among them", res.JSON200.Providers, p.Slug)
 }
+
+func TestSAMLGroupsMapToGrantsAndAnAbsentAttributeKeepsThem(t *testing.T) {
+	idp := testkit.StartForgingSAMLIDP(t)
+	e := start(t)
+	p := e.createSAML(t, idp, nil)
+	alpha, beta := e.project(t), e.project(t)
+	e.mapGroups(t, p.Slug, projectMapping("eng", alpha, "maintainer"), projectMapping("ops", beta, "viewer"), adminMapping("it-admins"))
+	email := uniqueEmail()
+	person := func(groups map[string][]string) testkit.SAMLAssertion {
+		a := samlPerson(email)
+		for name, values := range groups {
+			a.Attributes[name] = values
+		}
+		return a
+	}
+
+	b, _ := e.samlSignIn(t, idp, p.Slug, "", person(map[string][]string{"groups": {"eng", "ops", "it-admins"}}))
+	member := idOf(t, b)
+	e.wantGrants(t, alpha, member, management.GrantSourceSso, p.Slug, "maintainer")
+	e.wantGrants(t, beta, member, management.GrantSourceSso, p.Slug, "viewer")
+	if !signedIn(t, b).Member.InstanceAdmin {
+		t.Error("the mapped group did not make the member an instance admin")
+	}
+
+	// No attribute at all keeps everything.
+	e.samlSignIn(t, idp, p.Slug, "", person(nil))
+	e.wantGrants(t, alpha, member, management.GrantSourceSso, p.Slug, "maintainer")
+
+	// An attribute without a value is an empty list: the person is in no group.
+	b, _ = e.samlSignIn(t, idp, p.Slug, "", person(map[string][]string{"groups": {}}))
+	e.wantGrants(t, alpha, member, management.GrantSourceSso, p.Slug)
+	e.wantGrants(t, beta, member, management.GrantSourceSso, p.Slug)
+	if signedIn(t, b).Member.InstanceAdmin {
+		t.Error("an empty groups attribute left the member an instance admin")
+	}
+}

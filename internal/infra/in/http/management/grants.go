@@ -91,5 +91,8 @@ func grantOf(g access.Grant) Grant {
 		by := openapi_types.UUID(g.CreatedBy.Bytes())
 		out.CreatedBy = &by
 	}
+	if g.Provider != "" {
+		out.Provider = &g.Provider
+	}
 	return out
 }

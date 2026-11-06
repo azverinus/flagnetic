@@ -183,6 +183,9 @@ import type {
   GetAuthMethodsResponses,
   GetAuthProviderData,
   GetAuthProviderErrors,
+  GetAuthProviderGroupMappingsData,
+  GetAuthProviderGroupMappingsErrors,
+  GetAuthProviderGroupMappingsResponses,
   GetAuthProviderResponses,
   GetAuthSettingsData,
   GetAuthSettingsErrors,
@@ -415,6 +418,9 @@ import type {
   RejectChangeRequestData,
   RejectChangeRequestErrors,
   RejectChangeRequestResponses,
+  ReplaceAuthProviderGroupMappingsData,
+  ReplaceAuthProviderGroupMappingsErrors,
+  ReplaceAuthProviderGroupMappingsResponses,
   RestoreFlagData,
   RestoreFlagErrors,
   RestoreFlagResponses,
@@ -3867,8 +3873,10 @@ export const createGrant = <ThrowOnError extends boolean = false>(
  *
  * Removes one grant, leaving the member's others. The grant of a role
  * holding a permission the caller lacks in the project is refused
- * `role_not_allowed`. Removing the last owner's grant is allowed: an
- * instance admin holds every permission in every project.
+ * `role_not_allowed`. The grant of an auth provider's group mapping
+ * (`source` `sso`) is refused 409 `sso_sourced`: the directory owns it.
+ * Removing the last owner's grant is allowed: an instance admin holds
+ * every permission in every project.
  *
  */
 export const deleteGrant = <ThrowOnError extends boolean = false>(
@@ -4258,7 +4266,8 @@ export const getMember = <ThrowOnError extends boolean = false>(
  * Changes the fields sent and leaves the others as they are. An email
  * another member holds, whatever its case, is refused `already_exists`.
  * Demoting the instance's last active instance admin is refused
- * `last_instance_admin`.
+ * `last_instance_admin`, and demoting one an auth provider's group
+ * mapping made `sso_sourced`: only the provider takes it away.
  *
  */
 export const updateMember = <ThrowOnError extends boolean = false>(
@@ -4594,8 +4603,10 @@ export const createAuthProvider = <ThrowOnError extends boolean = false>(
  * Delete an auth provider
  *
  * Refused 409 `provider_in_use` while something depends on the provider;
- * `used_by` names what. Disable it instead: that stops its sign-ins
- * and leaves its members, identities and grants as they are. Audited
+ * `used_by` names what (`identities`, `grants` while its group mappings
+ * made a grant or an instance admin, among others). Disable it instead:
+ * that stops its sign-ins and leaves its members, identities and grants
+ * as they are. Audited
  * `auth_provider.deleted`.
  *
  */
@@ -4726,6 +4737,84 @@ export const disableAuthProvider = <ThrowOnError extends boolean = false>(
     ],
     url: "/instance/auth-providers/{provider}/disable",
     ...options,
+  });
+
+/**
+ * An auth provider's group mappings
+ *
+ * What the provider's directory groups grant, in order: a role in a
+ * project, or instance admin.
+ *
+ */
+export const getAuthProviderGroupMappings = <ThrowOnError extends boolean = false>(
+  options: Options<GetAuthProviderGroupMappingsData, ThrowOnError>,
+): RequestResult<
+  GetAuthProviderGroupMappingsResponses,
+  GetAuthProviderGroupMappingsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetAuthProviderGroupMappingsResponses,
+    GetAuthProviderGroupMappingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}/group-mappings",
+    ...options,
+  });
+
+/**
+ * Replace an auth provider's group mappings
+ *
+ * Replaces the whole list, then runs it at once for every member the
+ * provider knows, those who claimed groups at it on a sign-in: each is
+ * granted what their groups now map to and loses what the provider
+ * granted and no longer maps. A grant of a mapping is `source` `sso` and
+ * names the provider; grants of other sources, and an instance admin made
+ * by hand or by another provider, are left alone. The last active
+ * instance admin is never demoted by a mapping, and is counted in
+ * `kept_instance_admin` instead. A mapping has a non-blank `group` and
+ * either a `project` (key) with a built-in `role`, or `instance_admin`
+ * alone; a mapping that breaks that, or names a project that does not
+ * exist, is 422 `invalid_group_mappings` naming each field and nothing
+ * changes. Audited `group_mappings.updated`, and each grant and promotion
+ * under the provider as the `sso` actor; a replacement that changes
+ * nothing is not.
+ *
+ */
+export const replaceAuthProviderGroupMappings = <ThrowOnError extends boolean = false>(
+  options: Options<ReplaceAuthProviderGroupMappingsData, ThrowOnError>,
+): RequestResult<
+  ReplaceAuthProviderGroupMappingsResponses,
+  ReplaceAuthProviderGroupMappingsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).put<
+    ReplaceAuthProviderGroupMappingsResponses,
+    ReplaceAuthProviderGroupMappingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}/group-mappings",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**

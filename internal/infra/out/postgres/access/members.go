@@ -15,7 +15,7 @@ import (
 
 // memberColumns are the columns scanMember reads, prefixed by the members
 // table's alias m.
-const memberColumns = `m.id, m.email, m.display_name, m.status, m.instance_admin, m.locale, m.created_at`
+const memberColumns = `m.id, m.email, m.display_name, m.status, m.instance_admin, m.instance_admin_provider, m.locale, m.created_at`
 
 // scanMember returns a scan target of memberColumns and the member it fills.
 func scanMember() ([]any, func() access.Member) {
@@ -23,10 +23,14 @@ func scanMember() ([]any, func() access.Member) {
 		memberID [16]byte
 		m        access.Member
 		status   string
+		provider *string
 		locale   *string
 	)
-	return []any{&memberID, &m.Email, &m.DisplayName, &status, &m.InstanceAdmin, &locale, &m.CreatedAt}, func() access.Member {
+	return []any{&memberID, &m.Email, &m.DisplayName, &status, &m.InstanceAdmin, &provider, &locale, &m.CreatedAt}, func() access.Member {
 		m.ID, m.Status = id.FromBytes[access.Member](memberID), access.MemberStatus(status)
+		if provider != nil {
+			m.InstanceAdminProvider = *provider
+		}
 		if locale != nil {
 			m.Locale = *locale
 		}
@@ -237,16 +241,21 @@ func (s *Store) OtherActiveInstanceAdmins(ctx context.Context, member access.Mem
 }
 
 // SaveMember stores m's email, display name, status, instance admin switch
-// and locale, NULL when the member follows the browser.
+// with the provider that made it, and locale, NULL when the member follows
+// the browser.
 func (s *Store) SaveMember(ctx context.Context, m access.Member, at time.Time) error {
-	var locale *string
+	var locale, provider *string
 	if m.Locale != "" {
 		locale = &m.Locale
 	}
+	if m.InstanceAdminProvider != "" {
+		provider = &m.InstanceAdminProvider
+	}
 	_, err := s.db(ctx).Exec(ctx, `
-		UPDATE members SET email = $2, display_name = $3, status = $4, instance_admin = $5, locale = $6, updated_at = $7
+		UPDATE members SET email = $2, display_name = $3, status = $4, instance_admin = $5, instance_admin_provider = $6,
+		                   locale = $7, updated_at = $8
 		WHERE id = $1`,
-		m.ID.Bytes(), m.Email, m.DisplayName, string(m.Status), m.InstanceAdmin, locale, at)
+		m.ID.Bytes(), m.Email, m.DisplayName, string(m.Status), m.InstanceAdmin, provider, locale, at)
 	return emailTaken(err)
 }
 

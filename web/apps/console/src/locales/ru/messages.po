@@ -1103,6 +1103,11 @@ msgstr "Запись журнала аудита"
 msgid "Audit log"
 msgstr "Журнал аудита"
 
+#. A kind of actor in the audit log.
+#: src/lib/audit.ts
+msgid "Auth provider"
+msgstr "Провайдер аутентификации"
+
 #: src/components/navigation.tsx
 #: src/routes/_signed-in/admin/auth-settings.tsx
 msgid "Auth settings"
@@ -2750,6 +2755,11 @@ msgstr "Найдено"
 #: src/components/webhook-deliveries.tsx
 msgid "From"
 msgstr "С"
+
+#. A grant made by an auth provider's group mapping.
+#: src/lib/project-members.ts
+msgid "From the group mappings of {provider}, granted on {when}"
+msgstr "Выдана по соответствиям групп провайдера {provider} {when}"
 
 #: src/components/event-volume.tsx
 msgid "Gap"

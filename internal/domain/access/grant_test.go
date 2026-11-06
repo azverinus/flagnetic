@@ -2,6 +2,7 @@ package access_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -68,5 +69,17 @@ func TestAGrantIsOfABuiltInRoleToAMemberWhoIsNotDeactivated(t *testing.T) {
 		if e, ok := apperrors.From(err); !ok || e.Kind != tc.kind || e.Code != tc.code {
 			t.Errorf("%s: err = %v, want %s %s", name, err, tc.kind, tc.code)
 		}
+	}
+}
+
+func TestAnSSOGrantNamesTheProviderThatMadeIt(t *testing.T) {
+	ids := newIDs()
+	when := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	g := access.NewSSOGrant(id.New[access.Grant](ids), id.New[workspace.Project](ids), id.New[access.Member](ids), access.RoleViewer, "okta", when)
+	if g.Source != access.GrantSSO || g.Provider != "okta" || !g.CreatedBy.IsZero() || g.Role != access.RoleViewer {
+		t.Errorf("grant = %+v", g)
+	}
+	if e, ok := apperrors.From(access.ErrSSOSourced); !ok || e.Kind != apperrors.KindConflict || e.Code != "sso_sourced" {
+		t.Errorf("ErrSSOSourced = %v", access.ErrSSOSourced)
 	}
 }

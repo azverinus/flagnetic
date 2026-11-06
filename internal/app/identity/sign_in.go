@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/netip"
 	"net/url"
 	"slices"
@@ -165,14 +166,19 @@ type SignInDeps struct {
 	Attempts   AttemptStore
 	Identities LinkStore
 	Members    Members
-	OIDC       OIDCClient
-	SAML       SAMLClient
-	Replays    ReplayStore
-	Opener     Opener
-	Audit      AuditLog
-	Clock      clock.Clock
-	IDs        *id.Source
-	Random     io.Reader
+	// Mappings and Access give a member what the provider's group mappings
+	// map the groups they claim to.
+	Mappings MappingStore
+	Access   ProviderAccess
+	Logger   *slog.Logger
+	OIDC     OIDCClient
+	SAML     SAMLClient
+	Replays  ReplayStore
+	Opener   Opener
+	Audit    AuditLog
+	Clock    clock.Clock
+	IDs      *id.Source
+	Random   io.Reader
 	// BaseURL is the instance's public origin, nil when not configured.
 	BaseURL *url.URL
 }
@@ -447,6 +453,19 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 		linked identity.Identity
 		member MemberRecord
 	)
+	if claims.HasGroups {
+		// Replacing the mappings holds the provider until it has run them for
+		// every claim stored, so a sign-in waits for it and then applies the
+		// new ones: otherwise it could store its claim just after the
+		// replacement looked for claims, and apply the mappings that are gone.
+		// The provider is held before anything is written: linking an
+		// identity or storing the claim refers to the provider's row, and two
+		// sign-ins that each referred to it first would then wait on each
+		// other to hold it.
+		if _, err := h.d.Providers.LockProvider(ctx, p.Slug); err != nil {
+			return secret.String{}, err
+		}
+	}
 	found, err := h.d.Identities.IdentityBySubject(ctx, p.ID, claims.Subject)
 	hasIdentity := err == nil
 	if err != nil && !errors.Is(err, ErrNotFound) {
@@ -497,9 +516,43 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 	if err = h.d.Identities.RecordIdentitySignIn(ctx, linked.ID, now); err != nil {
 		return secret.String{}, err
 	}
+	if err = h.applyGroups(ctx, now, p, member, claims, cmd.RequestID); err != nil {
+		return secret.String{}, err
+	}
 	return h.d.Members.OpenSession(ctx, SessionRequest{
 		Member: member, Kind: p.Kind, Provider: p.Slug, ClientIP: cmd.ClientIP, UserAgent: cmd.UserAgent, RequestID: cmd.RequestID,
 	})
+}
+
+// applyGroups stores the groups the person claimed and gives member what the
+// provider's mappings map them to, replacing what the provider granted
+// before. A claim that is absent or not a list of strings changes nothing: a
+// misconfigured identity provider cannot strip everyone of their access.
+func (h *CompleteSignIn) applyGroups(ctx context.Context, now time.Time, p identity.Provider, member MemberRecord,
+	claims identity.VerifiedClaims, requestID string,
+) error {
+	mappings, err := h.d.Mappings.GroupMappings(ctx, p.ID)
+	if err != nil {
+		return err
+	}
+	if !claims.HasGroups {
+		if len(mappings) > 0 {
+			h.d.Logger.WarnContext(ctx, "the groups claim is missing or is not a list of strings, so the member keeps the access the provider granted",
+				"provider", p.Slug, "member", member.ID.String())
+		}
+		return nil
+	}
+	if err = h.d.Mappings.StoreGroupClaim(ctx, p.ID, member.ID, claims.Groups, now); err != nil {
+		return err
+	}
+	if len(mappings) == 0 {
+		// Nothing is mapped, so nothing was granted: editing the mappings
+		// runs them for everyone who claimed groups.
+		return nil
+	}
+	deps := GroupMappingDeps{Access: h.d.Access, Logger: h.d.Logger}
+	_, err = deps.replaceAccess(ctx, p, member.ID, mappings, claims.Groups, requestID)
+	return err
 }
 
 // recordLinked records identity.linked: the member, as the person who signed
