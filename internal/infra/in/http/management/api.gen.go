@@ -726,6 +726,27 @@ func (e SessionMethod) Valid() bool {
 	}
 }
 
+// Defines values for SinkDeadLetterStatus.
+const (
+	SinkDeadLetterStatusExpired     SinkDeadLetterStatus = "expired"
+	SinkDeadLetterStatusPending     SinkDeadLetterStatus = "pending"
+	SinkDeadLetterStatusRedelivered SinkDeadLetterStatus = "redelivered"
+)
+
+// Valid indicates whether the value is a known member of the SinkDeadLetterStatus enum.
+func (e SinkDeadLetterStatus) Valid() bool {
+	switch e {
+	case SinkDeadLetterStatusExpired:
+		return true
+	case SinkDeadLetterStatusPending:
+		return true
+	case SinkDeadLetterStatusRedelivered:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SinkEventKind.
 const (
 	SinkEventKindAlias             SinkEventKind = "alias"
@@ -4151,6 +4172,43 @@ type SinkCreate struct {
 	Webhook *SinkWebhookInput `json:"webhook,omitempty"`
 }
 
+// SinkDeadLetter A batch of one event kind the target rejected, set aside so the stream
+// could go on. Cursors are never exposed: the batch is told by how many
+// rows it held and when the first and the last of them were received.
+type SinkDeadLetter struct {
+	// Attempts How many times the target rejected the batch, redeliveries included.
+	Attempts  int       `json:"attempts"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// EventKind A kind of raw event a sink exports, each delivered through a stream of its own.
+	EventKind       SinkEventKind      `json:"event_kind"`
+	FirstReceivedAt time.Time          `json:"first_received_at"`
+	Id              openapi_types.UUID `json:"id"`
+
+	// LastFailure The last failed call of a stream.
+	LastFailure    SinkFailure `json:"last_failure"`
+	LastReceivedAt time.Time   `json:"last_received_at"`
+	RedeliveredAt  *time.Time  `json:"redelivered_at"`
+
+	// Rows How many rows the batch held when it was set aside, those of deleted environments included.
+	Rows int `json:"rows"`
+
+	// Status `pending` waits to be redelivered or discarded; `redelivered` was
+	// acknowledged by the target after a redelivery; `expired` lost every
+	// row to retention.
+	Status SinkDeadLetterStatus `json:"status"`
+}
+
+// SinkDeadLetterList defines model for SinkDeadLetterList.
+type SinkDeadLetterList struct {
+	Items []SinkDeadLetter `json:"items"`
+}
+
+// SinkDeadLetterStatus `pending` waits to be redelivered or discarded; `redelivered` was
+// acknowledged by the target after a redelivery; `expired` lost every
+// row to retention.
+type SinkDeadLetterStatus string
+
 // SinkEnable defines model for SinkEnable.
 type SinkEnable struct {
 	// StartFrom Where the streams this call creates start, a time within retention:
@@ -4907,6 +4965,9 @@ type ChangeRequestID = openapi_types.UUID
 
 // Cursor defines model for Cursor.
 type Cursor = string
+
+// DeadLetterID defines model for DeadLetterID.
+type DeadLetterID = openapi_types.UUID
 
 // DocumentFormat defines model for DocumentFormat.
 type DocumentFormat string
@@ -9913,6 +9974,40 @@ type ClientInterface interface {
 	// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
 	UpdateSink(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, body UpdateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListSinkDeadLetters A sink's dead letters
+	//
+	// The batches the target rejected `FLAGNETIC_SINK_REJECTION_ATTEMPTS`
+	// times and the sink set aside to deliver the next, oldest first, in
+	// every status; a discarded one is gone. Not paginated.
+	//
+	// Corresponds with GET /projects/{project}/sinks/{sink}/dead-letters (the `ListSinkDeadLetters` operationId).
+	ListSinkDeadLetters(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DiscardSinkDeadLetter Discard a dead letter
+	//
+	// The dead letter goes, whatever its status, and stops counting towards
+	// the sink being `degraded`. Its rows are not delivered. Audited as
+	// `sink.dead_letter_discarded`.
+	//
+	// Corresponds with DELETE /projects/{project}/sinks/{sink}/dead-letters/{deadLetter} (the `DiscardSinkDeadLetter` operationId).
+	DiscardSinkDeadLetter(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RedeliverSinkDeadLetter Redeliver a dead letter
+	//
+	// Reads the rows of the dead letter that are still stored and sends them
+	// to the target now, inside this request, under a delivery ID of its
+	// own: the dead letter's and its attempt's, so a repeat is another
+	// delivery. The sink's streams, cursors and health are not touched. When
+	// the target acknowledges, the dead letter is `redelivered`; when it
+	// does not, this still answers 200 with the dead letter, still
+	// `pending`, its `attempts` and `last_failure` updated. It may be
+	// repeated. Refused `rows_expired` when retention dropped every row of
+	// it. Audited as `sink.dead_letter_redelivered`; the target's own words
+	// are never answered.
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver (the `RedeliverSinkDeadLetter` operationId).
+	RedeliverSinkDeadLetter(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// EnableSinkWithBody Enable a sink
 	//
 	// Calls the sink's target first and refuses with `sink_not_ready`, naming
@@ -9996,6 +10091,20 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/sinks/{sink}/replay (the `ReplaySink` operationId).
 	ReplaySink(ctx context.Context, project ProjectKey, sink SinkID, body ReplaySinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResumeSink Resume a stopped sink
+	//
+	// A sink stops itself when `FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS`
+	// batches in a row of one stream were set aside as dead letters. This
+	// starts it again where it was: every stream keeps its place and its
+	// batch in flight, the count of consecutive dead letters is cleared and
+	// each stream is due now. Dead letters stay and are not redelivered; the
+	// sink is `degraded` while any waits. Editing a sink never resumes it. A
+	// sink that is not stopped is answered as it is, with nothing changed or
+	// recorded. Audited as `sink.resumed`. It takes no `If-Match`.
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/resume (the `ResumeSink` operationId).
+	ResumeSink(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RotateSinkSecret Rotate a webhook sink's secret
 	//
@@ -15224,6 +15333,70 @@ func (c *Client) UpdateSink(ctx context.Context, project ProjectKey, sink SinkID
 	return c.Client.Do(req)
 }
 
+// ListSinkDeadLetters A sink's dead letters
+//
+// The batches the target rejected `FLAGNETIC_SINK_REJECTION_ATTEMPTS`
+// times and the sink set aside to deliver the next, oldest first, in
+// every status; a discarded one is gone. Not paginated.
+//
+// Corresponds with GET /projects/{project}/sinks/{sink}/dead-letters (the `ListSinkDeadLetters` operationId).
+func (c *Client) ListSinkDeadLetters(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSinkDeadLettersRequest(c.Server, project, sink)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DiscardSinkDeadLetter Discard a dead letter
+//
+// The dead letter goes, whatever its status, and stops counting towards
+// the sink being `degraded`. Its rows are not delivered. Audited as
+// `sink.dead_letter_discarded`.
+//
+// Corresponds with DELETE /projects/{project}/sinks/{sink}/dead-letters/{deadLetter} (the `DiscardSinkDeadLetter` operationId).
+func (c *Client) DiscardSinkDeadLetter(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDiscardSinkDeadLetterRequest(c.Server, project, sink, deadLetter)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RedeliverSinkDeadLetter Redeliver a dead letter
+//
+// Reads the rows of the dead letter that are still stored and sends them
+// to the target now, inside this request, under a delivery ID of its
+// own: the dead letter's and its attempt's, so a repeat is another
+// delivery. The sink's streams, cursors and health are not touched. When
+// the target acknowledges, the dead letter is `redelivered`; when it
+// does not, this still answers 200 with the dead letter, still
+// `pending`, its `attempts` and `last_failure` updated. It may be
+// repeated. Refused `rows_expired` when retention dropped every row of
+// it. Audited as `sink.dead_letter_redelivered`; the target's own words
+// are never answered.
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver (the `RedeliverSinkDeadLetter` operationId).
+func (c *Client) RedeliverSinkDeadLetter(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRedeliverSinkDeadLetterRequest(c.Server, project, sink, deadLetter)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // EnableSinkWithBody Enable a sink
 //
 // Calls the sink's target first and refuses with `sink_not_ready`, naming
@@ -15338,6 +15511,30 @@ func (c *Client) ReplaySinkWithBody(ctx context.Context, project ProjectKey, sin
 // Corresponds with POST /projects/{project}/sinks/{sink}/replay (the `ReplaySink` operationId).
 func (c *Client) ReplaySink(ctx context.Context, project ProjectKey, sink SinkID, body ReplaySinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewReplaySinkRequest(c.Server, project, sink, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ResumeSink Resume a stopped sink
+//
+// A sink stops itself when `FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS`
+// batches in a row of one stream were set aside as dead letters. This
+// starts it again where it was: every stream keeps its place and its
+// batch in flight, the count of consecutive dead letters is cleared and
+// each stream is due now. Dead letters stay and are not redelivered; the
+// sink is `degraded` while any waits. Editing a sink never resumes it. A
+// sink that is not stopped is answered as it is, with nothing changed or
+// recorded. Audited as `sink.resumed`. It takes no `If-Match`.
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/resume (the `ResumeSink` operationId).
+func (c *Client) ResumeSink(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResumeSinkRequest(c.Server, project, sink)
 	if err != nil {
 		return nil, err
 	}
@@ -24139,6 +24336,143 @@ func NewUpdateSinkRequestWithBody(server string, project ProjectKey, sink SinkID
 	return req, nil
 }
 
+// NewListSinkDeadLettersRequest constructs an http.Request for the ListSinkDeadLetters method
+func NewListSinkDeadLettersRequest(server string, project ProjectKey, sink SinkID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s/dead-letters", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDiscardSinkDeadLetterRequest constructs an http.Request for the DiscardSinkDeadLetter method
+func NewDiscardSinkDeadLetterRequest(server string, project ProjectKey, sink SinkID, deadLetter DeadLetterID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "deadLetter", deadLetter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s/dead-letters/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRedeliverSinkDeadLetterRequest constructs an http.Request for the RedeliverSinkDeadLetter method
+func NewRedeliverSinkDeadLetterRequest(server string, project ProjectKey, sink SinkID, deadLetter DeadLetterID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "deadLetter", deadLetter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s/dead-letters/%s/redeliver", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewEnableSinkRequest calls the generic EnableSink builder with application/json body
 func NewEnableSinkRequest(server string, project ProjectKey, sink SinkID, body EnableSinkJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -24243,6 +24577,47 @@ func NewReplaySinkRequestWithBody(server string, project ProjectKey, sink SinkID
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewResumeSinkRequest constructs an http.Request for the ResumeSink method
+func NewResumeSinkRequest(server string, project ProjectKey, sink SinkID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s/resume", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -29092,6 +29467,46 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
 	UpdateSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, body UpdateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSinkResponse, error)
 
+	// ListSinkDeadLettersWithResponse A sink's dead letters
+	//
+	// The batches the target rejected `FLAGNETIC_SINK_REJECTION_ATTEMPTS`
+	// times and the sink set aside to deliver the next, oldest first, in
+	// every status; a discarded one is gone. Not paginated.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/sinks/{sink}/dead-letters (the `ListSinkDeadLetters` operationId).
+	ListSinkDeadLettersWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*ListSinkDeadLettersResponse, error)
+
+	// DiscardSinkDeadLetterWithResponse Discard a dead letter
+	//
+	// The dead letter goes, whatever its status, and stops counting towards
+	// the sink being `degraded`. Its rows are not delivered. Audited as
+	// `sink.dead_letter_discarded`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /projects/{project}/sinks/{sink}/dead-letters/{deadLetter} (the `DiscardSinkDeadLetter` operationId).
+	DiscardSinkDeadLetterWithResponse(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*DiscardSinkDeadLetterResponse, error)
+
+	// RedeliverSinkDeadLetterWithResponse Redeliver a dead letter
+	//
+	// Reads the rows of the dead letter that are still stored and sends them
+	// to the target now, inside this request, under a delivery ID of its
+	// own: the dead letter's and its attempt's, so a repeat is another
+	// delivery. The sink's streams, cursors and health are not touched. When
+	// the target acknowledges, the dead letter is `redelivered`; when it
+	// does not, this still answers 200 with the dead letter, still
+	// `pending`, its `attempts` and `last_failure` updated. It may be
+	// repeated. Refused `rows_expired` when retention dropped every row of
+	// it. Audited as `sink.dead_letter_redelivered`; the target's own words
+	// are never answered.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver (the `RedeliverSinkDeadLetter` operationId).
+	RedeliverSinkDeadLetterWithResponse(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*RedeliverSinkDeadLetterResponse, error)
+
 	// EnableSinkWithBodyWithResponse Enable a sink
 	//
 	// Calls the sink's target first and refuses with `sink_not_ready`, naming
@@ -29175,6 +29590,22 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/sinks/{sink}/replay (the `ReplaySink` operationId).
 	ReplaySinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, body ReplaySinkJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaySinkResponse, error)
+
+	// ResumeSinkWithResponse Resume a stopped sink
+	//
+	// A sink stops itself when `FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS`
+	// batches in a row of one stream were set aside as dead letters. This
+	// starts it again where it was: every stream keeps its place and its
+	// batch in flight, the count of consecutive dead letters is cleared and
+	// each stream is due now. Dead letters stay and are not redelivered; the
+	// sink is `degraded` while any waits. Editing a sink never resumes it. A
+	// sink that is not stopped is answered as it is, with nothing changed or
+	// recorded. Audited as `sink.resumed`. It takes no `If-Match`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/resume (the `ResumeSink` operationId).
+	ResumeSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*ResumeSinkResponse, error)
 
 	// RotateSinkSecretWithResponse Rotate a webhook sink's secret
 	//
@@ -41294,6 +41725,213 @@ func (r UpdateSinkResponse) ContentType() string {
 	return ""
 }
 
+// ListSinkDeadLettersResponse401Headers the declared response headers of an HTTP 401 response for ListSinkDeadLetters
+type ListSinkDeadLettersResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListSinkDeadLettersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SinkDeadLetterList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListSinkDeadLettersResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSinkDeadLettersResponse) GetJSON200() *SinkDeadLetterList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListSinkDeadLettersResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListSinkDeadLettersResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListSinkDeadLettersResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSinkDeadLettersResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSinkDeadLettersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSinkDeadLettersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSinkDeadLettersResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DiscardSinkDeadLetterResponse401Headers the declared response headers of an HTTP 401 response for DiscardSinkDeadLetter
+type DiscardSinkDeadLetterResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DiscardSinkDeadLetterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DiscardSinkDeadLetterResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DiscardSinkDeadLetterResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DiscardSinkDeadLetterResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DiscardSinkDeadLetterResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r DiscardSinkDeadLetterResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DiscardSinkDeadLetterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DiscardSinkDeadLetterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DiscardSinkDeadLetterResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RedeliverSinkDeadLetterResponse401Headers the declared response headers of an HTTP 401 response for RedeliverSinkDeadLetter
+type RedeliverSinkDeadLetterResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RedeliverSinkDeadLetterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SinkDeadLetter
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RedeliverSinkDeadLetterResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RedeliverSinkDeadLetterResponse) GetJSON200() *SinkDeadLetter {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RedeliverSinkDeadLetterResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RedeliverSinkDeadLetterResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RedeliverSinkDeadLetterResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r RedeliverSinkDeadLetterResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r RedeliverSinkDeadLetterResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RedeliverSinkDeadLetterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RedeliverSinkDeadLetterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RedeliverSinkDeadLetterResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // EnableSinkResponse200Headers the declared response headers of an HTTP 200 response for EnableSink
 type EnableSinkResponse200Headers struct {
 	ETag *string
@@ -41468,6 +42106,82 @@ func (r ReplaySinkResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ReplaySinkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ResumeSinkResponse200Headers the declared response headers of an HTTP 200 response for ResumeSink
+type ResumeSinkResponse200Headers struct {
+	ETag *string
+}
+
+// ResumeSinkResponse401Headers the declared response headers of an HTTP 401 response for ResumeSink
+type ResumeSinkResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ResumeSinkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Sink
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ResumeSinkResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ResumeSinkResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ResumeSinkResponse) GetJSON200() *Sink {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ResumeSinkResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ResumeSinkResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ResumeSinkResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ResumeSinkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ResumeSinkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ResumeSinkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ResumeSinkResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -48514,6 +49228,64 @@ func (c *ClientWithResponses) UpdateSinkWithResponse(ctx context.Context, projec
 	return ParseUpdateSinkResponse(rsp)
 }
 
+// ListSinkDeadLettersWithResponse A sink's dead letters
+//
+// The batches the target rejected `FLAGNETIC_SINK_REJECTION_ATTEMPTS`
+// times and the sink set aside to deliver the next, oldest first, in
+// every status; a discarded one is gone. Not paginated.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/sinks/{sink}/dead-letters (the `ListSinkDeadLetters` operationId).
+func (c *ClientWithResponses) ListSinkDeadLettersWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*ListSinkDeadLettersResponse, error) {
+	rsp, err := c.ListSinkDeadLetters(ctx, project, sink, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSinkDeadLettersResponse(rsp)
+}
+
+// DiscardSinkDeadLetterWithResponse Discard a dead letter
+//
+// The dead letter goes, whatever its status, and stops counting towards
+// the sink being `degraded`. Its rows are not delivered. Audited as
+// `sink.dead_letter_discarded`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /projects/{project}/sinks/{sink}/dead-letters/{deadLetter} (the `DiscardSinkDeadLetter` operationId).
+func (c *ClientWithResponses) DiscardSinkDeadLetterWithResponse(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*DiscardSinkDeadLetterResponse, error) {
+	rsp, err := c.DiscardSinkDeadLetter(ctx, project, sink, deadLetter, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDiscardSinkDeadLetterResponse(rsp)
+}
+
+// RedeliverSinkDeadLetterWithResponse Redeliver a dead letter
+//
+// Reads the rows of the dead letter that are still stored and sends them
+// to the target now, inside this request, under a delivery ID of its
+// own: the dead letter's and its attempt's, so a repeat is another
+// delivery. The sink's streams, cursors and health are not touched. When
+// the target acknowledges, the dead letter is `redelivered`; when it
+// does not, this still answers 200 with the dead letter, still
+// `pending`, its `attempts` and `last_failure` updated. It may be
+// repeated. Refused `rows_expired` when retention dropped every row of
+// it. Audited as `sink.dead_letter_redelivered`; the target's own words
+// are never answered.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver (the `RedeliverSinkDeadLetter` operationId).
+func (c *ClientWithResponses) RedeliverSinkDeadLetterWithResponse(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*RedeliverSinkDeadLetterResponse, error) {
+	rsp, err := c.RedeliverSinkDeadLetter(ctx, project, sink, deadLetter, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRedeliverSinkDeadLetterResponse(rsp)
+}
+
 // EnableSinkWithBodyWithResponse Enable a sink
 //
 // Calls the sink's target first and refuses with `sink_not_ready`, naming
@@ -48620,6 +49392,28 @@ func (c *ClientWithResponses) ReplaySinkWithResponse(ctx context.Context, projec
 		return nil, err
 	}
 	return ParseReplaySinkResponse(rsp)
+}
+
+// ResumeSinkWithResponse Resume a stopped sink
+//
+// A sink stops itself when `FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS`
+// batches in a row of one stream were set aside as dead letters. This
+// starts it again where it was: every stream keeps its place and its
+// batch in flight, the count of consecutive dead letters is cleared and
+// each stream is due now. Dead letters stay and are not redelivered; the
+// sink is `degraded` while any waits. Editing a sink never resumes it. A
+// sink that is not stopped is answered as it is, with nothing changed or
+// recorded. Audited as `sink.resumed`. It takes no `If-Match`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/resume (the `ResumeSink` operationId).
+func (c *ClientWithResponses) ResumeSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*ResumeSinkResponse, error) {
+	rsp, err := c.ResumeSink(ctx, project, sink, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResumeSinkResponse(rsp)
 }
 
 // RotateSinkSecretWithResponse Rotate a webhook sink's secret
@@ -60052,6 +60846,189 @@ func ParseUpdateSinkResponse(rsp *http.Response) (*UpdateSinkResponse, error) {
 	return response, nil
 }
 
+// ParseListSinkDeadLettersResponse parses an HTTP response from a ListSinkDeadLettersWithResponse call
+func ParseListSinkDeadLettersResponse(rsp *http.Response) (*ListSinkDeadLettersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSinkDeadLettersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SinkDeadLetterList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListSinkDeadLettersResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDiscardSinkDeadLetterResponse parses an HTTP response from a DiscardSinkDeadLetterWithResponse call
+func ParseDiscardSinkDeadLetterResponse(rsp *http.Response) (*DiscardSinkDeadLetterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DiscardSinkDeadLetterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DiscardSinkDeadLetterResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRedeliverSinkDeadLetterResponse parses an HTTP response from a RedeliverSinkDeadLetterWithResponse call
+func ParseRedeliverSinkDeadLetterResponse(rsp *http.Response) (*RedeliverSinkDeadLetterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RedeliverSinkDeadLetterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SinkDeadLetter
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers RedeliverSinkDeadLetterResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseEnableSinkResponse parses an HTTP response from a EnableSinkWithResponse call
 func ParseEnableSinkResponse(rsp *http.Response) (*EnableSinkResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -60207,6 +61184,76 @@ func ParseReplaySinkResponse(rsp *http.Response) (*ReplaySinkResponse, error) {
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers ReplaySinkResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseResumeSinkResponse parses an HTTP response from a ResumeSinkWithResponse call
+func ParseResumeSinkResponse(rsp *http.Response) (*ResumeSinkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ResumeSinkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Sink
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ResumeSinkResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers ResumeSinkResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -63298,12 +64345,24 @@ type ServerInterface interface {
 	// UpdateSink Edit a sink
 	// (PATCH /projects/{project}/sinks/{sink})
 	UpdateSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, params UpdateSinkParams)
+	// ListSinkDeadLetters A sink's dead letters
+	// (GET /projects/{project}/sinks/{sink}/dead-letters)
+	ListSinkDeadLetters(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
+	// DiscardSinkDeadLetter Discard a dead letter
+	// (DELETE /projects/{project}/sinks/{sink}/dead-letters/{deadLetter})
+	DiscardSinkDeadLetter(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, deadLetter DeadLetterID)
+	// RedeliverSinkDeadLetter Redeliver a dead letter
+	// (POST /projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver)
+	RedeliverSinkDeadLetter(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, deadLetter DeadLetterID)
 	// EnableSink Enable a sink
 	// (POST /projects/{project}/sinks/{sink}/enable)
 	EnableSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
 	// ReplaySink Replay a sink from a time
 	// (POST /projects/{project}/sinks/{sink}/replay)
 	ReplaySink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
+	// ResumeSink Resume a stopped sink
+	// (POST /projects/{project}/sinks/{sink}/resume)
+	ResumeSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
 	// RotateSinkSecret Rotate a webhook sink's secret
 	// (POST /projects/{project}/sinks/{sink}/rotate-secret)
 	RotateSinkSecret(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
@@ -69712,6 +70771,129 @@ func (siw *ServerInterfaceWrapper) UpdateSink(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ListSinkDeadLetters operation middleware
+func (siw *ServerInterfaceWrapper) ListSinkDeadLetters(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSinkDeadLetters(w, r, project, sink)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DiscardSinkDeadLetter operation middleware
+func (siw *ServerInterfaceWrapper) DiscardSinkDeadLetter(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "deadLetter" -------------
+	var deadLetter DeadLetterID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deadLetter", r.PathValue("deadLetter"), &deadLetter, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deadLetter", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DiscardSinkDeadLetter(w, r, project, sink, deadLetter)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RedeliverSinkDeadLetter operation middleware
+func (siw *ServerInterfaceWrapper) RedeliverSinkDeadLetter(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "deadLetter" -------------
+	var deadLetter DeadLetterID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deadLetter", r.PathValue("deadLetter"), &deadLetter, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deadLetter", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RedeliverSinkDeadLetter(w, r, project, sink, deadLetter)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // EnableSink operation middleware
 func (siw *ServerInterfaceWrapper) EnableSink(w http.ResponseWriter, r *http.Request) {
 
@@ -69773,6 +70955,41 @@ func (siw *ServerInterfaceWrapper) ReplaySink(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ReplaySink(w, r, project, sink)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResumeSink operation middleware
+func (siw *ServerInterfaceWrapper) ResumeSink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResumeSink(w, r, project, sink)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -71513,6 +72730,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/sample", wrapper.SampleSink)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/replay", wrapper.ReplaySink)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/rotate-secret", wrapper.RotateSinkSecret)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/resume", wrapper.ResumeSink)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/dead-letters", wrapper.ListSinkDeadLetters)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/dead-letters/{deadLetter}", wrapper.DiscardSinkDeadLetter)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver", wrapper.RedeliverSinkDeadLetter)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/webhooks", wrapper.ListInstanceWebhooks)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/webhooks", wrapper.CreateInstanceWebhook)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/webhooks/{webhook}", wrapper.DeleteInstanceWebhook)
@@ -86158,6 +87379,240 @@ func (response UpdateSink428ApplicationProblemPlusJSONResponse) VisitUpdateSinkR
 	return err
 }
 
+type ListSinkDeadLettersRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+}
+
+type ListSinkDeadLettersResponseObject interface {
+	VisitListSinkDeadLettersResponse(w http.ResponseWriter) error
+}
+
+type ListSinkDeadLetters200JSONResponse SinkDeadLetterList
+
+func (response ListSinkDeadLetters200JSONResponse) VisitListSinkDeadLettersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSinkDeadLetters401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListSinkDeadLetters401ApplicationProblemPlusJSONResponse) VisitListSinkDeadLettersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSinkDeadLetters403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListSinkDeadLetters403ApplicationProblemPlusJSONResponse) VisitListSinkDeadLettersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSinkDeadLetters404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListSinkDeadLetters404ApplicationProblemPlusJSONResponse) VisitListSinkDeadLettersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DiscardSinkDeadLetterRequestObject struct {
+	Project    ProjectKey   `json:"project"`
+	Sink       SinkID       `json:"sink"`
+	DeadLetter DeadLetterID `json:"deadLetter"`
+}
+
+type DiscardSinkDeadLetterResponseObject interface {
+	VisitDiscardSinkDeadLetterResponse(w http.ResponseWriter) error
+}
+
+type DiscardSinkDeadLetter204Response struct {
+}
+
+func (response DiscardSinkDeadLetter204Response) VisitDiscardSinkDeadLetterResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DiscardSinkDeadLetter401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DiscardSinkDeadLetter401ApplicationProblemPlusJSONResponse) VisitDiscardSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DiscardSinkDeadLetter403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DiscardSinkDeadLetter403ApplicationProblemPlusJSONResponse) VisitDiscardSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DiscardSinkDeadLetter404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DiscardSinkDeadLetter404ApplicationProblemPlusJSONResponse) VisitDiscardSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverSinkDeadLetterRequestObject struct {
+	Project    ProjectKey   `json:"project"`
+	Sink       SinkID       `json:"sink"`
+	DeadLetter DeadLetterID `json:"deadLetter"`
+}
+
+type RedeliverSinkDeadLetterResponseObject interface {
+	VisitRedeliverSinkDeadLetterResponse(w http.ResponseWriter) error
+}
+
+type RedeliverSinkDeadLetter200JSONResponse SinkDeadLetter
+
+func (response RedeliverSinkDeadLetter200JSONResponse) VisitRedeliverSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverSinkDeadLetter401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverSinkDeadLetter401ApplicationProblemPlusJSONResponse) VisitRedeliverSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverSinkDeadLetter403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverSinkDeadLetter403ApplicationProblemPlusJSONResponse) VisitRedeliverSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverSinkDeadLetter404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverSinkDeadLetter404ApplicationProblemPlusJSONResponse) VisitRedeliverSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverSinkDeadLetter422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverSinkDeadLetter422ApplicationProblemPlusJSONResponse) VisitRedeliverSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type EnableSinkRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Sink    SinkID     `json:"sink"`
@@ -86388,6 +87843,90 @@ func (response ReplaySink422ApplicationProblemPlusJSONResponse) VisitReplaySinkR
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeSinkRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+}
+
+type ResumeSinkResponseObject interface {
+	VisitResumeSinkResponse(w http.ResponseWriter) error
+}
+
+type ResumeSink200ResponseHeaders struct {
+	ETag *string
+}
+
+type ResumeSink200JSONResponse struct {
+	Body    Sink
+	Headers ResumeSink200ResponseHeaders
+}
+
+func (response ResumeSink200JSONResponse) VisitResumeSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeSink401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ResumeSink401ApplicationProblemPlusJSONResponse) VisitResumeSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeSink403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ResumeSink403ApplicationProblemPlusJSONResponse) VisitResumeSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeSink404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ResumeSink404ApplicationProblemPlusJSONResponse) VisitResumeSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -90324,12 +91863,24 @@ type StrictServerInterface interface {
 	// UpdateSink Edit a sink
 	// (PATCH /projects/{project}/sinks/{sink})
 	UpdateSink(ctx context.Context, request UpdateSinkRequestObject) (UpdateSinkResponseObject, error)
+	// ListSinkDeadLetters A sink's dead letters
+	// (GET /projects/{project}/sinks/{sink}/dead-letters)
+	ListSinkDeadLetters(ctx context.Context, request ListSinkDeadLettersRequestObject) (ListSinkDeadLettersResponseObject, error)
+	// DiscardSinkDeadLetter Discard a dead letter
+	// (DELETE /projects/{project}/sinks/{sink}/dead-letters/{deadLetter})
+	DiscardSinkDeadLetter(ctx context.Context, request DiscardSinkDeadLetterRequestObject) (DiscardSinkDeadLetterResponseObject, error)
+	// RedeliverSinkDeadLetter Redeliver a dead letter
+	// (POST /projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver)
+	RedeliverSinkDeadLetter(ctx context.Context, request RedeliverSinkDeadLetterRequestObject) (RedeliverSinkDeadLetterResponseObject, error)
 	// EnableSink Enable a sink
 	// (POST /projects/{project}/sinks/{sink}/enable)
 	EnableSink(ctx context.Context, request EnableSinkRequestObject) (EnableSinkResponseObject, error)
 	// ReplaySink Replay a sink from a time
 	// (POST /projects/{project}/sinks/{sink}/replay)
 	ReplaySink(ctx context.Context, request ReplaySinkRequestObject) (ReplaySinkResponseObject, error)
+	// ResumeSink Resume a stopped sink
+	// (POST /projects/{project}/sinks/{sink}/resume)
+	ResumeSink(ctx context.Context, request ResumeSinkRequestObject) (ResumeSinkResponseObject, error)
 	// RotateSinkSecret Rotate a webhook sink's secret
 	// (POST /projects/{project}/sinks/{sink}/rotate-secret)
 	RotateSinkSecret(ctx context.Context, request RotateSinkSecretRequestObject) (RotateSinkSecretResponseObject, error)
@@ -94525,6 +96076,89 @@ func (sh *strictHandler) UpdateSink(w http.ResponseWriter, r *http.Request, proj
 	}
 }
 
+// ListSinkDeadLetters operation middleware
+func (sh *strictHandler) ListSinkDeadLetters(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID) {
+	var request ListSinkDeadLettersRequestObject
+
+	request.Project = project
+	request.Sink = sink
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSinkDeadLetters(ctx, request.(ListSinkDeadLettersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSinkDeadLetters")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSinkDeadLettersResponseObject); ok {
+		if err := validResponse.VisitListSinkDeadLettersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DiscardSinkDeadLetter operation middleware
+func (sh *strictHandler) DiscardSinkDeadLetter(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, deadLetter DeadLetterID) {
+	var request DiscardSinkDeadLetterRequestObject
+
+	request.Project = project
+	request.Sink = sink
+	request.DeadLetter = deadLetter
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DiscardSinkDeadLetter(ctx, request.(DiscardSinkDeadLetterRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DiscardSinkDeadLetter")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DiscardSinkDeadLetterResponseObject); ok {
+		if err := validResponse.VisitDiscardSinkDeadLetterResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RedeliverSinkDeadLetter operation middleware
+func (sh *strictHandler) RedeliverSinkDeadLetter(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, deadLetter DeadLetterID) {
+	var request RedeliverSinkDeadLetterRequestObject
+
+	request.Project = project
+	request.Sink = sink
+	request.DeadLetter = deadLetter
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RedeliverSinkDeadLetter(ctx, request.(RedeliverSinkDeadLetterRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RedeliverSinkDeadLetter")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RedeliverSinkDeadLetterResponseObject); ok {
+		if err := validResponse.VisitRedeliverSinkDeadLetterResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // EnableSink operation middleware
 func (sh *strictHandler) EnableSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID) {
 	var request EnableSinkRequestObject
@@ -94589,6 +96223,33 @@ func (sh *strictHandler) ReplaySink(w http.ResponseWriter, r *http.Request, proj
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ReplaySinkResponseObject); ok {
 		if err := validResponse.VisitReplaySinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ResumeSink operation middleware
+func (sh *strictHandler) ResumeSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID) {
+	var request ResumeSinkRequestObject
+
+	request.Project = project
+	request.Sink = sink
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ResumeSink(ctx, request.(ResumeSinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ResumeSink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ResumeSinkResponseObject); ok {
+		if err := validResponse.VisitResumeSinkResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

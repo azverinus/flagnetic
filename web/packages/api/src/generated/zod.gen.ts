@@ -2423,6 +2423,37 @@ export const zSinkList = z.object({
 });
 
 /**
+ * `pending` waits to be redelivered or discarded; `redelivered` was
+ * acknowledged by the target after a redelivery; `expired` lost every
+ * row to retention.
+ *
+ */
+export const zSinkDeadLetterStatus = z.enum(["pending", "redelivered", "expired"]);
+
+/**
+ * A batch of one event kind the target rejected, set aside so the stream
+ * could go on. Cursors are never exposed: the batch is told by how many
+ * rows it held and when the first and the last of them were received.
+ *
+ */
+export const zSinkDeadLetter = z.object({
+  id: z.uuid(),
+  event_kind: zSinkEventKind,
+  rows: z.int(),
+  first_received_at: z.iso.datetime(),
+  last_received_at: z.iso.datetime(),
+  attempts: z.int(),
+  last_failure: zSinkFailure,
+  status: zSinkDeadLetterStatus,
+  created_at: z.iso.datetime(),
+  redelivered_at: z.iso.datetime().nullable(),
+});
+
+export const zSinkDeadLetterList = z.object({
+  items: z.array(zSinkDeadLetter),
+});
+
+/**
  * `pending` waits for its next attempt; `succeeded` was accepted by the
  * receiver; `failed` was refused in a way a retry would not change;
  * `exhausted` ran out of attempts; `dropped` was left unsent because
@@ -2863,6 +2894,11 @@ export const zWebhookId = z.uuid();
  * The sink's identifier.
  */
 export const zSinkId = z.uuid();
+
+/**
+ * The dead letter's identifier.
+ */
+export const zDeadLetterId = z.uuid();
 
 /**
  * The experiment's key.
@@ -4886,6 +4922,48 @@ export const zRotateSinkSecretPath = z.object({
  * The sink with its new secret.
  */
 export const zRotateSinkSecretResponse = zSinkWithSecret;
+
+export const zResumeSinkPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+});
+
+/**
+ * The sink as it is now.
+ */
+export const zResumeSinkResponse = zSink;
+
+export const zListSinkDeadLettersPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+});
+
+/**
+ * The sink's dead letters.
+ */
+export const zListSinkDeadLettersResponse = zSinkDeadLetterList;
+
+export const zDiscardSinkDeadLetterPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+  deadLetter: z.uuid(),
+});
+
+/**
+ * Discarded.
+ */
+export const zDiscardSinkDeadLetterResponse = z.void();
+
+export const zRedeliverSinkDeadLetterPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+  deadLetter: z.uuid(),
+});
+
+/**
+ * The dead letter after the attempt.
+ */
+export const zRedeliverSinkDeadLetterResponse = zSinkDeadLetter;
 
 /**
  * The instance's webhook subscriptions.

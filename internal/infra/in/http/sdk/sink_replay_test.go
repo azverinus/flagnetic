@@ -408,3 +408,34 @@ func TestASinkThatWasNeverEnabledHasNothingToReplay(t *testing.T) {
 		t.Errorf("%d sink.replayed entries, want the request recorded", n)
 	}
 }
+
+func TestABoundedReplayBatchSetAsideAsADeadLetterStillReturnsTheStreamToTheLivePosition(t *testing.T) {
+	f := startDelivering(t)
+	// The check, the three live batches and the replay's first batch are
+	// acknowledged; the replay's second, which ends it, is rejected until it
+	// is set aside.
+	r := testkit.StartReceiver(t, script(times(4, testkit.Reply{}), times(5, rejected), []testkit.Reply{{}})...)
+	sink, secret := f.enabled(t, small(r, "exposure"))
+	events, at := f.timeline(t, "u-1", "u-2", "u-3")
+	f.rounds(t, 4)
+	first := len(batchCalls(r))
+	if first != 3 {
+		t.Fatalf("the receiver got %d live batches, want 3", first)
+	}
+
+	f.replay(t, sink, management.SinkReplay{From: at[0], To: ptr(at[1])})
+	f.rounds(t, 8)
+	if got := f.deadLetters(t, sink); len(got) != 1 {
+		t.Fatalf("dead letters %+v, want the replay's second batch set aside", got)
+	}
+
+	next := f.exposure("u-4", "true", f.clock.Now())
+	f.post(t, next)
+	f.rounds(t, 2)
+	got, _ := delivered(t, r, secret, first)
+	want := append(ids(events[0]), slices.Repeat(ids(events[1]), 5)...)
+	want = append(want, ids(next)...)
+	if !slices.Equal(got, want) {
+		t.Errorf("after the replay the receiver got %v, want the replay's two batches (the second five times) then the new event alone: %v", got, want)
+	}
+}

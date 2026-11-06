@@ -44,15 +44,24 @@ type SinkMetrics struct {
 
 var _ appsinks.Observer = (*SinkMetrics)(nil)
 
+// PendingDeadLetters counts the dead letters waiting, per sink, those with
+// none included.
+type PendingDeadLetters interface {
+	PendingDeadLetters(ctx context.Context) (map[sinks.ID]int, error)
+}
+
 // NewSinkMetrics registers the series on reg:
 // flagnetic_sink_batches_total by sink, event kind and result,
-// flagnetic_sink_lag_seconds by sink and event kind, and
-// flagnetic_sink_rows_skipped_total by reason.
-func NewSinkMetrics(reg prometheus.Registerer) *SinkMetrics {
+// flagnetic_sink_lag_seconds by sink and event kind,
+// flagnetic_sink_rows_skipped_total by reason, and
+// flagnetic_sink_dead_letters by sink, which is read from pending whenever
+// it is scraped, so that every replica answers the same and a sink that is
+// gone leaves no series behind.
+func NewSinkMetrics(reg prometheus.Registerer, pending PendingDeadLetters) *SinkMetrics {
 	m := &SinkMetrics{
 		batches: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: metrics.Namespace, Subsystem: "sink", Name: "batches_total",
-			Help: "Batches attempted by sink and event kind, by result: ack, transient or rejected.",
+			Help: "Batches attempted by sink and event kind, by result: ack, transient, rejected, dead_lettered, redelivered or redelivery_failed.",
 		}, []string{"sink", "event_kind", "result"}),
 		lag: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: metrics.Namespace, Subsystem: "sink", Name: "lag_seconds",
@@ -63,8 +72,35 @@ func NewSinkMetrics(reg prometheus.Registerer) *SinkMetrics {
 			Help: "Rows a sink passed without exporting them, by reason: environment_deleted.",
 		}, []string{"reason"}),
 	}
-	reg.MustRegister(m.batches, m.lag, m.skipped)
+	reg.MustRegister(m.batches, m.lag, m.skipped, deadLetterGauge{pending})
 	return m
+}
+
+// deadLetterScrapeTimeout bounds how long a scrape waits for the counts.
+const deadLetterScrapeTimeout = 5 * time.Second
+
+// deadLetterGauge reports the dead letters waiting, per sink, as they are
+// when it is scraped.
+type deadLetterGauge struct{ pending PendingDeadLetters }
+
+var deadLetterDesc = prometheus.NewDesc(
+	prometheus.BuildFQName(metrics.Namespace, "sink", "dead_letters"),
+	"Dead letters waiting to be redelivered or discarded, by sink: neither redelivered, discarded nor expired.",
+	[]string{"sink"}, nil)
+
+func (deadLetterGauge) Describe(ch chan<- *prometheus.Desc) { ch <- deadLetterDesc }
+
+func (g deadLetterGauge) Collect(ch chan<- prometheus.Metric) {
+	ctx, cancel := context.WithTimeout(context.Background(), deadLetterScrapeTimeout)
+	defer cancel()
+	counts, err := g.pending.PendingDeadLetters(ctx)
+	if err != nil {
+		// A scrape that cannot count reports nothing, rather than zero.
+		return
+	}
+	for sink, n := range counts {
+		ch <- prometheus.MustNewConstMetric(deadLetterDesc, prometheus.GaugeValue, float64(n), sink.String())
+	}
 }
 
 // Batch counts one batch attempted.

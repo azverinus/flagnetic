@@ -204,6 +204,11 @@ type Handlers struct {
 	SampleSink       *appsinks.Sample
 	ReplaySink       *appsinks.Replay
 
+	ResumeSink              *appsinks.ResumeSink
+	ListSinkDeadLetters     *appsinks.ListDeadLetters
+	RedeliverSinkDeadLetter *appsinks.RedeliverDeadLetter
+	DiscardSinkDeadLetter   *appsinks.DiscardDeadLetter
+
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment
 	CreateSegment     *appflags.CreateSegment

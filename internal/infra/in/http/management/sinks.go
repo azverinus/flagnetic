@@ -374,3 +374,59 @@ func nonNilMap(m map[string]string) map[string]string {
 	}
 	return m
 }
+
+// ResumeSink starts a stopped sink again.
+func (a *api) ResumeSink(ctx context.Context, req ResumeSinkRequestObject) (ResumeSinkResponseObject, error) {
+	s, err := a.h.ResumeSink.Handle(ctx, appsinks.ResumeCommand{
+		Project: projectID(ctx), Sink: id.FromBytes[sinks.Sink](req.Sink), Request: requestOf(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return ResumeSink200JSONResponse{Body: sinkOut(s), Headers: ResumeSink200ResponseHeaders{ETag: etag(s.Version)}}, nil
+}
+
+// ListSinkDeadLetters answers a sink's dead letters.
+func (a *api) ListSinkDeadLetters(ctx context.Context, req ListSinkDeadLettersRequestObject) (ListSinkDeadLettersResponseObject, error) {
+	list, err := a.h.ListSinkDeadLetters.Handle(ctx, projectID(ctx), id.FromBytes[sinks.Sink](req.Sink))
+	if err != nil {
+		return nil, err
+	}
+	return ListSinkDeadLetters200JSONResponse{Items: each(list, deadLetterOut)}, nil
+}
+
+// RedeliverSinkDeadLetter sends a dead letter's rows to the target again.
+func (a *api) RedeliverSinkDeadLetter(ctx context.Context, req RedeliverSinkDeadLetterRequestObject) (RedeliverSinkDeadLetterResponseObject, error) {
+	dl, err := a.h.RedeliverSinkDeadLetter.Handle(ctx, deadLetterCommand(ctx, req.Sink, req.DeadLetter))
+	if err != nil {
+		return nil, err
+	}
+	return RedeliverSinkDeadLetter200JSONResponse(deadLetterOut(dl)), nil
+}
+
+// DiscardSinkDeadLetter gives a dead letter up.
+func (a *api) DiscardSinkDeadLetter(ctx context.Context, req DiscardSinkDeadLetterRequestObject) (DiscardSinkDeadLetterResponseObject, error) {
+	if err := a.h.DiscardSinkDeadLetter.Handle(ctx, deadLetterCommand(ctx, req.Sink, req.DeadLetter)); err != nil {
+		return nil, err
+	}
+	return DiscardSinkDeadLetter204Response{}, nil
+}
+
+func deadLetterCommand(ctx context.Context, sink SinkID, dl DeadLetterID) appsinks.DeadLetterCommand {
+	return appsinks.DeadLetterCommand{
+		Project: projectID(ctx), Sink: id.FromBytes[sinks.Sink](sink), DeadLetter: id.FromBytes[sinks.DeadLetter](dl),
+		Request: requestOf(ctx),
+	}
+}
+
+// deadLetterOut answers dl: the batch by its size and times, and why it was
+// last rejected by class, status and code.
+func deadLetterOut(dl sinks.DeadLetter) SinkDeadLetter {
+	r := dl.LastFailure.Report()
+	return SinkDeadLetter{
+		Id: openapi_types.UUID(dl.ID.Bytes()), EventKind: SinkEventKind(dl.EventKind), Rows: dl.Rows,
+		FirstReceivedAt: dl.FirstReceivedAt, LastReceivedAt: dl.LastReceivedAt, Attempts: dl.Attempts,
+		LastFailure: SinkFailure{Class: SinkFailureClass(r.Class), Status: r.Status, Code: r.Code, At: dl.LastFailure.At},
+		Status:      SinkDeadLetterStatus(dl.Status), CreatedAt: dl.CreatedAt, RedeliveredAt: dl.RedeliveredAt,
+	}
+}
