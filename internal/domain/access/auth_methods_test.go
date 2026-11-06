@@ -45,6 +45,31 @@ func TestAMemberKeepsAWayInWhileOneUsableRemains(t *testing.T) {
 	}
 }
 
+func TestOnlyAUsableWayInCountsWhateverTheMembersStatus(t *testing.T) {
+	set := time.Date(2026, 11, 6, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name    string
+		methods access.AuthMethods
+		want    bool
+	}{
+		{"a password", access.AuthMethods{Status: access.MemberDeactivated, PasswordSetAt: &set}, true},
+		{"an identity at an enabled provider", access.AuthMethods{
+			Status: access.MemberDeactivated, Identities: []access.IdentityMethod{{ID: "enabled", ProviderEnabled: true}},
+		}, true},
+		{"an identity at a disabled provider only", access.AuthMethods{
+			Status: access.MemberDeactivated, Identities: []access.IdentityMethod{{ID: "disabled"}},
+		}, false},
+		{"nothing at all", access.AuthMethods{Status: access.MemberDeactivated}, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.methods.HoldsUsableWayIn(); got != tc.want {
+				t.Errorf("HoldsUsableWayIn() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestReactivatingAMemberWhoHoldsAWayInMakesThemActive(t *testing.T) {
 	m := access.Member{Status: access.MemberDeactivated}
 	if got := m.Reactivated(true).Status; got != access.MemberActive {

@@ -458,7 +458,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 		}),
 		DeactivateMember:      appaccess.NewDeactivateMember(tx, accessStore, audit, d.Clock, d.IDs),
-		ReactivateMember:      appaccess.NewReactivateMember(tx, accessStore, identities, audit, d.Clock, d.IDs, rand.Reader),
+		ReactivateMember:      appaccess.NewReactivateMember(tx, accessStore, waysIn, audit, d.Clock, d.IDs, rand.Reader),
 		RemoveMyPassword:      appaccess.NewRemoveMyPassword(tx, accessStore, waysIn, audit, d.Clock, d.IDs),
 		ListMemberAuthMethods: appidentity.NewListMemberAuthMethods(signIn),
 		StartLink:             appidentity.NewStartLink(signIn),

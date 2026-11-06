@@ -562,6 +562,27 @@ func TestReactivatingAMemberWithNoWayInInvitesThemAgain(t *testing.T) {
 	}
 }
 
+func TestReactivatingAMemberWhoseOnlyIdentityIsAtADisabledProviderInvitesThemAgain(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	slug := e.forged(t, idp, nil)
+	email, _ := e.provisionedMember(t, idp, slug, "stranded-subject")
+	id := memberID(t, e, email)
+	if res, err := e.admin.DeactivateMemberWithResponse(t.Context(), id); err != nil || res.StatusCode() != http.StatusOK {
+		t.Fatalf("deactivating = %v, %v: %s", res.StatusCode(), err, res.Body)
+	}
+	if res, err := e.admin.DisableAuthProviderWithResponse(t.Context(), slug); err != nil || res.StatusCode() != http.StatusOK {
+		t.Fatalf("disabling the provider = %v, %v: %s", res.StatusCode(), err, res.Body)
+	}
+
+	res, err := e.admin.ReactivateMemberWithResponse(t.Context(), id)
+
+	// An identity at a disabled provider signs nobody in, so it is no way in.
+	if err != nil || res.JSON200 == nil || res.JSON200.Member.Status != management.MemberStatusInvited || res.JSON200.Invitation == nil {
+		t.Errorf("reactivating a member whose only identity is at a disabled provider = %v, %v: %s", res.StatusCode(), err, res.Body)
+	}
+}
+
 // auditedBefore returns what entries of action held in before, where the
 // field key equals value.
 func (e env) auditedBefore(t *testing.T, action, key, value string) []map[string]any {

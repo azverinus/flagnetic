@@ -47,6 +47,17 @@ func (m AuthMethods) KeepsWayIn(withoutPassword bool, withoutIdentity string) bo
 	if m.Status == MemberDeactivated {
 		return true
 	}
+	return m.usable(withoutPassword, withoutIdentity)
+}
+
+// HoldsUsableWayIn reports whether the member holds a usable way in,
+// whatever their status: what reactivating them asks, since a deactivated
+// member signs in nowhere until then.
+func (m AuthMethods) HoldsUsableWayIn() bool { return m.usable(false, "") }
+
+// usable reports whether a usable way in remains once the password
+// (withoutPassword) and the identity withoutIdentity are left out.
+func (m AuthMethods) usable(withoutPassword bool, withoutIdentity string) bool {
 	if !withoutPassword && m.passwordUsable() {
 		return true
 	}
