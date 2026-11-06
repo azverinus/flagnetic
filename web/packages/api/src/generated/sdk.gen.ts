@@ -145,6 +145,9 @@ import type {
   DisableAuthProviderData,
   DisableAuthProviderErrors,
   DisableAuthProviderResponses,
+  DiscardSinkDeadLetterData,
+  DiscardSinkDeadLetterErrors,
+  DiscardSinkDeadLetterResponses,
   DismissDiscoveredAttributeData,
   DismissDiscoveredAttributeErrors,
   DismissDiscoveredAttributeResponses,
@@ -180,6 +183,9 @@ import type {
   GetAuthMethodsResponses,
   GetAuthProviderData,
   GetAuthProviderErrors,
+  GetAuthProviderGroupMappingsData,
+  GetAuthProviderGroupMappingsErrors,
+  GetAuthProviderGroupMappingsResponses,
   GetAuthProviderResponses,
   GetAuthSettingsData,
   GetAuthSettingsErrors,
@@ -355,6 +361,9 @@ import type {
   ListSegmentUsagesData,
   ListSegmentUsagesErrors,
   ListSegmentUsagesResponses,
+  ListSinkDeadLettersData,
+  ListSinkDeadLettersErrors,
+  ListSinkDeadLettersResponses,
   ListSinksData,
   ListSinksErrors,
   ListSinksResponses,
@@ -391,6 +400,9 @@ import type {
   RedeliverInstanceWebhookDeliveryData,
   RedeliverInstanceWebhookDeliveryErrors,
   RedeliverInstanceWebhookDeliveryResponses,
+  RedeliverSinkDeadLetterData,
+  RedeliverSinkDeadLetterErrors,
+  RedeliverSinkDeadLetterResponses,
   RedeliverWebhookDeliveryData,
   RedeliverWebhookDeliveryErrors,
   RedeliverWebhookDeliveryResponses,
@@ -406,9 +418,15 @@ import type {
   RejectChangeRequestData,
   RejectChangeRequestErrors,
   RejectChangeRequestResponses,
+  ReplaceAuthProviderGroupMappingsData,
+  ReplaceAuthProviderGroupMappingsErrors,
+  ReplaceAuthProviderGroupMappingsResponses,
   RestoreFlagData,
   RestoreFlagErrors,
   RestoreFlagResponses,
+  ResumeSinkData,
+  ResumeSinkErrors,
+  ResumeSinkResponses,
   RevertFlagConfigurationData,
   RevertFlagConfigurationErrors,
   RevertFlagConfigurationResponses,
@@ -995,8 +1013,8 @@ export const createProject = <ThrowOnError extends boolean = false>(
  * Create a project from a project document
  *
  * Creates a project holding exactly the document: its environments (at
- * least one), unit types, declared attributes, segments and flags with
- * their configuration in every environment, besides the standard
+ * least one), unit types, declared attributes, segments, flags with
+ * their configuration in every environment and experiments, besides the standard
  * attributes every project has; no default environment or unit type is
  * added. The document is sent as `application/json` or
  * `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -1011,6 +1029,15 @@ export const createProject = <ThrowOnError extends boolean = false>(
  * the answer warns `owner_replaced` with the address. Protection is
  * bypassed in every environment, which take `protected` from the
  * document.
+ *
+ * Every experiment is created exactly as the document has it, its
+ * status, both salts, its timestamps and its decision, so that a unit
+ * keeps its assignment; a draft may leave its salts out and is given two.
+ * It is judged as a create is, and by the history its status leaves
+ * behind. A draft and a running experiment need a flag that is not
+ * archived and a declared unit type, a stopped one a declared unit type,
+ * and an archived one neither. No salt is shared by two experiments, or
+ * by an experiment and a rollout.
  *
  * The import applies whole or not at all. A document that breaks a rule
  * is refused 422 `invalid_document` with every fault found in `errors`,
@@ -1220,8 +1247,27 @@ export const exportProject = <ThrowOnError extends boolean = false>(
  * Protection is bypassed in every environment, and only the owner of a
  * project, never a project token, may import.
  *
- * Experiments cannot be imported yet: a document that has any is refused
- * whole, `unsupported` at each. The import applies whole or not at all;
+ * An experiment the project lacks is created exactly as the document has
+ * it: its status, both salts, its timestamps and its decision, so that
+ * a unit keeps its assignment; a draft may leave its salts out and is
+ * given two. It is judged as a create is, and by the history its status
+ * leaves behind: a started experiment has `started_at` and an
+ * `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+ * and a running experiment need a flag that is not archived and a declared
+ * unit type, a stopped one a declared unit type, and an archived one
+ * neither, so a stopped experiment outlives the flag it compared. An
+ * experiment that exists changes only as an ordinary edit of its status
+ * allows, never through its status: a field its status freezes, its
+ * status, its timestamps, its decision and its salts once it is past its
+ * draft are 409 `frozen`, naming every such field in `errors`, and a
+ * smaller traffic allocation of a running experiment is 409
+ * `traffic_allocation_decrease`. A larger one moves on the rulesets of
+ * the environments holding its rules and is recorded as
+ * `experiment.traffic_allocation_changed`. A rule serving an archived
+ * experiment is accepted. No salt is shared by two experiments, or by an
+ * experiment and a rollout.
+ *
+ * The import applies whole or not at all;
  * a document that breaks a rule is 422 `invalid_document` with every fault
  * found in `errors`, each pointing into the document.
  *
@@ -3827,8 +3873,10 @@ export const createGrant = <ThrowOnError extends boolean = false>(
  *
  * Removes one grant, leaving the member's others. The grant of a role
  * holding a permission the caller lacks in the project is refused
- * `role_not_allowed`. Removing the last owner's grant is allowed: an
- * instance admin holds every permission in every project.
+ * `role_not_allowed`. The grant of an auth provider's group mapping
+ * (`source` `sso`) is refused 409 `sso_sourced`: the directory owns it.
+ * Removing the last owner's grant is allowed: an instance admin holds
+ * every permission in every project.
  *
  */
 export const deleteGrant = <ThrowOnError extends boolean = false>(
@@ -4218,7 +4266,8 @@ export const getMember = <ThrowOnError extends boolean = false>(
  * Changes the fields sent and leaves the others as they are. An email
  * another member holds, whatever its case, is refused `already_exists`.
  * Demoting the instance's last active instance admin is refused
- * `last_instance_admin`.
+ * `last_instance_admin`, and demoting one an auth provider's group
+ * mapping made `sso_sourced`: only the provider takes it away.
  *
  */
 export const updateMember = <ThrowOnError extends boolean = false>(
@@ -4554,8 +4603,10 @@ export const createAuthProvider = <ThrowOnError extends boolean = false>(
  * Delete an auth provider
  *
  * Refused 409 `provider_in_use` while something depends on the provider;
- * `used_by` names what. Disable it instead: that stops its sign-ins
- * and leaves its members, identities and grants as they are. Audited
+ * `used_by` names what (`identities`, `grants` while its group mappings
+ * made a grant or an instance admin, among others). Disable it instead:
+ * that stops its sign-ins and leaves its members, identities and grants
+ * as they are. Audited
  * `auth_provider.deleted`.
  *
  */
@@ -4686,6 +4737,84 @@ export const disableAuthProvider = <ThrowOnError extends boolean = false>(
     ],
     url: "/instance/auth-providers/{provider}/disable",
     ...options,
+  });
+
+/**
+ * An auth provider's group mappings
+ *
+ * What the provider's directory groups grant, in order: a role in a
+ * project, or instance admin.
+ *
+ */
+export const getAuthProviderGroupMappings = <ThrowOnError extends boolean = false>(
+  options: Options<GetAuthProviderGroupMappingsData, ThrowOnError>,
+): RequestResult<
+  GetAuthProviderGroupMappingsResponses,
+  GetAuthProviderGroupMappingsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetAuthProviderGroupMappingsResponses,
+    GetAuthProviderGroupMappingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}/group-mappings",
+    ...options,
+  });
+
+/**
+ * Replace an auth provider's group mappings
+ *
+ * Replaces the whole list, then runs it at once for every member the
+ * provider knows, those who claimed groups at it on a sign-in: each is
+ * granted what their groups now map to and loses what the provider
+ * granted and no longer maps. A grant of a mapping is `source` `sso` and
+ * names the provider; grants of other sources, and an instance admin made
+ * by hand or by another provider, are left alone. The last active
+ * instance admin is never demoted by a mapping, and is counted in
+ * `kept_instance_admin` instead. A mapping has a non-blank `group` and
+ * either a `project` (key) with a built-in `role`, or `instance_admin`
+ * alone; a mapping that breaks that, or names a project that does not
+ * exist, is 422 `invalid_group_mappings` naming each field and nothing
+ * changes. Audited `group_mappings.updated`, and each grant and promotion
+ * under the provider as the `sso` actor; a replacement that changes
+ * nothing is not.
+ *
+ */
+export const replaceAuthProviderGroupMappings = <ThrowOnError extends boolean = false>(
+  options: Options<ReplaceAuthProviderGroupMappingsData, ThrowOnError>,
+): RequestResult<
+  ReplaceAuthProviderGroupMappingsResponses,
+  ReplaceAuthProviderGroupMappingsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).put<
+    ReplaceAuthProviderGroupMappingsResponses,
+    ReplaceAuthProviderGroupMappingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}/group-mappings",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**
@@ -5520,6 +5649,126 @@ export const rotateSinkSecret = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/sinks/{sink}/rotate-secret",
+    ...options,
+  });
+
+/**
+ * Resume a stopped sink
+ *
+ * A sink stops itself when `FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS`
+ * batches in a row of one stream were set aside as dead letters. This
+ * starts it again where it was: every stream keeps its place and its
+ * batch in flight, the count of consecutive dead letters is cleared and
+ * each stream is due now. Dead letters stay and are not redelivered; the
+ * sink is `degraded` while any waits. Editing a sink never resumes it. A
+ * sink that is not stopped is answered as it is, with nothing changed or
+ * recorded. Audited as `sink.resumed`. It takes no `If-Match`.
+ *
+ */
+export const resumeSink = <ThrowOnError extends boolean = false>(
+  options: Options<ResumeSinkData, ThrowOnError>,
+): RequestResult<ResumeSinkResponses, ResumeSinkErrors, ThrowOnError> =>
+  (options.client ?? client).post<ResumeSinkResponses, ResumeSinkErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/resume",
+    ...options,
+  });
+
+/**
+ * A sink's dead letters
+ *
+ * The batches the target rejected `FLAGNETIC_SINK_REJECTION_ATTEMPTS`
+ * times and the sink set aside to deliver the next, oldest first, in
+ * every status; a discarded one is gone. Not paginated.
+ *
+ */
+export const listSinkDeadLetters = <ThrowOnError extends boolean = false>(
+  options: Options<ListSinkDeadLettersData, ThrowOnError>,
+): RequestResult<ListSinkDeadLettersResponses, ListSinkDeadLettersErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListSinkDeadLettersResponses,
+    ListSinkDeadLettersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/dead-letters",
+    ...options,
+  });
+
+/**
+ * Discard a dead letter
+ *
+ * The dead letter goes, whatever its status, and stops counting towards
+ * the sink being `degraded`. Its rows are not delivered. Audited as
+ * `sink.dead_letter_discarded`.
+ *
+ */
+export const discardSinkDeadLetter = <ThrowOnError extends boolean = false>(
+  options: Options<DiscardSinkDeadLetterData, ThrowOnError>,
+): RequestResult<DiscardSinkDeadLetterResponses, DiscardSinkDeadLetterErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DiscardSinkDeadLetterResponses,
+    DiscardSinkDeadLetterErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/dead-letters/{deadLetter}",
+    ...options,
+  });
+
+/**
+ * Redeliver a dead letter
+ *
+ * Reads the rows of the dead letter that are still stored and sends them
+ * to the target now, inside this request, under a delivery ID of its
+ * own: the dead letter's and its attempt's, so a repeat is another
+ * delivery. The sink's streams, cursors and health are not touched. When
+ * the target acknowledges, the dead letter is `redelivered`; when it
+ * does not, this still answers 200 with the dead letter, still
+ * `pending`, its `attempts` and `last_failure` updated. It may be
+ * repeated. Refused `rows_expired` when retention dropped every row of
+ * it. Audited as `sink.dead_letter_redelivered`; the target's own words
+ * are never answered.
+ *
+ */
+export const redeliverSinkDeadLetter = <ThrowOnError extends boolean = false>(
+  options: Options<RedeliverSinkDeadLetterData, ThrowOnError>,
+): RequestResult<RedeliverSinkDeadLetterResponses, RedeliverSinkDeadLetterErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RedeliverSinkDeadLetterResponses,
+    RedeliverSinkDeadLetterErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver",
     ...options,
   });
 

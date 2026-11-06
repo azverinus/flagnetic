@@ -289,7 +289,9 @@ func TestADocumentThatBreaksARuleIsRefusedWholeAtThePointerOfEachFault(t *testin
 		{"an invalid attribute", func(d map[string]any) { d["attributes"].([]any)[0].(map[string]any)["type"] = "bogus" }, "/attributes/0/type", "invalid_type"},
 		{"an invalid segment", func(d map[string]any) { d["segments"].([]any)[0].(map[string]any)["key"] = "Bad Key" }, "/segments/0/key", "invalid_key"},
 		{"an invalid flag", func(d map[string]any) { d["flags"].([]any)[0].(map[string]any)["key"] = "1bad" }, "/flags/0/key", "invalid_key"},
-		{"an experiment", func(d map[string]any) { d["experiments"] = []any{map[string]any{"key": "e"}} }, "/experiments/0", "unsupported"},
+		{"an experiment past its draft without salts", func(d map[string]any) {
+			d["experiments"] = []any{map[string]any{"key": "e", "status": "running"}}
+		}, "/experiments/0/inclusion_salt", "required"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

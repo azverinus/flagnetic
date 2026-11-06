@@ -18,14 +18,15 @@ import (
 
 // ImportNewProjectDeps are what ImportNewProject runs on.
 type ImportNewProjectDeps struct {
-	Tx        Transactor
-	Workspace WorkspaceImport
-	Flags     FlagsImport
-	Owners    Owners
-	Rulesets  Rulesets
-	Audit     AuditLog
-	Clock     clock.Clock
-	IDs       *id.Source
+	Tx          Transactor
+	Workspace   WorkspaceImport
+	Flags       FlagsImport
+	Experiments ExperimentsImport
+	Owners      Owners
+	Rulesets    Rulesets
+	Audit       AuditLog
+	Clock       clock.Clock
+	IDs         *id.Source
 }
 
 // ImportNewProject creates a project from a project document.
@@ -157,7 +158,7 @@ func (r *importRun) apply(ctx context.Context) (ImportResult, error) {
 		return ImportResult{}, err
 	}
 	r.project = p
-	steps := []func(context.Context) error{r.declare, r.createSegments, r.createFlags, r.configureFlags}
+	steps := []func(context.Context) error{r.declare, r.createSegments, r.createFlags, r.createExperiments, r.configureFlags}
 	for _, step := range steps {
 		if err = step(ctx); err != nil {
 			return ImportResult{}, err
@@ -281,6 +282,39 @@ func (r *importRun) createFlags(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// createExperiments creates every experiment exactly as the document has it,
+// before the configurations are written, since a rule serves an experiment
+// only once it exists. An experiment whose flag the document names but the
+// import refused is skipped, its fault being the flag's.
+func (r *importRun) createExperiments(ctx context.Context) error {
+	named := map[string]bool{}
+	for _, f := range r.doc.Flags {
+		named[f.Key] = true
+	}
+	avoid := saltsOf(r.doc)
+	for i, e := range r.doc.Experiments {
+		at := transfer.Pointer("experiments", i)
+		if r.isRefused(at) || (named[e.Flag] && !r.flags[e.Flag]) {
+			continue
+		}
+		owner, err := r.ownerOf(ctx, e.Owner, at+"/owner")
+		if err != nil {
+			return err
+		}
+		_, err = r.h.d.Experiments.CreateExperiment(ctx, experimentImport(r.project.ID, e, owner, r.cmd.Caller, avoid, r.cmd.Request))
+		if ferr := r.fault(err, at); ferr != nil {
+			return ferr
+		}
+		if err == nil {
+			r.changes.Experiments.Created = append(r.changes.Experiments.Created, e.Key)
+		}
+	}
+	if len(r.doc.Experiments) == 0 {
+		return nil
+	}
+	return r.h.d.Experiments.CheckSalts(ctx)
 }
 
 // configureFlags writes each flag's configuration in each environment the

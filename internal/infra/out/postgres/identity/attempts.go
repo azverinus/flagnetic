@@ -31,7 +31,7 @@ func (s *Store) CreateAttempt(ctx context.Context, a identity.Attempt, now time.
 }
 
 const attemptColumns = `id, provider_id, intent, state_hash, nonce, code_verifier, saml_request_id, cookie_hash, return_to, created_at,
-	expires_at, callback_at, completion_hash, subject, email, email_verified, display_name`
+	expires_at, callback_at, completion_hash, subject, email, email_verified, display_name, groups`
 
 func scanAttempt(row pgx.Row) (identity.Attempt, error) {
 	var (
@@ -43,9 +43,10 @@ func scanAttempt(row pgx.Row) (identity.Attempt, error) {
 		subject, email, name  *string
 		requestID             *string
 		verified              *bool
+		groups                []string
 	)
 	err := row.Scan(&attemptID, &providerID, &intent, &state, &a.Nonce, &a.CodeVerifier, &requestID, &cookie, &a.ReturnTo, &a.CreatedAt,
-		&a.ExpiresAt, &a.CallbackAt, &completion, &subject, &email, &verified, &name)
+		&a.ExpiresAt, &a.CallbackAt, &completion, &subject, &email, &verified, &name, &groups)
 	if err != nil {
 		return a, err
 	}
@@ -55,7 +56,9 @@ func scanAttempt(row pgx.Row) (identity.Attempt, error) {
 	if completion != nil {
 		h := identity.SecretHash(completion)
 		a.CompletionHash = &h
-		a.Claims = &identity.VerifiedClaims{Subject: *subject, Email: *email, EmailVerified: *verified, Name: *name}
+		a.Claims = &identity.VerifiedClaims{
+			Subject: *subject, Email: *email, EmailVerified: *verified, Name: *name, Groups: groups, HasGroups: groups != nil,
+		}
 	}
 	return a, nil
 }
@@ -81,8 +84,8 @@ func (s *Store) TakeCallback(ctx context.Context, state identity.SecretHash, now
 // token its browser completes with.
 func (s *Store) StoreClaims(ctx context.Context, attempt identity.AttemptID, completion identity.SecretHash, c identity.VerifiedClaims) error {
 	_, err := s.db(ctx).Exec(ctx, `
-		UPDATE sso_attempts SET completion_hash = $2, subject = $3, email = $4, email_verified = $5, display_name = $6
-		WHERE id = $1`, attempt.Bytes(), completion[:], c.Subject, c.Email, c.EmailVerified, c.Name)
+		UPDATE sso_attempts SET completion_hash = $2, subject = $3, email = $4, email_verified = $5, display_name = $6, groups = $7
+		WHERE id = $1`, attempt.Bytes(), completion[:], c.Subject, c.Email, c.EmailVerified, c.Name, groupsOf(c))
 	if err != nil {
 		return fmt.Errorf("storing a sign-in attempt's claims: %w", err)
 	}
@@ -109,4 +112,16 @@ func (s *Store) TakeCompletion(ctx context.Context, completion identity.SecretHa
 		return a, fmt.Errorf("taking a sign-in attempt to complete: %w", err)
 	}
 	return a, nil
+}
+
+// groupsOf is the groups column of the claims: NULL unless the provider
+// claimed a list of strings, which may be empty.
+func groupsOf(c identity.VerifiedClaims) []string {
+	if !c.HasGroups {
+		return nil
+	}
+	if c.Groups == nil {
+		return []string{}
+	}
+	return c.Groups
 }

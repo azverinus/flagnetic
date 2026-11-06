@@ -62,22 +62,7 @@ func (e Experiment) Stop(d Decision, now time.Time) (Experiment, error) {
 		return e, errNotRunning
 	}
 	c := newCheck()
-	d.Note = c.note(d.Note)
-	switch d.Outcome {
-	case OutcomeWinner:
-		switch {
-		case d.WinnerVariation == "":
-			c.add("/winner_variation", "required", "a winner names the variation that won", nil)
-		case !slices.ContainsFunc(e.Variations, func(w Weight) bool { return w.Variation == d.WinnerVariation }):
-			c.add("/winner_variation", "unknown_variation", "the winner is one of the variations the experiment compares", nil)
-		}
-	case OutcomeRemoved:
-		if d.WinnerVariation != "" {
-			c.add("/winner_variation", "invalid_value", "a removal names no winner", nil)
-		}
-	default:
-		c.add("/outcome", "invalid_value", "an outcome is winner or removed", nil)
-	}
+	d = c.decision("", d, e.Variations)
 	if len(c.violations) > 0 {
 		return e, apperrors.Invalid("invalid_decision", "the decision is not valid", c.violations...)
 	}
@@ -136,10 +121,36 @@ func (e Experiment) Archive(now time.Time) (Experiment, error) {
 	return out, nil
 }
 
-func (c *check) note(n string) string {
+func (c *check) note(n string) string { return c.noteAt("/note", n) }
+
+func (c *check) noteAt(pointer, n string) string {
 	n = strings.TrimSpace(n)
 	if utf8.RuneCountInString(n) > maxNoteLength {
-		c.add("/note", "too_long", "a note has at most 2,000 characters", map[string]any{"max": maxNoteLength})
+		c.add(pointer, "too_long", "a note has at most 2,000 characters", map[string]any{"max": maxNoteLength})
 	}
 	return n
+}
+
+// decision returns d with its note trimmed, once judged as a stop judges it,
+// the violations pointing under prefix: a winner is one of the variations
+// the experiment compares, and a removal names none, so that what replaces
+// the experiment's rules is always something the comparison measured.
+func (c *check) decision(prefix string, d Decision, variations []Weight) Decision {
+	d.Note = c.noteAt(prefix+"/note", d.Note)
+	switch d.Outcome {
+	case OutcomeWinner:
+		switch {
+		case d.WinnerVariation == "":
+			c.add(prefix+"/winner_variation", "required", "a winner names the variation that won", nil)
+		case !slices.ContainsFunc(variations, func(w Weight) bool { return w.Variation == d.WinnerVariation }):
+			c.add(prefix+"/winner_variation", "unknown_variation", "the winner is one of the variations the experiment compares", nil)
+		}
+	case OutcomeRemoved:
+		if d.WinnerVariation != "" {
+			c.add(prefix+"/winner_variation", "invalid_value", "a removal names no winner", nil)
+		}
+	default:
+		c.add(prefix+"/outcome", "invalid_value", "an outcome is winner or removed", nil)
+	}
+	return d
 }

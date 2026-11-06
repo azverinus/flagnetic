@@ -598,7 +598,7 @@ func TestADocumentThatBreaksARuleIsRefusedWholeWithEveryFaultFound(t *testing.T)
 	entry(t, doc, "attributes", "plan")["type"] = "number"
 	documentConfigurationOf(doc, "banner_text", "staging")["fallthrough"] = "nowhere"
 	entry(t, doc, "flags", "matching_v2")["configurations"].(map[string]any)["ghost"] = map[string]any{"on": false, "off_variation": "false", "fallthrough": "false"}
-	doc["experiments"] = []any{map[string]any{"key": "e1"}}
+	doc["experiments"] = []any{map[string]any{"key": "e1", "status": "stopped"}}
 
 	res := mergeInto(t, f.admin, k, doc)
 	pr := assertProblem(t, "a document that breaks rules", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid_document")
@@ -607,7 +607,7 @@ func TestADocumentThatBreaksARuleIsRefusedWholeWithEveryFaultFound(t *testing.T)
 		got = append(got, e.Pointer+" "+e.Code)
 	}
 	for _, want := range []string{
-		"/attributes/0/type type_immutable", "/experiments/0 unsupported", "/flags/2/type type_immutable",
+		"/attributes/0/type type_immutable", "/experiments/0/inclusion_salt required", "/flags/2/type type_immutable",
 		"/flags/1/configurations/ghost unknown_environment",
 	} {
 		if !slices.Contains(got, want) {

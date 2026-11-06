@@ -91,6 +91,31 @@ export const zAuthProvider = z.object({
     }),
 });
 
+/**
+ * What members of a directory group are granted: a role in a project, or
+ * instance admin.
+ *
+ */
+export const zGroupMapping = z.object({
+  group: z.string(),
+  project: z.string().optional(),
+  role: z.string().optional(),
+  instance_admin: z.boolean().optional(),
+});
+
+export const zGroupMappings = z.object({
+  items: z.array(zGroupMapping),
+});
+
+/**
+ * What running the mappings for every member the provider knows did.
+ */
+export const zGroupMappingsRun = z.object({
+  granted: z.int(),
+  revoked: z.int(),
+  kept_instance_admin: z.int(),
+});
+
 export const zAuthProviderList = z.object({
   items: z.array(zAuthProvider),
 });
@@ -612,7 +637,8 @@ export const zGrant = z.object({
   id: z.uuid(),
   member: z.uuid(),
   role: zRoleName,
-  source: z.enum(["manual"]),
+  source: z.enum(["manual", "sso"]),
+  provider: z.string().nullable(),
   created_by: z.uuid().nullable(),
   created_at: z.iso.datetime(),
 });
@@ -725,7 +751,7 @@ export const zAttributePatch = z.object({
   description: zDescription.optional(),
 });
 
-export const zActorKind = z.enum(["member", "token", "cli", "system"]);
+export const zActorKind = z.enum(["member", "token", "cli", "system", "sso"]);
 
 export const zActor = z.object({
   kind: zActorKind,
@@ -2401,6 +2427,37 @@ export const zSinkList = z.object({
 });
 
 /**
+ * `pending` waits to be redelivered or discarded; `redelivered` was
+ * acknowledged by the target after a redelivery; `expired` lost every
+ * row to retention.
+ *
+ */
+export const zSinkDeadLetterStatus = z.enum(["pending", "redelivered", "expired"]);
+
+/**
+ * A batch of one event kind the target rejected, set aside so the stream
+ * could go on. Cursors are never exposed: the batch is told by how many
+ * rows it held and when the first and the last of them were received.
+ *
+ */
+export const zSinkDeadLetter = z.object({
+  id: z.uuid(),
+  event_kind: zSinkEventKind,
+  rows: z.int(),
+  first_received_at: z.iso.datetime(),
+  last_received_at: z.iso.datetime(),
+  attempts: z.int(),
+  last_failure: zSinkFailure,
+  status: zSinkDeadLetterStatus,
+  created_at: z.iso.datetime(),
+  redelivered_at: z.iso.datetime().nullable(),
+});
+
+export const zSinkDeadLetterList = z.object({
+  items: z.array(zSinkDeadLetter),
+});
+
+/**
  * `pending` waits for its next attempt; `succeeded` was accepted by the
  * receiver; `failed` was refused in a way a retry would not change;
  * `exhausted` ran out of attempts; `dropped` was left unsent because
@@ -2841,6 +2898,11 @@ export const zWebhookId = z.uuid();
  * The sink's identifier.
  */
 export const zSinkId = z.uuid();
+
+/**
+ * The dead letter's identifier.
+ */
+export const zDeadLetterId = z.uuid();
 
 /**
  * The experiment's key.
@@ -4530,6 +4592,26 @@ export const zDisableAuthProviderPath = z.object({
  */
 export const zDisableAuthProviderResponse = zAuthProvider;
 
+export const zGetAuthProviderGroupMappingsPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * The group mappings.
+ */
+export const zGetAuthProviderGroupMappingsResponse = zGroupMappings;
+
+export const zReplaceAuthProviderGroupMappingsBody = zGroupMappings;
+
+export const zReplaceAuthProviderGroupMappingsPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * What running the mappings did.
+ */
+export const zReplaceAuthProviderGroupMappingsResponse = zGroupMappingsRun;
+
 export const zTestAuthProviderPath = z.object({
   provider: z.string(),
 });
@@ -4840,6 +4922,48 @@ export const zRotateSinkSecretPath = z.object({
  * The sink with its new secret.
  */
 export const zRotateSinkSecretResponse = zSinkWithSecret;
+
+export const zResumeSinkPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+});
+
+/**
+ * The sink as it is now.
+ */
+export const zResumeSinkResponse = zSink;
+
+export const zListSinkDeadLettersPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+});
+
+/**
+ * The sink's dead letters.
+ */
+export const zListSinkDeadLettersResponse = zSinkDeadLetterList;
+
+export const zDiscardSinkDeadLetterPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+  deadLetter: z.uuid(),
+});
+
+/**
+ * Discarded.
+ */
+export const zDiscardSinkDeadLetterResponse = z.void();
+
+export const zRedeliverSinkDeadLetterPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+  deadLetter: z.uuid(),
+});
+
+/**
+ * The dead letter after the attempt.
+ */
+export const zRedeliverSinkDeadLetterResponse = zSinkDeadLetter;
 
 /**
  * The instance's webhook subscriptions.

@@ -86,9 +86,9 @@ export function madeBy(i18n: I18n, names: ReadonlyMap<string, string>, id: strin
 const grantOrigins: Record<
   Grant["source"],
   {
-    unrecorded: (when: string) => MessageDescriptor;
-    unknownMaker: (when: string) => MessageDescriptor;
-    madeBy: (by: string, when: string) => MessageDescriptor;
+    unrecorded: (when: string, provider: string) => MessageDescriptor;
+    unknownMaker: (when: string, provider: string) => MessageDescriptor;
+    madeBy: (by: string, when: string, provider: string) => MessageDescriptor;
   }
 > = {
   manual: {
@@ -102,15 +102,31 @@ const grantOrigins: Record<
     madeBy: (by, when) =>
       msg({ message: `Manual, granted by ${by} on ${when}`, comment: "A grant made by hand." }),
   },
+  // No member makes a grant of a group mapping: the auth provider does.
+  sso: {
+    unrecorded: (when, provider) => ssoGrantOrigin(when, provider),
+    unknownMaker: (when, provider) => ssoGrantOrigin(when, provider),
+    madeBy: (_by, when, provider) => ssoGrantOrigin(when, provider),
+  },
 };
+
+function ssoGrantOrigin(when: string, provider: string): MessageDescriptor {
+  return msg({
+    message: `From the group mappings of ${provider}, granted on ${when}`,
+    comment: "A grant made by an auth provider's group mapping.",
+  });
+}
 
 /** Where a grant comes from, who made it and when, as one sentence in the member's language. */
 export function grantOrigin(i18n: I18n, names: ReadonlyMap<string, string>, grant: Grant): string {
   const origin = grantOrigins[grant.source];
   const when = formatDateTime(i18n, grant.created_at);
-  if (grant.created_by === null) return i18n._(origin.unrecorded(when));
+  const provider = grant.provider ?? "";
+  if (grant.created_by === null) return i18n._(origin.unrecorded(when, provider));
   const by = names.get(grant.created_by);
-  return i18n._(by === undefined ? origin.unknownMaker(when) : origin.madeBy(by, when));
+  return i18n._(
+    by === undefined ? origin.unknownMaker(when, provider) : origin.madeBy(by, when, provider),
+  );
 }
 
 /** What a role lets its holder do in a project, as one sentence in the member's language. */

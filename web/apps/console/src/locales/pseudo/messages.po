@@ -1159,6 +1159,8 @@ msgstr ""
 msgid "Audit log"
 msgstr ""
 
+#. A kind of actor in the audit log.
+#: src/lib/audit.ts
 #: src/routes/_signed-in/admin/auth-providers/$provider.tsx
 msgid "Auth provider"
 msgstr ""
@@ -2929,6 +2931,11 @@ msgstr ""
 #: src/components/audit-log.tsx
 #: src/components/webhook-deliveries.tsx
 msgid "From"
+msgstr ""
+
+#. A grant made by an auth provider's group mapping.
+#: src/lib/project-members.ts
+msgid "From the group mappings of {provider}, granted on {when}"
 msgstr ""
 
 #: src/components/event-volume.tsx

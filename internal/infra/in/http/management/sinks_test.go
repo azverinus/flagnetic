@@ -767,3 +767,33 @@ func TestDeletingAProjectDeletesItsSinks(t *testing.T) {
 		t.Errorf("the deleted project still has sinks: %v, %v", left, err)
 	}
 }
+
+func TestDeadLetterActionsOfASinkOrADeadLetterThatDoesNotExistAreNotFound(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	created := createSink(t, admin, p.Key, webhookSink())
+	nobody := [16]byte{1}
+
+	list := do(admin.ListSinkDeadLettersWithResponse(t.Context(), p.Key, nobody))
+	redeliver := do(admin.RedeliverSinkDeadLetterWithResponse(t.Context(), p.Key, nobody, nobody))
+	discard := do(admin.DiscardSinkDeadLetterWithResponse(t.Context(), p.Key, nobody, nobody))
+	resume := do(admin.ResumeSinkWithResponse(t.Context(), p.Key, nobody))
+	noLetterRedeliver := do(admin.RedeliverSinkDeadLetterWithResponse(t.Context(), p.Key, created.Id, nobody))
+	noLetterDiscard := do(admin.DiscardSinkDeadLetterWithResponse(t.Context(), p.Key, created.Id, nobody))
+	assertProblem(t, "listing the dead letters of a sink that does not exist", list.StatusCode(), list.Body, http.StatusNotFound, "not_found")
+	assertProblem(t, "redelivering through a sink that does not exist", redeliver.StatusCode(), redeliver.Body, http.StatusNotFound, "not_found")
+	assertProblem(t, "discarding through a sink that does not exist", discard.StatusCode(), discard.Body, http.StatusNotFound, "not_found")
+	assertProblem(t, "resuming a sink that does not exist", resume.StatusCode(), resume.Body, http.StatusNotFound, "not_found")
+	assertProblem(t, "redelivering a dead letter that does not exist", noLetterRedeliver.StatusCode(), noLetterRedeliver.Body, http.StatusNotFound, "not_found")
+	assertProblem(t, "discarding a dead letter that does not exist", noLetterDiscard.StatusCode(), noLetterDiscard.Body, http.StatusNotFound, "not_found")
+
+	if res := do(admin.ListSinkDeadLettersWithResponse(t.Context(), p.Key, created.Id)); res.JSON200 == nil || len(res.JSON200.Items) != 0 {
+		t.Errorf("a sink with no dead letter lists %d: %s", res.StatusCode(), res.Body)
+	}
+	// A sink that is not stopped is answered as it is.
+	resumed := do(admin.ResumeSinkWithResponse(t.Context(), p.Key, created.Id))
+	if resumed.JSON200 == nil || resumed.JSON200.StoppedAt != nil || resumed.JSON200.Version != created.Version {
+		t.Errorf("resuming a sink that is not stopped = %d: %s, want it as it is", resumed.StatusCode(), resumed.Body)
+	}
+}

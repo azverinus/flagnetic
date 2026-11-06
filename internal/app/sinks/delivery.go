@@ -95,8 +95,9 @@ type DeliveryStore interface {
 	// its sink is enabled and not stopped; ErrHalted otherwise. held is false
 	// when the lease is gone.
 	Begin(ctx context.Context, stream StreamRef, token LeaseToken, in Inflight) (held bool, err error)
-	// Ack moves stream's cursor to to, clears its batch in flight, its
-	// failures and its run of dead letters, counts delivered rows and
+	// Ack moves stream's cursor to to, clears its batch in flight and its
+	// failures, ends its run of dead letters when it delivered rows (passing
+	// rows of other projects is no delivery), counts delivered rows and
 	// schedules its next attempt for next, releasing the lease.
 	Ack(ctx context.Context, stream StreamRef, token LeaseToken, to events.Cursor, delivered int, next, now time.Time) (held bool, err error)
 	// Fail records a failed attempt of stream: one more consecutive failure,
@@ -104,12 +105,44 @@ type DeliveryStore interface {
 	// next, the lease released. entered is true when this is the sink's first
 	// failing stream, which begins an episode.
 	Fail(ctx context.Context, stream StreamRef, token LeaseToken, f sinks.Failure, rejected bool, next, now time.Time) (held, entered bool, err error)
+	// SetAside sets the batch in flight of stream aside as the dead letter dl,
+	// in the same unit of work: the cursor moves to the batch's end, the batch
+	// and the stream's failures are cleared, its run of dead letters grows by
+	// one and the stream is due at now. When that run reaches stopAfter the
+	// sink is stopped, if it is not already. The lease is released.
+	SetAside(ctx context.Context, stream StreamRef, token LeaseToken, dl NewDeadLetter, stopAfter int, now time.Time) (SetAsideResult, error)
 	// Idle releases stream's lease with nothing to send, to be attempted
 	// again at next.
 	Idle(ctx context.Context, stream StreamRef, token LeaseToken, next time.Time) (held bool, err error)
 	// Release gives up stream's lease without an attempt, leaving everything
 	// else as it was.
 	Release(ctx context.Context, stream StreamRef, token LeaseToken) (held bool, err error)
+}
+
+// NewDeadLetter is the batch in flight of a stream, rejected for the last
+// time, as it is set aside.
+type NewDeadLetter struct {
+	ID sinks.DeadLetterID
+	// Failure is the rejection that set the batch aside.
+	Failure sinks.FailureAt
+	// Rows is how many rows the batch held, and First and Last when the first
+	// and the last of the rows sent were received.
+	Rows        int
+	First, Last time.Time
+}
+
+// SetAsideResult is what setting a batch aside found and did.
+type SetAsideResult struct {
+	// Held is false when the lease is gone, or the stream has no batch in
+	// flight, and nothing was done.
+	Held bool
+	// Attempts is how many times the batch was rejected.
+	Attempts int
+	// InARow is how many dead letters in a row the stream has now.
+	InARow int
+	// Stopped is true when this stopped the sink; false when it was already
+	// stopped or the run is short of the limit.
+	Stopped bool
 }
 
 // Rows reads the rows the streams export.
@@ -186,6 +219,13 @@ const (
 	ResultAck       = "ack"
 	ResultTransient = "transient"
 	ResultRejected  = "rejected"
+	// ResultDeadLettered counts the batch a rejection set aside, beside the
+	// rejection itself.
+	ResultDeadLettered = "dead_lettered"
+	// ResultRedelivered and ResultRedeliveryFailed count a dead letter sent
+	// again, acknowledged or not.
+	ResultRedelivered      = "redelivered"
+	ResultRedeliveryFailed = "redelivery_failed"
 )
 
 // SkipEnvironmentDeleted is the reason a row is skipped when its environment
@@ -213,6 +253,10 @@ type DeliverDeps struct {
 	Observer Observer
 	// Random returns a number in [0, 1), the spread of the backoff.
 	Random func() float64
+	// RejectionAttempts is how many times the target must reject a batch for
+	// it to be set aside as a dead letter, and StopAfterDeadLetters how many
+	// dead letters in a row on one stream stop the sink.
+	RejectionAttempts, StopAfterDeadLetters int
 }
 
 // ErrHalted answers a batch that may not begin because its sink was disabled
@@ -233,6 +277,9 @@ const (
 	// Released is a stream not attempted because its sink was stopped or
 	// disabled after the claim.
 	Released Result = "released"
+	// DeadLettered is a batch the target rejected for the last time and the
+	// stream set aside.
+	DeadLettered Result = "dead_lettered"
 	// LeaseLost is an attempt whose lease another replica took, which
 	// records nothing: the target may see the batch twice, under one delivery
 	// ID.
@@ -291,7 +338,11 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 		return Failed, fmt.Errorf("resolving the sink's environments: %w", err)
 	}
 	batch, in := sinks.Batch{From: due.Stream.Cursor}, due.Inflight
+	// The rejections of the batch before this attempt: those counted while it
+	// was in flight, none for a batch chosen now.
+	rejections := 0
 	if in != nil {
+		rejections = due.Rejections
 		// The batch in flight keeps the environments it was filtered to, so
 		// it finishes even once they are gone: its rows are then passed.
 		batch.To = in.To
@@ -379,6 +430,9 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 		h.d.Observer.Batch(ref.Sink, ref.Kind, ResultRejected)
 	} else {
 		h.d.Observer.Batch(ref.Sink, ref.Kind, ResultTransient)
+	}
+	if rejected && sinks.SetsAside(rejections, h.d.RejectionAttempts) {
+		return h.setAside(ctx, ref, token, c, batch, page, *failure, scope)
 	}
 	return h.fail(ctx, ref, token, c, due, *failure, rejected, scope)
 }

@@ -17,7 +17,7 @@ import (
 
 // grantColumns are the columns scanGrant reads, prefixed by the grants
 // table's alias g.
-const grantColumns = `g.id, g.project_id, g.member_id, g.role, g.source, g.created_by, g.created_at`
+const grantColumns = `g.id, g.project_id, g.member_id, g.role, g.source, g.provider, g.created_by, g.created_at`
 
 // scanGrant returns a scan target of grantColumns and the grant it fills.
 func scanGrant() ([]any, func() access.Grant) {
@@ -25,13 +25,17 @@ func scanGrant() ([]any, func() access.Grant) {
 		g                          access.Grant
 		grantID, projectID, member [16]byte
 		role, source               string
+		provider                   *string
 		createdBy                  *[16]byte
 	)
-	dest := []any{&grantID, &projectID, &member, &role, &source, &createdBy, &g.CreatedAt}
+	dest := []any{&grantID, &projectID, &member, &role, &source, &provider, &createdBy, &g.CreatedAt}
 	fill := func() access.Grant {
 		g.ID, g.Project, g.Member = id.FromBytes[access.Grant](grantID), id.FromBytes[workspace.Project](projectID),
 			id.FromBytes[access.Member](member)
 		g.Role, g.Source = access.RoleName(role), access.GrantSource(source)
+		if provider != nil {
+			g.Provider = *provider
+		}
 		if createdBy != nil {
 			g.CreatedBy = id.FromBytes[access.Member](*createdBy)
 		}
@@ -87,6 +91,35 @@ func (s *Store) GrantedProjects(ctx context.Context, member access.MemberID) ([]
 	return ids, nil
 }
 
+// providerOf is the provider column of g: NULL unless a provider made it.
+func providerOf(g access.Grant) *string {
+	if g.Provider == "" {
+		return nil
+	}
+	return &g.Provider
+}
+
+// ProviderGrants returns the grants the group mappings of the auth provider
+// with slug made to member, in every project, oldest first.
+func (s *Store) ProviderGrants(ctx context.Context, member access.MemberID, provider string) ([]access.Grant, error) {
+	return collectGrants(s.db(ctx).Query(ctx, `
+		SELECT `+grantColumns+` FROM grants g WHERE g.member_id = $1 AND g.source = 'sso' AND g.provider = $2
+		ORDER BY g.created_at, g.id`, member.Bytes(), provider))
+}
+
+// ProviderMadeAccess reports whether the group mappings of the auth provider
+// with slug made any grant or any instance admin.
+func (s *Store) ProviderMadeAccess(ctx context.Context, provider string) (bool, error) {
+	var made bool
+	err := s.db(ctx).QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM grants WHERE provider = $1)
+		    OR EXISTS (SELECT 1 FROM members WHERE instance_admin_provider = $1)`, provider).Scan(&made)
+	if err != nil {
+		return false, fmt.Errorf("looking for what an auth provider granted: %w", err)
+	}
+	return made, nil
+}
+
 // errAlreadyGranted refuses a grant the member holds already from the same
 // source.
 var errAlreadyGranted = apperrors.Conflict("already_granted", "the member holds this role from this source already")
@@ -99,9 +132,9 @@ func (s *Store) CreateGrant(ctx context.Context, g access.Grant) error {
 		createdBy = g.CreatedBy.Bytes()
 	}
 	_, err := s.db(ctx).Exec(ctx, `
-		INSERT INTO grants (id, project_id, member_id, role, source, created_by, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		g.ID.Bytes(), g.Project.Bytes(), g.Member.Bytes(), string(g.Role), string(g.Source), createdBy, g.CreatedAt)
+		INSERT INTO grants (id, project_id, member_id, role, source, provider, created_by, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		g.ID.Bytes(), g.Project.Bytes(), g.Member.Bytes(), string(g.Role), string(g.Source), providerOf(g), createdBy, g.CreatedAt)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return errAlreadyGranted.WithCause(err)
@@ -117,10 +150,10 @@ func (s *Store) CreateGrantUnlessHeld(ctx context.Context, g access.Grant) (bool
 		createdBy = g.CreatedBy.Bytes()
 	}
 	tag, err := s.db(ctx).Exec(ctx, `
-		INSERT INTO grants (id, project_id, member_id, role, source, created_by, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (project_id, member_id, role, source) DO NOTHING`,
-		g.ID.Bytes(), g.Project.Bytes(), g.Member.Bytes(), string(g.Role), string(g.Source), createdBy, g.CreatedAt)
+		INSERT INTO grants (id, project_id, member_id, role, source, provider, created_by, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT DO NOTHING`,
+		g.ID.Bytes(), g.Project.Bytes(), g.Member.Bytes(), string(g.Role), string(g.Source), providerOf(g), createdBy, g.CreatedAt)
 	if err != nil {
 		return false, fmt.Errorf("making a grant: %w", err)
 	}

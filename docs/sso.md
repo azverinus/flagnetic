@@ -107,11 +107,50 @@ Entra ID signs the assertion by default. Use the *App Federation Metadata Url* a
 
 Create a *SAML 2.0* app integration. Set **Single sign-on URL** to the `acs_url` and **Audience URI (SP Entity ID)** to the `entity_id`, **Name ID format** to `EmailAddress` and **Application username** to `Email`. Add attribute statements `email` (`user.email`), `name` (`user.displayName`) and, for groups, `groups` with a filter. Set `idp_metadata_url` to the *Metadata URL* of the *Sign On* tab. Okta signs the assertion; to have it encrypt, switch on **Assertion Encryption** with the certificate of the SP metadata.
 
+## Group mappings
+
+A provider's group mappings turn the directory groups of the people who sign in through it into access: a role in a project, or instance admin. The access follows the directory: it is made when a person signs in with a group, and removed when they no longer have it.
+
+**Reading the groups.** The identity provider has to send them. For an OIDC provider that is the claim `claims.groups` names (default `groups`) in the ID token, and the provider usually needs a scope or a setting to include it: Dex and Keycloak ask for the `groups` scope, Okta for a groups claim on the authorization server, Entra ID for the groups claim of the app registration. For a SAML provider it is the multi-valued attribute `claims.groups` names. A claim counts only when it is a list of strings; a list may be empty, which says the person is in no group.
+
+**Mapping groups.** `PUT /instance/auth-providers/{slug}/group-mappings` replaces the provider's whole list, and `GET` reads it. An instance admin's call, with a body of `items`, in order:
+
+```json
+{
+  "items": [
+    { "group": "engineering", "project": "checkout", "role": "developer" },
+    { "group": "platform-leads", "project": "checkout", "role": "owner" },
+    { "group": "it-admins", "instance_admin": true }
+  ]
+}
+```
+
+A mapping names a `group`, matched exactly as the identity provider spells it, and either a `project` (its key) with one of the built-in roles `owner`, `maintainer`, `developer` and `viewer`, or `instance_admin` alone. A blank group, a mapping that is both or neither, an unknown role and a project that does not exist are refused `422 invalid_group_mappings`, naming each field, and nothing changes. Several groups may map to the same role, and one group to several projects; a person holds the union of what their groups map to.
+
+**What a sign-in does.** Completing a sign-in stores the groups the person claimed, then makes the grants and the instance admin their groups map to and removes the provider's others. A person who loses a group loses what only that group gave them, at their next sign-in. A sign-in whose claim is missing or is not a list of strings changes nothing: the person keeps what the provider granted, and the server logs `the groups claim is missing or is not a list of strings` when the provider has mappings, so a misconfigured identity provider cannot strip everybody of their access.
+
+**Replacing the mappings runs them at once.** The new list is run in the same transaction for every member who has signed in through the provider, from the groups they last claimed, so a mapping you remove stops granting immediately instead of at each member's next sign-in. The answer counts what happened:
+
+```json
+{ "granted": 12, "revoked": 3, "kept_instance_admin": 0 }
+```
+
+`granted` counts the grants made and the members made instance admin, `revoked` the grants removed and the members no longer instance admin, `kept_instance_admin` the members the run could not demote because they are the last active instance admin. A deactivated member keeps none of the provider's grants and gains none.
+
+**Each source owns its own grants.** A grant a mapping made has `source` `sso` and names the provider; a grant made by hand has `source` `manual`. They sit side by side: a mapping never skips a project because the member holds a role there by hand, a hand grant may be added beside a mapped one, and two providers may each grant the same role. A provider replaces and removes only its own.
+
+- A mapped grant cannot be removed by hand: `DELETE /projects/{project}/grants/{grant}` answers `409 sso_sourced`. Change the mapping or the directory instead.
+- An instance admin a mapping made cannot be demoted by hand: `PATCH /members/{member}` with `instance_admin` false answers `409 sso_sourced`. Only the provider that made them takes it away. An instance admin made by hand is never taken away by a provider, and a provider never demotes the last active instance admin: that is logged and counted in `kept_instance_admin`, and neither fails the sign-in nor the replacement.
+- A member who loses `grant.manage` in a project through a mapping loses, as through any other change, the grant of each invitation they issued to it (`invitation.grant_revoked`).
+- A provider whose mappings made a grant or an instance admin cannot be deleted (`409 provider_in_use`, `used_by` naming `grants`): disable it instead.
+
+Replacing the mappings is audited as `group_mappings.updated` (the list before and after, and the counts) by the instance admin who did it. Every grant, revocation, promotion and demotion a mapping makes is audited as `grant.created`, `grant.deleted`, `member.promoted` or `member.demoted` with the provider as the actor (kind `sso`, named by its slug), and carries the `source` and the `provider`.
+
 ## What a sign-in does
 
 1. The browser opens `/sso/<slug>/start?return_to=<path>`. The instance creates a sign-in attempt that lives ten minutes, sets the cookie `__Host-flagnetic_sso` (plain `flagnetic_sso` only where cookies cannot be `Secure`: on `localhost`, or when `FLAGNETIC_INSECURE_COOKIES` allows it) and sends the browser to the identity provider with a state, a nonce and a PKCE S256 challenge.
 2. The identity provider sends the browser back to `/sso/<slug>/callback`. The instance exchanges the code, verifies the ID token (signature, issuer, audience, expiry, nonce), and stores the verified claims on the attempt. **Nothing about any member changes yet.** An answer is taken once: a replayed one finds the attempt used.
-3. The browser is redirected to `/sso/complete/<attempt>`. The instance checks that the browser presents the attempt's cookie, in constant time, then, in one transaction, resolves the person to a member, provisions or links as the provider allows, opens the session and redirects to `return_to`. A completion from any other browser changes nothing: no member, no identity, no session.
+3. The browser is redirected to `/sso/complete/<attempt>`. The instance checks that the browser presents the attempt's cookie, in constant time, then, in one transaction, resolves the person to a member, provisions or links as the provider allows, gives the member what their groups map to ([group mappings](#group-mappings)), opens the session and redirects to `return_to`. A completion from any other browser changes nothing: no member, no identity, no session.
 
 A SAML sign-in differs in its first two steps. The instance sends the browser to the identity provider's single sign-on endpoint with an AuthnRequest, by the HTTP-Redirect binding, whose ID the attempt remembers and whose `RelayState` is the attempt's state; the identity provider posts its response to `/sso/<slug>/acs`, where the instance verifies it as [above](#what-the-instance-checks-of-a-response) and stores the claims on the attempt. The attempt is taken once there too, so the same response posted again finds it used. Completion is the same.
 
@@ -121,7 +160,7 @@ The session records the provider it opened through; `GET /me/sessions` answers `
 
 An unknown or disabled provider answers `404` on all its addresses, and so does an address of the other kind: the ACS and the metadata of an OIDC provider, the callback of a SAML one. Disabling a provider keeps its members, identities and grants and stops its sign-ins.
 
-A provider with identities cannot be deleted (`409 provider_in_use`, `used_by: ["identities"]`); disable it instead.
+A provider with identities, or whose group mappings made a grant, cannot be deleted (`409 provider_in_use`, `used_by` naming `identities` and `grants`); disable it instead.
 
 ## Sign-in errors
 
@@ -137,6 +176,6 @@ Every failure redirects to `/sign-in?error=<code>`:
 
 ## Audit and metrics
 
-A first sign-in records `member.provisioned` or `identity.linked` (or both), and every sign-in `auth.signed_in` with its `method` (`oidc` or `saml`) and `provider`; a refused sign-in of a known member (one the subject is linked to, or one holding an email the provider vouches for) records `auth.sign_in_failed` with the `reason`: the member's status when it refuses them (`deactivated`, `invited`), or `not_linked` for an active member when the provider does not link by email.
+A first sign-in records `member.provisioned` or `identity.linked` (or both), the access the member's groups gave or took away as [group mappings](#group-mappings) record it, and every sign-in `auth.signed_in` with its `method` (`oidc` or `saml`) and `provider`; a refused sign-in of a known member (one the subject is linked to, or one holding an email the provider vouches for) records `auth.sign_in_failed` with the `reason`: the member's status when it refuses them (`deactivated`, `invited`), or `not_linked` for an active member when the provider does not link by email.
 
 `flagnetic_sso_sign_ins_total{kind,result}` counts sign-ins that ended, by `kind` (`oidc` or `saml`, `unknown` when the sign-in failed before its provider was known) and `result`: `succeeded` or the code above.

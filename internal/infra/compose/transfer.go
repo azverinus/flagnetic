@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	appexperiments "github.com/azverinus/flagnetic/internal/app/experiments"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	apptransfer "github.com/azverinus/flagnetic/internal/app/transfer"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
@@ -84,6 +85,34 @@ func (f transferFlags) WriteConfiguration(ctx context.Context, in apptransfer.Co
 	})
 	return effectOf(e), err
 }
+
+// transferExperiments gives the transfer context the import port of the
+// experiments context, which it may not import.
+type transferExperiments struct{ importer *appexperiments.Importer }
+
+var _ apptransfer.ExperimentsImport = transferExperiments{}
+
+func (e transferExperiments) command(in apptransfer.ExperimentImport) appexperiments.ImportCommand {
+	return appexperiments.ImportCommand{
+		Project: in.Project, Key: in.Key, Name: in.Name, Hypothesis: in.Hypothesis, Owner: in.Owner, Caller: in.Caller, Tags: in.Tags,
+		Flag: in.Flag, UnitType: in.UnitType, Variations: in.Variations, TrafficAllocation: in.TrafficAllocation,
+		InclusionSalt: in.InclusionSalt, VariationSalt: in.VariationSalt, Status: in.Status, ExpectedEndAt: in.ExpectedEndAt,
+		StartedAt: in.StartedAt, StoppedAt: in.StoppedAt, ArchivedAt: in.ArchivedAt, Decision: in.Decision, Avoid: in.Avoid,
+		Request: in.Request,
+	}
+}
+
+func (e transferExperiments) CreateExperiment(ctx context.Context, in apptransfer.ExperimentImport) (apptransfer.Effect, error) {
+	effect, err := e.importer.CreateExperiment(ctx, e.command(in))
+	return apptransfer.Effect{Changed: effect.Changed, Environments: effect.Environments}, err
+}
+
+func (e transferExperiments) UpdateExperiment(ctx context.Context, in apptransfer.ExperimentImport) (apptransfer.Effect, error) {
+	effect, err := e.importer.UpdateExperiment(ctx, e.command(in))
+	return apptransfer.Effect{Changed: effect.Changed, Environments: effect.Environments}, err
+}
+
+func (e transferExperiments) CheckSalts(ctx context.Context) error { return e.importer.CheckSalts(ctx) }
 
 // transferProjects gives the transfer context the project row lock of the
 // workspace context.

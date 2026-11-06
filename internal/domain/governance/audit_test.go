@@ -76,3 +76,10 @@ func TestAnEntryKeepsItsInstantToTheMicrosecondTheLogStores(t *testing.T) {
 		t.Errorf("occurred at %v, want %v", e.OccurredAt, want)
 	}
 }
+
+func TestAnAuthProviderActsAsTheSSOActorNamedBySlug(t *testing.T) {
+	a := governance.SSOActor("0192f0aa-0000-7000-8000-000000000001", "okta")
+	if a.Kind != governance.ActorSSO || a.ID != "0192f0aa-0000-7000-8000-000000000001" || a.Name != "okta" || a.MemberID != "" {
+		t.Errorf("actor = %+v", a)
+	}
+}

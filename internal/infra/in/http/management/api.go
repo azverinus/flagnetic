@@ -85,6 +85,8 @@ type Handlers struct {
 	EnableAuthProvider       *appidentity.EnableProvider
 	DisableAuthProvider      *appidentity.DisableProvider
 	TestAuthProvider         *appidentity.TestProvider
+	GetGroupMappings         *appidentity.GetGroupMappings
+	ReplaceGroupMappings     *appidentity.ReplaceGroupMappings
 
 	FindProject   *appworkspace.FindProject
 	ListProjects  *appworkspace.ListProjects
@@ -201,6 +203,11 @@ type Handlers struct {
 	EnableSink       *appsinks.Enable
 	TestSinkConfig   *appsinks.TestConfig
 	TestSink         *appsinks.Test
+
+	ResumeSink              *appsinks.ResumeSink
+	ListSinkDeadLetters     *appsinks.ListDeadLetters
+	RedeliverSinkDeadLetter *appsinks.RedeliverDeadLetter
+	DiscardSinkDeadLetter   *appsinks.DiscardDeadLetter
 
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment

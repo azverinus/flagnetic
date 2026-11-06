@@ -32,6 +32,8 @@ type Row interface {
 	// ID is the row's event ID, or a summary row's report ID, which the rows
 	// of one SDK report share: what a delivery ID is computed over.
 	ID() string
+	// Received is when the platform received the row.
+	Received() time.Time
 	// wire is the row as the schema lays it out, in the order of its columns.
 	wire() any
 }
@@ -60,6 +62,9 @@ type ExposureRow struct {
 
 // ID is the exposure's event ID.
 func (r ExposureRow) ID() string { return r.EventID }
+
+// Received is when the exposure was received.
+func (r ExposureRow) Received() time.Time { return r.ReceivedAt }
 
 type exposureWire struct {
 	SchemaVersion    int    `json:"schema_version"`
@@ -110,6 +115,9 @@ type AliasRow struct {
 
 // ID is the alias's event ID.
 func (r AliasRow) ID() string { return r.EventID }
+
+// Received is when the alias was received.
+func (r AliasRow) Received() time.Time { return r.ReceivedAt }
 
 type aliasWire struct {
 	SchemaVersion  int    `json:"schema_version"`
@@ -162,6 +170,9 @@ type SummaryRow struct {
 
 // ID is the row's report ID.
 func (r SummaryRow) ID() string { return r.ReportID }
+
+// Received is when the summary was received.
+func (r SummaryRow) Received() time.Time { return r.ReceivedAt }
 
 type summaryWire struct {
 	SchemaVersion    int    `json:"schema_version"`

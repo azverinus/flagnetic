@@ -325,6 +325,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		WebhookTick:           cfg.WebhookTick,
 		SinkTick:              cfg.SinkTick,
 		SinkLagWarning:        cfg.SinkLagWarning,
+		SinkRejectionAttempts: cfg.SinkRejectionAttempts, SinkStopAfterDeadLetters: cfg.SinkStopAfterDeadLetters,
 		WebhookSecretOverlap:  cfg.WebhookSecretOverlap,
 		AuditExportMaxEntries: cmp.Or(o.auditExportMax, cfg.AuditExportMaxEntries),
 		Schedule: compose.Schedule{

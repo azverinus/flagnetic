@@ -28,6 +28,7 @@ import (
 const (
 	ActorKindCli    ActorKind = "cli"
 	ActorKindMember ActorKind = "member"
+	ActorKindSso    ActorKind = "sso"
 	ActorKindSystem ActorKind = "system"
 	ActorKindToken  ActorKind = "token"
 )
@@ -38,6 +39,8 @@ func (e ActorKind) Valid() bool {
 	case ActorKindCli:
 		return true
 	case ActorKindMember:
+		return true
+	case ActorKindSso:
 		return true
 	case ActorKindSystem:
 		return true
@@ -381,12 +384,15 @@ func (e FlagType) Valid() bool {
 // Defines values for GrantSource.
 const (
 	GrantSourceManual GrantSource = "manual"
+	GrantSourceSso    GrantSource = "sso"
 )
 
 // Valid indicates whether the value is a known member of the GrantSource enum.
 func (e GrantSource) Valid() bool {
 	switch e {
 	case GrantSourceManual:
+		return true
+	case GrantSourceSso:
 		return true
 	default:
 		return false
@@ -720,6 +726,27 @@ func (e SessionMethod) Valid() bool {
 	case SessionMethodOidc:
 		return true
 	case SessionMethodSaml:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SinkDeadLetterStatus.
+const (
+	SinkDeadLetterStatusExpired     SinkDeadLetterStatus = "expired"
+	SinkDeadLetterStatusPending     SinkDeadLetterStatus = "pending"
+	SinkDeadLetterStatusRedelivered SinkDeadLetterStatus = "redelivered"
+)
+
+// Valid indicates whether the value is a known member of the SinkDeadLetterStatus enum.
+func (e SinkDeadLetterStatus) Valid() bool {
+	switch e {
+	case SinkDeadLetterStatusExpired:
+		return true
+	case SinkDeadLetterStatusPending:
+		return true
+	case SinkDeadLetterStatusRedelivered:
 		return true
 	default:
 		return false
@@ -2912,15 +2939,24 @@ type FlagType string
 type Grant struct {
 	CreatedAt time.Time `json:"created_at"`
 
-	// CreatedBy The member who made the grant.
+	// CreatedBy The member who made the grant; null for an `sso` grant.
 	CreatedBy *openapi_types.UUID `json:"created_by"`
 	Id        openapi_types.UUID  `json:"id"`
 	Member    openapi_types.UUID  `json:"member"`
-	Role      RoleName            `json:"role"`
-	Source    GrantSource         `json:"source"`
+
+	// Provider The slug of the auth provider whose group mapping made an `sso` grant; null otherwise.
+	Provider *string  `json:"provider"`
+	Role     RoleName `json:"role"`
+
+	// Source `manual` for a grant made by hand, `sso` for one an auth provider's
+	// group mapping made, which is removed only by the provider and refused
+	// `sso_sourced` by hand. Grants of several sources sit side by side.
+	Source GrantSource `json:"source"`
 }
 
-// GrantSource defines model for Grant.Source.
+// GrantSource `manual` for a grant made by hand, `sso` for one an auth provider's
+// group mapping made, which is removed only by the provider and refused
+// `sso_sourced` by hand. Grants of several sources sit side by side.
 type GrantSource string
 
 // GrantCreate defines model for GrantCreate.
@@ -2935,6 +2971,39 @@ type GrantCreate struct {
 // GrantList defines model for GrantList.
 type GrantList struct {
 	Items []Grant `json:"items"`
+}
+
+// GroupMapping What members of a directory group are granted: a role in a project, or
+// instance admin.
+type GroupMapping struct {
+	// Group The directory group, matched exactly as the provider claims it. Not blank.
+	Group string `json:"group"`
+
+	// InstanceAdmin Makes the members of the group instance admins. Sent alone, and only as `true`.
+	InstanceAdmin *bool `json:"instance_admin,omitempty"`
+
+	// Project The key of the project the role is granted in. Sent with `role`, never with `instance_admin`.
+	Project *string `json:"project,omitempty"`
+
+	// Role One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`.
+	Role *string `json:"role,omitempty"`
+}
+
+// GroupMappings defines model for GroupMappings.
+type GroupMappings struct {
+	Items []GroupMapping `json:"items"`
+}
+
+// GroupMappingsRun What running the mappings for every member the provider knows did.
+type GroupMappingsRun struct {
+	// Granted The grants made, and the members made instance admin.
+	Granted int `json:"granted"`
+
+	// KeptInstanceAdmin The members who stay instance admin although the mappings no longer make them one, because they are the last active instance admin.
+	KeptInstanceAdmin int `json:"kept_instance_admin"`
+
+	// Revoked The grants removed, and the members who are no longer instance admin.
+	Revoked int `json:"revoked"`
 }
 
 // HashCheck defines model for HashCheck.
@@ -4151,6 +4220,43 @@ type SinkCreate struct {
 	Webhook *SinkWebhookInput `json:"webhook,omitempty"`
 }
 
+// SinkDeadLetter A batch of one event kind the target rejected, set aside so the stream
+// could go on. Cursors are never exposed: the batch is told by how many
+// rows it held and when the first and the last of them were received.
+type SinkDeadLetter struct {
+	// Attempts How many times the target rejected the batch, redeliveries included.
+	Attempts  int       `json:"attempts"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// EventKind A kind of raw event a sink exports, each delivered through a stream of its own.
+	EventKind       SinkEventKind      `json:"event_kind"`
+	FirstReceivedAt time.Time          `json:"first_received_at"`
+	Id              openapi_types.UUID `json:"id"`
+
+	// LastFailure The last failed call of a stream.
+	LastFailure    SinkFailure `json:"last_failure"`
+	LastReceivedAt time.Time   `json:"last_received_at"`
+	RedeliveredAt  *time.Time  `json:"redelivered_at"`
+
+	// Rows How many rows the batch held when it was set aside, those of deleted environments included.
+	Rows int `json:"rows"`
+
+	// Status `pending` waits to be redelivered or discarded; `redelivered` was
+	// acknowledged by the target after a redelivery; `expired` lost every
+	// row to retention.
+	Status SinkDeadLetterStatus `json:"status"`
+}
+
+// SinkDeadLetterList defines model for SinkDeadLetterList.
+type SinkDeadLetterList struct {
+	Items []SinkDeadLetter `json:"items"`
+}
+
+// SinkDeadLetterStatus `pending` waits to be redelivered or discarded; `redelivered` was
+// acknowledged by the target after a redelivery; `expired` lost every
+// row to retention.
+type SinkDeadLetterStatus string
+
 // SinkEnable defines model for SinkEnable.
 type SinkEnable struct {
 	// StartFrom Where the streams this call creates start, a time within retention:
@@ -4866,6 +4972,9 @@ type ChangeRequestID = openapi_types.UUID
 
 // Cursor defines model for Cursor.
 type Cursor = string
+
+// DeadLetterID defines model for DeadLetterID.
+type DeadLetterID = openapi_types.UUID
 
 // DocumentFormat defines model for DocumentFormat.
 type DocumentFormat string
@@ -5819,6 +5928,9 @@ type CreateAuthProviderJSONRequestBody = AuthProviderCreate
 
 // UpdateAuthProviderJSONRequestBody defines body for UpdateAuthProvider for application/json ContentType.
 type UpdateAuthProviderJSONRequestBody = AuthProviderPatch
+
+// ReplaceAuthProviderGroupMappingsJSONRequestBody defines body for ReplaceAuthProviderGroupMappings for application/json ContentType.
+type ReplaceAuthProviderGroupMappingsJSONRequestBody = GroupMappings
 
 // UpdateAuthSettingsJSONRequestBody defines body for UpdateAuthSettings for application/json ContentType.
 type UpdateAuthSettingsJSONRequestBody = AuthSettings
@@ -7264,8 +7376,10 @@ type ClientInterface interface {
 	// DeleteAuthProvider Delete an auth provider
 	//
 	// Refused 409 `provider_in_use` while something depends on the provider;
-	// `used_by` names what. Disable it instead: that stops its sign-ins
-	// and leaves its members, identities and grants as they are. Audited
+	// `used_by` names what (`identities`, `grants` while its group mappings
+	// made a grant or an instance admin, among others). Disable it instead:
+	// that stops its sign-ins and leaves its members, identities and grants
+	// as they are. Audited
 	// `auth_provider.deleted`.
 	//
 	// Corresponds with DELETE /instance/auth-providers/{provider} (the `DeleteAuthProvider` operationId).
@@ -7319,6 +7433,58 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /instance/auth-providers/{provider}/enable (the `EnableAuthProvider` operationId).
 	EnableAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAuthProviderGroupMappings An auth provider's group mappings
+	//
+	// What the provider's directory groups grant, in order: a role in a
+	// project, or instance admin.
+	//
+	// Corresponds with GET /instance/auth-providers/{provider}/group-mappings (the `GetAuthProviderGroupMappings` operationId).
+	GetAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReplaceAuthProviderGroupMappingsWithBody Replace an auth provider's group mappings
+	//
+	// Replaces the whole list, then runs it at once for every member the
+	// provider knows, those who claimed groups at it on a sign-in: each is
+	// granted what their groups now map to and loses what the provider
+	// granted and no longer maps. A grant of a mapping is `source` `sso` and
+	// names the provider; grants of other sources, and an instance admin made
+	// by hand or by another provider, are left alone. The last active
+	// instance admin is never demoted by a mapping, and is counted in
+	// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+	// either a `project` (key) with a built-in `role`, or `instance_admin`
+	// alone; a mapping that breaks that, or names a project that does not
+	// exist, is 422 `invalid_group_mappings` naming each field and nothing
+	// changes. Audited `group_mappings.updated`, and each grant and promotion
+	// under the provider as the `sso` actor; a replacement that changes
+	// nothing is not.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+	ReplaceAuthProviderGroupMappingsWithBody(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReplaceAuthProviderGroupMappings Replace an auth provider's group mappings
+	//
+	// Replaces the whole list, then runs it at once for every member the
+	// provider knows, those who claimed groups at it on a sign-in: each is
+	// granted what their groups now map to and loses what the provider
+	// granted and no longer maps. A grant of a mapping is `source` `sso` and
+	// names the provider; grants of other sources, and an instance admin made
+	// by hand or by another provider, are left alone. The last active
+	// instance admin is never demoted by a mapping, and is counted in
+	// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+	// either a `project` (key) with a built-in `role`, or `instance_admin`
+	// alone; a mapping that breaks that, or names a project that does not
+	// exist, is 422 `invalid_group_mappings` naming each field and nothing
+	// changes. Audited `group_mappings.updated`, and each grant and promotion
+	// under the provider as the `sso` actor; a replacement that changes
+	// nothing is not.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+	ReplaceAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// TestAuthProvider Test that an auth provider can be reached
 	//
@@ -7655,7 +7821,8 @@ type ClientInterface interface {
 	// Changes the fields sent and leaves the others as they are. An email
 	// another member holds, whatever its case, is refused `already_exists`.
 	// Demoting the instance's last active instance admin is refused
-	// `last_instance_admin`.
+	// `last_instance_admin`, and demoting one an auth provider's group
+	// mapping made `sso_sourced`: only the provider takes it away.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -7667,7 +7834,8 @@ type ClientInterface interface {
 	// Changes the fields sent and leaves the others as they are. An email
 	// another member holds, whatever its case, is refused `already_exists`.
 	// Demoting the instance's last active instance admin is refused
-	// `last_instance_admin`.
+	// `last_instance_admin`, and demoting one an auth provider's group
+	// mapping made `sso_sourced`: only the provider takes it away.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -7774,8 +7942,8 @@ type ClientInterface interface {
 	// ImportNewProjectWithBody Create a project from a project document
 	//
 	// Creates a project holding exactly the document: its environments (at
-	// least one), unit types, declared attributes, segments and flags with
-	// their configuration in every environment, besides the standard
+	// least one), unit types, declared attributes, segments, flags with
+	// their configuration in every environment and experiments, besides the standard
 	// attributes every project has; no default environment or unit type is
 	// added. The document is sent as `application/json` or
 	// `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -7790,6 +7958,15 @@ type ClientInterface interface {
 	// the answer warns `owner_replaced` with the address. Protection is
 	// bypassed in every environment, which take `protected` from the
 	// document.
+	//
+	// Every experiment is created exactly as the document has it, its
+	// status, both salts, its timestamps and its decision, so that a unit
+	// keeps its assignment; a draft may leave its salts out and is given two.
+	// It is judged as a create is, and by the history its status leaves
+	// behind. A draft and a running experiment need a flag that is not
+	// archived and a declared unit type, a stopped one a declared unit type,
+	// and an archived one neither. No salt is shared by two experiments, or
+	// by an experiment and a rollout.
 	//
 	// The import applies whole or not at all. A document that breaks a rule
 	// is refused 422 `invalid_document` with every fault found in `errors`,
@@ -7810,8 +7987,8 @@ type ClientInterface interface {
 	// ImportNewProject Create a project from a project document
 	//
 	// Creates a project holding exactly the document: its environments (at
-	// least one), unit types, declared attributes, segments and flags with
-	// their configuration in every environment, besides the standard
+	// least one), unit types, declared attributes, segments, flags with
+	// their configuration in every environment and experiments, besides the standard
 	// attributes every project has; no default environment or unit type is
 	// added. The document is sent as `application/json` or
 	// `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -7826,6 +8003,15 @@ type ClientInterface interface {
 	// the answer warns `owner_replaced` with the address. Protection is
 	// bypassed in every environment, which take `protected` from the
 	// document.
+	//
+	// Every experiment is created exactly as the document has it, its
+	// status, both salts, its timestamps and its decision, so that a unit
+	// keeps its assignment; a draft may leave its salts out and is given two.
+	// It is judged as a create is, and by the history its status leaves
+	// behind. A draft and a running experiment need a flag that is not
+	// archived and a declared unit type, a stopped one a declared unit type,
+	// and an archived one neither. No salt is shared by two experiments, or
+	// by an experiment and a rollout.
 	//
 	// The import applies whole or not at all. A document that breaks a rule
 	// is refused 422 `invalid_document` with every fault found in `errors`,
@@ -9326,8 +9512,10 @@ type ClientInterface interface {
 	//
 	// Removes one grant, leaving the member's others. The grant of a role
 	// holding a permission the caller lacks in the project is refused
-	// `role_not_allowed`. Removing the last owner's grant is allowed: an
-	// instance admin holds every permission in every project.
+	// `role_not_allowed`. The grant of an auth provider's group mapping
+	// (`source` `sso`) is refused 409 `sso_sourced`: the directory owns it.
+	// Removing the last owner's grant is allowed: an instance admin holds
+	// every permission in every project.
 	//
 	// Corresponds with DELETE /projects/{project}/grants/{grant} (the `DeleteGrant` operationId).
 	DeleteGrant(ctx context.Context, project ProjectKey, grant GrantID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -9421,8 +9609,27 @@ type ClientInterface interface {
 	// Protection is bypassed in every environment, and only the owner of a
 	// project, never a project token, may import.
 	//
-	// Experiments cannot be imported yet: a document that has any is refused
-	// whole, `unsupported` at each. The import applies whole or not at all;
+	// An experiment the project lacks is created exactly as the document has
+	// it: its status, both salts, its timestamps and its decision, so that
+	// a unit keeps its assignment; a draft may leave its salts out and is
+	// given two. It is judged as a create is, and by the history its status
+	// leaves behind: a started experiment has `started_at` and an
+	// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+	// and a running experiment need a flag that is not archived and a declared
+	// unit type, a stopped one a declared unit type, and an archived one
+	// neither, so a stopped experiment outlives the flag it compared. An
+	// experiment that exists changes only as an ordinary edit of its status
+	// allows, never through its status: a field its status freezes, its
+	// status, its timestamps, its decision and its salts once it is past its
+	// draft are 409 `frozen`, naming every such field in `errors`, and a
+	// smaller traffic allocation of a running experiment is 409
+	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+	// the environments holding its rules and is recorded as
+	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// experiment is accepted. No salt is shared by two experiments, or by an
+	// experiment and a rollout.
+	//
+	// The import applies whole or not at all;
 	// a document that breaks a rule is 422 `invalid_document` with every fault
 	// found in `errors`, each pointing into the document.
 	//
@@ -9475,8 +9682,27 @@ type ClientInterface interface {
 	// Protection is bypassed in every environment, and only the owner of a
 	// project, never a project token, may import.
 	//
-	// Experiments cannot be imported yet: a document that has any is refused
-	// whole, `unsupported` at each. The import applies whole or not at all;
+	// An experiment the project lacks is created exactly as the document has
+	// it: its status, both salts, its timestamps and its decision, so that
+	// a unit keeps its assignment; a draft may leave its salts out and is
+	// given two. It is judged as a create is, and by the history its status
+	// leaves behind: a started experiment has `started_at` and an
+	// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+	// and a running experiment need a flag that is not archived and a declared
+	// unit type, a stopped one a declared unit type, and an archived one
+	// neither, so a stopped experiment outlives the flag it compared. An
+	// experiment that exists changes only as an ordinary edit of its status
+	// allows, never through its status: a field its status freezes, its
+	// status, its timestamps, its decision and its salts once it is past its
+	// draft are 409 `frozen`, naming every such field in `errors`, and a
+	// smaller traffic allocation of a running experiment is 409
+	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+	// the environments holding its rules and is recorded as
+	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// experiment is accepted. No salt is shared by two experiments, or by an
+	// experiment and a rollout.
+	//
+	// The import applies whole or not at all;
 	// a document that breaks a rule is 422 `invalid_document` with every fault
 	// found in `errors`, each pointing into the document.
 	//
@@ -9810,6 +10036,40 @@ type ClientInterface interface {
 	// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
 	UpdateSink(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, body UpdateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListSinkDeadLetters A sink's dead letters
+	//
+	// The batches the target rejected `FLAGNETIC_SINK_REJECTION_ATTEMPTS`
+	// times and the sink set aside to deliver the next, oldest first, in
+	// every status; a discarded one is gone. Not paginated.
+	//
+	// Corresponds with GET /projects/{project}/sinks/{sink}/dead-letters (the `ListSinkDeadLetters` operationId).
+	ListSinkDeadLetters(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DiscardSinkDeadLetter Discard a dead letter
+	//
+	// The dead letter goes, whatever its status, and stops counting towards
+	// the sink being `degraded`. Its rows are not delivered. Audited as
+	// `sink.dead_letter_discarded`.
+	//
+	// Corresponds with DELETE /projects/{project}/sinks/{sink}/dead-letters/{deadLetter} (the `DiscardSinkDeadLetter` operationId).
+	DiscardSinkDeadLetter(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RedeliverSinkDeadLetter Redeliver a dead letter
+	//
+	// Reads the rows of the dead letter that are still stored and sends them
+	// to the target now, inside this request, under a delivery ID of its
+	// own: the dead letter's and its attempt's, so a repeat is another
+	// delivery. The sink's streams, cursors and health are not touched. When
+	// the target acknowledges, the dead letter is `redelivered`; when it
+	// does not, this still answers 200 with the dead letter, still
+	// `pending`, its `attempts` and `last_failure` updated. It may be
+	// repeated. Refused `rows_expired` when retention dropped every row of
+	// it. Audited as `sink.dead_letter_redelivered`; the target's own words
+	// are never answered.
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver (the `RedeliverSinkDeadLetter` operationId).
+	RedeliverSinkDeadLetter(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// EnableSinkWithBody Enable a sink
 	//
 	// Calls the sink's target first and refuses with `sink_not_ready`, naming
@@ -9849,6 +10109,20 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/sinks/{sink}/enable (the `EnableSink` operationId).
 	EnableSink(ctx context.Context, project ProjectKey, sink SinkID, body EnableSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResumeSink Resume a stopped sink
+	//
+	// A sink stops itself when `FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS`
+	// batches in a row of one stream were set aside as dead letters. This
+	// starts it again where it was: every stream keeps its place and its
+	// batch in flight, the count of consecutive dead letters is cleared and
+	// each stream is due now. Dead letters stay and are not redelivered; the
+	// sink is `degraded` while any waits. Editing a sink never resumes it. A
+	// sink that is not stopped is answered as it is, with nothing changed or
+	// recorded. Audited as `sink.resumed`. It takes no `If-Match`.
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/resume (the `ResumeSink` operationId).
+	ResumeSink(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RotateSinkSecret Rotate a webhook sink's secret
 	//
@@ -10687,8 +10961,10 @@ func (c *Client) CreateAuthProvider(ctx context.Context, body CreateAuthProvider
 // DeleteAuthProvider Delete an auth provider
 //
 // Refused 409 `provider_in_use` while something depends on the provider;
-// `used_by` names what. Disable it instead: that stops its sign-ins
-// and leaves its members, identities and grants as they are. Audited
+// `used_by` names what (`identities`, `grants` while its group mappings
+// made a grant or an instance admin, among others). Disable it instead:
+// that stops its sign-ins and leaves its members, identities and grants
+// as they are. Audited
 // `auth_provider.deleted`.
 //
 // Corresponds with DELETE /instance/auth-providers/{provider} (the `DeleteAuthProvider` operationId).
@@ -10793,6 +11069,88 @@ func (c *Client) DisableAuthProvider(ctx context.Context, provider AuthProviderS
 // Corresponds with POST /instance/auth-providers/{provider}/enable (the `EnableAuthProvider` operationId).
 func (c *Client) EnableAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewEnableAuthProviderRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAuthProviderGroupMappings An auth provider's group mappings
+//
+// What the provider's directory groups grant, in order: a role in a
+// project, or instance admin.
+//
+// Corresponds with GET /instance/auth-providers/{provider}/group-mappings (the `GetAuthProviderGroupMappings` operationId).
+func (c *Client) GetAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuthProviderGroupMappingsRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReplaceAuthProviderGroupMappingsWithBody Replace an auth provider's group mappings
+//
+// Replaces the whole list, then runs it at once for every member the
+// provider knows, those who claimed groups at it on a sign-in: each is
+// granted what their groups now map to and loses what the provider
+// granted and no longer maps. A grant of a mapping is `source` `sso` and
+// names the provider; grants of other sources, and an instance admin made
+// by hand or by another provider, are left alone. The last active
+// instance admin is never demoted by a mapping, and is counted in
+// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+// either a `project` (key) with a built-in `role`, or `instance_admin`
+// alone; a mapping that breaks that, or names a project that does not
+// exist, is 422 `invalid_group_mappings` naming each field and nothing
+// changes. Audited `group_mappings.updated`, and each grant and promotion
+// under the provider as the `sso` actor; a replacement that changes
+// nothing is not.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+func (c *Client) ReplaceAuthProviderGroupMappingsWithBody(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaceAuthProviderGroupMappingsRequestWithBody(c.Server, provider, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReplaceAuthProviderGroupMappings Replace an auth provider's group mappings
+//
+// Replaces the whole list, then runs it at once for every member the
+// provider knows, those who claimed groups at it on a sign-in: each is
+// granted what their groups now map to and loses what the provider
+// granted and no longer maps. A grant of a mapping is `source` `sso` and
+// names the provider; grants of other sources, and an instance admin made
+// by hand or by another provider, are left alone. The last active
+// instance admin is never demoted by a mapping, and is counted in
+// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+// either a `project` (key) with a built-in `role`, or `instance_admin`
+// alone; a mapping that breaks that, or names a project that does not
+// exist, is 422 `invalid_group_mappings` naming each field and nothing
+// changes. Audited `group_mappings.updated`, and each grant and promotion
+// under the provider as the `sso` actor; a replacement that changes
+// nothing is not.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+func (c *Client) ReplaceAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaceAuthProviderGroupMappingsRequest(c.Server, provider, body)
 	if err != nil {
 		return nil, err
 	}
@@ -11388,7 +11746,8 @@ func (c *Client) GetMember(ctx context.Context, member MemberID, reqEditors ...R
 // Changes the fields sent and leaves the others as they are. An email
 // another member holds, whatever its case, is refused `already_exists`.
 // Demoting the instance's last active instance admin is refused
-// `last_instance_admin`.
+// `last_instance_admin`, and demoting one an auth provider's group
+// mapping made `sso_sourced`: only the provider takes it away.
 //
 // Takes any type of body and a specified content type.
 //
@@ -11410,7 +11769,8 @@ func (c *Client) UpdateMemberWithBody(ctx context.Context, member MemberID, cont
 // Changes the fields sent and leaves the others as they are. An email
 // another member holds, whatever its case, is refused `already_exists`.
 // Demoting the instance's last active instance admin is refused
-// `last_instance_admin`.
+// `last_instance_admin`, and demoting one an auth provider's group
+// mapping made `sso_sourced`: only the provider takes it away.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -11627,8 +11987,8 @@ func (c *Client) CreateProject(ctx context.Context, body CreateProjectJSONReques
 // ImportNewProjectWithBody Create a project from a project document
 //
 // Creates a project holding exactly the document: its environments (at
-// least one), unit types, declared attributes, segments and flags with
-// their configuration in every environment, besides the standard
+// least one), unit types, declared attributes, segments, flags with
+// their configuration in every environment and experiments, besides the standard
 // attributes every project has; no default environment or unit type is
 // added. The document is sent as `application/json` or
 // `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -11643,6 +12003,15 @@ func (c *Client) CreateProject(ctx context.Context, body CreateProjectJSONReques
 // the answer warns `owner_replaced` with the address. Protection is
 // bypassed in every environment, which take `protected` from the
 // document.
+//
+// Every experiment is created exactly as the document has it, its
+// status, both salts, its timestamps and its decision, so that a unit
+// keeps its assignment; a draft may leave its salts out and is given two.
+// It is judged as a create is, and by the history its status leaves
+// behind. A draft and a running experiment need a flag that is not
+// archived and a declared unit type, a stopped one a declared unit type,
+// and an archived one neither. No salt is shared by two experiments, or
+// by an experiment and a rollout.
 //
 // The import applies whole or not at all. A document that breaks a rule
 // is refused 422 `invalid_document` with every fault found in `errors`,
@@ -11673,8 +12042,8 @@ func (c *Client) ImportNewProjectWithBody(ctx context.Context, params *ImportNew
 // ImportNewProject Create a project from a project document
 //
 // Creates a project holding exactly the document: its environments (at
-// least one), unit types, declared attributes, segments and flags with
-// their configuration in every environment, besides the standard
+// least one), unit types, declared attributes, segments, flags with
+// their configuration in every environment and experiments, besides the standard
 // attributes every project has; no default environment or unit type is
 // added. The document is sent as `application/json` or
 // `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -11689,6 +12058,15 @@ func (c *Client) ImportNewProjectWithBody(ctx context.Context, params *ImportNew
 // the answer warns `owner_replaced` with the address. Protection is
 // bypassed in every environment, which take `protected` from the
 // document.
+//
+// Every experiment is created exactly as the document has it, its
+// status, both salts, its timestamps and its decision, so that a unit
+// keeps its assignment; a draft may leave its salts out and is given two.
+// It is judged as a create is, and by the history its status leaves
+// behind. A draft and a running experiment need a flag that is not
+// archived and a declared unit type, a stopped one a declared unit type,
+// and an archived one neither. No salt is shared by two experiments, or
+// by an experiment and a rollout.
 //
 // The import applies whole or not at all. A document that breaks a rule
 // is refused 422 `invalid_document` with every fault found in `errors`,
@@ -14239,8 +14617,10 @@ func (c *Client) CreateGrant(ctx context.Context, project ProjectKey, body Creat
 //
 // Removes one grant, leaving the member's others. The grant of a role
 // holding a permission the caller lacks in the project is refused
-// `role_not_allowed`. Removing the last owner's grant is allowed: an
-// instance admin holds every permission in every project.
+// `role_not_allowed`. The grant of an auth provider's group mapping
+// (`source` `sso`) is refused 409 `sso_sourced`: the directory owns it.
+// Removing the last owner's grant is allowed: an instance admin holds
+// every permission in every project.
 //
 // Corresponds with DELETE /projects/{project}/grants/{grant} (the `DeleteGrant` operationId).
 func (c *Client) DeleteGrant(ctx context.Context, project ProjectKey, grant GrantID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -14364,8 +14744,27 @@ func (c *Client) CheckHashUniformity(ctx context.Context, project ProjectKey, bo
 // Protection is bypassed in every environment, and only the owner of a
 // project, never a project token, may import.
 //
-// Experiments cannot be imported yet: a document that has any is refused
-// whole, `unsupported` at each. The import applies whole or not at all;
+// An experiment the project lacks is created exactly as the document has
+// it: its status, both salts, its timestamps and its decision, so that
+// a unit keeps its assignment; a draft may leave its salts out and is
+// given two. It is judged as a create is, and by the history its status
+// leaves behind: a started experiment has `started_at` and an
+// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+// and a running experiment need a flag that is not archived and a declared
+// unit type, a stopped one a declared unit type, and an archived one
+// neither, so a stopped experiment outlives the flag it compared. An
+// experiment that exists changes only as an ordinary edit of its status
+// allows, never through its status: a field its status freezes, its
+// status, its timestamps, its decision and its salts once it is past its
+// draft are 409 `frozen`, naming every such field in `errors`, and a
+// smaller traffic allocation of a running experiment is 409
+// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+// the environments holding its rules and is recorded as
+// `experiment.traffic_allocation_changed`. A rule serving an archived
+// experiment is accepted. No salt is shared by two experiments, or by an
+// experiment and a rollout.
+//
+// The import applies whole or not at all;
 // a document that breaks a rule is 422 `invalid_document` with every fault
 // found in `errors`, each pointing into the document.
 //
@@ -14428,8 +14827,27 @@ func (c *Client) ImportProjectWithBody(ctx context.Context, project ProjectKey, 
 // Protection is bypassed in every environment, and only the owner of a
 // project, never a project token, may import.
 //
-// Experiments cannot be imported yet: a document that has any is refused
-// whole, `unsupported` at each. The import applies whole or not at all;
+// An experiment the project lacks is created exactly as the document has
+// it: its status, both salts, its timestamps and its decision, so that
+// a unit keeps its assignment; a draft may leave its salts out and is
+// given two. It is judged as a create is, and by the history its status
+// leaves behind: a started experiment has `started_at` and an
+// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+// and a running experiment need a flag that is not archived and a declared
+// unit type, a stopped one a declared unit type, and an archived one
+// neither, so a stopped experiment outlives the flag it compared. An
+// experiment that exists changes only as an ordinary edit of its status
+// allows, never through its status: a field its status freezes, its
+// status, its timestamps, its decision and its salts once it is past its
+// draft are 409 `frozen`, naming every such field in `errors`, and a
+// smaller traffic allocation of a running experiment is 409
+// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+// the environments holding its rules and is recorded as
+// `experiment.traffic_allocation_changed`. A rule serving an archived
+// experiment is accepted. No salt is shared by two experiments, or by an
+// experiment and a rollout.
+//
+// The import applies whole or not at all;
 // a document that breaks a rule is 422 `invalid_document` with every fault
 // found in `errors`, each pointing into the document.
 //
@@ -14983,6 +15401,70 @@ func (c *Client) UpdateSink(ctx context.Context, project ProjectKey, sink SinkID
 	return c.Client.Do(req)
 }
 
+// ListSinkDeadLetters A sink's dead letters
+//
+// The batches the target rejected `FLAGNETIC_SINK_REJECTION_ATTEMPTS`
+// times and the sink set aside to deliver the next, oldest first, in
+// every status; a discarded one is gone. Not paginated.
+//
+// Corresponds with GET /projects/{project}/sinks/{sink}/dead-letters (the `ListSinkDeadLetters` operationId).
+func (c *Client) ListSinkDeadLetters(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSinkDeadLettersRequest(c.Server, project, sink)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DiscardSinkDeadLetter Discard a dead letter
+//
+// The dead letter goes, whatever its status, and stops counting towards
+// the sink being `degraded`. Its rows are not delivered. Audited as
+// `sink.dead_letter_discarded`.
+//
+// Corresponds with DELETE /projects/{project}/sinks/{sink}/dead-letters/{deadLetter} (the `DiscardSinkDeadLetter` operationId).
+func (c *Client) DiscardSinkDeadLetter(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDiscardSinkDeadLetterRequest(c.Server, project, sink, deadLetter)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RedeliverSinkDeadLetter Redeliver a dead letter
+//
+// Reads the rows of the dead letter that are still stored and sends them
+// to the target now, inside this request, under a delivery ID of its
+// own: the dead letter's and its attempt's, so a repeat is another
+// delivery. The sink's streams, cursors and health are not touched. When
+// the target acknowledges, the dead letter is `redelivered`; when it
+// does not, this still answers 200 with the dead letter, still
+// `pending`, its `attempts` and `last_failure` updated. It may be
+// repeated. Refused `rows_expired` when retention dropped every row of
+// it. Audited as `sink.dead_letter_redelivered`; the target's own words
+// are never answered.
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver (the `RedeliverSinkDeadLetter` operationId).
+func (c *Client) RedeliverSinkDeadLetter(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRedeliverSinkDeadLetterRequest(c.Server, project, sink, deadLetter)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // EnableSinkWithBody Enable a sink
 //
 // Calls the sink's target first and refuses with `sink_not_ready`, naming
@@ -15033,6 +15515,30 @@ func (c *Client) EnableSinkWithBody(ctx context.Context, project ProjectKey, sin
 // Corresponds with POST /projects/{project}/sinks/{sink}/enable (the `EnableSink` operationId).
 func (c *Client) EnableSink(ctx context.Context, project ProjectKey, sink SinkID, body EnableSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewEnableSinkRequest(c.Server, project, sink, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ResumeSink Resume a stopped sink
+//
+// A sink stops itself when `FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS`
+// batches in a row of one stream were set aside as dead letters. This
+// starts it again where it was: every stream keeps its place and its
+// batch in flight, the count of consecutive dead letters is cleared and
+// each stream is due now. Dead letters stay and are not redelivered; the
+// sink is `degraded` while any waits. Editing a sink never resumes it. A
+// sink that is not stopped is answered as it is, with nothing changed or
+// recorded. Audited as `sink.resumed`. It takes no `If-Match`.
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/resume (the `ResumeSink` operationId).
+func (c *Client) ResumeSink(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResumeSinkRequest(c.Server, project, sink)
 	if err != nil {
 		return nil, err
 	}
@@ -16859,6 +17365,87 @@ func NewEnableAuthProviderRequest(server string, provider AuthProviderSlug) (*ht
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewGetAuthProviderGroupMappingsRequest constructs an http.Request for the GetAuthProviderGroupMappings method
+func NewGetAuthProviderGroupMappingsRequest(server string, provider AuthProviderSlug) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s/group-mappings", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewReplaceAuthProviderGroupMappingsRequest calls the generic ReplaceAuthProviderGroupMappings builder with application/json body
+func NewReplaceAuthProviderGroupMappingsRequest(server string, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewReplaceAuthProviderGroupMappingsRequestWithBody(server, provider, "application/json", bodyReader)
+}
+
+// NewReplaceAuthProviderGroupMappingsRequestWithBody constructs an http.Request for the ReplaceAuthProviderGroupMappings method, with any body, and a specified content type
+func NewReplaceAuthProviderGroupMappingsRequestWithBody(server string, provider AuthProviderSlug, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s/group-mappings", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -23776,6 +24363,143 @@ func NewUpdateSinkRequestWithBody(server string, project ProjectKey, sink SinkID
 	return req, nil
 }
 
+// NewListSinkDeadLettersRequest constructs an http.Request for the ListSinkDeadLetters method
+func NewListSinkDeadLettersRequest(server string, project ProjectKey, sink SinkID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s/dead-letters", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDiscardSinkDeadLetterRequest constructs an http.Request for the DiscardSinkDeadLetter method
+func NewDiscardSinkDeadLetterRequest(server string, project ProjectKey, sink SinkID, deadLetter DeadLetterID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "deadLetter", deadLetter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s/dead-letters/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRedeliverSinkDeadLetterRequest constructs an http.Request for the RedeliverSinkDeadLetter method
+func NewRedeliverSinkDeadLetterRequest(server string, project ProjectKey, sink SinkID, deadLetter DeadLetterID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "deadLetter", deadLetter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s/dead-letters/%s/redeliver", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewEnableSinkRequest calls the generic EnableSink builder with application/json body
 func NewEnableSinkRequest(server string, project ProjectKey, sink SinkID, body EnableSinkJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -23826,6 +24550,47 @@ func NewEnableSinkRequestWithBody(server string, project ProjectKey, sink SinkID
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewResumeSinkRequest constructs an http.Request for the ResumeSink method
+func NewResumeSinkRequest(server string, project ProjectKey, sink SinkID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s/resume", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -25847,8 +26612,10 @@ type ClientWithResponsesInterface interface {
 	// DeleteAuthProviderWithResponse Delete an auth provider
 	//
 	// Refused 409 `provider_in_use` while something depends on the provider;
-	// `used_by` names what. Disable it instead: that stops its sign-ins
-	// and leaves its members, identities and grants as they are. Audited
+	// `used_by` names what (`identities`, `grants` while its group mappings
+	// made a grant or an instance admin, among others). Disable it instead:
+	// that stops its sign-ins and leaves its members, identities and grants
+	// as they are. Audited
 	// `auth_provider.deleted`.
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -25910,6 +26677,60 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /instance/auth-providers/{provider}/enable (the `EnableAuthProvider` operationId).
 	EnableAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*EnableAuthProviderResponse, error)
+
+	// GetAuthProviderGroupMappingsWithResponse An auth provider's group mappings
+	//
+	// What the provider's directory groups grant, in order: a role in a
+	// project, or instance admin.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /instance/auth-providers/{provider}/group-mappings (the `GetAuthProviderGroupMappings` operationId).
+	GetAuthProviderGroupMappingsWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*GetAuthProviderGroupMappingsResponse, error)
+
+	// ReplaceAuthProviderGroupMappingsWithBodyWithResponse Replace an auth provider's group mappings
+	//
+	// Replaces the whole list, then runs it at once for every member the
+	// provider knows, those who claimed groups at it on a sign-in: each is
+	// granted what their groups now map to and loses what the provider
+	// granted and no longer maps. A grant of a mapping is `source` `sso` and
+	// names the provider; grants of other sources, and an instance admin made
+	// by hand or by another provider, are left alone. The last active
+	// instance admin is never demoted by a mapping, and is counted in
+	// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+	// either a `project` (key) with a built-in `role`, or `instance_admin`
+	// alone; a mapping that breaks that, or names a project that does not
+	// exist, is 422 `invalid_group_mappings` naming each field and nothing
+	// changes. Audited `group_mappings.updated`, and each grant and promotion
+	// under the provider as the `sso` actor; a replacement that changes
+	// nothing is not.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+	ReplaceAuthProviderGroupMappingsWithBodyWithResponse(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error)
+
+	// ReplaceAuthProviderGroupMappingsWithResponse Replace an auth provider's group mappings
+	//
+	// Replaces the whole list, then runs it at once for every member the
+	// provider knows, those who claimed groups at it on a sign-in: each is
+	// granted what their groups now map to and loses what the provider
+	// granted and no longer maps. A grant of a mapping is `source` `sso` and
+	// names the provider; grants of other sources, and an instance admin made
+	// by hand or by another provider, are left alone. The last active
+	// instance admin is never demoted by a mapping, and is counted in
+	// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+	// either a `project` (key) with a built-in `role`, or `instance_admin`
+	// alone; a mapping that breaks that, or names a project that does not
+	// exist, is 422 `invalid_group_mappings` naming each field and nothing
+	// changes. Audited `group_mappings.updated`, and each grant and promotion
+	// under the provider as the `sso` actor; a replacement that changes
+	// nothing is not.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+	ReplaceAuthProviderGroupMappingsWithResponse(ctx context.Context, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error)
 
 	// TestAuthProviderWithResponse Test that an auth provider can be reached
 	//
@@ -26272,7 +27093,8 @@ type ClientWithResponsesInterface interface {
 	// Changes the fields sent and leaves the others as they are. An email
 	// another member holds, whatever its case, is refused `already_exists`.
 	// Demoting the instance's last active instance admin is refused
-	// `last_instance_admin`.
+	// `last_instance_admin`, and demoting one an auth provider's group
+	// mapping made `sso_sourced`: only the provider takes it away.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -26284,7 +27106,8 @@ type ClientWithResponsesInterface interface {
 	// Changes the fields sent and leaves the others as they are. An email
 	// another member holds, whatever its case, is refused `already_exists`.
 	// Demoting the instance's last active instance admin is refused
-	// `last_instance_admin`.
+	// `last_instance_admin`, and demoting one an auth provider's group
+	// mapping made `sso_sourced`: only the provider takes it away.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -26407,8 +27230,8 @@ type ClientWithResponsesInterface interface {
 	// ImportNewProjectWithBodyWithResponse Create a project from a project document
 	//
 	// Creates a project holding exactly the document: its environments (at
-	// least one), unit types, declared attributes, segments and flags with
-	// their configuration in every environment, besides the standard
+	// least one), unit types, declared attributes, segments, flags with
+	// their configuration in every environment and experiments, besides the standard
 	// attributes every project has; no default environment or unit type is
 	// added. The document is sent as `application/json` or
 	// `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -26423,6 +27246,15 @@ type ClientWithResponsesInterface interface {
 	// the answer warns `owner_replaced` with the address. Protection is
 	// bypassed in every environment, which take `protected` from the
 	// document.
+	//
+	// Every experiment is created exactly as the document has it, its
+	// status, both salts, its timestamps and its decision, so that a unit
+	// keeps its assignment; a draft may leave its salts out and is given two.
+	// It is judged as a create is, and by the history its status leaves
+	// behind. A draft and a running experiment need a flag that is not
+	// archived and a declared unit type, a stopped one a declared unit type,
+	// and an archived one neither. No salt is shared by two experiments, or
+	// by an experiment and a rollout.
 	//
 	// The import applies whole or not at all. A document that breaks a rule
 	// is refused 422 `invalid_document` with every fault found in `errors`,
@@ -26443,8 +27275,8 @@ type ClientWithResponsesInterface interface {
 	// ImportNewProjectWithResponse Create a project from a project document
 	//
 	// Creates a project holding exactly the document: its environments (at
-	// least one), unit types, declared attributes, segments and flags with
-	// their configuration in every environment, besides the standard
+	// least one), unit types, declared attributes, segments, flags with
+	// their configuration in every environment and experiments, besides the standard
 	// attributes every project has; no default environment or unit type is
 	// added. The document is sent as `application/json` or
 	// `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -26459,6 +27291,15 @@ type ClientWithResponsesInterface interface {
 	// the answer warns `owner_replaced` with the address. Protection is
 	// bypassed in every environment, which take `protected` from the
 	// document.
+	//
+	// Every experiment is created exactly as the document has it, its
+	// status, both salts, its timestamps and its decision, so that a unit
+	// keeps its assignment; a draft may leave its salts out and is given two.
+	// It is judged as a create is, and by the history its status leaves
+	// behind. A draft and a running experiment need a flag that is not
+	// archived and a declared unit type, a stopped one a declared unit type,
+	// and an archived one neither. No salt is shared by two experiments, or
+	// by an experiment and a rollout.
 	//
 	// The import applies whole or not at all. A document that breaks a rule
 	// is refused 422 `invalid_document` with every fault found in `errors`,
@@ -28061,8 +28902,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Removes one grant, leaving the member's others. The grant of a role
 	// holding a permission the caller lacks in the project is refused
-	// `role_not_allowed`. Removing the last owner's grant is allowed: an
-	// instance admin holds every permission in every project.
+	// `role_not_allowed`. The grant of an auth provider's group mapping
+	// (`source` `sso`) is refused 409 `sso_sourced`: the directory owns it.
+	// Removing the last owner's grant is allowed: an instance admin holds
+	// every permission in every project.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -28158,8 +29001,27 @@ type ClientWithResponsesInterface interface {
 	// Protection is bypassed in every environment, and only the owner of a
 	// project, never a project token, may import.
 	//
-	// Experiments cannot be imported yet: a document that has any is refused
-	// whole, `unsupported` at each. The import applies whole or not at all;
+	// An experiment the project lacks is created exactly as the document has
+	// it: its status, both salts, its timestamps and its decision, so that
+	// a unit keeps its assignment; a draft may leave its salts out and is
+	// given two. It is judged as a create is, and by the history its status
+	// leaves behind: a started experiment has `started_at` and an
+	// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+	// and a running experiment need a flag that is not archived and a declared
+	// unit type, a stopped one a declared unit type, and an archived one
+	// neither, so a stopped experiment outlives the flag it compared. An
+	// experiment that exists changes only as an ordinary edit of its status
+	// allows, never through its status: a field its status freezes, its
+	// status, its timestamps, its decision and its salts once it is past its
+	// draft are 409 `frozen`, naming every such field in `errors`, and a
+	// smaller traffic allocation of a running experiment is 409
+	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+	// the environments holding its rules and is recorded as
+	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// experiment is accepted. No salt is shared by two experiments, or by an
+	// experiment and a rollout.
+	//
+	// The import applies whole or not at all;
 	// a document that breaks a rule is 422 `invalid_document` with every fault
 	// found in `errors`, each pointing into the document.
 	//
@@ -28212,8 +29074,27 @@ type ClientWithResponsesInterface interface {
 	// Protection is bypassed in every environment, and only the owner of a
 	// project, never a project token, may import.
 	//
-	// Experiments cannot be imported yet: a document that has any is refused
-	// whole, `unsupported` at each. The import applies whole or not at all;
+	// An experiment the project lacks is created exactly as the document has
+	// it: its status, both salts, its timestamps and its decision, so that
+	// a unit keeps its assignment; a draft may leave its salts out and is
+	// given two. It is judged as a create is, and by the history its status
+	// leaves behind: a started experiment has `started_at` and an
+	// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+	// and a running experiment need a flag that is not archived and a declared
+	// unit type, a stopped one a declared unit type, and an archived one
+	// neither, so a stopped experiment outlives the flag it compared. An
+	// experiment that exists changes only as an ordinary edit of its status
+	// allows, never through its status: a field its status freezes, its
+	// status, its timestamps, its decision and its salts once it is past its
+	// draft are 409 `frozen`, naming every such field in `errors`, and a
+	// smaller traffic allocation of a running experiment is 409
+	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+	// the environments holding its rules and is recorded as
+	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// experiment is accepted. No salt is shared by two experiments, or by an
+	// experiment and a rollout.
+	//
+	// The import applies whole or not at all;
 	// a document that breaks a rule is 422 `invalid_document` with every fault
 	// found in `errors`, each pointing into the document.
 	//
@@ -28565,6 +29446,46 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /projects/{project}/sinks/{sink} (the `UpdateSink` operationId).
 	UpdateSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, params *UpdateSinkParams, body UpdateSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSinkResponse, error)
 
+	// ListSinkDeadLettersWithResponse A sink's dead letters
+	//
+	// The batches the target rejected `FLAGNETIC_SINK_REJECTION_ATTEMPTS`
+	// times and the sink set aside to deliver the next, oldest first, in
+	// every status; a discarded one is gone. Not paginated.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/sinks/{sink}/dead-letters (the `ListSinkDeadLetters` operationId).
+	ListSinkDeadLettersWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*ListSinkDeadLettersResponse, error)
+
+	// DiscardSinkDeadLetterWithResponse Discard a dead letter
+	//
+	// The dead letter goes, whatever its status, and stops counting towards
+	// the sink being `degraded`. Its rows are not delivered. Audited as
+	// `sink.dead_letter_discarded`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /projects/{project}/sinks/{sink}/dead-letters/{deadLetter} (the `DiscardSinkDeadLetter` operationId).
+	DiscardSinkDeadLetterWithResponse(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*DiscardSinkDeadLetterResponse, error)
+
+	// RedeliverSinkDeadLetterWithResponse Redeliver a dead letter
+	//
+	// Reads the rows of the dead letter that are still stored and sends them
+	// to the target now, inside this request, under a delivery ID of its
+	// own: the dead letter's and its attempt's, so a repeat is another
+	// delivery. The sink's streams, cursors and health are not touched. When
+	// the target acknowledges, the dead letter is `redelivered`; when it
+	// does not, this still answers 200 with the dead letter, still
+	// `pending`, its `attempts` and `last_failure` updated. It may be
+	// repeated. Refused `rows_expired` when retention dropped every row of
+	// it. Audited as `sink.dead_letter_redelivered`; the target's own words
+	// are never answered.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver (the `RedeliverSinkDeadLetter` operationId).
+	RedeliverSinkDeadLetterWithResponse(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*RedeliverSinkDeadLetterResponse, error)
+
 	// EnableSinkWithBodyWithResponse Enable a sink
 	//
 	// Calls the sink's target first and refuses with `sink_not_ready`, naming
@@ -28604,6 +29525,22 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/sinks/{sink}/enable (the `EnableSink` operationId).
 	EnableSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, body EnableSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*EnableSinkResponse, error)
+
+	// ResumeSinkWithResponse Resume a stopped sink
+	//
+	// A sink stops itself when `FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS`
+	// batches in a row of one stream were set aside as dead letters. This
+	// starts it again where it was: every stream keeps its place and its
+	// batch in flight, the count of consecutive dead letters is cleared and
+	// each stream is due now. Dead letters stay and are not redelivered; the
+	// sink is `degraded` while any waits. Editing a sink never resumes it. A
+	// sink that is not stopped is answered as it is, with nothing changed or
+	// recorded. Audited as `sink.resumed`. It takes no `If-Match`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/resume (the `ResumeSink` operationId).
+	ResumeSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*ResumeSinkResponse, error)
 
 	// RotateSinkSecretWithResponse Rotate a webhook sink's secret
 	//
@@ -30316,6 +31253,158 @@ func (r EnableAuthProviderResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r EnableAuthProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetAuthProviderGroupMappingsResponse401Headers the declared response headers of an HTTP 401 response for GetAuthProviderGroupMappings
+type GetAuthProviderGroupMappingsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetAuthProviderGroupMappingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *GroupMappings
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetAuthProviderGroupMappingsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAuthProviderGroupMappingsResponse) GetJSON200() *GroupMappings {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetAuthProviderGroupMappingsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetAuthProviderGroupMappingsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetAuthProviderGroupMappingsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAuthProviderGroupMappingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuthProviderGroupMappingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuthProviderGroupMappingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAuthProviderGroupMappingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ReplaceAuthProviderGroupMappingsResponse401Headers the declared response headers of an HTTP 401 response for ReplaceAuthProviderGroupMappings
+type ReplaceAuthProviderGroupMappingsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ReplaceAuthProviderGroupMappingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *GroupMappingsRun
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ReplaceAuthProviderGroupMappingsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ReplaceAuthProviderGroupMappingsResponse) GetJSON200() *GroupMappingsRun {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ReplaceAuthProviderGroupMappingsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ReplaceAuthProviderGroupMappingsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ReplaceAuthProviderGroupMappingsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ReplaceAuthProviderGroupMappingsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ReplaceAuthProviderGroupMappingsResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r ReplaceAuthProviderGroupMappingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ReplaceAuthProviderGroupMappingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReplaceAuthProviderGroupMappingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReplaceAuthProviderGroupMappingsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -39212,6 +40301,8 @@ type DeleteGrantResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *Invalid
 	// Headers401 the parsed response headers for an HTTP 401 response
@@ -39231,6 +40322,11 @@ func (r DeleteGrantResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r DeleteGrantResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r DeleteGrantResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
@@ -40685,6 +41781,213 @@ func (r UpdateSinkResponse) ContentType() string {
 	return ""
 }
 
+// ListSinkDeadLettersResponse401Headers the declared response headers of an HTTP 401 response for ListSinkDeadLetters
+type ListSinkDeadLettersResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListSinkDeadLettersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SinkDeadLetterList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListSinkDeadLettersResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSinkDeadLettersResponse) GetJSON200() *SinkDeadLetterList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListSinkDeadLettersResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListSinkDeadLettersResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListSinkDeadLettersResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSinkDeadLettersResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSinkDeadLettersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSinkDeadLettersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSinkDeadLettersResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DiscardSinkDeadLetterResponse401Headers the declared response headers of an HTTP 401 response for DiscardSinkDeadLetter
+type DiscardSinkDeadLetterResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DiscardSinkDeadLetterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DiscardSinkDeadLetterResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DiscardSinkDeadLetterResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DiscardSinkDeadLetterResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DiscardSinkDeadLetterResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r DiscardSinkDeadLetterResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DiscardSinkDeadLetterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DiscardSinkDeadLetterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DiscardSinkDeadLetterResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RedeliverSinkDeadLetterResponse401Headers the declared response headers of an HTTP 401 response for RedeliverSinkDeadLetter
+type RedeliverSinkDeadLetterResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RedeliverSinkDeadLetterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SinkDeadLetter
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RedeliverSinkDeadLetterResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RedeliverSinkDeadLetterResponse) GetJSON200() *SinkDeadLetter {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RedeliverSinkDeadLetterResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RedeliverSinkDeadLetterResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RedeliverSinkDeadLetterResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r RedeliverSinkDeadLetterResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r RedeliverSinkDeadLetterResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RedeliverSinkDeadLetterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RedeliverSinkDeadLetterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RedeliverSinkDeadLetterResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // EnableSinkResponse200Headers the declared response headers of an HTTP 200 response for EnableSink
 type EnableSinkResponse200Headers struct {
 	ETag *string
@@ -40769,6 +42072,82 @@ func (r EnableSinkResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r EnableSinkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ResumeSinkResponse200Headers the declared response headers of an HTTP 200 response for ResumeSink
+type ResumeSinkResponse200Headers struct {
+	ETag *string
+}
+
+// ResumeSinkResponse401Headers the declared response headers of an HTTP 401 response for ResumeSink
+type ResumeSinkResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ResumeSinkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Sink
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ResumeSinkResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ResumeSinkResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ResumeSinkResponse) GetJSON200() *Sink {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ResumeSinkResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ResumeSinkResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ResumeSinkResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ResumeSinkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ResumeSinkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ResumeSinkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ResumeSinkResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -43908,8 +45287,10 @@ func (c *ClientWithResponses) CreateAuthProviderWithResponse(ctx context.Context
 // DeleteAuthProviderWithResponse Delete an auth provider
 //
 // Refused 409 `provider_in_use` while something depends on the provider;
-// `used_by` names what. Disable it instead: that stops its sign-ins
-// and leaves its members, identities and grants as they are. Audited
+// `used_by` names what (`identities`, `grants` while its group mappings
+// made a grant or an instance admin, among others). Disable it instead:
+// that stops its sign-ins and leaves its members, identities and grants
+// as they are. Audited
 // `auth_provider.deleted`.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -44006,6 +45387,78 @@ func (c *ClientWithResponses) EnableAuthProviderWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseEnableAuthProviderResponse(rsp)
+}
+
+// GetAuthProviderGroupMappingsWithResponse An auth provider's group mappings
+//
+// What the provider's directory groups grant, in order: a role in a
+// project, or instance admin.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/auth-providers/{provider}/group-mappings (the `GetAuthProviderGroupMappings` operationId).
+func (c *ClientWithResponses) GetAuthProviderGroupMappingsWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*GetAuthProviderGroupMappingsResponse, error) {
+	rsp, err := c.GetAuthProviderGroupMappings(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuthProviderGroupMappingsResponse(rsp)
+}
+
+// ReplaceAuthProviderGroupMappingsWithBodyWithResponse Replace an auth provider's group mappings
+//
+// Replaces the whole list, then runs it at once for every member the
+// provider knows, those who claimed groups at it on a sign-in: each is
+// granted what their groups now map to and loses what the provider
+// granted and no longer maps. A grant of a mapping is `source` `sso` and
+// names the provider; grants of other sources, and an instance admin made
+// by hand or by another provider, are left alone. The last active
+// instance admin is never demoted by a mapping, and is counted in
+// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+// either a `project` (key) with a built-in `role`, or `instance_admin`
+// alone; a mapping that breaks that, or names a project that does not
+// exist, is 422 `invalid_group_mappings` naming each field and nothing
+// changes. Audited `group_mappings.updated`, and each grant and promotion
+// under the provider as the `sso` actor; a replacement that changes
+// nothing is not.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+func (c *ClientWithResponses) ReplaceAuthProviderGroupMappingsWithBodyWithResponse(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error) {
+	rsp, err := c.ReplaceAuthProviderGroupMappingsWithBody(ctx, provider, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReplaceAuthProviderGroupMappingsResponse(rsp)
+}
+
+// ReplaceAuthProviderGroupMappingsWithResponse Replace an auth provider's group mappings
+//
+// Replaces the whole list, then runs it at once for every member the
+// provider knows, those who claimed groups at it on a sign-in: each is
+// granted what their groups now map to and loses what the provider
+// granted and no longer maps. A grant of a mapping is `source` `sso` and
+// names the provider; grants of other sources, and an instance admin made
+// by hand or by another provider, are left alone. The last active
+// instance admin is never demoted by a mapping, and is counted in
+// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+// either a `project` (key) with a built-in `role`, or `instance_admin`
+// alone; a mapping that breaks that, or names a project that does not
+// exist, is 422 `invalid_group_mappings` naming each field and nothing
+// changes. Audited `group_mappings.updated`, and each grant and promotion
+// under the provider as the `sso` actor; a replacement that changes
+// nothing is not.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+func (c *ClientWithResponses) ReplaceAuthProviderGroupMappingsWithResponse(ctx context.Context, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error) {
+	rsp, err := c.ReplaceAuthProviderGroupMappings(ctx, provider, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReplaceAuthProviderGroupMappingsResponse(rsp)
 }
 
 // TestAuthProviderWithResponse Test that an auth provider can be reached
@@ -44519,7 +45972,8 @@ func (c *ClientWithResponses) GetMemberWithResponse(ctx context.Context, member 
 // Changes the fields sent and leaves the others as they are. An email
 // another member holds, whatever its case, is refused `already_exists`.
 // Demoting the instance's last active instance admin is refused
-// `last_instance_admin`.
+// `last_instance_admin`, and demoting one an auth provider's group
+// mapping made `sso_sourced`: only the provider takes it away.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -44537,7 +45991,8 @@ func (c *ClientWithResponses) UpdateMemberWithBodyWithResponse(ctx context.Conte
 // Changes the fields sent and leaves the others as they are. An email
 // another member holds, whatever its case, is refused `already_exists`.
 // Demoting the instance's last active instance admin is refused
-// `last_instance_admin`.
+// `last_instance_admin`, and demoting one an auth provider's group
+// mapping made `sso_sourced`: only the provider takes it away.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -44726,8 +46181,8 @@ func (c *ClientWithResponses) CreateProjectWithResponse(ctx context.Context, bod
 // ImportNewProjectWithBodyWithResponse Create a project from a project document
 //
 // Creates a project holding exactly the document: its environments (at
-// least one), unit types, declared attributes, segments and flags with
-// their configuration in every environment, besides the standard
+// least one), unit types, declared attributes, segments, flags with
+// their configuration in every environment and experiments, besides the standard
 // attributes every project has; no default environment or unit type is
 // added. The document is sent as `application/json` or
 // `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -44742,6 +46197,15 @@ func (c *ClientWithResponses) CreateProjectWithResponse(ctx context.Context, bod
 // the answer warns `owner_replaced` with the address. Protection is
 // bypassed in every environment, which take `protected` from the
 // document.
+//
+// Every experiment is created exactly as the document has it, its
+// status, both salts, its timestamps and its decision, so that a unit
+// keeps its assignment; a draft may leave its salts out and is given two.
+// It is judged as a create is, and by the history its status leaves
+// behind. A draft and a running experiment need a flag that is not
+// archived and a declared unit type, a stopped one a declared unit type,
+// and an archived one neither. No salt is shared by two experiments, or
+// by an experiment and a rollout.
 //
 // The import applies whole or not at all. A document that breaks a rule
 // is refused 422 `invalid_document` with every fault found in `errors`,
@@ -44768,8 +46232,8 @@ func (c *ClientWithResponses) ImportNewProjectWithBodyWithResponse(ctx context.C
 // ImportNewProjectWithResponse Create a project from a project document
 //
 // Creates a project holding exactly the document: its environments (at
-// least one), unit types, declared attributes, segments and flags with
-// their configuration in every environment, besides the standard
+// least one), unit types, declared attributes, segments, flags with
+// their configuration in every environment and experiments, besides the standard
 // attributes every project has; no default environment or unit type is
 // added. The document is sent as `application/json` or
 // `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -44784,6 +46248,15 @@ func (c *ClientWithResponses) ImportNewProjectWithBodyWithResponse(ctx context.C
 // the answer warns `owner_replaced` with the address. Protection is
 // bypassed in every environment, which take `protected` from the
 // document.
+//
+// Every experiment is created exactly as the document has it, its
+// status, both salts, its timestamps and its decision, so that a unit
+// keeps its assignment; a draft may leave its salts out and is given two.
+// It is judged as a create is, and by the history its status leaves
+// behind. A draft and a running experiment need a flag that is not
+// archived and a declared unit type, a stopped one a declared unit type,
+// and an archived one neither. No salt is shared by two experiments, or
+// by an experiment and a rollout.
 //
 // The import applies whole or not at all. A document that breaks a rule
 // is refused 422 `invalid_document` with every fault found in `errors`,
@@ -47016,8 +48489,10 @@ func (c *ClientWithResponses) CreateGrantWithResponse(ctx context.Context, proje
 //
 // Removes one grant, leaving the member's others. The grant of a role
 // holding a permission the caller lacks in the project is refused
-// `role_not_allowed`. Removing the last owner's grant is allowed: an
-// instance admin holds every permission in every project.
+// `role_not_allowed`. The grant of an auth provider's group mapping
+// (`source` `sso`) is refused 409 `sso_sourced`: the directory owns it.
+// Removing the last owner's grant is allowed: an instance admin holds
+// every permission in every project.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -47131,8 +48606,27 @@ func (c *ClientWithResponses) CheckHashUniformityWithResponse(ctx context.Contex
 // Protection is bypassed in every environment, and only the owner of a
 // project, never a project token, may import.
 //
-// Experiments cannot be imported yet: a document that has any is refused
-// whole, `unsupported` at each. The import applies whole or not at all;
+// An experiment the project lacks is created exactly as the document has
+// it: its status, both salts, its timestamps and its decision, so that
+// a unit keeps its assignment; a draft may leave its salts out and is
+// given two. It is judged as a create is, and by the history its status
+// leaves behind: a started experiment has `started_at` and an
+// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+// and a running experiment need a flag that is not archived and a declared
+// unit type, a stopped one a declared unit type, and an archived one
+// neither, so a stopped experiment outlives the flag it compared. An
+// experiment that exists changes only as an ordinary edit of its status
+// allows, never through its status: a field its status freezes, its
+// status, its timestamps, its decision and its salts once it is past its
+// draft are 409 `frozen`, naming every such field in `errors`, and a
+// smaller traffic allocation of a running experiment is 409
+// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+// the environments holding its rules and is recorded as
+// `experiment.traffic_allocation_changed`. A rule serving an archived
+// experiment is accepted. No salt is shared by two experiments, or by an
+// experiment and a rollout.
+//
+// The import applies whole or not at all;
 // a document that breaks a rule is 422 `invalid_document` with every fault
 // found in `errors`, each pointing into the document.
 //
@@ -47191,8 +48685,27 @@ func (c *ClientWithResponses) ImportProjectWithBodyWithResponse(ctx context.Cont
 // Protection is bypassed in every environment, and only the owner of a
 // project, never a project token, may import.
 //
-// Experiments cannot be imported yet: a document that has any is refused
-// whole, `unsupported` at each. The import applies whole or not at all;
+// An experiment the project lacks is created exactly as the document has
+// it: its status, both salts, its timestamps and its decision, so that
+// a unit keeps its assignment; a draft may leave its salts out and is
+// given two. It is judged as a create is, and by the history its status
+// leaves behind: a started experiment has `started_at` and an
+// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+// and a running experiment need a flag that is not archived and a declared
+// unit type, a stopped one a declared unit type, and an archived one
+// neither, so a stopped experiment outlives the flag it compared. An
+// experiment that exists changes only as an ordinary edit of its status
+// allows, never through its status: a field its status freezes, its
+// status, its timestamps, its decision and its salts once it is past its
+// draft are 409 `frozen`, naming every such field in `errors`, and a
+// smaller traffic allocation of a running experiment is 409
+// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+// the environments holding its rules and is recorded as
+// `experiment.traffic_allocation_changed`. A rule serving an archived
+// experiment is accepted. No salt is shared by two experiments, or by an
+// experiment and a rollout.
+//
+// The import applies whole or not at all;
 // a document that breaks a rule is 422 `invalid_document` with every fault
 // found in `errors`, each pointing into the document.
 //
@@ -47676,6 +49189,64 @@ func (c *ClientWithResponses) UpdateSinkWithResponse(ctx context.Context, projec
 	return ParseUpdateSinkResponse(rsp)
 }
 
+// ListSinkDeadLettersWithResponse A sink's dead letters
+//
+// The batches the target rejected `FLAGNETIC_SINK_REJECTION_ATTEMPTS`
+// times and the sink set aside to deliver the next, oldest first, in
+// every status; a discarded one is gone. Not paginated.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/sinks/{sink}/dead-letters (the `ListSinkDeadLetters` operationId).
+func (c *ClientWithResponses) ListSinkDeadLettersWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*ListSinkDeadLettersResponse, error) {
+	rsp, err := c.ListSinkDeadLetters(ctx, project, sink, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSinkDeadLettersResponse(rsp)
+}
+
+// DiscardSinkDeadLetterWithResponse Discard a dead letter
+//
+// The dead letter goes, whatever its status, and stops counting towards
+// the sink being `degraded`. Its rows are not delivered. Audited as
+// `sink.dead_letter_discarded`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /projects/{project}/sinks/{sink}/dead-letters/{deadLetter} (the `DiscardSinkDeadLetter` operationId).
+func (c *ClientWithResponses) DiscardSinkDeadLetterWithResponse(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*DiscardSinkDeadLetterResponse, error) {
+	rsp, err := c.DiscardSinkDeadLetter(ctx, project, sink, deadLetter, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDiscardSinkDeadLetterResponse(rsp)
+}
+
+// RedeliverSinkDeadLetterWithResponse Redeliver a dead letter
+//
+// Reads the rows of the dead letter that are still stored and sends them
+// to the target now, inside this request, under a delivery ID of its
+// own: the dead letter's and its attempt's, so a repeat is another
+// delivery. The sink's streams, cursors and health are not touched. When
+// the target acknowledges, the dead letter is `redelivered`; when it
+// does not, this still answers 200 with the dead letter, still
+// `pending`, its `attempts` and `last_failure` updated. It may be
+// repeated. Refused `rows_expired` when retention dropped every row of
+// it. Audited as `sink.dead_letter_redelivered`; the target's own words
+// are never answered.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver (the `RedeliverSinkDeadLetter` operationId).
+func (c *ClientWithResponses) RedeliverSinkDeadLetterWithResponse(ctx context.Context, project ProjectKey, sink SinkID, deadLetter DeadLetterID, reqEditors ...RequestEditorFn) (*RedeliverSinkDeadLetterResponse, error) {
+	rsp, err := c.RedeliverSinkDeadLetter(ctx, project, sink, deadLetter, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRedeliverSinkDeadLetterResponse(rsp)
+}
+
 // EnableSinkWithBodyWithResponse Enable a sink
 //
 // Calls the sink's target first and refuses with `sink_not_ready`, naming
@@ -47726,6 +49297,28 @@ func (c *ClientWithResponses) EnableSinkWithResponse(ctx context.Context, projec
 		return nil, err
 	}
 	return ParseEnableSinkResponse(rsp)
+}
+
+// ResumeSinkWithResponse Resume a stopped sink
+//
+// A sink stops itself when `FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS`
+// batches in a row of one stream were set aside as dead letters. This
+// starts it again where it was: every stream keeps its place and its
+// batch in flight, the count of consecutive dead letters is cleared and
+// each stream is due now. Dead letters stay and are not redelivered; the
+// sink is `degraded` while any waits. Editing a sink never resumes it. A
+// sink that is not stopped is answered as it is, with nothing changed or
+// recorded. Audited as `sink.resumed`. It takes no `If-Match`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/resume (the `ResumeSink` operationId).
+func (c *ClientWithResponses) ResumeSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*ResumeSinkResponse, error) {
+	rsp, err := c.ResumeSink(ctx, project, sink, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResumeSinkResponse(rsp)
 }
 
 // RotateSinkSecretWithResponse Rotate a webhook sink's secret
@@ -49620,6 +51213,140 @@ func ParseEnableAuthProviderResponse(rsp *http.Response) (*EnableAuthProviderRes
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers EnableAuthProviderResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetAuthProviderGroupMappingsResponse parses an HTTP response from a GetAuthProviderGroupMappingsWithResponse call
+func ParseGetAuthProviderGroupMappingsResponse(rsp *http.Response) (*GetAuthProviderGroupMappingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuthProviderGroupMappingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GroupMappings
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetAuthProviderGroupMappingsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseReplaceAuthProviderGroupMappingsResponse parses an HTTP response from a ReplaceAuthProviderGroupMappingsWithResponse call
+func ParseReplaceAuthProviderGroupMappingsResponse(rsp *http.Response) (*ReplaceAuthProviderGroupMappingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReplaceAuthProviderGroupMappingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GroupMappingsRun
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ReplaceAuthProviderGroupMappingsResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -57791,6 +59518,13 @@ func ParseDeleteGrantResponse(rsp *http.Response) (*DeleteGrantResponse, error) 
 		}
 		response.ApplicationproblemJSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest Invalid
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -59108,6 +60842,189 @@ func ParseUpdateSinkResponse(rsp *http.Response) (*UpdateSinkResponse, error) {
 	return response, nil
 }
 
+// ParseListSinkDeadLettersResponse parses an HTTP response from a ListSinkDeadLettersWithResponse call
+func ParseListSinkDeadLettersResponse(rsp *http.Response) (*ListSinkDeadLettersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSinkDeadLettersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SinkDeadLetterList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListSinkDeadLettersResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDiscardSinkDeadLetterResponse parses an HTTP response from a DiscardSinkDeadLetterWithResponse call
+func ParseDiscardSinkDeadLetterResponse(rsp *http.Response) (*DiscardSinkDeadLetterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DiscardSinkDeadLetterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DiscardSinkDeadLetterResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRedeliverSinkDeadLetterResponse parses an HTTP response from a RedeliverSinkDeadLetterWithResponse call
+func ParseRedeliverSinkDeadLetterResponse(rsp *http.Response) (*RedeliverSinkDeadLetterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RedeliverSinkDeadLetterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SinkDeadLetter
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers RedeliverSinkDeadLetterResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseEnableSinkResponse parses an HTTP response from a EnableSinkWithResponse call
 func ParseEnableSinkResponse(rsp *http.Response) (*EnableSinkResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -59179,6 +61096,76 @@ func ParseEnableSinkResponse(rsp *http.Response) (*EnableSinkResponse, error) {
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers EnableSinkResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseResumeSinkResponse parses an HTTP response from a ResumeSinkWithResponse call
+func ParseResumeSinkResponse(rsp *http.Response) (*ResumeSinkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ResumeSinkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Sink
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ResumeSinkResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers ResumeSinkResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -61824,6 +63811,12 @@ type ServerInterface interface {
 	// EnableAuthProvider Enable an auth provider
 	// (POST /instance/auth-providers/{provider}/enable)
 	EnableAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// GetAuthProviderGroupMappings An auth provider's group mappings
+	// (GET /instance/auth-providers/{provider}/group-mappings)
+	GetAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// ReplaceAuthProviderGroupMappings Replace an auth provider's group mappings
+	// (PUT /instance/auth-providers/{provider}/group-mappings)
+	ReplaceAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
 	// TestAuthProvider Test that an auth provider can be reached
 	// (POST /instance/auth-providers/{provider}/test)
 	TestAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
@@ -62196,9 +64189,21 @@ type ServerInterface interface {
 	// UpdateSink Edit a sink
 	// (PATCH /projects/{project}/sinks/{sink})
 	UpdateSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, params UpdateSinkParams)
+	// ListSinkDeadLetters A sink's dead letters
+	// (GET /projects/{project}/sinks/{sink}/dead-letters)
+	ListSinkDeadLetters(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
+	// DiscardSinkDeadLetter Discard a dead letter
+	// (DELETE /projects/{project}/sinks/{sink}/dead-letters/{deadLetter})
+	DiscardSinkDeadLetter(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, deadLetter DeadLetterID)
+	// RedeliverSinkDeadLetter Redeliver a dead letter
+	// (POST /projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver)
+	RedeliverSinkDeadLetter(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, deadLetter DeadLetterID)
 	// EnableSink Enable a sink
 	// (POST /projects/{project}/sinks/{sink}/enable)
 	EnableSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
+	// ResumeSink Resume a stopped sink
+	// (POST /projects/{project}/sinks/{sink}/resume)
+	ResumeSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
 	// RotateSinkSecret Rotate a webhook sink's secret
 	// (POST /projects/{project}/sinks/{sink}/rotate-secret)
 	RotateSinkSecret(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
@@ -62979,6 +64984,58 @@ func (siw *ServerInterfaceWrapper) EnableAuthProvider(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.EnableAuthProvider(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAuthProviderGroupMappings operation middleware
+func (siw *ServerInterfaceWrapper) GetAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuthProviderGroupMappings(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReplaceAuthProviderGroupMappings operation middleware
+func (siw *ServerInterfaceWrapper) ReplaceAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReplaceAuthProviderGroupMappings(w, r, provider)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -68604,6 +70661,129 @@ func (siw *ServerInterfaceWrapper) UpdateSink(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ListSinkDeadLetters operation middleware
+func (siw *ServerInterfaceWrapper) ListSinkDeadLetters(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSinkDeadLetters(w, r, project, sink)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DiscardSinkDeadLetter operation middleware
+func (siw *ServerInterfaceWrapper) DiscardSinkDeadLetter(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "deadLetter" -------------
+	var deadLetter DeadLetterID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deadLetter", r.PathValue("deadLetter"), &deadLetter, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deadLetter", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DiscardSinkDeadLetter(w, r, project, sink, deadLetter)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RedeliverSinkDeadLetter operation middleware
+func (siw *ServerInterfaceWrapper) RedeliverSinkDeadLetter(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "deadLetter" -------------
+	var deadLetter DeadLetterID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deadLetter", r.PathValue("deadLetter"), &deadLetter, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deadLetter", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RedeliverSinkDeadLetter(w, r, project, sink, deadLetter)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // EnableSink operation middleware
 func (siw *ServerInterfaceWrapper) EnableSink(w http.ResponseWriter, r *http.Request) {
 
@@ -68630,6 +70810,41 @@ func (siw *ServerInterfaceWrapper) EnableSink(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.EnableSink(w, r, project, sink)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResumeSink operation middleware
+func (siw *ServerInterfaceWrapper) ResumeSink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResumeSink(w, r, project, sink)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -70305,6 +72520,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/instance/auth-providers/{provider}", wrapper.UpdateAuthProvider)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/enable", wrapper.EnableAuthProvider)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/disable", wrapper.DisableAuthProvider)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-providers/{provider}/group-mappings", wrapper.GetAuthProviderGroupMappings)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/auth-providers/{provider}/group-mappings", wrapper.ReplaceAuthProviderGroupMappings)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/test", wrapper.TestAuthProvider)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/instance/smtp", wrapper.DeleteMailSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/smtp", wrapper.GetMailSettings)
@@ -70333,6 +72550,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/enable", wrapper.EnableSink)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/test", wrapper.TestSink)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/rotate-secret", wrapper.RotateSinkSecret)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/resume", wrapper.ResumeSink)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/dead-letters", wrapper.ListSinkDeadLetters)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/dead-letters/{deadLetter}", wrapper.DiscardSinkDeadLetter)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver", wrapper.RedeliverSinkDeadLetter)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/webhooks", wrapper.ListInstanceWebhooks)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/webhooks", wrapper.CreateInstanceWebhook)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/webhooks/{webhook}", wrapper.DeleteInstanceWebhook)
@@ -71771,6 +73992,185 @@ type EnableAuthProvider422ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response EnableAuthProvider422ApplicationProblemPlusJSONResponse) VisitEnableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProviderGroupMappingsRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+}
+
+type GetAuthProviderGroupMappingsResponseObject interface {
+	VisitGetAuthProviderGroupMappingsResponse(w http.ResponseWriter) error
+}
+
+type GetAuthProviderGroupMappings200JSONResponse GroupMappings
+
+func (response GetAuthProviderGroupMappings200JSONResponse) VisitGetAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProviderGroupMappings401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthProviderGroupMappings401ApplicationProblemPlusJSONResponse) VisitGetAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProviderGroupMappings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthProviderGroupMappings403ApplicationProblemPlusJSONResponse) VisitGetAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProviderGroupMappings404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthProviderGroupMappings404ApplicationProblemPlusJSONResponse) VisitGetAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaceAuthProviderGroupMappingsRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+	Body     *ReplaceAuthProviderGroupMappingsJSONRequestBody
+}
+
+type ReplaceAuthProviderGroupMappingsResponseObject interface {
+	VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error
+}
+
+type ReplaceAuthProviderGroupMappings200JSONResponse GroupMappingsRun
+
+func (response ReplaceAuthProviderGroupMappings200JSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaceAuthProviderGroupMappings400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaceAuthProviderGroupMappings400ApplicationProblemPlusJSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaceAuthProviderGroupMappings401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaceAuthProviderGroupMappings401ApplicationProblemPlusJSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaceAuthProviderGroupMappings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaceAuthProviderGroupMappings403ApplicationProblemPlusJSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaceAuthProviderGroupMappings404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaceAuthProviderGroupMappings404ApplicationProblemPlusJSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaceAuthProviderGroupMappings422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaceAuthProviderGroupMappings422ApplicationProblemPlusJSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -83164,6 +85564,22 @@ func (response DeleteGrant404ApplicationProblemPlusJSONResponse) VisitDeleteGran
 	return err
 }
 
+type DeleteGrant409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteGrant409ApplicationProblemPlusJSONResponse) VisitDeleteGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteGrant422ApplicationProblemPlusJSONResponse struct {
 	InvalidApplicationProblemPlusJSONResponse
 }
@@ -84978,6 +87394,240 @@ func (response UpdateSink428ApplicationProblemPlusJSONResponse) VisitUpdateSinkR
 	return err
 }
 
+type ListSinkDeadLettersRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+}
+
+type ListSinkDeadLettersResponseObject interface {
+	VisitListSinkDeadLettersResponse(w http.ResponseWriter) error
+}
+
+type ListSinkDeadLetters200JSONResponse SinkDeadLetterList
+
+func (response ListSinkDeadLetters200JSONResponse) VisitListSinkDeadLettersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSinkDeadLetters401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListSinkDeadLetters401ApplicationProblemPlusJSONResponse) VisitListSinkDeadLettersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSinkDeadLetters403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListSinkDeadLetters403ApplicationProblemPlusJSONResponse) VisitListSinkDeadLettersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSinkDeadLetters404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListSinkDeadLetters404ApplicationProblemPlusJSONResponse) VisitListSinkDeadLettersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DiscardSinkDeadLetterRequestObject struct {
+	Project    ProjectKey   `json:"project"`
+	Sink       SinkID       `json:"sink"`
+	DeadLetter DeadLetterID `json:"deadLetter"`
+}
+
+type DiscardSinkDeadLetterResponseObject interface {
+	VisitDiscardSinkDeadLetterResponse(w http.ResponseWriter) error
+}
+
+type DiscardSinkDeadLetter204Response struct {
+}
+
+func (response DiscardSinkDeadLetter204Response) VisitDiscardSinkDeadLetterResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DiscardSinkDeadLetter401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DiscardSinkDeadLetter401ApplicationProblemPlusJSONResponse) VisitDiscardSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DiscardSinkDeadLetter403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DiscardSinkDeadLetter403ApplicationProblemPlusJSONResponse) VisitDiscardSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DiscardSinkDeadLetter404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DiscardSinkDeadLetter404ApplicationProblemPlusJSONResponse) VisitDiscardSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverSinkDeadLetterRequestObject struct {
+	Project    ProjectKey   `json:"project"`
+	Sink       SinkID       `json:"sink"`
+	DeadLetter DeadLetterID `json:"deadLetter"`
+}
+
+type RedeliverSinkDeadLetterResponseObject interface {
+	VisitRedeliverSinkDeadLetterResponse(w http.ResponseWriter) error
+}
+
+type RedeliverSinkDeadLetter200JSONResponse SinkDeadLetter
+
+func (response RedeliverSinkDeadLetter200JSONResponse) VisitRedeliverSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverSinkDeadLetter401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverSinkDeadLetter401ApplicationProblemPlusJSONResponse) VisitRedeliverSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverSinkDeadLetter403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverSinkDeadLetter403ApplicationProblemPlusJSONResponse) VisitRedeliverSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverSinkDeadLetter404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverSinkDeadLetter404ApplicationProblemPlusJSONResponse) VisitRedeliverSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverSinkDeadLetter422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverSinkDeadLetter422ApplicationProblemPlusJSONResponse) VisitRedeliverSinkDeadLetterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type EnableSinkRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Sink    SinkID     `json:"sink"`
@@ -85091,6 +87741,90 @@ func (response EnableSink422ApplicationProblemPlusJSONResponse) VisitEnableSinkR
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeSinkRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+}
+
+type ResumeSinkResponseObject interface {
+	VisitResumeSinkResponse(w http.ResponseWriter) error
+}
+
+type ResumeSink200ResponseHeaders struct {
+	ETag *string
+}
+
+type ResumeSink200JSONResponse struct {
+	Body    Sink
+	Headers ResumeSink200ResponseHeaders
+}
+
+func (response ResumeSink200JSONResponse) VisitResumeSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeSink401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ResumeSink401ApplicationProblemPlusJSONResponse) VisitResumeSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeSink403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ResumeSink403ApplicationProblemPlusJSONResponse) VisitResumeSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeSink404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ResumeSink404ApplicationProblemPlusJSONResponse) VisitResumeSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -88548,6 +91282,12 @@ type StrictServerInterface interface {
 	// EnableAuthProvider Enable an auth provider
 	// (POST /instance/auth-providers/{provider}/enable)
 	EnableAuthProvider(ctx context.Context, request EnableAuthProviderRequestObject) (EnableAuthProviderResponseObject, error)
+	// GetAuthProviderGroupMappings An auth provider's group mappings
+	// (GET /instance/auth-providers/{provider}/group-mappings)
+	GetAuthProviderGroupMappings(ctx context.Context, request GetAuthProviderGroupMappingsRequestObject) (GetAuthProviderGroupMappingsResponseObject, error)
+	// ReplaceAuthProviderGroupMappings Replace an auth provider's group mappings
+	// (PUT /instance/auth-providers/{provider}/group-mappings)
+	ReplaceAuthProviderGroupMappings(ctx context.Context, request ReplaceAuthProviderGroupMappingsRequestObject) (ReplaceAuthProviderGroupMappingsResponseObject, error)
 	// TestAuthProvider Test that an auth provider can be reached
 	// (POST /instance/auth-providers/{provider}/test)
 	TestAuthProvider(ctx context.Context, request TestAuthProviderRequestObject) (TestAuthProviderResponseObject, error)
@@ -88920,9 +91660,21 @@ type StrictServerInterface interface {
 	// UpdateSink Edit a sink
 	// (PATCH /projects/{project}/sinks/{sink})
 	UpdateSink(ctx context.Context, request UpdateSinkRequestObject) (UpdateSinkResponseObject, error)
+	// ListSinkDeadLetters A sink's dead letters
+	// (GET /projects/{project}/sinks/{sink}/dead-letters)
+	ListSinkDeadLetters(ctx context.Context, request ListSinkDeadLettersRequestObject) (ListSinkDeadLettersResponseObject, error)
+	// DiscardSinkDeadLetter Discard a dead letter
+	// (DELETE /projects/{project}/sinks/{sink}/dead-letters/{deadLetter})
+	DiscardSinkDeadLetter(ctx context.Context, request DiscardSinkDeadLetterRequestObject) (DiscardSinkDeadLetterResponseObject, error)
+	// RedeliverSinkDeadLetter Redeliver a dead letter
+	// (POST /projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver)
+	RedeliverSinkDeadLetter(ctx context.Context, request RedeliverSinkDeadLetterRequestObject) (RedeliverSinkDeadLetterResponseObject, error)
 	// EnableSink Enable a sink
 	// (POST /projects/{project}/sinks/{sink}/enable)
 	EnableSink(ctx context.Context, request EnableSinkRequestObject) (EnableSinkResponseObject, error)
+	// ResumeSink Resume a stopped sink
+	// (POST /projects/{project}/sinks/{sink}/resume)
+	ResumeSink(ctx context.Context, request ResumeSinkRequestObject) (ResumeSinkResponseObject, error)
 	// RotateSinkSecret Rotate a webhook sink's secret
 	// (POST /projects/{project}/sinks/{sink}/rotate-secret)
 	RotateSinkSecret(ctx context.Context, request RotateSinkSecretRequestObject) (RotateSinkSecretResponseObject, error)
@@ -89451,6 +92203,65 @@ func (sh *strictHandler) EnableAuthProvider(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(EnableAuthProviderResponseObject); ok {
 		if err := validResponse.VisitEnableAuthProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAuthProviderGroupMappings operation middleware
+func (sh *strictHandler) GetAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request GetAuthProviderGroupMappingsRequestObject
+
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAuthProviderGroupMappings(ctx, request.(GetAuthProviderGroupMappingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAuthProviderGroupMappings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAuthProviderGroupMappingsResponseObject); ok {
+		if err := validResponse.VisitGetAuthProviderGroupMappingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReplaceAuthProviderGroupMappings operation middleware
+func (sh *strictHandler) ReplaceAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request ReplaceAuthProviderGroupMappingsRequestObject
+
+	request.Provider = provider
+
+	var body ReplaceAuthProviderGroupMappingsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReplaceAuthProviderGroupMappings(ctx, request.(ReplaceAuthProviderGroupMappingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReplaceAuthProviderGroupMappings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReplaceAuthProviderGroupMappingsResponseObject); ok {
+		if err := validResponse.VisitReplaceAuthProviderGroupMappingsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -93115,6 +95926,89 @@ func (sh *strictHandler) UpdateSink(w http.ResponseWriter, r *http.Request, proj
 	}
 }
 
+// ListSinkDeadLetters operation middleware
+func (sh *strictHandler) ListSinkDeadLetters(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID) {
+	var request ListSinkDeadLettersRequestObject
+
+	request.Project = project
+	request.Sink = sink
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSinkDeadLetters(ctx, request.(ListSinkDeadLettersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSinkDeadLetters")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSinkDeadLettersResponseObject); ok {
+		if err := validResponse.VisitListSinkDeadLettersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DiscardSinkDeadLetter operation middleware
+func (sh *strictHandler) DiscardSinkDeadLetter(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, deadLetter DeadLetterID) {
+	var request DiscardSinkDeadLetterRequestObject
+
+	request.Project = project
+	request.Sink = sink
+	request.DeadLetter = deadLetter
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DiscardSinkDeadLetter(ctx, request.(DiscardSinkDeadLetterRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DiscardSinkDeadLetter")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DiscardSinkDeadLetterResponseObject); ok {
+		if err := validResponse.VisitDiscardSinkDeadLetterResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RedeliverSinkDeadLetter operation middleware
+func (sh *strictHandler) RedeliverSinkDeadLetter(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, deadLetter DeadLetterID) {
+	var request RedeliverSinkDeadLetterRequestObject
+
+	request.Project = project
+	request.Sink = sink
+	request.DeadLetter = deadLetter
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RedeliverSinkDeadLetter(ctx, request.(RedeliverSinkDeadLetterRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RedeliverSinkDeadLetter")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RedeliverSinkDeadLetterResponseObject); ok {
+		if err := validResponse.VisitRedeliverSinkDeadLetterResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // EnableSink operation middleware
 func (sh *strictHandler) EnableSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID) {
 	var request EnableSinkRequestObject
@@ -93145,6 +96039,33 @@ func (sh *strictHandler) EnableSink(w http.ResponseWriter, r *http.Request, proj
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(EnableSinkResponseObject); ok {
 		if err := validResponse.VisitEnableSinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ResumeSink operation middleware
+func (sh *strictHandler) ResumeSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID) {
+	var request ResumeSinkRequestObject
+
+	request.Project = project
+	request.Sink = sink
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ResumeSink(ctx, request.(ResumeSinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ResumeSink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ResumeSinkResponseObject); ok {
+		if err := validResponse.VisitResumeSinkResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

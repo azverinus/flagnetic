@@ -47,6 +47,11 @@ type VerifiedClaims struct {
 	// EmailVerified is whether the provider says it verified the email.
 	EmailVerified bool
 	Name          string
+	// Groups are the directory groups the provider claimed for the person.
+	// HasGroups is false when the claim was absent or not a list of strings
+	// (Groups is then nil), so the person's earlier groups stand.
+	Groups    []string
+	HasGroups bool
 }
 
 // Attempt is one sign-in, from the moment a browser starts it to the moment

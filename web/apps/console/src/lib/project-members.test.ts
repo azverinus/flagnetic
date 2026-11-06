@@ -52,6 +52,7 @@ describe("where a grant comes from", () => {
     member: "m2",
     role: "viewer" as const,
     source: "manual" as const,
+    provider: null,
     created_by: "m2",
     created_at: "2026-10-21T10:00:00Z",
   };
@@ -66,6 +67,13 @@ describe("where a grant comes from", () => {
     );
     expect(grantOrigin(i18n, names, { ...grant, created_by: null })).toMatch(
       /^Manual, granted on [^b]*$/,
+    );
+  });
+
+  it("names the auth provider whose group mapping made it", () => {
+    const mapped = { ...grant, source: "sso" as const, provider: "okta", created_by: null };
+    expect(grantOrigin(i18n, names, mapped)).toMatch(
+      /^From the group mappings of okta, granted on /,
     );
   });
 });

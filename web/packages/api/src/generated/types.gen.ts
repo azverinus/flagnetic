@@ -217,6 +217,52 @@ export type AuthProvider = {
   version: number;
 };
 
+/**
+ * What members of a directory group are granted: a role in a project, or
+ * instance admin.
+ *
+ */
+export type GroupMapping = {
+  /**
+   * The directory group, matched exactly as the provider claims it. Not blank.
+   */
+  group: string;
+  /**
+   * The key of the project the role is granted in. Sent with `role`, never with `instance_admin`.
+   */
+  project?: string;
+  /**
+   * One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`.
+   */
+  role?: string;
+  /**
+   * Makes the members of the group instance admins. Sent alone, and only as `true`.
+   */
+  instance_admin?: boolean;
+};
+
+export type GroupMappings = {
+  items: Array<GroupMapping>;
+};
+
+/**
+ * What running the mappings for every member the provider knows did.
+ */
+export type GroupMappingsRun = {
+  /**
+   * The grants made, and the members made instance admin.
+   */
+  granted: number;
+  /**
+   * The grants removed, and the members who are no longer instance admin.
+   */
+  revoked: number;
+  /**
+   * The members who stay instance admin although the mappings no longer make them one, because they are the last active instance admin.
+   */
+  kept_instance_admin: number;
+};
+
 export type AuthProviderList = {
   items: Array<AuthProvider>;
 };
@@ -989,9 +1035,19 @@ export type Grant = {
   id: string;
   member: string;
   role: RoleName;
-  source: "manual";
   /**
-   * The member who made the grant.
+   * `manual` for a grant made by hand, `sso` for one an auth provider's
+   * group mapping made, which is removed only by the provider and refused
+   * `sso_sourced` by hand. Grants of several sources sit side by side.
+   *
+   */
+  source: "manual" | "sso";
+  /**
+   * The slug of the auth provider whose group mapping made an `sso` grant; null otherwise.
+   */
+  provider: string | null;
+  /**
+   * The member who made the grant; null for an `sso` grant.
    */
   created_by: string | null;
   created_at: string;
@@ -1187,7 +1243,7 @@ export type AttributePatch = {
   description?: Description;
 };
 
-export type ActorKind = "member" | "token" | "cli" | "system";
+export type ActorKind = "member" | "token" | "cli" | "system" | "sso";
 
 /**
  * Who changed what, when, from which value to which. Secrets are never recorded; a token appears by its hint.
@@ -3447,6 +3503,43 @@ export type SinkList = {
 };
 
 /**
+ * `pending` waits to be redelivered or discarded; `redelivered` was
+ * acknowledged by the target after a redelivery; `expired` lost every
+ * row to retention.
+ *
+ */
+export type SinkDeadLetterStatus = "pending" | "redelivered" | "expired";
+
+/**
+ * A batch of one event kind the target rejected, set aside so the stream
+ * could go on. Cursors are never exposed: the batch is told by how many
+ * rows it held and when the first and the last of them were received.
+ *
+ */
+export type SinkDeadLetter = {
+  id: string;
+  event_kind: SinkEventKind;
+  /**
+   * How many rows the batch held when it was set aside, those of deleted environments included.
+   */
+  rows: number;
+  first_received_at: string;
+  last_received_at: string;
+  /**
+   * How many times the target rejected the batch, redeliveries included.
+   */
+  attempts: number;
+  last_failure: SinkFailure;
+  status: SinkDeadLetterStatus;
+  created_at: string;
+  redelivered_at: string | null;
+};
+
+export type SinkDeadLetterList = {
+  items: Array<SinkDeadLetter>;
+};
+
+/**
  * `pending` waits for its next attempt; `succeeded` was accepted by the
  * receiver; `failed` was refused in a way a retry would not change;
  * `exhausted` ran out of attempts; `dropped` was left unsent because
@@ -4046,6 +4139,11 @@ export type WebhookId = string;
  * The sink's identifier.
  */
 export type SinkId = string;
+
+/**
+ * The dead letter's identifier.
+ */
+export type DeadLetterId = string;
 
 /**
  * The experiment's key.
@@ -11423,6 +11521,10 @@ export type DeleteGrantErrors = {
    */
   404: Problem;
   /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
    * The request is well formed but breaks a rule; `errors` names each field to fix.
    */
   422: Problem;
@@ -13066,6 +13168,120 @@ export type DisableAuthProviderResponses = {
 
 export type DisableAuthProviderResponse =
   DisableAuthProviderResponses[keyof DisableAuthProviderResponses];
+
+export type GetAuthProviderGroupMappingsData = {
+  body?: never;
+  path: {
+    /**
+     * The auth provider's slug.
+     */
+    provider: string;
+  };
+  query?: never;
+  url: "/instance/auth-providers/{provider}/group-mappings";
+};
+
+export type GetAuthProviderGroupMappingsErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetAuthProviderGroupMappingsError =
+  GetAuthProviderGroupMappingsErrors[keyof GetAuthProviderGroupMappingsErrors];
+
+export type GetAuthProviderGroupMappingsResponses = {
+  /**
+   * The group mappings.
+   */
+  200: GroupMappings;
+};
+
+export type GetAuthProviderGroupMappingsResponse =
+  GetAuthProviderGroupMappingsResponses[keyof GetAuthProviderGroupMappingsResponses];
+
+export type ReplaceAuthProviderGroupMappingsData = {
+  body: GroupMappings;
+  path: {
+    /**
+     * The auth provider's slug.
+     */
+    provider: string;
+  };
+  query?: never;
+  url: "/instance/auth-providers/{provider}/group-mappings";
+};
+
+export type ReplaceAuthProviderGroupMappingsErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type ReplaceAuthProviderGroupMappingsError =
+  ReplaceAuthProviderGroupMappingsErrors[keyof ReplaceAuthProviderGroupMappingsErrors];
+
+export type ReplaceAuthProviderGroupMappingsResponses = {
+  /**
+   * What running the mappings did.
+   */
+  200: GroupMappingsRun;
+};
+
+export type ReplaceAuthProviderGroupMappingsResponse =
+  ReplaceAuthProviderGroupMappingsResponses[keyof ReplaceAuthProviderGroupMappingsResponses];
 
 export type TestAuthProviderData = {
   body?: never;
@@ -14813,6 +15029,243 @@ export type RotateSinkSecretResponses = {
 };
 
 export type RotateSinkSecretResponse = RotateSinkSecretResponses[keyof RotateSinkSecretResponses];
+
+export type ResumeSinkData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The sink's identifier.
+     */
+    sink: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks/{sink}/resume";
+};
+
+export type ResumeSinkErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ResumeSinkError = ResumeSinkErrors[keyof ResumeSinkErrors];
+
+export type ResumeSinkResponses = {
+  /**
+   * The sink as it is now.
+   */
+  200: Sink;
+};
+
+export type ResumeSinkResponse = ResumeSinkResponses[keyof ResumeSinkResponses];
+
+export type ListSinkDeadLettersData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The sink's identifier.
+     */
+    sink: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks/{sink}/dead-letters";
+};
+
+export type ListSinkDeadLettersErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListSinkDeadLettersError = ListSinkDeadLettersErrors[keyof ListSinkDeadLettersErrors];
+
+export type ListSinkDeadLettersResponses = {
+  /**
+   * The sink's dead letters.
+   */
+  200: SinkDeadLetterList;
+};
+
+export type ListSinkDeadLettersResponse =
+  ListSinkDeadLettersResponses[keyof ListSinkDeadLettersResponses];
+
+export type DiscardSinkDeadLetterData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The sink's identifier.
+     */
+    sink: string;
+    /**
+     * The dead letter's identifier.
+     */
+    deadLetter: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks/{sink}/dead-letters/{deadLetter}";
+};
+
+export type DiscardSinkDeadLetterErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type DiscardSinkDeadLetterError =
+  DiscardSinkDeadLetterErrors[keyof DiscardSinkDeadLetterErrors];
+
+export type DiscardSinkDeadLetterResponses = {
+  /**
+   * Discarded.
+   */
+  204: void;
+};
+
+export type DiscardSinkDeadLetterResponse =
+  DiscardSinkDeadLetterResponses[keyof DiscardSinkDeadLetterResponses];
+
+export type RedeliverSinkDeadLetterData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The sink's identifier.
+     */
+    sink: string;
+    /**
+     * The dead letter's identifier.
+     */
+    deadLetter: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver";
+};
+
+export type RedeliverSinkDeadLetterErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type RedeliverSinkDeadLetterError =
+  RedeliverSinkDeadLetterErrors[keyof RedeliverSinkDeadLetterErrors];
+
+export type RedeliverSinkDeadLetterResponses = {
+  /**
+   * The dead letter after the attempt.
+   */
+  200: SinkDeadLetter;
+};
+
+export type RedeliverSinkDeadLetterResponse =
+  RedeliverSinkDeadLetterResponses[keyof RedeliverSinkDeadLetterResponses];
 
 export type ListInstanceWebhooksData = {
   body?: never;
