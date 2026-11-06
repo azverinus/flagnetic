@@ -378,6 +378,10 @@ export type AuthMethods = {
    */
   local_login_enabled: boolean;
   /**
+   * Whether a member can ask for a password reset by mail (`POST /auth/password-reset`): the instance has an SMTP server and self-service password reset is on. The sign-in page offers the forgotten-password link only then.
+   */
+  password_reset_available: boolean;
+  /**
    * The enabled auth providers a member signs in through, ordered by display name.
    */
   providers: Array<AuthMethodProvider>;
@@ -579,6 +583,13 @@ export type PasswordReset = {
   expires_at: string;
 };
 
+export type PasswordResetRequest = {
+  /**
+   * The email the member signs in with, whatever its case.
+   */
+  email: string;
+};
+
 export type PasswordResetCompletion = {
   password: string;
 };
@@ -741,6 +752,10 @@ export type AuthSettings = {
    * The fewest characters a password chosen from now on has, never below 12. 12 on a fresh instance.
    */
   password_min_length: number;
+  /**
+   * Whether a member can ask for a password reset by mail (`POST /auth/password-reset`). It also takes an SMTP server. True on a fresh instance. An instance admin can still issue a reset link whatever this says.
+   */
+  self_service_password_reset: boolean;
 };
 
 /**
@@ -4537,6 +4552,48 @@ export type AcceptInvitationResponses = {
 };
 
 export type AcceptInvitationResponse = AcceptInvitationResponses[keyof AcceptInvitationResponses];
+
+export type RequestPasswordResetData = {
+  body: PasswordResetRequest;
+  path?: never;
+  query?: never;
+  url: "/auth/password-reset";
+};
+
+export type RequestPasswordResetErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * `request_too_large`: the body is larger than the operation accepts; one that checks a password accepts 8 KiB.
+   */
+  413: Problem;
+  /**
+   * `unsupported_media_type`: the body is not sent as `application/json`, which the operations opening a session require so a form on another site cannot call them.
+   */
+  415: Problem;
+};
+
+export type RequestPasswordResetError =
+  RequestPasswordResetErrors[keyof RequestPasswordResetErrors];
+
+export type RequestPasswordResetResponses = {
+  /**
+   * The request was received. Nothing more is said.
+   */
+  202: unknown;
+};
 
 export type GetPasswordResetData = {
   body?: never;

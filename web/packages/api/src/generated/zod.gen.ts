@@ -188,6 +188,7 @@ export const zAuthMethodProvider = z.object({
 
 export const zAuthMethods = z.object({
   local_login_enabled: z.boolean(),
+  password_reset_available: z.boolean(),
   providers: z.array(zAuthMethodProvider),
 });
 
@@ -302,6 +303,10 @@ export const zPasswordReset = z.object({
   email: z.string(),
   display_name: z.string(),
   expires_at: z.iso.datetime(),
+});
+
+export const zPasswordResetRequest = z.object({
+  email: z.string(),
 });
 
 export const zPasswordResetCompletion = z.object({
@@ -439,6 +444,7 @@ export const zAuthSettings = z.object({
     }),
   token_expiry_required: z.boolean(),
   password_min_length: z.int(),
+  self_service_password_reset: z.boolean(),
 });
 
 /**
@@ -3053,6 +3059,8 @@ export const zAcceptInvitationPath = z.object({
  * Accepted and signed in. The body is the caller, as `GET /me` answers it.
  */
 export const zAcceptInvitationResponse = zMe;
+
+export const zRequestPasswordResetBody = zPasswordResetRequest;
 
 export const zGetPasswordResetPath = z.object({
   secret: z.string(),

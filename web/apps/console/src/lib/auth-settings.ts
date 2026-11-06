@@ -57,6 +57,8 @@ export function secondsOf(duration: Duration): number | undefined {
 export type AuthSettingsValues = Record<DurationField, Duration> & {
   token_expiry_required: boolean;
   password_min_length: string;
+  /** Not edited here: the form sends back what it was given, as the server replaces every setting. */
+  self_service_password_reset: boolean;
 };
 
 /** The form's fields that hold a duration. */
@@ -74,6 +76,7 @@ export const pointerOf: Record<keyof AuthSettingsValues, string> = {
   token_max_lifetime: "/token_max_lifetime_seconds",
   token_expiry_required: "/token_expiry_required",
   password_min_length: "/password_min_length",
+  self_service_password_reset: "/self_service_password_reset",
 };
 
 export function formOf(settings: AuthSettings): AuthSettingsValues {
@@ -83,6 +86,7 @@ export function formOf(settings: AuthSettings): AuthSettingsValues {
     token_max_lifetime: durationOf(settings.token_max_lifetime_seconds),
     token_expiry_required: settings.token_expiry_required,
     password_min_length: String(settings.password_min_length),
+    self_service_password_reset: settings.self_service_password_reset,
   };
 }
 
@@ -94,6 +98,7 @@ export function settingsOf(values: AuthSettingsValues): AuthSettings {
     token_max_lifetime_seconds: secondsOf(values.token_max_lifetime) ?? 0,
     token_expiry_required: values.token_expiry_required,
     password_min_length: Number(values.password_min_length.trim()),
+    self_service_password_reset: values.self_service_password_reset,
   };
 }
 
@@ -138,6 +143,7 @@ export function authSettingsSchema(i18n: I18n) {
       token_max_lifetime: duration,
       token_expiry_required: z.boolean(),
       password_min_length: z.string(),
+      self_service_password_reset: z.boolean(),
     })
     .superRefine((values, context) => {
       for (const field of durationFields) {

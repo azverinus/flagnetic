@@ -62,6 +62,8 @@ type Handlers struct {
 	ReissueInvitation   *appaccess.ReissueInvitation
 	GetInvitation       *appaccess.GetInvitation
 	AcceptInvitation    *appaccess.AcceptInvitation
+	RequestReset        *appaccess.RequestPasswordReset
+	ResetAvailable      *appaccess.PasswordResetAvailable
 	IssueReset          *appaccess.IssuePasswordReset
 	GetReset            *appaccess.GetPasswordReset
 	CompleteReset       *appaccess.CompletePasswordReset
@@ -406,7 +408,7 @@ func (a *api) seam(op operations.Entry, next http.Handler) http.Handler {
 		case errors.Is(err, errUnauthenticated) && op.Requirement == access.RequirePublic:
 			err = nil
 		}
-		if err == nil && op.OpensSession && !isJSON(r) {
+		if err == nil && (op.OpensSession || op.JSONOnly) && !isJSON(r) {
 			err = errNotJSON
 		}
 		if err != nil {

@@ -33,6 +33,11 @@ type Entry struct {
 	// are public, so no session guards them against another site, and a form
 	// on another site cannot send JSON without the browser asking first.
 	OpensSession bool
+	// JSONOnly operations (x-json-only) accept only a JSON body for the same
+	// reason, though they open no session: a public operation that changes
+	// something, such as asking for a password reset, must not be sent from a
+	// form on another site.
+	JSONOnly bool
 	// ChecksPassword operations (x-checks-password) accept a body of at most
 	// PasswordBodyLimit bytes, so a huge one is refused before anything,
 	// let alone a hash, is spent on it.
@@ -70,6 +75,7 @@ func Read(doc []byte) (map[string]Entry, error) {
 				Permission      string `yaml:"x-permission"`
 				SessionRequired bool   `yaml:"x-session-required"`
 				OpensSession    bool   `yaml:"x-opens-session"`
+				JSONOnly        bool   `yaml:"x-json-only"`
 				ChecksPassword  bool   `yaml:"x-checks-password"`
 				MaxBodyBytes    int64  `yaml:"x-max-body-bytes"`
 			}
@@ -97,7 +103,7 @@ func Read(doc []byte) (map[string]Entry, error) {
 					Name: o.OperationID, Requirement: requirement, SessionRequired: o.SessionRequired,
 					Read: read, Scope: access.ScopeOf(requirement, read), OpenToProjectTokens: where == whoAmI,
 				},
-				OpensSession: o.OpensSession, ChecksPassword: o.ChecksPassword, MaxBodyBytes: o.MaxBodyBytes,
+				OpensSession: o.OpensSession, JSONOnly: o.JSONOnly, ChecksPassword: o.ChecksPassword, MaxBodyBytes: o.MaxBodyBytes,
 			}
 		}
 	}
@@ -127,8 +133,8 @@ var Table = map[string]Entry{
 	slices.Sort(patterns)
 	for _, p := range patterns {
 		o := ops[p]
-		fmt.Fprintf(&b, "\t%q: {Operation: access.Operation{Name: %q, Requirement: %q, SessionRequired: %t, Read: %t, Scope: %q, OpenToProjectTokens: %t}, OpensSession: %t, ChecksPassword: %t, MaxBodyBytes: %d},\n",
-			p, o.Name, string(o.Requirement), o.SessionRequired, o.Read, string(o.Scope), o.OpenToProjectTokens, o.OpensSession, o.ChecksPassword, o.MaxBodyBytes)
+		fmt.Fprintf(&b, "\t%q: {Operation: access.Operation{Name: %q, Requirement: %q, SessionRequired: %t, Read: %t, Scope: %q, OpenToProjectTokens: %t}, OpensSession: %t, JSONOnly: %t, ChecksPassword: %t, MaxBodyBytes: %d},\n",
+			p, o.Name, string(o.Requirement), o.SessionRequired, o.Read, string(o.Scope), o.OpenToProjectTokens, o.OpensSession, o.JSONOnly, o.ChecksPassword, o.MaxBodyBytes)
 	}
 	b.WriteString("}\n")
 	return format.Source(b.Bytes())

@@ -1355,6 +1355,9 @@ type AuthMethods struct {
 	// LocalLoginEnabled Whether a member signs in with their email and password.
 	LocalLoginEnabled bool `json:"local_login_enabled"`
 
+	// PasswordResetAvailable Whether a member can ask for a password reset by mail (`POST /auth/password-reset`): the instance has an SMTP server and self-service password reset is on. The sign-in page offers the forgotten-password link only then.
+	PasswordResetAvailable bool `json:"password_reset_available"`
+
 	// Providers The enabled auth providers a member signs in through, ordered by display name.
 	Providers []AuthMethodProvider `json:"providers"`
 }
@@ -1569,6 +1572,9 @@ type AuthProviderTest struct {
 type AuthSettings struct {
 	// PasswordMinLength The fewest characters a password chosen from now on has, never below 12. 12 on a fresh instance.
 	PasswordMinLength int `json:"password_min_length"`
+
+	// SelfServicePasswordReset Whether a member can ask for a password reset by mail (`POST /auth/password-reset`). It also takes an SMTP server. True on a fresh instance. An instance admin can still issue a reset link whatever this says.
+	SelfServicePasswordReset bool `json:"self_service_password_reset"`
 
 	// SessionAbsoluteTimeoutSeconds A session ends this long after it opened, however much it is used. 2592000 (30 days) on a fresh instance.
 	SessionAbsoluteTimeoutSeconds int64 `json:"session_absolute_timeout_seconds"`
@@ -3388,6 +3394,12 @@ type PasswordReset struct {
 // PasswordResetCompletion defines model for PasswordResetCompletion.
 type PasswordResetCompletion struct {
 	Password string `json:"password"`
+}
+
+// PasswordResetRequest defines model for PasswordResetRequest.
+type PasswordResetRequest struct {
+	// Email The email the member signs in with, whatever its case.
+	Email string `json:"email"`
 }
 
 // PastExpectedEndAlertDetails defines model for PastExpectedEndAlertDetails.
@@ -5986,6 +5998,9 @@ type ListInstanceWebhookDeliveriesParams struct {
 // AcceptInvitationJSONRequestBody defines body for AcceptInvitation for application/json ContentType.
 type AcceptInvitationJSONRequestBody = InvitationAcceptance
 
+// RequestPasswordResetJSONRequestBody defines body for RequestPasswordReset for application/json ContentType.
+type RequestPasswordResetJSONRequestBody = PasswordResetRequest
+
 // CompletePasswordResetJSONRequestBody defines body for CompletePasswordReset for application/json ContentType.
 type CompletePasswordResetJSONRequestBody = PasswordResetCompletion
 
@@ -7338,6 +7353,56 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /auth/methods (the `GetAuthMethods` operationId).
 	GetAuthMethods(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RequestPasswordResetWithBody Ask for a password reset by mail
+	//
+	// For a member who forgot their password. Answers `202 Accepted` at
+	// once whoever the email belongs to, whether or not anything comes of
+	// it, so the answer reveals nothing about which addresses exist. The
+	// lookup, the issuing and the mail happen after the answer.
+	//
+	// A password reset link is mailed, to the member in their language,
+	// only when the instance has an SMTP server and self-service password
+	// reset is on in the auth settings, the email belongs to an active
+	// member who holds a password, and no self-service reset was issued
+	// for them in the last 5 minutes (a reset counts when it was issued,
+	// even if its mail could not be sent). The link opens
+	// `/password-reset/{secret}` in the console, works once and expires
+	// after an hour; completing it is `POST /auth/password-reset/{secret}`.
+	// A reset issued is audited `password.reset_requested`.
+	//
+	// The body must be sent as `application/json`, at most 8 KiB;
+	// anything else is refused `unsupported_media_type`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/password-reset (the `RequestPasswordReset` operationId).
+	RequestPasswordResetWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RequestPasswordReset Ask for a password reset by mail
+	//
+	// For a member who forgot their password. Answers `202 Accepted` at
+	// once whoever the email belongs to, whether or not anything comes of
+	// it, so the answer reveals nothing about which addresses exist. The
+	// lookup, the issuing and the mail happen after the answer.
+	//
+	// A password reset link is mailed, to the member in their language,
+	// only when the instance has an SMTP server and self-service password
+	// reset is on in the auth settings, the email belongs to an active
+	// member who holds a password, and no self-service reset was issued
+	// for them in the last 5 minutes (a reset counts when it was issued,
+	// even if its mail could not be sent). The link opens
+	// `/password-reset/{secret}` in the console, works once and expires
+	// after an hour; completing it is `POST /auth/password-reset/{secret}`.
+	// A reset issued is audited `password.reset_requested`.
+	//
+	// The body must be sent as `application/json`, at most 8 KiB;
+	// anything else is refused `unsupported_media_type`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/password-reset (the `RequestPasswordReset` operationId).
+	RequestPasswordReset(ctx context.Context, body RequestPasswordResetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPasswordReset What a password reset's link opens
 	//
@@ -10998,6 +11063,76 @@ func (c *Client) AcceptInvitation(ctx context.Context, secret string, body Accep
 // Corresponds with GET /auth/methods (the `GetAuthMethods` operationId).
 func (c *Client) GetAuthMethods(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetAuthMethodsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RequestPasswordResetWithBody Ask for a password reset by mail
+//
+// For a member who forgot their password. Answers `202 Accepted` at
+// once whoever the email belongs to, whether or not anything comes of
+// it, so the answer reveals nothing about which addresses exist. The
+// lookup, the issuing and the mail happen after the answer.
+//
+// A password reset link is mailed, to the member in their language,
+// only when the instance has an SMTP server and self-service password
+// reset is on in the auth settings, the email belongs to an active
+// member who holds a password, and no self-service reset was issued
+// for them in the last 5 minutes (a reset counts when it was issued,
+// even if its mail could not be sent). The link opens
+// `/password-reset/{secret}` in the console, works once and expires
+// after an hour; completing it is `POST /auth/password-reset/{secret}`.
+// A reset issued is audited `password.reset_requested`.
+//
+// The body must be sent as `application/json`, at most 8 KiB;
+// anything else is refused `unsupported_media_type`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/password-reset (the `RequestPasswordReset` operationId).
+func (c *Client) RequestPasswordResetWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRequestPasswordResetRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RequestPasswordReset Ask for a password reset by mail
+//
+// For a member who forgot their password. Answers `202 Accepted` at
+// once whoever the email belongs to, whether or not anything comes of
+// it, so the answer reveals nothing about which addresses exist. The
+// lookup, the issuing and the mail happen after the answer.
+//
+// A password reset link is mailed, to the member in their language,
+// only when the instance has an SMTP server and self-service password
+// reset is on in the auth settings, the email belongs to an active
+// member who holds a password, and no self-service reset was issued
+// for them in the last 5 minutes (a reset counts when it was issued,
+// even if its mail could not be sent). The link opens
+// `/password-reset/{secret}` in the console, works once and expires
+// after an hour; completing it is `POST /auth/password-reset/{secret}`.
+// A reset issued is audited `password.reset_requested`.
+//
+// The body must be sent as `application/json`, at most 8 KiB;
+// anything else is refused `unsupported_media_type`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/password-reset (the `RequestPasswordReset` operationId).
+func (c *Client) RequestPasswordReset(ctx context.Context, body RequestPasswordResetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRequestPasswordResetRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -17476,6 +17611,46 @@ func NewGetAuthMethodsRequest(server string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewRequestPasswordResetRequest calls the generic RequestPasswordReset builder with application/json body
+func NewRequestPasswordResetRequest(server string, body RequestPasswordResetJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRequestPasswordResetRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewRequestPasswordResetRequestWithBody constructs an http.Request for the RequestPasswordReset method, with any body, and a specified content type
+func NewRequestPasswordResetRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/password-reset")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -27162,6 +27337,56 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /auth/methods (the `GetAuthMethods` operationId).
 	GetAuthMethodsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthMethodsResponse, error)
 
+	// RequestPasswordResetWithBodyWithResponse Ask for a password reset by mail
+	//
+	// For a member who forgot their password. Answers `202 Accepted` at
+	// once whoever the email belongs to, whether or not anything comes of
+	// it, so the answer reveals nothing about which addresses exist. The
+	// lookup, the issuing and the mail happen after the answer.
+	//
+	// A password reset link is mailed, to the member in their language,
+	// only when the instance has an SMTP server and self-service password
+	// reset is on in the auth settings, the email belongs to an active
+	// member who holds a password, and no self-service reset was issued
+	// for them in the last 5 minutes (a reset counts when it was issued,
+	// even if its mail could not be sent). The link opens
+	// `/password-reset/{secret}` in the console, works once and expires
+	// after an hour; completing it is `POST /auth/password-reset/{secret}`.
+	// A reset issued is audited `password.reset_requested`.
+	//
+	// The body must be sent as `application/json`, at most 8 KiB;
+	// anything else is refused `unsupported_media_type`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/password-reset (the `RequestPasswordReset` operationId).
+	RequestPasswordResetWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RequestPasswordResetResponse, error)
+
+	// RequestPasswordResetWithResponse Ask for a password reset by mail
+	//
+	// For a member who forgot their password. Answers `202 Accepted` at
+	// once whoever the email belongs to, whether or not anything comes of
+	// it, so the answer reveals nothing about which addresses exist. The
+	// lookup, the issuing and the mail happen after the answer.
+	//
+	// A password reset link is mailed, to the member in their language,
+	// only when the instance has an SMTP server and self-service password
+	// reset is on in the auth settings, the email belongs to an active
+	// member who holds a password, and no self-service reset was issued
+	// for them in the last 5 minutes (a reset counts when it was issued,
+	// even if its mail could not be sent). The link opens
+	// `/password-reset/{secret}` in the console, works once and expires
+	// after an hour; completing it is `POST /auth/password-reset/{secret}`.
+	// A reset issued is audited `password.reset_requested`.
+	//
+	// The body must be sent as `application/json`, at most 8 KiB;
+	// anything else is refused `unsupported_media_type`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/password-reset (the `RequestPasswordReset` operationId).
+	RequestPasswordResetWithResponse(ctx context.Context, body RequestPasswordResetJSONRequestBody, reqEditors ...RequestEditorFn) (*RequestPasswordResetResponse, error)
+
 	// GetPasswordResetWithResponse What a password reset's link opens
 	//
 	// Read before anyone is signed in, to show whose password the link
@@ -31334,6 +31559,75 @@ func (r GetAuthMethodsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetAuthMethodsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RequestPasswordResetResponse401Headers the declared response headers of an HTTP 401 response for RequestPasswordReset
+type RequestPasswordResetResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RequestPasswordResetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *RequestTooLarge
+	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
+	ApplicationproblemJSON415 *UnsupportedMediaType
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RequestPasswordResetResponse401Headers
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r RequestPasswordResetResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RequestPasswordResetResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r RequestPasswordResetResponse) GetApplicationproblemJSON413() *RequestTooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
+func (r RequestPasswordResetResponse) GetApplicationproblemJSON415() *UnsupportedMediaType {
+	return r.ApplicationproblemJSON415
+}
+
+// GetBody returns the raw response body bytes
+func (r RequestPasswordResetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RequestPasswordResetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RequestPasswordResetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RequestPasswordResetResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -46385,6 +46679,68 @@ func (c *ClientWithResponses) GetAuthMethodsWithResponse(ctx context.Context, re
 	return ParseGetAuthMethodsResponse(rsp)
 }
 
+// RequestPasswordResetWithBodyWithResponse Ask for a password reset by mail
+//
+// For a member who forgot their password. Answers `202 Accepted` at
+// once whoever the email belongs to, whether or not anything comes of
+// it, so the answer reveals nothing about which addresses exist. The
+// lookup, the issuing and the mail happen after the answer.
+//
+// A password reset link is mailed, to the member in their language,
+// only when the instance has an SMTP server and self-service password
+// reset is on in the auth settings, the email belongs to an active
+// member who holds a password, and no self-service reset was issued
+// for them in the last 5 minutes (a reset counts when it was issued,
+// even if its mail could not be sent). The link opens
+// `/password-reset/{secret}` in the console, works once and expires
+// after an hour; completing it is `POST /auth/password-reset/{secret}`.
+// A reset issued is audited `password.reset_requested`.
+//
+// The body must be sent as `application/json`, at most 8 KiB;
+// anything else is refused `unsupported_media_type`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/password-reset (the `RequestPasswordReset` operationId).
+func (c *ClientWithResponses) RequestPasswordResetWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RequestPasswordResetResponse, error) {
+	rsp, err := c.RequestPasswordResetWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRequestPasswordResetResponse(rsp)
+}
+
+// RequestPasswordResetWithResponse Ask for a password reset by mail
+//
+// For a member who forgot their password. Answers `202 Accepted` at
+// once whoever the email belongs to, whether or not anything comes of
+// it, so the answer reveals nothing about which addresses exist. The
+// lookup, the issuing and the mail happen after the answer.
+//
+// A password reset link is mailed, to the member in their language,
+// only when the instance has an SMTP server and self-service password
+// reset is on in the auth settings, the email belongs to an active
+// member who holds a password, and no self-service reset was issued
+// for them in the last 5 minutes (a reset counts when it was issued,
+// even if its mail could not be sent). The link opens
+// `/password-reset/{secret}` in the console, works once and expires
+// after an hour; completing it is `POST /auth/password-reset/{secret}`.
+// A reset issued is audited `password.reset_requested`.
+//
+// The body must be sent as `application/json`, at most 8 KiB;
+// anything else is refused `unsupported_media_type`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/password-reset (the `RequestPasswordReset` operationId).
+func (c *ClientWithResponses) RequestPasswordResetWithResponse(ctx context.Context, body RequestPasswordResetJSONRequestBody, reqEditors ...RequestEditorFn) (*RequestPasswordResetResponse, error) {
+	rsp, err := c.RequestPasswordReset(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRequestPasswordResetResponse(rsp)
+}
+
 // GetPasswordResetWithResponse What a password reset's link opens
 //
 // Read before anyone is signed in, to show whose password the link
@@ -51974,6 +52330,69 @@ func ParseGetAuthMethodsResponse(rsp *http.Response) (*GetAuthMethodsResponse, e
 	switch {
 	case rsp.StatusCode == 401:
 		var headers GetAuthMethodsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRequestPasswordResetResponse parses an HTTP response from a RequestPasswordResetWithResponse call
+func ParseRequestPasswordResetResponse(rsp *http.Response) (*RequestPasswordResetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RequestPasswordResetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 202:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest RequestTooLarge
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest UnsupportedMediaType
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON415 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers RequestPasswordResetResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -65633,6 +66052,9 @@ type ServerInterface interface {
 	// GetAuthMethods How members sign in
 	// (GET /auth/methods)
 	GetAuthMethods(w http.ResponseWriter, r *http.Request)
+	// RequestPasswordReset Ask for a password reset by mail
+	// (POST /auth/password-reset)
+	RequestPasswordReset(w http.ResponseWriter, r *http.Request)
 	// GetPasswordReset What a password reset's link opens
 	// (GET /auth/password-reset/{secret})
 	GetPasswordReset(w http.ResponseWriter, r *http.Request, secret string)
@@ -66638,6 +67060,20 @@ func (siw *ServerInterfaceWrapper) GetAuthMethods(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAuthMethods(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RequestPasswordReset operation middleware
+func (siw *ServerInterfaceWrapper) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestPasswordReset(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -74400,6 +74836,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/methods", wrapper.GetAuthMethods)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/invitations/{secret}", wrapper.GetInvitation)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/invitations/{secret}", wrapper.AcceptInvitation)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/password-reset", wrapper.RequestPasswordReset)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/password-reset/{secret}", wrapper.GetPasswordReset)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/password-reset/{secret}", wrapper.CompletePasswordReset)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
@@ -75155,6 +75592,89 @@ func (response GetAuthMethods401ApplicationProblemPlusJSONResponse) VisitGetAuth
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestPasswordResetRequestObject struct {
+	Body *RequestPasswordResetJSONRequestBody
+}
+
+type RequestPasswordResetResponseObject interface {
+	VisitRequestPasswordResetResponse(w http.ResponseWriter) error
+}
+
+type RequestPasswordReset202Response struct {
+}
+
+func (response RequestPasswordReset202Response) VisitRequestPasswordResetResponse(w http.ResponseWriter) error {
+	w.WriteHeader(202)
+	return nil
+}
+
+type RequestPasswordReset400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response RequestPasswordReset400ApplicationProblemPlusJSONResponse) VisitRequestPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestPasswordReset401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RequestPasswordReset401ApplicationProblemPlusJSONResponse) VisitRequestPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestPasswordReset413ApplicationProblemPlusJSONResponse struct {
+	RequestTooLargeApplicationProblemPlusJSONResponse
+}
+
+func (response RequestPasswordReset413ApplicationProblemPlusJSONResponse) VisitRequestPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestPasswordReset415ApplicationProblemPlusJSONResponse struct {
+	UnsupportedMediaTypeApplicationProblemPlusJSONResponse
+}
+
+func (response RequestPasswordReset415ApplicationProblemPlusJSONResponse) VisitRequestPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -93814,6 +94334,9 @@ type StrictServerInterface interface {
 	// GetAuthMethods How members sign in
 	// (GET /auth/methods)
 	GetAuthMethods(ctx context.Context, request GetAuthMethodsRequestObject) (GetAuthMethodsResponseObject, error)
+	// RequestPasswordReset Ask for a password reset by mail
+	// (POST /auth/password-reset)
+	RequestPasswordReset(ctx context.Context, request RequestPasswordResetRequestObject) (RequestPasswordResetResponseObject, error)
 	// GetPasswordReset What a password reset's link opens
 	// (GET /auth/password-reset/{secret})
 	GetPasswordReset(ctx context.Context, request GetPasswordResetRequestObject) (GetPasswordResetResponseObject, error)
@@ -94529,6 +95052,37 @@ func (sh *strictHandler) GetAuthMethods(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetAuthMethodsResponseObject); ok {
 		if err := validResponse.VisitGetAuthMethodsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RequestPasswordReset operation middleware
+func (sh *strictHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
+	var request RequestPasswordResetRequestObject
+
+	var body RequestPasswordResetJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RequestPasswordReset(ctx, request.(RequestPasswordResetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RequestPasswordReset")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RequestPasswordResetResponseObject); ok {
+		if err := validResponse.VisitRequestPasswordResetResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

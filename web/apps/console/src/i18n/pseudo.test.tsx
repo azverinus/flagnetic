@@ -95,6 +95,7 @@ const screens: { name: string; routes?: Record<string, FakeAnswer>; ui: () => Re
           token_max_lifetime_seconds: 31_536_000,
           token_expiry_required: false,
           password_min_length: 12,
+          self_service_password_reset: true,
         }}
       />
     ),

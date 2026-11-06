@@ -55,6 +55,19 @@ func WithDisplayName(name string) MemberOption {
 // has not accepted their invitation.
 func NewMember(t testing.TB, pool *pgxpool.Pool, opts ...MemberOption) Member {
 	t.Helper()
+	return newMember(t, pool, true, opts)
+}
+
+// NewPasswordlessMember creates a member as NewMember does, who holds no
+// password, as one who signs in through an auth provider only: nobody can
+// sign in as them with MemberPassword, which Member.Password still names.
+func NewPasswordlessMember(t testing.TB, pool *pgxpool.Pool, opts ...MemberOption) Member {
+	t.Helper()
+	return newMember(t, pool, false, opts)
+}
+
+func newMember(t testing.TB, pool *pgxpool.Pool, password bool, opts []MemberOption) Member {
+	t.Helper()
 	m := access.Member{
 		ID: id.New[access.Member](id.NewSource(Clock())), Email: strings.ToLower(rand.Text()) + "@example.com",
 		DisplayName: "Test Member", Status: access.MemberActive, CreatedAt: Clock().Now(),
@@ -64,7 +77,7 @@ func NewMember(t testing.TB, pool *pgxpool.Pool, opts ...MemberOption) Member {
 	}
 	RecordSecret(MemberPassword)
 	var hash string
-	if m.Status != access.MemberInvited {
+	if password && m.Status != access.MemberInvited {
 		var err error
 		if hash, err = compose.Hasher().Hash(t.Context(), secret.New(MemberPassword)); err != nil {
 			t.Fatal(err)

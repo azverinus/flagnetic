@@ -229,6 +229,50 @@ paths:
           $ref: "#/components/responses/TooManyAttempts"
         "503":
           $ref: "#/components/responses/Busy"
+  /auth/password-reset:
+    post:
+      operationId: requestPasswordReset
+      summary: Ask for a password reset by mail
+      description: |
+        For a member who forgot their password. Answers `202 Accepted` at
+        once whoever the email belongs to, whether or not anything comes of
+        it, so the answer reveals nothing about which addresses exist. The
+        lookup, the issuing and the mail happen after the answer.
+
+        A password reset link is mailed, to the member in their language,
+        only when the instance has an SMTP server and self-service password
+        reset is on in the auth settings, the email belongs to an active
+        member who holds a password, and no self-service reset was issued
+        for them in the last 5 minutes (a reset counts when it was issued,
+        even if its mail could not be sent). The link opens
+        `/password-reset/{secret}` in the console, works once and expires
+        after an hour; completing it is `POST /auth/password-reset/{secret}`.
+        A reset issued is audited `password.reset_requested`.
+
+        The body must be sent as `application/json`, at most 8 KiB;
+        anything else is refused `unsupported_media_type`.
+      x-permission: public
+      x-json-only: true
+      x-max-body-bytes: 8192
+      security: []
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordResetRequest"
+      responses:
+        "202":
+          description: The request was received. Nothing more is said.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
   /auth/password-reset/{secret}:
     parameters:
       - name: secret
@@ -7811,11 +7855,14 @@ components:
             type: string
     AuthMethods:
       type: object
-      required: [local_login_enabled, providers]
+      required: [local_login_enabled, password_reset_available, providers]
       properties:
         local_login_enabled:
           type: boolean
           description: Whether a member signs in with their email and password.
+        password_reset_available:
+          type: boolean
+          description: "Whether a member can ask for a password reset by mail (`POST /auth/password-reset`): the instance has an SMTP server and self-service password reset is on. The sign-in page offers the forgotten-password link only then."
         providers:
           type: array
           description: The enabled auth providers a member signs in through, ordered by display name.
@@ -8043,6 +8090,13 @@ components:
         expires_at:
           type: string
           format: date-time
+    PasswordResetRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          description: The email the member signs in with, whatever its case.
     PasswordResetCompletion:
       type: object
       required: [password]
@@ -8227,7 +8281,7 @@ components:
     AuthSettings:
       type: object
       description: The instance's rules for sessions, API tokens and passwords.
-      required: [session_idle_timeout_seconds, session_absolute_timeout_seconds, token_max_lifetime_seconds, token_expiry_required, password_min_length]
+      required: [session_idle_timeout_seconds, session_absolute_timeout_seconds, token_max_lifetime_seconds, token_expiry_required, password_min_length, self_service_password_reset]
       properties:
         session_idle_timeout_seconds:
           type: integer
@@ -8247,6 +8301,9 @@ components:
         password_min_length:
           type: integer
           description: The fewest characters a password chosen from now on has, never below 12. 12 on a fresh instance.
+        self_service_password_reset:
+          type: boolean
+          description: Whether a member can ask for a password reset by mail (`POST /auth/password-reset`). It also takes an SMTP server. True on a fresh instance. An instance admin can still issue a reset link whatever this says.
     SmtpSecurity:
       type: string
       enum: [starttls, tls, none]

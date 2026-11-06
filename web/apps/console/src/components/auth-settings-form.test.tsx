@@ -13,6 +13,7 @@ const fresh = {
   token_max_lifetime_seconds: 31_536_000,
   token_expiry_required: false,
   password_min_length: 12,
+  self_service_password_reset: true,
 };
 
 async function retype(label: string, value: string) {

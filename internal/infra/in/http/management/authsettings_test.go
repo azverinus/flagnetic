@@ -28,7 +28,7 @@ func freshInstance(t *testing.T, c clock.Clock) (*testkit.Server, *pgxpool.Pool,
 // them.
 var defaultSettings = management.AuthSettings{
 	SessionIdleTimeoutSeconds: 86400, SessionAbsoluteTimeoutSeconds: 2592000, TokenMaxLifetimeSeconds: 31536000,
-	TokenExpiryRequired: false, PasswordMinLength: 12,
+	TokenExpiryRequired: false, PasswordMinLength: 12, SelfServicePasswordReset: true,
 }
 
 func getSettings(t *testing.T, c *management.ClientWithResponses) management.AuthSettings {
@@ -66,7 +66,7 @@ func TestReadingAndUpdatingEveryAuthSetting(t *testing.T) {
 	_, _, admin := freshInstance(t, testkit.Clock())
 	want := management.AuthSettings{
 		SessionIdleTimeoutSeconds: 7200, SessionAbsoluteTimeoutSeconds: 172800, TokenMaxLifetimeSeconds: 604800,
-		TokenExpiryRequired: true, PasswordMinLength: 16,
+		TokenExpiryRequired: true, PasswordMinLength: 16, SelfServicePasswordReset: false,
 	}
 	if got := putSettings(t, admin, want); got != want {
 		t.Errorf("PUT answered %+v, want %+v", got, want)

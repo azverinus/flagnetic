@@ -172,8 +172,12 @@ func (a *api) GetAuthMethods(ctx context.Context, _ GetAuthMethodsRequestObject)
 	if err != nil {
 		return nil, err
 	}
+	resetAvailable, err := a.h.ResetAvailable.Handle(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return GetAuthMethods200JSONResponse{
-		LocalLoginEnabled: true,
+		LocalLoginEnabled: true, PasswordResetAvailable: resetAvailable,
 		Providers: each(list, func(p identity.Provider) AuthMethodProvider {
 			return AuthMethodProvider{Slug: p.Slug, DisplayName: p.DisplayName, Kind: AuthProviderKind(p.Kind)}
 		}),
@@ -213,6 +217,14 @@ func (a *api) AcceptInvitation(ctx context.Context, req AcceptInvitationRequestO
 	}
 	cookie := sessionCookie(ctx, res.Cookie.Reveal())
 	return AcceptInvitation200JSONResponse{Body: me, Headers: AcceptInvitation200ResponseHeaders{SetCookie: &cookie}}, nil
+}
+
+// RequestPasswordReset answers 202 at once, whoever the email belongs to; a
+// password reset is issued and mailed after the answer, when there is one to
+// issue.
+func (a *api) RequestPasswordReset(ctx context.Context, req RequestPasswordResetRequestObject) (RequestPasswordResetResponseObject, error) {
+	a.h.RequestReset.Handle(ctx, appaccess.RequestPasswordResetCommand{Email: req.Body.Email, RequestID: flaghttp.RequestIDOf(ctx)})
+	return RequestPasswordReset202Response{}, nil
 }
 
 // GetPasswordReset answers what a password reset's link opens.

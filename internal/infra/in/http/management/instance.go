@@ -21,11 +21,12 @@ func (a *api) GetAuthSettings(ctx context.Context, _ GetAuthSettingsRequestObjec
 func (a *api) UpdateAuthSettings(ctx context.Context, req UpdateAuthSettingsRequestObject) (UpdateAuthSettingsResponseObject, error) {
 	b := req.Body
 	s, err := a.h.UpdateAuthSettings.Handle(ctx, access.AuthSettings{
-		SessionIdleTimeout:     seconds(b.SessionIdleTimeoutSeconds),
-		SessionAbsoluteTimeout: seconds(b.SessionAbsoluteTimeoutSeconds),
-		TokenMaxLifetime:       seconds(b.TokenMaxLifetimeSeconds),
-		TokenExpiryRequired:    b.TokenExpiryRequired,
-		PasswordMinLength:      b.PasswordMinLength,
+		SessionIdleTimeout:       seconds(b.SessionIdleTimeoutSeconds),
+		SessionAbsoluteTimeout:   seconds(b.SessionAbsoluteTimeoutSeconds),
+		TokenMaxLifetime:         seconds(b.TokenMaxLifetimeSeconds),
+		TokenExpiryRequired:      b.TokenExpiryRequired,
+		PasswordMinLength:        b.PasswordMinLength,
+		SelfServicePasswordReset: b.SelfServicePasswordReset,
 	}, requestOf(ctx))
 	if err != nil {
 		return nil, err
@@ -54,5 +55,6 @@ func authSettingsOf(s access.AuthSettings) AuthSettings {
 		TokenMaxLifetimeSeconds:       int64(s.TokenMaxLifetime / time.Second),
 		TokenExpiryRequired:           s.TokenExpiryRequired,
 		PasswordMinLength:             s.PasswordMinLength,
+		SelfServicePasswordReset:      s.SelfServicePasswordReset,
 	}
 }

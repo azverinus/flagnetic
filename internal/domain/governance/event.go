@@ -426,6 +426,7 @@ var entryOnlyActions = []string{
 	"password.changed",
 	"password.reset",
 	"password.reset_issued",
+	"password.reset_requested",
 	"project.created",
 	"project.deleted",
 	"project.updated",

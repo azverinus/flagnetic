@@ -79,3 +79,43 @@ func TestOnlyPasswordResetsLongPastUseArePurged(t *testing.T) {
 		t.Errorf("cutoff = %v, want %v", cut.EndedBy, want)
 	}
 }
+
+func TestASelfServicePasswordResetIsDueOncePerInterval(t *testing.T) {
+	if access.PasswordResetInterval != 5*time.Minute {
+		t.Fatalf("interval = %v, want 5 minutes", access.PasswordResetInterval)
+	}
+	last := now
+	for name, tc := range map[string]struct {
+		at   time.Time
+		want bool
+	}{
+		"right after":                 {last, false},
+		"a second before the end":     {last.Add(access.PasswordResetInterval - time.Second), false},
+		"when the interval has ended": {last.Add(access.PasswordResetInterval), true},
+		"long after":                  {last.Add(time.Hour), true},
+	} {
+		if got := access.SelfServicePasswordResetDue(&last, tc.at); got != tc.want {
+			t.Errorf("%s: due = %t, want %t", name, got, tc.want)
+		}
+	}
+	if !access.SelfServicePasswordResetDue(nil, now) {
+		t.Error("not due for a member who never asked")
+	}
+}
+
+func TestOnlyAnActiveMemberHoldingAPasswordIsMailedAReset(t *testing.T) {
+	for name, tc := range map[string]struct {
+		status   access.MemberStatus
+		password bool
+		want     bool
+	}{
+		"active with a password":    {access.MemberActive, true, true},
+		"active without a password": {access.MemberActive, false, false},
+		"invited":                   {access.MemberInvited, false, false},
+		"deactivated":               {access.MemberDeactivated, true, false},
+	} {
+		if got := access.CanAskForPasswordReset(access.Member{Status: tc.status}, tc.password); got != tc.want {
+			t.Errorf("%s: %t, want %t", name, got, tc.want)
+		}
+	}
+}

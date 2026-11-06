@@ -22,6 +22,9 @@ type AuthSettings struct {
 	// PasswordMinLength is the fewest code points a password has, never
 	// below MinPasswordLength.
 	PasswordMinLength int
+	// SelfServicePasswordReset lets a member ask for a password reset by
+	// mail. An instance admin can still issue a reset link whatever it says.
+	SelfServicePasswordReset bool
 }
 
 // DefaultAuthSettings are the settings of a fresh instance.
@@ -30,6 +33,9 @@ var DefaultAuthSettings = AuthSettings{
 	SessionAbsoluteTimeout: DefaultSessionTimeouts.Absolute,
 	TokenMaxLifetime:       365 * 24 * time.Hour,
 	PasswordMinLength:      MinPasswordLength,
+	// A member who forgot their password is helped without an instance
+	// admin as soon as the instance can send mail.
+	SelfServicePasswordReset: true,
 }
 
 // The bounds of every duration of the settings: a minute keeps an instance
