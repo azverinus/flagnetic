@@ -715,7 +715,7 @@ export const acceptInvitation = <ThrowOnError extends boolean = false>(
  * it, so the answer reveals nothing about which addresses exist. The
  * lookup, the issuing and the mail happen after the answer.
  *
- * A password reset link is mailed, to the member in their language,
+ * A password reset is mailed, to the member in their language,
  * only when the instance has an SMTP server and self-service password
  * reset is on in the auth settings, the email belongs to an active
  * member who holds a password, and no self-service reset was issued

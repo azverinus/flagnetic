@@ -131,7 +131,7 @@ A password reset is issued and mailed only when all of these hold; otherwise not
 
 The mail is written in the member's language and carries the same link an instance admin's reset does: `FLAGNETIC_BASE_URL` followed by `/password-reset/<secret>`, valid for an hour and usable once. It is completed with `POST /auth/password-reset/{secret}` as described above, with the same effects. A reset issued this way is recorded as `password.reset_requested` in the name of the member, without its secret; the mail's failure is logged and counted like any other (see [Mail](mail.md#what-happens-when-a-send-fails)).
 
-An instance admin switches the self-service reset off with `self_service_password_reset: false` in the auth settings. That removes only the member's own way: an instance admin can still issue a reset link.
+An instance admin switches the self-service reset off with `self_service_password_reset: false` in the auth settings. That removes only the member's own way: an instance admin can still issue a password reset.
 
 ## API tokens and scopes
 

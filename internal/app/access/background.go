@@ -15,12 +15,14 @@ import (
 // with it.
 type Background struct {
 	logger *slog.Logger
-	wg     sync.WaitGroup
-	// mu orders each job's place in wg before Wait begins: once waiting is
-	// set, a job still runs but is not awaited, since adding to an empty
-	// wait group while it is being waited on is not allowed.
+	// mu guards running and idle. A count of its own rather than a wait
+	// group: a job may start another (a password reset request queues its
+	// mail) after Wait has begun, and that one must be awaited too, or the
+	// reset is issued while its mail dies with the replica.
 	mu      sync.Mutex
-	waiting bool
+	running int
+	// idle is closed when running falls to zero; nil while nothing runs.
+	idle chan struct{}
 }
 
 // NewBackground returns the runner, which logs a job's panic to logger.
@@ -38,31 +40,37 @@ func (b *Background) Go(ctx context.Context, name string, bound time.Duration, f
 	})
 }
 
-// track counts a job Wait awaits and returns what ends it, or nothing to
-// end once Wait has begun.
+// track counts a job Wait awaits and returns what ends it.
 func (b *Background) track() (done func()) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.waiting {
-		return func() {}
+	if b.running == 0 {
+		b.idle = make(chan struct{})
 	}
-	b.wg.Add(1)
-	return b.wg.Done
+	b.running++
+	return func() {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		b.running--
+		if b.running == 0 {
+			close(b.idle)
+			b.idle = nil
+		}
+	}
 }
 
-// Wait returns once every job started so far has ended, or ctx ends. A
-// replica stopping calls it after its requests are done.
+// Wait returns once every job started so far, and every job those start
+// while they run, has ended, or ctx ends. A replica stopping calls it after
+// its requests are done.
 func (b *Background) Wait(ctx context.Context) {
 	b.mu.Lock()
-	b.waiting = true
+	idle := b.idle
 	b.mu.Unlock()
-	done := make(chan struct{})
-	go func() {
-		b.wg.Wait()
-		close(done)
-	}()
+	if idle == nil {
+		return
+	}
 	select {
-	case <-done:
+	case <-idle:
 	case <-ctx.Done():
 	}
 }

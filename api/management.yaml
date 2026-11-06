@@ -13,8 +13,9 @@ info:
     narrowed by its scopes: each permission falls under one scope, and a token
     exercises it only when it carries that scope. Operations marked
     `x-session-required` refuse every API token. Operations marked
-    `x-opens-session` accept a body sent as `application/json` only
-    (`415 unsupported_media_type` otherwise); operations marked
+    `x-opens-session` or `x-json-only` accept a body sent as
+    `application/json` only (`415 unsupported_media_type` otherwise);
+    operations marked
     `x-checks-password` accept a body of 8 KiB at most
     (`413 request_too_large` otherwise).
 
@@ -239,7 +240,7 @@ paths:
         it, so the answer reveals nothing about which addresses exist. The
         lookup, the issuing and the mail happen after the answer.
 
-        A password reset link is mailed, to the member in their language,
+        A password reset is mailed, to the member in their language,
         only when the instance has an SMTP server and self-service password
         reset is on in the auth settings, the email belongs to an active
         member who holds a password, and no self-service reset was issued
@@ -8303,7 +8304,7 @@ components:
           description: The fewest characters a password chosen from now on has, never below 12. 12 on a fresh instance.
         self_service_password_reset:
           type: boolean
-          description: Whether a member can ask for a password reset by mail (`POST /auth/password-reset`). It also takes an SMTP server. True on a fresh instance. An instance admin can still issue a reset link whatever this says.
+          description: Whether a member can ask for a password reset by mail (`POST /auth/password-reset`). It also takes an SMTP server. True on a fresh instance. An instance admin can still issue a password reset whatever this says.
     SmtpSecurity:
       type: string
       enum: [starttls, tls, none]

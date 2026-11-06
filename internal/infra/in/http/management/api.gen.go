@@ -1573,7 +1573,7 @@ type AuthSettings struct {
 	// PasswordMinLength The fewest characters a password chosen from now on has, never below 12. 12 on a fresh instance.
 	PasswordMinLength int `json:"password_min_length"`
 
-	// SelfServicePasswordReset Whether a member can ask for a password reset by mail (`POST /auth/password-reset`). It also takes an SMTP server. True on a fresh instance. An instance admin can still issue a reset link whatever this says.
+	// SelfServicePasswordReset Whether a member can ask for a password reset by mail (`POST /auth/password-reset`). It also takes an SMTP server. True on a fresh instance. An instance admin can still issue a password reset whatever this says.
 	SelfServicePasswordReset bool `json:"self_service_password_reset"`
 
 	// SessionAbsoluteTimeoutSeconds A session ends this long after it opened, however much it is used. 2592000 (30 days) on a fresh instance.
@@ -7361,7 +7361,7 @@ type ClientInterface interface {
 	// it, so the answer reveals nothing about which addresses exist. The
 	// lookup, the issuing and the mail happen after the answer.
 	//
-	// A password reset link is mailed, to the member in their language,
+	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
 	// reset is on in the auth settings, the email belongs to an active
 	// member who holds a password, and no self-service reset was issued
@@ -7386,7 +7386,7 @@ type ClientInterface interface {
 	// it, so the answer reveals nothing about which addresses exist. The
 	// lookup, the issuing and the mail happen after the answer.
 	//
-	// A password reset link is mailed, to the member in their language,
+	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
 	// reset is on in the auth settings, the email belongs to an active
 	// member who holds a password, and no self-service reset was issued
@@ -11080,7 +11080,7 @@ func (c *Client) GetAuthMethods(ctx context.Context, reqEditors ...RequestEditor
 // it, so the answer reveals nothing about which addresses exist. The
 // lookup, the issuing and the mail happen after the answer.
 //
-// A password reset link is mailed, to the member in their language,
+// A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
 // reset is on in the auth settings, the email belongs to an active
 // member who holds a password, and no self-service reset was issued
@@ -11115,7 +11115,7 @@ func (c *Client) RequestPasswordResetWithBody(ctx context.Context, contentType s
 // it, so the answer reveals nothing about which addresses exist. The
 // lookup, the issuing and the mail happen after the answer.
 //
-// A password reset link is mailed, to the member in their language,
+// A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
 // reset is on in the auth settings, the email belongs to an active
 // member who holds a password, and no self-service reset was issued
@@ -27344,7 +27344,7 @@ type ClientWithResponsesInterface interface {
 	// it, so the answer reveals nothing about which addresses exist. The
 	// lookup, the issuing and the mail happen after the answer.
 	//
-	// A password reset link is mailed, to the member in their language,
+	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
 	// reset is on in the auth settings, the email belongs to an active
 	// member who holds a password, and no self-service reset was issued
@@ -27369,7 +27369,7 @@ type ClientWithResponsesInterface interface {
 	// it, so the answer reveals nothing about which addresses exist. The
 	// lookup, the issuing and the mail happen after the answer.
 	//
-	// A password reset link is mailed, to the member in their language,
+	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
 	// reset is on in the auth settings, the email belongs to an active
 	// member who holds a password, and no self-service reset was issued
@@ -46686,7 +46686,7 @@ func (c *ClientWithResponses) GetAuthMethodsWithResponse(ctx context.Context, re
 // it, so the answer reveals nothing about which addresses exist. The
 // lookup, the issuing and the mail happen after the answer.
 //
-// A password reset link is mailed, to the member in their language,
+// A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
 // reset is on in the auth settings, the email belongs to an active
 // member who holds a password, and no self-service reset was issued
@@ -46717,7 +46717,7 @@ func (c *ClientWithResponses) RequestPasswordResetWithBodyWithResponse(ctx conte
 // it, so the answer reveals nothing about which addresses exist. The
 // lookup, the issuing and the mail happen after the answer.
 //
-// A password reset link is mailed, to the member in their language,
+// A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
 // reset is on in the auth settings, the email belongs to an active
 // member who holds a password, and no self-service reset was issued

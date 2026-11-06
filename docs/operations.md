@@ -77,7 +77,7 @@ An instance admin changes the instance's auth settings at runtime (`/instance/au
 | `token_max_lifetime_seconds` | 31536000 (365 days) | The furthest ahead an API token may expire. |
 | `token_expiry_required` | false | Whether an API token must be created with an expiry. |
 | `password_min_length` | 12 | The fewest characters a password chosen from now on has; never below 12. |
-| `self_service_password_reset` | true | Whether a member can ask for a password reset by mail ([Access](access.md#asking-for-a-password-reset-by-mail)); it also takes an SMTP server. An instance admin can issue a reset link whatever this says. |
+| `self_service_password_reset` | true | Whether a member can ask for a password reset by mail ([Access](access.md#asking-for-a-password-reset-by-mail)); it also takes an SMTP server. An instance admin can issue a password reset whatever this says. |
 
 Durations are whole seconds from a minute to ten years, and the idle timeout is at most the absolute one. Every replica applies a change within a second: each keeps a copy of the settings and drops it when PostgreSQL notifies it of a change, and reads the settings from PostgreSQL on every use while its listener is down (`flagnetic_listener_up{channel="auth_settings"}` at 0). Live sessions are judged by the timeouts in force, so lowering one signs out every session already past it; raising the absolute timeout never lengthens a session opened under a lower one. Each change is recorded in the instance audit log as `auth_settings.updated`, with the settings before and after.
 

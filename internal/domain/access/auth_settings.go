@@ -23,7 +23,7 @@ type AuthSettings struct {
 	// below MinPasswordLength.
 	PasswordMinLength int
 	// SelfServicePasswordReset lets a member ask for a password reset by
-	// mail. An instance admin can still issue a reset link whatever it says.
+	// mail. An instance admin can still issue a password reset whatever it says.
 	SelfServicePasswordReset bool
 }
 

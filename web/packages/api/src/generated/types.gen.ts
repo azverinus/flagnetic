@@ -753,7 +753,7 @@ export type AuthSettings = {
    */
   password_min_length: number;
   /**
-   * Whether a member can ask for a password reset by mail (`POST /auth/password-reset`). It also takes an SMTP server. True on a fresh instance. An instance admin can still issue a reset link whatever this says.
+   * Whether a member can ask for a password reset by mail (`POST /auth/password-reset`). It also takes an SMTP server. True on a fresh instance. An instance admin can still issue a password reset whatever this says.
    */
   self_service_password_reset: boolean;
 };

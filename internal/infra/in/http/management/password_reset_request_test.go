@@ -73,7 +73,7 @@ func (in resetInstance) ask(t *testing.T, email string) {
 	}
 }
 
-// linkIn returns the password reset link the mail holds, in its text, and
+// linkIn returns the link of the password reset the mail holds, in its text, and
 // fails unless its HTML holds the same.
 func linkIn(t *testing.T, m testkit.ReceivedMail) string {
 	t.Helper()
@@ -383,7 +383,7 @@ func TestAFailedResetMailIsLoggedWithoutItsLink(t *testing.T) {
 	for _, r := range logs.Records() {
 		for k, v := range r.Attrs {
 			if strings.Contains(r.Message+k+fmt.Sprint(v), "/password-reset/") {
-				t.Errorf("a log record carries the reset link: %+v", r)
+				t.Errorf("a log record carries the password reset's link: %+v", r)
 			}
 		}
 	}
