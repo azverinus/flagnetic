@@ -170,8 +170,12 @@ func memberInvitationOf(ctx context.Context, res appaccess.InvitedMember) Member
 }
 
 func memberOf(v appaccess.MemberView) Member {
-	return Member{
+	out := Member{
 		Id: openapi_types.UUID(v.ID.Bytes()), Email: v.Email, DisplayName: v.DisplayName, Status: MemberStatus(v.Status),
 		InstanceAdmin: v.InstanceAdmin, CreatedAt: v.CreatedAt, LastSignInAt: v.LastSignInAt, ProjectCount: v.ProjectCount,
 	}
+	if v.Provisioned() {
+		out.Provider = &v.Provider
+	}
+	return out
 }

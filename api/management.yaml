@@ -7980,7 +7980,7 @@ components:
     Member:
       type: object
       description: A member as an instance admin sees them.
-      required: [id, email, display_name, status, instance_admin, created_at, last_sign_in_at, project_count]
+      required: [id, email, display_name, status, instance_admin, provider, created_at, last_sign_in_at, project_count]
       properties:
         id:
           type: string
@@ -7993,6 +7993,14 @@ components:
           $ref: "#/components/schemas/MemberStatus"
         instance_admin:
           type: boolean
+        provider:
+          type: string
+          nullable: true
+          description: |
+            The slug of the auth provider whose SCIM token created or adopted
+            the member, null for any other. A provisioned member's email,
+            name and status follow that provider; changing them here is
+            refused 409 `member_provisioned`.
         created_at:
           type: string
           format: date-time

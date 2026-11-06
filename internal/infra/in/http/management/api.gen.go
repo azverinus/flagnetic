@@ -3297,8 +3297,14 @@ type Member struct {
 	LastSignInAt *time.Time `json:"last_sign_in_at"`
 
 	// ProjectCount How many projects the member holds a grant in; none while they are invited.
-	ProjectCount int          `json:"project_count"`
-	Status       MemberStatus `json:"status"`
+	ProjectCount int `json:"project_count"`
+
+	// Provider The slug of the auth provider whose SCIM token created or adopted
+	// the member, null for any other. A provisioned member's email,
+	// name and status follow that provider; changing them here is
+	// refused 409 `member_provisioned`.
+	Provider *string      `json:"provider"`
+	Status   MemberStatus `json:"status"`
 }
 
 // MemberInvitation defines model for MemberInvitation.
