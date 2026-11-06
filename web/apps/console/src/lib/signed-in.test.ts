@@ -108,6 +108,18 @@ describe("the sign-in page's search", () => {
     });
   });
 
+  it("keeps the error a failed single sign-on sent, and the provider it names, only as codes", () => {
+    expect(validateSignInSearch({ error: "sso_required", provider: "acme" })).toEqual({
+      error: "sso_required",
+      provider: "acme",
+    });
+    expect(validateSignInSearch({ error: "<script>", provider: "acme" })).toEqual({});
+    expect(validateSignInSearch({ error: "sso_required", provider: "A b" })).toEqual({
+      error: "sso_required",
+    });
+    expect(validateSignInSearch({ provider: "acme" })).toEqual({});
+  });
+
   it("does not send a member back to the sign-in page itself", () => {
     expect(signInSearch({ pathname: "/sign-in", searchStr: "?ended=true" }, true)).toEqual({
       ended: true,

@@ -12,7 +12,15 @@ export type SignInSearch = {
   returnTo?: string;
   /** Set when the member was sent here because their session ended. */
   ended?: boolean;
+  /** The code a failed single sign-on sent the member back with. */
+  error?: string;
+  /** The slug of the provider the error names, as `sso_required` does. */
+  provider?: string;
 };
+
+/** What a code or slug in the address may look like; anything else is dropped. */
+const errorCodePattern = /^[a-z][a-z0-9_]{0,63}$/;
+const providerSlugPattern = /^[a-z][a-z0-9_-]{0,63}$/;
 
 /** Reads the sign-in page's search parameters, dropping anything unsafe. */
 export function validateSignInSearch(search: Record<string, unknown>): SignInSearch {
@@ -22,6 +30,12 @@ export function validateSignInSearch(search: Record<string, unknown>): SignInSea
     if (target !== "/") out.returnTo = target;
   }
   if (search.ended === true || search.ended === "true") out.ended = true;
+  if (typeof search.error === "string" && errorCodePattern.test(search.error)) {
+    out.error = search.error;
+    if (typeof search.provider === "string" && providerSlugPattern.test(search.provider)) {
+      out.provider = search.provider;
+    }
+  }
   return out;
 }
 

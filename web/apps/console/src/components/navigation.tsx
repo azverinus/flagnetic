@@ -17,6 +17,7 @@ import {
   type LucideIcon,
   RotateCwIcon,
   ServerIcon,
+  ShieldCheckIcon,
   SettingsIcon,
   TagsIcon,
   UsersIcon,
@@ -151,6 +152,7 @@ type InstanceScreen = Screen & {
     | "/admin/projects"
     | "/admin/members"
     | "/admin/auth-settings"
+    | "/admin/auth-providers"
     | "/admin/audit"
     | "/admin/webhooks";
 };
@@ -160,6 +162,7 @@ const instanceScreens: InstanceScreen[] = [
   { to: "/admin/projects", label: msg`Projects`, icon: LayersIcon },
   { to: "/admin/members", label: msg`Members`, icon: UsersIcon },
   { to: "/admin/auth-settings", label: msg`Auth settings`, icon: KeyRoundIcon },
+  { to: "/admin/auth-providers", label: msg`Auth providers`, icon: ShieldCheckIcon },
   { to: "/admin/webhooks", label: msg`Webhooks`, icon: WebhookIcon },
   { to: "/admin/audit", label: msg`Audit log`, icon: HistoryIcon },
 ];

@@ -24,8 +24,27 @@ export function currentFirst(sessions: readonly Session[]): Session[] {
 }
 
 /**
- * The columns of a list of sessions: the device, this one marked, its
- * address, and when it signed in, was last seen and ends at the latest.
+ * How a session was opened: with the member's password, or through an
+ * auth provider, named by its slug.
+ */
+function SessionMethod({ session }: { session: Session }) {
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      {session.method === "local" ? (
+        <Trans>Password</Trans>
+      ) : session.method === "oidc" ? (
+        <Trans>OpenID Connect</Trans>
+      ) : (
+        <Trans>SAML</Trans>
+      )}
+      {session.provider ? <code className="font-mono text-xs">{session.provider}</code> : null}
+    </span>
+  );
+}
+
+/**
+ * The columns of a list of sessions: the device, this one marked, how it
+ * signed in, its address, and when it signed in, was last seen and ends at the latest.
  */
 export function useSessionColumns(): TableColumn<Session>[] {
   const { i18n, t } = useLingui();
@@ -44,6 +63,11 @@ export function useSessionColumns(): TableColumn<Session>[] {
             ) : null}
           </span>
         ),
+      },
+      {
+        id: "method",
+        header: t`Signed in with`,
+        cell: ({ row }) => <SessionMethod session={row.original} />,
       },
       {
         id: "address",
