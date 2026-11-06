@@ -3,6 +3,7 @@ package access_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
@@ -174,5 +175,31 @@ func TestAProvisionedMemberIsActiveWithoutAPasswordAndNamedAfterTheirNameOrEmail
 	}
 	if _, err := access.NewProvisionedMember(access.MemberID{}, "not-an-email", "x", now); err == nil {
 		t.Error("an address without an at sign was accepted")
+	}
+}
+
+func TestAnInstanceAdminAProviderMadeIsDemotedOnlyByThatProvider(t *testing.T) {
+	ids := newIDs()
+	when := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	admin, err := access.NewInstanceAdmin(id.New[access.Member](ids), "ira@example.com", "Ira", when)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admin.InstanceAdminProvider = "okta"
+	no, yes := false, true
+
+	_, err = admin.Edited(access.MemberChange{InstanceAdmin: &no})
+	if e, ok := apperrors.From(err); !ok || e.Kind != apperrors.KindConflict || e.Code != "sso_sourced" {
+		t.Errorf("demoting by hand = %v, want 409 sso_sourced", err)
+	}
+	same, err := admin.Edited(access.MemberChange{InstanceAdmin: &yes})
+	if err != nil || same != admin {
+		t.Errorf("promoting an instance admin = %+v, %v; want them unchanged", same, err)
+	}
+
+	admin.InstanceAdminProvider = ""
+	demoted, err := admin.Edited(access.MemberChange{InstanceAdmin: &no})
+	if err != nil || demoted.InstanceAdmin {
+		t.Errorf("demoting an instance admin made by hand = %+v, %v", demoted, err)
 	}
 }

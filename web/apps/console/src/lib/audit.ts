@@ -194,6 +194,7 @@ const actorKindLabels = {
   token: msg({ message: "API token", comment: "A kind of actor in the audit log." }),
   cli: msg({ message: "Command line", comment: "A kind of actor in the audit log." }),
   system: msg({ message: "System", comment: "A kind of actor in the audit log." }),
+  sso: msg({ message: "Auth provider", comment: "A kind of actor in the audit log." }),
 } satisfies Record<ActorKind, MessageDescriptor>;
 
 export const auditActorKinds = zActorKind.options;

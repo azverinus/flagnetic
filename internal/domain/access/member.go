@@ -43,6 +43,10 @@ type Member struct {
 	Status      MemberStatus
 	// InstanceAdmin holds every permission in every project.
 	InstanceAdmin bool
+	// InstanceAdminProvider is the slug of the auth provider whose group
+	// mapping made the member an instance admin, "" for one made by hand. Only
+	// that provider takes it away.
+	InstanceAdminProvider string
 	// Locale is the console language the member chose, or "" to follow the
 	// browser.
 	Locale    string
@@ -155,6 +159,9 @@ func (m Member) Edited(change MemberChange) (Member, error) {
 		m.DisplayName = name
 	}
 	if change.InstanceAdmin != nil {
+		if !*change.InstanceAdmin && m.InstanceAdminProvider != "" {
+			return Member{}, ErrSSOSourced
+		}
 		m.InstanceAdmin = *change.InstanceAdmin
 	}
 	return m, nil

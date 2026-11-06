@@ -91,6 +91,31 @@ export const zAuthProvider = z.object({
     }),
 });
 
+/**
+ * What members of a directory group are granted: a role in a project, or
+ * instance admin.
+ *
+ */
+export const zGroupMapping = z.object({
+  group: z.string(),
+  project: z.string().optional(),
+  role: z.string().optional(),
+  instance_admin: z.boolean().optional(),
+});
+
+export const zGroupMappings = z.object({
+  items: z.array(zGroupMapping),
+});
+
+/**
+ * What running the mappings for every member the provider knows did.
+ */
+export const zGroupMappingsRun = z.object({
+  granted: z.int(),
+  revoked: z.int(),
+  kept_instance_admin: z.int(),
+});
+
 export const zAuthProviderList = z.object({
   items: z.array(zAuthProvider),
 });
@@ -612,7 +637,8 @@ export const zGrant = z.object({
   id: z.uuid(),
   member: z.uuid(),
   role: zRoleName,
-  source: z.enum(["manual"]),
+  source: z.enum(["manual", "sso"]),
+  provider: z.string().nullable(),
   created_by: z.uuid().nullable(),
   created_at: z.iso.datetime(),
 });
@@ -725,7 +751,7 @@ export const zAttributePatch = z.object({
   description: zDescription.optional(),
 });
 
-export const zActorKind = z.enum(["member", "token", "cli", "system"]);
+export const zActorKind = z.enum(["member", "token", "cli", "system", "sso"]);
 
 export const zActor = z.object({
   kind: zActorKind,
@@ -4587,6 +4613,26 @@ export const zDisableAuthProviderPath = z.object({
  * The auth provider, disabled.
  */
 export const zDisableAuthProviderResponse = zAuthProvider;
+
+export const zGetAuthProviderGroupMappingsPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * The group mappings.
+ */
+export const zGetAuthProviderGroupMappingsResponse = zGroupMappings;
+
+export const zReplaceAuthProviderGroupMappingsBody = zGroupMappings;
+
+export const zReplaceAuthProviderGroupMappingsPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * What running the mappings did.
+ */
+export const zReplaceAuthProviderGroupMappingsResponse = zGroupMappingsRun;
 
 export const zTestAuthProviderPath = z.object({
   provider: z.string(),

@@ -372,7 +372,15 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	samlClient := saml.NewClient()
 	authProviders := appidentity.ProviderDeps{
 		Tx: tx, Store: identityStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Sealer: o.Keyring, BaseURL: o.BaseURL, SAML: samlClient, SPKeys: samlClient,
-		References: []appidentity.ProviderReference{identityStore},
+		References: []appidentity.ProviderReference{identityStore, providerGrants{providers: identityStore, access: accessStore}},
+	}
+	// A provider's group mappings give members grants and instance admin: the
+	// identity context decides what the groups map to, the access context
+	// makes it so.
+	groupMappings := appidentity.GroupMappingDeps{
+		Tx: tx, Providers: identityStore, Mappings: identityStore, Projects: projectDirectory{ws: ws},
+		Access: providerAccess{svc: appaccess.NewProviderAccess(accessStore, audit, d.Clock, d.IDs)},
+		Audit:  audit, Clock: d.Clock, IDs: d.IDs, Logger: edge.Logger(),
 	}
 	managementOptions := o.Options
 	managementOptions.Clock = d.Clock
@@ -382,6 +390,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	oidcClient := oidc.NewClient()
 	signIn := appidentity.SignInDeps{
 		Tx: tx, Providers: identityStore, Attempts: identityStore, Identities: identityStore, Members: ssoMembers{sso: ssoAccess},
+		Mappings: identityStore, Access: groupMappings.Access, Logger: edge.Logger(),
 		OIDC: oidcClient, SAML: samlClient, Replays: identityStore, Opener: o.Keyring, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, BaseURL: o.BaseURL,
 	}
 	sso.Mount(edge, sso.Handlers{
@@ -400,6 +409,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		EnableAuthProvider:       appidentity.NewEnableProvider(authProviders),
 		DisableAuthProvider:      appidentity.NewDisableProvider(authProviders),
 		TestAuthProvider:         appidentity.NewTestProvider(identityStore, oidc.NewDiscoverer(), samlClient),
+		GetGroupMappings:         appidentity.NewGetGroupMappings(identityStore, identityStore),
+		ReplaceGroupMappings:     appidentity.NewReplaceGroupMappings(groupMappings),
 		AuthenticateToken:        appaccess.NewAuthenticateToken(accessStore, tokenUses, d.Clock),
 		AuthenticateSession:      appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey),
 		SignIn: appaccess.NewSignIn(appaccess.SignInDeps{

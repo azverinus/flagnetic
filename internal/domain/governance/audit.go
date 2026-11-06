@@ -25,6 +25,9 @@ const (
 	ActorToken  ActorKind = "token"
 	ActorCLI    ActorKind = "cli"
 	ActorSystem ActorKind = "system"
+	// ActorSSO is an auth provider: its group mappings grant and revoke access
+	// when a person signs in through it or an instance admin replaces them.
+	ActorSSO ActorKind = "sso"
 )
 
 // Actor is who an audit entry names as having made the change.
@@ -43,6 +46,12 @@ type Actor struct {
 // member: command is the command run, such as "admin bootstrap".
 func CLIActor(command string) Actor {
 	return Actor{Kind: ActorCLI, ID: "cli", Name: "flagnetic " + command}
+}
+
+// SSOActor returns the actor of a change an auth provider's group mappings
+// make: the provider's identifier, named by its slug.
+func SSOActor(providerID, slug string) Actor {
+	return Actor{Kind: ActorSSO, ID: providerID, Name: slug}
 }
 
 // Request is where a change is made: by which actor, in which request. Every

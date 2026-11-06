@@ -157,7 +157,9 @@ func NewDeleteGrant(tx Transactor, store GrantStore, audit AuditLog, c clock.Clo
 // Handle removes the grant and records grant.deleted in the project. The
 // grant of a role holding a permission the caller lacks in the project is
 // refused role_not_allowed, so nobody narrows access beyond their own
-// reach; an unknown grant is ErrGrantNotFound. Removing the last owner
+// reach; the grant of an auth provider's group mapping is refused
+// sso_sourced, since the directory owns it; an unknown grant is
+// ErrGrantNotFound. Removing the last owner
 // grant is allowed: an instance admin can always step in. A member left
 // without grant.manage in the project loses the grant of each invitation
 // they issued to it, recorded as invitation.grant_revoked.
@@ -169,6 +171,9 @@ func (h *DeleteGrant) Handle(ctx context.Context, cmd DeleteGrantCommand) error 
 		}
 		if err != nil {
 			return err
+		}
+		if grant.Source == access.GrantSSO {
+			return access.ErrSSOSourced
 		}
 		role, _ := access.RoleNamed(grant.Role)
 		if err = access.CheckGrantorCap(cmd.Project.Held, role); err != nil {
@@ -197,6 +202,9 @@ func (h *DeleteGrant) Handle(ctx context.Context, cmd DeleteGrantCommand) error 
 // when it removed the grant, after it otherwise.
 func grantRecord(action string, project ProjectRef, g access.Grant, member access.Member, removed bool) governance.Record {
 	values := map[string]any{"member": g.Member.String(), "email": member.Email, "role": g.Role, "source": g.Source}
+	if g.Provider != "" {
+		values["provider"] = g.Provider
+	}
 	r := governance.Record{
 		Project: project.ID, Action: action,
 		Entity: governance.Entity{Kind: "grant", ID: g.ID.String(), Key: member.Email},
