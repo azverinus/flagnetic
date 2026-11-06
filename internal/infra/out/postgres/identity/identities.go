@@ -56,15 +56,21 @@ func (s *Store) RecordIdentitySignIn(ctx context.Context, i identity.ID, at time
 }
 
 // ProviderUses names "identities" when any identity is linked through
-// provider.
+// provider, and "scim_tokens" while it holds a token not revoked.
 func (s *Store) ProviderUses(ctx context.Context, provider identity.ProviderID) ([]string, error) {
-	var exists bool
-	err := s.db(ctx).QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identities WHERE provider_id = $1)`, provider.Bytes()).Scan(&exists)
+	var identities, tokens bool
+	err := s.db(ctx).QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM identities WHERE provider_id = $1),
+		       EXISTS (SELECT 1 FROM scim_tokens WHERE provider_id = $1 AND revoked_at IS NULL)`, provider.Bytes()).Scan(&identities, &tokens)
 	if err != nil {
-		return nil, fmt.Errorf("counting an auth provider's identities: %w", err)
+		return nil, fmt.Errorf("counting what refers to an auth provider: %w", err)
 	}
-	if exists {
-		return []string{"identities"}, nil
+	var uses []string
+	if identities {
+		uses = append(uses, "identities")
 	}
-	return nil, nil
+	if tokens {
+		uses = append(uses, "scim_tokens")
+	}
+	return uses, nil
 }

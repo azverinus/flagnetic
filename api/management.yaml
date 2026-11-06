@@ -5539,6 +5539,82 @@ paths:
           $ref: "#/components/responses/NotFound"
         "502":
           $ref: "#/components/responses/BadGateway"
+  /instance/scim-tokens:
+    get:
+      operationId: listScimTokens
+      summary: The instance's SCIM tokens
+      description: |
+        Every SCIM token, the newest first, revoked and expired ones included,
+        by their hint and the auth provider each is bound to: a token's value
+        is shown only when it is created.
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "200":
+          description: The tokens.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScimTokenList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createScimToken
+      summary: Create a SCIM token
+      description: |
+        Creates a SCIM token an identity provider presents to `/scim/v2` and
+        answers its value, shown this once and never again. The token is bound
+        for life to the auth provider named by `provider`: it reaches that
+        provider's provisioned members and groups and nothing else, and it is
+        refused while the provider is disabled. An unknown provider and an expiry
+        that is not in the future are refused 422 `invalid_scim_token`, naming
+        the field. Only a session creates a token, so a leaked
+        credential can never multiply itself. Audited `scim_token.created`.
+      x-permission: instance_admin
+      x-session-required: true
+      tags: [instance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScimTokenCreate"
+      responses:
+        "201":
+          description: The token, with its value.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedScimToken"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /instance/scim-tokens/{token}:
+    parameters:
+      - $ref: "#/components/parameters/TokenID"
+    delete:
+      operationId: revokeScimToken
+      summary: Revoke a SCIM token
+      description: |
+        Revokes the token, which `/scim/v2` refuses from then on. A token
+        already revoked, or an identifier that names none, is not found.
+        Audited `scim_token.revoked`.
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "204":
+          description: Revoked.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /instance/smtp:
     get:
       operationId: getMailSettings
@@ -8434,6 +8510,68 @@ components:
           type: string
           format: password
           description: The token's value, `fn_pat_` and 40 characters, shown this once.
+    ScimToken:
+      type: object
+      description: A SCIM token, by its hint; its value is shown only when it is created.
+      required: [id, provider, hint, expires_at, created_at, last_used_at, revoked_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          description: The slug of the auth provider the token is bound to, for life.
+        hint:
+          type: string
+          description: The value's prefix and its first four characters, such as `fn_scim_Ab3d`.
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the token stops working; null for a token that never expires.
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the token was last presented, recorded at most once a minute; null until it is used.
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+    ScimTokenList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScimToken"
+    ScimTokenCreate:
+      type: object
+      required: [provider]
+      properties:
+        provider:
+          type: string
+          description: The slug of the auth provider the token is bound to. It cannot change.
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the token stops working; absent or null for a token that never expires.
+    CreatedScimToken:
+      type: object
+      description: A SCIM token just created, with its value.
+      required: [token, value]
+      properties:
+        token:
+          $ref: "#/components/schemas/ScimToken"
+        value:
+          type: string
+          format: password
+          description: The token's value, `fn_scim_` and 40 characters, shown this once.
     ProjectToken:
       type: object
       description: A token belonging to a project, by its hint; its value is shown only when it is created.
@@ -8987,7 +9125,7 @@ components:
           $ref: "#/components/schemas/Description"
     ActorKind:
       type: string
-      enum: [member, token, cli, system, sso]
+      enum: [member, token, cli, system, sso, scim]
     AuditEntry:
       type: object
       description: Who changed what, when, from which value to which. Secrets are never recorded; a token appears by its hint.

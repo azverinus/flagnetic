@@ -92,6 +92,9 @@ type Handlers struct {
 	TestAuthProvider         *appidentity.TestProvider
 	GetGroupMappings         *appidentity.GetGroupMappings
 	ReplaceGroupMappings     *appidentity.ReplaceGroupMappings
+	ListSCIMTokens           *appidentity.ListSCIMTokens
+	CreateSCIMToken          *appidentity.CreateSCIMToken
+	RevokeSCIMToken          *appidentity.RevokeSCIMToken
 
 	FindProject   *appworkspace.FindProject
 	ListProjects  *appworkspace.ListProjects

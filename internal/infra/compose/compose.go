@@ -375,6 +375,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Tx: tx, Store: identityStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Sealer: o.Keyring, BaseURL: o.BaseURL, SAML: samlClient, SPKeys: samlClient,
 		References: []appidentity.ProviderReference{identityStore, providerGrants{providers: identityStore, access: accessStore}},
 	}
+	scimTokens := appidentity.SCIMTokenDeps{
+		Tx: tx, Providers: identityStore, Store: identityStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, Sealer: o.Keyring,
+	}
 	// A provider's group mappings give members grants and instance admin: the
 	// identity context decides what the groups map to, the access context
 	// makes it so.
@@ -412,6 +415,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		TestAuthProvider:         appidentity.NewTestProvider(identityStore, oidc.NewDiscoverer(), samlClient),
 		GetGroupMappings:         appidentity.NewGetGroupMappings(identityStore, identityStore),
 		ReplaceGroupMappings:     appidentity.NewReplaceGroupMappings(groupMappings),
+		ListSCIMTokens:           appidentity.NewListSCIMTokens(identityStore),
+		CreateSCIMToken:          appidentity.NewCreateSCIMToken(scimTokens),
+		RevokeSCIMToken:          appidentity.NewRevokeSCIMToken(scimTokens),
 		AuthenticateToken:        appaccess.NewAuthenticateToken(accessStore, tokenUses, d.Clock),
 		AuthenticateSession:      appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey),
 		SignIn: appaccess.NewSignIn(appaccess.SignInDeps{
