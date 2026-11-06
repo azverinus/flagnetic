@@ -40,6 +40,9 @@ import type {
   CloneExperimentData,
   CloneExperimentErrors,
   CloneExperimentResponses,
+  CompletePasswordResetData,
+  CompletePasswordResetErrors,
+  CompletePasswordResetResponses,
   CopyChangeRequestData,
   CopyChangeRequestErrors,
   CopyChangeRequestResponses,
@@ -244,6 +247,9 @@ import type {
   GetMemberErrors,
   GetMemberResponses,
   GetMeResponses,
+  GetPasswordResetData,
+  GetPasswordResetErrors,
+  GetPasswordResetResponses,
   GetProjectAuditEntryData,
   GetProjectAuditEntryErrors,
   GetProjectAuditEntryResponses,
@@ -280,6 +286,9 @@ import type {
   InviteProjectMemberData,
   InviteProjectMemberErrors,
   InviteProjectMemberResponses,
+  IssuePasswordResetData,
+  IssuePasswordResetErrors,
+  IssuePasswordResetResponses,
   KillFlagData,
   KillFlagErrors,
   KillFlagResponses,
@@ -682,6 +691,56 @@ export const acceptInvitation = <ThrowOnError extends boolean = false>(
 ): RequestResult<AcceptInvitationResponses, AcceptInvitationErrors, ThrowOnError> =>
   (options.client ?? client).post<AcceptInvitationResponses, AcceptInvitationErrors, ThrowOnError>({
     url: "/auth/invitations/{secret}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * What a password reset's link opens
+ *
+ * Read before anyone is signed in, to show whose password the link
+ * sets. A password reset that cannot be completed, whether it was never
+ * issued, has been used or ended by another, has expired, or belongs to
+ * a member who is not active, is `reset_gone`, alike. The secret never
+ * reaches a log line.
+ *
+ */
+export const getPasswordReset = <ThrowOnError extends boolean = false>(
+  options: Options<GetPasswordResetData, ThrowOnError>,
+): RequestResult<GetPasswordResetResponses, GetPasswordResetErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetPasswordResetResponses, GetPasswordResetErrors, ThrowOnError>({
+    url: "/auth/password-reset/{secret}",
+    ...options,
+  });
+
+/**
+ * Complete a password reset
+ *
+ * Sets the member's new password under the password policy
+ * (`weak_password` otherwise), clears the lockout on their email, signs
+ * them out of every device, ends every other open password reset and
+ * invitation of theirs, and opens a session, setting its cookie. The
+ * body must be sent as `application/json`; anything else is refused
+ * `unsupported_media_type`.
+ *
+ * Each attempt counts as a failure of its address before the secret is
+ * looked up, and is taken back once the secret opens a password reset:
+ * a hundred failures from one address in fifteen minutes, sign-ins
+ * included, throttle the address (`rate_limited`).
+ *
+ */
+export const completePasswordReset = <ThrowOnError extends boolean = false>(
+  options: Options<CompletePasswordResetData, ThrowOnError>,
+): RequestResult<CompletePasswordResetResponses, CompletePasswordResetErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CompletePasswordResetResponses,
+    CompletePasswordResetErrors,
+    ThrowOnError
+  >({
+    url: "/auth/password-reset/{secret}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -4374,6 +4433,38 @@ export const reissueInvitation = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/members/{member}/invitation",
+    ...options,
+  });
+
+/**
+ * Issue a password reset for a member
+ *
+ * Issues a one-time link that lets an active member set a new password,
+ * answered with the link, shown this once and never mailed. It expires
+ * after an hour. A member who is still invited is refused
+ * `member_not_active`: issue their invitation again instead. A
+ * deactivated member is refused `member_deactivated`. Earlier password
+ * resets of the member stay open; completing one ends the others.
+ * Recorded as `password.reset_issued`, without the link.
+ *
+ */
+export const issuePasswordReset = <ThrowOnError extends boolean = false>(
+  options: Options<IssuePasswordResetData, ThrowOnError>,
+): RequestResult<IssuePasswordResetResponses, IssuePasswordResetErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    IssuePasswordResetResponses,
+    IssuePasswordResetErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/members/{member}/password-reset",
     ...options,
   });
 

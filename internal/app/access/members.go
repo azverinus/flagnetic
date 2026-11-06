@@ -270,6 +270,7 @@ type DeactivationStore interface {
 	// the member created belong to their projects and stay.
 	RevokePersonalTokens(ctx context.Context, member access.MemberID, at time.Time) (int, error)
 	InvitationStore
+	PasswordResetStore
 	InvitationGrantStore
 }
 
@@ -289,8 +290,8 @@ func NewDeactivateMember(tx Transactor, store DeactivationStore, audit AuditLog,
 
 // Handle deactivates the member and, in the same unit of work, revokes
 // every session and personal access token they hold and consumes their open
-// invitations, recording member.deactivated with how many sessions and
-// tokens it revoked. The invitations they issued lose their grants,
+// invitations and password resets, recording member.deactivated with how
+// many sessions and tokens it revoked. The invitations they issued lose their grants,
 // recorded as invitation.grant_revoked, and still activate whoever accepts
 // them. A deactivated member
 // is left as they are; the last active instance admin is refused
@@ -312,6 +313,9 @@ func (h *DeactivateMember) Handle(ctx context.Context, member access.MemberID, r
 				return access.Member{}, nil, err
 			}
 			if _, err = h.store.ConsumeInvitations(ctx, member, now); err != nil {
+				return access.Member{}, nil, err
+			}
+			if _, err = h.store.ConsumePasswordResets(ctx, member, now); err != nil {
 				return access.Member{}, nil, err
 			}
 			dropped, err := dropInvitationGrants(ctx, h.store, after, workspace.ProjectID{})

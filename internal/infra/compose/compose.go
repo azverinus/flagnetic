@@ -446,6 +446,12 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 			Random: rand.Reader, Key: sessionKey,
 		}),
+		IssueReset: appaccess.NewIssuePasswordReset(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
+		GetReset:   appaccess.NewGetPasswordReset(accessStore, d.Clock),
+		CompleteReset: appaccess.NewCompletePasswordReset(appaccess.CompletePasswordResetDeps{
+			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
+			Random: rand.Reader, Key: sessionKey,
+		}),
 		ListPersonalTokens:  appaccess.NewListPersonalTokens(accessStore),
 		CreatePersonalToken: appaccess.NewCreatePersonalToken(tx, accessStore, settings, audit, d.Clock, d.IDs, rand.Reader),
 		RevokePersonalToken: appaccess.NewRevokePersonalToken(tx, accessStore, audit, d.Clock, d.IDs),

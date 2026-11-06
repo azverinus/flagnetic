@@ -32,6 +32,9 @@ type AuthRetentionStore interface {
 	// PurgeInvitations deletes at most limit invitations that ended at or
 	// before the cutoff, except each member's latest.
 	PurgeInvitations(ctx context.Context, cut access.InvitationCutoffs, limit int) (int, error)
+	// PurgePasswordResets deletes at most limit password resets that ended
+	// at or before the cutoff.
+	PurgePasswordResets(ctx context.Context, cut access.PasswordResetCutoffs, limit int) (int, error)
 }
 
 // AuthRetentionBatch is how many rows one transaction of the purge deletes,
@@ -46,12 +49,13 @@ type AuthPurged struct {
 	KnownSourceFailures int
 	KnownSources        int
 	Invitations         int
+	PasswordResets      int
 }
 
 // PurgeAuthRecords deletes ended sessions, emails' failures that no longer
 // count, sources' windows that are over, sources no longer known to their
-// members and invitations long past use, so their tables do not grow
-// forever.
+// members, and invitations and password resets long past use, so their
+// tables do not grow forever.
 type PurgeAuthRecords struct {
 	tx       Transactor
 	store    AuthRetentionStore
@@ -80,7 +84,7 @@ func (h *PurgeAuthRecords) Handle(ctx context.Context) (AuthPurged, error) {
 	}
 	now := h.clock.Now()
 	sessions, failures := access.EndedSessionCutoffs(now, settings.SessionTimeouts()), access.AttemptCutoffs(now)
-	invitations := access.InvitationCutoffsAt(now)
+	invitations, resets := access.InvitationCutoffsAt(now), access.PasswordResetCutoffsAt(now)
 	var purged AuthPurged
 	for _, step := range []struct {
 		count *int
@@ -103,6 +107,9 @@ func (h *PurgeAuthRecords) Handle(ctx context.Context) (AuthPurged, error) {
 		}},
 		{&purged.Invitations, func(ctx context.Context) (int, error) {
 			return h.store.PurgeInvitations(ctx, invitations, AuthRetentionBatch)
+		}},
+		{&purged.PasswordResets, func(ctx context.Context) (int, error) {
+			return h.store.PurgePasswordResets(ctx, resets, AuthRetentionBatch)
 		}},
 	} {
 		err = h.batches(ctx, step.count, step.purge)
