@@ -41,26 +41,23 @@ func (h *Replay) Handle(ctx context.Context, cmd ReplayCommand) (sinks.Sink, err
 	if err := sinks.CheckReplay(cmd.From, cmd.To, now, h.d.Retention); err != nil {
 		return sinks.Sink{}, err
 	}
-	seen, err := sinkOf(ctx, h.d.Store, cmd.Project, cmd.Sink)
-	if err != nil {
-		return seen, err
-	}
-	kinds, err := sinks.SelectKinds(cmd.Kinds, seen.StreamKinds())
-	if err != nil {
-		return seen, err
-	}
-	err = h.d.Tx.Within(ctx, func(ctx context.Context) error { return h.replay(ctx, cmd, kinds, now) })
-	if err != nil {
-		return seen, err
+	if err := h.d.Tx.Within(ctx, func(ctx context.Context) error { return h.replay(ctx, cmd, now) }); err != nil {
+		return sinks.Sink{}, err
 	}
 	return h.d.read(ctx, cmd.Project, cmd.Sink)
 }
 
-func (h *Replay) replay(ctx context.Context, cmd ReplayCommand, kinds []sinks.EventKind, now time.Time) error {
+func (h *Replay) replay(ctx context.Context, cmd ReplayCommand, now time.Time) error {
 	if err := h.d.lockProject(ctx, cmd.Project); err != nil {
 		return err
 	}
 	s, err := sinkOf(ctx, h.d.Store, cmd.Project, cmd.Sink)
+	if err != nil {
+		return err
+	}
+	// The kinds are checked against the sink read under the project's lock,
+	// so that an edit of its event kinds cannot land between check and replay.
+	kinds, err := sinks.SelectKinds(cmd.Kinds, s.StreamKinds())
 	if err != nil {
 		return err
 	}

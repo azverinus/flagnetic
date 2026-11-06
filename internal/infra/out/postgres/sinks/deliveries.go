@@ -88,6 +88,12 @@ func scanStream(row pgx.Row) (streamRow, error) {
 	}
 	r.rejections = inflightRejections
 	if stopXID != nil {
+		// The table ties each position's two columns together but not the
+		// stop to the resume position; a row with one and not the other is
+		// reported rather than read as a replay half set.
+		if resumeXID == nil {
+			return r, errors.New("reading a stream: a replay stop without a resume position")
+		}
 		stop, stopErr := cursorOf(*stopXID, *stopSeq)
 		if stopErr != nil {
 			return r, stopErr
