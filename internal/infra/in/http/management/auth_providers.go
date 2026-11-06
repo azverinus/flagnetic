@@ -37,6 +37,15 @@ func idpCertificatesOut(m identity.IDPMetadata) []IdPCertificate {
 	return out
 }
 
+func spCertificatesOut(c identity.SAML) []SPCertificate {
+	certs := c.SPCertificates()
+	out := make([]SPCertificate, len(certs))
+	for i, cert := range certs {
+		out[i] = SPCertificate{Sha256: cert.SHA256, NotAfter: cert.NotAfter, Status: SPCertificateStatus(cert.Status)}
+	}
+	return out
+}
+
 // authProviderOut returns p as the API answers it, never with its secret.
 func (a *api) authProviderOut(p identity.Provider) AuthProvider {
 	out := AuthProvider{
@@ -60,6 +69,7 @@ func (a *api) authProviderOut(p identity.Provider) AuthProvider {
 		if acs, entity := a.opts.samlURLs(p); acs != "" {
 			out.AcsUrl, out.EntityId, out.MetadataUrl = &acs, &entity, &entity
 		}
+		out.RotationPending, out.SpCertificates = new(c.RotationPending()), new(spCertificatesOut(*c))
 		return out
 	}
 	if uri := a.opts.redirectURI(p); uri != "" {
@@ -191,6 +201,26 @@ func (a *api) DisableAuthProvider(ctx context.Context, req DisableAuthProviderRe
 		return nil, err
 	}
 	return DisableAuthProvider200JSONResponse{Body: a.authProviderOut(p), Headers: DisableAuthProvider200ResponseHeaders{ETag: etag(p.Version)}}, nil
+}
+
+// RotateAuthProviderCertificate starts the rotation of a SAML provider's SP
+// certificate.
+func (a *api) RotateAuthProviderCertificate(ctx context.Context, req RotateAuthProviderCertificateRequestObject) (RotateAuthProviderCertificateResponseObject, error) {
+	p, err := a.h.RotateAuthProviderCertificate.Handle(ctx, appidentity.ProviderCommand{Slug: req.Provider, Request: requestOf(ctx)})
+	if err != nil {
+		return nil, err
+	}
+	return RotateAuthProviderCertificate200JSONResponse{Body: a.authProviderOut(p), Headers: RotateAuthProviderCertificate200ResponseHeaders{ETag: etag(p.Version)}}, nil
+}
+
+// CompleteAuthProviderCertificateRotation completes the rotation of a SAML
+// provider's SP certificate.
+func (a *api) CompleteAuthProviderCertificateRotation(ctx context.Context, req CompleteAuthProviderCertificateRotationRequestObject) (CompleteAuthProviderCertificateRotationResponseObject, error) {
+	p, err := a.h.CompleteAuthProviderCertificateRotation.Handle(ctx, appidentity.ProviderCommand{Slug: req.Provider, Request: requestOf(ctx)})
+	if err != nil {
+		return nil, err
+	}
+	return CompleteAuthProviderCertificateRotation200JSONResponse{Body: a.authProviderOut(p), Headers: CompleteAuthProviderCertificateRotation200ResponseHeaders{ETag: etag(p.Version)}}, nil
 }
 
 // TestAuthProvider answers what an auth provider's discovery document or

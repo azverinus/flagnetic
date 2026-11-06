@@ -126,6 +126,23 @@ export type IdPCertificate = {
   not_after: string;
 };
 
+/**
+ * A certificate the instance presents to a SAML identity provider.
+ */
+export type SpCertificate = {
+  /**
+   * The lowercase hex SHA-256 of the certificate.
+   */
+  sha256: string;
+  not_after: string;
+  /**
+   * `current` signs the authentication requests; `next` is the certificate a pending
+   * rotation will make current.
+   *
+   */
+  status: "current" | "next";
+};
+
 export type AuthProvider = {
   id: string;
   /**
@@ -172,7 +189,9 @@ export type AuthProvider = {
    */
   redirect_uri?: string;
   /**
-   * SAML only: where the identity provider's metadata is fetched from; absent when the metadata was pasted.
+   * SAML only: where the identity provider's metadata is fetched from, and read again daily; absent
+   * when the metadata was pasted, which is never refreshed.
+   *
    */
   idp_metadata_url?: string;
   /**
@@ -188,7 +207,7 @@ export type AuthProvider = {
    */
   idp_certificates?: Array<IdPCertificate>;
   /**
-   * SAML only: when the identity provider's metadata was last read.
+   * SAML only: when the identity provider's metadata was last read, at creation, on an edit of its source or by the daily refresh.
    */
   idp_metadata_refreshed_at?: string;
   /**
@@ -212,6 +231,16 @@ export type AuthProvider = {
    * SAML only: where the instance serves its metadata, to import into the identity provider.
    */
   metadata_url?: string;
+  /**
+   * SAML only: the certificates the instance presents, the current one and, while a rotation is
+   * pending, the next. The metadata at `metadata_url` lists them all.
+   *
+   */
+  sp_certificates?: Array<SpCertificate>;
+  /**
+   * SAML only: whether a certificate rotation was started and not completed.
+   */
+  rotation_pending?: boolean;
   created_at: string;
   updated_at: string;
   version: number;
@@ -13532,6 +13561,128 @@ export type DisableAuthProviderResponses = {
 
 export type DisableAuthProviderResponse =
   DisableAuthProviderResponses[keyof DisableAuthProviderResponses];
+
+export type RotateAuthProviderCertificateData = {
+  body?: never;
+  path: {
+    /**
+     * The auth provider's slug.
+     */
+    provider: string;
+  };
+  query?: never;
+  url: "/instance/auth-providers/{provider}/rotate-certificate";
+};
+
+export type RotateAuthProviderCertificateErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type RotateAuthProviderCertificateError =
+  RotateAuthProviderCertificateErrors[keyof RotateAuthProviderCertificateErrors];
+
+export type RotateAuthProviderCertificateResponses = {
+  /**
+   * The auth provider, with the next certificate in `sp_certificates`.
+   */
+  200: AuthProvider;
+};
+
+export type RotateAuthProviderCertificateResponse =
+  RotateAuthProviderCertificateResponses[keyof RotateAuthProviderCertificateResponses];
+
+export type CompleteAuthProviderCertificateRotationData = {
+  body?: never;
+  path: {
+    /**
+     * The auth provider's slug.
+     */
+    provider: string;
+  };
+  query?: never;
+  url: "/instance/auth-providers/{provider}/rotate-certificate/complete";
+};
+
+export type CompleteAuthProviderCertificateRotationErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CompleteAuthProviderCertificateRotationError =
+  CompleteAuthProviderCertificateRotationErrors[keyof CompleteAuthProviderCertificateRotationErrors];
+
+export type CompleteAuthProviderCertificateRotationResponses = {
+  /**
+   * The auth provider, with the new certificate current and no other.
+   */
+  200: AuthProvider;
+};
+
+export type CompleteAuthProviderCertificateRotationResponse =
+  CompleteAuthProviderCertificateRotationResponses[keyof CompleteAuthProviderCertificateRotationResponses];
 
 export type GetAuthProviderGroupMappingsData = {
   body?: never;

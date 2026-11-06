@@ -5442,6 +5442,79 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /instance/auth-providers/{provider}/rotate-certificate:
+    parameters:
+      - $ref: "#/components/parameters/AuthProviderSlug"
+    post:
+      operationId: rotateAuthProviderCertificate
+      summary: Start rotating a SAML provider's SP certificate
+      description: |
+        Generates the next key pair (an RSA-2048 key and a self-signed certificate
+        valid for three years) beside the current one. The SP metadata lists both
+        certificates from then on, so the identity provider can import the new one;
+        an assertion encrypted to either is accepted, while authentication requests
+        stay signed with the current key. Complete the rotation once the identity
+        provider has imported the metadata. Refused `409 rotation_pending` while a
+        rotation is pending and `422 not_saml` for an OIDC provider. Audited
+        `auth_provider.certificate_rotation_started`, naming the certificates by
+        fingerprint.
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "200":
+          description: The auth provider, with the next certificate in `sp_certificates`.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthProvider"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /instance/auth-providers/{provider}/rotate-certificate/complete:
+    parameters:
+      - $ref: "#/components/parameters/AuthProviderSlug"
+    post:
+      operationId: completeAuthProviderCertificateRotation
+      summary: Complete the rotation of a SAML provider's SP certificate
+      description: |
+        Makes the next key pair current and destroys the retired private key: from
+        then on requests are signed with the new key and an assertion encrypted to the
+        old certificate is refused. Do it once the identity provider has imported the
+        SP metadata that lists the new certificate. Refused `409 no_rotation_pending`
+        when none was started and `422 not_saml` for an OIDC provider. Audited
+        `auth_provider.certificate_rotation_completed`.
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "200":
+          description: The auth provider, with the new certificate current and no other.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthProvider"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /instance/auth-providers/{provider}/group-mappings:
     parameters:
       - $ref: "#/components/parameters/AuthProviderSlug"
@@ -7647,6 +7720,23 @@ components:
         not_after:
           type: string
           format: date-time
+    SPCertificate:
+      type: object
+      description: A certificate the instance presents to a SAML identity provider.
+      required: [sha256, not_after, status]
+      properties:
+        sha256:
+          type: string
+          description: The lowercase hex SHA-256 of the certificate.
+        not_after:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [current, next]
+          description: |
+            `current` signs the authentication requests; `next` is the certificate a pending
+            rotation will make current.
     AuthProvider:
       type: object
       required: [id, slug, kind, display_name, enabled, domains, link_by_email, auto_provision, created_at, updated_at, version]
@@ -7700,7 +7790,9 @@ components:
             `FLAGNETIC_BASE_URL`; absent while the instance has none.
         idp_metadata_url:
           type: string
-          description: "SAML only: where the identity provider's metadata is fetched from; absent when the metadata was pasted."
+          description: |
+            SAML only: where the identity provider's metadata is fetched from, and read again daily; absent
+            when the metadata was pasted, which is never refreshed.
         idp_entity_id:
           type: string
           description: SAML only, read from the identity provider's metadata.
@@ -7715,7 +7807,7 @@ components:
         idp_metadata_refreshed_at:
           type: string
           format: date-time
-          description: "SAML only: when the identity provider's metadata was last read."
+          description: "SAML only: when the identity provider's metadata was last read, at creation, on an edit of its source or by the daily refresh."
         sign_requests:
           type: boolean
           description: "SAML only: whether the authentication requests are signed."
@@ -7734,6 +7826,16 @@ components:
         metadata_url:
           type: string
           description: "SAML only: where the instance serves its metadata, to import into the identity provider."
+        sp_certificates:
+          type: array
+          description: |
+            SAML only: the certificates the instance presents, the current one and, while a rotation is
+            pending, the next. The metadata at `metadata_url` lists them all.
+          items:
+            $ref: "#/components/schemas/SPCertificate"
+        rotation_pending:
+          type: boolean
+          description: "SAML only: whether a certificate rotation was started and not completed."
         created_at:
           type: string
           format: date-time

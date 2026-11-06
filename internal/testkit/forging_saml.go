@@ -23,6 +23,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -143,6 +144,17 @@ type ForgingSAMLIDP struct {
 	key, otherKey   *rsa.PrivateKey
 	cert, otherCert []byte // DER
 	srv             *httptest.Server
+
+	// mu guards what the metadata endpoint serves, which a test changes while
+	// the instance fetches it.
+	mu sync.Mutex
+	// published are the signing certificates (DER) the metadata lists, and
+	// served what else of it is changed; fetches counts the requests for it.
+	published [][]byte
+	served    SAMLMetadataOptions
+	status    int
+	delay     time.Duration
+	fetches   int
 }
 
 // StartForgingSAMLIDP starts a forging provider that ends with the test.
@@ -153,9 +165,19 @@ func StartForgingSAMLIDP(t testing.TB) *ForgingSAMLIDP {
 	f.otherKey, f.otherCert = newSigningKey(t)
 	f.Certificate = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: f.cert})
 	mux := http.NewServeMux()
+	f.published = [][]byte{f.cert}
 	mux.HandleFunc("GET /metadata", func(w http.ResponseWriter, _ *http.Request) {
+		f.mu.Lock()
+		f.fetches++
+		status, delay, options := f.status, f.delay, f.served
+		f.mu.Unlock()
+		time.Sleep(delay)
+		if status != 0 {
+			http.Error(w, "unavailable", status)
+			return
+		}
 		w.Header().Set("Content-Type", "application/samlmetadata+xml")
-		_, _ = io.WriteString(w, f.Metadata(SAMLMetadataOptions{}))
+		_, _ = io.WriteString(w, f.Metadata(options))
 	})
 	mux.HandleFunc("GET /big", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write(append([]byte("<!-- "), bytes.Repeat([]byte("x"), 2<<20)...))
@@ -166,6 +188,54 @@ func StartForgingSAMLIDP(t testing.TB) *ForgingSAMLIDP {
 	t.Cleanup(f.srv.Close)
 	f.EntityID, f.SSOURL, f.MetadataURL = f.srv.URL+"/metadata", f.srv.URL+"/sso", f.srv.URL+"/metadata"
 	return f
+}
+
+// MetadataFetches is how many times the metadata endpoint was requested.
+func (f *ForgingSAMLIDP) MetadataFetches() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.fetches
+}
+
+// ServeMetadata changes the mistakes the metadata endpoint makes in what it
+// serves from now on, such as another entity ID.
+func (f *ForgingSAMLIDP) ServeMetadata(o SAMLMetadataOptions) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.served = o
+}
+
+// FailMetadata makes the metadata endpoint answer status, and the metadata
+// again for 0.
+func (f *ForgingSAMLIDP) FailMetadata(status int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.status = status
+}
+
+// DelayMetadata makes the metadata endpoint take d to answer, so two requests
+// for it overlap.
+func (f *ForgingSAMLIDP) DelayMetadata(d time.Duration) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.delay = d
+}
+
+// RotateSigningKey makes the provider sign with a new key and publish its
+// certificate in its metadata, as an identity provider does when its
+// certificate is about to expire. With keepOld the certificate it replaced is
+// published beside the new one; without, it is not.
+func (f *ForgingSAMLIDP) RotateSigningKey(t testing.TB, keepOld bool) {
+	t.Helper()
+	key, cert := newSigningKey(t)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	published := [][]byte{cert}
+	if keepOld {
+		published = append(published, f.cert)
+	}
+	f.key, f.cert, f.published = key, cert, published
+	f.Certificate = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert})
 }
 
 // Close stops the provider answering, as an identity provider that went away.
@@ -200,6 +270,9 @@ func newSigningKey(t testing.TB) (*rsa.PrivateKey, []byte) {
 
 // Metadata returns the provider's metadata document.
 func (f *ForgingSAMLIDP) Metadata(o SAMLMetadataOptions) string {
+	f.mu.Lock()
+	published := f.published
+	f.mu.Unlock()
 	entity := f.EntityID
 	if o.OtherEntityID != "" {
 		entity = o.OtherEntityID
@@ -208,8 +281,10 @@ func (f *ForgingSAMLIDP) Metadata(o SAMLMetadataOptions) string {
 	fmt.Fprintf(&b, `<?xml version="1.0"?><md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" entityID=%q>`, entity)
 	b.WriteString(`<md:IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">`)
 	if !o.NoCertificate {
-		fmt.Fprintf(&b, `<md:KeyDescriptor use="signing"><ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:X509Data>`+
-			`<ds:X509Certificate>%s</ds:X509Certificate></ds:X509Data></ds:KeyInfo></md:KeyDescriptor>`, base64.StdEncoding.EncodeToString(f.cert))
+		for _, cert := range published {
+			fmt.Fprintf(&b, `<md:KeyDescriptor use="signing"><ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:X509Data>`+
+				`<ds:X509Certificate>%s</ds:X509Certificate></ds:X509Data></ds:KeyInfo></md:KeyDescriptor>`, base64.StdEncoding.EncodeToString(cert))
+		}
 	}
 	if !o.NoRedirectBinding {
 		fmt.Fprintf(&b, `<md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location=%q/>`, f.SSOURL)

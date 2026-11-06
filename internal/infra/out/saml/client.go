@@ -21,6 +21,7 @@ import (
 	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
 	"github.com/azverinus/flagnetic/internal/domain/identity"
 	"github.com/azverinus/flagnetic/internal/infra/out/idphttp"
+	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
 // Client is the instance as a SAML service provider, and reads identity
@@ -67,14 +68,39 @@ var nameIDFormatURNs = map[string]string{
 	identity.NameIDTransient:    "urn:oasis:names:tc:SAML:2.0:nameid-format:transient",
 }
 
-// serviceProvider returns the gosaml2 service provider cfg describes, judging
-// the validity of certificates and subject confirmations at cfg.Now.
+// serviceProvider returns the gosaml2 service provider cfg describes with the
+// instance's current key pair, judging the validity of certificates and subject
+// confirmations at cfg.Now.
 func serviceProvider(cfg appidentity.SAMLConfig) (*saml2.SAMLServiceProvider, error) {
-	block, _ := pem.Decode([]byte(cfg.SPCertificate))
+	return serviceProviderWith(cfg, cfg.SPCertificate, cfg.SPKey)
+}
+
+// serviceProviders returns a service provider for each key pair a response may
+// have been encrypted to: the current one, then the next while a rotation is
+// pending.
+func serviceProviders(cfg appidentity.SAMLConfig) ([]*saml2.SAMLServiceProvider, error) {
+	current, err := serviceProvider(cfg)
+	if err != nil {
+		return nil, err
+	}
+	out := []*saml2.SAMLServiceProvider{current}
+	if cfg.NextSPCertificate != "" {
+		next, err := serviceProviderWith(cfg, cfg.NextSPCertificate, cfg.NextSPKey)
+		if err != nil {
+			return nil, fmt.Errorf("the next key pair: %w", err)
+		}
+		out = append(out, next)
+	}
+	return out, nil
+}
+
+// serviceProviderWith is serviceProvider with the key pair certificatePEM and key.
+func serviceProviderWith(cfg appidentity.SAMLConfig, certificatePEM string, spKey secret.String) (*saml2.SAMLServiceProvider, error) {
+	block, _ := pem.Decode([]byte(certificatePEM))
 	if block == nil {
 		return nil, errors.New("the instance's certificate is not PEM")
 	}
-	keyBlock, _ := pem.Decode([]byte(cfg.SPKey.Reveal()))
+	keyBlock, _ := pem.Decode([]byte(spKey.Reveal()))
 	if keyBlock == nil {
 		return nil, errors.New("the instance's key is not PEM")
 	}
@@ -138,7 +164,9 @@ func (c *Client) AuthnRequestURL(cfg appidentity.SAMLConfig, requestID, relaySta
 	return sp.BuildAuthURLRedirect(relayState, doc)
 }
 
-// Metadata returns the instance's SAML metadata for the provider.
+// Metadata returns the instance's SAML metadata for the provider: the current
+// certificate, and the next one too while a rotation is pending, so the
+// identity provider can import it before it takes the current one's place.
 func (c *Client) Metadata(cfg appidentity.SAMLConfig) ([]byte, error) {
 	sp, err := serviceProvider(cfg)
 	if err != nil {
@@ -150,6 +178,11 @@ func (c *Client) Metadata(cfg appidentity.SAMLConfig) ([]byte, error) {
 	}
 	if format := nameIDFormatURNs[cfg.NameIDFormat]; format != "" {
 		descriptor.SPSSODescriptor.NameIDFormats = []string{format}
+	}
+	if cfg.NextSPCertificate != "" {
+		if err = listNextCertificate(descriptor, cfg.NextSPCertificate); err != nil {
+			return nil, err
+		}
 	}
 	return marshalMetadata(descriptor)
 }
