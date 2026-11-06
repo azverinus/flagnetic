@@ -23,7 +23,7 @@ export const Route = createFileRoute("/sign-in")({
 });
 
 function SignInPage() {
-  const { returnTo, ended } = Route.useSearch();
+  const { returnTo, ended, error, provider } = Route.useSearch();
   const queryClient = useQueryClient();
   const router = useRouter();
   return (
@@ -33,6 +33,9 @@ function SignInPage() {
       </h1>
       <SignInForm
         ended={ended}
+        returnTo={returnTo}
+        error={error}
+        errorProvider={provider}
         onSignedIn={(me) => {
           queryClient.setQueryData(meQuery.queryKey, me);
           void router.navigate({ href: safeReturnTo(returnTo), replace: true });

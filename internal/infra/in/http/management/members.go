@@ -130,6 +130,28 @@ func (a *api) ReissueInvitation(ctx context.Context, req ReissueInvitationReques
 	return ReissueInvitation201JSONResponse(memberInvitationOf(ctx, res)), nil
 }
 
+// passwordResetLinkPath is where the console opens a password reset,
+// followed by its secret.
+const passwordResetLinkPath = "/password-reset/"
+
+// IssuePasswordReset issues a password reset for a member and answers its
+// one-time link, shown this once.
+func (a *api) IssuePasswordReset(ctx context.Context, req IssuePasswordResetRequestObject) (IssuePasswordResetResponseObject, error) {
+	member, err := memberIDOf(req.Member)
+	if err != nil {
+		return nil, err
+	}
+	res, err := a.h.IssueReset.Handle(ctx, appaccess.IssuePasswordResetCommand{
+		Caller: callerOf(ctx), Member: member, Request: requestOf(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return IssuePasswordReset201JSONResponse{
+		Url: browserOf(ctx).console + passwordResetLinkPath + res.Secret.Reveal(), ExpiresAt: res.ExpiresAt,
+	}, nil
+}
+
 // invitationLinkPath is where the console opens an invitation, followed by
 // its secret.
 const invitationLinkPath = "/invitations/"

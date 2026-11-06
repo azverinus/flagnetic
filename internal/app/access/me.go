@@ -85,6 +85,7 @@ type PasswordChangeStore interface {
 	MemberSessions(ctx context.Context, member access.MemberID) ([]access.Session, error)
 	RevokeSessions(ctx context.Context, sessions []access.SessionID, at time.Time) ([]access.SessionID, error)
 	ConsumeInvitations(ctx context.Context, member access.MemberID, at time.Time) (int, error)
+	ConsumePasswordResets(ctx context.Context, member access.MemberID, at time.Time) (int, error)
 }
 
 // ErrWrongCurrentPassword refuses a password change whose current password
@@ -127,9 +128,9 @@ type ChangeMyPasswordCommand struct {
 }
 
 // Handle sets the caller's new password, revokes every other live session
-// of theirs and consumes their open invitations, in one unit of work, and
-// records password.changed with how many sessions it revoked. The session
-// the caller is signed in to stays.
+// of theirs and consumes their open invitations and password resets, in one
+// unit of work, and records password.changed with how many sessions it
+// revoked. The session the caller is signed in to stays.
 //
 // The new password is held to the policy (weak_password at /new_password)
 // before the current one is checked, so a weak one costs no attempt. The
@@ -169,8 +170,8 @@ func (h *ChangeMyPassword) Handle(ctx context.Context, cmd ChangeMyPasswordComma
 }
 
 // change hashes the new password and stores it, revoking the caller's other
-// sessions and consuming their invitations, in one unit of work that also
-// takes back the failure reserved.
+// sessions and consuming their invitations and password resets, in one unit
+// of work that also takes back the failure reserved.
 func (h *ChangeMyPassword) change(ctx context.Context, cmd ChangeMyPasswordCommand, member access.Member,
 	reserved access.Reservation, settings access.AuthSettings,
 ) error {
@@ -184,9 +185,9 @@ func (h *ChangeMyPassword) change(ctx context.Context, cmd ChangeMyPasswordComma
 }
 
 // apply stores the new password hash of member, revokes their other live
-// sessions, consumes their invitations, takes back the failure reserved and
-// records password.changed with how many sessions it revoked, in the unit
-// of work ctx carries.
+// sessions, consumes their invitations and password resets, takes back the
+// failure reserved and records password.changed with how many sessions it
+// revoked, in the unit of work ctx carries.
 func (h *ChangeMyPassword) apply(ctx context.Context, cmd ChangeMyPasswordCommand, member access.Member,
 	reserved access.Reservation, settings access.AuthSettings, hash string,
 ) error {
@@ -213,6 +214,9 @@ func (h *ChangeMyPassword) apply(ctx context.Context, cmd ChangeMyPasswordComman
 		}
 	}
 	if _, err := h.d.Store.ConsumeInvitations(ctx, member.ID, now); err != nil {
+		return err
+	}
+	if _, err := h.d.Store.ConsumePasswordResets(ctx, member.ID, now); err != nil {
 		return err
 	}
 	return recordAll(ctx, h.d.Audit, h.d.IDs, now, cmd.Request, governance.Record{

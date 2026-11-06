@@ -1,5 +1,7 @@
+import { stopDex } from "./support/dex";
 import { stop } from "./support/instance";
 
-export default function globalTeardown(): void {
+export default async function globalTeardown(): Promise<void> {
   stop();
+  await stopDex();
 }

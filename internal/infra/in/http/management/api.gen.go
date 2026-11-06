@@ -3183,6 +3183,14 @@ type IssuedInvitation struct {
 	Url string `json:"url"`
 }
 
+// IssuedPasswordReset A password reset just issued. Its link is shown this once.
+type IssuedPasswordReset struct {
+	ExpiresAt time.Time `json:"expires_at"`
+
+	// Url The one-time link to pass on to the member.
+	Url string `json:"url"`
+}
+
 // JsonPatchOperation defines model for JsonPatchOperation.
 type JsonPatchOperation struct {
 	From  *string              `json:"from,omitempty"`
@@ -3366,6 +3374,20 @@ type PasswordChange struct {
 
 	// NewPassword 12 to 128 characters, or the instance's minimum length; not containing the part of the email before the @, nor a common password.
 	NewPassword string `json:"new_password"`
+}
+
+// PasswordReset What a password reset's link opens.
+type PasswordReset struct {
+	DisplayName string `json:"display_name"`
+
+	// Email The member's email with all but the first character of its local part hidden, such as `g***@example.com`.
+	Email     string    `json:"email"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// PasswordResetCompletion defines model for PasswordResetCompletion.
+type PasswordResetCompletion struct {
+	Password string `json:"password"`
 }
 
 // PastExpectedEndAlertDetails defines model for PastExpectedEndAlertDetails.
@@ -5098,6 +5120,9 @@ type InvitationGone = Problem
 // NotFound A problem document (RFC 9457). Code-specific values are further members.
 type NotFound = Problem
 
+// PasswordResetGone A problem document (RFC 9457). Code-specific values are further members.
+type PasswordResetGone = Problem
+
 // PreconditionRequired A problem document (RFC 9457). Code-specific values are further members.
 type PreconditionRequired = Problem
 
@@ -5960,6 +5985,9 @@ type ListInstanceWebhookDeliveriesParams struct {
 
 // AcceptInvitationJSONRequestBody defines body for AcceptInvitation for application/json ContentType.
 type AcceptInvitationJSONRequestBody = InvitationAcceptance
+
+// CompletePasswordResetJSONRequestBody defines body for CompletePasswordReset for application/json ContentType.
+type CompletePasswordResetJSONRequestBody = PasswordResetCompletion
 
 // SignInJSONRequestBody defines body for SignIn for application/json ContentType.
 type SignInJSONRequestBody = SignInRequest
@@ -7311,6 +7339,55 @@ type ClientInterface interface {
 	// Corresponds with GET /auth/methods (the `GetAuthMethods` operationId).
 	GetAuthMethods(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetPasswordReset What a password reset's link opens
+	//
+	// Read before anyone is signed in, to show whose password the link
+	// sets. A password reset that cannot be completed, whether it was never
+	// issued, has been used or ended by another, has expired, or belongs to
+	// a member who is not active, is `reset_gone`, alike. The secret never
+	// reaches a log line.
+	//
+	// Corresponds with GET /auth/password-reset/{secret} (the `GetPasswordReset` operationId).
+	GetPasswordReset(ctx context.Context, secret string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompletePasswordResetWithBody Complete a password reset
+	//
+	// Sets the member's new password under the password policy
+	// (`weak_password` otherwise), clears the lockout on their email, signs
+	// them out of every device, ends every other open password reset and
+	// invitation of theirs, and opens a session, setting its cookie. The
+	// body must be sent as `application/json`; anything else is refused
+	// `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its address before the secret is
+	// looked up, and is taken back once the secret opens a password reset:
+	// a hundred failures from one address in fifteen minutes, sign-ins
+	// included, throttle the address (`rate_limited`).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/password-reset/{secret} (the `CompletePasswordReset` operationId).
+	CompletePasswordResetWithBody(ctx context.Context, secret string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompletePasswordReset Complete a password reset
+	//
+	// Sets the member's new password under the password policy
+	// (`weak_password` otherwise), clears the lockout on their email, signs
+	// them out of every device, ends every other open password reset and
+	// invitation of theirs, and opens a session, setting its cookie. The
+	// body must be sent as `application/json`; anything else is refused
+	// `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its address before the secret is
+	// looked up, and is taken back once the secret opens a password reset:
+	// a hundred failures from one address in fifteen minutes, sign-ins
+	// included, throttle the address (`rate_limited`).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/password-reset/{secret} (the `CompletePasswordReset` operationId).
+	CompletePasswordReset(ctx context.Context, secret string, body CompletePasswordResetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// SignInWithBody Sign in with an email and a password
 	//
 	// Opens a fresh session and sets its cookie. A wrong email, a wrong
@@ -7914,6 +7991,19 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /members/{member}/invitation (the `ReissueInvitation` operationId).
 	ReissueInvitation(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// IssuePasswordReset Issue a password reset for a member
+	//
+	// Issues a one-time link that lets an active member set a new password,
+	// answered with the link, shown this once and never mailed. It expires
+	// after an hour. A member who is still invited is refused
+	// `member_not_active`: issue their invitation again instead. A
+	// deactivated member is refused `member_deactivated`. Earlier password
+	// resets of the member stay open; completing one ends the others.
+	// Recorded as `password.reset_issued`, without the link.
+	//
+	// Corresponds with POST /members/{member}/password-reset (the `IssuePasswordReset` operationId).
+	IssuePasswordReset(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ReactivateMember Bring a deactivated member back
 	//
@@ -10918,6 +11008,85 @@ func (c *Client) GetAuthMethods(ctx context.Context, reqEditors ...RequestEditor
 	return c.Client.Do(req)
 }
 
+// GetPasswordReset What a password reset's link opens
+//
+// Read before anyone is signed in, to show whose password the link
+// sets. A password reset that cannot be completed, whether it was never
+// issued, has been used or ended by another, has expired, or belongs to
+// a member who is not active, is `reset_gone`, alike. The secret never
+// reaches a log line.
+//
+// Corresponds with GET /auth/password-reset/{secret} (the `GetPasswordReset` operationId).
+func (c *Client) GetPasswordReset(ctx context.Context, secret string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetPasswordResetRequest(c.Server, secret)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompletePasswordResetWithBody Complete a password reset
+//
+// Sets the member's new password under the password policy
+// (`weak_password` otherwise), clears the lockout on their email, signs
+// them out of every device, ends every other open password reset and
+// invitation of theirs, and opens a session, setting its cookie. The
+// body must be sent as `application/json`; anything else is refused
+// `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its address before the secret is
+// looked up, and is taken back once the secret opens a password reset:
+// a hundred failures from one address in fifteen minutes, sign-ins
+// included, throttle the address (`rate_limited`).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/password-reset/{secret} (the `CompletePasswordReset` operationId).
+func (c *Client) CompletePasswordResetWithBody(ctx context.Context, secret string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompletePasswordResetRequestWithBody(c.Server, secret, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompletePasswordReset Complete a password reset
+//
+// Sets the member's new password under the password policy
+// (`weak_password` otherwise), clears the lockout on their email, signs
+// them out of every device, ends every other open password reset and
+// invitation of theirs, and opens a session, setting its cookie. The
+// body must be sent as `application/json`; anything else is refused
+// `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its address before the secret is
+// looked up, and is taken back once the secret opens a password reset:
+// a hundred failures from one address in fifteen minutes, sign-ins
+// included, throttle the address (`rate_limited`).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/password-reset/{secret} (the `CompletePasswordReset` operationId).
+func (c *Client) CompletePasswordReset(ctx context.Context, secret string, body CompletePasswordResetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompletePasswordResetRequest(c.Server, secret, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // SignInWithBody Sign in with an email and a password
 //
 // Opens a fresh session and sets its cookie. A wrong email, a wrong
@@ -11952,6 +12121,29 @@ func (c *Client) DeactivateMember(ctx context.Context, member MemberID, reqEdito
 // Corresponds with POST /members/{member}/invitation (the `ReissueInvitation` operationId).
 func (c *Client) ReissueInvitation(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewReissueInvitationRequest(c.Server, member)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// IssuePasswordReset Issue a password reset for a member
+//
+// Issues a one-time link that lets an active member set a new password,
+// answered with the link, shown this once and never mailed. It expires
+// after an hour. A member who is still invited is refused
+// `member_not_active`: issue their invitation again instead. A
+// deactivated member is refused `member_deactivated`. Earlier password
+// resets of the member stay open; completing one ends the others.
+// Recorded as `password.reset_issued`, without the link.
+//
+// Corresponds with POST /members/{member}/password-reset (the `IssuePasswordReset` operationId).
+func (c *Client) IssuePasswordReset(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewIssuePasswordResetRequest(c.Server, member)
 	if err != nil {
 		return nil, err
 	}
@@ -17288,6 +17480,87 @@ func NewGetAuthMethodsRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewGetPasswordResetRequest constructs an http.Request for the GetPasswordReset method
+func NewGetPasswordResetRequest(server string, secret string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "secret", secret, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/password-reset/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCompletePasswordResetRequest calls the generic CompletePasswordReset builder with application/json body
+func NewCompletePasswordResetRequest(server string, secret string, body CompletePasswordResetJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCompletePasswordResetRequestWithBody(server, secret, "application/json", bodyReader)
+}
+
+// NewCompletePasswordResetRequestWithBody constructs an http.Request for the CompletePasswordReset method, with any body, and a specified content type
+func NewCompletePasswordResetRequestWithBody(server string, secret string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "secret", secret, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/password-reset/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewSignInRequest calls the generic SignIn builder with application/json body
 func NewSignInRequest(server string, body SignInJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -18484,6 +18757,40 @@ func NewReissueInvitationRequest(server string, member MemberID) (*http.Request,
 	}
 
 	operationPath := fmt.Sprintf("/members/%s/invitation", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewIssuePasswordResetRequest constructs an http.Request for the IssuePasswordReset method
+func NewIssuePasswordResetRequest(server string, member MemberID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s/password-reset", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -26855,6 +27162,57 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /auth/methods (the `GetAuthMethods` operationId).
 	GetAuthMethodsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthMethodsResponse, error)
 
+	// GetPasswordResetWithResponse What a password reset's link opens
+	//
+	// Read before anyone is signed in, to show whose password the link
+	// sets. A password reset that cannot be completed, whether it was never
+	// issued, has been used or ended by another, has expired, or belongs to
+	// a member who is not active, is `reset_gone`, alike. The secret never
+	// reaches a log line.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /auth/password-reset/{secret} (the `GetPasswordReset` operationId).
+	GetPasswordResetWithResponse(ctx context.Context, secret string, reqEditors ...RequestEditorFn) (*GetPasswordResetResponse, error)
+
+	// CompletePasswordResetWithBodyWithResponse Complete a password reset
+	//
+	// Sets the member's new password under the password policy
+	// (`weak_password` otherwise), clears the lockout on their email, signs
+	// them out of every device, ends every other open password reset and
+	// invitation of theirs, and opens a session, setting its cookie. The
+	// body must be sent as `application/json`; anything else is refused
+	// `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its address before the secret is
+	// looked up, and is taken back once the secret opens a password reset:
+	// a hundred failures from one address in fifteen minutes, sign-ins
+	// included, throttle the address (`rate_limited`).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/password-reset/{secret} (the `CompletePasswordReset` operationId).
+	CompletePasswordResetWithBodyWithResponse(ctx context.Context, secret string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CompletePasswordResetResponse, error)
+
+	// CompletePasswordResetWithResponse Complete a password reset
+	//
+	// Sets the member's new password under the password policy
+	// (`weak_password` otherwise), clears the lockout on their email, signs
+	// them out of every device, ends every other open password reset and
+	// invitation of theirs, and opens a session, setting its cookie. The
+	// body must be sent as `application/json`; anything else is refused
+	// `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its address before the secret is
+	// looked up, and is taken back once the secret opens a password reset:
+	// a hundred failures from one address in fifteen minutes, sign-ins
+	// included, throttle the address (`rate_limited`).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/password-reset/{secret} (the `CompletePasswordReset` operationId).
+	CompletePasswordResetWithResponse(ctx context.Context, secret string, body CompletePasswordResetJSONRequestBody, reqEditors ...RequestEditorFn) (*CompletePasswordResetResponse, error)
+
 	// SignInWithBodyWithResponse Sign in with an email and a password
 	//
 	// Opens a fresh session and sets its cookie. A wrong email, a wrong
@@ -27502,6 +27860,21 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /members/{member}/invitation (the `ReissueInvitation` operationId).
 	ReissueInvitationWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ReissueInvitationResponse, error)
+
+	// IssuePasswordResetWithResponse Issue a password reset for a member
+	//
+	// Issues a one-time link that lets an active member set a new password,
+	// answered with the link, shown this once and never mailed. It expires
+	// after an hour. A member who is still invited is refused
+	// `member_not_active`: issue their invitation again instead. A
+	// deactivated member is refused `member_deactivated`. Earlier password
+	// resets of the member stay open; completing one ends the others.
+	// Recorded as `password.reset_issued`, without the link.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /members/{member}/password-reset (the `IssuePasswordReset` operationId).
+	IssuePasswordResetWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*IssuePasswordResetResponse, error)
 
 	// ReactivateMemberWithResponse Bring a deactivated member back
 	//
@@ -30967,6 +31340,193 @@ func (r GetAuthMethodsResponse) ContentType() string {
 	return ""
 }
 
+// GetPasswordResetResponse401Headers the declared response headers of an HTTP 401 response for GetPasswordReset
+type GetPasswordResetResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetPasswordResetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PasswordReset
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
+	ApplicationproblemJSON410 *PasswordResetGone
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetPasswordResetResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetPasswordResetResponse) GetJSON200() *PasswordReset {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetPasswordResetResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
+func (r GetPasswordResetResponse) GetApplicationproblemJSON410() *PasswordResetGone {
+	return r.ApplicationproblemJSON410
+}
+
+// GetBody returns the raw response body bytes
+func (r GetPasswordResetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetPasswordResetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetPasswordResetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetPasswordResetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CompletePasswordResetResponse200Headers the declared response headers of an HTTP 200 response for CompletePasswordReset
+type CompletePasswordResetResponse200Headers struct {
+	SetCookie *string
+}
+
+// CompletePasswordResetResponse401Headers the declared response headers of an HTTP 401 response for CompletePasswordReset
+type CompletePasswordResetResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+// CompletePasswordResetResponse429Headers the declared response headers of an HTTP 429 response for CompletePasswordReset
+type CompletePasswordResetResponse429Headers struct {
+	RetryAfter *int
+}
+
+// CompletePasswordResetResponse503Headers the declared response headers of an HTTP 503 response for CompletePasswordReset
+type CompletePasswordResetResponse503Headers struct {
+	RetryAfter *int
+}
+
+type CompletePasswordResetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Me
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
+	ApplicationproblemJSON410 *PasswordResetGone
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *RequestTooLarge
+	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
+	ApplicationproblemJSON415 *UnsupportedMediaType
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyAttempts
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *Busy
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *CompletePasswordResetResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CompletePasswordResetResponse401Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *CompletePasswordResetResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *CompletePasswordResetResponse503Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CompletePasswordResetResponse) GetJSON200() *Me {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CompletePasswordResetResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CompletePasswordResetResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
+func (r CompletePasswordResetResponse) GetApplicationproblemJSON410() *PasswordResetGone {
+	return r.ApplicationproblemJSON410
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r CompletePasswordResetResponse) GetApplicationproblemJSON413() *RequestTooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
+func (r CompletePasswordResetResponse) GetApplicationproblemJSON415() *UnsupportedMediaType {
+	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CompletePasswordResetResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r CompletePasswordResetResponse) GetApplicationproblemJSON429() *TooManyAttempts {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r CompletePasswordResetResponse) GetApplicationproblemJSON503() *Busy {
+	return r.ApplicationproblemJSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r CompletePasswordResetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CompletePasswordResetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CompletePasswordResetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CompletePasswordResetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // SignInResponse200Headers the declared response headers of an HTTP 200 response for SignIn
 type SignInResponse200Headers struct {
 	SetCookie *string
@@ -33399,6 +33959,82 @@ func (r ReissueInvitationResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ReissueInvitationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// IssuePasswordResetResponse401Headers the declared response headers of an HTTP 401 response for IssuePasswordReset
+type IssuePasswordResetResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type IssuePasswordResetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *IssuedPasswordReset
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *IssuePasswordResetResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r IssuePasswordResetResponse) GetJSON201() *IssuedPasswordReset {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r IssuePasswordResetResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r IssuePasswordResetResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r IssuePasswordResetResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r IssuePasswordResetResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r IssuePasswordResetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r IssuePasswordResetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r IssuePasswordResetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r IssuePasswordResetResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -45749,6 +46385,75 @@ func (c *ClientWithResponses) GetAuthMethodsWithResponse(ctx context.Context, re
 	return ParseGetAuthMethodsResponse(rsp)
 }
 
+// GetPasswordResetWithResponse What a password reset's link opens
+//
+// Read before anyone is signed in, to show whose password the link
+// sets. A password reset that cannot be completed, whether it was never
+// issued, has been used or ended by another, has expired, or belongs to
+// a member who is not active, is `reset_gone`, alike. The secret never
+// reaches a log line.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /auth/password-reset/{secret} (the `GetPasswordReset` operationId).
+func (c *ClientWithResponses) GetPasswordResetWithResponse(ctx context.Context, secret string, reqEditors ...RequestEditorFn) (*GetPasswordResetResponse, error) {
+	rsp, err := c.GetPasswordReset(ctx, secret, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetPasswordResetResponse(rsp)
+}
+
+// CompletePasswordResetWithBodyWithResponse Complete a password reset
+//
+// Sets the member's new password under the password policy
+// (`weak_password` otherwise), clears the lockout on their email, signs
+// them out of every device, ends every other open password reset and
+// invitation of theirs, and opens a session, setting its cookie. The
+// body must be sent as `application/json`; anything else is refused
+// `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its address before the secret is
+// looked up, and is taken back once the secret opens a password reset:
+// a hundred failures from one address in fifteen minutes, sign-ins
+// included, throttle the address (`rate_limited`).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/password-reset/{secret} (the `CompletePasswordReset` operationId).
+func (c *ClientWithResponses) CompletePasswordResetWithBodyWithResponse(ctx context.Context, secret string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CompletePasswordResetResponse, error) {
+	rsp, err := c.CompletePasswordResetWithBody(ctx, secret, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCompletePasswordResetResponse(rsp)
+}
+
+// CompletePasswordResetWithResponse Complete a password reset
+//
+// Sets the member's new password under the password policy
+// (`weak_password` otherwise), clears the lockout on their email, signs
+// them out of every device, ends every other open password reset and
+// invitation of theirs, and opens a session, setting its cookie. The
+// body must be sent as `application/json`; anything else is refused
+// `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its address before the secret is
+// looked up, and is taken back once the secret opens a password reset:
+// a hundred failures from one address in fifteen minutes, sign-ins
+// included, throttle the address (`rate_limited`).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/password-reset/{secret} (the `CompletePasswordReset` operationId).
+func (c *ClientWithResponses) CompletePasswordResetWithResponse(ctx context.Context, secret string, body CompletePasswordResetJSONRequestBody, reqEditors ...RequestEditorFn) (*CompletePasswordResetResponse, error) {
+	rsp, err := c.CompletePasswordReset(ctx, secret, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCompletePasswordResetResponse(rsp)
+}
+
 // SignInWithBodyWithResponse Sign in with an email and a password
 //
 // Opens a fresh session and sets its cookie. A wrong email, a wrong
@@ -46659,6 +47364,27 @@ func (c *ClientWithResponses) ReissueInvitationWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseReissueInvitationResponse(rsp)
+}
+
+// IssuePasswordResetWithResponse Issue a password reset for a member
+//
+// Issues a one-time link that lets an active member set a new password,
+// answered with the link, shown this once and never mailed. It expires
+// after an hour. A member who is still invited is refused
+// `member_not_active`: issue their invitation again instead. A
+// deactivated member is refused `member_deactivated`. Earlier password
+// resets of the member stay open; completing one ends the others.
+// Recorded as `password.reset_issued`, without the link.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /members/{member}/password-reset (the `IssuePasswordReset` operationId).
+func (c *ClientWithResponses) IssuePasswordResetWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*IssuePasswordResetResponse, error) {
+	rsp, err := c.IssuePasswordReset(ctx, member, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseIssuePasswordResetResponse(rsp)
 }
 
 // ReactivateMemberWithResponse Bring a deactivated member back
@@ -51261,6 +51987,184 @@ func ParseGetAuthMethodsResponse(rsp *http.Response) (*GetAuthMethodsResponse, e
 	return response, nil
 }
 
+// ParseGetPasswordResetResponse parses an HTTP response from a GetPasswordResetWithResponse call
+func ParseGetPasswordResetResponse(rsp *http.Response) (*GetPasswordResetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetPasswordResetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PasswordReset
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 410:
+		var dest PasswordResetGone
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON410 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetPasswordResetResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCompletePasswordResetResponse parses an HTTP response from a CompletePasswordResetWithResponse call
+func ParseCompletePasswordResetResponse(rsp *http.Response) (*CompletePasswordResetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CompletePasswordResetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Me
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 410:
+		var dest PasswordResetGone
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON410 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest RequestTooLarge
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest UnsupportedMediaType
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyAttempts
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Busy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers CompletePasswordResetResponse200Headers
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers CompletePasswordResetResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	case rsp.StatusCode == 429:
+		var headers CompletePasswordResetResponse429Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers CompletePasswordResetResponse503Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseSignInResponse parses an HTTP response from a SignInWithResponse call
 func ParseSignInResponse(rsp *http.Response) (*SignInResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -53449,6 +54353,73 @@ func ParseReissueInvitationResponse(rsp *http.Response) (*ReissueInvitationRespo
 	switch {
 	case rsp.StatusCode == 401:
 		var headers ReissueInvitationResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseIssuePasswordResetResponse parses an HTTP response from a IssuePasswordResetWithResponse call
+func ParseIssuePasswordResetResponse(rsp *http.Response) (*IssuePasswordResetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &IssuePasswordResetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest IssuedPasswordReset
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers IssuePasswordResetResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -64662,6 +65633,12 @@ type ServerInterface interface {
 	// GetAuthMethods How members sign in
 	// (GET /auth/methods)
 	GetAuthMethods(w http.ResponseWriter, r *http.Request)
+	// GetPasswordReset What a password reset's link opens
+	// (GET /auth/password-reset/{secret})
+	GetPasswordReset(w http.ResponseWriter, r *http.Request, secret string)
+	// CompletePasswordReset Complete a password reset
+	// (POST /auth/password-reset/{secret})
+	CompletePasswordReset(w http.ResponseWriter, r *http.Request, secret string)
 	// SignIn Sign in with an email and a password
 	// (POST /auth/sign-in)
 	SignIn(w http.ResponseWriter, r *http.Request)
@@ -64761,6 +65738,9 @@ type ServerInterface interface {
 	// ReissueInvitation Replace an invited member's link
 	// (POST /members/{member}/invitation)
 	ReissueInvitation(w http.ResponseWriter, r *http.Request, member MemberID)
+	// IssuePasswordReset Issue a password reset for a member
+	// (POST /members/{member}/password-reset)
+	IssuePasswordReset(w http.ResponseWriter, r *http.Request, member MemberID)
 	// ReactivateMember Bring a deactivated member back
 	// (POST /members/{member}/reactivate)
 	ReactivateMember(w http.ResponseWriter, r *http.Request, member MemberID)
@@ -65667,6 +66647,58 @@ func (siw *ServerInterfaceWrapper) GetAuthMethods(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// GetPasswordReset operation middleware
+func (siw *ServerInterfaceWrapper) GetPasswordReset(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "secret" -------------
+	var secret string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "secret", r.PathValue("secret"), &secret, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "secret", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPasswordReset(w, r, secret)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompletePasswordReset operation middleware
+func (siw *ServerInterfaceWrapper) CompletePasswordReset(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "secret" -------------
+	var secret string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "secret", r.PathValue("secret"), &secret, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "secret", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompletePasswordReset(w, r, secret)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SignIn operation middleware
 func (siw *ServerInterfaceWrapper) SignIn(w http.ResponseWriter, r *http.Request) {
 
@@ -66363,6 +67395,32 @@ func (siw *ServerInterfaceWrapper) ReissueInvitation(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ReissueInvitation(w, r, member)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// IssuePasswordReset operation middleware
+func (siw *ServerInterfaceWrapper) IssuePasswordReset(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.IssuePasswordReset(w, r, member)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -73342,6 +74400,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/methods", wrapper.GetAuthMethods)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/invitations/{secret}", wrapper.GetInvitation)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/invitations/{secret}", wrapper.AcceptInvitation)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/password-reset/{secret}", wrapper.GetPasswordReset)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/password-reset/{secret}", wrapper.CompletePasswordReset)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/me", wrapper.UpdateMe)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/password", wrapper.ChangeMyPassword)
@@ -73461,6 +74521,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members/{member}/deactivate", wrapper.DeactivateMember)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members/{member}/reactivate", wrapper.ReactivateMember)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members/{member}/invitation", wrapper.ReissueInvitation)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members/{member}/password-reset", wrapper.IssuePasswordReset)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/members/{member}/sessions", wrapper.RevokeMemberSessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}/sessions", wrapper.ListMemberSessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}/tokens", wrapper.ListMemberTokens)
@@ -73547,6 +74608,8 @@ type InvalidApplicationProblemPlusJSONResponse Problem
 type InvitationGoneApplicationProblemPlusJSONResponse Problem
 
 type NotFoundApplicationProblemPlusJSONResponse Problem
+
+type PasswordResetGoneApplicationProblemPlusJSONResponse Problem
 
 type PreconditionRequiredApplicationProblemPlusJSONResponse Problem
 
@@ -74092,6 +75155,233 @@ func (response GetAuthMethods401ApplicationProblemPlusJSONResponse) VisitGetAuth
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPasswordResetRequestObject struct {
+	Secret string `json:"secret"`
+}
+
+type GetPasswordResetResponseObject interface {
+	VisitGetPasswordResetResponse(w http.ResponseWriter) error
+}
+
+type GetPasswordReset200JSONResponse PasswordReset
+
+func (response GetPasswordReset200JSONResponse) VisitGetPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPasswordReset401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetPasswordReset401ApplicationProblemPlusJSONResponse) VisitGetPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPasswordReset410ApplicationProblemPlusJSONResponse struct {
+	PasswordResetGoneApplicationProblemPlusJSONResponse
+}
+
+func (response GetPasswordReset410ApplicationProblemPlusJSONResponse) VisitGetPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(410)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasswordResetRequestObject struct {
+	Secret string `json:"secret"`
+	Body   *CompletePasswordResetJSONRequestBody
+}
+
+type CompletePasswordResetResponseObject interface {
+	VisitCompletePasswordResetResponse(w http.ResponseWriter) error
+}
+
+type CompletePasswordReset200ResponseHeaders struct {
+	SetCookie *string
+}
+
+type CompletePasswordReset200JSONResponse struct {
+	Body    Me
+	Headers CompletePasswordReset200ResponseHeaders
+}
+
+func (response CompletePasswordReset200JSONResponse) VisitCompletePasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasswordReset400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasswordReset400ApplicationProblemPlusJSONResponse) VisitCompletePasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasswordReset401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasswordReset401ApplicationProblemPlusJSONResponse) VisitCompletePasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasswordReset410ApplicationProblemPlusJSONResponse struct {
+	PasswordResetGoneApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasswordReset410ApplicationProblemPlusJSONResponse) VisitCompletePasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(410)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasswordReset413ApplicationProblemPlusJSONResponse struct {
+	RequestTooLargeApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasswordReset413ApplicationProblemPlusJSONResponse) VisitCompletePasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasswordReset415ApplicationProblemPlusJSONResponse struct {
+	UnsupportedMediaTypeApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasswordReset415ApplicationProblemPlusJSONResponse) VisitCompletePasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasswordReset422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasswordReset422ApplicationProblemPlusJSONResponse) VisitCompletePasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasswordReset429ApplicationProblemPlusJSONResponse struct {
+	TooManyAttemptsApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasswordReset429ApplicationProblemPlusJSONResponse) VisitCompletePasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasswordReset503ApplicationProblemPlusJSONResponse struct {
+	BusyApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasswordReset503ApplicationProblemPlusJSONResponse) VisitCompletePasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -76817,6 +78107,95 @@ type ReissueInvitation409ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response ReissueInvitation409ApplicationProblemPlusJSONResponse) VisitReissueInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type IssuePasswordResetRequestObject struct {
+	Member MemberID `json:"member"`
+}
+
+type IssuePasswordResetResponseObject interface {
+	VisitIssuePasswordResetResponse(w http.ResponseWriter) error
+}
+
+type IssuePasswordReset201JSONResponse IssuedPasswordReset
+
+func (response IssuePasswordReset201JSONResponse) VisitIssuePasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type IssuePasswordReset401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response IssuePasswordReset401ApplicationProblemPlusJSONResponse) VisitIssuePasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type IssuePasswordReset403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response IssuePasswordReset403ApplicationProblemPlusJSONResponse) VisitIssuePasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type IssuePasswordReset404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response IssuePasswordReset404ApplicationProblemPlusJSONResponse) VisitIssuePasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type IssuePasswordReset409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response IssuePasswordReset409ApplicationProblemPlusJSONResponse) VisitIssuePasswordResetResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -92435,6 +93814,12 @@ type StrictServerInterface interface {
 	// GetAuthMethods How members sign in
 	// (GET /auth/methods)
 	GetAuthMethods(ctx context.Context, request GetAuthMethodsRequestObject) (GetAuthMethodsResponseObject, error)
+	// GetPasswordReset What a password reset's link opens
+	// (GET /auth/password-reset/{secret})
+	GetPasswordReset(ctx context.Context, request GetPasswordResetRequestObject) (GetPasswordResetResponseObject, error)
+	// CompletePasswordReset Complete a password reset
+	// (POST /auth/password-reset/{secret})
+	CompletePasswordReset(ctx context.Context, request CompletePasswordResetRequestObject) (CompletePasswordResetResponseObject, error)
 	// SignIn Sign in with an email and a password
 	// (POST /auth/sign-in)
 	SignIn(ctx context.Context, request SignInRequestObject) (SignInResponseObject, error)
@@ -92534,6 +93919,9 @@ type StrictServerInterface interface {
 	// ReissueInvitation Replace an invited member's link
 	// (POST /members/{member}/invitation)
 	ReissueInvitation(ctx context.Context, request ReissueInvitationRequestObject) (ReissueInvitationResponseObject, error)
+	// IssuePasswordReset Issue a password reset for a member
+	// (POST /members/{member}/password-reset)
+	IssuePasswordReset(ctx context.Context, request IssuePasswordResetRequestObject) (IssuePasswordResetResponseObject, error)
 	// ReactivateMember Bring a deactivated member back
 	// (POST /members/{member}/reactivate)
 	ReactivateMember(ctx context.Context, request ReactivateMemberRequestObject) (ReactivateMemberResponseObject, error)
@@ -93141,6 +94529,65 @@ func (sh *strictHandler) GetAuthMethods(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetAuthMethodsResponseObject); ok {
 		if err := validResponse.VisitGetAuthMethodsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPasswordReset operation middleware
+func (sh *strictHandler) GetPasswordReset(w http.ResponseWriter, r *http.Request, secret string) {
+	var request GetPasswordResetRequestObject
+
+	request.Secret = secret
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPasswordReset(ctx, request.(GetPasswordResetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPasswordReset")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPasswordResetResponseObject); ok {
+		if err := validResponse.VisitGetPasswordResetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CompletePasswordReset operation middleware
+func (sh *strictHandler) CompletePasswordReset(w http.ResponseWriter, r *http.Request, secret string) {
+	var request CompletePasswordResetRequestObject
+
+	request.Secret = secret
+
+	var body CompletePasswordResetJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompletePasswordReset(ctx, request.(CompletePasswordResetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompletePasswordReset")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompletePasswordResetResponseObject); ok {
+		if err := validResponse.VisitCompletePasswordResetResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -94043,6 +95490,32 @@ func (sh *strictHandler) ReissueInvitation(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ReissueInvitationResponseObject); ok {
 		if err := validResponse.VisitReissueInvitationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// IssuePasswordReset operation middleware
+func (sh *strictHandler) IssuePasswordReset(w http.ResponseWriter, r *http.Request, member MemberID) {
+	var request IssuePasswordResetRequestObject
+
+	request.Member = member
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.IssuePasswordReset(ctx, request.(IssuePasswordResetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "IssuePasswordReset")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(IssuePasswordResetResponseObject); ok {
+		if err := validResponse.VisitIssuePasswordResetResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

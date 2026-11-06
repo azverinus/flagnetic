@@ -309,7 +309,8 @@ func TestThePublicOperationsAreTheOnesDeclaredPublic(t *testing.T) {
 	}
 	slices.Sort(public)
 	want := []string{
-		"GET /auth/invitations/{secret}", "GET /auth/methods", "POST /auth/invitations/{secret}", "POST /auth/sign-in",
+		"GET /auth/invitations/{secret}", "GET /auth/methods", "GET /auth/password-reset/{secret}", "POST /auth/invitations/{secret}",
+		"POST /auth/password-reset/{secret}", "POST /auth/sign-in",
 	}
 	if !slices.Equal(public, want) {
 		t.Fatalf("public operations = %v, want %v", public, want)

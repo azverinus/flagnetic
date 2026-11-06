@@ -221,6 +221,13 @@ msgstr ""
 msgid "{name} is deactivated."
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
+#: src/components/auth-provider-list.tsx
+msgid "{name} is disabled."
+msgstr ""
+
+#: src/components/auth-provider-detail.tsx
+#: src/components/auth-provider-list.tsx
 #: src/components/webhook-list.tsx
 msgid "{name} is enabled."
 msgstr ""
@@ -286,6 +293,7 @@ msgstr ""
 msgid "{revoked, plural, one {Revoked # session.} other {Revoked # sessions.}}"
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
 #: src/components/webhook-detail.tsx
 msgid "{savedName} is saved."
 msgstr ""
@@ -410,6 +418,10 @@ msgstr ""
 msgid "A disabled webhook is sent nothing."
 msgstr ""
 
+#: src/components/auth-provider-form.tsx
+msgid "A first sign-in whose verified email is in the domains above is linked to the existing member with that email. Anyone who controls such an address at the provider then signs in as that member, so turn it on only for a provider you trust with these domains."
+msgstr ""
+
 #: src/lib/conditions.ts
 #: src/lib/configuration-draft.ts
 msgid "A flag cannot require itself."
@@ -489,6 +501,10 @@ msgstr ""
 msgid "A protected environment cannot be deleted. Stop protecting it on its page first."
 msgstr ""
 
+#: src/components/auth-provider-form.tsx
+msgid "A provider with this slug already exists."
+msgstr ""
+
 #: src/components/sdk-keys.tsx
 msgid "A replacement key is created with the same kind, name and allowed origins. The old key keeps working for the overlap, so services can move to the new one without an outage; then it is refused."
 msgstr ""
@@ -526,6 +542,14 @@ msgstr ""
 msgid "A running experiment's traffic allocation can only grow."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "A scope is a word without spaces."
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+msgid "A secret is stored and never shown again. Leave this empty to keep it, or type a new one to replace it."
+msgstr ""
+
 #: src/components/segment-fields.tsx
 msgid "A segment compares declared attributes only; one without conditions holds every context."
 msgstr ""
@@ -556,6 +580,10 @@ msgstr ""
 
 #: src/components/auth-settings-form.tsx
 msgid "A session ends this long after its last request."
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+msgid "A sign-in whose verified email is in the domains above and has no member yet creates one, active, who holds no access until a project grants them a role."
 msgstr ""
 
 #: src/lib/experiments.ts
@@ -678,6 +706,10 @@ msgstr ""
 msgid "Add condition"
 msgstr ""
 
+#: src/components/auth-provider-list.tsx
+msgid "Add one to let members sign in through your company's identity provider. Members keep signing in with their password until you do."
+msgstr ""
+
 #: src/components/overrides-section.tsx
 msgid "Add override"
 msgstr ""
@@ -690,12 +722,20 @@ msgstr ""
 msgid "Add prerequisite condition"
 msgstr ""
 
+#: src/components/auth-provider-form.tsx
+msgid "Add provider"
+msgstr ""
+
 #: src/components/rule-editor.tsx
 msgid "Add rule"
 msgstr ""
 
 #: src/components/rule-editor.tsx
 msgid "Add segment condition"
+msgstr ""
+
+#: src/components/auth-provider-detail.tsx
+msgid "Add this as an allowed redirect (callback) URI of the client, with the client ID and secret below."
 msgstr ""
 
 #: src/components/tester-panel.tsx
@@ -754,6 +794,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "An attribute's type is fixed once it is declared."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "an enforced domain"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
@@ -999,6 +1043,10 @@ msgstr ""
 msgid "Archived."
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
+msgid "Asking the identity provider…"
+msgstr ""
+
 #: src/components/experiment-assignment.tsx
 msgid "Assignment lookup"
 msgstr ""
@@ -1019,6 +1067,14 @@ msgstr ""
 #: src/lib/experiments.ts
 #: src/lib/problem-messages.ts
 msgid "At most {max} characters."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "At most {max} domains."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "At most {max} scopes."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -1105,7 +1161,18 @@ msgstr ""
 
 #. A kind of actor in the audit log.
 #: src/lib/audit.ts
+#: src/routes/_signed-in/admin/auth-providers/$provider.tsx
 msgid "Auth provider"
+msgstr ""
+
+#: src/components/auth-provider-detail.tsx
+msgid "Auth provider not found"
+msgstr ""
+
+#: src/components/auth-provider-list.tsx
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/admin/auth-providers/route.tsx
+msgid "Auth providers"
 msgstr ""
 
 #: src/components/navigation.tsx
@@ -1125,6 +1192,10 @@ msgstr ""
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Author"
+msgstr ""
+
+#: src/components/auth-provider-detail.tsx
+msgid "Authorization endpoint"
 msgstr ""
 
 #: src/components/change-request-diff.tsx
@@ -1471,6 +1542,10 @@ msgstr ""
 msgid "Chosen tags"
 msgstr ""
 
+#: src/components/auth-provider-form.tsx
+msgid "Claims"
+msgstr ""
+
 #: src/components/audit-log.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -1494,6 +1569,14 @@ msgstr ""
 
 #: src/lib/sdk-keys.ts
 msgid "Client"
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+msgid "Client ID"
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+msgid "Client secret"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
@@ -1622,14 +1705,20 @@ msgstr ""
 msgid "Contexts are served by the overrides, rules and fallthrough below."
 msgstr ""
 
+#: src/components/copyable-value.tsx
 #: src/components/experiment-assignment.tsx
 #: src/components/ui/reveal-secret.tsx
 msgid "Copied to the clipboard."
 msgstr ""
 
 #: src/components/change-request-actions.tsx
+#: src/components/copyable-value.tsx
 #: src/components/ui/reveal-secret.tsx
 msgid "Copy"
+msgstr ""
+
+#: src/components/copyable-value.tsx
+msgid "Copy {label}"
 msgstr ""
 
 #: src/components/compare-environments.tsx
@@ -1674,6 +1763,10 @@ msgstr ""
 
 #: src/components/sdk-keys.tsx
 msgid "Create key"
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+msgid "Create members on first sign-in"
 msgstr ""
 
 #: src/components/webhook-list.tsx
@@ -1793,6 +1886,7 @@ msgstr ""
 msgid "Definition"
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
 #: src/components/experiment-transitions.tsx
 #: src/components/webhook-detail.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
@@ -1810,6 +1904,8 @@ msgstr ""
 msgid "Delete {key}"
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
+#: src/components/auth-provider-list.tsx
 #: src/components/webhook-detail.tsx
 #: src/components/webhook-list.tsx
 msgid "Delete {name}"
@@ -1837,6 +1933,11 @@ msgstr ""
 
 #: src/components/delete-project.tsx
 msgid "Delete project"
+msgstr ""
+
+#: src/components/auth-provider-detail.tsx
+#: src/components/auth-provider-list.tsx
+msgid "Delete provider"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
@@ -1929,6 +2030,15 @@ msgstr ""
 msgid "Differs between"
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
+msgid "Disable"
+msgstr ""
+
+#: src/components/auth-provider-list.tsx
+msgid "Disable {name}"
+msgstr ""
+
+#: src/components/auth-provider-badges.tsx
 #: src/components/webhook-status.tsx
 msgid "Disabled"
 msgstr ""
@@ -1976,6 +2086,11 @@ msgstr ""
 
 #: src/lib/conditions.ts
 msgid "does not equal"
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+#: src/components/auth-provider-list.tsx
+msgid "Domains"
 msgstr ""
 
 #: src/components/download-audit.tsx
@@ -2081,6 +2196,10 @@ msgstr ""
 msgid "Email"
 msgstr ""
 
+#: src/components/auth-provider-form.tsx
+msgid "Email claim"
+msgstr ""
+
 #: src/components/experiment-transitions.tsx
 msgid "Empty clears it."
 msgstr ""
@@ -2089,15 +2208,19 @@ msgstr ""
 msgid "Empty context"
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
 #: src/components/webhook-detail.tsx
 msgid "Enable"
 msgstr ""
 
+#: src/components/auth-provider-list.tsx
 #: src/components/webhook-disabled-banner.tsx
 #: src/components/webhook-list.tsx
 msgid "Enable {name}"
 msgstr ""
 
+#: src/components/auth-provider-badges.tsx
+#: src/components/auth-provider-form.tsx
 #: src/components/webhook-editor.tsx
 #: src/components/webhook-status.tsx
 msgid "Enabled"
@@ -2109,6 +2232,22 @@ msgstr ""
 
 #: src/lib/conditions.ts
 msgid "ends with"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Enter a claim name of 1 to 256 characters."
+msgstr ""
+
+#: src/lib/auth-providers.ts
+msgid "Enter a claim name."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Enter a client ID of 1 to 512 characters."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Enter a client secret of 1 to 4096 characters."
 msgstr ""
 
 #: src/lib/conditions.ts
@@ -2128,6 +2267,11 @@ msgstr ""
 msgid "Enter a full semantic version, such as 1.41.0."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "Enter a name of 1 to 200 characters."
+msgstr ""
+
+#: src/lib/auth-providers.ts
 #: src/lib/forms.ts
 #: src/lib/problem-messages.ts
 msgid "Enter a name."
@@ -2159,6 +2303,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "Enter a scheme, a host and an optional port, such as https://app.example.com."
+msgstr ""
+
+#: src/lib/auth-providers.ts
+msgid "Enter a slug."
 msgstr ""
 
 #: src/components/change-request-actions.tsx
@@ -2194,12 +2342,25 @@ msgstr ""
 msgid "Enter an absolute URL, such as https://example.com/flagnetic."
 msgstr ""
 
+#: src/lib/auth-providers.ts
+msgid "Enter an absolute URL, such as https://login.example.com."
+msgstr ""
+
 #: src/components/member-form.tsx
 msgid "Enter an email address."
 msgstr ""
 
+#: src/lib/auth-providers.ts
+#: src/lib/problem-messages.ts
+msgid "Enter at least one email domain."
+msgstr ""
+
 #: src/lib/experiments.ts
 msgid "Enter every weight to see the total."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Enter host names such as example.com, without an at sign or a scheme."
 msgstr ""
 
 #: src/lib/variations.ts
@@ -2208,6 +2369,22 @@ msgstr ""
 
 #: src/lib/experiment-transitions.ts
 msgid "Enter more than {from} %: the traffic allocation only grows."
+msgstr ""
+
+#: src/lib/auth-providers.ts
+msgid "Enter the client ID."
+msgstr ""
+
+#: src/lib/auth-providers.ts
+msgid "Enter the client secret."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Enter the http or https URL of the identity provider, without credentials, a query or a fragment."
+msgstr ""
+
+#: src/lib/auth-providers.ts
+msgid "Enter the issuer's URL."
 msgstr ""
 
 #: src/lib/flag-detail.ts
@@ -2769,6 +2946,10 @@ msgstr ""
 msgid "Gaps"
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
+msgid "Go to the auth providers"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 msgid "Go to the change requests"
 msgstr ""
@@ -2829,6 +3010,10 @@ msgstr ""
 #: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Grants"
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+msgid "Groups claim"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
@@ -3045,10 +3230,16 @@ msgstr ""
 msgid "Issue link"
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
+#: src/components/auth-provider-form.tsx
+msgid "Issuer"
+msgstr ""
+
 #: src/components/experiment-transitions.tsx
 msgid "It cannot start until these are fixed:"
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
 #: src/components/webhook-detail.tsx
 msgid "It does not exist here, or it was deleted."
 msgstr ""
@@ -3143,6 +3334,10 @@ msgstr ""
 msgid "Key or name"
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
+msgid "Keys"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Kill switch"
 msgstr ""
@@ -3155,6 +3350,7 @@ msgstr ""
 msgid "Kill switch: {flagKey} in {name}"
 msgstr ""
 
+#: src/components/auth-provider-list.tsx
 #: src/components/sdk-keys.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Kind"
@@ -3271,6 +3467,14 @@ msgstr ""
 msgid "Light"
 msgstr ""
 
+#: src/components/auth-provider-form.tsx
+msgid "Link members by email"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "linked identities"
+msgstr ""
+
 #. An attribute type.
 #: src/lib/attribute-types.ts
 msgid "List"
@@ -3278,6 +3482,10 @@ msgstr ""
 
 #: src/components/webhook-deliveries.tsx
 msgid "Load older deliveries"
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+msgid "Load their version"
 msgstr ""
 
 #: src/components/ui/table.tsx
@@ -3431,6 +3639,11 @@ msgstr ""
 msgid "Members"
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
+#: src/components/auth-provider-list.tsx
+msgid "Members can no longer sign in through it. A provider that members have signed in through cannot be deleted; disable it instead. This cannot be undone."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Members of the project"
 msgstr ""
@@ -3467,6 +3680,8 @@ msgstr ""
 msgid "Move rule {position} up"
 msgstr ""
 
+#: src/components/auth-provider-form.tsx
+#: src/components/auth-provider-list.tsx
 #: src/components/experiment-fields.tsx
 #: src/components/experiment-transitions.tsx
 #: src/components/flag-definition-sheet.tsx
@@ -3492,12 +3707,20 @@ msgstr ""
 msgid "Name changed from “{before}” to “{after}”."
 msgstr ""
 
+#: src/components/auth-provider-form.tsx
+msgid "Name claim"
+msgstr ""
+
 #: src/components/search-field.tsx
 msgid "Name or email"
 msgstr ""
 
 #: src/components/experiment-fields.tsx
 msgid "Names the experiment in rules and in the exposures SDKs report: letters, digits, ., - and _. It never changes."
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+msgid "Names the provider in sign-in addresses and in the redirect URI. It never changes."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -3532,6 +3755,10 @@ msgstr ""
 msgid "New attribute"
 msgstr ""
 
+#: src/components/auth-provider-list.tsx
+msgid "New auth provider"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "New environment"
 msgstr ""
@@ -3557,6 +3784,10 @@ msgstr ""
 
 #: src/components/project-token-list.tsx
 msgid "New project token"
+msgstr ""
+
+#: src/components/auth-provider-list.tsx
+msgid "New provider"
 msgstr ""
 
 #: src/components/sdk-keys.tsx
@@ -3607,6 +3838,10 @@ msgstr ""
 
 #: src/components/webhook-delivery-sheet.tsx
 msgid "No attempt has been made yet."
+msgstr ""
+
+#: src/components/auth-provider-list.tsx
+msgid "No auth provider yet."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
@@ -3688,6 +3923,10 @@ msgstr ""
 
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "No member matches the search and the status filter."
+msgstr ""
+
+#: src/lib/sso-errors.ts
+msgid "No member of this instance matches that account. Ask an instance admin to invite you."
 msgstr ""
 
 #: src/routes/_signed-in/admin/members/index.tsx
@@ -3936,6 +4175,10 @@ msgstr ""
 msgid "Off variation changed from <0>{before}</0> to <1>{after}</1>."
 msgstr ""
 
+#: src/components/auth-provider-form.tsx
+msgid "Offer the provider on the sign-in page now. Turn it off to test it first."
+msgstr ""
+
 #: src/components/audit-log.tsx
 msgid "Older entries"
 msgstr ""
@@ -4026,6 +4269,11 @@ msgstr ""
 msgid "Open the change request for review"
 msgstr ""
 
+#: src/components/auth-provider-badges.tsx
+#: src/components/session-list.tsx
+msgid "OpenID Connect"
+msgstr ""
+
 #: src/components/condition-row.tsx
 msgid "Operator (condition {position})"
 msgstr ""
@@ -4036,6 +4284,10 @@ msgstr ""
 
 #: src/components/change-request-actions.tsx
 msgid "Optional; the author and the audit log see it."
+msgstr ""
+
+#: src/components/sign-in-form.tsx
+msgid "or"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -4153,6 +4405,7 @@ msgid "Part"
 msgstr ""
 
 #: src/components/invitation-acceptance.tsx
+#: src/components/session-list.tsx
 #: src/components/sign-in-form.tsx
 #: src/routes/_signed-in/settings/profile.tsx
 msgid "Password"
@@ -4205,6 +4458,10 @@ msgstr ""
 #: src/components/personal-menu.tsx
 #: src/routes/_signed-in/settings/route.tsx
 msgid "Personal settings"
+msgstr ""
+
+#: src/components/auth-provider-detail.tsx
+msgid "PKCE methods"
 msgstr ""
 
 #: src/components/sdk-inventory.tsx
@@ -4359,6 +4616,10 @@ msgstr ""
 msgid "Protection"
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "provisioned members"
+msgstr ""
+
 #: src/components/sdk-keys.tsx
 msgid "Put it in the client SDK’s configuration. It ships inside the browser or the app, so anyone can read it: it learns only the values served to a context, never the ruleset."
 msgstr ""
@@ -4462,8 +4723,16 @@ msgstr ""
 msgid "Redeliver the {type} delivery"
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
+msgid "Redirect URI"
+msgstr ""
+
 #: src/components/experiment-exposures.tsx
 msgid "Refresh"
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+msgid "Refuse a sign-in whose token does not say the email is verified. Turn it off only for a provider that does not send the claim and checks addresses itself."
 msgstr ""
 
 #: src/components/experiment-exposures.tsx
@@ -4477,6 +4746,10 @@ msgstr ""
 
 #: src/components/configuration-editor.tsx
 msgid "Regenerate the salt?"
+msgstr ""
+
+#: src/components/auth-provider-detail.tsx
+msgid "Register the instance at the identity provider"
 msgstr ""
 
 #: src/components/change-request-actions.tsx
@@ -4590,6 +4863,10 @@ msgstr ""
 #: src/components/query-error.tsx
 #: src/lib/toast.ts
 msgid "Request ID: {requestId}"
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+msgid "Require a verified email"
 msgstr ""
 
 #: src/components/condition-row.tsx
@@ -4831,6 +5108,11 @@ msgstr ""
 msgid "Salt <0>{salt}</0>"
 msgstr ""
 
+#: src/components/auth-provider-badges.tsx
+#: src/components/session-list.tsx
+msgid "SAML"
+msgstr ""
+
 #: src/components/experiment-exposures.tsx
 msgid "Sample-ratio check"
 msgstr ""
@@ -4839,6 +5121,7 @@ msgstr ""
 msgid "Sample-ratio mismatch"
 msgstr ""
 
+#: src/components/auth-provider-form.tsx
 #: src/components/auth-settings-form.tsx
 #: src/components/change-request-actions.tsx
 #: src/components/member-actions.tsx
@@ -4885,9 +5168,18 @@ msgstr ""
 msgid "Scheduled"
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "SCIM tokens"
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 msgid "Scopes"
+msgstr ""
+
+#: src/components/auth-provider-detail.tsx
+msgid "Scopes it lists"
 msgstr ""
 
 #: src/components/sdk-inventory.tsx
@@ -4985,6 +5277,10 @@ msgstr ""
 msgid "Sent"
 msgstr ""
 
+#: src/components/auth-provider-form.tsx
+msgid "Separated by spaces. The defaults read the email and the name."
+msgstr ""
+
 #: src/components/configuration-editor.tsx
 msgid "Served while the flag is off, and when a prerequisite fails."
 msgstr ""
@@ -5044,6 +5340,11 @@ msgstr ""
 msgid "Sessions"
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "Set the instance's public address first (FLAGNETIC_BASE_URL): the redirect URI the identity provider is told is built from it."
+msgstr ""
+
+#: src/components/auth-provider-detail.tsx
 #: src/components/navigation.tsx
 #: src/components/webhook-detail.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
@@ -5089,6 +5390,14 @@ msgstr ""
 msgid "Sign in"
 msgstr ""
 
+#: src/components/sign-in-form.tsx
+msgid "Sign in with {name}"
+msgstr ""
+
+#: src/components/sign-in-form.tsx
+msgid "Sign in with a provider"
+msgstr ""
+
 #: src/components/personal-menu.tsx
 msgid "Sign out"
 msgstr ""
@@ -5106,8 +5415,20 @@ msgstr ""
 msgid "Signed in"
 msgstr ""
 
+#: src/components/session-list.tsx
+msgid "Signed in with"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Signed out"
+msgstr ""
+
+#: src/lib/sso-errors.ts
+msgid "Signing in did not work ({code}). Try again, or ask your instance admin."
+msgstr ""
+
+#: src/lib/sso-errors.ts
+msgid "Signing in through the identity provider failed. Try again; if it keeps failing, ask your instance admin to check the provider."
 msgstr ""
 
 #: src/components/sign-in-form.tsx
@@ -5132,6 +5453,11 @@ msgstr ""
 
 #: src/components/experiment-exposures.tsx
 msgid "Skipped: the check needs 1,000 units first exposed; units first exposed so far: {n}."
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+#: src/components/auth-provider-list.tsx
+msgid "Slug"
 msgstr ""
 
 #: src/components/experiment-exposures.tsx
@@ -5286,6 +5612,10 @@ msgstr ""
 msgid "Stops the experiment and ships the winner <0>{winner}</0>."
 msgstr ""
 
+#: src/components/auth-provider-form.tsx
+msgid "Stored encrypted and never shown again."
+msgstr ""
+
 #. An attribute type.
 #: src/lib/attribute-types.ts
 #: src/lib/flags.ts
@@ -5386,8 +5716,16 @@ msgstr ""
 msgid "Temporary, to be removed by {expected}"
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
+msgid "Test"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Tester"
+msgstr ""
+
+#: src/components/auth-provider-detail.tsx
+msgid "Testing…"
 msgstr ""
 
 #: src/components/session-list.tsx
@@ -5396,6 +5734,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "That is not your current password."
+msgstr ""
+
+#: src/lib/sso-errors.ts
+msgid "That sign-in was started in another browser or window, so it was not completed. Start it again from here."
 msgstr ""
 
 #: src/components/experiment-alerts.tsx
@@ -5422,6 +5764,7 @@ msgstr ""
 msgid "The browser refused the clipboard. Select the query and copy it by hand."
 msgstr ""
 
+#: src/components/copyable-value.tsx
 #: src/components/ui/reveal-secret.tsx
 msgid "The browser refused the clipboard. Select the value and copy it by hand."
 msgstr ""
@@ -5545,6 +5888,10 @@ msgstr ""
 
 #: src/components/experiment-transitions.tsx
 msgid "The draft never starts and nothing about it changes any more; no ruleset changes. Archived experiments are listed only on request; it can still be cloned."
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+msgid "The email domains this provider vouches for, one per line or separated by spaces. A subdomain is not included. Linking and creating members apply to these emails only."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -5720,6 +6067,30 @@ msgstr ""
 msgid "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
+msgid "The identity provider answered"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The identity provider could not be reached or did not answer as expected: {failure}"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The identity provider could not be reached or did not answer as expected."
+msgstr ""
+
+#: src/lib/sso-errors.ts
+msgid "The identity provider refused the sign-in. Ask whoever runs it, or your instance admin."
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+msgid "The identity provider's issuer URL; its discovery document is read from it. Plain http is accepted only on a loopback address."
+msgstr ""
+
+#: src/components/auth-provider-list.tsx
+msgid "The identity providers members sign in through. Each is offered on the sign-in page and vouches only for the email domains you give it."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "The idle timeout cannot be longer than the absolute timeout."
 msgstr ""
@@ -5759,6 +6130,10 @@ msgstr ""
 
 #: src/components/project-audit.tsx
 msgid "The most recent changes in this project"
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+msgid "The names of the claims the instance reads from the identity provider's tokens."
 msgstr ""
 
 #: src/components/password-form.tsx
@@ -5879,6 +6254,22 @@ msgstr ""
 msgid "The proposed configuration is written to the environment now, and its SDKs receive it."
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
+msgid "The provider does not list the S256 PKCE method, which sign-in needs. Sign-ins through it will fail."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The provider is still in use. Disable it instead: that stops its sign-ins and keeps its members, identities and grants."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The provider is still used by {uses}. Disable it instead: that stops its sign-ins and keeps its members, identities and grants."
+msgstr ""
+
+#: src/components/auth-provider-detail.tsx
+msgid "The redirect URI is built from the instance's public address (FLAGNETIC_BASE_URL), which is not set. Set it, and the address shows here."
+msgstr ""
+
 #: src/components/sdk-keys.tsx
 msgid "The replacement SDK key"
 msgstr ""
@@ -5987,6 +6378,10 @@ msgstr ""
 
 #: src/components/sdk-keys.tsx
 msgid "The sites the key may be used from, such as https://app.example.com. Leave it empty to allow any origin."
+msgstr ""
+
+#: src/components/auth-provider-form.tsx
+msgid "The slug never changes."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -6231,6 +6626,10 @@ msgstr ""
 msgid "This project has no unit type yet."
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
+msgid "This provider is disabled: it is not offered on the sign-in page, and its sign-ins are refused. Its members, identities and grants are kept."
+msgstr ""
+
 #: src/lib/flag-detail.ts
 msgid "This rule is no longer in the configuration."
 msgstr ""
@@ -6241,6 +6640,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "This server cannot load the ruleset yet. Try again in a moment."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "This slug is reserved."
 msgstr ""
 
 #: src/lib/tester.ts
@@ -6278,12 +6681,20 @@ msgstr ""
 msgid "to be removed by {by}"
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
+msgid "Token endpoint"
+msgstr ""
+
 #: src/components/auth-settings-form.tsx
 msgid "Token expiry required"
 msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "Too long."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Too many domains."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -6304,6 +6715,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "Too many requests. Try again later."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Too many scopes."
 msgstr ""
 
 #: src/components/sign-in-form.tsx
@@ -6479,6 +6894,10 @@ msgstr ""
 msgid "Use {min} to {max} characters."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "Use an https URL. Plain http is accepted only on a loopback address such as localhost."
+msgstr ""
+
 #: src/components/tester-panel.tsx
 msgid "Use unsaved draft"
 msgstr ""
@@ -6494,6 +6913,10 @@ msgstr ""
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Used by flags and segments"
+msgstr ""
+
+#: src/components/auth-provider-detail.tsx
+msgid "User info endpoint"
 msgstr ""
 
 #: src/components/tester-panel.tsx
@@ -6686,6 +7109,10 @@ msgstr ""
 msgid "What the project is called and what it is for."
 msgstr ""
 
+#: src/components/auth-provider-form.tsx
+msgid "What the sign-in button says: “Sign in with …”."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 msgid "What this change request was based on changed after it was written; it can no longer be approved or applied. Copy it to propose it again."
 msgstr ""
@@ -6836,12 +7263,24 @@ msgstr ""
 msgid "You need the permission to {name}."
 msgstr ""
 
+#: src/lib/sso-errors.ts
+msgid "Your account here is deactivated. Ask an instance admin to reactivate it."
+msgstr ""
+
 #: src/components/token-list.tsx
 msgid "Your API tokens"
 msgstr ""
 
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Your changes on this page will be lost."
+msgstr ""
+
+#: src/lib/sso-errors.ts
+msgid "Your email address signs in through {providerName} only. Use its button."
+msgstr ""
+
+#: src/lib/sso-errors.ts
+msgid "Your email address signs in through your company's identity provider only. Use its button."
 msgstr ""
 
 #: src/components/token-list.tsx

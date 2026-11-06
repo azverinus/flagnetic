@@ -12,24 +12,34 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { signInStartPath } from "@/lib/auth-providers";
 import { ApiError, unwrap } from "@/lib/errors";
 import { problemMessage, retryWait } from "@/lib/problem-messages";
 import { authMethodsQuery } from "@/lib/queries";
 import { forgetsSecret } from "@/lib/mutations";
+import { ssoErrorMessage } from "@/lib/sso-errors";
 
 export type SignInFormProps = {
   /** Set when the member was sent here because their session ended. */
   ended?: boolean;
+  /** Where to go once signed in, kept through a provider's sign-in. */
+  returnTo?: string;
+  /** The code a failed single sign-on sent the member back with. */
+  error?: string;
+  /** The slug of the provider the error names. */
+  errorProvider?: string;
   /** Called with the caller once the session is open. */
   onSignedIn: (me: Me) => void;
 };
 
 /**
- * The sign-in form: email and password, and the reason for a refusal in the
- * member's language. Every refusal the server gives is explained here rather
- * than toasted, because the member has nothing else on the page.
+ * The ways to sign in: email and password when the instance allows them,
+ * and a link to each enabled auth provider's sign-in. The reason for a
+ * refusal, or for a single sign-on that failed, is given in the member's
+ * language. Every refusal the server gives is explained here rather than
+ * toasted, because the member has nothing else on the page.
  */
-export function SignInForm({ ended, onSignedIn }: SignInFormProps) {
+export function SignInForm({ ended, returnTo, error, errorProvider, onSignedIn }: SignInFormProps) {
   const { i18n, t } = useLingui();
   const methods = useQuery(authMethodsQuery);
   const refusalId = useId();
@@ -59,7 +69,9 @@ export function SignInForm({ ended, onSignedIn }: SignInFormProps) {
     onSuccess: onSignedIn,
   });
 
-  if (methods.data && !methods.data.local_login_enabled) {
+  const providers = methods.data?.providers ?? [];
+  const localLogin = methods.data?.local_login_enabled ?? true;
+  if (methods.data && !localLogin && providers.length === 0) {
     return (
       <p role="status" className="text-sm text-muted-foreground">
         <Trans>No way to sign in is enabled on this instance. Ask its operator.</Trans>
@@ -69,39 +81,82 @@ export function SignInForm({ ended, onSignedIn }: SignInFormProps) {
 
   const refusal = submit.error instanceof ApiError ? submit.error : undefined;
   const { errors } = form.formState;
+  const failedProvider = providers.find((provider) => provider.slug === errorProvider);
+  // The sentence names the provider, which the list of methods knows; it is
+  // said once that list is read, not first without the name.
+  const namesProvider = errorProvider !== undefined && methods.isPending;
   return (
-    <form
-      noValidate
-      className="flex flex-col gap-4"
-      aria-describedby={refusal ? refusalId : undefined}
-      onSubmit={form.handleSubmit((values) => submit.mutate(values))}
-    >
-      {ended && !refusal ? (
+    <div className="flex flex-col gap-4">
+      {ended && !refusal && !error ? (
         <p role="status" className="flex items-start gap-2 rounded-md border bg-muted p-3 text-sm">
           <InfoIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
           <Trans>Your session has ended. Sign in again to continue.</Trans>
         </p>
       ) : null}
-      {refusal ? (
+      {error && !refusal && !namesProvider ? (
         <p
-          id={refusalId}
           role="alert"
           className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
         >
           <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
-          {signInRefusalMessage(i18n, refusal)}
+          {ssoErrorMessage(i18n, error, failedProvider?.display_name)}
         </p>
       ) : null}
-      <Field label={<Trans>Email</Trans>} error={errors.email?.message}>
-        <Input type="email" autoComplete="username" autoFocus {...form.register("email")} />
-      </Field>
-      <Field label={<Trans>Password</Trans>} error={errors.password?.message}>
-        <Input type="password" autoComplete="current-password" {...form.register("password")} />
-      </Field>
-      <Button type="submit" disabled={submit.isPending}>
-        {submit.isPending ? <Trans>Signing in…</Trans> : <Trans>Sign in</Trans>}
-      </Button>
-    </form>
+      {localLogin ? (
+        <form
+          noValidate
+          className="flex flex-col gap-4"
+          aria-describedby={refusal ? refusalId : undefined}
+          onSubmit={form.handleSubmit((values) => submit.mutate(values))}
+        >
+          {refusal ? (
+            <p
+              id={refusalId}
+              role="alert"
+              className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
+            >
+              <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
+              {signInRefusalMessage(i18n, refusal)}
+            </p>
+          ) : null}
+          <Field label={<Trans>Email</Trans>} error={errors.email?.message}>
+            <Input type="email" autoComplete="username" autoFocus {...form.register("email")} />
+          </Field>
+          <Field label={<Trans>Password</Trans>} error={errors.password?.message}>
+            <Input type="password" autoComplete="current-password" {...form.register("password")} />
+          </Field>
+          <Button type="submit" disabled={submit.isPending}>
+            {submit.isPending ? <Trans>Signing in…</Trans> : <Trans>Sign in</Trans>}
+          </Button>
+        </form>
+      ) : null}
+      {providers.length > 0 ? (
+        <>
+          {localLogin ? (
+            <p
+              aria-hidden
+              className="flex items-center gap-3 text-xs text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border"
+            >
+              <Trans>or</Trans>
+            </p>
+          ) : null}
+          <ul aria-label={t`Sign in with a provider`} className="flex flex-col gap-2">
+            {providers.map((provider) => {
+              const name = provider.display_name;
+              return (
+                <li key={provider.slug}>
+                  <Button variant="outline" className="w-full" asChild>
+                    <a href={signInStartPath(provider.slug, returnTo)}>
+                      <Trans>Sign in with {name}</Trans>
+                    </a>
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      ) : null}
+    </div>
   );
 }
 

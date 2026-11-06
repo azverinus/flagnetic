@@ -62,6 +62,9 @@ type Handlers struct {
 	ReissueInvitation   *appaccess.ReissueInvitation
 	GetInvitation       *appaccess.GetInvitation
 	AcceptInvitation    *appaccess.AcceptInvitation
+	IssueReset          *appaccess.IssuePasswordReset
+	GetReset            *appaccess.GetPasswordReset
+	CompleteReset       *appaccess.CompletePasswordReset
 	ListPersonalTokens  *appaccess.ListPersonalTokens
 	CreatePersonalToken *appaccess.CreatePersonalToken
 	RevokePersonalToken *appaccess.RevokePersonalToken
@@ -252,9 +255,10 @@ func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer, opts Op
 		RequestErrorHandlerFunc:  invalidRequest,
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) { edge.WriteError(w, r, httpError(err)) },
 	})
-	// The links invitations hand out carry their secret in the path the
-	// browser opens.
+	// The links invitations and password resets hand out carry their secret
+	// in the path the browser opens.
 	edge.SecretPath(invitationLinkPath + "{secret}")
+	edge.SecretPath(passwordResetLinkPath + "{secret}")
 	HandlerWithOptions(rawBodies{ServerInterface: strict, a: a}, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
 		BaseRouter:       router{a},

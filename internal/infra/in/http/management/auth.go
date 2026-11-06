@@ -214,3 +214,30 @@ func (a *api) AcceptInvitation(ctx context.Context, req AcceptInvitationRequestO
 	cookie := sessionCookie(ctx, res.Cookie.Reveal())
 	return AcceptInvitation200JSONResponse{Body: me, Headers: AcceptInvitation200ResponseHeaders{SetCookie: &cookie}}, nil
 }
+
+// GetPasswordReset answers what a password reset's link opens.
+func (a *api) GetPasswordReset(ctx context.Context, req GetPasswordResetRequestObject) (GetPasswordResetResponseObject, error) {
+	v, err := a.h.GetReset.Handle(ctx, secret.New(req.Secret))
+	if err != nil {
+		return nil, err
+	}
+	return GetPasswordReset200JSONResponse{Email: v.MaskedEmail, DisplayName: v.DisplayName, ExpiresAt: v.ExpiresAt}, nil
+}
+
+// CompletePasswordReset sets the member's new password, opens a session and
+// sets its cookie.
+func (a *api) CompletePasswordReset(ctx context.Context, req CompletePasswordResetRequestObject) (CompletePasswordResetResponseObject, error) {
+	res, err := a.h.CompleteReset.Handle(ctx, appaccess.CompletePasswordResetCommand{
+		Secret: secret.New(req.Secret), Password: secret.New(req.Body.Password),
+		ClientIP: flaghttp.ClientOf(ctx).IP, UserAgent: browserOf(ctx).userAgent, RequestID: flaghttp.RequestIDOf(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	me, err := a.meOf(ctx, res.Caller)
+	if err != nil {
+		return nil, err
+	}
+	cookie := sessionCookie(ctx, res.Cookie.Reveal())
+	return CompletePasswordReset200JSONResponse{Body: me, Headers: CompletePasswordReset200ResponseHeaders{SetCookie: &cookie}}, nil
+}

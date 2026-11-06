@@ -6,8 +6,8 @@ Members sign in through an identity provider the instance admin has added as an 
 
 1. Set `FLAGNETIC_BASE_URL` to the address members reach the console at, such as `https://flags.example.com`. Without it a provider cannot be created, edited or enabled, and the redirect URI below cannot be built.
 2. In the identity provider, register a client for a web application that uses the authorization code flow, and give it the redirect URI the instance computes: `<base URL>/sso/<slug>/callback`, answered as `redirect_uri` when the provider is created. Take note of the client ID and the client secret. The instance sends the client secret to the token endpoint and uses PKCE besides, so a client that insists on PKCE alone is fine too.
-3. As an instance admin, add the provider with `POST /instance/auth-providers`: a `slug` of your choice, the `issuer` (the address under which the identity provider serves `/.well-known/openid-configuration`), the `client_id`, the `client_secret`, and the `domains` the provider vouches for.
-4. Check it with `POST /instance/auth-providers/{slug}/test`, which fetches the discovery document and says what it found.
+3. As an instance admin, add the provider under **Auth providers** in the console (**New provider**; its page shows the redirect URI to copy), or with `POST /instance/auth-providers`: a `slug` of your choice, the `issuer` (the address under which the identity provider serves `/.well-known/openid-configuration`), the `client_id`, the `client_secret`, and the `domains` the provider vouches for.
+4. Check it with **Test** on the provider's page, or `POST /instance/auth-providers/{slug}/test`, which fetches the discovery document and says what it found. The console also warns when the document does not list the `S256` PKCE method, which sign-in needs.
 
 The provider now appears as a button on the sign-in page, and `GET /sso/<slug>/start` begins a sign-in.
 
