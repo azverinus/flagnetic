@@ -185,6 +185,28 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(
         msg`Too many entries match these filters to download at once. Narrow them, for example with From and To, and try again.`,
       );
+    case "base_url_required":
+      return i18n._(
+        msg`Set the instance's public address first (FLAGNETIC_BASE_URL): the redirect URI the identity provider is told is built from it.`,
+      );
+    case "provider_unreachable": {
+      const failure = error.problem.failure;
+      return typeof failure === "string" && failure !== ""
+        ? i18n._(
+            msg`The identity provider could not be reached or did not answer as expected: ${failure}`,
+          )
+        : i18n._(msg`The identity provider could not be reached or did not answer as expected.`);
+    }
+    case "provider_in_use": {
+      const uses = providerUses(i18n, error);
+      return uses
+        ? i18n._(
+            msg`The provider is still used by ${uses}. Disable it instead: that stops its sign-ins and keeps its members, identities and grants.`,
+          )
+        : i18n._(
+            msg`The provider is still in use. Disable it instead: that stops its sign-ins and keeps its members, identities and grants.`,
+          );
+    }
     case "invitation_gone":
       return i18n._(
         msg`This invitation link no longer works: it was used, replaced by a newer one, or it expired.`,
@@ -213,6 +235,32 @@ function referenceList(i18n: I18n, error: ApiError): string | undefined {
           ? i18n._(msg`the segment ${key}`)
           : key;
     return environment ? i18n._(msg`${what} in ${environment}`) : what;
+  });
+  return new Intl.ListFormat(i18n.locale, { type: "conjunction" }).format(named);
+}
+
+/**
+ * What a `provider_in_use` refusal says still depends on the provider,
+ * joined as the member's language joins a list. The server names each use
+ * in English; the ones it names today are translated, any other is shown
+ * as it came.
+ */
+function providerUses(i18n: I18n, error: ApiError): string | undefined {
+  const uses = error.problem.used_by;
+  if (!Array.isArray(uses) || uses.length === 0) return undefined;
+  const named = uses.map((use) => {
+    switch (use) {
+      case "identities":
+        return i18n._(msg`linked identities`);
+      case "SCIM tokens":
+        return i18n._(msg`SCIM tokens`);
+      case "provisioned members":
+        return i18n._(msg`provisioned members`);
+      case "an enforced domain":
+        return i18n._(msg`an enforced domain`);
+      default:
+        return String(use);
+    }
   });
   return new Intl.ListFormat(i18n.locale, { type: "conjunction" }).format(named);
 }
@@ -327,6 +375,42 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
         default:
           return i18n._(msg`Choose a stronger password.`);
       }
+    case "invalid_slug":
+      return i18n._(
+        msg`Start with a lowercase letter; then lowercase letters, digits, - and _, at most 64 in all.`,
+      );
+    case "reserved_slug":
+      return i18n._(msg`This slug is reserved.`);
+    case "invalid_display_name":
+      return i18n._(msg`Enter a name of 1 to 200 characters.`);
+    case "domains_required":
+      return i18n._(msg`Enter at least one email domain.`);
+    case "too_many_domains": {
+      const max = numberParam(i18n, violation, "max");
+      return max ? i18n._(msg`At most ${max} domains.`) : i18n._(msg`Too many domains.`);
+    }
+    case "invalid_domain":
+      return i18n._(msg`Enter host names such as example.com, without an at sign or a scheme.`);
+    case "invalid_issuer":
+      return i18n._(
+        msg`Enter the http or https URL of the identity provider, without credentials, a query or a fragment.`,
+      );
+    case "insecure_url":
+      return i18n._(
+        msg`Use an https URL. Plain http is accepted only on a loopback address such as localhost.`,
+      );
+    case "invalid_client_id":
+      return i18n._(msg`Enter a client ID of 1 to 512 characters.`);
+    case "invalid_client_secret":
+      return i18n._(msg`Enter a client secret of 1 to 4096 characters.`);
+    case "too_many_scopes": {
+      const max = numberParam(i18n, violation, "max");
+      return max ? i18n._(msg`At most ${max} scopes.`) : i18n._(msg`Too many scopes.`);
+    }
+    case "invalid_scope":
+      return i18n._(msg`A scope is a word without spaces.`);
+    case "invalid_claim":
+      return i18n._(msg`Enter a claim name of 1 to 256 characters.`);
     case "too_soon":
       return i18n._(msg`Choose a later time: the server needs some lead to apply it.`);
     case "too_late":

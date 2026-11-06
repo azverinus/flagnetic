@@ -1,4 +1,5 @@
 import {
+  createAuthProvider,
   createChangeRequest,
   createExperiment,
   createGrant,
@@ -600,5 +601,59 @@ test.describe("the console in Russian", () => {
     await expect(dialog.getByRole("button", { name: "Скачать CSV" })).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Удалить проект" })).toBeDisabled();
     await expectNoSeriousViolations(page, "the project deletion dialog in Russian");
+  });
+
+  test("reads the auth providers, their form and the sign-in errors in Russian", async ({
+    page,
+  }) => {
+    must(
+      "adding a provider",
+      await createAuthProvider({
+        client: managementClient(),
+        body: {
+          slug: "acme-ru",
+          kind: "oidc",
+          display_name: "Акме",
+          enabled: false,
+          domains: ["acme-ru.test"],
+          issuer: "https://login.acme-ru.test",
+          client_id: "flagnetic",
+          client_secret: "unused",
+        },
+      }),
+    );
+    await signIn(page, admin, russian);
+    await page.goto("/admin/auth-providers");
+
+    await expect(page.getByRole("heading", { name: "Провайдеры входа", level: 1 })).toBeVisible();
+    const row = page
+      .getByRole("table", { name: "Провайдеры входа" })
+      .getByRole("row", { name: /Акме/ });
+    await expect(row).toContainText("Отключён");
+    await expect(row).toContainText("OpenID Connect");
+    await expectNoSeriousViolations(page, "the auth providers in Russian");
+
+    await page.getByRole("button", { name: "Новый провайдер" }).click();
+    const dialog = page.getByRole("dialog", { name: "Новый провайдер входа" });
+    await dialog.getByRole("button", { name: "Добавить провайдера" }).click();
+    await expect(dialog.getByText("Введите слаг.")).toBeVisible();
+    await expect(dialog.getByText("Введите хотя бы один почтовый домен.")).toBeVisible();
+    await expectNoSeriousViolations(page, "the new auth provider dialog in Russian");
+    await dialog.getByRole("button", { name: "Отмена" }).click();
+
+    await page.goto("/admin/auth-providers/acme-ru");
+    await expect(page.getByRole("heading", { name: "Акме", level: 1 })).toBeVisible();
+    await expect(page.getByText(/Провайдер отключён/)).toBeVisible();
+    await expect(page.getByText("/sso/acme-ru/callback")).toBeVisible();
+    await expectNoSeriousViolations(page, "an auth provider's page in Russian");
+  });
+
+  test("explains a failed single sign-on on the sign-in page in Russian", async ({ page }) => {
+    await page.goto("/sign-in?error=member_not_found");
+
+    await expect(page.getByRole("alert")).toHaveText(
+      "В этом экземпляре нет участника, соответствующего этой учётной записи. Попросите администратора экземпляра пригласить вас.",
+    );
+    await expectNoSeriousViolations(page, "the sign-in page with an error in Russian");
   });
 });

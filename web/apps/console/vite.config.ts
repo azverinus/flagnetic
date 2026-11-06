@@ -54,6 +54,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": { target: process.env.FLAGNETIC_URL ?? "http://localhost:8080", changeOrigin: false },
+      // The sign-in addresses of the auth providers are served by the binary too.
+      "/sso": { target: process.env.FLAGNETIC_URL ?? "http://localhost:8080", changeOrigin: false },
     },
   },
 });

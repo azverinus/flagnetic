@@ -101,4 +101,75 @@ describe("the sign-in form", () => {
     ).toBeInTheDocument();
     expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
   });
+
+  describe("with auth providers", () => {
+    const providers = [
+      { slug: "acme", display_name: "Acme SSO", kind: "oidc" },
+      { slug: "globex", display_name: "Globex", kind: "saml" },
+    ];
+    const withProviders = {
+      status: 200,
+      body: { local_login_enabled: true, providers },
+    };
+
+    it("offers a way in per enabled provider, keeping where the member was going", async () => {
+      fakeServer({ "GET /auth/methods": withProviders });
+      renderWithProviders(<SignInForm returnTo="/projects/checkout?tab=a" onSignedIn={vi.fn()} />);
+
+      const acme = await screen.findByRole("link", { name: "Sign in with Acme SSO" });
+      expect(acme).toHaveAttribute(
+        "href",
+        "/sso/acme/start?return_to=%2Fprojects%2Fcheckout%3Ftab%3Da",
+      );
+      expect(screen.getByRole("link", { name: "Sign in with Globex" })).toHaveAttribute(
+        "href",
+        expect.stringMatching(/^\/sso\/globex\/start/),
+      );
+      // The password form stays, since local login is on.
+      expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    });
+
+    it("starts at the provider without a return path when there is none", async () => {
+      fakeServer({ "GET /auth/methods": withProviders });
+      renderWithProviders(<SignInForm onSignedIn={vi.fn()} />);
+
+      expect(await screen.findByRole("link", { name: "Sign in with Acme SSO" })).toHaveAttribute(
+        "href",
+        "/sso/acme/start",
+      );
+    });
+
+    it("offers only the providers when local login is off", async () => {
+      fakeServer({
+        "GET /auth/methods": { status: 200, body: { local_login_enabled: false, providers } },
+      });
+      renderWithProviders(<SignInForm onSignedIn={vi.fn()} />);
+
+      expect(await screen.findByRole("link", { name: "Sign in with Acme SSO" })).toBeVisible();
+      expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+      expect(screen.queryByText(/No way to sign in/)).not.toBeInTheDocument();
+    });
+
+    it.each([
+      ["member_not_found", "No member of this instance matches that account."],
+      ["attempt_mismatch", "That sign-in was started in another browser or window"],
+      ["sso_failed", "Signing in through the identity provider failed."],
+    ])("explains the error %s the provider sent the member back with", async (code, message) => {
+      fakeServer({ "GET /auth/methods": withProviders });
+      renderWithProviders(<SignInForm error={code} onSignedIn={vi.fn()} />);
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    });
+
+    it("names the provider an enforced email must use", async () => {
+      fakeServer({ "GET /auth/methods": withProviders });
+      renderWithProviders(
+        <SignInForm error="sso_required" errorProvider="acme" onSignedIn={vi.fn()} />,
+      );
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Your email address signs in through Acme SSO only. Use its button.",
+      );
+    });
+  });
 });

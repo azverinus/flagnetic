@@ -50,6 +50,30 @@ describe("the session list", () => {
     expect(second).not.toHaveTextContent("This device");
   });
 
+  it("says how each device signed in, and through which provider", async () => {
+    fakeServer({
+      "GET /me/sessions": {
+        status: 200,
+        body: {
+          items: [
+            { ...session("s1", chrome, true), method: "oidc", provider: "acme" },
+            session("s2", firefox, false),
+            { ...session("s3", firefox, false), method: "saml", provider: "globex" },
+          ],
+        },
+      },
+    });
+    renderWithProviders(<SessionList />);
+
+    await screen.findByText("acme");
+    const [oidc, local, saml] = rows();
+    expect(oidc).toHaveTextContent("OpenID Connect");
+    expect(oidc).toHaveTextContent("acme");
+    expect(local).toHaveTextContent("Password");
+    expect(saml).toHaveTextContent("SAML");
+    expect(saml).toHaveTextContent("globex");
+  });
+
   it("revokes another device after saying what happens to it", async () => {
     let items = [session("s1", chrome, true), session("s2", firefox, false)];
     const server = fakeServer({
