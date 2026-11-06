@@ -26,7 +26,7 @@ test.describe("auth providers", () => {
   test("asks for a slug the server would accept before sending anything", async ({ page }) => {
     await signIn(page);
     await page.goto("/admin/auth-providers");
-    await expect(page.getByText("No auth provider yet.")).toBeVisible();
+    await expect(heading(page, "Auth providers")).toBeVisible();
 
     await page.getByRole("button", { name: "New provider" }).click();
     const dialog = page.getByRole("dialog", { name: "New auth provider" });
