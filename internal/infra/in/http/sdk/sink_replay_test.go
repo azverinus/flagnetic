@@ -390,3 +390,21 @@ func TestSampleRefusesAnEventKindTheSinkDoesNotExport(t *testing.T) {
 		t.Errorf("the receiver got %d calls from a refused sample, want none", n)
 	}
 }
+
+func TestASinkThatWasNeverEnabledHasNothingToReplay(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t)
+	sink, _ := f.create(t, webhook(r, "exposure"))
+	f.timeline(t, "u-1")
+
+	replayed := f.replay(t, sink, management.SinkReplay{From: f.clock.Now().Add(-2 * time.Hour)})
+	if replayed.Enabled || len(replayed.Streams) != 0 {
+		t.Errorf("sink after the replay %+v, want it disabled with no stream", replayed)
+	}
+	if n := len(r.Calls()); n != 0 {
+		t.Errorf("the receiver got %d calls, want none", n)
+	}
+	if n := len(f.audited(t, "sink.replayed", sink)); n != 1 {
+		t.Errorf("%d sink.replayed entries, want the request recorded", n)
+	}
+}
