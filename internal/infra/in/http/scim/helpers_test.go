@@ -7,10 +7,13 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
 
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/scim"
@@ -190,3 +193,33 @@ func assertScimError(t *testing.T, what string, r reply, status int, scimType st
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
+
+func escape(s string) string { return url.QueryEscape(s) }
+
+func newUUID() string { return uuid.NewString() }
+
+// secretOfLink returns the secret of a link an instance admin was given.
+func secretOfLink(link string) string { return link[strings.LastIndex(link, "/")+1:] }
+
+// do returns res, failing the test on err.
+func do[R any](res R, err error) R {
+	if err != nil {
+		panic(err)
+	}
+	return res
+}
+
+// assertProblem checks a management API answer is the problem document of
+// status and code.
+func assertProblem(t *testing.T, what string, status int, body []byte, wantStatus int, wantCode string) management.Problem {
+	t.Helper()
+	var p management.Problem
+	if status != wantStatus {
+		t.Errorf("%s: status = %d, want %d: %s", what, status, wantStatus, body)
+		return p
+	}
+	if err := json.Unmarshal(body, &p); err != nil || p.Code != wantCode {
+		t.Errorf("%s: problem = %s, want code %s", what, body, wantCode)
+	}
+	return p
+}

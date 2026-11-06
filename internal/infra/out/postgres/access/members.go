@@ -79,6 +79,22 @@ func (s *Store) MemberByID(ctx context.Context, member access.MemberID) (access.
 	return m(), nil
 }
 
+// MemberByExternalID returns the member the provider with this slug
+// provisioned with externalID as their external ID; ErrNotFound when there is
+// none.
+func (s *Store) MemberByExternalID(ctx context.Context, provider, externalID string) (access.Member, error) {
+	dest, m := scanMember()
+	err := s.db(ctx).QueryRow(ctx, `SELECT `+memberColumns+` FROM members m WHERE m.provider = $1 AND m.external_id = $2`,
+		provider, externalID).Scan(dest...)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return access.Member{}, appaccess.ErrNotFound
+	}
+	if err != nil {
+		return access.Member{}, fmt.Errorf("reading a member by external ID: %w", err)
+	}
+	return m(), nil
+}
+
 // MemberEmails returns the email address of each of members that exists,
 // as the member signs in with it.
 func (s *Store) MemberEmails(ctx context.Context, members []access.MemberID) (map[access.MemberID]string, error) {
