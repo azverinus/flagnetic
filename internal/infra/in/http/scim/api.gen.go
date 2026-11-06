@@ -162,7 +162,7 @@ type ServiceProviderConfig struct {
 	} `json:"sort,omitempty"`
 }
 
-// User A member, mapped per the spec's attribute table.
+// User A member, as SCIM describes a user.
 type User struct {
 	Active      *bool    `json:"active,omitempty"`
 	DisplayName *string  `json:"displayName,omitempty"`

@@ -329,7 +329,7 @@ components:
           type: string
     User:
       type: object
-      description: A member, mapped per the spec's attribute table.
+      description: A member, as SCIM describes a user.
       properties:
         schemas:
           type: array
