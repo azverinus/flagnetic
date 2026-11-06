@@ -363,16 +363,34 @@ done
 #
 # The tests that can see a change: those of the packages that changed, those
 # of every package importing one (their tests start the server through the
-# test kit), and the guard tests, which read the whole tree.
+# test kit), and the guard tests, which read files outside their package.
 
-GUARD_RE='go/parser|go/packages|go/ast|parser\.Parse|packages\.Load|filepath\.Walk|WalkDir|os\.ReadDir\(|os\.ReadFile\("\.\.|os\.DirFS\("\.\.|"\.\./|runtime\.Caller'
+# A guard test is one that reads files outside its own package, so a change
+# elsewhere can break it. Two kinds, told apart by what they read:
+#   - a test that parses Go source (go/parser, go/ast, go/packages) checks
+#     every server package, so it runs whenever the server changed;
+#   - a test that opens a fixed file elsewhere in the tree ("../../api/x.yaml")
+#     can only be broken by a change under that top-level directory, so it
+#     runs when something there changed. Running these on every server change
+#     would add the largest test package to a change in a leaf package.
+GUARD_SOURCE_RE='go/parser|go/packages|go/ast|parser\.Parse|packages\.Load'
+GUARD_PATH_RE='"(\.\./)+[^"]+"'
 
-guard_packages() { # packages with a test that reads files outside its directory
-  grep -rlE "$GUARD_RE" --include='*_test.go' internal cmd 2>/dev/null | while read -r f; do import_path "$(dirname "$f")"; echo; done | sed '/^$/d' | sort -u
+guard_packages() {
+  if [ "$SERVER" = 1 ]; then
+    grep -rlE "$GUARD_SOURCE_RE" --include='*_test.go' internal cmd 2>/dev/null
+  fi
+  grep -rlE "$GUARD_PATH_RE" --include='*_test.go' internal cmd 2>/dev/null | while read -r f; do
+    for top in $(grep -ohE "$GUARD_PATH_RE" "$f" | tr -d '"' | sed -E 's#^(\.\./)+##' | cut -d/ -f1 | sort -u); do
+      if changed "^$top/"; then echo "$f"; break; fi
+    done
+  done
 }
 
+GUARDS="$(guard_packages | while read -r f; do import_path "$(dirname "$f")"; echo; done | sed '/^$/d' | sort -u)"
+
 TEST_PKGS=""; COVER_PKGS=""
-if [ "$SERVER" = 1 ] || [ -n "$CHANGED_PKGS" ]; then
+if [ "$SERVER" = 1 ] || [ -n "$CHANGED_PKGS" ] || [ -n "$GUARDS" ]; then
   if [ "$WIDE" = 1 ]; then
     TEST_PKGS="./..."
     COVER_PKGS="./internal/..."
@@ -387,7 +405,7 @@ if [ "$SERVER" = 1 ] || [ -n "$CHANGED_PKGS" ]; then
         for (i = 2; i <= NF && !hit; i++) if ($i in changed) hit = 1
         if (hit) print pkg
       }' "$WORK/changed.txt" "$WORK/deps.txt")"
-    if [ "$SERVER" = 1 ]; then TEST_PKGS="$TEST_PKGS"$'\n'"$(guard_packages)"; fi
+    TEST_PKGS="$TEST_PKGS"$'\n'"$GUARDS"
     # A changed package without tests of its own is covered by the packages
     # above, but is built and vetted by the build step.
     TEST_PKGS="$(printf '%s\n' "$TEST_PKGS" | sort -u | sed '/^$/d' | grep -E "^$ROOT_MODULE(/|$)")"
