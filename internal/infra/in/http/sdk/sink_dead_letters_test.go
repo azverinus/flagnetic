@@ -380,7 +380,10 @@ func TestRedeliveringADeadLetterWhoseRowsAreGoneIsRefused(t *testing.T) {
 func TestDeadLetterActionsAreScopedToTheirSinkAndNeedSinkManage(t *testing.T) {
 	f := startDelivering(t)
 	r := testkit.StartReceiver(t, script(times(5, rejected), []testkit.Reply{{}})...)
-	created, _ := f.enabled(t, small(r, "exposure"))
+	// Limited to an environment, the dead letter keeps the filter its batch had.
+	body := small(r, "exposure")
+	body.Environments = &[]string{"production"}
+	created, _ := f.enabled(t, body)
 	other, _ := f.create(t, webhook(r, "alias"))
 	f.post(t, f.exposure("u-1", "true", f.clock.Now()))
 	f.rounds(t, 5)

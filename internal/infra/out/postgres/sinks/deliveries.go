@@ -353,14 +353,7 @@ func (s *Store) Fail(ctx context.Context, stream appsinks.StreamRef, token appsi
 	if err != nil {
 		return false, false, fmt.Errorf("reading a stream's failures: %w", err)
 	}
-	var status any
-	if f.Status != 0 {
-		status = f.Status
-	}
-	var code any
-	if f.Code != "" {
-		code = f.Code
-	}
+	status, code := failureArgs(f)
 	_, err = db.Exec(ctx, `
 		UPDATE sink_streams SET
 		    consecutive_failures = consecutive_failures + 1,
@@ -398,4 +391,16 @@ func (s *Store) Release(ctx context.Context, stream appsinks.StreamRef, token ap
 		return false, fmt.Errorf("releasing a stream: %w", err)
 	}
 	return tag.RowsAffected() > 0, nil
+}
+
+// failureArgs returns a failure's status and code as query arguments: null
+// where the target gave none.
+func failureArgs(f sinks.Failure) (status, code any) {
+	if f.Status != 0 {
+		status = f.Status
+	}
+	if f.Code != "" {
+		code = f.Code
+	}
+	return status, code
 }

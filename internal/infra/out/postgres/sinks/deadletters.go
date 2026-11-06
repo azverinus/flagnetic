@@ -24,14 +24,7 @@ func (s *Store) SetAside(ctx context.Context, stream appsinks.StreamRef, token a
 	if _, err := db.Exec(ctx, `SELECT 1 FROM sinks WHERE id = $1 FOR NO KEY UPDATE`, stream.Sink.Bytes()); err != nil {
 		return res, fmt.Errorf("locking a sink: %w", err)
 	}
-	var status any
-	if dl.Failure.Status != 0 {
-		status = dl.Failure.Status
-	}
-	var code any
-	if dl.Failure.Code != "" {
-		code = dl.Failure.Code
-	}
+	status, code := failureArgs(dl.Failure.Failure)
 	err := db.QueryRow(ctx, `
 		INSERT INTO sink_dead_letters (id, sink_id, event_kind, from_xid, from_seq, to_xid, to_seq, environments, rows,
 		    first_received_at, last_received_at, attempts, last_failure_class, last_failure_status, last_failure_code,
@@ -162,12 +155,7 @@ func (s *Store) RecordRedelivery(ctx context.Context, sink sinks.ID, dl sinks.De
 	var class, status, code, at any
 	if failure != nil {
 		class, at = string(failure.Class), failure.At
-		if failure.Status != 0 {
-			status = failure.Status
-		}
-		if failure.Code != "" {
-			code = failure.Code
-		}
+		status, code = failureArgs(failure.Failure)
 	}
 	row := s.db(ctx).QueryRow(ctx, `
 		UPDATE sink_dead_letters d SET
@@ -190,14 +178,11 @@ func (s *Store) RecordRedelivery(ctx context.Context, sink sinks.ID, dl sinks.De
 	return out, nil
 }
 
-// DiscardDeadLetter deletes sink's dead letter dl.
+// DiscardDeadLetter deletes sink's dead letter dl; one that is gone already
+// is left gone.
 func (s *Store) DiscardDeadLetter(ctx context.Context, sink sinks.ID, dl sinks.DeadLetterID) error {
-	tag, err := s.db(ctx).Exec(ctx, `DELETE FROM sink_dead_letters WHERE sink_id = $1 AND id = $2`, sink.Bytes(), dl.Bytes())
-	if err != nil {
+	if _, err := s.db(ctx).Exec(ctx, `DELETE FROM sink_dead_letters WHERE sink_id = $1 AND id = $2`, sink.Bytes(), dl.Bytes()); err != nil {
 		return fmt.Errorf("discarding a dead letter: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return appsinks.ErrNotFound
 	}
 	return nil
 }

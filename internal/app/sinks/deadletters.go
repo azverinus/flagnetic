@@ -33,7 +33,8 @@ type DeadLetterStore interface {
 	// either the failure that ended it or, when the target acknowledged it,
 	// that it is redelivered at now. It returns the dead letter as it is.
 	RecordRedelivery(ctx context.Context, sink sinks.ID, dl sinks.DeadLetterID, failure *sinks.FailureAt, now time.Time) (sinks.DeadLetter, error)
-	// DiscardDeadLetter deletes sink's dead letter dl, or answers ErrNotFound.
+	// DiscardDeadLetter deletes sink's dead letter dl; one gone already is left
+	// gone.
 	DiscardDeadLetter(ctx context.Context, sink sinks.ID, dl sinks.DeadLetterID) error
 	// Resume clears sink's stop and each of its streams' run of dead letters
 	// and makes the streams due at now at the latest; it reports when the sink
@@ -251,9 +252,6 @@ func (h *DiscardDeadLetter) Handle(ctx context.Context, cmd DeadLetterCommand) e
 			return err
 		}
 		if err = h.d.DeadLetters.DiscardDeadLetter(ctx, s.ID, dl.ID); err != nil {
-			if errors.Is(err, ErrNotFound) {
-				return ErrDeadLetterNotFound
-			}
 			return err
 		}
 		return h.d.recordDoc(ctx, now, cmd.Request, "sink.dead_letter_discarded", s, deadLetterDoc(dl))
