@@ -1,5 +1,5 @@
 import type { AuthProvider } from "@flagnetic/api";
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -120,6 +120,57 @@ describe("an auth provider's page", () => {
 
     expect(await screen.findByRole("button", { name: "Disable" })).toBeInTheDocument();
     expect(server.requests.some((r) => r.url.endsWith("/acme/enable"))).toBe(true);
+  });
+
+  it("deletes the provider and goes to the list, never saying it was not found", async () => {
+    let deleted = false;
+    let notFound = 0;
+    fakeServer({
+      "GET /instance/auth-providers/acme": () => {
+        if (!deleted) return { status: 200, body: acme };
+        notFound++;
+        return problem(404, "not_found");
+      },
+      "DELETE /instance/auth-providers/acme": () => {
+        deleted = true;
+        return { status: 204 };
+      },
+    });
+    const { router } = await renderScreen();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    await user.click(await screen.findByRole("button", { name: "Delete provider" }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/admin/auth-providers"));
+    expect(screen.queryByText("Auth provider not found")).not.toBeInTheDocument();
+    // The page was not read again while shown, which would have said so.
+    expect(notFound).toBe(0);
+  });
+
+  it("forgets a test's answer once the settings it was for are saved", async () => {
+    fakeServer({
+      "GET /instance/auth-providers/acme": { status: 200, body: acme },
+      "POST /instance/auth-providers/acme/test": { status: 200, body: discovery },
+      "PATCH /instance/auth-providers/acme": {
+        status: 200,
+        body: { ...acme, issuer: "https://login2.acme.example", version: 3 },
+      },
+    });
+    await renderScreen();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Test" }));
+    expect(await screen.findByText("The identity provider answered")).toBeVisible();
+
+    const issuer = screen.getByLabelText("Issuer");
+    await user.clear(issuer);
+    await user.type(issuer, "https://login2.acme.example");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(screen.queryByText("The identity provider answered")).not.toBeInTheDocument(),
+    );
   });
 
   it("says there is no such provider", async () => {

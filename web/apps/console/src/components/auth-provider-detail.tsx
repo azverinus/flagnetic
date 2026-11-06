@@ -24,7 +24,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { authProviderApi, authProviderQuery, authProvidersKey } from "@/lib/auth-providers";
 import { ApiError } from "@/lib/errors";
-import { useListMutation } from "@/lib/mutations";
 import { problemMessage } from "@/lib/problem-messages";
 import { authMethodsQuery } from "@/lib/queries";
 
@@ -103,14 +102,21 @@ function AuthProviderPage({
     mutationFn: () => authProviderApi.test(provider.slug),
     meta: { toast: false },
   });
-  const remove = useListMutation(
-    () => authProviderApi.remove(provider.slug),
-    authProvidersKey,
-    () => {
+  const remove = useMutation({
+    mutationFn: () => authProviderApi.remove(provider.slug),
+    meta: { toast: false },
+    onSuccess: async () => {
+      // Leave the page before forgetting the provider: reading it again
+      // while it is shown would answer 404 and say it was not found.
+      await navigate({ to: "/admin/auth-providers" });
+      queryClient.removeQueries({
+        queryKey: authProviderQuery(provider.slug).queryKey,
+        exact: true,
+      });
+      void queryClient.invalidateQueries({ queryKey: authProvidersKey, exact: true });
       void queryClient.invalidateQueries({ queryKey: authMethodsQuery.queryKey });
-      void navigate({ to: "/admin/auth-providers" });
     },
-  );
+  });
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
@@ -190,6 +196,8 @@ function AuthProviderPage({
             layout="page"
             onSaved={(saved) => {
               remember(saved);
+              // A test answered for the settings before the save; test again.
+              test.reset();
               const { display_name: savedName } = saved;
               toast.success(t`${savedName} is saved.`);
             }}
@@ -210,7 +218,7 @@ function AuthProviderPage({
         destructive
         pending={remove.isPending}
         refusal={remove.error}
-        onConfirm={() => remove.mutate(undefined)}
+        onConfirm={() => remove.mutate()}
       >
         <p>
           <Trans>
