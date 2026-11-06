@@ -13,6 +13,7 @@ import (
 	"time"
 
 	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
+	"github.com/azverinus/flagnetic/internal/domain/identity"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 )
@@ -50,6 +51,9 @@ type Options struct {
 	// SessionCookie returns the Set-Cookie value that carries a session
 	// cookie's value.
 	SessionCookie func(value string, secure bool) string
+	// SessionCookieName is the name of the session cookie, which a link
+	// completes in.
+	SessionCookieName string
 	// Metrics counts sign-ins; nil counts none.
 	Metrics *Metrics
 }
@@ -115,6 +119,17 @@ func attemptCookieName(secure bool) string {
 	return plainCookie
 }
 
+// AttemptCookie returns the Set-Cookie value that binds a sign-in attempt to
+// the browser it is sent to, carrying value for lifetime. secure says
+// whether cookies set to the request are Secure.
+func AttemptCookie(value string, lifetime time.Duration, secure bool) string {
+	c := &http.Cookie{ //nolint:gosec // Secure is decided per request, as for the session cookie
+		Name: attemptCookieName(secure), Value: value, Path: "/", MaxAge: int(lifetime / time.Second),
+		HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
+	}
+	return c.String()
+}
+
 func (e *edge) start(w http.ResponseWriter, r *http.Request, slug string) {
 	res, err := e.h.Start.Handle(r.Context(), appidentity.StartCommand{Slug: slug, ReturnTo: r.URL.Query().Get("return_to")})
 	if err != nil {
@@ -122,10 +137,7 @@ func (e *edge) start(w http.ResponseWriter, r *http.Request, slug string) {
 		return
 	}
 	secure := e.secure(r)
-	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure is decided per request, as for the session cookie
-		Name: attemptCookieName(secure), Value: res.Cookie.Reveal(), Path: "/", MaxAge: int(res.Lifetime / time.Second),
-		HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
-	})
+	w.Header().Add("Set-Cookie", AttemptCookie(res.Cookie.Reveal(), res.Lifetime, secure))
 	http.Redirect(w, r, res.RedirectURL, http.StatusFound)
 }
 
@@ -183,11 +195,21 @@ func (e *edge) complete(w http.ResponseWriter, r *http.Request, token string) {
 	http.SetCookie(w, &http.Cookie{ //nolint:gosec // clears the cookie, with the attributes it was set with
 		Name: name, Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
 	})
+	var session string
+	if c, err := r.Cookie(e.o.SessionCookieName); err == nil {
+		session = c.Value
+	}
 	res, err := e.h.Complete.Handle(r.Context(), appidentity.CompleteCommand{
-		Token: token, Cookie: cookie, ClientIP: clientIP(r), UserAgent: r.UserAgent(), RequestID: flaghttp.RequestIDOf(r.Context()),
+		Token: token, Cookie: cookie, SessionCookie: session, ClientIP: clientIP(r), UserAgent: r.UserAgent(),
+		RequestID: flaghttp.RequestIDOf(r.Context()),
 	})
 	if err != nil {
 		e.refuse(w, r, err)
+		return
+	}
+	if res.Linked {
+		e.o.Metrics.count(string(res.Kind), "linked")
+		http.Redirect(w, r, res.ReturnTo, http.StatusSeeOther)
 		return
 	}
 	e.o.Metrics.count(string(res.Kind), "succeeded")
@@ -207,7 +229,7 @@ func (e *edge) refuse(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.As(err, &failure):
 		e.o.Metrics.count(string(failure.Kind), string(failure.Code))
 		e.Logger().WarnContext(r.Context(), "single sign-on failed", "code", failure.Code, "error", err)
-		redirectToSignIn(w, r, failure.Code)
+		redirectWithError(w, r, failure.Intent, failure.Code)
 	case apperrors.IsKind(err, apperrors.KindNotFound):
 		e.WriteError(w, r, err)
 	default:
@@ -218,5 +240,16 @@ func (e *edge) refuse(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 func redirectToSignIn(w http.ResponseWriter, r *http.Request, code appidentity.FailureCode) {
-	http.Redirect(w, r, "/sign-in?error="+url.QueryEscape(string(code)), http.StatusSeeOther)
+	redirectWithError(w, r, "", code)
+}
+
+// redirectWithError sends the browser back to the page it started from, with
+// the code: the settings for a link, whose member is signed in already, the
+// sign-in page otherwise.
+func redirectWithError(w http.ResponseWriter, r *http.Request, intent identity.Intent, code appidentity.FailureCode) {
+	page := "/sign-in"
+	if intent == identity.IntentLink {
+		page = identity.DefaultLinkReturnTo
+	}
+	http.Redirect(w, r, page+"?error="+url.QueryEscape(string(code)), http.StatusSeeOther)
 }

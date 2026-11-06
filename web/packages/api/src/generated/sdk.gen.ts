@@ -295,6 +295,9 @@ import type {
   KillFlagData,
   KillFlagErrors,
   KillFlagResponses,
+  LinkMyIdentityData,
+  LinkMyIdentityErrors,
+  LinkMyIdentityResponses,
   ListAttributesData,
   ListAttributesErrors,
   ListAttributesResponses,
@@ -331,6 +334,9 @@ import type {
   ListInstanceWebhooksData,
   ListInstanceWebhooksErrors,
   ListInstanceWebhooksResponses,
+  ListMemberIdentitiesData,
+  ListMemberIdentitiesErrors,
+  ListMemberIdentitiesResponses,
   ListMembersData,
   ListMembersErrors,
   ListMemberSessionsData,
@@ -340,6 +346,9 @@ import type {
   ListMemberTokensData,
   ListMemberTokensErrors,
   ListMemberTokensResponses,
+  ListMyIdentitiesData,
+  ListMyIdentitiesErrors,
+  ListMyIdentitiesResponses,
   ListMySessionsData,
   ListMySessionsErrors,
   ListMySessionsResponses,
@@ -433,6 +442,9 @@ import type {
   RejectChangeRequestData,
   RejectChangeRequestErrors,
   RejectChangeRequestResponses,
+  RemoveMyPasswordData,
+  RemoveMyPasswordErrors,
+  RemoveMyPasswordResponses,
   ReplaceAuthProviderGroupMappingsData,
   ReplaceAuthProviderGroupMappingsErrors,
   ReplaceAuthProviderGroupMappingsResponses,
@@ -533,6 +545,12 @@ import type {
   TestWebhookData,
   TestWebhookErrors,
   TestWebhookResponses,
+  UnlinkMemberIdentityData,
+  UnlinkMemberIdentityErrors,
+  UnlinkMemberIdentityResponses,
+  UnlinkMyIdentityData,
+  UnlinkMyIdentityErrors,
+  UnlinkMyIdentityResponses,
   UpdateAttributeData,
   UpdateAttributeErrors,
   UpdateAttributeResponses,
@@ -855,6 +873,39 @@ export const updateMe = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Remove your password
+ *
+ * Removes the caller's password, so they sign in only through the
+ * auth providers they linked. Refused 409 `last_auth_method` when no
+ * other usable way in remains: an identity at an enabled auth provider.
+ * A member who holds no password is answered 204 and nothing is
+ * recorded. Removing a password ends the member's open invitations and
+ * password resets, as changing it does, so an old link cannot set one
+ * again. The caller's sessions stay. Recorded as `password.removed`.
+ * Only a session may do this.
+ *
+ */
+export const removeMyPassword = <ThrowOnError extends boolean = false>(
+  options?: Options<RemoveMyPasswordData, ThrowOnError>,
+): RequestResult<RemoveMyPasswordResponses, RemoveMyPasswordErrors, ThrowOnError> =>
+  (options?.client ?? client).delete<
+    RemoveMyPasswordResponses,
+    RemoveMyPasswordErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/me/password",
+    ...options,
+  });
+
+/**
  * Change your password
  *
  * Sets a new password once the current one is proved, and revokes
@@ -891,6 +942,102 @@ export const changeMyPassword = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * Your ways to sign in
+ *
+ * Whether the caller holds a password and when they set it, and the
+ * identities they linked at auth providers, oldest first, with when
+ * each last signed in. An identity at a disabled auth provider is
+ * listed with `provider_enabled` false: it is no way in until the
+ * provider is enabled again.
+ *
+ */
+export const listMyIdentities = <ThrowOnError extends boolean = false>(
+  options?: Options<ListMyIdentitiesData, ThrowOnError>,
+): RequestResult<ListMyIdentitiesResponses, ListMyIdentitiesErrors, ThrowOnError> =>
+  (options?.client ?? client).get<ListMyIdentitiesResponses, ListMyIdentitiesErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/me/identities",
+    ...options,
+  });
+
+/**
+ * Link an auth provider to your account
+ *
+ * Starts linking an identity at an enabled auth provider to the caller,
+ * answered with the address to send the browser to. The attempt is bound
+ * to the browser through the same cookie a sign-in sets, and to the
+ * session this request is signed in to: completing it from another
+ * browser, or after that session ended, links nothing. Completing it
+ * links the subject the provider vouches for to the caller, whatever its
+ * email, and returns the browser to `return_to`, a path of this
+ * instance, `/settings` when absent or not one. Recorded as
+ * `identity.linked`. When the subject is already linked to another
+ * member nothing is linked and the browser lands on the settings page
+ * with `error=identity_linked`; any other failure lands there with its
+ * sign-in code. A disabled or unknown provider is not found. Only a
+ * session may do this.
+ *
+ */
+export const linkMyIdentity = <ThrowOnError extends boolean = false>(
+  options: Options<LinkMyIdentityData, ThrowOnError>,
+): RequestResult<LinkMyIdentityResponses, LinkMyIdentityErrors, ThrowOnError> =>
+  (options.client ?? client).post<LinkMyIdentityResponses, LinkMyIdentityErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/me/identities/{provider}/link",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Unlink one of your identities
+ *
+ * Unlinks an identity of the caller. Refused 409 `last_auth_method`
+ * when it is the caller's last usable way in: the other ways are a
+ * password and identities at enabled auth providers. Unlinking an
+ * identity at a disabled auth provider is always allowed, since it was
+ * no way in. An identity of another member, or an identifier that names
+ * none, is not found. Recorded as `identity.unlinked`. Only a session
+ * may do this.
+ *
+ */
+export const unlinkMyIdentity = <ThrowOnError extends boolean = false>(
+  options: Options<UnlinkMyIdentityData, ThrowOnError>,
+): RequestResult<UnlinkMyIdentityResponses, UnlinkMyIdentityErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    UnlinkMyIdentityResponses,
+    UnlinkMyIdentityErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/me/identities/{identity}",
+    ...options,
   });
 
 /**
@@ -4521,6 +4668,65 @@ export const issuePasswordReset = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/members/{member}/password-reset",
+    ...options,
+  });
+
+/**
+ * A member's ways to sign in
+ *
+ * Whether the member holds a password and when they set it, and the
+ * identities they linked at auth providers, as `/me/identities` lists
+ * them.
+ *
+ */
+export const listMemberIdentities = <ThrowOnError extends boolean = false>(
+  options: Options<ListMemberIdentitiesData, ThrowOnError>,
+): RequestResult<ListMemberIdentitiesResponses, ListMemberIdentitiesErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListMemberIdentitiesResponses,
+    ListMemberIdentitiesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/members/{member}/identities",
+    ...options,
+  });
+
+/**
+ * Unlink a member's identity
+ *
+ * Unlinks an identity of the member, under the rules of a member
+ * unlinking their own: refused 409 `last_auth_method` when it is the
+ * member's last usable way in, except for a deactivated member, who
+ * signs in nowhere. An identity that does not belong to the member is
+ * not found. Recorded as `identity.unlinked` with the instance admin as
+ * its actor.
+ *
+ */
+export const unlinkMemberIdentity = <ThrowOnError extends boolean = false>(
+  options: Options<UnlinkMemberIdentityData, ThrowOnError>,
+): RequestResult<UnlinkMemberIdentityResponses, UnlinkMemberIdentityErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    UnlinkMemberIdentityResponses,
+    UnlinkMemberIdentityErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/members/{member}/identities/{identity}",
     ...options,
   });
 

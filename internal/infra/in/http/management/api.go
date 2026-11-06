@@ -55,6 +55,7 @@ type Handlers struct {
 	UpdateMember        *appaccess.UpdateMember
 	UpdateMe            *appaccess.UpdateMe
 	ChangeMyPassword    *appaccess.ChangeMyPassword
+	RemoveMyPassword    *appaccess.RemoveMyPassword
 	DeactivateMember    *appaccess.DeactivateMember
 	ReactivateMember    *appaccess.ReactivateMember
 	InviteMember        *appaccess.InviteMember
@@ -81,6 +82,9 @@ type Handlers struct {
 	ProjectPermissions  *appaccess.ProjectPermissions
 	WorkingProjects     *appaccess.WorkingProjects
 
+	ListMemberAuthMethods    *appidentity.ListMemberAuthMethods
+	StartLink                *appidentity.StartLink
+	UnlinkIdentity           *appidentity.UnlinkIdentity
 	ListAuthProviders        *appidentity.ListProviders
 	ListEnabledAuthProviders *appidentity.ListEnabledProviders
 	CreateAuthProvider       *appidentity.CreateProvider

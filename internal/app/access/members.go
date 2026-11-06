@@ -351,24 +351,27 @@ type ReactivationStore interface {
 
 // ReactivateMember brings a deactivated member back.
 type ReactivateMember struct {
-	tx     Transactor
-	store  ReactivationStore
-	audit  AuditLog
-	clock  clock.Clock
-	ids    *id.Source
-	random io.Reader
+	tx         Transactor
+	store      ReactivationStore
+	identities IdentityDirectory
+	audit      AuditLog
+	clock      clock.Clock
+	ids        *id.Source
+	random     io.Reader
 }
 
 // NewReactivateMember returns the handler; random draws invitation secrets.
-func NewReactivateMember(tx Transactor, store ReactivationStore, audit AuditLog, c clock.Clock, ids *id.Source, random io.Reader,
+func NewReactivateMember(tx Transactor, store ReactivationStore, identities IdentityDirectory, audit AuditLog, c clock.Clock, ids *id.Source,
+	random io.Reader,
 ) *ReactivateMember {
-	return &ReactivateMember{tx: tx, store: store, audit: audit, clock: c, ids: ids, random: random}
+	return &ReactivateMember{tx: tx, store: store, identities: identities, audit: audit, clock: c, ids: ids, random: random}
 }
 
-// Handle makes a deactivated member active when they hold a password,
-// recording member.reactivated. One who never set a password is invited
-// again, with a fresh invitation, since the one they had was consumed when
-// they were deactivated. What their deactivation revoked stays revoked. A
+// Handle makes a deactivated member active when they hold a way to sign in,
+// a password or an identity at an auth provider, recording
+// member.reactivated. One who holds neither is invited again, with a fresh
+// invitation, since the one they had was consumed when they were
+// deactivated. What their deactivation revoked stays revoked. A
 // member who is not deactivated is left as they are.
 func (h *ReactivateMember) Handle(ctx context.Context, member access.MemberID, req governance.Request) (InvitedMember, error) {
 	var issued *IssuedInvitation
@@ -380,7 +383,11 @@ func (h *ReactivateMember) Handle(ctx context.Context, member access.MemberID, r
 			if before.Status != access.MemberDeactivated {
 				return before, nil, nil
 			}
-			after := before.Reactivated(holdsPassword)
+			held, err := h.identities.MemberIdentities(ctx, before.ID)
+			if err != nil {
+				return access.Member{}, nil, err
+			}
+			after := before.Reactivated(holdsPassword || len(held) > 0)
 			record := governance.Record{
 				Action: "member.reactivated", Entity: memberEntity(after),
 				Before: map[string]any{"status": before.Status}, After: map[string]any{"status": after.Status},

@@ -22,8 +22,19 @@ const AttemptLifetime = 10 * time.Minute
 // Intent is what a sign-in attempt is for.
 type Intent string
 
-// IntentLogin signs a person in.
-const IntentLogin Intent = "login"
+const (
+	// IntentLogin signs a person in.
+	IntentLogin Intent = "login"
+	// IntentLink links the subject to the member signed in, in the session
+	// that started the attempt.
+	IntentLink Intent = "link"
+)
+
+// Session is the identity context's view of a session of the access context.
+type Session struct{}
+
+// SessionID identifies a session.
+type SessionID = id.Of[Session]
 
 // SecretHash is the SHA-256 of a random value, the only form in which the
 // attempt keeps what its browser or the identity provider will present
@@ -75,6 +86,10 @@ type Attempt struct {
 	RequestID string
 	// CookieHash binds the attempt to the browser that started it.
 	CookieHash SecretHash
+	// Member and Session bind a link attempt to the member who started it and
+	// the session they started it in; zero for a login.
+	Member  MemberID
+	Session SessionID
 	// ReturnTo is where the browser lands after signing in, already validated.
 	ReturnTo  string
 	CreatedAt time.Time
@@ -131,5 +146,27 @@ func NewLoginAttempt(attemptID AttemptID, provider ProviderID, returnTo string, 
 func NewSAMLLoginAttempt(attemptID AttemptID, provider ProviderID, returnTo, requestID string, s Secrets, now time.Time) Attempt {
 	a := NewLoginAttempt(attemptID, provider, returnTo, s, now)
 	a.Nonce, a.CodeVerifier, a.RequestID = "", "", requestID
+	return a
+}
+
+// DefaultLinkReturnTo is where the browser lands after linking when the member
+// named no page of this site: their settings, where the identities are.
+const DefaultLinkReturnTo = "/settings"
+
+// NewLinkAttempt returns the attempt a browser starts to link the subject of
+// provider to member, signed in in session, at now, returning to returnTo
+// when it is a path of this site and to the settings otherwise. requestID is
+// the AuthnRequest's of a SAML provider, empty for OIDC.
+func NewLinkAttempt(attemptID AttemptID, provider ProviderID, member MemberID, session SessionID, returnTo, requestID string,
+	s Secrets, now time.Time,
+) Attempt {
+	if returnTo == "" || ValidReturnTo(returnTo) == "/" && returnTo != "/" {
+		returnTo = DefaultLinkReturnTo
+	}
+	a := NewLoginAttempt(attemptID, provider, returnTo, s, now)
+	a.Intent, a.Member, a.Session = IntentLink, member, session
+	if requestID != "" {
+		a.Nonce, a.CodeVerifier, a.RequestID = "", "", requestID
+	}
 	return a
 }

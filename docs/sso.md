@@ -163,6 +163,17 @@ An unknown or disabled provider answers `404` on all its addresses, and so does 
 
 A provider with identities, or whose group mappings made a grant, cannot be deleted (`409 provider_in_use`, `used_by` naming `identities` and `grants`); disable it instead.
 
+## Linking and unlinking identities
+
+A member signed in with a password links a provider to their account, so they can sign in through it next time, from their settings. A member's ways in are their password and their identities, the subjects providers know them by.
+
+- `GET /me/identities` answers `{password: {set, set_at}, identities}`: each identity with its provider (`provider`, `provider_name`, `kind`, `provider_enabled`), the `subject` and when it was `linked_at` and last used (`last_sign_in_at`). An API token may read it.
+- `POST /me/identities/<slug>/link` (a session only) starts linking. It takes an optional `return_to`, honoured under the rules of a sign-in's but falling back to `/settings`, answers `{start_url}`, the address to send the browser to, and sets the attempt cookie. The attempt is bound to the browser and to the session that started it: finishing it in another browser, in a session opened afterwards or after signing out links nothing. When the provider answers, the subject is linked to the member **whatever its email**, with no check against the provider's domains, and the browser lands on `return_to`. Linking a subject that is already linked to the same member changes nothing. A disabled or unknown provider is `404`. Recorded as `identity.linked`.
+- `DELETE /me/identities/<identity>` (a session only) unlinks an identity of the caller. An instance admin unlinks a member's with `DELETE /members/<member>/identities/<identity>` and lists them with `GET /members/<member>/identities`, for example to undo a wrong link. Recorded as `identity.unlinked`.
+- **The last way in stays.** Unlinking an identity, or removing the password with `DELETE /me/password` (a session only, recorded as `password.removed`; [Access](access.md#your-own-account) covers it), is refused `409 last_auth_method` when no other usable way in would remain. A usable way in is a password, or an identity at an enabled provider: an identity at a disabled provider is listed but signs nobody in, so unlinking it is always allowed. A deactivated member signs in nowhere, so an instance admin may unlink their last identity.
+
+Where a link fails the browser lands on `/settings?error=<code>`: `identity_linked` when the subject is linked to another member, `attempt_mismatch` for a browser or session that did not start the link, `sso_failed` or `idp_error` as at sign-in.
+
 ## Sign-in errors
 
 Every failure redirects to `/sign-in?error=<code>`:
@@ -174,9 +185,10 @@ Every failure redirects to `/sign-in?error=<code>`:
 | `member_not_found` | No member matches the person: their email is outside the provider's domains or (OIDC) unverified, linking by email is off, provisioning is off, or they hold an invitation they have not accepted. | Add the domain, switch `link_by_email` or `auto_provision` on, or invite the person. |
 | `member_deactivated` | The member was deactivated. The failure is audited as `auth.sign_in_failed`. | An instance admin may reactivate them. |
 | `attempt_mismatch` | The browser completing the sign-in is not the one that started it. | Start again in the same browser. |
+| `identity_linked` | Only when linking, on the settings page: the provider's subject is already linked to another member. | An instance admin unlinks it from that member, or the person links a different account at the provider. |
 
 ## Audit and metrics
 
-A first sign-in records `member.provisioned` or `identity.linked` (or both), the access the member's groups gave or took away as [group mappings](#group-mappings) record it, and every sign-in `auth.signed_in` with its `method` (`oidc` or `saml`) and `provider`; a refused sign-in of a known member (one the subject is linked to, or one holding an email the provider vouches for) records `auth.sign_in_failed` with the `reason`: the member's status when it refuses them (`deactivated`, `invited`), or `not_linked` for an active member when the provider does not link by email.
+A first sign-in records `member.provisioned` or `identity.linked` (or both), unlinking an identity `identity.unlinked`, the access the member's groups gave or took away as [group mappings](#group-mappings) record it, and every sign-in `auth.signed_in` with its `method` (`oidc` or `saml`) and `provider`; a refused sign-in of a known member (one the subject is linked to, or one holding an email the provider vouches for) records `auth.sign_in_failed` with the `reason`: the member's status when it refuses them (`deactivated`, `invited`), or `not_linked` for an active member when the provider does not link by email.
 
 `flagnetic_sso_sign_ins_total{kind,result}` counts sign-ins that ended, by `kind` (`oidc` or `saml`, `unknown` when the sign-in failed before its provider was known) and `result`: `succeeded` or the code above.

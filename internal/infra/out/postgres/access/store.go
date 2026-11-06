@@ -52,10 +52,14 @@ var errEmailTaken = apperrors.Conflict("already_exists", "a member with this ema
 
 // CreateMember stores m with its password hash ("" for none).
 func (s *Store) CreateMember(ctx context.Context, m access.Member, passwordHash string) error {
+	var passwordSetAt *time.Time
+	if passwordHash != "" {
+		passwordSetAt = &m.CreatedAt
+	}
 	_, err := s.db(ctx).Exec(ctx, `
-		INSERT INTO members (id, email, display_name, status, instance_admin, locale, password_hash, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), NULLIF($7, ''), $8, $8)`,
-		m.ID.Bytes(), m.Email, m.DisplayName, string(m.Status), m.InstanceAdmin, m.Locale, passwordHash, m.CreatedAt)
+		INSERT INTO members (id, email, display_name, status, instance_admin, locale, password_hash, password_set_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), NULLIF($7, ''), $8, $9, $9)`,
+		m.ID.Bytes(), m.Email, m.DisplayName, string(m.Status), m.InstanceAdmin, m.Locale, passwordHash, passwordSetAt, m.CreatedAt)
 	return emailTaken(err)
 }
 

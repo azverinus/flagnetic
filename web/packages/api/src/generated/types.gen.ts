@@ -569,6 +569,68 @@ export type InvitationAcceptance = {
 };
 
 /**
+ * Whether a member holds a password.
+ */
+export type PasswordStatus = {
+  set: boolean;
+  /**
+   * When the password was last set; absent when none is.
+   */
+  set_at?: string;
+};
+
+/**
+ * The subject an auth provider knows a member by.
+ */
+export type LinkedIdentity = {
+  id: string;
+  /**
+   * The slug of the auth provider.
+   */
+  provider: string;
+  /**
+   * The auth provider's display name.
+   */
+  provider_name: string;
+  kind: AuthProviderKind;
+  /**
+   * Whether the auth provider is enabled; an identity at a disabled one is no way in.
+   */
+  provider_enabled: boolean;
+  /**
+   * The provider's identifier of the person.
+   */
+  subject: string;
+  linked_at: string;
+  /**
+   * When the member last signed in through the identity; absent until they do.
+   */
+  last_sign_in_at?: string;
+};
+
+/**
+ * The ways a member holds to sign in.
+ */
+export type MemberAuthMethods = {
+  password: PasswordStatus;
+  identities: Array<LinkedIdentity>;
+};
+
+export type IdentityLinkStart = {
+  /**
+   * A path of this instance to return the browser to once linked; `/settings` when absent or not a path of this instance.
+   */
+  return_to?: string;
+};
+
+export type IdentityLinkStarted = {
+  /**
+   * Where to send the browser to authenticate at the auth provider.
+   */
+  start_url: string;
+};
+
+/**
  * A password reset just issued. Its link is shown this once.
  */
 export type IssuedPasswordReset = {
@@ -4342,6 +4404,11 @@ export type AttributeKey = string;
 export type SessionId = string;
 
 /**
+ * The identity's identifier.
+ */
+export type IdentityId = string;
+
+/**
  * The member's identifier.
  */
 export type MemberId = string;
@@ -4857,6 +4924,52 @@ export type UpdateMeResponses = {
 
 export type UpdateMeResponse = UpdateMeResponses[keyof UpdateMeResponses];
 
+export type RemoveMyPasswordData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/me/password";
+};
+
+export type RemoveMyPasswordErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+};
+
+export type RemoveMyPasswordError = RemoveMyPasswordErrors[keyof RemoveMyPasswordErrors];
+
+export type RemoveMyPasswordResponses = {
+  /**
+   * Removed, or the caller held no password.
+   */
+  204: void;
+};
+
+export type RemoveMyPasswordResponse = RemoveMyPasswordResponses[keyof RemoveMyPasswordResponses];
+
 export type ChangeMyPasswordData = {
   body: PasswordChange;
   path?: never;
@@ -4927,6 +5040,162 @@ export type ChangeMyPasswordResponses = {
 };
 
 export type ChangeMyPasswordResponse = ChangeMyPasswordResponses[keyof ChangeMyPasswordResponses];
+
+export type ListMyIdentitiesData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/me/identities";
+};
+
+export type ListMyIdentitiesErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+};
+
+export type ListMyIdentitiesError = ListMyIdentitiesErrors[keyof ListMyIdentitiesErrors];
+
+export type ListMyIdentitiesResponses = {
+  /**
+   * The caller's password status and identities.
+   */
+  200: MemberAuthMethods;
+};
+
+export type ListMyIdentitiesResponse = ListMyIdentitiesResponses[keyof ListMyIdentitiesResponses];
+
+export type LinkMyIdentityData = {
+  body?: IdentityLinkStart;
+  path: {
+    /**
+     * The auth provider's slug.
+     */
+    provider: string;
+  };
+  query?: never;
+  url: "/me/identities/{provider}/link";
+};
+
+export type LinkMyIdentityErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+  /**
+   * `provider_unreachable` or `smtp_failed`: a system the server asked, such as an identity provider or the SMTP server, did not answer as needed; `failure` says why.
+   */
+  502: Problem;
+};
+
+export type LinkMyIdentityError = LinkMyIdentityErrors[keyof LinkMyIdentityErrors];
+
+export type LinkMyIdentityResponses = {
+  /**
+   * Where to send the browser.
+   */
+  200: IdentityLinkStarted;
+};
+
+export type LinkMyIdentityResponse = LinkMyIdentityResponses[keyof LinkMyIdentityResponses];
+
+export type UnlinkMyIdentityData = {
+  body?: never;
+  path: {
+    /**
+     * The identity's identifier.
+     */
+    identity: string;
+  };
+  query?: never;
+  url: "/me/identities/{identity}";
+};
+
+export type UnlinkMyIdentityErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+};
+
+export type UnlinkMyIdentityError = UnlinkMyIdentityErrors[keyof UnlinkMyIdentityErrors];
+
+export type UnlinkMyIdentityResponses = {
+  /**
+   * Unlinked.
+   */
+  204: void;
+};
+
+export type UnlinkMyIdentityResponse = UnlinkMyIdentityResponses[keyof UnlinkMyIdentityResponses];
 
 export type RevokeMySessionsData = {
   body?: never;
@@ -12839,6 +13108,120 @@ export type IssuePasswordResetResponses = {
 
 export type IssuePasswordResetResponse =
   IssuePasswordResetResponses[keyof IssuePasswordResetResponses];
+
+export type ListMemberIdentitiesData = {
+  body?: never;
+  path: {
+    /**
+     * The member's identifier.
+     */
+    member: string;
+  };
+  query?: never;
+  url: "/members/{member}/identities";
+};
+
+export type ListMemberIdentitiesErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListMemberIdentitiesError =
+  ListMemberIdentitiesErrors[keyof ListMemberIdentitiesErrors];
+
+export type ListMemberIdentitiesResponses = {
+  /**
+   * The member's password status and identities.
+   */
+  200: MemberAuthMethods;
+};
+
+export type ListMemberIdentitiesResponse =
+  ListMemberIdentitiesResponses[keyof ListMemberIdentitiesResponses];
+
+export type UnlinkMemberIdentityData = {
+  body?: never;
+  path: {
+    /**
+     * The member's identifier.
+     */
+    member: string;
+    /**
+     * The identity's identifier.
+     */
+    identity: string;
+  };
+  query?: never;
+  url: "/members/{member}/identities/{identity}";
+};
+
+export type UnlinkMemberIdentityErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+};
+
+export type UnlinkMemberIdentityError =
+  UnlinkMemberIdentityErrors[keyof UnlinkMemberIdentityErrors];
+
+export type UnlinkMemberIdentityResponses = {
+  /**
+   * Unlinked.
+   */
+  204: void;
+};
+
+export type UnlinkMemberIdentityResponse =
+  UnlinkMemberIdentityResponses[keyof UnlinkMemberIdentityResponses];
 
 export type RevokeMemberSessionsData = {
   body?: never;
