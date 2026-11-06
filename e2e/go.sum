@@ -137,12 +137,16 @@ github.com/prometheus/common v0.72.0 h1:tAYsE+sPJxIncDAobm4H5aQjmox9ZxEIIqPbiffa
 github.com/prometheus/common v0.72.0/go.mod h1:77NWqAQ2tXT7BIK40qjJdw5Acrsrg1TlHAnsQi3i6mk=
 github.com/prometheus/procfs v0.22.0 h1:6q9+/JL9IKAPbCmBrv9n5O5Ty3NKnciV5X7YGw0oics=
 github.com/prometheus/procfs v0.22.0/go.mod h1:CvmFr/GVhIjIvWJZW3tgkODBQMRIf0EyWMQLHCHab58=
+github.com/q-uint/parser v0.3.1 h1:VCHob90UXy0L5oMgny5EjbDC2YeEGNc6qahWa8+tUhQ=
+github.com/q-uint/parser v0.3.1/go.mod h1:+Ds4ucT1DM1SwDpzgz7glN+rnrzxMAXgiYpt4aRUUY8=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/russellhaering/gosaml2 v0.12.0 h1:/otu5cL+pAUnO41Mi2zAbOd6GP+pTqYCMBUlxL8yw4E=
 github.com/russellhaering/gosaml2 v0.12.0/go.mod h1:txFBNgTGPBhdtNqMo+XR5YPqavMyqhks5GL0scTP+r4=
 github.com/russellhaering/goxmldsig v1.6.1 h1:SB7R5ttvrGIDB2juJAK/i7DQ2Ivr7agG+ohfNJjwyYU=
 github.com/russellhaering/goxmldsig v1.6.1/go.mod h1:haZkRcLs9W/Xp989fIjP3BrTdbFQveRF0QNZSYoH09w=
+github.com/scim2/filter-parser/v2 v2.3.1 h1:o24v+z9drjtWoF6XLtXOFWpkmo1GGfBKZqrAjy6npQM=
+github.com/scim2/filter-parser/v2 v2.3.1/go.mod h1:R5u/HUG8vO+TVvtmBzUX2LSuEej27v+ckcJqjIa4d8E=
 github.com/sethvargo/go-retry v0.5.0 h1:JYfFKmVJ8ER06GReN1efzc5cm52BrVsFVzmcHiKJwfY=
 github.com/sethvargo/go-retry v0.5.0/go.mod h1:tvsjdKG6xfiCx4LSiUZ06kcv38xvdVQwv8R6/VnnVWg=
 github.com/shirou/gopsutil/v4 v4.26.6 h1:Mzr/npDtQC/xpeEuQKHZt8Zo9CmPvhTj8nkR8w5TLDs=
