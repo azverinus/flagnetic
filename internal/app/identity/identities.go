@@ -57,9 +57,9 @@ func (h *CompleteSignIn) link(ctx context.Context, p identity.Provider, attempt 
 		return SignedIn{}, fail(CodeAttemptMismatch, errors.New("the session that started the link is not the one completing it"))
 	}
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		m, found, err := h.d.Members.LockMember(ctx, member)
-		if err != nil {
-			return err
+		m, found, lockErr := h.d.Members.LockMember(ctx, member)
+		if lockErr != nil {
+			return lockErr
 		}
 		if !found || m.Status != identity.MemberActive {
 			return fail(CodeAttemptMismatch, errors.New("the member who started the link cannot sign in"))
@@ -102,7 +102,7 @@ type MemberAuthMethods struct {
 	// PasswordSetAt is when the member set the password they hold, nil when
 	// they hold none.
 	PasswordSetAt *time.Time
-	Identities    []IdentityView
+	Identities    []LinkedIdentity
 }
 
 // ListMemberAuthMethods answers a member's password status and identities.
@@ -130,7 +130,7 @@ func (h *ListMemberAuthMethods) Handle(ctx context.Context, member identity.Memb
 		return MemberAuthMethods{}, err
 	}
 	if identities == nil {
-		identities = []IdentityView{}
+		identities = []LinkedIdentity{}
 	}
 	return MemberAuthMethods{PasswordSetAt: setAt, Identities: identities}, nil
 }
@@ -173,7 +173,7 @@ func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 		if err != nil {
 			return err
 		}
-		var unlinking *IdentityView
+		var unlinking *LinkedIdentity
 		for i := range held {
 			if held[i].ID == identityID {
 				unlinking = &held[i]

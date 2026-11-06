@@ -55,7 +55,7 @@ func (s *Store) CreateIdentity(ctx context.Context, i identity.Identity) error {
 
 // MemberIdentities returns the identities member holds, oldest first, each
 // with the provider it is at.
-func (s *Store) MemberIdentities(ctx context.Context, member identity.MemberID) ([]appidentity.IdentityView, error) {
+func (s *Store) MemberIdentities(ctx context.Context, member identity.MemberID) ([]appidentity.LinkedIdentity, error) {
 	rows, err := s.db(ctx).Query(ctx, `
 		SELECT i.id, i.provider_id, i.subject, i.member_id, i.linked_at, i.last_sign_in_at, p.slug, p.display_name, p.kind, p.enabled
 		FROM identities i JOIN auth_providers p ON p.id = i.provider_id
@@ -64,10 +64,10 @@ func (s *Store) MemberIdentities(ctx context.Context, member identity.MemberID) 
 		return nil, fmt.Errorf("listing a member's identities: %w", err)
 	}
 	defer rows.Close()
-	var out []appidentity.IdentityView
+	var out []appidentity.LinkedIdentity
 	for rows.Next() {
 		var (
-			v                              appidentity.IdentityView
+			v                              appidentity.LinkedIdentity
 			identityID, providerID, holder [16]byte
 			kind                           string
 		)

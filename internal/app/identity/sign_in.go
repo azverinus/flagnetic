@@ -115,7 +115,7 @@ type LinkStore interface {
 	RecordIdentitySignIn(ctx context.Context, i identity.ID, at time.Time) error
 	// MemberIdentities returns the identities member holds, oldest first, each
 	// with the provider it is at.
-	MemberIdentities(ctx context.Context, member identity.MemberID) ([]IdentityView, error)
+	MemberIdentities(ctx context.Context, member identity.MemberID) ([]LinkedIdentity, error)
 	// DeleteIdentity deletes the identity.
 	DeleteIdentity(ctx context.Context, i identity.ID) error
 }
@@ -167,8 +167,8 @@ type SessionResolver interface {
 	SessionOf(ctx context.Context, cookie string) (identity.MemberID, identity.SessionID, bool, error)
 }
 
-// IdentityView is an identity with the provider it is at.
-type IdentityView struct {
+// LinkedIdentity is an identity with the provider it is at.
+type LinkedIdentity struct {
 	identity.Identity
 	ProviderSlug string
 	ProviderName string

@@ -486,8 +486,9 @@ func TestAnInstanceAdminUnlinksAMembersIdentityUnderTheSameRules(t *testing.T) {
 	}
 
 	// A deactivated member signs in nowhere, so their last identity may go.
-	if res, err := e.admin.DeactivateMemberWithResponse(t.Context(), ssoOnlyID); err != nil || res.StatusCode() != http.StatusOK {
-		t.Fatalf("deactivating = %v, %v: %s", res.StatusCode(), err, res.Body)
+	deactivate, err := e.admin.DeactivateMemberWithResponse(t.Context(), ssoOnlyID)
+	if err != nil || deactivate.StatusCode() != http.StatusOK {
+		t.Fatalf("deactivating = %v, %v: %s", deactivate.StatusCode(), err, deactivate.Body)
 	}
 	res, err = e.admin.UnlinkMemberIdentityWithResponse(t.Context(), ssoOnlyID, ssoIdentity.Id.String())
 	if err != nil || res.StatusCode() != http.StatusNoContent {
