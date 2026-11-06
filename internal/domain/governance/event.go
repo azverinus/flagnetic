@@ -410,6 +410,7 @@ var entryOnlyActions = []string{
 	"experiment.deleted",
 	"experiment.salts_regenerated",
 	"experiment.updated",
+	"group_mappings.updated",
 	"identity.linked",
 	"invitation.grant_revoked",
 	"member.created",

@@ -154,7 +154,7 @@ func (h *PromoteMember) Handle(ctx context.Context, email string, req governance
 			Action: "member.promoted",
 			Entity: memberEntity(m),
 			Before: map[string]any{"instance_admin": false},
-			After:  map[string]any{"instance_admin": true},
+			After:  map[string]any{"instance_admin": true, "source": access.GrantManual},
 		})
 		if err != nil {
 			return err

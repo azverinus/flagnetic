@@ -28,6 +28,7 @@ import (
 const (
 	ActorKindCli    ActorKind = "cli"
 	ActorKindMember ActorKind = "member"
+	ActorKindSso    ActorKind = "sso"
 	ActorKindSystem ActorKind = "system"
 	ActorKindToken  ActorKind = "token"
 )
@@ -38,6 +39,8 @@ func (e ActorKind) Valid() bool {
 	case ActorKindCli:
 		return true
 	case ActorKindMember:
+		return true
+	case ActorKindSso:
 		return true
 	case ActorKindSystem:
 		return true
@@ -381,12 +384,15 @@ func (e FlagType) Valid() bool {
 // Defines values for GrantSource.
 const (
 	GrantSourceManual GrantSource = "manual"
+	GrantSourceSso    GrantSource = "sso"
 )
 
 // Valid indicates whether the value is a known member of the GrantSource enum.
 func (e GrantSource) Valid() bool {
 	switch e {
 	case GrantSourceManual:
+		return true
+	case GrantSourceSso:
 		return true
 	default:
 		return false
@@ -2912,15 +2918,24 @@ type FlagType string
 type Grant struct {
 	CreatedAt time.Time `json:"created_at"`
 
-	// CreatedBy The member who made the grant.
+	// CreatedBy The member who made the grant; null for an `sso` grant.
 	CreatedBy *openapi_types.UUID `json:"created_by"`
 	Id        openapi_types.UUID  `json:"id"`
 	Member    openapi_types.UUID  `json:"member"`
-	Role      RoleName            `json:"role"`
-	Source    GrantSource         `json:"source"`
+
+	// Provider The slug of the auth provider whose group mapping made an `sso` grant; null otherwise.
+	Provider *string  `json:"provider"`
+	Role     RoleName `json:"role"`
+
+	// Source `manual` for a grant made by hand, `sso` for one an auth provider's
+	// group mapping made, which is removed only by the provider and refused
+	// `sso_sourced` by hand. Grants of several sources sit side by side.
+	Source GrantSource `json:"source"`
 }
 
-// GrantSource defines model for Grant.Source.
+// GrantSource `manual` for a grant made by hand, `sso` for one an auth provider's
+// group mapping made, which is removed only by the provider and refused
+// `sso_sourced` by hand. Grants of several sources sit side by side.
 type GrantSource string
 
 // GrantCreate defines model for GrantCreate.
@@ -2935,6 +2950,39 @@ type GrantCreate struct {
 // GrantList defines model for GrantList.
 type GrantList struct {
 	Items []Grant `json:"items"`
+}
+
+// GroupMapping What members of a directory group are granted: a role in a project, or
+// instance admin.
+type GroupMapping struct {
+	// Group The directory group, matched exactly as the provider claims it. Not blank.
+	Group string `json:"group"`
+
+	// InstanceAdmin Makes the members of the group instance admins. Sent alone, and only as `true`.
+	InstanceAdmin *bool `json:"instance_admin,omitempty"`
+
+	// Project The key of the project the role is granted in. Sent with `role`, never with `instance_admin`.
+	Project *string `json:"project,omitempty"`
+
+	// Role One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`.
+	Role *string `json:"role,omitempty"`
+}
+
+// GroupMappings defines model for GroupMappings.
+type GroupMappings struct {
+	Items []GroupMapping `json:"items"`
+}
+
+// GroupMappingsRun What running the mappings for every member the provider knows did.
+type GroupMappingsRun struct {
+	// Granted The grants made, and the members made instance admin.
+	Granted int `json:"granted"`
+
+	// KeptInstanceAdmin The members who stay instance admin although the mappings no longer make them one, because they are the last active instance admin.
+	KeptInstanceAdmin int `json:"kept_instance_admin"`
+
+	// Revoked The grants removed, and the members who are no longer instance admin.
+	Revoked int `json:"revoked"`
 }
 
 // HashCheck defines model for HashCheck.
@@ -5820,6 +5868,9 @@ type CreateAuthProviderJSONRequestBody = AuthProviderCreate
 // UpdateAuthProviderJSONRequestBody defines body for UpdateAuthProvider for application/json ContentType.
 type UpdateAuthProviderJSONRequestBody = AuthProviderPatch
 
+// ReplaceAuthProviderGroupMappingsJSONRequestBody defines body for ReplaceAuthProviderGroupMappings for application/json ContentType.
+type ReplaceAuthProviderGroupMappingsJSONRequestBody = GroupMappings
+
 // UpdateAuthSettingsJSONRequestBody defines body for UpdateAuthSettings for application/json ContentType.
 type UpdateAuthSettingsJSONRequestBody = AuthSettings
 
@@ -7264,8 +7315,10 @@ type ClientInterface interface {
 	// DeleteAuthProvider Delete an auth provider
 	//
 	// Refused 409 `provider_in_use` while something depends on the provider;
-	// `used_by` names what. Disable it instead: that stops its sign-ins
-	// and leaves its members, identities and grants as they are. Audited
+	// `used_by` names what (`identities`, `grants` while its group mappings
+	// made a grant or an instance admin, among others). Disable it instead:
+	// that stops its sign-ins and leaves its members, identities and grants
+	// as they are. Audited
 	// `auth_provider.deleted`.
 	//
 	// Corresponds with DELETE /instance/auth-providers/{provider} (the `DeleteAuthProvider` operationId).
@@ -7319,6 +7372,58 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /instance/auth-providers/{provider}/enable (the `EnableAuthProvider` operationId).
 	EnableAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAuthProviderGroupMappings An auth provider's group mappings
+	//
+	// What the provider's directory groups grant, in order: a role in a
+	// project, or instance admin.
+	//
+	// Corresponds with GET /instance/auth-providers/{provider}/group-mappings (the `GetAuthProviderGroupMappings` operationId).
+	GetAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReplaceAuthProviderGroupMappingsWithBody Replace an auth provider's group mappings
+	//
+	// Replaces the whole list, then runs it at once for every member the
+	// provider knows, those who claimed groups at it on a sign-in: each is
+	// granted what their groups now map to and loses what the provider
+	// granted and no longer maps. A grant of a mapping is `source` `sso` and
+	// names the provider; grants of other sources, and an instance admin made
+	// by hand or by another provider, are left alone. The last active
+	// instance admin is never demoted by a mapping, and is counted in
+	// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+	// either a `project` (key) with a built-in `role`, or `instance_admin`
+	// alone; a mapping that breaks that, or names a project that does not
+	// exist, is 422 `invalid_group_mappings` naming each field and nothing
+	// changes. Audited `group_mappings.updated`, and each grant and promotion
+	// under the provider as the `sso` actor; a replacement that changes
+	// nothing is not.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+	ReplaceAuthProviderGroupMappingsWithBody(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReplaceAuthProviderGroupMappings Replace an auth provider's group mappings
+	//
+	// Replaces the whole list, then runs it at once for every member the
+	// provider knows, those who claimed groups at it on a sign-in: each is
+	// granted what their groups now map to and loses what the provider
+	// granted and no longer maps. A grant of a mapping is `source` `sso` and
+	// names the provider; grants of other sources, and an instance admin made
+	// by hand or by another provider, are left alone. The last active
+	// instance admin is never demoted by a mapping, and is counted in
+	// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+	// either a `project` (key) with a built-in `role`, or `instance_admin`
+	// alone; a mapping that breaks that, or names a project that does not
+	// exist, is 422 `invalid_group_mappings` naming each field and nothing
+	// changes. Audited `group_mappings.updated`, and each grant and promotion
+	// under the provider as the `sso` actor; a replacement that changes
+	// nothing is not.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+	ReplaceAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// TestAuthProvider Test that an auth provider can be reached
 	//
@@ -7655,7 +7760,8 @@ type ClientInterface interface {
 	// Changes the fields sent and leaves the others as they are. An email
 	// another member holds, whatever its case, is refused `already_exists`.
 	// Demoting the instance's last active instance admin is refused
-	// `last_instance_admin`.
+	// `last_instance_admin`, and demoting one an auth provider's group
+	// mapping made `sso_sourced`: only the provider takes it away.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -7667,7 +7773,8 @@ type ClientInterface interface {
 	// Changes the fields sent and leaves the others as they are. An email
 	// another member holds, whatever its case, is refused `already_exists`.
 	// Demoting the instance's last active instance admin is refused
-	// `last_instance_admin`.
+	// `last_instance_admin`, and demoting one an auth provider's group
+	// mapping made `sso_sourced`: only the provider takes it away.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9344,8 +9451,10 @@ type ClientInterface interface {
 	//
 	// Removes one grant, leaving the member's others. The grant of a role
 	// holding a permission the caller lacks in the project is refused
-	// `role_not_allowed`. Removing the last owner's grant is allowed: an
-	// instance admin holds every permission in every project.
+	// `role_not_allowed`. The grant of an auth provider's group mapping
+	// (`source` `sso`) is refused 409 `sso_sourced`: the directory owns it.
+	// Removing the last owner's grant is allowed: an instance admin holds
+	// every permission in every project.
 	//
 	// Corresponds with DELETE /projects/{project}/grants/{grant} (the `DeleteGrant` operationId).
 	DeleteGrant(ctx context.Context, project ProjectKey, grant GrantID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -10743,8 +10852,10 @@ func (c *Client) CreateAuthProvider(ctx context.Context, body CreateAuthProvider
 // DeleteAuthProvider Delete an auth provider
 //
 // Refused 409 `provider_in_use` while something depends on the provider;
-// `used_by` names what. Disable it instead: that stops its sign-ins
-// and leaves its members, identities and grants as they are. Audited
+// `used_by` names what (`identities`, `grants` while its group mappings
+// made a grant or an instance admin, among others). Disable it instead:
+// that stops its sign-ins and leaves its members, identities and grants
+// as they are. Audited
 // `auth_provider.deleted`.
 //
 // Corresponds with DELETE /instance/auth-providers/{provider} (the `DeleteAuthProvider` operationId).
@@ -10849,6 +10960,88 @@ func (c *Client) DisableAuthProvider(ctx context.Context, provider AuthProviderS
 // Corresponds with POST /instance/auth-providers/{provider}/enable (the `EnableAuthProvider` operationId).
 func (c *Client) EnableAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewEnableAuthProviderRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAuthProviderGroupMappings An auth provider's group mappings
+//
+// What the provider's directory groups grant, in order: a role in a
+// project, or instance admin.
+//
+// Corresponds with GET /instance/auth-providers/{provider}/group-mappings (the `GetAuthProviderGroupMappings` operationId).
+func (c *Client) GetAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuthProviderGroupMappingsRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReplaceAuthProviderGroupMappingsWithBody Replace an auth provider's group mappings
+//
+// Replaces the whole list, then runs it at once for every member the
+// provider knows, those who claimed groups at it on a sign-in: each is
+// granted what their groups now map to and loses what the provider
+// granted and no longer maps. A grant of a mapping is `source` `sso` and
+// names the provider; grants of other sources, and an instance admin made
+// by hand or by another provider, are left alone. The last active
+// instance admin is never demoted by a mapping, and is counted in
+// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+// either a `project` (key) with a built-in `role`, or `instance_admin`
+// alone; a mapping that breaks that, or names a project that does not
+// exist, is 422 `invalid_group_mappings` naming each field and nothing
+// changes. Audited `group_mappings.updated`, and each grant and promotion
+// under the provider as the `sso` actor; a replacement that changes
+// nothing is not.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+func (c *Client) ReplaceAuthProviderGroupMappingsWithBody(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaceAuthProviderGroupMappingsRequestWithBody(c.Server, provider, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReplaceAuthProviderGroupMappings Replace an auth provider's group mappings
+//
+// Replaces the whole list, then runs it at once for every member the
+// provider knows, those who claimed groups at it on a sign-in: each is
+// granted what their groups now map to and loses what the provider
+// granted and no longer maps. A grant of a mapping is `source` `sso` and
+// names the provider; grants of other sources, and an instance admin made
+// by hand or by another provider, are left alone. The last active
+// instance admin is never demoted by a mapping, and is counted in
+// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+// either a `project` (key) with a built-in `role`, or `instance_admin`
+// alone; a mapping that breaks that, or names a project that does not
+// exist, is 422 `invalid_group_mappings` naming each field and nothing
+// changes. Audited `group_mappings.updated`, and each grant and promotion
+// under the provider as the `sso` actor; a replacement that changes
+// nothing is not.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+func (c *Client) ReplaceAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaceAuthProviderGroupMappingsRequest(c.Server, provider, body)
 	if err != nil {
 		return nil, err
 	}
@@ -11444,7 +11637,8 @@ func (c *Client) GetMember(ctx context.Context, member MemberID, reqEditors ...R
 // Changes the fields sent and leaves the others as they are. An email
 // another member holds, whatever its case, is refused `already_exists`.
 // Demoting the instance's last active instance admin is refused
-// `last_instance_admin`.
+// `last_instance_admin`, and demoting one an auth provider's group
+// mapping made `sso_sourced`: only the provider takes it away.
 //
 // Takes any type of body and a specified content type.
 //
@@ -11466,7 +11660,8 @@ func (c *Client) UpdateMemberWithBody(ctx context.Context, member MemberID, cont
 // Changes the fields sent and leaves the others as they are. An email
 // another member holds, whatever its case, is refused `already_exists`.
 // Demoting the instance's last active instance admin is refused
-// `last_instance_admin`.
+// `last_instance_admin`, and demoting one an auth provider's group
+// mapping made `sso_sourced`: only the provider takes it away.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -14313,8 +14508,10 @@ func (c *Client) CreateGrant(ctx context.Context, project ProjectKey, body Creat
 //
 // Removes one grant, leaving the member's others. The grant of a role
 // holding a permission the caller lacks in the project is refused
-// `role_not_allowed`. Removing the last owner's grant is allowed: an
-// instance admin holds every permission in every project.
+// `role_not_allowed`. The grant of an auth provider's group mapping
+// (`source` `sso`) is refused 409 `sso_sourced`: the directory owns it.
+// Removing the last owner's grant is allowed: an instance admin holds
+// every permission in every project.
 //
 // Corresponds with DELETE /projects/{project}/grants/{grant} (the `DeleteGrant` operationId).
 func (c *Client) DeleteGrant(ctx context.Context, project ProjectKey, grant GrantID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -16971,6 +17168,87 @@ func NewEnableAuthProviderRequest(server string, provider AuthProviderSlug) (*ht
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewGetAuthProviderGroupMappingsRequest constructs an http.Request for the GetAuthProviderGroupMappings method
+func NewGetAuthProviderGroupMappingsRequest(server string, provider AuthProviderSlug) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s/group-mappings", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewReplaceAuthProviderGroupMappingsRequest calls the generic ReplaceAuthProviderGroupMappings builder with application/json body
+func NewReplaceAuthProviderGroupMappingsRequest(server string, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewReplaceAuthProviderGroupMappingsRequestWithBody(server, provider, "application/json", bodyReader)
+}
+
+// NewReplaceAuthProviderGroupMappingsRequestWithBody constructs an http.Request for the ReplaceAuthProviderGroupMappings method, with any body, and a specified content type
+func NewReplaceAuthProviderGroupMappingsRequestWithBody(server string, provider AuthProviderSlug, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s/group-mappings", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -25959,8 +26237,10 @@ type ClientWithResponsesInterface interface {
 	// DeleteAuthProviderWithResponse Delete an auth provider
 	//
 	// Refused 409 `provider_in_use` while something depends on the provider;
-	// `used_by` names what. Disable it instead: that stops its sign-ins
-	// and leaves its members, identities and grants as they are. Audited
+	// `used_by` names what (`identities`, `grants` while its group mappings
+	// made a grant or an instance admin, among others). Disable it instead:
+	// that stops its sign-ins and leaves its members, identities and grants
+	// as they are. Audited
 	// `auth_provider.deleted`.
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -26022,6 +26302,60 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /instance/auth-providers/{provider}/enable (the `EnableAuthProvider` operationId).
 	EnableAuthProviderWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*EnableAuthProviderResponse, error)
+
+	// GetAuthProviderGroupMappingsWithResponse An auth provider's group mappings
+	//
+	// What the provider's directory groups grant, in order: a role in a
+	// project, or instance admin.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /instance/auth-providers/{provider}/group-mappings (the `GetAuthProviderGroupMappings` operationId).
+	GetAuthProviderGroupMappingsWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*GetAuthProviderGroupMappingsResponse, error)
+
+	// ReplaceAuthProviderGroupMappingsWithBodyWithResponse Replace an auth provider's group mappings
+	//
+	// Replaces the whole list, then runs it at once for every member the
+	// provider knows, those who claimed groups at it on a sign-in: each is
+	// granted what their groups now map to and loses what the provider
+	// granted and no longer maps. A grant of a mapping is `source` `sso` and
+	// names the provider; grants of other sources, and an instance admin made
+	// by hand or by another provider, are left alone. The last active
+	// instance admin is never demoted by a mapping, and is counted in
+	// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+	// either a `project` (key) with a built-in `role`, or `instance_admin`
+	// alone; a mapping that breaks that, or names a project that does not
+	// exist, is 422 `invalid_group_mappings` naming each field and nothing
+	// changes. Audited `group_mappings.updated`, and each grant and promotion
+	// under the provider as the `sso` actor; a replacement that changes
+	// nothing is not.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+	ReplaceAuthProviderGroupMappingsWithBodyWithResponse(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error)
+
+	// ReplaceAuthProviderGroupMappingsWithResponse Replace an auth provider's group mappings
+	//
+	// Replaces the whole list, then runs it at once for every member the
+	// provider knows, those who claimed groups at it on a sign-in: each is
+	// granted what their groups now map to and loses what the provider
+	// granted and no longer maps. A grant of a mapping is `source` `sso` and
+	// names the provider; grants of other sources, and an instance admin made
+	// by hand or by another provider, are left alone. The last active
+	// instance admin is never demoted by a mapping, and is counted in
+	// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+	// either a `project` (key) with a built-in `role`, or `instance_admin`
+	// alone; a mapping that breaks that, or names a project that does not
+	// exist, is 422 `invalid_group_mappings` naming each field and nothing
+	// changes. Audited `group_mappings.updated`, and each grant and promotion
+	// under the provider as the `sso` actor; a replacement that changes
+	// nothing is not.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+	ReplaceAuthProviderGroupMappingsWithResponse(ctx context.Context, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error)
 
 	// TestAuthProviderWithResponse Test that an auth provider can be reached
 	//
@@ -26384,7 +26718,8 @@ type ClientWithResponsesInterface interface {
 	// Changes the fields sent and leaves the others as they are. An email
 	// another member holds, whatever its case, is refused `already_exists`.
 	// Demoting the instance's last active instance admin is refused
-	// `last_instance_admin`.
+	// `last_instance_admin`, and demoting one an auth provider's group
+	// mapping made `sso_sourced`: only the provider takes it away.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -26396,7 +26731,8 @@ type ClientWithResponsesInterface interface {
 	// Changes the fields sent and leaves the others as they are. An email
 	// another member holds, whatever its case, is refused `already_exists`.
 	// Demoting the instance's last active instance admin is refused
-	// `last_instance_admin`.
+	// `last_instance_admin`, and demoting one an auth provider's group
+	// mapping made `sso_sourced`: only the provider takes it away.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -28191,8 +28527,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Removes one grant, leaving the member's others. The grant of a role
 	// holding a permission the caller lacks in the project is refused
-	// `role_not_allowed`. Removing the last owner's grant is allowed: an
-	// instance admin holds every permission in every project.
+	// `role_not_allowed`. The grant of an auth provider's group mapping
+	// (`source` `sso`) is refused 409 `sso_sourced`: the directory owns it.
+	// Removing the last owner's grant is allowed: an instance admin holds
+	// every permission in every project.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -30484,6 +30822,158 @@ func (r EnableAuthProviderResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r EnableAuthProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetAuthProviderGroupMappingsResponse401Headers the declared response headers of an HTTP 401 response for GetAuthProviderGroupMappings
+type GetAuthProviderGroupMappingsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetAuthProviderGroupMappingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *GroupMappings
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetAuthProviderGroupMappingsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAuthProviderGroupMappingsResponse) GetJSON200() *GroupMappings {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetAuthProviderGroupMappingsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetAuthProviderGroupMappingsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetAuthProviderGroupMappingsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAuthProviderGroupMappingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuthProviderGroupMappingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuthProviderGroupMappingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAuthProviderGroupMappingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ReplaceAuthProviderGroupMappingsResponse401Headers the declared response headers of an HTTP 401 response for ReplaceAuthProviderGroupMappings
+type ReplaceAuthProviderGroupMappingsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ReplaceAuthProviderGroupMappingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *GroupMappingsRun
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ReplaceAuthProviderGroupMappingsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ReplaceAuthProviderGroupMappingsResponse) GetJSON200() *GroupMappingsRun {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ReplaceAuthProviderGroupMappingsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ReplaceAuthProviderGroupMappingsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ReplaceAuthProviderGroupMappingsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ReplaceAuthProviderGroupMappingsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ReplaceAuthProviderGroupMappingsResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r ReplaceAuthProviderGroupMappingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ReplaceAuthProviderGroupMappingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReplaceAuthProviderGroupMappingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReplaceAuthProviderGroupMappingsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -39380,6 +39870,8 @@ type DeleteGrantResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *Invalid
 	// Headers401 the parsed response headers for an HTTP 401 response
@@ -39399,6 +39891,11 @@ func (r DeleteGrantResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r DeleteGrantResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r DeleteGrantResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
@@ -44076,8 +44573,10 @@ func (c *ClientWithResponses) CreateAuthProviderWithResponse(ctx context.Context
 // DeleteAuthProviderWithResponse Delete an auth provider
 //
 // Refused 409 `provider_in_use` while something depends on the provider;
-// `used_by` names what. Disable it instead: that stops its sign-ins
-// and leaves its members, identities and grants as they are. Audited
+// `used_by` names what (`identities`, `grants` while its group mappings
+// made a grant or an instance admin, among others). Disable it instead:
+// that stops its sign-ins and leaves its members, identities and grants
+// as they are. Audited
 // `auth_provider.deleted`.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -44174,6 +44673,78 @@ func (c *ClientWithResponses) EnableAuthProviderWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseEnableAuthProviderResponse(rsp)
+}
+
+// GetAuthProviderGroupMappingsWithResponse An auth provider's group mappings
+//
+// What the provider's directory groups grant, in order: a role in a
+// project, or instance admin.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/auth-providers/{provider}/group-mappings (the `GetAuthProviderGroupMappings` operationId).
+func (c *ClientWithResponses) GetAuthProviderGroupMappingsWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*GetAuthProviderGroupMappingsResponse, error) {
+	rsp, err := c.GetAuthProviderGroupMappings(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuthProviderGroupMappingsResponse(rsp)
+}
+
+// ReplaceAuthProviderGroupMappingsWithBodyWithResponse Replace an auth provider's group mappings
+//
+// Replaces the whole list, then runs it at once for every member the
+// provider knows, those who claimed groups at it on a sign-in: each is
+// granted what their groups now map to and loses what the provider
+// granted and no longer maps. A grant of a mapping is `source` `sso` and
+// names the provider; grants of other sources, and an instance admin made
+// by hand or by another provider, are left alone. The last active
+// instance admin is never demoted by a mapping, and is counted in
+// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+// either a `project` (key) with a built-in `role`, or `instance_admin`
+// alone; a mapping that breaks that, or names a project that does not
+// exist, is 422 `invalid_group_mappings` naming each field and nothing
+// changes. Audited `group_mappings.updated`, and each grant and promotion
+// under the provider as the `sso` actor; a replacement that changes
+// nothing is not.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+func (c *ClientWithResponses) ReplaceAuthProviderGroupMappingsWithBodyWithResponse(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error) {
+	rsp, err := c.ReplaceAuthProviderGroupMappingsWithBody(ctx, provider, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReplaceAuthProviderGroupMappingsResponse(rsp)
+}
+
+// ReplaceAuthProviderGroupMappingsWithResponse Replace an auth provider's group mappings
+//
+// Replaces the whole list, then runs it at once for every member the
+// provider knows, those who claimed groups at it on a sign-in: each is
+// granted what their groups now map to and loses what the provider
+// granted and no longer maps. A grant of a mapping is `source` `sso` and
+// names the provider; grants of other sources, and an instance admin made
+// by hand or by another provider, are left alone. The last active
+// instance admin is never demoted by a mapping, and is counted in
+// `kept_instance_admin` instead. A mapping has a non-blank `group` and
+// either a `project` (key) with a built-in `role`, or `instance_admin`
+// alone; a mapping that breaks that, or names a project that does not
+// exist, is 422 `invalid_group_mappings` naming each field and nothing
+// changes. Audited `group_mappings.updated`, and each grant and promotion
+// under the provider as the `sso` actor; a replacement that changes
+// nothing is not.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
+func (c *ClientWithResponses) ReplaceAuthProviderGroupMappingsWithResponse(ctx context.Context, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error) {
+	rsp, err := c.ReplaceAuthProviderGroupMappings(ctx, provider, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReplaceAuthProviderGroupMappingsResponse(rsp)
 }
 
 // TestAuthProviderWithResponse Test that an auth provider can be reached
@@ -44687,7 +45258,8 @@ func (c *ClientWithResponses) GetMemberWithResponse(ctx context.Context, member 
 // Changes the fields sent and leaves the others as they are. An email
 // another member holds, whatever its case, is refused `already_exists`.
 // Demoting the instance's last active instance admin is refused
-// `last_instance_admin`.
+// `last_instance_admin`, and demoting one an auth provider's group
+// mapping made `sso_sourced`: only the provider takes it away.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -44705,7 +45277,8 @@ func (c *ClientWithResponses) UpdateMemberWithBodyWithResponse(ctx context.Conte
 // Changes the fields sent and leaves the others as they are. An email
 // another member holds, whatever its case, is refused `already_exists`.
 // Demoting the instance's last active instance admin is refused
-// `last_instance_admin`.
+// `last_instance_admin`, and demoting one an auth provider's group
+// mapping made `sso_sourced`: only the provider takes it away.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -47202,8 +47775,10 @@ func (c *ClientWithResponses) CreateGrantWithResponse(ctx context.Context, proje
 //
 // Removes one grant, leaving the member's others. The grant of a role
 // holding a permission the caller lacks in the project is refused
-// `role_not_allowed`. Removing the last owner's grant is allowed: an
-// instance admin holds every permission in every project.
+// `role_not_allowed`. The grant of an auth provider's group mapping
+// (`source` `sso`) is refused 409 `sso_sourced`: the directory owns it.
+// Removing the last owner's grant is allowed: an instance admin holds
+// every permission in every project.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -49844,6 +50419,140 @@ func ParseEnableAuthProviderResponse(rsp *http.Response) (*EnableAuthProviderRes
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers EnableAuthProviderResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetAuthProviderGroupMappingsResponse parses an HTTP response from a GetAuthProviderGroupMappingsWithResponse call
+func ParseGetAuthProviderGroupMappingsResponse(rsp *http.Response) (*GetAuthProviderGroupMappingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuthProviderGroupMappingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GroupMappings
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetAuthProviderGroupMappingsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseReplaceAuthProviderGroupMappingsResponse parses an HTTP response from a ReplaceAuthProviderGroupMappingsWithResponse call
+func ParseReplaceAuthProviderGroupMappingsResponse(rsp *http.Response) (*ReplaceAuthProviderGroupMappingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReplaceAuthProviderGroupMappingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GroupMappingsRun
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ReplaceAuthProviderGroupMappingsResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -58015,6 +58724,13 @@ func ParseDeleteGrantResponse(rsp *http.Response) (*DeleteGrantResponse, error) 
 		}
 		response.ApplicationproblemJSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest Invalid
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -62048,6 +62764,12 @@ type ServerInterface interface {
 	// EnableAuthProvider Enable an auth provider
 	// (POST /instance/auth-providers/{provider}/enable)
 	EnableAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// GetAuthProviderGroupMappings An auth provider's group mappings
+	// (GET /instance/auth-providers/{provider}/group-mappings)
+	GetAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// ReplaceAuthProviderGroupMappings Replace an auth provider's group mappings
+	// (PUT /instance/auth-providers/{provider}/group-mappings)
+	ReplaceAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
 	// TestAuthProvider Test that an auth provider can be reached
 	// (POST /instance/auth-providers/{provider}/test)
 	TestAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
@@ -63203,6 +63925,58 @@ func (siw *ServerInterfaceWrapper) EnableAuthProvider(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.EnableAuthProvider(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAuthProviderGroupMappings operation middleware
+func (siw *ServerInterfaceWrapper) GetAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuthProviderGroupMappings(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReplaceAuthProviderGroupMappings operation middleware
+func (siw *ServerInterfaceWrapper) ReplaceAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReplaceAuthProviderGroupMappings(w, r, provider)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -70529,6 +71303,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/instance/auth-providers/{provider}", wrapper.UpdateAuthProvider)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/enable", wrapper.EnableAuthProvider)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/disable", wrapper.DisableAuthProvider)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-providers/{provider}/group-mappings", wrapper.GetAuthProviderGroupMappings)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/auth-providers/{provider}/group-mappings", wrapper.ReplaceAuthProviderGroupMappings)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/test", wrapper.TestAuthProvider)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/instance/smtp", wrapper.DeleteMailSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/smtp", wrapper.GetMailSettings)
@@ -71995,6 +72771,185 @@ type EnableAuthProvider422ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response EnableAuthProvider422ApplicationProblemPlusJSONResponse) VisitEnableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProviderGroupMappingsRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+}
+
+type GetAuthProviderGroupMappingsResponseObject interface {
+	VisitGetAuthProviderGroupMappingsResponse(w http.ResponseWriter) error
+}
+
+type GetAuthProviderGroupMappings200JSONResponse GroupMappings
+
+func (response GetAuthProviderGroupMappings200JSONResponse) VisitGetAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProviderGroupMappings401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthProviderGroupMappings401ApplicationProblemPlusJSONResponse) VisitGetAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProviderGroupMappings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthProviderGroupMappings403ApplicationProblemPlusJSONResponse) VisitGetAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthProviderGroupMappings404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthProviderGroupMappings404ApplicationProblemPlusJSONResponse) VisitGetAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaceAuthProviderGroupMappingsRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+	Body     *ReplaceAuthProviderGroupMappingsJSONRequestBody
+}
+
+type ReplaceAuthProviderGroupMappingsResponseObject interface {
+	VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error
+}
+
+type ReplaceAuthProviderGroupMappings200JSONResponse GroupMappingsRun
+
+func (response ReplaceAuthProviderGroupMappings200JSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaceAuthProviderGroupMappings400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaceAuthProviderGroupMappings400ApplicationProblemPlusJSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaceAuthProviderGroupMappings401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaceAuthProviderGroupMappings401ApplicationProblemPlusJSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaceAuthProviderGroupMappings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaceAuthProviderGroupMappings403ApplicationProblemPlusJSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaceAuthProviderGroupMappings404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaceAuthProviderGroupMappings404ApplicationProblemPlusJSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaceAuthProviderGroupMappings422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaceAuthProviderGroupMappings422ApplicationProblemPlusJSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -83388,6 +84343,22 @@ func (response DeleteGrant404ApplicationProblemPlusJSONResponse) VisitDeleteGran
 	return err
 }
 
+type DeleteGrant409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteGrant409ApplicationProblemPlusJSONResponse) VisitDeleteGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteGrant422ApplicationProblemPlusJSONResponse struct {
 	InvalidApplicationProblemPlusJSONResponse
 }
@@ -88772,6 +89743,12 @@ type StrictServerInterface interface {
 	// EnableAuthProvider Enable an auth provider
 	// (POST /instance/auth-providers/{provider}/enable)
 	EnableAuthProvider(ctx context.Context, request EnableAuthProviderRequestObject) (EnableAuthProviderResponseObject, error)
+	// GetAuthProviderGroupMappings An auth provider's group mappings
+	// (GET /instance/auth-providers/{provider}/group-mappings)
+	GetAuthProviderGroupMappings(ctx context.Context, request GetAuthProviderGroupMappingsRequestObject) (GetAuthProviderGroupMappingsResponseObject, error)
+	// ReplaceAuthProviderGroupMappings Replace an auth provider's group mappings
+	// (PUT /instance/auth-providers/{provider}/group-mappings)
+	ReplaceAuthProviderGroupMappings(ctx context.Context, request ReplaceAuthProviderGroupMappingsRequestObject) (ReplaceAuthProviderGroupMappingsResponseObject, error)
 	// TestAuthProvider Test that an auth provider can be reached
 	// (POST /instance/auth-providers/{provider}/test)
 	TestAuthProvider(ctx context.Context, request TestAuthProviderRequestObject) (TestAuthProviderResponseObject, error)
@@ -89675,6 +90652,65 @@ func (sh *strictHandler) EnableAuthProvider(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(EnableAuthProviderResponseObject); ok {
 		if err := validResponse.VisitEnableAuthProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAuthProviderGroupMappings operation middleware
+func (sh *strictHandler) GetAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request GetAuthProviderGroupMappingsRequestObject
+
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAuthProviderGroupMappings(ctx, request.(GetAuthProviderGroupMappingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAuthProviderGroupMappings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAuthProviderGroupMappingsResponseObject); ok {
+		if err := validResponse.VisitGetAuthProviderGroupMappingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReplaceAuthProviderGroupMappings operation middleware
+func (sh *strictHandler) ReplaceAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request ReplaceAuthProviderGroupMappingsRequestObject
+
+	request.Provider = provider
+
+	var body ReplaceAuthProviderGroupMappingsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReplaceAuthProviderGroupMappings(ctx, request.(ReplaceAuthProviderGroupMappingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReplaceAuthProviderGroupMappings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReplaceAuthProviderGroupMappingsResponseObject); ok {
+		if err := validResponse.VisitReplaceAuthProviderGroupMappingsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
