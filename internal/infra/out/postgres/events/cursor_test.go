@@ -76,3 +76,68 @@ func TestTheTailAndTheFirstRowAfterATimeAreFoundByTransactionNumber(t *testing.T
 		}
 	}
 }
+
+// A batch bounded by a position ends at or before it, by transaction number,
+// and a batch short of its limit ends at the last row up to the bound, so the
+// stream stops exactly there.
+func TestABoundedBatchEndsAtTheBoundByTransactionNumber(t *testing.T) {
+	pool := testkit.Pool(t)
+	if _, err := pool.Exec(t.Context(), `
+		CREATE TABLE bounded_by_number (xid xid8 NOT NULL, seq bigint NOT NULL);
+		INSERT INTO bounded_by_number VALUES ('9', 1), ('9', 2), ('10', 3), ('10', 4)`); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DROP TABLE bounded_by_number`) })
+
+	until := events.Cursor{XID: 10, Seq: 3}
+	b, err := pgevents.BoundUntil(t.Context(), pool, "bounded_by_number", pgevents.Scope{}, events.Cursor{}, &until, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Rows != 3 || b.To != until {
+		t.Errorf("batch = %d rows to %+v, want 3 rows to %+v", b.Rows, b.To, until)
+	}
+	// A full batch ends at its own last row, short of the bound.
+	b, err = pgevents.BoundUntil(t.Context(), pool, "bounded_by_number", pgevents.Scope{}, events.Cursor{}, &until, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Rows != 2 || b.To != (events.Cursor{XID: 9, Seq: 2}) {
+		t.Errorf("full batch = %d rows to %+v, want 2 rows to transaction 9, seq 2", b.Rows, b.To)
+	}
+	// Nothing between the cursor and the bound: the batch stays where it was.
+	b, err = pgevents.BoundUntil(t.Context(), pool, "bounded_by_number", pgevents.Scope{}, until, &until, 10)
+	if err != nil || b.Rows != 0 || b.To != until {
+		t.Errorf("batch at the bound = %d rows to %+v, %v, want none, the bound", b.Rows, b.To, err)
+	}
+}
+
+// The last row received at or before a time is found by transaction number.
+func TestTheLastRowReceivedAtOrBeforeATimeIsFoundByTransactionNumber(t *testing.T) {
+	pool := testkit.Pool(t)
+	if _, err := pool.Exec(t.Context(), `
+		CREATE TABLE last_by_number (xid xid8 NOT NULL, seq bigint NOT NULL, received_at timestamptz NOT NULL);
+		INSERT INTO last_by_number VALUES
+			('99', 1, '2026-11-03 10:00:00+00'), ('99', 2, '2026-11-03 11:00:00+00'),
+			('100', 3, '2026-11-03 12:00:00+00'), ('100', 4, '2026-11-03 13:00:00+00')`); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DROP TABLE last_by_number`) })
+
+	for name, tc := range map[string]struct {
+		to   time.Time
+		want events.Cursor
+		ok   bool
+	}{
+		"before every row":      {time.Date(2026, 11, 3, 9, 0, 0, 0, time.UTC), events.Cursor{}, false},
+		"exactly at a row":      {time.Date(2026, 11, 3, 10, 0, 0, 0, time.UTC), events.Cursor{XID: 99, Seq: 1}, true},
+		"within transaction 99": {time.Date(2026, 11, 3, 11, 30, 0, 0, time.UTC), events.Cursor{XID: 99, Seq: 2}, true},
+		"within 100":            {time.Date(2026, 11, 3, 12, 30, 0, 0, time.UTC), events.Cursor{XID: 100, Seq: 3}, true},
+		"after every row":       {time.Date(2026, 11, 3, 14, 0, 0, 0, time.UTC), events.Cursor{XID: 100, Seq: 4}, true},
+	} {
+		got, ok, err := pgevents.Last(t.Context(), pool, "last_by_number", pgevents.Scope{}, tc.to)
+		if err != nil || ok != tc.ok || got != tc.want {
+			t.Errorf("last %s = %+v, %v, %v, want %+v, %v", name, got, ok, err, tc.want, tc.ok)
+		}
+	}
+}

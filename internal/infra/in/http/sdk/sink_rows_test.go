@@ -51,7 +51,7 @@ func readStream(t *testing.T, srv *testkit.Server, store *pgsinks.Store, kind si
 	t.Helper()
 	srv.AwaitHorizon(t)
 	for {
-		b, err := store.NextBatch(t.Context(), kind, scope, from, size)
+		b, err := store.NextBatch(t.Context(), kind, scope, from, size, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -161,18 +161,18 @@ func TestASinksCursorPassesOtherProjectsRowsWithNoRowOfItsOwn(t *testing.T) {
 	now := mine.clock.Now()
 	mine.post(t, mine.exposure("mine-1", "true", now))
 	mine.srv.AwaitHorizon(t)
-	first, err := mine.store.NextBatch(t.Context(), sinks.EventExposure, mine.scope(t), events.Cursor{}, 10)
+	first, err := mine.store.NextBatch(t.Context(), sinks.EventExposure, mine.scope(t), events.Cursor{}, 10, nil)
 	if err != nil || first.Rows != 1 {
 		t.Fatalf("first batch = %+v (%v), want this project's row", first, err)
 	}
 	other.post(t, other.exposure("other-1", "true", now), other.exposure("other-2", "true", now))
 	mine.srv.AwaitHorizon(t)
 
-	b, err := mine.store.NextBatch(t.Context(), sinks.EventExposure, mine.scope(t), first.To, 10)
+	b, err := mine.store.NextBatch(t.Context(), sinks.EventExposure, mine.scope(t), first.To, 10, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	passed, err := other.store.NextBatch(t.Context(), sinks.EventExposure, other.scope(t), events.Cursor{}, 10)
+	passed, err := other.store.NextBatch(t.Context(), sinks.EventExposure, other.scope(t), events.Cursor{}, 10, nil)
 	if err != nil || passed.Rows != 2 {
 		t.Fatalf("the other project's batch = %+v (%v), want its two rows", passed, err)
 	}
@@ -210,7 +210,7 @@ func TestASinkLimitedToAnEnvironmentReadsOnlyItsRowsAndLagsOnlyBehindThem(t *tes
 	}
 	// A batch bounded by size counts only the rows its filter admits: the
 	// staging row does not take up a place of the production batch.
-	b, err := f.store.NextBatch(t.Context(), sinks.EventExposure, f.scope(t, "production"), events.Cursor{}, 2)
+	b, err := f.store.NextBatch(t.Context(), sinks.EventExposure, f.scope(t, "production"), events.Cursor{}, 2, nil)
 	if err != nil || b.Rows != 2 {
 		t.Fatalf("production batch = %+v (%v), want its two rows", b, err)
 	}
@@ -273,7 +273,7 @@ func TestAnIngestTransactionHeldOpenIsNeverSkipped(t *testing.T) {
 	f.post(t, f.exposure("after", "true", now))
 	f.srv.AwaitHorizon(t)
 
-	b, err := f.store.NextBatch(t.Context(), sinks.EventExposure, scope, events.Cursor{}, 10)
+	b, err := f.store.NextBatch(t.Context(), sinks.EventExposure, scope, events.Cursor{}, 10, nil)
 	if err != nil || b.Rows != 0 {
 		t.Fatalf("batch while the transaction is open = %+v (%v), want none: nothing past it is read", b, err)
 	}
@@ -345,7 +345,7 @@ func TestAReadThatCannotBeDoneIsAnErrorAndNeverAnEmptyBatch(t *testing.T) {
 	f := startSinkRows(t)
 	scope := f.scope(t)
 	b := sinks.Batch{To: events.Cursor{XID: 1, Seq: 1}}
-	if _, err := f.store.NextBatch(t.Context(), "click", scope, events.Cursor{}, 1); err == nil {
+	if _, err := f.store.NextBatch(t.Context(), "click", scope, events.Cursor{}, 1, nil); err == nil {
 		t.Error("a batch of an event kind that has no raw table = nil error, want one")
 	}
 	if _, _, err := f.store.OldestUnread(t.Context(), "click", scope, events.Cursor{}); err == nil {
@@ -359,7 +359,7 @@ func TestAReadThatCannotBeDoneIsAnErrorAndNeverAnEmptyBatch(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	for _, kind := range sinks.EventKinds {
-		if _, err := f.store.NextBatch(ctx, kind, scope, events.Cursor{}, 1); err == nil {
+		if _, err := f.store.NextBatch(ctx, kind, scope, events.Cursor{}, 1, nil); err == nil {
 			t.Errorf("a %s batch with the context ended = nil error, want one", kind)
 		}
 		if _, _, err := f.store.OldestUnread(ctx, kind, scope, events.Cursor{}); err == nil {

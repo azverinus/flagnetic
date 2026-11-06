@@ -4275,6 +4275,47 @@ type SinkPatch struct {
 	Webhook *SinkWebhookInput `json:"webhook,omitempty"`
 }
 
+// SinkReplay defines model for SinkReplay.
+type SinkReplay struct {
+	// EventKinds The event kinds to replay; empty or absent for every kind the sink exports.
+	EventKinds *[]string `json:"event_kinds,omitempty"`
+
+	// From Where the replay starts, a time within retention: the first event
+	// received at or after it is the first sent again.
+	From time.Time `json:"from"`
+
+	// To Where it ends: the last event received at or before it is the last
+	// sent again. Absent, the replay runs on into the live stream.
+	To *time.Time `json:"to,omitempty"`
+}
+
+// SinkSample defines model for SinkSample.
+type SinkSample struct {
+	// EventKinds The event kinds to send samples of; empty or absent for every kind the sink exports.
+	EventKinds *[]string `json:"event_kinds,omitempty"`
+}
+
+// SinkSampleKindResult defines model for SinkSampleKindResult.
+type SinkSampleKindResult struct {
+	// Class Why not, when it did not.
+	Class *SinkFailureClass `json:"class"`
+
+	// Code The protocol's own error code, when the target speaks one.
+	Code      *string `json:"code"`
+	EventKind string  `json:"event_kind"`
+
+	// Ok Whether the target acknowledged the sample.
+	Ok bool `json:"ok"`
+
+	// Status The HTTP status the target answered, when it did.
+	Status *int `json:"status"`
+}
+
+// SinkSampleResult defines model for SinkSampleResult.
+type SinkSampleResult struct {
+	Results []SinkSampleKindResult `json:"results"`
+}
+
 // SinkStream One event kind's delivery. Cursors are never exposed.
 type SinkStream struct {
 	// EventKind A kind of raw event a sink exports, each delivered through a stream of its own.
@@ -5957,6 +5998,12 @@ type UpdateSinkJSONRequestBody = SinkPatch
 
 // EnableSinkJSONRequestBody defines body for EnableSink for application/json ContentType.
 type EnableSinkJSONRequestBody = SinkEnable
+
+// ReplaySinkJSONRequestBody defines body for ReplaySink for application/json ContentType.
+type ReplaySinkJSONRequestBody = SinkReplay
+
+// SampleSinkJSONRequestBody defines body for SampleSink for application/json ContentType.
+type SampleSinkJSONRequestBody = SinkSample
 
 // TestSinkJSONRequestBody defines body for TestSink for application/json ContentType.
 type TestSinkJSONRequestBody = SinkTest
@@ -9906,6 +9953,50 @@ type ClientInterface interface {
 	// Corresponds with POST /projects/{project}/sinks/{sink}/enable (the `EnableSink` operationId).
 	EnableSink(ctx context.Context, project ProjectKey, sink SinkID, body EnableSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ReplaySinkWithBody Replay a sink from a time
+	//
+	// Sends the events received since `from` again, in order, to the
+	// requested event kinds' streams (every kind the sink exports when
+	// `event_kinds` is absent or empty), then the live stream goes on. Each
+	// stream goes back to just before the first event received at or after
+	// `from` in the sink's environments. With `to` it stops after the last
+	// event received at or before it and returns to where it was, so that
+	// nothing past `to` is sent twice. A stream with no event in the range is
+	// left as it is. `from` must be within retention (`out_of_retention`) and
+	// `to` must not be before `from` (`invalid_replay_range`). A replay is
+	// applied by the delivery worker before the stream's next batch, which a
+	// disabled or stopped sink starts once it runs again; the batch in flight
+	// is dropped. A replay sent while another bounded one runs still returns
+	// to the position that one would have. Audited as `sink.replayed`. It
+	// takes no `If-Match`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/replay (the `ReplaySink` operationId).
+	ReplaySinkWithBody(ctx context.Context, project ProjectKey, sink SinkID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReplaySink Replay a sink from a time
+	//
+	// Sends the events received since `from` again, in order, to the
+	// requested event kinds' streams (every kind the sink exports when
+	// `event_kinds` is absent or empty), then the live stream goes on. Each
+	// stream goes back to just before the first event received at or after
+	// `from` in the sink's environments. With `to` it stops after the last
+	// event received at or before it and returns to where it was, so that
+	// nothing past `to` is sent twice. A stream with no event in the range is
+	// left as it is. `from` must be within retention (`out_of_retention`) and
+	// `to` must not be before `from` (`invalid_replay_range`). A replay is
+	// applied by the delivery worker before the stream's next batch, which a
+	// disabled or stopped sink starts once it runs again; the batch in flight
+	// is dropped. A replay sent while another bounded one runs still returns
+	// to the position that one would have. Audited as `sink.replayed`. It
+	// takes no `If-Match`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/replay (the `ReplaySink` operationId).
+	ReplaySink(ctx context.Context, project ProjectKey, sink SinkID, body ReplaySinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// RotateSinkSecret Rotate a webhook sink's secret
 	//
 	// Issues a webhook sink a new secret, answered this once. The secret it
@@ -9920,6 +10011,44 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/sinks/{sink}/rotate-secret (the `RotateSinkSecret` operationId).
 	RotateSinkSecret(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SampleSinkWithBody Send sample rows to a sink
+	//
+	// Sends ten sample rows of each requested event kind (`event_kinds`,
+	// every kind the sink exports when absent or empty) to the sink's
+	// target, so that the receiving side can be built before real events
+	// flow. The rows are marked as samples: their identifiers are `sample-1`
+	// to `sample-10`, their keys and unit are `sample` but for the
+	// project's own key, and a webhook sink's envelope carries
+	// `"sample": true`. A disabled or stopped sink can be sampled. It
+	// touches no stream, cursor, count or health. Each kind is answered on
+	// its own, a target that fails as a 200 with `ok` false and why by class,
+	// status and code, never by the target's own words. Audited as
+	// `sink.sampled`. It takes no `If-Match`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/sample (the `SampleSink` operationId).
+	SampleSinkWithBody(ctx context.Context, project ProjectKey, sink SinkID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SampleSink Send sample rows to a sink
+	//
+	// Sends ten sample rows of each requested event kind (`event_kinds`,
+	// every kind the sink exports when absent or empty) to the sink's
+	// target, so that the receiving side can be built before real events
+	// flow. The rows are marked as samples: their identifiers are `sample-1`
+	// to `sample-10`, their keys and unit are `sample` but for the
+	// project's own key, and a webhook sink's envelope carries
+	// `"sample": true`. A disabled or stopped sink can be sampled. It
+	// touches no stream, cursor, count or health. Each kind is answered on
+	// its own, a target that fails as a 200 with `ok` false and why by class,
+	// status and code, never by the target's own words. Audited as
+	// `sink.sampled`. It takes no `If-Match`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/sample (the `SampleSink` operationId).
+	SampleSink(ctx context.Context, project ProjectKey, sink SinkID, body SampleSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// TestSinkWithBody Test a saved sink
 	//
@@ -15155,6 +15284,70 @@ func (c *Client) EnableSink(ctx context.Context, project ProjectKey, sink SinkID
 	return c.Client.Do(req)
 }
 
+// ReplaySinkWithBody Replay a sink from a time
+//
+// Sends the events received since `from` again, in order, to the
+// requested event kinds' streams (every kind the sink exports when
+// `event_kinds` is absent or empty), then the live stream goes on. Each
+// stream goes back to just before the first event received at or after
+// `from` in the sink's environments. With `to` it stops after the last
+// event received at or before it and returns to where it was, so that
+// nothing past `to` is sent twice. A stream with no event in the range is
+// left as it is. `from` must be within retention (`out_of_retention`) and
+// `to` must not be before `from` (`invalid_replay_range`). A replay is
+// applied by the delivery worker before the stream's next batch, which a
+// disabled or stopped sink starts once it runs again; the batch in flight
+// is dropped. A replay sent while another bounded one runs still returns
+// to the position that one would have. Audited as `sink.replayed`. It
+// takes no `If-Match`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/replay (the `ReplaySink` operationId).
+func (c *Client) ReplaySinkWithBody(ctx context.Context, project ProjectKey, sink SinkID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaySinkRequestWithBody(c.Server, project, sink, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReplaySink Replay a sink from a time
+//
+// Sends the events received since `from` again, in order, to the
+// requested event kinds' streams (every kind the sink exports when
+// `event_kinds` is absent or empty), then the live stream goes on. Each
+// stream goes back to just before the first event received at or after
+// `from` in the sink's environments. With `to` it stops after the last
+// event received at or before it and returns to where it was, so that
+// nothing past `to` is sent twice. A stream with no event in the range is
+// left as it is. `from` must be within retention (`out_of_retention`) and
+// `to` must not be before `from` (`invalid_replay_range`). A replay is
+// applied by the delivery worker before the stream's next batch, which a
+// disabled or stopped sink starts once it runs again; the batch in flight
+// is dropped. A replay sent while another bounded one runs still returns
+// to the position that one would have. Audited as `sink.replayed`. It
+// takes no `If-Match`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/replay (the `ReplaySink` operationId).
+func (c *Client) ReplaySink(ctx context.Context, project ProjectKey, sink SinkID, body ReplaySinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaySinkRequest(c.Server, project, sink, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // RotateSinkSecret Rotate a webhook sink's secret
 //
 // Issues a webhook sink a new secret, answered this once. The secret it
@@ -15170,6 +15363,64 @@ func (c *Client) EnableSink(ctx context.Context, project ProjectKey, sink SinkID
 // Corresponds with POST /projects/{project}/sinks/{sink}/rotate-secret (the `RotateSinkSecret` operationId).
 func (c *Client) RotateSinkSecret(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRotateSinkSecretRequest(c.Server, project, sink)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SampleSinkWithBody Send sample rows to a sink
+//
+// Sends ten sample rows of each requested event kind (`event_kinds`,
+// every kind the sink exports when absent or empty) to the sink's
+// target, so that the receiving side can be built before real events
+// flow. The rows are marked as samples: their identifiers are `sample-1`
+// to `sample-10`, their keys and unit are `sample` but for the
+// project's own key, and a webhook sink's envelope carries
+// `"sample": true`. A disabled or stopped sink can be sampled. It
+// touches no stream, cursor, count or health. Each kind is answered on
+// its own, a target that fails as a 200 with `ok` false and why by class,
+// status and code, never by the target's own words. Audited as
+// `sink.sampled`. It takes no `If-Match`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/sample (the `SampleSink` operationId).
+func (c *Client) SampleSinkWithBody(ctx context.Context, project ProjectKey, sink SinkID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSampleSinkRequestWithBody(c.Server, project, sink, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SampleSink Send sample rows to a sink
+//
+// Sends ten sample rows of each requested event kind (`event_kinds`,
+// every kind the sink exports when absent or empty) to the sink's
+// target, so that the receiving side can be built before real events
+// flow. The rows are marked as samples: their identifiers are `sample-1`
+// to `sample-10`, their keys and unit are `sample` but for the
+// project's own key, and a webhook sink's envelope carries
+// `"sample": true`. A disabled or stopped sink can be sampled. It
+// touches no stream, cursor, count or health. Each kind is answered on
+// its own, a target that fails as a 200 with `ok` false and why by class,
+// status and code, never by the target's own words. Audited as
+// `sink.sampled`. It takes no `If-Match`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/sample (the `SampleSink` operationId).
+func (c *Client) SampleSink(ctx context.Context, project ProjectKey, sink SinkID, body SampleSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSampleSinkRequest(c.Server, project, sink, body)
 	if err != nil {
 		return nil, err
 	}
@@ -23942,6 +24193,60 @@ func NewEnableSinkRequestWithBody(server string, project ProjectKey, sink SinkID
 	return req, nil
 }
 
+// NewReplaySinkRequest calls the generic ReplaySink builder with application/json body
+func NewReplaySinkRequest(server string, project ProjectKey, sink SinkID, body ReplaySinkJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewReplaySinkRequestWithBody(server, project, sink, "application/json", bodyReader)
+}
+
+// NewReplaySinkRequestWithBody constructs an http.Request for the ReplaySink method, with any body, and a specified content type
+func NewReplaySinkRequestWithBody(server string, project ProjectKey, sink SinkID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s/replay", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewRotateSinkSecretRequest constructs an http.Request for the RotateSinkSecret method
 func NewRotateSinkSecretRequest(server string, project ProjectKey, sink SinkID) (*http.Request, error) {
 	var err error
@@ -23979,6 +24284,60 @@ func NewRotateSinkSecretRequest(server string, project ProjectKey, sink SinkID) 
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewSampleSinkRequest calls the generic SampleSink builder with application/json body
+func NewSampleSinkRequest(server string, project ProjectKey, sink SinkID, body SampleSinkJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSampleSinkRequestWithBody(server, project, sink, "application/json", bodyReader)
+}
+
+// NewSampleSinkRequestWithBody constructs an http.Request for the SampleSink method, with any body, and a specified content type
+func NewSampleSinkRequestWithBody(server string, project ProjectKey, sink SinkID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s/sample", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -28773,6 +29132,50 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /projects/{project}/sinks/{sink}/enable (the `EnableSink` operationId).
 	EnableSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, body EnableSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*EnableSinkResponse, error)
 
+	// ReplaySinkWithBodyWithResponse Replay a sink from a time
+	//
+	// Sends the events received since `from` again, in order, to the
+	// requested event kinds' streams (every kind the sink exports when
+	// `event_kinds` is absent or empty), then the live stream goes on. Each
+	// stream goes back to just before the first event received at or after
+	// `from` in the sink's environments. With `to` it stops after the last
+	// event received at or before it and returns to where it was, so that
+	// nothing past `to` is sent twice. A stream with no event in the range is
+	// left as it is. `from` must be within retention (`out_of_retention`) and
+	// `to` must not be before `from` (`invalid_replay_range`). A replay is
+	// applied by the delivery worker before the stream's next batch, which a
+	// disabled or stopped sink starts once it runs again; the batch in flight
+	// is dropped. A replay sent while another bounded one runs still returns
+	// to the position that one would have. Audited as `sink.replayed`. It
+	// takes no `If-Match`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/replay (the `ReplaySink` operationId).
+	ReplaySinkWithBodyWithResponse(ctx context.Context, project ProjectKey, sink SinkID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaySinkResponse, error)
+
+	// ReplaySinkWithResponse Replay a sink from a time
+	//
+	// Sends the events received since `from` again, in order, to the
+	// requested event kinds' streams (every kind the sink exports when
+	// `event_kinds` is absent or empty), then the live stream goes on. Each
+	// stream goes back to just before the first event received at or after
+	// `from` in the sink's environments. With `to` it stops after the last
+	// event received at or before it and returns to where it was, so that
+	// nothing past `to` is sent twice. A stream with no event in the range is
+	// left as it is. `from` must be within retention (`out_of_retention`) and
+	// `to` must not be before `from` (`invalid_replay_range`). A replay is
+	// applied by the delivery worker before the stream's next batch, which a
+	// disabled or stopped sink starts once it runs again; the batch in flight
+	// is dropped. A replay sent while another bounded one runs still returns
+	// to the position that one would have. Audited as `sink.replayed`. It
+	// takes no `If-Match`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/replay (the `ReplaySink` operationId).
+	ReplaySinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, body ReplaySinkJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaySinkResponse, error)
+
 	// RotateSinkSecretWithResponse Rotate a webhook sink's secret
 	//
 	// Issues a webhook sink a new secret, answered this once. The secret it
@@ -28789,6 +29192,44 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/sinks/{sink}/rotate-secret (the `RotateSinkSecret` operationId).
 	RotateSinkSecretWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*RotateSinkSecretResponse, error)
+
+	// SampleSinkWithBodyWithResponse Send sample rows to a sink
+	//
+	// Sends ten sample rows of each requested event kind (`event_kinds`,
+	// every kind the sink exports when absent or empty) to the sink's
+	// target, so that the receiving side can be built before real events
+	// flow. The rows are marked as samples: their identifiers are `sample-1`
+	// to `sample-10`, their keys and unit are `sample` but for the
+	// project's own key, and a webhook sink's envelope carries
+	// `"sample": true`. A disabled or stopped sink can be sampled. It
+	// touches no stream, cursor, count or health. Each kind is answered on
+	// its own, a target that fails as a 200 with `ok` false and why by class,
+	// status and code, never by the target's own words. Audited as
+	// `sink.sampled`. It takes no `If-Match`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/sample (the `SampleSink` operationId).
+	SampleSinkWithBodyWithResponse(ctx context.Context, project ProjectKey, sink SinkID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SampleSinkResponse, error)
+
+	// SampleSinkWithResponse Send sample rows to a sink
+	//
+	// Sends ten sample rows of each requested event kind (`event_kinds`,
+	// every kind the sink exports when absent or empty) to the sink's
+	// target, so that the receiving side can be built before real events
+	// flow. The rows are marked as samples: their identifiers are `sample-1`
+	// to `sample-10`, their keys and unit are `sample` but for the
+	// project's own key, and a webhook sink's envelope carries
+	// `"sample": true`. A disabled or stopped sink can be sampled. It
+	// touches no stream, cursor, count or health. Each kind is answered on
+	// its own, a target that fails as a 200 with `ok` false and why by class,
+	// status and code, never by the target's own words. Audited as
+	// `sink.sampled`. It takes no `If-Match`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/sample (the `SampleSink` operationId).
+	SampleSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, body SampleSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*SampleSinkResponse, error)
 
 	// TestSinkWithBodyWithResponse Test a saved sink
 	//
@@ -40943,6 +41384,96 @@ func (r EnableSinkResponse) ContentType() string {
 	return ""
 }
 
+// ReplaySinkResponse200Headers the declared response headers of an HTTP 200 response for ReplaySink
+type ReplaySinkResponse200Headers struct {
+	ETag *string
+}
+
+// ReplaySinkResponse401Headers the declared response headers of an HTTP 401 response for ReplaySink
+type ReplaySinkResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ReplaySinkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Sink
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ReplaySinkResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ReplaySinkResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ReplaySinkResponse) GetJSON200() *Sink {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ReplaySinkResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ReplaySinkResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ReplaySinkResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ReplaySinkResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ReplaySinkResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r ReplaySinkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ReplaySinkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReplaySinkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReplaySinkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // RotateSinkSecretResponse200Headers the declared response headers of an HTTP 200 response for RotateSinkSecret
 type RotateSinkSecretResponse200Headers struct {
 	ETag *string
@@ -41020,6 +41551,89 @@ func (r RotateSinkSecretResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r RotateSinkSecretResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// SampleSinkResponse401Headers the declared response headers of an HTTP 401 response for SampleSink
+type SampleSinkResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type SampleSinkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SinkSampleResult
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *SampleSinkResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SampleSinkResponse) GetJSON200() *SinkSampleResult {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SampleSinkResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SampleSinkResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SampleSinkResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SampleSinkResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r SampleSinkResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r SampleSinkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SampleSinkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SampleSinkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SampleSinkResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -47952,6 +48566,62 @@ func (c *ClientWithResponses) EnableSinkWithResponse(ctx context.Context, projec
 	return ParseEnableSinkResponse(rsp)
 }
 
+// ReplaySinkWithBodyWithResponse Replay a sink from a time
+//
+// Sends the events received since `from` again, in order, to the
+// requested event kinds' streams (every kind the sink exports when
+// `event_kinds` is absent or empty), then the live stream goes on. Each
+// stream goes back to just before the first event received at or after
+// `from` in the sink's environments. With `to` it stops after the last
+// event received at or before it and returns to where it was, so that
+// nothing past `to` is sent twice. A stream with no event in the range is
+// left as it is. `from` must be within retention (`out_of_retention`) and
+// `to` must not be before `from` (`invalid_replay_range`). A replay is
+// applied by the delivery worker before the stream's next batch, which a
+// disabled or stopped sink starts once it runs again; the batch in flight
+// is dropped. A replay sent while another bounded one runs still returns
+// to the position that one would have. Audited as `sink.replayed`. It
+// takes no `If-Match`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/replay (the `ReplaySink` operationId).
+func (c *ClientWithResponses) ReplaySinkWithBodyWithResponse(ctx context.Context, project ProjectKey, sink SinkID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaySinkResponse, error) {
+	rsp, err := c.ReplaySinkWithBody(ctx, project, sink, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReplaySinkResponse(rsp)
+}
+
+// ReplaySinkWithResponse Replay a sink from a time
+//
+// Sends the events received since `from` again, in order, to the
+// requested event kinds' streams (every kind the sink exports when
+// `event_kinds` is absent or empty), then the live stream goes on. Each
+// stream goes back to just before the first event received at or after
+// `from` in the sink's environments. With `to` it stops after the last
+// event received at or before it and returns to where it was, so that
+// nothing past `to` is sent twice. A stream with no event in the range is
+// left as it is. `from` must be within retention (`out_of_retention`) and
+// `to` must not be before `from` (`invalid_replay_range`). A replay is
+// applied by the delivery worker before the stream's next batch, which a
+// disabled or stopped sink starts once it runs again; the batch in flight
+// is dropped. A replay sent while another bounded one runs still returns
+// to the position that one would have. Audited as `sink.replayed`. It
+// takes no `If-Match`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/replay (the `ReplaySink` operationId).
+func (c *ClientWithResponses) ReplaySinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, body ReplaySinkJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaySinkResponse, error) {
+	rsp, err := c.ReplaySink(ctx, project, sink, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReplaySinkResponse(rsp)
+}
+
 // RotateSinkSecretWithResponse Rotate a webhook sink's secret
 //
 // Issues a webhook sink a new secret, answered this once. The secret it
@@ -47973,6 +48643,56 @@ func (c *ClientWithResponses) RotateSinkSecretWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseRotateSinkSecretResponse(rsp)
+}
+
+// SampleSinkWithBodyWithResponse Send sample rows to a sink
+//
+// Sends ten sample rows of each requested event kind (`event_kinds`,
+// every kind the sink exports when absent or empty) to the sink's
+// target, so that the receiving side can be built before real events
+// flow. The rows are marked as samples: their identifiers are `sample-1`
+// to `sample-10`, their keys and unit are `sample` but for the
+// project's own key, and a webhook sink's envelope carries
+// `"sample": true`. A disabled or stopped sink can be sampled. It
+// touches no stream, cursor, count or health. Each kind is answered on
+// its own, a target that fails as a 200 with `ok` false and why by class,
+// status and code, never by the target's own words. Audited as
+// `sink.sampled`. It takes no `If-Match`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/sample (the `SampleSink` operationId).
+func (c *ClientWithResponses) SampleSinkWithBodyWithResponse(ctx context.Context, project ProjectKey, sink SinkID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SampleSinkResponse, error) {
+	rsp, err := c.SampleSinkWithBody(ctx, project, sink, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSampleSinkResponse(rsp)
+}
+
+// SampleSinkWithResponse Send sample rows to a sink
+//
+// Sends ten sample rows of each requested event kind (`event_kinds`,
+// every kind the sink exports when absent or empty) to the sink's
+// target, so that the receiving side can be built before real events
+// flow. The rows are marked as samples: their identifiers are `sample-1`
+// to `sample-10`, their keys and unit are `sample` but for the
+// project's own key, and a webhook sink's envelope carries
+// `"sample": true`. A disabled or stopped sink can be sampled. It
+// touches no stream, cursor, count or health. Each kind is answered on
+// its own, a target that fails as a 200 with `ok` false and why by class,
+// status and code, never by the target's own words. Audited as
+// `sink.sampled`. It takes no `If-Match`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/sample (the `SampleSink` operationId).
+func (c *ClientWithResponses) SampleSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, body SampleSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*SampleSinkResponse, error) {
+	rsp, err := c.SampleSink(ctx, project, sink, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSampleSinkResponse(rsp)
 }
 
 // TestSinkWithBodyWithResponse Test a saved sink
@@ -59416,6 +60136,90 @@ func ParseEnableSinkResponse(rsp *http.Response) (*EnableSinkResponse, error) {
 	return response, nil
 }
 
+// ParseReplaySinkResponse parses an HTTP response from a ReplaySinkWithResponse call
+func ParseReplaySinkResponse(rsp *http.Response) (*ReplaySinkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReplaySinkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Sink
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ReplaySinkResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers ReplaySinkResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseRotateSinkSecretResponse parses an HTTP response from a RotateSinkSecretWithResponse call
 func ParseRotateSinkSecretResponse(rsp *http.Response) (*RotateSinkSecretResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -59480,6 +60284,80 @@ func ParseRotateSinkSecretResponse(rsp *http.Response) (*RotateSinkSecretRespons
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers RotateSinkSecretResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseSampleSinkResponse parses an HTTP response from a SampleSinkWithResponse call
+func ParseSampleSinkResponse(rsp *http.Response) (*SampleSinkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SampleSinkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SinkSampleResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers SampleSinkResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -62423,9 +63301,15 @@ type ServerInterface interface {
 	// EnableSink Enable a sink
 	// (POST /projects/{project}/sinks/{sink}/enable)
 	EnableSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
+	// ReplaySink Replay a sink from a time
+	// (POST /projects/{project}/sinks/{sink}/replay)
+	ReplaySink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
 	// RotateSinkSecret Rotate a webhook sink's secret
 	// (POST /projects/{project}/sinks/{sink}/rotate-secret)
 	RotateSinkSecret(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
+	// SampleSink Send sample rows to a sink
+	// (POST /projects/{project}/sinks/{sink}/sample)
+	SampleSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
 	// TestSink Test a saved sink
 	// (POST /projects/{project}/sinks/{sink}/test)
 	TestSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
@@ -68863,6 +69747,41 @@ func (siw *ServerInterfaceWrapper) EnableSink(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ReplaySink operation middleware
+func (siw *ServerInterfaceWrapper) ReplaySink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReplaySink(w, r, project, sink)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RotateSinkSecret operation middleware
 func (siw *ServerInterfaceWrapper) RotateSinkSecret(w http.ResponseWriter, r *http.Request) {
 
@@ -68889,6 +69808,41 @@ func (siw *ServerInterfaceWrapper) RotateSinkSecret(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RotateSinkSecret(w, r, project, sink)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SampleSink operation middleware
+func (siw *ServerInterfaceWrapper) SampleSink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SampleSink(w, r, project, sink)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -70556,6 +71510,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/sinks/{sink}", wrapper.UpdateSink)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/enable", wrapper.EnableSink)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/test", wrapper.TestSink)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/sample", wrapper.SampleSink)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/replay", wrapper.ReplaySink)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/rotate-secret", wrapper.RotateSinkSecret)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/webhooks", wrapper.ListInstanceWebhooks)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/webhooks", wrapper.CreateInstanceWebhook)
@@ -85319,6 +86275,123 @@ func (response EnableSink422ApplicationProblemPlusJSONResponse) VisitEnableSinkR
 	return err
 }
 
+type ReplaySinkRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+	Body    *ReplaySinkJSONRequestBody
+}
+
+type ReplaySinkResponseObject interface {
+	VisitReplaySinkResponse(w http.ResponseWriter) error
+}
+
+type ReplaySink200ResponseHeaders struct {
+	ETag *string
+}
+
+type ReplaySink200JSONResponse struct {
+	Body    Sink
+	Headers ReplaySink200ResponseHeaders
+}
+
+func (response ReplaySink200JSONResponse) VisitReplaySinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaySink400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaySink400ApplicationProblemPlusJSONResponse) VisitReplaySinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaySink401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaySink401ApplicationProblemPlusJSONResponse) VisitReplaySinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaySink403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaySink403ApplicationProblemPlusJSONResponse) VisitReplaySinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaySink404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaySink404ApplicationProblemPlusJSONResponse) VisitReplaySinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaySink422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaySink422ApplicationProblemPlusJSONResponse) VisitReplaySinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RotateSinkSecretRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Sink    SinkID     `json:"sink"`
@@ -85408,6 +86481,113 @@ type RotateSinkSecret422ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response RotateSinkSecret422ApplicationProblemPlusJSONResponse) VisitRotateSinkSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SampleSinkRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+	Body    *SampleSinkJSONRequestBody
+}
+
+type SampleSinkResponseObject interface {
+	VisitSampleSinkResponse(w http.ResponseWriter) error
+}
+
+type SampleSink200JSONResponse SinkSampleResult
+
+func (response SampleSink200JSONResponse) VisitSampleSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SampleSink400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SampleSink400ApplicationProblemPlusJSONResponse) VisitSampleSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SampleSink401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response SampleSink401ApplicationProblemPlusJSONResponse) VisitSampleSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SampleSink403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SampleSink403ApplicationProblemPlusJSONResponse) VisitSampleSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SampleSink404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SampleSink404ApplicationProblemPlusJSONResponse) VisitSampleSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SampleSink422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response SampleSink422ApplicationProblemPlusJSONResponse) VisitSampleSinkResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -89147,9 +90327,15 @@ type StrictServerInterface interface {
 	// EnableSink Enable a sink
 	// (POST /projects/{project}/sinks/{sink}/enable)
 	EnableSink(ctx context.Context, request EnableSinkRequestObject) (EnableSinkResponseObject, error)
+	// ReplaySink Replay a sink from a time
+	// (POST /projects/{project}/sinks/{sink}/replay)
+	ReplaySink(ctx context.Context, request ReplaySinkRequestObject) (ReplaySinkResponseObject, error)
 	// RotateSinkSecret Rotate a webhook sink's secret
 	// (POST /projects/{project}/sinks/{sink}/rotate-secret)
 	RotateSinkSecret(ctx context.Context, request RotateSinkSecretRequestObject) (RotateSinkSecretResponseObject, error)
+	// SampleSink Send sample rows to a sink
+	// (POST /projects/{project}/sinks/{sink}/sample)
+	SampleSink(ctx context.Context, request SampleSinkRequestObject) (SampleSinkResponseObject, error)
 	// TestSink Test a saved sink
 	// (POST /projects/{project}/sinks/{sink}/test)
 	TestSink(ctx context.Context, request TestSinkRequestObject) (TestSinkResponseObject, error)
@@ -93376,6 +94562,40 @@ func (sh *strictHandler) EnableSink(w http.ResponseWriter, r *http.Request, proj
 	}
 }
 
+// ReplaySink operation middleware
+func (sh *strictHandler) ReplaySink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID) {
+	var request ReplaySinkRequestObject
+
+	request.Project = project
+	request.Sink = sink
+
+	var body ReplaySinkJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReplaySink(ctx, request.(ReplaySinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReplaySink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReplaySinkResponseObject); ok {
+		if err := validResponse.VisitReplaySinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // RotateSinkSecret operation middleware
 func (sh *strictHandler) RotateSinkSecret(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID) {
 	var request RotateSinkSecretRequestObject
@@ -93396,6 +94616,43 @@ func (sh *strictHandler) RotateSinkSecret(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RotateSinkSecretResponseObject); ok {
 		if err := validResponse.VisitRotateSinkSecretResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SampleSink operation middleware
+func (sh *strictHandler) SampleSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID) {
+	var request SampleSinkRequestObject
+
+	request.Project = project
+	request.Sink = sink
+
+	var body SampleSinkJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SampleSink(ctx, request.(SampleSinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SampleSink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SampleSinkResponseObject); ok {
+		if err := validResponse.VisitSampleSinkResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

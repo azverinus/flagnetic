@@ -62,12 +62,12 @@ func (s *Store) Scope(ctx context.Context, project workspace.ProjectID, keys []s
 // rows of other projects and environments are not in it; a batch short of
 // limit, empty or not, ends past them at the horizon, so the stream's cursor
 // passes them.
-func (s *Store) NextBatch(ctx context.Context, kind sinks.EventKind, scope sinks.Scope, from events.Cursor, limit int) (sinks.Batch, error) {
+func (s *Store) NextBatch(ctx context.Context, kind sinks.EventKind, scope sinks.Scope, from events.Cursor, limit int, until *events.Cursor) (sinks.Batch, error) {
 	table, err := rawTable(kind)
 	if err != nil {
 		return sinks.Batch{}, err
 	}
-	b, err := pgevents.Bound(ctx, s.db(ctx), table, pgScope(scope), from, limit)
+	b, err := pgevents.BoundUntil(ctx, s.db(ctx), table, pgScope(scope), from, until, limit)
 	return sinks.Batch{From: b.From, To: b.To, Rows: b.Rows}, err
 }
 
@@ -102,6 +102,16 @@ func (s *Store) Before(ctx context.Context, kind sinks.EventKind, scope sinks.Sc
 		return events.Cursor{}, false, err
 	}
 	return pgevents.Before(ctx, s.db(ctx), table, pgScope(scope), from)
+}
+
+// Last returns the position of the last row of kind in scope received at or
+// before to, below the snapshot horizon; ok is false when there is none.
+func (s *Store) Last(ctx context.Context, kind sinks.EventKind, scope sinks.Scope, to time.Time) (events.Cursor, bool, error) {
+	table, err := rawTable(kind)
+	if err != nil {
+		return events.Cursor{}, false, err
+	}
+	return pgevents.Last(ctx, s.db(ctx), table, pgScope(scope), to)
 }
 
 // ReadBatch reads the rows of batch b of the stream of kind in scope, with

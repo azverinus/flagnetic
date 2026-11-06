@@ -62,6 +62,15 @@ type Store interface {
 	CreateStream(ctx context.Context, sink sinks.ID, kind sinks.EventKind, at events.Cursor, now time.Time) error
 	// DeleteStream drops the stream of kind of sink with its position.
 	DeleteStream(ctx context.Context, sink sinks.ID, kind sinks.EventKind) error
+	// LockStream reads the stream of kind of sink for the unit of work, which
+	// holds it against the delivery worker's writes; ErrNotFound when the
+	// sink has none.
+	LockStream(ctx context.Context, sink sinks.ID, kind sinks.EventKind) (sinks.Stream, error)
+	// Replay puts the stream of kind of sink as plan has it: the position it
+	// reads on from, applied by the delivery worker before the stream's next
+	// batch, and where a bounded replay stops and returns to. It drops the
+	// batch in flight and the lease and makes the stream due at now.
+	Replay(ctx context.Context, sink sinks.ID, kind sinks.EventKind, plan sinks.ReplayPlan, now time.Time) error
 	// SaveWarnings stores what the last check of sink's target found wrong.
 	SaveWarnings(ctx context.Context, sink sinks.ID, warnings []string) error
 }

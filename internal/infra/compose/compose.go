@@ -600,6 +600,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		EnableSink:       appsinks.NewEnable(sinks),
 		TestSinkConfig:   appsinks.NewTestConfig(sinks),
 		TestSink:         appsinks.NewTest(sinks),
+		SampleSink:       appsinks.NewSample(sinks),
+		ReplaySink:       appsinks.NewReplay(sinks),
 		UpdateSink:       appsinks.NewUpdate(sinks),
 		DeleteSink:       appsinks.NewDelete(sinks),
 		RotateSinkSecret: appsinks.NewRotateSecret(sinks),

@@ -73,7 +73,7 @@ func (d Deps) withLag(ctx context.Context, s sinks.Sink) (sinks.Sink, error) {
 		if !named {
 			break
 		}
-		at, ok, err := d.Rows.OldestUnread(ctx, st.EventKind, scope, st.Cursor)
+		at, ok, err := d.Rows.OldestUnread(ctx, st.EventKind, scope, st.Live())
 		if err != nil {
 			return s, err
 		}

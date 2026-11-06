@@ -79,10 +79,23 @@ func (sc Scope) Where(alias string, first int) (string, []any) {
 // stream of one project passes the other projects' rows then, even with no
 // row of its own to read, rather than scanning them again on every call.
 func Bound(ctx context.Context, db pgxtx.DB, table string, scope Scope, from events.Cursor, limit int) (Batch, error) {
+	return BoundUntil(ctx, db, table, scope, from, nil, limit)
+}
+
+// BoundUntil is Bound for a stream that must not read past until, when it is
+// not nil: a batch ends at or before it, and one short of limit ends at the
+// last row up to it, which is until itself when it names a row of the table.
+func BoundUntil(ctx context.Context, db pgxtx.DB, table string, scope Scope, from events.Cursor, until *events.Cursor, limit int) (Batch, error) {
 	b := Batch{From: from, To: from}
 	where, scoped := scope.Where("", 4)
 	if where != "" {
 		where = " AND " + where
+	}
+	args := append([]any{xidText(from), from.Seq, limit}, scoped...)
+	var capped string
+	if until != nil {
+		capped = " AND (xid, seq) <= ($" + strconv.Itoa(len(args)+1) + "::text::xid8, $" + strconv.Itoa(len(args)+2) + ")"
+		args = append(args, xidText(*until), until.Seq)
 	}
 	// The end is chosen by the xid8 column, never by its text: "10" sorts
 	// before "9" as text, and a cursor stopped short would read rows again.
@@ -96,16 +109,16 @@ func Bound(ctx context.Context, db pgxtx.DB, table string, scope Scope, from eve
 	err := db.QueryRow(ctx, `
 		WITH b AS (
 			SELECT xid, seq FROM `+tbl+`
-			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < pg_snapshot_xmin(pg_current_snapshot())`+where+`
+			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < pg_snapshot_xmin(pg_current_snapshot())`+where+capped+`
 			ORDER BY xid, seq LIMIT $3),
 		e AS (
 			SELECT xid, seq FROM `+tbl+`
-			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < pg_snapshot_xmin(pg_current_snapshot())
+			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < pg_snapshot_xmin(pg_current_snapshot())`+capped+`
 			ORDER BY xid DESC, seq DESC LIMIT 1)
 		SELECT count(*), (SELECT b.xid::text FROM b ORDER BY b.xid DESC, b.seq DESC LIMIT 1),
 			(SELECT b.seq FROM b ORDER BY b.xid DESC, b.seq DESC LIMIT 1),
 			(SELECT e.xid::text FROM e), (SELECT e.seq FROM e)
-		FROM b`, append([]any{xidText(from), from.Seq, limit}, scoped...)...).Scan(&b.Rows, &toXID, &toSeq, &endXID, &endSeq)
+		FROM b`, args...).Scan(&b.Rows, &toXID, &toSeq, &endXID, &endSeq)
 	if err != nil {
 		return Batch{}, fmt.Errorf("choosing a batch of %s: %w", table, err)
 	}
@@ -265,6 +278,32 @@ func Before(ctx context.Context, db pgxtx.DB, table string, scope Scope, from ti
 		return events.Cursor{}, false, fmt.Errorf("finding the first row of %s received at %s: %w", table, from.Format(time.RFC3339), err)
 	}
 	if at, err = cursorOf(xid, seq-1); err != nil {
+		return events.Cursor{}, false, err
+	}
+	return at, true, nil
+}
+
+// Last returns the position of the last row of table in scope received at or
+// before to, of transactions below the snapshot horizon, in the order a stream
+// reads them; ok is false when there is none.
+func Last(ctx context.Context, db pgxtx.DB, table string, scope Scope, to time.Time) (at events.Cursor, ok bool, err error) {
+	where, scoped := scope.Where("", 2)
+	if where != "" {
+		where = " AND " + where
+	}
+	var xid string
+	var seq int64
+	// The column is named for its text apart from its own, as Tail's is.
+	err = db.QueryRow(ctx, `SELECT xid::text AS xid_text, seq FROM `+pgx.Identifier{table}.Sanitize()+`
+		WHERE received_at <= $1 AND xid < pg_snapshot_xmin(pg_current_snapshot())`+where+`
+		ORDER BY xid DESC, seq DESC LIMIT 1`, append([]any{to}, scoped...)...).Scan(&xid, &seq)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return events.Cursor{}, false, nil
+	}
+	if err != nil {
+		return events.Cursor{}, false, fmt.Errorf("finding the last row of %s received at %s: %w", table, to.Format(time.RFC3339), err)
+	}
+	if at, err = cursorOf(xid, seq); err != nil {
 		return events.Cursor{}, false, err
 	}
 	return at, true, nil

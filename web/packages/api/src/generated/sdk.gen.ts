@@ -406,6 +406,9 @@ import type {
   RejectChangeRequestData,
   RejectChangeRequestErrors,
   RejectChangeRequestResponses,
+  ReplaySinkData,
+  ReplaySinkErrors,
+  ReplaySinkResponses,
   RestoreFlagData,
   RestoreFlagErrors,
   RestoreFlagResponses,
@@ -445,6 +448,9 @@ import type {
   RotateWebhookSecretData,
   RotateWebhookSecretErrors,
   RotateWebhookSecretResponses,
+  SampleSinkData,
+  SampleSinkErrors,
+  SampleSinkResponses,
   SendStaleFlagDigestData,
   SendStaleFlagDigestErrors,
   SendStaleFlagDigestResponses,
@@ -5514,6 +5520,81 @@ export const testSink = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/sinks/{sink}/test",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Send sample rows to a sink
+ *
+ * Sends ten sample rows of each requested event kind (`event_kinds`,
+ * every kind the sink exports when absent or empty) to the sink's
+ * target, so that the receiving side can be built before real events
+ * flow. The rows are marked as samples: their identifiers are `sample-1`
+ * to `sample-10`, their keys and unit are `sample` but for the
+ * project's own key, and a webhook sink's envelope carries
+ * `"sample": true`. A disabled or stopped sink can be sampled. It
+ * touches no stream, cursor, count or health. Each kind is answered on
+ * its own, a target that fails as a 200 with `ok` false and why by class,
+ * status and code, never by the target's own words. Audited as
+ * `sink.sampled`. It takes no `If-Match`.
+ *
+ */
+export const sampleSink = <ThrowOnError extends boolean = false>(
+  options: Options<SampleSinkData, ThrowOnError>,
+): RequestResult<SampleSinkResponses, SampleSinkErrors, ThrowOnError> =>
+  (options.client ?? client).post<SampleSinkResponses, SampleSinkErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/sample",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Replay a sink from a time
+ *
+ * Sends the events received since `from` again, in order, to the
+ * requested event kinds' streams (every kind the sink exports when
+ * `event_kinds` is absent or empty), then the live stream goes on. Each
+ * stream goes back to just before the first event received at or after
+ * `from` in the sink's environments. With `to` it stops after the last
+ * event received at or before it and returns to where it was, so that
+ * nothing past `to` is sent twice. A stream with no event in the range is
+ * left as it is. `from` must be within retention (`out_of_retention`) and
+ * `to` must not be before `from` (`invalid_replay_range`). A replay is
+ * applied by the delivery worker before the stream's next batch, which a
+ * disabled or stopped sink starts once it runs again; the batch in flight
+ * is dropped. A replay sent while another bounded one runs still returns
+ * to the position that one would have. Audited as `sink.replayed`. It
+ * takes no `If-Match`.
+ *
+ */
+export const replaySink = <ThrowOnError extends boolean = false>(
+  options: Options<ReplaySinkData, ThrowOnError>,
+): RequestResult<ReplaySinkResponses, ReplaySinkErrors, ThrowOnError> =>
+  (options.client ?? client).post<ReplaySinkResponses, ReplaySinkErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/replay",
     ...options,
     headers: {
       "Content-Type": "application/json",

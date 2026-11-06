@@ -150,6 +150,41 @@ func testResultOut(t appsinks.Tested) SinkTestResult {
 	return out
 }
 
+// SampleSink sends sample rows to a sink's target.
+func (a *api) SampleSink(ctx context.Context, req SampleSinkRequestObject) (SampleSinkResponseObject, error) {
+	cmd := appsinks.SampleCommand{Project: projectID(ctx), Sink: id.FromBytes[sinks.Sink](req.Sink), Request: requestOf(ctx)}
+	if req.Body != nil {
+		cmd.Kinds = eventKindsIn(req.Body.EventKinds)
+	}
+	sampled, err := a.h.SampleSink.Handle(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	out := SinkSampleResult{Results: make([]SinkSampleKindResult, len(sampled))}
+	for i, v := range sampled {
+		out.Results[i] = SinkSampleKindResult{EventKind: string(v.EventKind), Ok: v.Failure == nil}
+		if v.Failure != nil {
+			r := v.Failure.Report()
+			class := SinkFailureClass(r.Class)
+			out.Results[i].Class, out.Results[i].Status, out.Results[i].Code = &class, r.Status, r.Code
+		}
+	}
+	return SampleSink200JSONResponse(out), nil
+}
+
+// ReplaySink sends a sink's history again from a time.
+func (a *api) ReplaySink(ctx context.Context, req ReplaySinkRequestObject) (ReplaySinkResponseObject, error) {
+	b := *req.Body
+	s, err := a.h.ReplaySink.Handle(ctx, appsinks.ReplayCommand{
+		Project: projectID(ctx), Sink: id.FromBytes[sinks.Sink](req.Sink), From: b.From, To: b.To,
+		Kinds: eventKindsIn(b.EventKinds), Request: requestOf(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return ReplaySink200JSONResponse{Body: sinkOut(s), Headers: ReplaySink200ResponseHeaders{ETag: etag(s.Version)}}, nil
+}
+
 // DeleteSink deletes a sink.
 func (a *api) DeleteSink(ctx context.Context, req DeleteSinkRequestObject) (DeleteSinkResponseObject, error) {
 	expected, err := ifMatch(req.Params.IfMatch)

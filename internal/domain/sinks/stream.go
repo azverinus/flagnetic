@@ -59,6 +59,9 @@ type Stream struct {
 	// ConsecutiveFailures is how many calls in a row failed; zero once one
 	// is acknowledged. A stream with any is failing.
 	ConsecutiveFailures int
+	// Stop and Resume are set while a bounded replay runs: the last row it
+	// sends, and the position the stream returns to after it.
+	Stop, Resume *events.Cursor
 }
 
 // Failing reports whether the stream's last call failed.

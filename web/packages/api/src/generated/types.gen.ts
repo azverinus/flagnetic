@@ -3393,6 +3393,56 @@ export type SinkTestResult = {
   warnings: Array<string>;
 };
 
+export type SinkSample = {
+  /**
+   * The event kinds to send samples of; empty or absent for every kind the sink exports.
+   */
+  event_kinds?: Array<string>;
+};
+
+export type SinkSampleResult = {
+  results: Array<SinkSampleKindResult>;
+};
+
+export type SinkSampleKindResult = {
+  event_kind: string;
+  /**
+   * Whether the target acknowledged the sample.
+   */
+  ok: boolean;
+  /**
+   * Why not, when it did not.
+   */
+  class: SinkFailureClass | null;
+  /**
+   * The HTTP status the target answered, when it did.
+   */
+  status: number | null;
+  /**
+   * The protocol's own error code, when the target speaks one.
+   */
+  code: string | null;
+};
+
+export type SinkReplay = {
+  /**
+   * Where the replay starts, a time within retention: the first event
+   * received at or after it is the first sent again.
+   *
+   */
+  from: string;
+  /**
+   * Where it ends: the last event received at or before it is the last
+   * sent again. Absent, the replay runs on into the live stream.
+   *
+   */
+  to?: string;
+  /**
+   * The event kinds to replay; empty or absent for every kind the sink exports.
+   */
+  event_kinds?: Array<string>;
+};
+
 export type SinkCreate = {
   name: string;
   /**
@@ -14754,6 +14804,132 @@ export type TestSinkResponses = {
 };
 
 export type TestSinkResponse = TestSinkResponses[keyof TestSinkResponses];
+
+export type SampleSinkData = {
+  body?: SinkSample;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The sink's identifier.
+     */
+    sink: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks/{sink}/sample";
+};
+
+export type SampleSinkErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type SampleSinkError = SampleSinkErrors[keyof SampleSinkErrors];
+
+export type SampleSinkResponses = {
+  /**
+   * What each event kind's sample found, in the order the kinds are listed.
+   */
+  200: SinkSampleResult;
+};
+
+export type SampleSinkResponse = SampleSinkResponses[keyof SampleSinkResponses];
+
+export type ReplaySinkData = {
+  body: SinkReplay;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The sink's identifier.
+     */
+    sink: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks/{sink}/replay";
+};
+
+export type ReplaySinkErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type ReplaySinkError = ReplaySinkErrors[keyof ReplaySinkErrors];
+
+export type ReplaySinkResponses = {
+  /**
+   * The sink as it is now.
+   */
+  200: Sink;
+};
+
+export type ReplaySinkResponse = ReplaySinkResponses[keyof ReplaySinkResponses];
 
 export type RotateSinkSecretData = {
   body?: never;

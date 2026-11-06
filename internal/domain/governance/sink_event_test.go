@@ -130,7 +130,7 @@ func TestASinkEventsDataHasEveryFieldOfItsTypeEvenWhenTheEntryLacksOne(t *testin
 }
 
 func TestEveryOtherSinkActionIsOnlyAnAuditEntry(t *testing.T) {
-	for _, action := range []string{"sink.created", "sink.updated", "sink.deleted", "sink.secret_rotated", "sink.enabled", "sink.disabled", "sink.tested"} {
+	for _, action := range []string{"sink.created", "sink.updated", "sink.deleted", "sink.secret_rotated", "sink.enabled", "sink.disabled", "sink.tested", "sink.replayed", "sink.sampled"} {
 		e := sinkEntry(action, governance.SinkDeliveryActor, map[string]any{"sink": sinkRef("webhook")})
 
 		if got := types(governance.DeriveEvents(e)); !slices.Equal(got, []string{governance.EventAuditEntry}) {

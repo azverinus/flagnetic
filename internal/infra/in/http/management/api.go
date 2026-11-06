@@ -201,6 +201,8 @@ type Handlers struct {
 	EnableSink       *appsinks.Enable
 	TestSinkConfig   *appsinks.TestConfig
 	TestSink         *appsinks.Test
+	SampleSink       *appsinks.Sample
+	ReplaySink       *appsinks.Replay
 
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment
