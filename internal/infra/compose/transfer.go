@@ -112,6 +112,8 @@ func (e transferExperiments) UpdateExperiment(ctx context.Context, in apptransfe
 	return apptransfer.Effect{Changed: effect.Changed, Environments: effect.Environments}, err
 }
 
+func (e transferExperiments) CheckSalts(ctx context.Context) error { return e.importer.CheckSalts(ctx) }
+
 // transferProjects gives the transfer context the project row lock of the
 // workspace context.
 type transferProjects struct{ projects *pgworkspace.Store }

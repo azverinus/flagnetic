@@ -181,6 +181,10 @@ type ExperimentImport struct {
 type ExperimentsImport interface {
 	CreateExperiment(ctx context.Context, in ExperimentImport) (Effect, error)
 	UpdateExperiment(ctx context.Context, in ExperimentImport) (Effect, error)
+	// CheckSalts refuses two experiments of a project sharing a salt once
+	// every experiment is written: until then one may take a salt another
+	// gives up later in the same import.
+	CheckSalts(ctx context.Context) error
 }
 
 // Owners resolves the owners a document names, who are email addresses.

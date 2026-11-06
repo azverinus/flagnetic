@@ -311,7 +311,10 @@ func (r *importRun) createExperiments(ctx context.Context) error {
 			r.changes.Experiments.Created = append(r.changes.Experiments.Created, e.Key)
 		}
 	}
-	return nil
+	if len(r.doc.Experiments) == 0 {
+		return nil
+	}
+	return r.h.d.Experiments.CheckSalts(ctx)
 }
 
 // configureFlags writes each flag's configuration in each environment the

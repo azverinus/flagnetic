@@ -569,3 +569,43 @@ func TestAnOwnerWhoMayOwnTakesTheExperimentsTheDocumentGivesThem(t *testing.T) {
 	// whatever case it is written.
 	assertNothingChanged(t, mustMerge(t, f.admin, k, d))
 }
+
+func TestDraftsMayHandTheirSaltsToOneAnotherInOneImport(t *testing.T) {
+	f := experimentsToTransfer(t)
+	k := f.project.Key
+	draft := func(key, inclusion, variation string) map[string]any {
+		return map[string]any{
+			"key": key, "name": "Draft " + key, "flag": "checkout_title", "unit_type": "user", "status": "draft",
+			"variations":     []any{map[string]any{"variation": "a", "weight": 5000}, map[string]any{"variation": "b", "weight": 5000}},
+			"inclusion_salt": inclusion, "variation_salt": variation,
+		}
+	}
+	document := func(experiments ...any) map[string]any {
+		return map[string]any{"schema_version": 1, "experiments": experiments}
+	}
+	mustMerge(t, f.admin, k, document(draft("e_one", "00000000000000aa", "00000000000000bb"), draft("e_two", "00000000000000cc", "00000000000000dd")))
+
+	// Two drafts swap their inclusion salts, and a new draft takes the
+	// variation salt one of them gives up, whichever is written first.
+	swapped := document(
+		draft("e_new", "00000000000000ee", "00000000000000bb"),
+		draft("e_one", "00000000000000cc", "00000000000000ff"),
+		draft("e_two", "00000000000000aa", "00000000000000dd"),
+	)
+	for _, dryRun := range []bool{true, false} {
+		r := mustMerge(t, f.admin, k, swapped, mergeOptions{dryRun: dryRun})
+		assertJSON(t, "experiment changes", []any{r.Changes.Experiments.Created, keysOfUpdates(r.Changes.Experiments.Updated)},
+			`[["e_new"], ["e_one", "e_two"]]`)
+	}
+	after := exported(t, f.admin, k)
+	for key, want := range map[string][2]string{
+		"e_new": {"00000000000000ee", "00000000000000bb"},
+		"e_one": {"00000000000000cc", "00000000000000ff"},
+		"e_two": {"00000000000000aa", "00000000000000dd"},
+	} {
+		e := entry(t, after, "experiments", key)
+		if e["inclusion_salt"] != want[0] || e["variation_salt"] != want[1] {
+			t.Errorf("%s salts = %v, %v; want %v", key, e["inclusion_salt"], e["variation_salt"], want)
+		}
+	}
+}

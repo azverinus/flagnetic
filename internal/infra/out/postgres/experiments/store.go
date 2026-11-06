@@ -292,6 +292,29 @@ func (s *Store) UpdateExperiment(ctx context.Context, e experiments.Experiment) 
 	return nil
 }
 
+// DeferSaltChecks makes the database check that no two experiments of a
+// project share a salt only when the unit of work ends, or when
+// CheckSalts asks: until then one experiment may take a salt another is
+// about to give up.
+func (s *Store) DeferSaltChecks(ctx context.Context) error {
+	_, err := s.db(ctx).Exec(ctx, `SET CONSTRAINTS experiments_inclusion_salt, experiments_variation_salt DEFERRED`)
+	if err != nil {
+		return fmt.Errorf("deferring the salt checks: %w", err)
+	}
+	return nil
+}
+
+// CheckSalts checks now that no two experiments of a project share a salt,
+// and from then on at every write, so that a unit of work rolled back is
+// checked as one committed would be.
+func (s *Store) CheckSalts(ctx context.Context) error {
+	_, err := s.db(ctx).Exec(ctx, `SET CONSTRAINTS experiments_inclusion_salt, experiments_variation_salt IMMEDIATE`)
+	if err != nil {
+		return fmt.Errorf("checking the salts of experiments: %w", err)
+	}
+	return nil
+}
+
 // DeleteExperiment deletes the experiment.
 func (s *Store) DeleteExperiment(ctx context.Context, experiment experiments.ExperimentID) error {
 	tag, err := s.db(ctx).Exec(ctx, `DELETE FROM experiments WHERE id = $1`, experiment.Bytes())

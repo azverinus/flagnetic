@@ -673,7 +673,10 @@ func (r *mergeRun) writeExperiments(ctx context.Context) error {
 			r.moveEnvironments(effect.Environments)
 		}
 	}
-	return nil
+	if len(r.plan.Experiments.Created)+len(r.plan.Experiments.Updated) == 0 {
+		return nil
+	}
+	return e.CheckSalts(ctx)
 }
 
 // moveEnvironments notes that the ruleset of each of the environments moves

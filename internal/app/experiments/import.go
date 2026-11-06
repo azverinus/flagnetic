@@ -16,6 +16,14 @@ import (
 type ImportStore interface {
 	ExperimentCreator
 	ExperimentUpdater
+	// DeferSaltChecks lets an experiment of the project take, until
+	// CheckSalts or the end of the unit of work, a salt another still has:
+	// an import may hand one draft's salt to another experiment, or swap two
+	// drafts' salts, in whatever order it writes them.
+	DeferSaltChecks(ctx context.Context) error
+	// CheckSalts refuses, from now on, two experiments of a project sharing
+	// a salt.
+	CheckSalts(ctx context.Context) error
 }
 
 // ImporterDeps are what the Importer runs on.
@@ -95,6 +103,9 @@ func (i *Importer) CreateExperiment(ctx context.Context, cmd ImportCommand) (Imp
 	now := i.d.Recorder.now()
 	err := i.d.Tx.Within(ctx, func(ctx context.Context) error {
 		if err := lockProject(ctx, i.d.Projects, cmd.Project); err != nil {
+			return err
+		}
+		if err := i.d.Store.DeferSaltChecks(ctx); err != nil {
 			return err
 		}
 		in, err := i.facts(ctx, cmd)
@@ -201,6 +212,9 @@ func (i *Importer) UpdateExperiment(ctx context.Context, cmd ImportCommand) (Imp
 		if err := lockProject(ctx, i.d.Projects, cmd.Project); err != nil {
 			return err
 		}
+		if err := i.d.Store.DeferSaltChecks(ctx); err != nil {
+			return err
+		}
 		before, err := i.d.Store.ExperimentByKey(ctx, cmd.Project, cmd.Key)
 		if err != nil {
 			return experimentNotFound(err)
@@ -248,6 +262,15 @@ func (i *Importer) UpdateExperiment(ctx context.Context, cmd ImportCommand) (Imp
 		})
 	})
 	return effect, err
+}
+
+// CheckSalts checks, once the import has written every experiment, that no
+// two experiments of a project share a salt, which the writes let wait so
+// that one may take a salt another gives up later. Checked here rather than
+// when the unit of work commits, a dry run, which never commits, is checked
+// as the import it previews.
+func (i *Importer) CheckSalts(ctx context.Context) error {
+	return i.d.Tx.Within(ctx, i.d.Store.CheckSalts)
 }
 
 // collectedRulesets notes the environments whose ruleset a write would move
