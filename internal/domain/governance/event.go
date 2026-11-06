@@ -424,6 +424,8 @@ var entryOnlyActions = []string{
 	"member.reactivated",
 	"member.updated",
 	"password.changed",
+	"password.reset",
+	"password.reset_issued",
 	"project.created",
 	"project.deleted",
 	"project.updated",

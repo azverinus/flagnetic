@@ -288,6 +288,27 @@ export const zInvitationAcceptance = z.object({
 });
 
 /**
+ * A password reset just issued. Its link is shown this once.
+ */
+export const zIssuedPasswordReset = z.object({
+  url: z.string(),
+  expires_at: z.iso.datetime(),
+});
+
+/**
+ * What a password reset's link opens.
+ */
+export const zPasswordReset = z.object({
+  email: z.string(),
+  display_name: z.string(),
+  expires_at: z.iso.datetime(),
+});
+
+export const zPasswordResetCompletion = z.object({
+  password: z.string(),
+});
+
+/**
  * The member the credential acts for; absent for a project token, which acts for none.
  */
 export const zMeMember = z.object({
@@ -3011,6 +3032,26 @@ export const zAcceptInvitationPath = z.object({
  */
 export const zAcceptInvitationResponse = zMe;
 
+export const zGetPasswordResetPath = z.object({
+  secret: z.string(),
+});
+
+/**
+ * The password reset.
+ */
+export const zGetPasswordResetResponse = zPasswordReset;
+
+export const zCompletePasswordResetBody = zPasswordResetCompletion;
+
+export const zCompletePasswordResetPath = z.object({
+  secret: z.string(),
+});
+
+/**
+ * Reset and signed in. The body is the caller, as `GET /me` answers it.
+ */
+export const zCompletePasswordResetResponse = zMe;
+
 /**
  * The caller.
  */
@@ -4479,6 +4520,15 @@ export const zReissueInvitationPath = z.object({
  * The member with their fresh invitation.
  */
 export const zReissueInvitationResponse = zMemberInvitation;
+
+export const zIssuePasswordResetPath = z.object({
+  member: z.string(),
+});
+
+/**
+ * The password reset's one-time link.
+ */
+export const zIssuePasswordResetResponse = zIssuedPasswordReset;
 
 export const zRevokeMemberSessionsPath = z.object({
   member: z.string(),
