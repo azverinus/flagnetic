@@ -5168,6 +5168,11 @@ msgstr "Расписание"
 msgid "Scheduled"
 msgstr "По расписанию"
 
+#. A kind of actor in the audit log.
+#: src/lib/audit.ts
+msgid "SCIM token"
+msgstr "Токен SCIM"
+
 #: src/lib/problem-messages.ts
 msgid "SCIM tokens"
 msgstr "токены SCIM"

@@ -82,6 +82,9 @@ import type {
   CreateProjectTokenData,
   CreateProjectTokenErrors,
   CreateProjectTokenResponses,
+  CreateScimTokenData,
+  CreateScimTokenErrors,
+  CreateScimTokenResponses,
   CreateSdkKeyData,
   CreateSdkKeyErrors,
   CreateSdkKeyResponses,
@@ -358,6 +361,9 @@ import type {
   ListRolesData,
   ListRolesErrors,
   ListRolesResponses,
+  ListScimTokensData,
+  ListScimTokensErrors,
+  ListScimTokensResponses,
   ListSdkInventoryData,
   ListSdkInventoryErrors,
   ListSdkInventoryResponses,
@@ -463,6 +469,9 @@ import type {
   RevokeProjectTokenData,
   RevokeProjectTokenErrors,
   RevokeProjectTokenResponses,
+  RevokeScimTokenData,
+  RevokeScimTokenErrors,
+  RevokeScimTokenResponses,
   RevokeSdkKeyData,
   RevokeSdkKeyErrors,
   RevokeSdkKeyResponses,
@@ -4979,6 +4988,87 @@ export const testAuthProvider = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/instance/auth-providers/{provider}/test",
+    ...options,
+  });
+
+/**
+ * The instance's SCIM tokens
+ *
+ * Every SCIM token, the newest first, revoked and expired ones included,
+ * by their hint and the auth provider each is bound to: a token's value
+ * is shown only when it is created.
+ *
+ */
+export const listScimTokens = <ThrowOnError extends boolean = false>(
+  options?: Options<ListScimTokensData, ThrowOnError>,
+): RequestResult<ListScimTokensResponses, ListScimTokensErrors, ThrowOnError> =>
+  (options?.client ?? client).get<ListScimTokensResponses, ListScimTokensErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/scim-tokens",
+    ...options,
+  });
+
+/**
+ * Create a SCIM token
+ *
+ * Creates a SCIM token an identity provider presents to `/scim/v2` and
+ * answers its value, shown this once and never again. The token is bound
+ * for life to the auth provider named by `provider`: it reaches that
+ * provider's provisioned members and groups and nothing else, and it is
+ * refused while the provider is disabled. An unknown provider and an expiry
+ * that is not in the future are refused 422 `invalid_scim_token`, naming
+ * the field. Only a session creates a token, so a leaked
+ * credential can never multiply itself. Audited `scim_token.created`.
+ *
+ */
+export const createScimToken = <ThrowOnError extends boolean = false>(
+  options: Options<CreateScimTokenData, ThrowOnError>,
+): RequestResult<CreateScimTokenResponses, CreateScimTokenErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateScimTokenResponses, CreateScimTokenErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/scim-tokens",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Revoke a SCIM token
+ *
+ * Revokes the token, which `/scim/v2` refuses from then on. A token
+ * already revoked, or an identifier that names none, is not found.
+ * Audited `scim_token.revoked`.
+ *
+ */
+export const revokeScimToken = <ThrowOnError extends boolean = false>(
+  options: Options<RevokeScimTokenData, ThrowOnError>,
+): RequestResult<RevokeScimTokenResponses, RevokeScimTokenErrors, ThrowOnError> =>
+  (options.client ?? client).delete<RevokeScimTokenResponses, RevokeScimTokenErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/scim-tokens/{token}",
     ...options,
   });
 

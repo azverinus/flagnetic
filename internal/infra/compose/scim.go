@@ -109,7 +109,7 @@ func (a scimMembers) SetActive(ctx context.Context, cmd appidentity.SetUserActiv
 	return provisionedOf(m), scimRefusal(err)
 }
 
-// providerProvisioned names "provisioned_members" among what keeps a provider
+// providerProvisioned names "provisioned members" among what keeps a provider
 // from being deleted while it holds members.
 type providerProvisioned struct {
 	providers appidentity.ProviderStore
@@ -127,7 +127,7 @@ func (p providerProvisioned) ProviderUses(ctx context.Context, provider identity
 	if err != nil || !held {
 		return nil, err
 	}
-	return []string{"provisioned_members"}, nil
+	return []string{"provisioned members"}, nil
 }
 
 // sourceThrottle lets the identity context count the failed attempts of an

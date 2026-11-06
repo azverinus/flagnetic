@@ -566,8 +566,8 @@ func TestAProviderWithTokensOrProvisionedMembersIsNotDeleted(t *testing.T) {
 	created := e.createToken(t, management.ScimTokenCreate{Provider: withToken})
 	res := remove(withToken)
 	p := assertProblem(t, "a provider with a token", res.StatusCode(), res.Body, http.StatusConflict, "provider_in_use")
-	if p.UsedBy == nil || !strings.Contains(strings.Join(*p.UsedBy, ","), "scim_tokens") {
-		t.Errorf("used_by = %v, want scim_tokens", p.UsedBy)
+	if p.UsedBy == nil || !strings.Contains(strings.Join(*p.UsedBy, ","), "SCIM tokens") {
+		t.Errorf("used_by = %v, want SCIM tokens", p.UsedBy)
 	}
 	if r, err := e.browser.RevokeScimTokenWithResponse(t.Context(), created.Token.Id.String()); err != nil || r.StatusCode() != http.StatusNoContent {
 		t.Fatalf("revoking: %v, %d", err, r.StatusCode())
@@ -589,8 +589,8 @@ func TestAProviderWithTokensOrProvisionedMembersIsNotDeleted(t *testing.T) {
 	}
 	res = remove(withMember)
 	p = assertProblem(t, "a provider with a provisioned member", res.StatusCode(), res.Body, http.StatusConflict, "provider_in_use")
-	if p.UsedBy == nil || !strings.Contains(strings.Join(*p.UsedBy, ","), "provisioned_members") {
-		t.Errorf("used_by = %v, want provisioned_members", p.UsedBy)
+	if p.UsedBy == nil || !strings.Contains(strings.Join(*p.UsedBy, ","), "provisioned members") {
+		t.Errorf("used_by = %v, want provisioned members", p.UsedBy)
 	}
 }
 

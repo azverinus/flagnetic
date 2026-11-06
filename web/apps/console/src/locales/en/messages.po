@@ -5168,6 +5168,11 @@ msgstr "Schedule"
 msgid "Scheduled"
 msgstr "Scheduled"
 
+#. A kind of actor in the audit log.
+#: src/lib/audit.ts
+msgid "SCIM token"
+msgstr "SCIM token"
+
 #: src/lib/problem-messages.ts
 msgid "SCIM tokens"
 msgstr "SCIM tokens"

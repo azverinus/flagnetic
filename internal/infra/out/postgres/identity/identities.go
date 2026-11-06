@@ -56,7 +56,7 @@ func (s *Store) RecordIdentitySignIn(ctx context.Context, i identity.ID, at time
 }
 
 // ProviderUses names "identities" when any identity is linked through
-// provider, and "scim_tokens" while it holds a token not revoked.
+// provider, and "SCIM tokens" while it holds a token not revoked.
 func (s *Store) ProviderUses(ctx context.Context, provider identity.ProviderID) ([]string, error) {
 	var identities, tokens bool
 	err := s.db(ctx).QueryRow(ctx, `
@@ -70,7 +70,7 @@ func (s *Store) ProviderUses(ctx context.Context, provider identity.ProviderID) 
 		uses = append(uses, "identities")
 	}
 	if tokens {
-		uses = append(uses, "scim_tokens")
+		uses = append(uses, "SCIM tokens")
 	}
 	return uses, nil
 }

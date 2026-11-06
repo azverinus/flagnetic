@@ -203,3 +203,108 @@ func TestAnInstanceAdminAProviderMadeIsDemotedOnlyByThatProvider(t *testing.T) {
 		t.Errorf("demoting an instance admin made by hand = %+v, %v", demoted, err)
 	}
 }
+
+func provisioned(t *testing.T) access.Member {
+	t.Helper()
+	m, err := access.NewSCIMMember(id.New[access.Member](newIDs()), " Jo@Example.com ", " Jo Doe ", "okta", "ext-1", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m
+}
+
+func TestAMemberASCIMTokenProvisionsIsActiveAndBelongsToItsProvider(t *testing.T) {
+	m := provisioned(t)
+	if m.Email != "Jo@Example.com" || m.DisplayName != "Jo Doe" || m.Status != access.MemberActive || m.InstanceAdmin ||
+		m.Provider != "okta" || m.ExternalID != "ext-1" || !m.Provisioned() || !m.CreatedAt.Equal(now) {
+		t.Errorf("member = %+v", m)
+	}
+	named, err := access.NewSCIMMember(id.New[access.Member](newIDs()), "jo@example.com", " ", "okta", "", now)
+	if err != nil || named.DisplayName != "jo@example.com" || named.ExternalID != "" {
+		t.Errorf("a member without a name = %+v, %v; want them named after their email", named, err)
+	}
+	for name, c := range map[string]struct{ email, display string }{
+		"a bad email": {"nobody", "x"}, "a long name": {"jo@example.com", strings.Repeat("n", 201)},
+	} {
+		if _, err := access.NewSCIMMember(id.New[access.Member](newIDs()), c.email, c.display, "okta", "", now); !apperrors.IsKind(err, apperrors.KindInvalid) {
+			t.Errorf("%s = %v, want an invalid refusal", name, err)
+		}
+	}
+}
+
+func TestOnlyAnActiveMemberNobodyProvisionsAndWhoIsNoInstanceAdminIsAdoptable(t *testing.T) {
+	active := access.Member{Status: access.MemberActive}
+	for name, c := range map[string]struct {
+		m    access.Member
+		want bool
+	}{
+		"active":                  {active, true},
+		"an instance admin":       {access.Member{Status: access.MemberActive, InstanceAdmin: true}, false},
+		"invited":                 {access.Member{Status: access.MemberInvited}, false},
+		"deactivated":             {access.Member{Status: access.MemberDeactivated}, false},
+		"provisioned already":     {access.Member{Status: access.MemberActive, Provider: "okta"}, false},
+		"provisioned, same again": {access.Member{Status: access.MemberActive, Provider: "okta", ExternalID: "x"}, false},
+	} {
+		if got := c.m.Adoptable(); got != c.want {
+			t.Errorf("%s: Adoptable = %v, want %v", name, got, c.want)
+		}
+	}
+	adopted, err := active.Adopted(" New@Example.com ", "New Name", "okta", "ext-9")
+	if err != nil || adopted.Email != "New@Example.com" || adopted.DisplayName != "New Name" || adopted.Provider != "okta" ||
+		adopted.ExternalID != "ext-9" || adopted.Status != access.MemberActive {
+		t.Errorf("Adopted = %+v, %v", adopted, err)
+	}
+	if e, ok := apperrors.From(access.ErrNotAdoptable); !ok || e.Kind != apperrors.KindConflict {
+		t.Errorf("ErrNotAdoptable = %v", access.ErrNotAdoptable)
+	}
+}
+
+func TestADirectorySyncsEmailAndNameWithinTheBoundsOfAnyMember(t *testing.T) {
+	m := provisioned(t)
+	email, name := " Moved@Example.com ", "  "
+	synced, err := m.Synced(&email, &name)
+	if err != nil || synced.Email != "Moved@Example.com" || synced.DisplayName != "Moved@Example.com" {
+		t.Errorf("Synced = %+v, %v; want the email and, without a name, the email as the name", synced, err)
+	}
+	left, err := m.Synced(nil, nil)
+	if err != nil || left != m {
+		t.Errorf("Synced of nothing = %+v, %v; want the member as they are", left, err)
+	}
+	bad := "nobody"
+	if _, err = m.Synced(&bad, nil); !apperrors.IsKind(err, apperrors.KindInvalid) {
+		t.Errorf("Synced to a bad email = %v, want an invalid refusal", err)
+	}
+}
+
+func TestAProvisionedMembersEmailAndNameAreRefusedToTheManagementAPI(t *testing.T) {
+	m := provisioned(t)
+	other, same := "someone-else@example.com", " Jo Doe "
+	for name, change := range map[string]access.MemberChange{
+		"another email": {Email: &other}, "another name": {DisplayName: &other},
+	} {
+		if _, err := m.Edited(change); !isProvisioned(err) {
+			t.Errorf("Edited(%s) = %v, want member_provisioned", name, err)
+		}
+		if _, err := m.Profiled(access.ProfileChange{DisplayName: change.DisplayName}, []string{"en"}); change.DisplayName != nil && !isProvisioned(err) {
+			t.Errorf("Profiled(%s) = %v, want member_provisioned", name, err)
+		}
+	}
+	admin := true
+	if got, err := m.Edited(access.MemberChange{Email: &m.Email, DisplayName: &same, InstanceAdmin: &admin}); err != nil || !got.InstanceAdmin {
+		t.Errorf("Edited with what is so and a promotion = %+v, %v; want only the promotion", got, err)
+	}
+	locale := "en"
+	if got, err := m.Profiled(access.ProfileChange{Locale: &locale}, []string{"en"}); err != nil || got.Locale != "en" {
+		t.Errorf("Profiled with a locale = %+v, %v; the language is the member's own", got, err)
+	}
+	var plain access.Member
+	plain.Email, plain.DisplayName = "a@example.com", "A"
+	if _, err := plain.Edited(access.MemberChange{Email: &other}); err != nil {
+		t.Errorf("Edited of a member nobody provisions = %v", err)
+	}
+}
+
+func isProvisioned(err error) bool {
+	e, ok := apperrors.From(err)
+	return ok && e.Kind == apperrors.KindConflict && e.Code == "member_provisioned"
+}

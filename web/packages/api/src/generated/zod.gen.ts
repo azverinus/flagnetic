@@ -203,6 +203,7 @@ export const zMember = z.object({
   display_name: z.string(),
   status: zMemberStatus,
   instance_admin: z.boolean(),
+  provider: z.string().nullable(),
   created_at: z.iso.datetime(),
   last_sign_in_at: z.iso.datetime().nullable(),
   project_count: z.int(),
@@ -521,6 +522,36 @@ export const zCreatedApiToken = z.object({
 });
 
 /**
+ * A SCIM token, by its hint; its value is shown only when it is created.
+ */
+export const zScimToken = z.object({
+  id: z.uuid(),
+  provider: z.string(),
+  hint: z.string(),
+  expires_at: z.iso.datetime().nullable(),
+  created_at: z.iso.datetime(),
+  last_used_at: z.iso.datetime().nullable(),
+  revoked_at: z.iso.datetime().nullable(),
+});
+
+export const zScimTokenList = z.object({
+  items: z.array(zScimToken),
+});
+
+export const zScimTokenCreate = z.object({
+  provider: z.string(),
+  expires_at: z.iso.datetime().nullish(),
+});
+
+/**
+ * A SCIM token just created, with its value.
+ */
+export const zCreatedScimToken = z.object({
+  token: zScimToken,
+  value: z.string(),
+});
+
+/**
  * A token belonging to a project, by its hint; its value is shown only when it is created.
  */
 export const zProjectToken = z.object({
@@ -778,7 +809,7 @@ export const zAttributePatch = z.object({
   description: zDescription.optional(),
 });
 
-export const zActorKind = z.enum(["member", "token", "cli", "system", "sso"]);
+export const zActorKind = z.enum(["member", "token", "cli", "system", "sso", "scim"]);
 
 export const zActor = z.object({
   kind: zActorKind,
@@ -4700,6 +4731,27 @@ export const zTestAuthProviderPath = z.object({
  * What the discovery document says.
  */
 export const zTestAuthProviderResponse = zAuthProviderTest;
+
+/**
+ * The tokens.
+ */
+export const zListScimTokensResponse = zScimTokenList;
+
+export const zCreateScimTokenBody = zScimTokenCreate;
+
+/**
+ * The token, with its value.
+ */
+export const zCreateScimTokenResponse = zCreatedScimToken;
+
+export const zRevokeScimTokenPath = z.object({
+  token: z.string(),
+});
+
+/**
+ * Revoked.
+ */
+export const zRevokeScimTokenResponse = z.void();
 
 /**
  * Removed.
