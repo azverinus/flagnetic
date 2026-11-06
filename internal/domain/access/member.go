@@ -49,9 +49,27 @@ type Member struct {
 	InstanceAdminProvider string
 	// Locale is the console language the member chose, or "" to follow the
 	// browser.
-	Locale    string
-	CreatedAt time.Time
+	Locale string
+	// Provider is the slug of the auth provider whose SCIM token created or
+	// adopted the member, "" for a member nobody provisioned. A provisioned
+	// member's email, name and status follow that provider.
+	Provider string
+	// ExternalID is the provider's own identifier of the person, "" for none;
+	// unique among the provider's members, and what a sign-in through the
+	// provider is linked by.
+	ExternalID string
+	CreatedAt  time.Time
 }
+
+// Provisioned reports whether an identity provider created or adopted the
+// member through SCIM, so that its directory decides the member's email, name
+// and status.
+func (m Member) Provisioned() bool { return m.Provider != "" }
+
+// ErrMemberProvisioned refuses changing by hand what the identity provider
+// that provisioned a member decides: their email, name and status.
+var ErrMemberProvisioned = apperrors.Conflict("member_provisioned",
+	"the member is provisioned by an identity provider, which decides their email, name and status; change them there")
 
 // Bounds of a member's fields.
 const (
@@ -100,6 +118,74 @@ func NewProvisionedMember(memberID MemberID, email, displayName string, now time
 	return Member{ID: memberID, Email: email, DisplayName: displayName, Status: MemberActive, CreatedAt: now}, nil
 }
 
+// NewSCIMMember returns the active member an identity provider provisions
+// through SCIM, without a password: the provider's directory is how they
+// sign in. Without a display name the member is named after their email.
+func NewSCIMMember(memberID MemberID, email, displayName, provider, externalID string, now time.Time) (Member, error) {
+	email = strings.TrimSpace(email)
+	if _, err := checkEmail(email); err != nil {
+		return Member{}, err
+	}
+	displayName = strings.TrimSpace(displayName)
+	if displayName == "" {
+		displayName = email
+	}
+	if err := checkDisplayName(displayName); err != nil {
+		return Member{}, err
+	}
+	return Member{
+		ID: memberID, Email: email, DisplayName: displayName, Status: MemberActive, Provider: provider, ExternalID: externalID, CreatedAt: now,
+	}, nil
+}
+
+// ErrNotAdoptable refuses adopting a member an identity provider may not take
+// over: an instance admin, whom no directory decides; one another provider (or
+// this one) provisions already; one who is not active, whose invitation or
+// offboarding is someone's decision.
+var ErrNotAdoptable = apperrors.Conflict("not_adoptable", "the member cannot be adopted by an identity provider")
+
+// Adoptable reports whether an identity provider may adopt m: they are active,
+// no instance admin, and nobody provisions them.
+func (m Member) Adoptable() bool {
+	return m.Status == MemberActive && !m.InstanceAdmin && !m.Provisioned()
+}
+
+// Adopted returns m, a member the instance already knew, as the provider
+// whose SCIM token adopts them provisions them from now on: the directory's
+// email, name and external ID replace theirs.
+func (m Member) Adopted(email, displayName, provider, externalID string) (Member, error) {
+	adopted, err := m.Synced(&email, &displayName)
+	if err != nil {
+		return Member{}, err
+	}
+	adopted.Provider, adopted.ExternalID = provider, externalID
+	return adopted, nil
+}
+
+// Synced returns m with the email and display name a directory states,
+// trimmed and held to the bounds of a new member's; a nil one is left as it
+// is.
+func (m Member) Synced(email, displayName *string) (Member, error) {
+	if email != nil {
+		e := strings.TrimSpace(*email)
+		if _, err := checkEmail(e); err != nil {
+			return Member{}, err
+		}
+		m.Email = e
+	}
+	if displayName != nil {
+		name := strings.TrimSpace(*displayName)
+		if name == "" {
+			name = m.Email
+		}
+		if err := checkDisplayName(name); err != nil {
+			return Member{}, err
+		}
+		m.DisplayName = name
+	}
+	return m, nil
+}
+
 // checkEmail accepts one address of the form local@domain without spaces and
 // returns its local part. Whether the address receives mail is not judged:
 // that would take sending some.
@@ -144,6 +230,9 @@ type MemberChange struct {
 // and held to the bounds of a new member's. Whether another member holds the
 // email is the store's to judge.
 func (m Member) Edited(change MemberChange) (Member, error) {
+	if m.Provisioned() && (differs(change.Email, m.Email) || differs(change.DisplayName, m.DisplayName)) {
+		return Member{}, ErrMemberProvisioned
+	}
 	if change.Email != nil {
 		email := strings.TrimSpace(*change.Email)
 		if _, err := checkEmail(email); err != nil {
@@ -167,6 +256,11 @@ func (m Member) Edited(change MemberChange) (Member, error) {
 	return m, nil
 }
 
+// differs reports whether a change names a value other than current.
+func differs(change *string, current string) bool {
+	return change != nil && strings.TrimSpace(*change) != current
+}
+
 // ProfileChange is a member's edit of themself; a nil field is left as it
 // is.
 type ProfileChange struct {
@@ -180,6 +274,9 @@ type ProfileChange struct {
 // languages, or "" to follow the browser. The email and the instance admin
 // switch are an instance admin's to change, never the member's own.
 func (m Member) Profiled(change ProfileChange, offered []string) (Member, error) {
+	if m.Provisioned() && differs(change.DisplayName, m.DisplayName) {
+		return Member{}, ErrMemberProvisioned
+	}
 	if change.DisplayName != nil {
 		name := strings.TrimSpace(*change.DisplayName)
 		if err := checkDisplayName(name); err != nil {

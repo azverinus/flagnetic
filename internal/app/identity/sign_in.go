@@ -111,6 +111,9 @@ type Members interface {
 	MemberByEmail(ctx context.Context, email string) (MemberRecord, bool, error)
 	// MemberByID returns the member; false when none has the identifier.
 	MemberByID(ctx context.Context, member identity.MemberID) (MemberRecord, bool, error)
+	// MemberByExternalID returns the member the provider with this slug
+	// provisioned with externalID as their external ID; false when none.
+	MemberByExternalID(ctx context.Context, provider, externalID string) (MemberRecord, bool, error)
 	// ProvisionMember creates an active member without a password and records
 	// that provider provisioned them.
 	ProvisionMember(ctx context.Context, email, displayName string, kind identity.Kind, provider, requestID string) (MemberRecord, error)
@@ -481,7 +484,16 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 			member, in.Linked = m, &m.KnownMember
 		}
 	}
-	if in.Linked == nil && claims.Email != "" {
+	if in.Linked == nil && claims.Subject != "" {
+		m, ok, memberErr := h.d.Members.MemberByExternalID(ctx, p.Slug, claims.Subject)
+		if memberErr != nil {
+			return secret.String{}, memberErr
+		}
+		if ok {
+			member, in.Provisioned = m, &m.KnownMember
+		}
+	}
+	if in.Linked == nil && in.Provisioned == nil && claims.Email != "" {
 		m, ok, memberErr := h.d.Members.MemberByEmail(ctx, claims.Email)
 		if memberErr != nil {
 			return secret.String{}, memberErr
@@ -492,7 +504,7 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 	}
 	res, err := identity.Resolve(in)
 	if err != nil {
-		known := in.Linked != nil || (in.ByEmail != nil && p.Vouches(claims))
+		known := in.Linked != nil || in.Provisioned != nil || (in.ByEmail != nil && p.Vouches(claims))
 		return secret.String{}, &unresolved{err: err, member: member, known: known}
 	}
 	now := h.d.now()
@@ -502,7 +514,7 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 			return secret.String{}, err
 		}
 		fallthrough
-	case identity.LinkByEmail:
+	case identity.LinkByEmail, identity.LinkProvisioned:
 		linked = identity.Identity{
 			ID: id.New[identity.Identity](h.d.IDs), Provider: p.ID, Subject: claims.Subject, Member: member.ID, LinkedAt: now,
 		}

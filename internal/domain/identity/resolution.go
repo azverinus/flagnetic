@@ -48,6 +48,9 @@ const (
 	SignInLinked ResolveAction = iota + 1
 	// LinkByEmail links the subject to the active member holding its email.
 	LinkByEmail
+	// LinkProvisioned links the subject to the member the provider's directory
+	// provisioned with it as their external ID.
+	LinkProvisioned
 	// Provision creates an active member for the subject and links it.
 	Provision
 )
@@ -59,6 +62,10 @@ type ResolveInput struct {
 	// Linked is the member the subject is linked to at the provider, nil when
 	// it is linked to none.
 	Linked *KnownMember
+	// Provisioned is the member the provider provisioned through SCIM whose
+	// external ID is the subject; nil when there is none. Only looked for when
+	// the subject is linked to no one.
+	Provisioned *KnownMember
 	// ByEmail is the member holding Claims.Email, whatever its case; nil when
 	// none does.
 	ByEmail *KnownMember
@@ -76,12 +83,15 @@ type Resolution struct {
 //
 //  1. the subject is linked: that member, however the email reads now, and no
 //     provider domain is asked for, since the link itself is the proof;
-//  2. the email is not one the provider vouches for (in its domains, and
+//  2. the subject is the external ID of a member the provider provisioned: that
+//     member, active, however the email reads and whether or not it is the
+//     provider's to vouch for: the directory named the person itself;
+//  3. the email is not one the provider vouches for (in its domains, and
 //     verified when the provider requires it): no member;
-//  3. a member holds the email: a deactivated one is refused as such, an
+//  4. a member holds the email: a deactivated one is refused as such, an
 //     active one is linked when the provider links by email, and an invited
 //     one is not signed in (their invitation is how they arrive);
-//  4. the provider provisions: a new member.
+//  5. the provider provisions: a new member.
 //
 // Anything else is ErrMemberNotFound; a deactivated member is
 // ErrMemberDeactivated.
@@ -92,6 +102,15 @@ func Resolve(in ResolveInput) (Resolution, error) {
 		}
 		if l.Status == MemberActive {
 			return Resolution{Action: SignInLinked, Member: l.ID}, nil
+		}
+		return Resolution{}, ErrMemberNotFound
+	}
+	if p := in.Provisioned; p != nil {
+		switch p.Status {
+		case MemberDeactivated:
+			return Resolution{}, ErrMemberDeactivated
+		case MemberActive:
+			return Resolution{Action: LinkProvisioned, Member: p.ID}, nil
 		}
 		return Resolution{}, ErrMemberNotFound
 	}

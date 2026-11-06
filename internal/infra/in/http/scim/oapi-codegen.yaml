@@ -1,0 +1,11 @@
+# Generates the SCIM API's models, standard-library server interface and
+# client from api/scim.yaml (`task generate`). Not the strict server: how a
+# body is read, and how a patch applies, is ours to decide.
+package: scim
+output: api.gen.go
+generate:
+  models: true
+  std-http-server: true
+  client: true
+compatibility:
+  always-prefix-enum-values: true

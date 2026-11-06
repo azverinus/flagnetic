@@ -299,35 +299,48 @@ func NewDeactivateMember(tx Transactor, store DeactivationStore, audit AuditLog,
 func (h *DeactivateMember) Handle(ctx context.Context, member access.MemberID, req governance.Request) (MemberView, error) {
 	return changeMember(ctx, h.tx, h.store, h.audit, h.clock, h.ids, req, member,
 		func(ctx context.Context, before access.Member, _ bool, now time.Time) (access.Member, []governance.Record, error) {
-			if before.Status == access.MemberDeactivated {
-				return before, nil, nil
+			if before.Provisioned() {
+				return access.Member{}, nil, access.ErrMemberProvisioned
 			}
-			// A refusal of the outcome rolls the revocations back with it.
-			after := before.Deactivated()
-			sessions, err := h.store.RevokeMemberSessions(ctx, member, now)
-			if err != nil {
-				return access.Member{}, nil, err
-			}
-			tokens, err := h.store.RevokePersonalTokens(ctx, member, now)
-			if err != nil {
-				return access.Member{}, nil, err
-			}
-			if _, err = h.store.ConsumeInvitations(ctx, member, now); err != nil {
-				return access.Member{}, nil, err
-			}
-			if _, err = h.store.ConsumePasswordResets(ctx, member, now); err != nil {
-				return access.Member{}, nil, err
-			}
-			dropped, err := dropInvitationGrants(ctx, h.store, after, workspace.ProjectID{})
-			if err != nil {
-				return access.Member{}, nil, err
-			}
-			return after, append([]governance.Record{{
-				Action: "member.deactivated", Entity: memberEntity(after),
-				Before: map[string]any{"status": before.Status},
-				After:  map[string]any{"status": after.Status, "sessions_revoked": sessions, "tokens_revoked": tokens},
-			}}, dropped...), nil
+			return deactivateMember(ctx, h.store, before, now)
 		})
+}
+
+// deactivateMember returns before offboarded, with the audit records of it,
+// after revoking every session and personal access token before holds and
+// consuming their open invitations and password resets. A member already
+// deactivated is returned as they are. The invitations before issued lose
+// their grants. A refusal of the outcome, such as leaving the instance
+// without an instance admin, rolls the revocations back with the unit of
+// work.
+func deactivateMember(ctx context.Context, store DeactivationStore, before access.Member, now time.Time) (access.Member, []governance.Record, error) {
+	if before.Status == access.MemberDeactivated {
+		return before, nil, nil
+	}
+	after := before.Deactivated()
+	sessions, err := store.RevokeMemberSessions(ctx, before.ID, now)
+	if err != nil {
+		return access.Member{}, nil, err
+	}
+	tokens, err := store.RevokePersonalTokens(ctx, before.ID, now)
+	if err != nil {
+		return access.Member{}, nil, err
+	}
+	if _, err = store.ConsumeInvitations(ctx, before.ID, now); err != nil {
+		return access.Member{}, nil, err
+	}
+	if _, err = store.ConsumePasswordResets(ctx, before.ID, now); err != nil {
+		return access.Member{}, nil, err
+	}
+	dropped, err := dropInvitationGrants(ctx, store, after, workspace.ProjectID{})
+	if err != nil {
+		return access.Member{}, nil, err
+	}
+	return after, append([]governance.Record{{
+		Action: "member.deactivated", Entity: memberEntity(after),
+		Before: map[string]any{"status": before.Status},
+		After:  map[string]any{"status": after.Status, "sessions_revoked": sessions, "tokens_revoked": tokens},
+	}}, dropped...), nil
 }
 
 // ReactivationStore is what bringing a member back needs.
@@ -361,6 +374,9 @@ func (h *ReactivateMember) Handle(ctx context.Context, member access.MemberID, r
 	var issued *IssuedInvitation
 	view, err := changeMember(ctx, h.tx, h.store, h.audit, h.clock, h.ids, req, member,
 		func(ctx context.Context, before access.Member, holdsPassword bool, now time.Time) (access.Member, []governance.Record, error) {
+			if before.Provisioned() {
+				return access.Member{}, nil, access.ErrMemberProvisioned
+			}
 			if before.Status != access.MemberDeactivated {
 				return before, nil, nil
 			}

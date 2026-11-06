@@ -28,6 +28,8 @@ const (
 	// ActorSSO is an auth provider: its group mappings grant and revoke access
 	// when a person signs in through it or an instance admin replaces them.
 	ActorSSO ActorKind = "sso"
+	// ActorSCIM is a SCIM token: an identity provider provisioning members.
+	ActorSCIM ActorKind = "scim"
 )
 
 // Actor is who an audit entry names as having made the change.
@@ -52,6 +54,12 @@ func CLIActor(command string) Actor {
 // make: the provider's identifier, named by its slug.
 func SSOActor(providerID, slug string) Actor {
 	return Actor{Kind: ActorSSO, ID: providerID, Name: slug}
+}
+
+// SCIMActor returns the actor of a change an identity provider makes through
+// a SCIM token: the token's identifier, named by its hint.
+func SCIMActor(tokenID, hint string) Actor {
+	return Actor{Kind: ActorSCIM, ID: tokenID, Name: hint}
 }
 
 // Request is where a change is made: by which actor, in which request. Every

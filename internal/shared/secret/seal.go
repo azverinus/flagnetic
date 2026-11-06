@@ -34,6 +34,9 @@ const (
 	// PurposeSMTPPassword seals the password the instance authenticates to
 	// its SMTP server with.
 	PurposeSMTPPassword Purpose = "smtp password"
+	// PurposeSCIMToken seals the hashes of SCIM tokens, which are compared by
+	// opening each one rather than found by an index.
+	PurposeSCIMToken Purpose = "scim token" //nolint:gosec // a label, not a credential
 	// PurposeSAMLSPKey seals the private keys the instance presents to SAML
 	// identity providers.
 	PurposeSAMLSPKey Purpose = "saml sp key"

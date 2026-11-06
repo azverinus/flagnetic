@@ -14,6 +14,7 @@ const grace: Member = {
   display_name: "Grace Hopper",
   status: "active",
   instance_admin: true,
+  provider: null,
   created_at: "2026-10-01T10:00:00Z",
   last_sign_in_at: "2026-10-21T10:00:00Z",
   project_count: 0,

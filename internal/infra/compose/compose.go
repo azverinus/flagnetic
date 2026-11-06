@@ -35,6 +35,7 @@ import (
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/console"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/scim"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sso"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
@@ -371,9 +372,13 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// own check to References.
 	identityStore := pgidentity.NewStore(d.Pool)
 	samlClient := saml.NewClient()
+	provisioning := appaccess.NewProvisioning(tx, accessStore, audit, d.Clock, d.IDs)
 	authProviders := appidentity.ProviderDeps{
 		Tx: tx, Store: identityStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Sealer: o.Keyring, BaseURL: o.BaseURL, SAML: samlClient, SPKeys: samlClient,
-		References: []appidentity.ProviderReference{identityStore, providerGrants{providers: identityStore, access: accessStore}},
+		References: []appidentity.ProviderReference{identityStore, providerGrants{providers: identityStore, access: accessStore}, providerProvisioned{providers: identityStore, svc: provisioning}},
+	}
+	scimTokens := appidentity.SCIMTokenDeps{
+		Tx: tx, Providers: identityStore, Store: identityStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, Sealer: o.Keyring,
 	}
 	// A provider's group mappings give members grants and instance admin: the
 	// identity context decides what the groups map to, the access context
@@ -400,6 +405,13 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	}, sso.Options{
 		SecureCookies: managementOptions.SecureCookies, SessionCookie: management.SessionCookieHeader, Metrics: sso.NewMetrics(reg),
 	})
+	scimUsers := appidentity.SCIMUserDeps{Tx: tx, Providers: identityStore, Members: scimMembers{svc: provisioning}}
+	scim.Mount(edge, scim.Handlers{
+		Authenticate: appidentity.NewAuthenticateSCIM(scimTokens, sourceThrottle{svc: appaccess.NewSourceThrottle(tx, accessStore)}, o.Keyring, edge.Logger()),
+		ListUsers:    appidentity.NewListSCIMUsers(scimUsers), GetUser: appidentity.NewGetSCIMUser(scimUsers),
+		CreateUser: appidentity.NewCreateSCIMUser(scimUsers), ReplaceUser: appidentity.NewReplaceSCIMUser(scimUsers),
+		PatchUser: appidentity.NewPatchSCIMUser(scimUsers), DeleteUser: appidentity.NewDeleteSCIMUser(scimUsers),
+	})
 	management.Mount(edge, management.Handlers{
 		ListAuthProviders:        appidentity.NewListProviders(identityStore),
 		ListEnabledAuthProviders: appidentity.NewListEnabledProviders(identityStore),
@@ -412,6 +424,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		TestAuthProvider:         appidentity.NewTestProvider(identityStore, oidc.NewDiscoverer(), samlClient),
 		GetGroupMappings:         appidentity.NewGetGroupMappings(identityStore, identityStore),
 		ReplaceGroupMappings:     appidentity.NewReplaceGroupMappings(groupMappings),
+		ListSCIMTokens:           appidentity.NewListSCIMTokens(identityStore),
+		CreateSCIMToken:          appidentity.NewCreateSCIMToken(scimTokens),
+		RevokeSCIMToken:          appidentity.NewRevokeSCIMToken(scimTokens),
 		AuthenticateToken:        appaccess.NewAuthenticateToken(accessStore, tokenUses, d.Clock),
 		AuthenticateSession:      appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey),
 		SignIn: appaccess.NewSignIn(appaccess.SignInDeps{

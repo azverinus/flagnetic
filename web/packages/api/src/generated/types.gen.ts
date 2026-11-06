@@ -421,6 +421,14 @@ export type Member = {
   display_name: string;
   status: MemberStatus;
   instance_admin: boolean;
+  /**
+   * The slug of the auth provider whose SCIM token created or adopted
+   * the member, null for any other. A provisioned member's email,
+   * name and status follow that provider; changing them here is
+   * refused 409 `member_provisioned`.
+   *
+   */
+  provider: string | null;
   created_at: string;
   /**
    * When the member last signed in; null until they do.
@@ -875,6 +883,57 @@ export type CreatedApiToken = {
 };
 
 /**
+ * A SCIM token, by its hint; its value is shown only when it is created.
+ */
+export type ScimToken = {
+  id: string;
+  /**
+   * The slug of the auth provider the token is bound to, for life.
+   */
+  provider: string;
+  /**
+   * The value's prefix and its first four characters, such as `fn_scim_Ab3d`.
+   */
+  hint: string;
+  /**
+   * When the token stops working; null for a token that never expires.
+   */
+  expires_at: string | null;
+  created_at: string;
+  /**
+   * When the token was last presented, recorded at most once a minute; null until it is used.
+   */
+  last_used_at: string | null;
+  revoked_at: string | null;
+};
+
+export type ScimTokenList = {
+  items: Array<ScimToken>;
+};
+
+export type ScimTokenCreate = {
+  /**
+   * The slug of the auth provider the token is bound to. It cannot change.
+   */
+  provider: string;
+  /**
+   * When the token stops working; absent or null for a token that never expires.
+   */
+  expires_at?: string | null;
+};
+
+/**
+ * A SCIM token just created, with its value.
+ */
+export type CreatedScimToken = {
+  token: ScimToken;
+  /**
+   * The token's value, `fn_scim_` and 40 characters, shown this once.
+   */
+  value: string;
+};
+
+/**
  * A token belonging to a project, by its hint; its value is shown only when it is created.
  */
 export type ProjectToken = {
@@ -1285,7 +1344,7 @@ export type AttributePatch = {
   description?: Description;
 };
 
-export type ActorKind = "member" | "token" | "cli" | "system" | "sso";
+export type ActorKind = "member" | "token" | "cli" | "system" | "sso" | "scim";
 
 /**
  * Who changed what, when, from which value to which. Secrets are never recorded; a token appears by its hint.
@@ -13642,6 +13701,145 @@ export type TestAuthProviderResponses = {
 };
 
 export type TestAuthProviderResponse = TestAuthProviderResponses[keyof TestAuthProviderResponses];
+
+export type ListScimTokensData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/instance/scim-tokens";
+};
+
+export type ListScimTokensErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+};
+
+export type ListScimTokensError = ListScimTokensErrors[keyof ListScimTokensErrors];
+
+export type ListScimTokensResponses = {
+  /**
+   * The tokens.
+   */
+  200: ScimTokenList;
+};
+
+export type ListScimTokensResponse = ListScimTokensResponses[keyof ListScimTokensResponses];
+
+export type CreateScimTokenData = {
+  body: ScimTokenCreate;
+  path?: never;
+  query?: never;
+  url: "/instance/scim-tokens";
+};
+
+export type CreateScimTokenErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CreateScimTokenError = CreateScimTokenErrors[keyof CreateScimTokenErrors];
+
+export type CreateScimTokenResponses = {
+  /**
+   * The token, with its value.
+   */
+  201: CreatedScimToken;
+};
+
+export type CreateScimTokenResponse = CreateScimTokenResponses[keyof CreateScimTokenResponses];
+
+export type RevokeScimTokenData = {
+  body?: never;
+  path: {
+    /**
+     * The API token's identifier.
+     */
+    token: string;
+  };
+  query?: never;
+  url: "/instance/scim-tokens/{token}";
+};
+
+export type RevokeScimTokenErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type RevokeScimTokenError = RevokeScimTokenErrors[keyof RevokeScimTokenErrors];
+
+export type RevokeScimTokenResponses = {
+  /**
+   * Revoked.
+   */
+  204: void;
+};
+
+export type RevokeScimTokenResponse = RevokeScimTokenResponses[keyof RevokeScimTokenResponses];
 
 export type DeleteMailSettingsData = {
   body?: never;

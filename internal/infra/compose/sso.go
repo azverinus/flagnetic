@@ -43,6 +43,11 @@ func (a ssoMembers) MemberByID(ctx context.Context, member identity.MemberID) (a
 	return recordOf(m), ok, err
 }
 
+func (a ssoMembers) MemberByExternalID(ctx context.Context, provider, externalID string) (appidentity.MemberRecord, bool, error) {
+	m, ok, err := a.sso.MemberByExternalID(ctx, provider, externalID)
+	return recordOf(m), ok, err
+}
+
 func (a ssoMembers) ProvisionMember(ctx context.Context, email, displayName string, kind identity.Kind, provider, requestID string) (appidentity.MemberRecord, error) {
 	m, err := a.sso.ProvisionMember(ctx, email, displayName, access.SignInMethod(kind), provider, requestID)
 	return recordOf(m), err

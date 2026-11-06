@@ -21,6 +21,9 @@ type SSOStore interface {
 	MemberByEmail(ctx context.Context, email string) (access.Member, string, error)
 	// MemberByID returns the member; ErrNotFound when none has the identifier.
 	MemberByID(ctx context.Context, member access.MemberID) (access.Member, error)
+	// MemberByExternalID returns the member the provider with this slug
+	// provisioned with externalID; ErrNotFound when none.
+	MemberByExternalID(ctx context.Context, provider, externalID string) (access.Member, error)
 	CreateMember(ctx context.Context, m access.Member, passwordHash string) error
 	RecordSignIn(ctx context.Context, member access.MemberID, at time.Time) error
 	knownSourceRecorder
@@ -61,6 +64,16 @@ func (s *SSO) MemberByEmail(ctx context.Context, email string) (access.Member, b
 // MemberByID returns the member; false when none has the identifier.
 func (s *SSO) MemberByID(ctx context.Context, member access.MemberID) (access.Member, bool, error) {
 	m, err := s.store.MemberByID(ctx, member)
+	if errors.Is(err, ErrNotFound) {
+		return access.Member{}, false, nil
+	}
+	return m, err == nil, err
+}
+
+// MemberByExternalID returns the member the provider with this slug
+// provisioned with externalID as their external ID; false when none.
+func (s *SSO) MemberByExternalID(ctx context.Context, provider, externalID string) (access.Member, bool, error) {
+	m, err := s.store.MemberByExternalID(ctx, provider, externalID)
 	if errors.Is(err, ErrNotFound) {
 		return access.Member{}, false, nil
 	}

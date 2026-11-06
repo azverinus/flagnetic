@@ -28,6 +28,7 @@ import (
 const (
 	ActorKindCli    ActorKind = "cli"
 	ActorKindMember ActorKind = "member"
+	ActorKindScim   ActorKind = "scim"
 	ActorKindSso    ActorKind = "sso"
 	ActorKindSystem ActorKind = "system"
 	ActorKindToken  ActorKind = "token"
@@ -39,6 +40,8 @@ func (e ActorKind) Valid() bool {
 	case ActorKindCli:
 		return true
 	case ActorKindMember:
+		return true
+	case ActorKindScim:
 		return true
 	case ActorKindSso:
 		return true
@@ -1856,6 +1859,15 @@ type CreatedProjectToken struct {
 	Value string `json:"value"`
 }
 
+// CreatedScimToken A SCIM token just created, with its value.
+type CreatedScimToken struct {
+	// Token A SCIM token, by its hint; its value is shown only when it is created.
+	Token ScimToken `json:"token"`
+
+	// Value The token's value, `fn_scim_` and 40 characters, shown this once.
+	Value string `json:"value"`
+}
+
 // CreatedSdkKey An SDK key just created, with its value.
 type CreatedSdkKey struct {
 	// Key An SDK key of an environment; its value is shown only when it is created or is a rotation's replacement.
@@ -3285,8 +3297,14 @@ type Member struct {
 	LastSignInAt *time.Time `json:"last_sign_in_at"`
 
 	// ProjectCount How many projects the member holds a grant in; none while they are invited.
-	ProjectCount int          `json:"project_count"`
-	Status       MemberStatus `json:"status"`
+	ProjectCount int `json:"project_count"`
+
+	// Provider The slug of the auth provider whose SCIM token created or adopted
+	// the member, null for any other. A provisioned member's email,
+	// name and status follow that provider; changing them here is
+	// refused 409 `member_provisioned`.
+	Provider *string      `json:"provider"`
+	Status   MemberStatus `json:"status"`
 }
 
 // MemberInvitation defines model for MemberInvitation.
@@ -3837,6 +3855,39 @@ type ScheduleFailure struct {
 	// `FLAGNETIC_SCHEDULE_MAX_FAILURES` attempts (5 by default). Cancel
 	// the change request and copy it to propose it again.
 	Stopped bool `json:"stopped"`
+}
+
+// ScimToken A SCIM token, by its hint; its value is shown only when it is created.
+type ScimToken struct {
+	CreatedAt time.Time `json:"created_at"`
+
+	// ExpiresAt When the token stops working; null for a token that never expires.
+	ExpiresAt *time.Time `json:"expires_at"`
+
+	// Hint The value's prefix and its first four characters, such as `fn_scim_Ab3d`.
+	Hint string             `json:"hint"`
+	Id   openapi_types.UUID `json:"id"`
+
+	// LastUsedAt When the token was last presented, recorded at most once a minute; null until it is used.
+	LastUsedAt *time.Time `json:"last_used_at"`
+
+	// Provider The slug of the auth provider the token is bound to, for life.
+	Provider  string     `json:"provider"`
+	RevokedAt *time.Time `json:"revoked_at"`
+}
+
+// ScimTokenCreate defines model for ScimTokenCreate.
+type ScimTokenCreate struct {
+	// ExpiresAt When the token stops working; absent or null for a token that never expires.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+
+	// Provider The slug of the auth provider the token is bound to. It cannot change.
+	Provider string `json:"provider"`
+}
+
+// ScimTokenList defines model for ScimTokenList.
+type ScimTokenList struct {
+	Items []ScimToken `json:"items"`
 }
 
 // Scope What an API token may touch. Each permission falls under one scope, and a token exercises it only when it carries that scope.
@@ -6019,6 +6070,9 @@ type ReplaceAuthProviderGroupMappingsJSONRequestBody = GroupMappings
 // UpdateAuthSettingsJSONRequestBody defines body for UpdateAuthSettings for application/json ContentType.
 type UpdateAuthSettingsJSONRequestBody = AuthSettings
 
+// CreateScimTokenJSONRequestBody defines body for CreateScimToken for application/json ContentType.
+type CreateScimTokenJSONRequestBody = ScimTokenCreate
+
 // UpdateMailSettingsJSONRequestBody defines body for UpdateMailSettings for application/json ContentType.
 type UpdateMailSettingsJSONRequestBody = SmtpSettingsUpdate
 
@@ -7723,6 +7777,56 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
 	UpdateAuthSettings(ctx context.Context, body UpdateAuthSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListScimTokens The instance's SCIM tokens
+	//
+	// Every SCIM token, the newest first, revoked and expired ones included,
+	// by their hint and the auth provider each is bound to: a token's value
+	// is shown only when it is created.
+	//
+	// Corresponds with GET /instance/scim-tokens (the `ListScimTokens` operationId).
+	ListScimTokens(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateScimTokenWithBody Create a SCIM token
+	//
+	// Creates a SCIM token an identity provider presents to `/scim/v2` and
+	// answers its value, shown this once and never again. The token is bound
+	// for life to the auth provider named by `provider`: it reaches that
+	// provider's provisioned members and groups and nothing else, and it is
+	// refused while the provider is disabled. An unknown provider and an expiry
+	// that is not in the future are refused 422 `invalid_scim_token`, naming
+	// the field. Only a session creates a token, so a leaked
+	// credential can never multiply itself. Audited `scim_token.created`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /instance/scim-tokens (the `CreateScimToken` operationId).
+	CreateScimTokenWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateScimToken Create a SCIM token
+	//
+	// Creates a SCIM token an identity provider presents to `/scim/v2` and
+	// answers its value, shown this once and never again. The token is bound
+	// for life to the auth provider named by `provider`: it reaches that
+	// provider's provisioned members and groups and nothing else, and it is
+	// refused while the provider is disabled. An unknown provider and an expiry
+	// that is not in the future are refused 422 `invalid_scim_token`, naming
+	// the field. Only a session creates a token, so a leaked
+	// credential can never multiply itself. Audited `scim_token.created`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /instance/scim-tokens (the `CreateScimToken` operationId).
+	CreateScimToken(ctx context.Context, body CreateScimTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeScimToken Revoke a SCIM token
+	//
+	// Revokes the token, which `/scim/v2` refuses from then on. A token
+	// already revoked, or an identifier that names none, is not found.
+	// Audited `scim_token.revoked`.
+	//
+	// Corresponds with DELETE /instance/scim-tokens/{token} (the `RevokeScimToken` operationId).
+	RevokeScimToken(ctx context.Context, token TokenID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteMailSettings Remove the instance's SMTP server
 	//
@@ -11673,6 +11777,96 @@ func (c *Client) UpdateAuthSettingsWithBody(ctx context.Context, contentType str
 // Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
 func (c *Client) UpdateAuthSettings(ctx context.Context, body UpdateAuthSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateAuthSettingsRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListScimTokens The instance's SCIM tokens
+//
+// Every SCIM token, the newest first, revoked and expired ones included,
+// by their hint and the auth provider each is bound to: a token's value
+// is shown only when it is created.
+//
+// Corresponds with GET /instance/scim-tokens (the `ListScimTokens` operationId).
+func (c *Client) ListScimTokens(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListScimTokensRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateScimTokenWithBody Create a SCIM token
+//
+// Creates a SCIM token an identity provider presents to `/scim/v2` and
+// answers its value, shown this once and never again. The token is bound
+// for life to the auth provider named by `provider`: it reaches that
+// provider's provisioned members and groups and nothing else, and it is
+// refused while the provider is disabled. An unknown provider and an expiry
+// that is not in the future are refused 422 `invalid_scim_token`, naming
+// the field. Only a session creates a token, so a leaked
+// credential can never multiply itself. Audited `scim_token.created`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /instance/scim-tokens (the `CreateScimToken` operationId).
+func (c *Client) CreateScimTokenWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateScimTokenRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateScimToken Create a SCIM token
+//
+// Creates a SCIM token an identity provider presents to `/scim/v2` and
+// answers its value, shown this once and never again. The token is bound
+// for life to the auth provider named by `provider`: it reaches that
+// provider's provisioned members and groups and nothing else, and it is
+// refused while the provider is disabled. An unknown provider and an expiry
+// that is not in the future are refused 422 `invalid_scim_token`, naming
+// the field. Only a session creates a token, so a leaked
+// credential can never multiply itself. Audited `scim_token.created`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /instance/scim-tokens (the `CreateScimToken` operationId).
+func (c *Client) CreateScimToken(ctx context.Context, body CreateScimTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateScimTokenRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeScimToken Revoke a SCIM token
+//
+// Revokes the token, which `/scim/v2` refuses from then on. A token
+// already revoked, or an identifier that names none, is not found.
+// Audited `scim_token.revoked`.
+//
+// Corresponds with DELETE /instance/scim-tokens/{token} (the `RevokeScimToken` operationId).
+func (c *Client) RevokeScimToken(ctx context.Context, token TokenID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeScimTokenRequest(c.Server, token)
 	if err != nil {
 		return nil, err
 	}
@@ -18246,6 +18440,107 @@ func NewUpdateAuthSettingsRequestWithBody(server string, contentType string, bod
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListScimTokensRequest constructs an http.Request for the ListScimTokens method
+func NewListScimTokensRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/scim-tokens")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateScimTokenRequest calls the generic CreateScimToken builder with application/json body
+func NewCreateScimTokenRequest(server string, body CreateScimTokenJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateScimTokenRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateScimTokenRequestWithBody constructs an http.Request for the CreateScimToken method, with any body, and a specified content type
+func NewCreateScimTokenRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/scim-tokens")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRevokeScimTokenRequest constructs an http.Request for the RevokeScimToken method
+func NewRevokeScimTokenRequest(server string, token TokenID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "token", token, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/scim-tokens/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -27727,6 +28022,60 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
 	UpdateAuthSettingsWithResponse(ctx context.Context, body UpdateAuthSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAuthSettingsResponse, error)
 
+	// ListScimTokensWithResponse The instance's SCIM tokens
+	//
+	// Every SCIM token, the newest first, revoked and expired ones included,
+	// by their hint and the auth provider each is bound to: a token's value
+	// is shown only when it is created.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /instance/scim-tokens (the `ListScimTokens` operationId).
+	ListScimTokensWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListScimTokensResponse, error)
+
+	// CreateScimTokenWithBodyWithResponse Create a SCIM token
+	//
+	// Creates a SCIM token an identity provider presents to `/scim/v2` and
+	// answers its value, shown this once and never again. The token is bound
+	// for life to the auth provider named by `provider`: it reaches that
+	// provider's provisioned members and groups and nothing else, and it is
+	// refused while the provider is disabled. An unknown provider and an expiry
+	// that is not in the future are refused 422 `invalid_scim_token`, naming
+	// the field. Only a session creates a token, so a leaked
+	// credential can never multiply itself. Audited `scim_token.created`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /instance/scim-tokens (the `CreateScimToken` operationId).
+	CreateScimTokenWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateScimTokenResponse, error)
+
+	// CreateScimTokenWithResponse Create a SCIM token
+	//
+	// Creates a SCIM token an identity provider presents to `/scim/v2` and
+	// answers its value, shown this once and never again. The token is bound
+	// for life to the auth provider named by `provider`: it reaches that
+	// provider's provisioned members and groups and nothing else, and it is
+	// refused while the provider is disabled. An unknown provider and an expiry
+	// that is not in the future are refused 422 `invalid_scim_token`, naming
+	// the field. Only a session creates a token, so a leaked
+	// credential can never multiply itself. Audited `scim_token.created`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /instance/scim-tokens (the `CreateScimToken` operationId).
+	CreateScimTokenWithResponse(ctx context.Context, body CreateScimTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateScimTokenResponse, error)
+
+	// RevokeScimTokenWithResponse Revoke a SCIM token
+	//
+	// Revokes the token, which `/scim/v2` refuses from then on. A token
+	// already revoked, or an identifier that names none, is not found.
+	// Audited `scim_token.revoked`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /instance/scim-tokens/{token} (the `RevokeScimToken` operationId).
+	RevokeScimTokenWithResponse(ctx context.Context, token TokenID, reqEditors ...RequestEditorFn) (*RevokeScimTokenResponse, error)
+
 	// DeleteMailSettingsWithResponse Remove the instance's SMTP server
 	//
 	// The instance stops mailing; what it mails is shown as links again. Not found while no SMTP server is configured.
@@ -32907,6 +33256,199 @@ func (r UpdateAuthSettingsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r UpdateAuthSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListScimTokensResponse401Headers the declared response headers of an HTTP 401 response for ListScimTokens
+type ListScimTokensResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListScimTokensResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ScimTokenList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListScimTokensResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListScimTokensResponse) GetJSON200() *ScimTokenList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListScimTokensResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListScimTokensResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r ListScimTokensResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListScimTokensResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListScimTokensResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListScimTokensResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateScimTokenResponse401Headers the declared response headers of an HTTP 401 response for CreateScimToken
+type CreateScimTokenResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateScimTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *CreatedScimToken
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateScimTokenResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateScimTokenResponse) GetJSON201() *CreatedScimToken {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateScimTokenResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateScimTokenResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreateScimTokenResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateScimTokenResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateScimTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateScimTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateScimTokenResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RevokeScimTokenResponse401Headers the declared response headers of an HTTP 401 response for RevokeScimToken
+type RevokeScimTokenResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RevokeScimTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RevokeScimTokenResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RevokeScimTokenResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RevokeScimTokenResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RevokeScimTokenResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r RevokeScimTokenResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeScimTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeScimTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeScimTokenResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -47213,6 +47755,84 @@ func (c *ClientWithResponses) UpdateAuthSettingsWithResponse(ctx context.Context
 	return ParseUpdateAuthSettingsResponse(rsp)
 }
 
+// ListScimTokensWithResponse The instance's SCIM tokens
+//
+// Every SCIM token, the newest first, revoked and expired ones included,
+// by their hint and the auth provider each is bound to: a token's value
+// is shown only when it is created.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/scim-tokens (the `ListScimTokens` operationId).
+func (c *ClientWithResponses) ListScimTokensWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListScimTokensResponse, error) {
+	rsp, err := c.ListScimTokens(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListScimTokensResponse(rsp)
+}
+
+// CreateScimTokenWithBodyWithResponse Create a SCIM token
+//
+// Creates a SCIM token an identity provider presents to `/scim/v2` and
+// answers its value, shown this once and never again. The token is bound
+// for life to the auth provider named by `provider`: it reaches that
+// provider's provisioned members and groups and nothing else, and it is
+// refused while the provider is disabled. An unknown provider and an expiry
+// that is not in the future are refused 422 `invalid_scim_token`, naming
+// the field. Only a session creates a token, so a leaked
+// credential can never multiply itself. Audited `scim_token.created`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /instance/scim-tokens (the `CreateScimToken` operationId).
+func (c *ClientWithResponses) CreateScimTokenWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateScimTokenResponse, error) {
+	rsp, err := c.CreateScimTokenWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateScimTokenResponse(rsp)
+}
+
+// CreateScimTokenWithResponse Create a SCIM token
+//
+// Creates a SCIM token an identity provider presents to `/scim/v2` and
+// answers its value, shown this once and never again. The token is bound
+// for life to the auth provider named by `provider`: it reaches that
+// provider's provisioned members and groups and nothing else, and it is
+// refused while the provider is disabled. An unknown provider and an expiry
+// that is not in the future are refused 422 `invalid_scim_token`, naming
+// the field. Only a session creates a token, so a leaked
+// credential can never multiply itself. Audited `scim_token.created`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /instance/scim-tokens (the `CreateScimToken` operationId).
+func (c *ClientWithResponses) CreateScimTokenWithResponse(ctx context.Context, body CreateScimTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateScimTokenResponse, error) {
+	rsp, err := c.CreateScimToken(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateScimTokenResponse(rsp)
+}
+
+// RevokeScimTokenWithResponse Revoke a SCIM token
+//
+// Revokes the token, which `/scim/v2` refuses from then on. A token
+// already revoked, or an identifier that names none, is not found.
+// Audited `scim_token.revoked`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /instance/scim-tokens/{token} (the `RevokeScimToken` operationId).
+func (c *ClientWithResponses) RevokeScimTokenWithResponse(ctx context.Context, token TokenID, reqEditors ...RequestEditorFn) (*RevokeScimTokenResponse, error) {
+	rsp, err := c.RevokeScimToken(ctx, token, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeScimTokenResponse(rsp)
+}
+
 // DeleteMailSettingsWithResponse Remove the instance's SMTP server
 //
 // The instance stops mailing; what it mails is shown as links again. Not found while no SMTP server is configured.
@@ -53570,6 +54190,175 @@ func ParseUpdateAuthSettingsResponse(rsp *http.Response) (*UpdateAuthSettingsRes
 	switch {
 	case rsp.StatusCode == 401:
 		var headers UpdateAuthSettingsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListScimTokensResponse parses an HTTP response from a ListScimTokensWithResponse call
+func ParseListScimTokensResponse(rsp *http.Response) (*ListScimTokensResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListScimTokensResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ScimTokenList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListScimTokensResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateScimTokenResponse parses an HTTP response from a CreateScimTokenWithResponse call
+func ParseCreateScimTokenResponse(rsp *http.Response) (*CreateScimTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateScimTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest CreatedScimToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers CreateScimTokenResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRevokeScimTokenResponse parses an HTTP response from a RevokeScimTokenWithResponse call
+func ParseRevokeScimTokenResponse(rsp *http.Response) (*RevokeScimTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeScimTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers RevokeScimTokenResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -66103,6 +66892,15 @@ type ServerInterface interface {
 	// UpdateAuthSettings Change the instance's auth settings
 	// (PUT /instance/auth-settings)
 	UpdateAuthSettings(w http.ResponseWriter, r *http.Request)
+	// ListScimTokens The instance's SCIM tokens
+	// (GET /instance/scim-tokens)
+	ListScimTokens(w http.ResponseWriter, r *http.Request)
+	// CreateScimToken Create a SCIM token
+	// (POST /instance/scim-tokens)
+	CreateScimToken(w http.ResponseWriter, r *http.Request)
+	// RevokeScimToken Revoke a SCIM token
+	// (DELETE /instance/scim-tokens/{token})
+	RevokeScimToken(w http.ResponseWriter, r *http.Request, token TokenID)
 	// DeleteMailSettings Remove the instance's SMTP server
 	// (DELETE /instance/smtp)
 	DeleteMailSettings(w http.ResponseWriter, r *http.Request)
@@ -67442,6 +68240,60 @@ func (siw *ServerInterfaceWrapper) UpdateAuthSettings(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAuthSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListScimTokens operation middleware
+func (siw *ServerInterfaceWrapper) ListScimTokens(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListScimTokens(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateScimToken operation middleware
+func (siw *ServerInterfaceWrapper) CreateScimToken(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateScimToken(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeScimToken operation middleware
+func (siw *ServerInterfaceWrapper) RevokeScimToken(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "token" -------------
+	var token TokenID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", r.PathValue("token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeScimToken(w, r, token)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -74975,6 +75827,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-providers/{provider}/group-mappings", wrapper.GetAuthProviderGroupMappings)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/auth-providers/{provider}/group-mappings", wrapper.ReplaceAuthProviderGroupMappings)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/test", wrapper.TestAuthProvider)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/scim-tokens", wrapper.ListScimTokens)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/scim-tokens", wrapper.CreateScimToken)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/instance/scim-tokens/{token}", wrapper.RevokeScimToken)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/instance/smtp", wrapper.DeleteMailSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/smtp", wrapper.GetMailSettings)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/smtp", wrapper.UpdateMailSettings)
@@ -77162,6 +78017,202 @@ func (response UpdateAuthSettings422ApplicationProblemPlusJSONResponse) VisitUpd
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListScimTokensRequestObject struct {
+}
+
+type ListScimTokensResponseObject interface {
+	VisitListScimTokensResponse(w http.ResponseWriter) error
+}
+
+type ListScimTokens200JSONResponse ScimTokenList
+
+func (response ListScimTokens200JSONResponse) VisitListScimTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListScimTokens401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListScimTokens401ApplicationProblemPlusJSONResponse) VisitListScimTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListScimTokens403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListScimTokens403ApplicationProblemPlusJSONResponse) VisitListScimTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateScimTokenRequestObject struct {
+	Body *CreateScimTokenJSONRequestBody
+}
+
+type CreateScimTokenResponseObject interface {
+	VisitCreateScimTokenResponse(w http.ResponseWriter) error
+}
+
+type CreateScimToken201JSONResponse CreatedScimToken
+
+func (response CreateScimToken201JSONResponse) VisitCreateScimTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateScimToken401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateScimToken401ApplicationProblemPlusJSONResponse) VisitCreateScimTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateScimToken403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateScimToken403ApplicationProblemPlusJSONResponse) VisitCreateScimTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateScimToken422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CreateScimToken422ApplicationProblemPlusJSONResponse) VisitCreateScimTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeScimTokenRequestObject struct {
+	Token TokenID `json:"token"`
+}
+
+type RevokeScimTokenResponseObject interface {
+	VisitRevokeScimTokenResponse(w http.ResponseWriter) error
+}
+
+type RevokeScimToken204Response struct {
+}
+
+func (response RevokeScimToken204Response) VisitRevokeScimTokenResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeScimToken401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeScimToken401ApplicationProblemPlusJSONResponse) VisitRevokeScimTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeScimToken403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeScimToken403ApplicationProblemPlusJSONResponse) VisitRevokeScimTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeScimToken404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeScimToken404ApplicationProblemPlusJSONResponse) VisitRevokeScimTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -94385,6 +95436,15 @@ type StrictServerInterface interface {
 	// UpdateAuthSettings Change the instance's auth settings
 	// (PUT /instance/auth-settings)
 	UpdateAuthSettings(ctx context.Context, request UpdateAuthSettingsRequestObject) (UpdateAuthSettingsResponseObject, error)
+	// ListScimTokens The instance's SCIM tokens
+	// (GET /instance/scim-tokens)
+	ListScimTokens(ctx context.Context, request ListScimTokensRequestObject) (ListScimTokensResponseObject, error)
+	// CreateScimToken Create a SCIM token
+	// (POST /instance/scim-tokens)
+	CreateScimToken(ctx context.Context, request CreateScimTokenRequestObject) (CreateScimTokenResponseObject, error)
+	// RevokeScimToken Revoke a SCIM token
+	// (DELETE /instance/scim-tokens/{token})
+	RevokeScimToken(ctx context.Context, request RevokeScimTokenRequestObject) (RevokeScimTokenResponseObject, error)
 	// DeleteMailSettings Remove the instance's SMTP server
 	// (DELETE /instance/smtp)
 	DeleteMailSettings(ctx context.Context, request DeleteMailSettingsRequestObject) (DeleteMailSettingsResponseObject, error)
@@ -95530,6 +96590,87 @@ func (sh *strictHandler) UpdateAuthSettings(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateAuthSettingsResponseObject); ok {
 		if err := validResponse.VisitUpdateAuthSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListScimTokens operation middleware
+func (sh *strictHandler) ListScimTokens(w http.ResponseWriter, r *http.Request) {
+	var request ListScimTokensRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListScimTokens(ctx, request.(ListScimTokensRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListScimTokens")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListScimTokensResponseObject); ok {
+		if err := validResponse.VisitListScimTokensResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateScimToken operation middleware
+func (sh *strictHandler) CreateScimToken(w http.ResponseWriter, r *http.Request) {
+	var request CreateScimTokenRequestObject
+
+	var body CreateScimTokenJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateScimToken(ctx, request.(CreateScimTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateScimToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateScimTokenResponseObject); ok {
+		if err := validResponse.VisitCreateScimTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeScimToken operation middleware
+func (sh *strictHandler) RevokeScimToken(w http.ResponseWriter, r *http.Request, token TokenID) {
+	var request RevokeScimTokenRequestObject
+
+	request.Token = token
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeScimToken(ctx, request.(RevokeScimTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeScimToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeScimTokenResponseObject); ok {
+		if err := validResponse.VisitRevokeScimTokenResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

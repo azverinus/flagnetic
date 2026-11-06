@@ -201,7 +201,7 @@ const consoleRoute = "console"
 // path under one that no route matches is answered as an unknown operation,
 // never with the console's entry document, so a client of an API never
 // receives HTML.
-var reservedPrefixes = []string{"/api", "/sdk", "/sso", "/healthz", "/readyz", "/metrics"}
+var reservedPrefixes = []string{"/api", "/sdk", "/sso", "/scim", "/healthz", "/readyz", "/metrics"}
 
 // Console mounts h for every GET and HEAD request no route matches outside
 // the reserved prefixes: the console's own routes, rendered in the browser.

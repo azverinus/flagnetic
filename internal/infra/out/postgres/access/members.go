@@ -15,7 +15,7 @@ import (
 
 // memberColumns are the columns scanMember reads, prefixed by the members
 // table's alias m.
-const memberColumns = `m.id, m.email, m.display_name, m.status, m.instance_admin, m.instance_admin_provider, m.locale, m.created_at`
+const memberColumns = `m.id, m.email, m.display_name, m.status, m.instance_admin, m.instance_admin_provider, m.locale, m.provider, m.external_id, m.created_at`
 
 // scanMember returns a scan target of memberColumns and the member it fills.
 func scanMember() ([]any, func() access.Member) {
@@ -25,14 +25,22 @@ func scanMember() ([]any, func() access.Member) {
 		status   string
 		provider *string
 		locale   *string
+		scim     *string
+		external *string
 	)
-	return []any{&memberID, &m.Email, &m.DisplayName, &status, &m.InstanceAdmin, &provider, &locale, &m.CreatedAt}, func() access.Member {
+	return []any{&memberID, &m.Email, &m.DisplayName, &status, &m.InstanceAdmin, &provider, &locale, &scim, &external, &m.CreatedAt}, func() access.Member {
 		m.ID, m.Status = id.FromBytes[access.Member](memberID), access.MemberStatus(status)
 		if provider != nil {
 			m.InstanceAdminProvider = *provider
 		}
 		if locale != nil {
 			m.Locale = *locale
+		}
+		if scim != nil {
+			m.Provider = *scim
+		}
+		if external != nil {
+			m.ExternalID = *external
 		}
 		return m
 	}
@@ -67,6 +75,22 @@ func (s *Store) MemberByID(ctx context.Context, member access.MemberID) (access.
 	}
 	if err != nil {
 		return access.Member{}, fmt.Errorf("reading a member: %w", err)
+	}
+	return m(), nil
+}
+
+// MemberByExternalID returns the member the provider with this slug
+// provisioned with externalID as their external ID; ErrNotFound when there is
+// none.
+func (s *Store) MemberByExternalID(ctx context.Context, provider, externalID string) (access.Member, error) {
+	dest, m := scanMember()
+	err := s.db(ctx).QueryRow(ctx, `SELECT `+memberColumns+` FROM members m WHERE m.provider = $1 AND m.external_id = $2`,
+		provider, externalID).Scan(dest...)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return access.Member{}, appaccess.ErrNotFound
+	}
+	if err != nil {
+		return access.Member{}, fmt.Errorf("reading a member by external ID: %w", err)
 	}
 	return m(), nil
 }

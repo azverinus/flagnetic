@@ -42,7 +42,7 @@ const minSecretLength = 8
 
 // tokenValueShape matches an API token's whole value, a kind prefix and 40
 // base62 characters, and not its hint, which the audit log does record.
-var tokenValueShape = regexp.MustCompile(`fn_[a-z]{3}_[0-9A-Za-z]{40}`)
+var tokenValueShape = regexp.MustCompile(`fn_[a-z]{3,4}_[0-9A-Za-z]{40}`)
 
 // redactedSecret is what an entry, and a response reading one, writes in
 // place of a secret, such as a webhook subscription's: a member named
