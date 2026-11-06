@@ -38,43 +38,46 @@ const BaseURL = "/api/v1"
 
 // Handlers are the use cases the management API serves.
 type Handlers struct {
-	AuthenticateToken   *appaccess.AuthenticateToken
-	AuthenticateSession *appaccess.AuthenticateSession
-	SignIn              *appaccess.SignIn
-	SignOut             *appaccess.SignOut
-	ListSessions        *appaccess.ListSessions
-	RevokeSessions      *appaccess.RevokeSessions
-	GetAuthSettings     *appaccess.GetAuthSettings
-	UpdateAuthSettings  *appaccess.UpdateAuthSettings
-	GetSMTP             *appaccess.GetSMTP
-	ConfigureSMTP       *appaccess.ConfigureSMTP
-	RemoveSMTP          *appaccess.RemoveSMTP
-	SendTestMail        *appaccess.SendTestMail
-	ListMembers         *appaccess.ListMembers
-	GetMember           *appaccess.GetMember
-	UpdateMember        *appaccess.UpdateMember
-	UpdateMe            *appaccess.UpdateMe
-	ChangeMyPassword    *appaccess.ChangeMyPassword
-	DeactivateMember    *appaccess.DeactivateMember
-	ReactivateMember    *appaccess.ReactivateMember
-	InviteMember        *appaccess.InviteMember
-	InviteToProject     *appaccess.InviteToProject
-	ReissueInvitation   *appaccess.ReissueInvitation
-	GetInvitation       *appaccess.GetInvitation
-	AcceptInvitation    *appaccess.AcceptInvitation
-	ListPersonalTokens  *appaccess.ListPersonalTokens
-	CreatePersonalToken *appaccess.CreatePersonalToken
-	RevokePersonalToken *appaccess.RevokePersonalToken
-	ListProjectMembers  *appaccess.ListProjectMembers
-	CountProjectMembers *appaccess.CountProjectMembers
-	ListGrants          *appaccess.ListGrants
-	CreateGrant         *appaccess.CreateGrant
-	DeleteGrant         *appaccess.DeleteGrant
-	ListProjectTokens   *appaccess.ListProjectTokens
-	CreateProjectToken  *appaccess.CreateProjectToken
-	RevokeProjectToken  *appaccess.RevokeProjectToken
-	ProjectPermissions  *appaccess.ProjectPermissions
-	WorkingProjects     *appaccess.WorkingProjects
+	AuthenticateToken     *appaccess.AuthenticateToken
+	AuthenticateSession   *appaccess.AuthenticateSession
+	SignIn                *appaccess.SignIn
+	SignOut               *appaccess.SignOut
+	ListSessions          *appaccess.ListSessions
+	RevokeSessions        *appaccess.RevokeSessions
+	GetAuthSettings       *appaccess.GetAuthSettings
+	UpdateAuthSettings    *appaccess.UpdateAuthSettings
+	GetSMTP               *appaccess.GetSMTP
+	ConfigureSMTP         *appaccess.ConfigureSMTP
+	RemoveSMTP            *appaccess.RemoveSMTP
+	SendTestMail          *appaccess.SendTestMail
+	ListMembers           *appaccess.ListMembers
+	GetMember             *appaccess.GetMember
+	UpdateMember          *appaccess.UpdateMember
+	UpdateMe              *appaccess.UpdateMe
+	ChangeMyPassword      *appaccess.ChangeMyPassword
+	DeactivateMember      *appaccess.DeactivateMember
+	ReactivateMember      *appaccess.ReactivateMember
+	InviteMember          *appaccess.InviteMember
+	InviteToProject       *appaccess.InviteToProject
+	ReissueInvitation     *appaccess.ReissueInvitation
+	GetInvitation         *appaccess.GetInvitation
+	AcceptInvitation      *appaccess.AcceptInvitation
+	IssuePasswordReset    *appaccess.IssuePasswordReset
+	GetPasswordReset      *appaccess.GetPasswordReset
+	CompletePasswordReset *appaccess.CompletePasswordReset
+	ListPersonalTokens    *appaccess.ListPersonalTokens
+	CreatePersonalToken   *appaccess.CreatePersonalToken
+	RevokePersonalToken   *appaccess.RevokePersonalToken
+	ListProjectMembers    *appaccess.ListProjectMembers
+	CountProjectMembers   *appaccess.CountProjectMembers
+	ListGrants            *appaccess.ListGrants
+	CreateGrant           *appaccess.CreateGrant
+	DeleteGrant           *appaccess.DeleteGrant
+	ListProjectTokens     *appaccess.ListProjectTokens
+	CreateProjectToken    *appaccess.CreateProjectToken
+	RevokeProjectToken    *appaccess.RevokeProjectToken
+	ProjectPermissions    *appaccess.ProjectPermissions
+	WorkingProjects       *appaccess.WorkingProjects
 
 	ListAuthProviders        *appidentity.ListProviders
 	ListEnabledAuthProviders *appidentity.ListEnabledProviders
@@ -250,9 +253,10 @@ func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer, opts Op
 		RequestErrorHandlerFunc:  invalidRequest,
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) { edge.WriteError(w, r, httpError(err)) },
 	})
-	// The links invitations hand out carry their secret in the path the
-	// browser opens.
+	// The links invitations and password resets hand out carry their secret
+	// in the path the browser opens.
 	edge.SecretPath(invitationLinkPath + "{secret}")
+	edge.SecretPath(passwordResetLinkPath + "{secret}")
 	HandlerWithOptions(rawBodies{ServerInterface: strict, a: a}, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
 		BaseRouter:       router{a},

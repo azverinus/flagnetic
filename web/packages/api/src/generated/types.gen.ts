@@ -557,6 +557,33 @@ export type InvitationAcceptance = {
 };
 
 /**
+ * A password reset just issued. Its link is shown this once.
+ */
+export type IssuedPasswordReset = {
+  /**
+   * The one-time link to pass on to the member.
+   */
+  url: string;
+  expires_at: string;
+};
+
+/**
+ * What a password reset's link opens.
+ */
+export type PasswordReset = {
+  /**
+   * The member's email with all but the first character of its local part hidden, such as `g***@example.com`.
+   */
+  email: string;
+  display_name: string;
+  expires_at: string;
+};
+
+export type PasswordResetCompletion = {
+  password: string;
+};
+
+/**
  * The member the credential acts for; absent for a project token, which acts for none.
  */
 export type MeMember = {
@@ -4460,6 +4487,121 @@ export type AcceptInvitationResponses = {
 };
 
 export type AcceptInvitationResponse = AcceptInvitationResponses[keyof AcceptInvitationResponses];
+
+export type GetPasswordResetData = {
+  body?: never;
+  path: {
+    /**
+     * The password reset's secret, the last segment of the link an instance admin passed on.
+     */
+    secret: string;
+  };
+  query?: never;
+  url: "/auth/password-reset/{secret}";
+};
+
+export type GetPasswordResetErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * `reset_gone`: the link opens no password reset that can be completed: it was never issued, has been used or ended by another, has expired, or its member is not active.
+   */
+  410: Problem;
+};
+
+export type GetPasswordResetError = GetPasswordResetErrors[keyof GetPasswordResetErrors];
+
+export type GetPasswordResetResponses = {
+  /**
+   * The password reset.
+   */
+  200: PasswordReset;
+};
+
+export type GetPasswordResetResponse = GetPasswordResetResponses[keyof GetPasswordResetResponses];
+
+export type CompletePasswordResetData = {
+  body: PasswordResetCompletion;
+  path: {
+    /**
+     * The password reset's secret, the last segment of the link an instance admin passed on.
+     */
+    secret: string;
+  };
+  query?: never;
+  url: "/auth/password-reset/{secret}";
+};
+
+export type CompletePasswordResetErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * `reset_gone`: the link opens no password reset that can be completed: it was never issued, has been used or ended by another, has expired, or its member is not active.
+   */
+  410: Problem;
+  /**
+   * `request_too_large`: the body is larger than the operation accepts; one that checks a password accepts 8 KiB.
+   */
+  413: Problem;
+  /**
+   * `unsupported_media_type`: the body is not sent as `application/json`, which the operations opening a session require so a form on another site cannot call them.
+   */
+  415: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+  /**
+   * Refused before the password is checked: `locked` while the email is
+   * locked by consecutive failures (from an address its member signed in
+   * from within thirty days, by that address's own consecutive failures
+   * on it), `rate_limited` while the address is
+   * throttled. `retry_after` and the `Retry-After` header give the
+   * seconds until the attempt can be made again.
+   *
+   */
+  429: Problem;
+  /**
+   * `busy`: the replica is checking as many passwords as it may at once
+   * and no turn freed within two seconds. The attempt was not counted as
+   * a failure; retry after `Retry-After` seconds.
+   *
+   */
+  503: Problem;
+};
+
+export type CompletePasswordResetError =
+  CompletePasswordResetErrors[keyof CompletePasswordResetErrors];
+
+export type CompletePasswordResetResponses = {
+  /**
+   * Reset and signed in. The body is the caller, as `GET /me` answers it.
+   */
+  200: Me;
+};
+
+export type CompletePasswordResetResponse =
+  CompletePasswordResetResponses[keyof CompletePasswordResetResponses];
 
 export type GetMeData = {
   body?: never;
@@ -12475,6 +12617,62 @@ export type ReissueInvitationResponses = {
 
 export type ReissueInvitationResponse =
   ReissueInvitationResponses[keyof ReissueInvitationResponses];
+
+export type IssuePasswordResetData = {
+  body?: never;
+  path: {
+    /**
+     * The member's identifier.
+     */
+    member: string;
+  };
+  query?: never;
+  url: "/members/{member}/password-reset";
+};
+
+export type IssuePasswordResetErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+};
+
+export type IssuePasswordResetError = IssuePasswordResetErrors[keyof IssuePasswordResetErrors];
+
+export type IssuePasswordResetResponses = {
+  /**
+   * The password reset's one-time link.
+   */
+  201: IssuedPasswordReset;
+};
+
+export type IssuePasswordResetResponse =
+  IssuePasswordResetResponses[keyof IssuePasswordResetResponses];
 
 export type RevokeMemberSessionsData = {
   body?: never;

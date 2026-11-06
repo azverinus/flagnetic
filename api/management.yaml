@@ -229,6 +229,91 @@ paths:
           $ref: "#/components/responses/TooManyAttempts"
         "503":
           $ref: "#/components/responses/Busy"
+  /auth/password-reset/{secret}:
+    parameters:
+      - name: secret
+        in: path
+        required: true
+        description: The password reset's secret, the last segment of the link an instance admin passed on.
+        schema:
+          type: string
+    get:
+      operationId: getPasswordReset
+      summary: What a password reset's link opens
+      description: |
+        Read before anyone is signed in, to show whose password the link
+        sets. A password reset that cannot be completed, whether it was never
+        issued, has been used or ended by another, has expired, or belongs to
+        a member who is not active, is `reset_gone`, alike. The secret never
+        reaches a log line.
+      x-permission: public
+      security: []
+      tags: [auth]
+      responses:
+        "200":
+          description: The password reset.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasswordReset"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "410":
+          $ref: "#/components/responses/PasswordResetGone"
+    post:
+      operationId: completePasswordReset
+      summary: Complete a password reset
+      description: |
+        Sets the member's new password under the password policy
+        (`weak_password` otherwise), clears the lockout on their email, signs
+        them out of every device, ends every other open password reset and
+        invitation of theirs, and opens a session, setting its cookie. The
+        body must be sent as `application/json`; anything else is refused
+        `unsupported_media_type`.
+
+        Each attempt counts as a failure of its address before the secret is
+        looked up, and is taken back once the secret opens a password reset:
+        a hundred failures from one address in fifteen minutes, sign-ins
+        included, throttle the address (`rate_limited`).
+      x-permission: public
+      x-opens-session: true
+      x-checks-password: true
+      security: []
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordResetCompletion"
+      responses:
+        "200":
+          description: Reset and signed in. The body is the caller, as `GET /me` answers it.
+          headers:
+            Set-Cookie:
+              description: The session cookie `flagnetic_session`, as sign-in sets it.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "410":
+          $ref: "#/components/responses/PasswordResetGone"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "429":
+          $ref: "#/components/responses/TooManyAttempts"
+        "503":
+          $ref: "#/components/responses/Busy"
   /me:
     get:
       operationId: getMe
@@ -4930,6 +5015,37 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /members/{member}/password-reset:
+    parameters:
+      - $ref: "#/components/parameters/MemberID"
+    post:
+      operationId: issuePasswordReset
+      summary: Issue a password reset for a member
+      description: |
+        Issues a one-time link that lets an active member set a new password,
+        answered with the link, shown this once and never mailed. It expires
+        after an hour. A member who is still invited is refused
+        `member_not_active`: issue their invitation again instead. A
+        deactivated member is refused `member_deactivated`. Earlier password
+        resets of the member stay open; completing one ends the others.
+        Recorded as `password.reset_issued`, without the link.
+      x-permission: instance_admin
+      tags: [members]
+      responses:
+        "201":
+          description: The password reset's one-time link.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssuedPasswordReset"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /members/{member}/sessions:
     parameters:
       - $ref: "#/components/parameters/MemberID"
@@ -7148,6 +7264,12 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
+    PasswordResetGone:
+      description: "`reset_gone`: the link opens no password reset that can be completed: it was never issued, has been used or ended by another, has expired, or its member is not active."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
     Busy:
       description: |
         `busy`: the replica is checking as many passwords as it may at once
@@ -7797,6 +7919,37 @@ components:
         name:
           type: string
     InvitationAcceptance:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          format: password
+    IssuedPasswordReset:
+      type: object
+      description: A password reset just issued. Its link is shown this once.
+      required: [url, expires_at]
+      properties:
+        url:
+          type: string
+          description: The one-time link to pass on to the member.
+        expires_at:
+          type: string
+          format: date-time
+    PasswordReset:
+      type: object
+      description: What a password reset's link opens.
+      required: [email, display_name, expires_at]
+      properties:
+        email:
+          type: string
+          description: The member's email with all but the first character of its local part hidden, such as `g***@example.com`.
+        display_name:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+    PasswordResetCompletion:
       type: object
       required: [password]
       properties:
