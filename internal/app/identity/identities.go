@@ -13,8 +13,10 @@ import (
 )
 
 var (
-	errIdentityNotFound = apperrors.NotFound("not_found", "the member has no such identity")
-	errMemberNotFound   = apperrors.NotFound("not_found", "the instance has no such member")
+	errIdentityNotFound  = apperrors.NotFound("not_found", "the member has no such identity")
+	errMemberNotFound    = apperrors.NotFound("not_found", "the instance has no such member")
+	errMemberProvisioned = apperrors.Conflict("member_provisioned",
+		"the member is provisioned through this auth provider, which signs them in: change it in the directory")
 	errProviderUnusable = apperrors.BadGateway("provider_unreachable", "the auth provider could not be reached to link an identity")
 )
 
@@ -151,7 +153,9 @@ type UnlinkCommand struct {
 // or whose identifier names none, is not found. An identity that is a usable
 // way in, at an enabled provider, is refused with the conflict
 // last_auth_method when no other usable way in remains; a deactivated member
-// signs in nowhere and needs none.
+// signs in nowhere and needs none. The identity of a provisioned member at
+// the provider that provisions them is the directory's, and is refused with
+// the conflict member_provisioned.
 func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 	identityID, err := id.Parse[identity.Identity](cmd.Identity)
 	if err != nil {
@@ -177,6 +181,9 @@ func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 		}
 		if unlinking == nil {
 			return errIdentityNotFound
+		}
+		if m.Provider != "" && m.Provider == unlinking.ProviderSlug {
+			return errMemberProvisioned
 		}
 		if unlinking.ProviderEnabled {
 			if err = h.d.Members.EnsureWayIn(ctx, m, identityID); err != nil {

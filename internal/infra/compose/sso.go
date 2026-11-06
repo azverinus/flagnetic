@@ -27,7 +27,7 @@ var _ appidentity.Members = ssoMembers{}
 func recordOf(m access.Member) appidentity.MemberRecord {
 	return appidentity.MemberRecord{
 		KnownMember: identity.KnownMember{ID: id.FromBytes[identity.Member](m.ID.Bytes()), Status: identity.MemberStatus(m.Status)},
-		Email:       m.Email, DisplayName: m.DisplayName,
+		Email:       m.Email, DisplayName: m.DisplayName, Provider: m.Provider,
 	}
 }
 

@@ -125,6 +125,9 @@ type MemberRecord struct {
 	identity.KnownMember
 	Email       string
 	DisplayName string
+	// Provider is the slug of the auth provider whose SCIM token provisioned
+	// the member, "" for one it did not.
+	Provider string
 }
 
 // Members is what the identity context asks of the access context, acting in

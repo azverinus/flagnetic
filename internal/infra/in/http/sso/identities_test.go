@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/scim"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -634,5 +635,50 @@ func TestUnlinkingAnIdentityOfAnUnknownMemberIsNotFound(t *testing.T) {
 
 	if err != nil || res.StatusCode() != http.StatusNotFound {
 		t.Errorf("unlinking an identity of an unknown member = %v, %v", res.StatusCode(), err)
+	}
+}
+
+func TestAProvisionedMembersIdentityAtTheirProviderIsNotUnlinked(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	noFallback := func(p *provider) { p.autoProvision, p.linkByEmail = false, false }
+	bound, other := e.forged(t, idp, noFallback), e.forged(t, idp, noFallback)
+	address := uniqueEmail()
+	created, err := e.scimClient(t, bound).CreateUserWithApplicationScimPlusJSONBodyWithResponse(t.Context(), scim.User{UserName: &address, ExternalId: ptr("sub-provisioned")})
+	if err != nil || created.ApplicationscimJSON201 == nil {
+		t.Fatalf("provisioning: %v, %d: %s", err, created.StatusCode(), created.Body)
+	}
+	idp.NextClaims(map[string]any{"sub": "sub-provisioned", "email": uniqueEmail()})
+	b := testkit.NewBrowser(t, e.srv.URL)
+	e.signIn(t, b, bound, "", e.opts())
+	if signedIn(t, b) == nil {
+		t.Fatal("the provisioned member could not sign in")
+	}
+	e.link(t, idp, b, other, "sub-other", nil)
+	methods := methodsOf(t, b)
+	id := memberID(t, e, address)
+
+	// Their own and the instance admin's unlinking both meet the directory.
+	for name, unlink := range map[string]func() (*http.Response, []byte){
+		"the member": func() (*http.Response, []byte) {
+			r, _ := b.UnlinkMyIdentityWithResponse(t.Context(), identityAt(t, methods, bound).Id.String())
+			return r.HTTPResponse, r.Body
+		},
+		"an instance admin": func() (*http.Response, []byte) {
+			r, _ := e.admin.UnlinkMemberIdentityWithResponse(t.Context(), id, identityAt(t, methods, bound).Id.String())
+			return r.HTTPResponse, r.Body
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			res, body := unlink()
+			if res.StatusCode != http.StatusConflict || !strings.Contains(string(body), `"member_provisioned"`) {
+				t.Errorf("unlinking the identity at the provisioning provider = %d: %s", res.StatusCode, body)
+			}
+		})
+	}
+	// An identity at another provider is the member's own.
+	res, err := b.UnlinkMyIdentityWithResponse(t.Context(), identityAt(t, methods, other).Id.String())
+	if err != nil || res.StatusCode() != http.StatusNoContent {
+		t.Errorf("unlinking an identity at another provider = %v, %v: %s", res.StatusCode(), err, res.Body)
 	}
 }
