@@ -129,9 +129,8 @@ type ChangeMyPasswordCommand struct {
 
 // Handle sets the caller's new password, revokes every other live session
 // of theirs and consumes their open invitations and password resets, in one
-// unit of work, and
-// records password.changed with how many sessions it revoked. The session
-// the caller is signed in to stays.
+// unit of work, and records password.changed with how many sessions it
+// revoked. The session the caller is signed in to stays.
 //
 // The new password is held to the policy (weak_password at /new_password)
 // before the current one is checked, so a weak one costs no attempt. The
@@ -187,8 +186,8 @@ func (h *ChangeMyPassword) change(ctx context.Context, cmd ChangeMyPasswordComma
 
 // apply stores the new password hash of member, revokes their other live
 // sessions, consumes their invitations and password resets, takes back the
-// failure reserved and records password.changed with how many sessions it revoked, in the unit
-// of work ctx carries.
+// failure reserved and records password.changed with how many sessions it
+// revoked, in the unit of work ctx carries.
 func (h *ChangeMyPassword) apply(ctx context.Context, cmd ChangeMyPasswordCommand, member access.Member,
 	reserved access.Reservation, settings access.AuthSettings, hash string,
 ) error {

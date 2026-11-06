@@ -433,7 +433,7 @@ func TestACompletedPasswordResetCountsNoFailureOfItsAddress(t *testing.T) {
 	}
 }
 
-func TestOnlyOneOfTwoCompletionsAtOnceSucceeds(t *testing.T) {
+func TestOnlyOneOfConcurrentCompletionsSucceeds(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	issued := issueReset(t, admin, testkit.NewMember(t, testkit.Pool(t)).ID)
@@ -508,7 +508,7 @@ func TestTheRetentionWorkerPurgesPasswordResetsThirtyDaysAfterUseOrExpiry(t *tes
 	}{
 		"used thirty days ago":    {used.Url, false},
 		"expired thirty days ago": {expired.Url, false},
-		"expired a day ago":       {recent.Url, true},
+		"expired two days ago":    {recent.Url, true},
 	} {
 		if got := kept(tc.link); got != tc.kept {
 			t.Errorf("%s: kept = %t, want %t", name, got, tc.kept)

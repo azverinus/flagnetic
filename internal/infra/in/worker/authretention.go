@@ -16,8 +16,8 @@ const AuthRetentionName = "auth_retention"
 
 // AuthRetention returns the worker purging ended sessions, failed sign-ins
 // that no longer count, sources no longer known to their members and
-// invitations and password resets long past use, once an hour: nothing waits on the purge,
-// which only keeps the tables small. Its metric
+// invitations and password resets long past use, once an hour: nothing
+// waits on the purge, which only keeps the tables small. Its metric
 // flagnetic_auth_purged_rows_total, registered on reg, counts the rows each
 // kind lost.
 func AuthRetention(h *appaccess.PurgeAuthRecords, reg prometheus.Registerer) Worker {

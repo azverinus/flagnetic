@@ -110,8 +110,8 @@ func (s *Store) PurgePasswordResets(ctx context.Context, cut access.PasswordRese
 }
 
 // ClearSignInFailures ends the consecutive failed sign-ins counted under
-// email, whatever its case, its own and those from the sources its member signed in from, which
-// lifts any lockout of the email. The failures of an address, which are not
+// email, whatever its case, its own and those from the sources its member
+// signed in from, which lifts any lockout of the email. The failures of an address, which are not
 // the member's, stay.
 func (s *Store) ClearSignInFailures(ctx context.Context, email string) error {
 	for _, table := range []string{"sign_in_email_failures", "sign_in_known_source_failures"} {
