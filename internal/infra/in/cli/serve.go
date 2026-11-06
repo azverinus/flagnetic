@@ -114,8 +114,9 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		WebhookTick:           cfg.WebhookTick,
 		SinkTick:              cfg.SinkTick,
 		SinkLagWarning:        cfg.SinkLagWarning,
-		WebhookSecretOverlap:  cfg.WebhookSecretOverlap,
-		Options:               management.Options{BaseURL: cfg.BaseURL, InsecureCookies: cfg.InsecureCookies},
+		SinkRejectionAttempts: cfg.SinkRejectionAttempts, SinkStopAfterDeadLetters: cfg.SinkStopAfterDeadLetters,
+		WebhookSecretOverlap: cfg.WebhookSecretOverlap,
+		Options:              management.Options{BaseURL: cfg.BaseURL, InsecureCookies: cfg.InsecureCookies},
 	})
 	// Run on every way out, after the requests are done.
 	defer background.Close()

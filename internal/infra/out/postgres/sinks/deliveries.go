@@ -120,7 +120,7 @@ func (s *Store) withStreams(ctx context.Context, list []sinks.Sink) error {
 		})
 		list[i].Streams = streams
 	}
-	return nil
+	return s.withDeadLetters(ctx, list)
 }
 
 // CreateStream starts the stream of kind of sink at the position at, due now.
@@ -319,7 +319,8 @@ func (s *Store) Ack(ctx context.Context, stream appsinks.StreamRef, token appsin
 		    cursor_xid = $4::text::xid8, cursor_seq = $5,
 		    inflight_xid = NULL, inflight_seq = NULL, inflight_environments = NULL, inflight_rejections = 0,
 		    lease_token = NULL, lease_until = NULL, next_attempt_at = $6,
-		    consecutive_failures = 0, consecutive_dead_letters = 0,
+		    consecutive_failures = 0,
+		    consecutive_dead_letters = CASE WHEN $7::bigint > 0 THEN 0 ELSE consecutive_dead_letters END,
 		    last_failure_class = NULL, last_failure_status = NULL, last_failure_code = NULL, last_failure_at = NULL,
 		    last_delivered_at = CASE WHEN $7::bigint > 0 THEN $8::timestamptz ELSE last_delivered_at END,
 		    delivered_total = delivered_total + $7::bigint
