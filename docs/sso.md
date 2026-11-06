@@ -89,10 +89,6 @@ Before the certificate expires, or if its key may have leaked, replace the pair 
 
 Both calls are for SAML providers (`422 not_saml` for an OIDC one), need no `If-Match` and answer the provider with its new `ETag`. They are audited as `auth_provider.certificate_rotation_started` and `auth_provider.certificate_rotation_completed`, naming the certificates by fingerprint and never a key. Editing the provider while a rotation is pending leaves it pending. Complete the rotation only after the identity provider encrypts to the new certificate: an assertion it still encrypts to the old one is lost the moment you complete.
 
-### The instance's key pair
-
-Creating a SAML provider generates a key pair for it: an RSA-2048 key and a self-signed certificate valid for three years. The private key is sealed under the instance's secret key and never leaves the instance; the certificate is in the SP metadata. The instance signs its authentication requests with the key (`sign_requests`, default true: the HTTP-Redirect binding signs the query with RSA-SHA256) and decrypts encrypted assertions with it; an identity provider that encrypts assertions needs the certificate from the SP metadata.
-
 ### Attributes, name identifiers and signing
 
 - `claims` names the assertion attributes the instance reads, as for an OIDC provider's claims: `email`, `name` and `groups` by default. An attribute is matched by its `Name` or its `FriendlyName`, and its first value counts. The email is the NameID when its format is `emailAddress`, otherwise the attribute named by `claims.email`.
