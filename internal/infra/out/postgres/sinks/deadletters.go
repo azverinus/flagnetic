@@ -17,7 +17,10 @@ import (
 // SetAside sets the batch in flight of stream aside as the dead letter dl and
 // moves the stream past it, while token holds the lease. It takes the sink's
 // row first, as a failure does, so that two streams of one sink setting a
-// batch aside on two replicas at once do not both stop it.
+// batch aside on two replicas at once do not both stop it. The stream's row
+// is locked while the dead letter is written, so a replica that takes the
+// lease over cannot slip in before the cursor moves: the lease either holds
+// for both statements or for neither.
 func (s *Store) SetAside(ctx context.Context, stream appsinks.StreamRef, token appsinks.LeaseToken, dl appsinks.NewDeadLetter, stopAfter int, now time.Time) (appsinks.SetAsideResult, error) {
 	db := s.db(ctx)
 	var res appsinks.SetAsideResult
@@ -33,6 +36,7 @@ func (s *Store) SetAside(ctx context.Context, stream appsinks.StreamRef, token a
 		    ss.inflight_environments, $5, $6, $7, ss.inflight_rejections + 1, $8, $9, $10, $11, 'pending', $11
 		FROM sink_streams ss
 		WHERE ss.sink_id = $1 AND ss.event_kind = $2 AND ss.lease_token = $3 AND ss.inflight_xid IS NOT NULL
+		FOR UPDATE OF ss
 		RETURNING attempts`,
 		stream.Sink.Bytes(), string(stream.Kind), token.String(), dl.ID.Bytes(), dl.Rows, dl.First, dl.Last,
 		string(dl.Failure.Class), status, code, now).Scan(&res.Attempts)
