@@ -81,20 +81,22 @@ type Handlers struct {
 	ProjectPermissions  *appaccess.ProjectPermissions
 	WorkingProjects     *appaccess.WorkingProjects
 
-	ListAuthProviders        *appidentity.ListProviders
-	ListEnabledAuthProviders *appidentity.ListEnabledProviders
-	CreateAuthProvider       *appidentity.CreateProvider
-	GetAuthProvider          *appidentity.GetProvider
-	UpdateAuthProvider       *appidentity.UpdateProvider
-	DeleteAuthProvider       *appidentity.DeleteProvider
-	EnableAuthProvider       *appidentity.EnableProvider
-	DisableAuthProvider      *appidentity.DisableProvider
-	TestAuthProvider         *appidentity.TestProvider
-	GetGroupMappings         *appidentity.GetGroupMappings
-	ReplaceGroupMappings     *appidentity.ReplaceGroupMappings
-	ListSCIMTokens           *appidentity.ListSCIMTokens
-	CreateSCIMToken          *appidentity.CreateSCIMToken
-	RevokeSCIMToken          *appidentity.RevokeSCIMToken
+	ListAuthProviders                       *appidentity.ListProviders
+	ListEnabledAuthProviders                *appidentity.ListEnabledProviders
+	CreateAuthProvider                      *appidentity.CreateProvider
+	GetAuthProvider                         *appidentity.GetProvider
+	UpdateAuthProvider                      *appidentity.UpdateProvider
+	DeleteAuthProvider                      *appidentity.DeleteProvider
+	EnableAuthProvider                      *appidentity.EnableProvider
+	DisableAuthProvider                     *appidentity.DisableProvider
+	RotateAuthProviderCertificate           *appidentity.RotateCertificate
+	CompleteAuthProviderCertificateRotation *appidentity.CompleteCertificateRotation
+	TestAuthProvider                        *appidentity.TestProvider
+	GetGroupMappings                        *appidentity.GetGroupMappings
+	ReplaceGroupMappings                    *appidentity.ReplaceGroupMappings
+	ListSCIMTokens                          *appidentity.ListSCIMTokens
+	CreateSCIMToken                         *appidentity.CreateSCIMToken
+	RevokeSCIMToken                         *appidentity.RevokeSCIMToken
 
 	FindProject   *appworkspace.FindProject
 	ListProjects  *appworkspace.ListProjects

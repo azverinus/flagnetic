@@ -57,11 +57,32 @@ func (c *Client) VerifyResponse(cfg appidentity.SAMLConfig, response, requestID 
 	if err = inspect(raw); err != nil {
 		return none, err
 	}
-	sp, err := serviceProvider(cfg)
+	sps, err := serviceProviders(cfg)
 	if err != nil {
 		return none, err
 	}
 	encoded := base64.StdEncoding.EncodeToString(raw)
+	// The identity provider encrypted to the key pair the SP metadata it
+	// imported listed, which during a rotation is either of two; nothing in the
+	// response says which, and a response that fails for any other reason fails
+	// with each key alike.
+	var first error
+	for _, sp := range sps {
+		assertion, err := verifyWith(sp, cfg, encoded, requestID)
+		if err == nil {
+			return assertion, nil
+		}
+		if first == nil {
+			first = err
+		}
+	}
+	return none, first
+}
+
+// verifyWith checks the response encoded as sp, which decrypts with one key
+// pair, and returns what its assertion asserts of a person.
+func verifyWith(sp *saml2.SAMLServiceProvider, cfg appidentity.SAMLConfig, encoded, requestID string) (appidentity.SAMLAssertion, error) {
+	var none appidentity.SAMLAssertion
 	resp, err := sp.ValidateEncodedResponse(encoded)
 	var invalid saml2.ErrInvalidValue
 	if errors.As(err, &invalid) && invalid.Reason == saml2.ReasonExpired {

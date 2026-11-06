@@ -97,6 +97,10 @@ type SAML struct {
 	// instance's secret key.
 	SPCertificate string
 	SealedSPKey   string
+	// NextSPCertificate and NextSealedSPKey are the key pair a pending rotation
+	// will make current: both empty when none is pending.
+	NextSPCertificate string
+	NextSealedSPKey   string
 }
 
 // SAMLInput is the SAML part of a provider's creation.

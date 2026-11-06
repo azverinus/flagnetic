@@ -62,7 +62,32 @@ The metadata is read when the provider is created and again whenever an edit nam
 
 - A metadata URL must be `https`, except on a loopback address (`422 insecure_url`); the document is at most 1 MiB, and one that cannot be fetched is `502 provider_unreachable` with the `failure`.
 - Metadata that cannot be used is `422 invalid_auth_provider` with a violation at the field it came from: `invalid_metadata` (not an EntityDescriptor of an identity provider, a DOCTYPE, a certificate that cannot be read, an http single sign-on address away from loopback), `no_redirect_binding` (the identity provider offers no HTTP-Redirect single sign-on service) or `no_signing_certificate`.
-- The `idp_certificates` are the certificates a response may be signed with. The instance does not refresh them yet: to follow the identity provider's rotation, edit the provider with the new metadata.
+- The `idp_certificates` are the certificates a response may be signed with. For metadata fetched from a URL they follow the identity provider's own rotations through the [daily refresh](#refreshing-the-metadata); metadata that was pasted is never read again, so to follow a rotation edit the provider with the new document.
+
+### Refreshing the metadata
+
+An identity provider that publishes its metadata at a URL rotates its signing certificate now and then, and a sign-in signed by a certificate the instance has not read is refused. So every replica runs the SAML metadata refresh worker once an hour; replicas running it at once take turns under an advisory lock, so one fetches. A round reads again the metadata of each enabled SAML provider whose metadata comes from a URL and was last read (`idp_metadata_refreshed_at`) a day ago or more. A provider with pasted metadata, or one that is disabled, is left alone; enabling a provider that has gone stale refreshes it in the next round.
+
+- **Nothing changed.** Only `idp_metadata_refreshed_at` moves, so the provider is not read again for a day. Nothing is audited and the provider's `version` stays.
+- **New certificates or a new single sign-on address.** They are applied, the `version` goes up, and `auth_provider.metadata_refreshed` records the certificates and address before and after (certificates as their fingerprints), attributed to the `system` actor *SAML metadata refresh*. The certificates the metadata lists replace the old ones: an identity provider that wants a rotation overlap lists the old and the new certificate together.
+- **Another entity ID.** The metadata now describes a different identity provider, which is never applied silently: whoever controls the URL could otherwise swap the provider's signing certificates. Nothing changes, the server logs *the identity provider's metadata names another entity than the provider's* with the provider, its entity ID and the one offered, and `auth_provider.metadata_refresh_refused` is audited with both. The refusal repeats every round (hourly) until an instance admin settles it: if the identity provider really moved, edit the provider with the metadata (`idp_metadata_url` or `idp_metadata_xml`), which reads it at once; if the URL is wrong, correct it.
+- **The fetch or the metadata fails** (the identity provider is down, answers a status other than 200, or the document cannot be used). The provider keeps the metadata it has, the server logs *the identity provider's metadata could not be refreshed* with the provider and the cause, and the next hourly round tries again.
+
+`flagnetic_worker_failures_total{worker="saml_metadata_refresh"}` counts rounds that failed on the instance's own storage; an identity provider's failure is a log record, not a failed round.
+
+### The instance's key pair
+
+Creating a SAML provider generates a key pair for it: an RSA-2048 key and a self-signed certificate valid for three years. The private key is sealed under the instance's secret key and never leaves the instance; the certificate is in the SP metadata. The instance signs its authentication requests with the key (`sign_requests`, default true: the HTTP-Redirect binding signs the query with RSA-SHA256) and decrypts encrypted assertions with it; an identity provider that encrypts assertions needs the certificate from the SP metadata. The provider answers its certificates as `sp_certificates`, each with its `sha256`, `not_after` and `status`.
+
+### Rotating the certificate
+
+Before the certificate expires, or if its key may have leaked, replace the pair in two steps, so that sign-in never breaks while the identity provider catches up:
+
+1. `POST /instance/auth-providers/{slug}/rotate-certificate` generates the next pair beside the current one. The answer has `rotation_pending: true` and two `sp_certificates`, `current` and `next`. The SP metadata now lists both certificates, each for signing and for encryption; an assertion encrypted to either is decrypted, while authentication requests are still signed with the current key. A second start is refused `409 rotation_pending`.
+2. Give the identity provider the new SP metadata (re-import `metadata_url`, or upload the `next` certificate as the encryption certificate and, if it verifies requests, as the request signing certificate). Until it has, nothing changes for it.
+3. `POST /instance/auth-providers/{slug}/rotate-certificate/complete` makes the next pair current and destroys the retired private key: requests are signed with the new key from then on, the metadata lists only the new certificate, and an assertion still encrypted to the old one is refused. Completing with no rotation pending is `409 no_rotation_pending`.
+
+Both calls are for SAML providers (`422 not_saml` for an OIDC one), need no `If-Match` and answer the provider with its new `ETag`. They are audited as `auth_provider.certificate_rotation_started` and `auth_provider.certificate_rotation_completed`, naming the certificates by fingerprint and never a key. Editing the provider while a rotation is pending leaves it pending. Complete the rotation only after the identity provider encrypts to the new certificate: an assertion it still encrypts to the old one is lost the moment you complete.
 
 ### The instance's key pair
 
@@ -85,7 +110,7 @@ The identity provider posts a SAML response to the ACS (at most 1 MiB; the addre
 - it answers the request the attempt made: `InResponseTo` is the request's ID. A response nobody asked for is refused, so a sign-in cannot start at the identity provider;
 - its conditions and its subject confirmation hold, with two minutes of clock skew;
 - it holds one assertion, and that assertion was not accepted before: each is remembered until it could no longer be accepted;
-- an encrypted assertion uses RSA-OAEP key transport and AES-CBC or AES-GCM; `rsa-1_5` is refused, and so is any document with a DOCTYPE.
+- an encrypted assertion uses RSA-OAEP key transport and AES-CBC or AES-GCM; `rsa-1_5` is refused, and so is any document with a DOCTYPE. The OAEP digest is SHA-1: the library reads the SHA-2 digests only under the XML-DSig names, not the XML Encryption names identity providers send (`http://www.w3.org/2001/04/xmlenc#sha256`), so an identity provider that encrypts with the SHA-256 digest, as Keycloak does by default, cannot be used with encryption yet. Leave assertions unencrypted (they are signed, and the connection is TLS) or set the identity provider's digest to SHA-1.
 
 A response that does not pass is `sso_failed`, and a response that says the identity provider refused the person is `idp_error`. The server's log record `single sign-on failed` carries the cause.
 
