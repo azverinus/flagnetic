@@ -52,10 +52,23 @@ func (p *Provisioning) Get(ctx context.Context, provider string, member access.M
 
 // lock is Get, locking the member until the unit of work ends.
 func (p *Provisioning) lock(ctx context.Context, provider string, member access.MemberID) (access.Member, error) {
-	m, _, err := p.store.LockMember(ctx, member)
+	m, err := p.lockMember(ctx, member)
 	if errors.Is(err, ErrNotFound) || (err == nil && m.Provider != provider) {
 		return access.Member{}, ErrProvisionedMemberNotFound
 	}
+	return m, err
+}
+
+// lockMember locks the instance's admins and then the member, in the order
+// every change of a member takes them: a SCIM request that updates a member
+// and then deactivates them in one unit of work would otherwise hold the
+// member while waiting for the admins that an instance admin's change of the
+// same member holds while waiting for the member, and deadlock.
+func (p *Provisioning) lockMember(ctx context.Context, member access.MemberID) (access.Member, error) {
+	if err := p.store.LockInstanceAdmins(ctx); err != nil {
+		return access.Member{}, err
+	}
+	m, _, err := p.store.LockMember(ctx, member)
 	return m, err
 }
 
@@ -106,7 +119,7 @@ type AdoptCommand struct {
 // ID the directory's from now on, and records member.adopted.
 func (p *Provisioning) Adopt(ctx context.Context, cmd AdoptCommand) (access.Member, error) {
 	now := p.clock.Now()
-	before, _, err := p.store.LockMember(ctx, cmd.Member)
+	before, err := p.lockMember(ctx, cmd.Member)
 	if errors.Is(err, ErrNotFound) {
 		return access.Member{}, ErrProvisionedMemberNotFound
 	}

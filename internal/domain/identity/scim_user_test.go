@@ -108,6 +108,11 @@ func TestPatchingAUser(t *testing.T) {
 		"several attributes without a path": {
 			[]identity.PatchOperation{op("replace", "", map[string]any{"displayName": "Jo", "externalId": "x", "active": true})},
 			identity.UserPatch{DisplayName: s("Jo"), ExternalID: s("x"), Active: b(true)}},
+		"userName wins over emails without a path": {
+			[]identity.PatchOperation{op("replace", "", map[string]any{
+				"userName": "jo@example.com", "emails": []any{map[string]any{"value": "other@example.com", "primary": true}},
+			})},
+			identity.UserPatch{Email: s("jo@example.com")}},
 		"urn prefixed key": {
 			[]identity.PatchOperation{op("replace", "", map[string]any{"urn:ietf:params:scim:schemas:core:2.0:User:active": false})},
 			identity.UserPatch{Active: b(false)}},

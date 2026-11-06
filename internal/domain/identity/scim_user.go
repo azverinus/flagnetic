@@ -3,6 +3,8 @@ package identity
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -265,8 +267,14 @@ func applyUserOperation(p *UserPatch, op string, o PatchOperation) error {
 		if !ok {
 			return scimErr("invalidValue", "an operation without a path carries an object of attributes")
 		}
-		for name, v := range obj {
-			if err := applyUserAttribute(p, op, name, v); err != nil {
+		// The attributes are applied in the order of their names, not of a
+		// map's iteration, so that one request always has one outcome: userName
+		// sorts after emails, and wins over them as it does in a new User.
+		names := slices.SortedFunc(maps.Keys(obj), func(a, b string) int {
+			return strings.Compare(strings.ToLower(a), strings.ToLower(b))
+		})
+		for _, name := range names {
+			if err := applyUserAttribute(p, op, name, obj[name]); err != nil {
 				return err
 			}
 		}
