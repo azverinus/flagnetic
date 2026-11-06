@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/azverinus/flagnetic/internal/domain/experiments"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
@@ -176,11 +177,6 @@ func (f *faults) createSections(d Document) {
 	if d.Environments != nil && len(d.Environments) == 0 {
 		f.add(Pointer("environments"), "invalid_value", "a project has at least one environment", map[string]any{"min": 1})
 	}
-	// Experiments are imported by a later change: refusing the document
-	// whole is better than creating a project that silently lacks them.
-	for i := range d.Experiments {
-		f.add(Pointer("experiments", i), "unsupported", "a document that creates a project cannot hold experiments yet", nil)
-	}
 }
 
 // uniqueKeys refuses a key that two entities of one kind share.
@@ -199,6 +195,7 @@ func (f *faults) uniqueKeys(d Document) {
 	unique("attributes", mapKeys(d.Attributes, func(a Attribute) string { return a.Key }))
 	unique("segments", mapKeys(d.Segments, func(s Segment) string { return s.Key }))
 	unique("flags", mapKeys(d.Flags, func(fl Flag) string { return fl.Key }))
+	unique("experiments", mapKeys(d.Experiments, func(e Experiment) string { return e.Key }))
 }
 
 func mapKeys[T any](in []T, key func(T) string) []string {
@@ -249,6 +246,33 @@ func (f *faults) configurations(d Document) {
 	}
 }
 
+// experimentSalts judges the salts of the experiments of d against owners,
+// the salts of everything else of the project once the import is written.
+func (f *faults) experimentSalts(d Document, owners map[string]saltOwner) {
+	for i, e := range d.Experiments {
+		who := experimentSaltOwner(e.Key)
+		for _, s := range []struct{ pointer, salt string }{
+			{"inclusion_salt", e.InclusionSalt}, {"variation_salt", e.VariationSalt},
+		} {
+			at := Pointer("experiments", i, s.pointer)
+			switch {
+			case s.salt == "" && e.Status == "draft":
+				continue
+			case s.salt == "":
+				f.add(at, "required", "an experiment past its draft has its salts, which keep a unit in its assignment", nil)
+			case !experiments.ValidSalt(s.salt):
+				f.add(at, "invalid_value", "a salt is 16 lower-case hexadecimal characters", nil)
+			default:
+				if _, taken := owners[s.salt]; taken {
+					f.add(at, "duplicate", "another experiment or rollout has this salt; no salt is shared", nil)
+					continue
+				}
+				owners[s.salt] = who
+			}
+		}
+	}
+}
+
 func sortedConfigurationKeys(m map[string]Configuration) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
@@ -258,17 +282,25 @@ func sortedConfigurationKeys(m map[string]Configuration) []string {
 	return keys
 }
 
-// saltOwner is the rollout that has a salt: the rule of a flag, which the
-// same rule of the flag in another environment shares it with.
+// saltOwner is what has a salt: a rollout, the rule of a flag, which the same
+// rule of the flag in another environment shares it with; or an experiment,
+// which shares its salts with nothing.
 type saltOwner struct{ flag, rule string }
+
+// experimentSaltOwner is the owner of the salts of the experiment keyed key.
+func experimentSaltOwner(key string) saltOwner { return saltOwner{rule: "experiment " + key} }
 
 // salts refuses a rule identifier that is not a UUID, a salt that is not 16
 // lower-case letters and digits, and a salt shared by rollouts that are not
 // the same rule of one flag in several environments, which is what copying
-// a configuration makes.
+// a configuration makes. The salts of experiments are judged with them, since
+// no experiment shares a salt with another experiment or a rollout: one that
+// is not 16 lower-case hexadecimal characters, one used twice, and one an
+// experiment past its draft lacks, which only a draft may, as it is given
+// two when it is written.
 //
-// kept are the salts of rollouts the import leaves where they are, with the
-// rule that has each.
+// kept are the salts of rollouts and experiments the import leaves where
+// they are, with the owner of each.
 func (f *faults) salts(d Document, kept map[string]saltOwner) {
 	owners := maps.Clone(kept)
 	if owners == nil {
@@ -311,4 +343,5 @@ func (f *faults) salts(d Document, kept map[string]saltOwner) {
 			}
 		}
 	}
+	f.experimentSalts(d, owners)
 }

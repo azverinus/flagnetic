@@ -258,6 +258,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Evaluations: eventStore,
 	})
 	experimentRec := appexperiments.NewRecorder(audit, d.Clock, d.IDs)
+	experimentImporter := appexperiments.NewImporter(appexperiments.ImporterDeps{
+		Tx: tx, Projects: experimentStore, Store: experimentStore, Flags: flagStore, UnitTypes: ws, Rollouts: flagStore,
+		Owners: owners, Holders: flagStore, Recorder: experimentRec,
+	})
 	// Stale flags are judged from what the events context counts and the
 	// experiments context's running experiments.
 	listStaleFlags := appflags.NewListStaleFlags(appflags.StaleDeps{
@@ -626,14 +630,16 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		// An import writes through the contexts that own what it writes, in
 		// one unit of work, moving each environment's ruleset on once.
 		ImportNewProject: apptransfer.NewImportNewProject(apptransfer.ImportNewProjectDeps{
-			Tx: tx, Workspace: workspaceImporter, Flags: transferFlags{flagImporter},
+			Tx: tx, Workspace: workspaceImporter, Flags: transferFlags{flagImporter}, Experiments: transferExperiments{experimentImporter},
 			Owners: transferOwners{members: accessStore, ownership: owners}, Rulesets: rulesets, Audit: audit,
 			Clock: d.Clock, IDs: d.IDs,
 		}),
 		ImportIntoProject: apptransfer.NewImportIntoProject(apptransfer.ImportIntoProjectDeps{
-			Tx: tx, Projects: transferProjects{ws}, Workspace: ws, Flags: flagStore, Members: accessStore, History: auditLog,
+			Tx: tx, Projects: transferProjects{ws}, Workspace: ws, Flags: flagStore, Experiments: experimentStore,
+			Members: accessStore, History: auditLog,
 			WorkspaceImport: workspaceImporter, FlagsImport: transferFlags{flagImporter},
-			Owners: transferOwners{members: accessStore, ownership: owners}, Rulesets: rulesets, Audit: audit,
+			ExperimentsImport: transferExperiments{experimentImporter},
+			Owners:            transferOwners{members: accessStore, ownership: owners}, Rulesets: rulesets, Audit: audit,
 			Clock: d.Clock, IDs: d.IDs,
 		}),
 	}, reg, managementOptions)

@@ -57,7 +57,8 @@ type weightDoc struct {
 	Weight    int    `json:"weight"`
 }
 
-// CreateExperiment stores e.
+// CreateExperiment stores e. Only an import creates an experiment past its
+// draft, with the decision a stop recorded.
 func (s *Store) CreateExperiment(ctx context.Context, e experiments.Experiment) error {
 	docs := make([]weightDoc, len(e.Variations))
 	for i, w := range e.Variations {
@@ -67,19 +68,33 @@ func (s *Store) CreateExperiment(ctx context.Context, e experiments.Experiment) 
 	if err != nil {
 		return err
 	}
+	outcome, winner, note := decisionColumns(e.Decision)
 	_, err = s.db(ctx).Exec(ctx, `
 		INSERT INTO experiments (id, project_id, key, name, hypothesis, owner_id, tags, flag_id, unit_type, variations,
 		    traffic_allocation, inclusion_salt, variation_salt, status, expected_end_at, started_at, stopped_at,
-		    archived_at, created_by, created_at, updated_at, version)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
+		    archived_at, created_by, created_at, updated_at, version, decision_outcome, decision_winner, decision_note)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
 		e.ID.Bytes(), e.Project.Bytes(), e.Key, e.Name, e.Hypothesis, e.Owner.Bytes(), e.Tags, e.Flag.Bytes(), e.UnitType,
 		variations, e.TrafficAllocation, e.InclusionSalt, e.VariationSalt, string(e.Status), e.ExpectedEndAt, e.StartedAt,
-		e.StoppedAt, e.ArchivedAt, optionalMember(e.CreatedBy), e.CreatedAt, e.UpdatedAt, e.Version)
+		e.StoppedAt, e.ArchivedAt, optionalMember(e.CreatedBy), e.CreatedAt, e.UpdatedAt, e.Version, outcome, winner, note)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "experiments_project_id_key_key" {
 		return apperrors.Conflict("already_exists", "the project has an experiment with this key already").WithCause(err)
 	}
 	return err
+}
+
+// decisionColumns are the values of the decision columns for d: all null for
+// none, the winner null for a removal.
+func decisionColumns(d *experiments.Decision) (outcome, winner, note any) {
+	if d == nil {
+		return nil, nil, nil
+	}
+	outcome, note = string(d.Outcome), d.Note
+	if d.WinnerVariation != "" {
+		winner = d.WinnerVariation
+	}
+	return outcome, winner, note
 }
 
 func optionalMember(m *access.MemberID) any {
@@ -258,13 +273,7 @@ func (s *Store) UpdateExperiment(ctx context.Context, e experiments.Experiment) 
 	if err != nil {
 		return err
 	}
-	var outcome, winner, note any
-	if d := e.Decision; d != nil {
-		outcome, note = string(d.Outcome), d.Note
-		if d.WinnerVariation != "" {
-			winner = d.WinnerVariation
-		}
-	}
+	outcome, winner, note := decisionColumns(e.Decision)
 	tag, err := s.db(ctx).Exec(ctx, `
 		UPDATE experiments SET name = $2, hypothesis = $3, owner_id = $4, tags = $5, flag_id = $6, unit_type = $7,
 		    variations = $8, traffic_allocation = $9, inclusion_salt = $10, variation_salt = $11, status = $12,
