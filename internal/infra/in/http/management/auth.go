@@ -217,7 +217,7 @@ func (a *api) AcceptInvitation(ctx context.Context, req AcceptInvitationRequestO
 
 // GetPasswordReset answers what a password reset's link opens.
 func (a *api) GetPasswordReset(ctx context.Context, req GetPasswordResetRequestObject) (GetPasswordResetResponseObject, error) {
-	v, err := a.h.GetPasswordReset.Handle(ctx, secret.New(req.Secret))
+	v, err := a.h.GetReset.Handle(ctx, secret.New(req.Secret))
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +227,7 @@ func (a *api) GetPasswordReset(ctx context.Context, req GetPasswordResetRequestO
 // CompletePasswordReset sets the member's new password, opens a session and
 // sets its cookie.
 func (a *api) CompletePasswordReset(ctx context.Context, req CompletePasswordResetRequestObject) (CompletePasswordResetResponseObject, error) {
-	res, err := a.h.CompletePasswordReset.Handle(ctx, appaccess.CompletePasswordResetCommand{
+	res, err := a.h.CompleteReset.Handle(ctx, appaccess.CompletePasswordResetCommand{
 		Secret: secret.New(req.Secret), Password: secret.New(req.Body.Password),
 		ClientIP: flaghttp.ClientOf(ctx).IP, UserAgent: browserOf(ctx).userAgent, RequestID: flaghttp.RequestIDOf(ctx),
 	})

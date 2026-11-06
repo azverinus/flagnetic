@@ -141,7 +141,7 @@ func (a *api) IssuePasswordReset(ctx context.Context, req IssuePasswordResetRequ
 	if err != nil {
 		return nil, err
 	}
-	res, err := a.h.IssuePasswordReset.Handle(ctx, appaccess.IssuePasswordResetCommand{
+	res, err := a.h.IssueReset.Handle(ctx, appaccess.IssuePasswordResetCommand{
 		Caller: callerOf(ctx), Member: member, Request: requestOf(ctx),
 	})
 	if err != nil {
