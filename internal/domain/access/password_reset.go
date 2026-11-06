@@ -28,7 +28,7 @@ const PasswordResetLifetime = time.Hour
 // does not grow forever while a recent link can still be looked into.
 const PasswordResetRetention = 30 * 24 * time.Hour
 
-const passwordResetSecretLength = 32
+const resetSecretLength = 32
 
 // PasswordReset is the one-time link that lets an active member set a new
 // password.
@@ -52,7 +52,7 @@ type PasswordReset struct {
 // from random in unpadded base64url, shown once to whoever the reset is
 // handed to and never stored.
 func NewPasswordReset(resetID PasswordResetID, member, issuedBy MemberID, now time.Time, random io.Reader) (PasswordReset, secret.String) {
-	raw := make([]byte, passwordResetSecretLength)
+	raw := make([]byte, resetSecretLength)
 	if _, err := io.ReadFull(random, raw); err != nil {
 		// The system's randomness never fails; an exhausted test source is
 		// a programming error.
@@ -69,7 +69,7 @@ func NewPasswordReset(resetID PasswordResetID, member, issuedBy MemberID, now ti
 // no lookup.
 func ParsePasswordResetSecret(value string) (PasswordResetHash, bool) {
 	raw, err := base64.RawURLEncoding.Strict().DecodeString(value)
-	if err != nil || len(raw) != passwordResetSecretLength {
+	if err != nil || len(raw) != resetSecretLength {
 		return PasswordResetHash{}, false
 	}
 	return sha256.Sum256(raw), true
