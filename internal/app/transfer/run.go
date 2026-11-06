@@ -75,6 +75,11 @@ func (r *run) fault(err error, pointer string) error {
 		return nil
 	}
 	e, ok := apperrors.From(err)
+	if ok && e.Kind == apperrors.KindConflict && len(e.Violations) > 0 {
+		// A conflict that names the fields in conflict, such as frozen, ends
+		// the import as it is, its fields pointing into the document.
+		return e.Under(pointer)
+	}
 	if !ok || e.Kind != apperrors.KindInvalid {
 		return err
 	}

@@ -7774,8 +7774,8 @@ type ClientInterface interface {
 	// ImportNewProjectWithBody Create a project from a project document
 	//
 	// Creates a project holding exactly the document: its environments (at
-	// least one), unit types, declared attributes, segments and flags with
-	// their configuration in every environment, besides the standard
+	// least one), unit types, declared attributes, segments, flags with
+	// their configuration in every environment and experiments, besides the standard
 	// attributes every project has; no default environment or unit type is
 	// added. The document is sent as `application/json` or
 	// `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -7790,6 +7790,15 @@ type ClientInterface interface {
 	// the answer warns `owner_replaced` with the address. Protection is
 	// bypassed in every environment, which take `protected` from the
 	// document.
+	//
+	// Every experiment is created exactly as the document has it, its
+	// status, both salts, its timestamps and its decision, so that a unit
+	// keeps its assignment; a draft may leave its salts out and is given two.
+	// It is judged as a create is, and by the history its status leaves
+	// behind. A draft and a running experiment need a flag that is not
+	// archived and a declared unit type, a stopped one a declared unit type,
+	// and an archived one neither. No salt is shared by two experiments, or
+	// by an experiment and a rollout.
 	//
 	// The import applies whole or not at all. A document that breaks a rule
 	// is refused 422 `invalid_document` with every fault found in `errors`,
@@ -7810,8 +7819,8 @@ type ClientInterface interface {
 	// ImportNewProject Create a project from a project document
 	//
 	// Creates a project holding exactly the document: its environments (at
-	// least one), unit types, declared attributes, segments and flags with
-	// their configuration in every environment, besides the standard
+	// least one), unit types, declared attributes, segments, flags with
+	// their configuration in every environment and experiments, besides the standard
 	// attributes every project has; no default environment or unit type is
 	// added. The document is sent as `application/json` or
 	// `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -7826,6 +7835,15 @@ type ClientInterface interface {
 	// the answer warns `owner_replaced` with the address. Protection is
 	// bypassed in every environment, which take `protected` from the
 	// document.
+	//
+	// Every experiment is created exactly as the document has it, its
+	// status, both salts, its timestamps and its decision, so that a unit
+	// keeps its assignment; a draft may leave its salts out and is given two.
+	// It is judged as a create is, and by the history its status leaves
+	// behind. A draft and a running experiment need a flag that is not
+	// archived and a declared unit type, a stopped one a declared unit type,
+	// and an archived one neither. No salt is shared by two experiments, or
+	// by an experiment and a rollout.
 	//
 	// The import applies whole or not at all. A document that breaks a rule
 	// is refused 422 `invalid_document` with every fault found in `errors`,
@@ -9421,8 +9439,27 @@ type ClientInterface interface {
 	// Protection is bypassed in every environment, and only the owner of a
 	// project, never a project token, may import.
 	//
-	// Experiments cannot be imported yet: a document that has any is refused
-	// whole, `unsupported` at each. The import applies whole or not at all;
+	// An experiment the project lacks is created exactly as the document has
+	// it: its status, both salts, its timestamps and its decision, so that
+	// a unit keeps its assignment; a draft may leave its salts out and is
+	// given two. It is judged as a create is, and by the history its status
+	// leaves behind: a started experiment has `started_at` and an
+	// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+	// and a running experiment need a flag that is not archived and a declared
+	// unit type, a stopped one a declared unit type, and an archived one
+	// neither, so a stopped experiment outlives the flag it compared. An
+	// experiment that exists changes only as an ordinary edit of its status
+	// allows, never through its status: a field its status freezes, its
+	// status, its timestamps, its decision and its salts once it is past its
+	// draft are 409 `frozen`, naming every such field in `errors`, and a
+	// smaller traffic allocation of a running experiment is 409
+	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+	// the environments holding its rules and is recorded as
+	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// experiment is accepted. No salt is shared by two experiments, or by an
+	// experiment and a rollout.
+	//
+	// The import applies whole or not at all;
 	// a document that breaks a rule is 422 `invalid_document` with every fault
 	// found in `errors`, each pointing into the document.
 	//
@@ -9475,8 +9512,27 @@ type ClientInterface interface {
 	// Protection is bypassed in every environment, and only the owner of a
 	// project, never a project token, may import.
 	//
-	// Experiments cannot be imported yet: a document that has any is refused
-	// whole, `unsupported` at each. The import applies whole or not at all;
+	// An experiment the project lacks is created exactly as the document has
+	// it: its status, both salts, its timestamps and its decision, so that
+	// a unit keeps its assignment; a draft may leave its salts out and is
+	// given two. It is judged as a create is, and by the history its status
+	// leaves behind: a started experiment has `started_at` and an
+	// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+	// and a running experiment need a flag that is not archived and a declared
+	// unit type, a stopped one a declared unit type, and an archived one
+	// neither, so a stopped experiment outlives the flag it compared. An
+	// experiment that exists changes only as an ordinary edit of its status
+	// allows, never through its status: a field its status freezes, its
+	// status, its timestamps, its decision and its salts once it is past its
+	// draft are 409 `frozen`, naming every such field in `errors`, and a
+	// smaller traffic allocation of a running experiment is 409
+	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+	// the environments holding its rules and is recorded as
+	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// experiment is accepted. No salt is shared by two experiments, or by an
+	// experiment and a rollout.
+	//
+	// The import applies whole or not at all;
 	// a document that breaks a rule is 422 `invalid_document` with every fault
 	// found in `errors`, each pointing into the document.
 	//
@@ -11627,8 +11683,8 @@ func (c *Client) CreateProject(ctx context.Context, body CreateProjectJSONReques
 // ImportNewProjectWithBody Create a project from a project document
 //
 // Creates a project holding exactly the document: its environments (at
-// least one), unit types, declared attributes, segments and flags with
-// their configuration in every environment, besides the standard
+// least one), unit types, declared attributes, segments, flags with
+// their configuration in every environment and experiments, besides the standard
 // attributes every project has; no default environment or unit type is
 // added. The document is sent as `application/json` or
 // `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -11643,6 +11699,15 @@ func (c *Client) CreateProject(ctx context.Context, body CreateProjectJSONReques
 // the answer warns `owner_replaced` with the address. Protection is
 // bypassed in every environment, which take `protected` from the
 // document.
+//
+// Every experiment is created exactly as the document has it, its
+// status, both salts, its timestamps and its decision, so that a unit
+// keeps its assignment; a draft may leave its salts out and is given two.
+// It is judged as a create is, and by the history its status leaves
+// behind. A draft and a running experiment need a flag that is not
+// archived and a declared unit type, a stopped one a declared unit type,
+// and an archived one neither. No salt is shared by two experiments, or
+// by an experiment and a rollout.
 //
 // The import applies whole or not at all. A document that breaks a rule
 // is refused 422 `invalid_document` with every fault found in `errors`,
@@ -11673,8 +11738,8 @@ func (c *Client) ImportNewProjectWithBody(ctx context.Context, params *ImportNew
 // ImportNewProject Create a project from a project document
 //
 // Creates a project holding exactly the document: its environments (at
-// least one), unit types, declared attributes, segments and flags with
-// their configuration in every environment, besides the standard
+// least one), unit types, declared attributes, segments, flags with
+// their configuration in every environment and experiments, besides the standard
 // attributes every project has; no default environment or unit type is
 // added. The document is sent as `application/json` or
 // `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -11689,6 +11754,15 @@ func (c *Client) ImportNewProjectWithBody(ctx context.Context, params *ImportNew
 // the answer warns `owner_replaced` with the address. Protection is
 // bypassed in every environment, which take `protected` from the
 // document.
+//
+// Every experiment is created exactly as the document has it, its
+// status, both salts, its timestamps and its decision, so that a unit
+// keeps its assignment; a draft may leave its salts out and is given two.
+// It is judged as a create is, and by the history its status leaves
+// behind. A draft and a running experiment need a flag that is not
+// archived and a declared unit type, a stopped one a declared unit type,
+// and an archived one neither. No salt is shared by two experiments, or
+// by an experiment and a rollout.
 //
 // The import applies whole or not at all. A document that breaks a rule
 // is refused 422 `invalid_document` with every fault found in `errors`,
@@ -14364,8 +14438,27 @@ func (c *Client) CheckHashUniformity(ctx context.Context, project ProjectKey, bo
 // Protection is bypassed in every environment, and only the owner of a
 // project, never a project token, may import.
 //
-// Experiments cannot be imported yet: a document that has any is refused
-// whole, `unsupported` at each. The import applies whole or not at all;
+// An experiment the project lacks is created exactly as the document has
+// it: its status, both salts, its timestamps and its decision, so that
+// a unit keeps its assignment; a draft may leave its salts out and is
+// given two. It is judged as a create is, and by the history its status
+// leaves behind: a started experiment has `started_at` and an
+// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+// and a running experiment need a flag that is not archived and a declared
+// unit type, a stopped one a declared unit type, and an archived one
+// neither, so a stopped experiment outlives the flag it compared. An
+// experiment that exists changes only as an ordinary edit of its status
+// allows, never through its status: a field its status freezes, its
+// status, its timestamps, its decision and its salts once it is past its
+// draft are 409 `frozen`, naming every such field in `errors`, and a
+// smaller traffic allocation of a running experiment is 409
+// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+// the environments holding its rules and is recorded as
+// `experiment.traffic_allocation_changed`. A rule serving an archived
+// experiment is accepted. No salt is shared by two experiments, or by an
+// experiment and a rollout.
+//
+// The import applies whole or not at all;
 // a document that breaks a rule is 422 `invalid_document` with every fault
 // found in `errors`, each pointing into the document.
 //
@@ -14428,8 +14521,27 @@ func (c *Client) ImportProjectWithBody(ctx context.Context, project ProjectKey, 
 // Protection is bypassed in every environment, and only the owner of a
 // project, never a project token, may import.
 //
-// Experiments cannot be imported yet: a document that has any is refused
-// whole, `unsupported` at each. The import applies whole or not at all;
+// An experiment the project lacks is created exactly as the document has
+// it: its status, both salts, its timestamps and its decision, so that
+// a unit keeps its assignment; a draft may leave its salts out and is
+// given two. It is judged as a create is, and by the history its status
+// leaves behind: a started experiment has `started_at` and an
+// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+// and a running experiment need a flag that is not archived and a declared
+// unit type, a stopped one a declared unit type, and an archived one
+// neither, so a stopped experiment outlives the flag it compared. An
+// experiment that exists changes only as an ordinary edit of its status
+// allows, never through its status: a field its status freezes, its
+// status, its timestamps, its decision and its salts once it is past its
+// draft are 409 `frozen`, naming every such field in `errors`, and a
+// smaller traffic allocation of a running experiment is 409
+// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+// the environments holding its rules and is recorded as
+// `experiment.traffic_allocation_changed`. A rule serving an archived
+// experiment is accepted. No salt is shared by two experiments, or by an
+// experiment and a rollout.
+//
+// The import applies whole or not at all;
 // a document that breaks a rule is 422 `invalid_document` with every fault
 // found in `errors`, each pointing into the document.
 //
@@ -26407,8 +26519,8 @@ type ClientWithResponsesInterface interface {
 	// ImportNewProjectWithBodyWithResponse Create a project from a project document
 	//
 	// Creates a project holding exactly the document: its environments (at
-	// least one), unit types, declared attributes, segments and flags with
-	// their configuration in every environment, besides the standard
+	// least one), unit types, declared attributes, segments, flags with
+	// their configuration in every environment and experiments, besides the standard
 	// attributes every project has; no default environment or unit type is
 	// added. The document is sent as `application/json` or
 	// `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -26423,6 +26535,15 @@ type ClientWithResponsesInterface interface {
 	// the answer warns `owner_replaced` with the address. Protection is
 	// bypassed in every environment, which take `protected` from the
 	// document.
+	//
+	// Every experiment is created exactly as the document has it, its
+	// status, both salts, its timestamps and its decision, so that a unit
+	// keeps its assignment; a draft may leave its salts out and is given two.
+	// It is judged as a create is, and by the history its status leaves
+	// behind. A draft and a running experiment need a flag that is not
+	// archived and a declared unit type, a stopped one a declared unit type,
+	// and an archived one neither. No salt is shared by two experiments, or
+	// by an experiment and a rollout.
 	//
 	// The import applies whole or not at all. A document that breaks a rule
 	// is refused 422 `invalid_document` with every fault found in `errors`,
@@ -26443,8 +26564,8 @@ type ClientWithResponsesInterface interface {
 	// ImportNewProjectWithResponse Create a project from a project document
 	//
 	// Creates a project holding exactly the document: its environments (at
-	// least one), unit types, declared attributes, segments and flags with
-	// their configuration in every environment, besides the standard
+	// least one), unit types, declared attributes, segments, flags with
+	// their configuration in every environment and experiments, besides the standard
 	// attributes every project has; no default environment or unit type is
 	// added. The document is sent as `application/json` or
 	// `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -26459,6 +26580,15 @@ type ClientWithResponsesInterface interface {
 	// the answer warns `owner_replaced` with the address. Protection is
 	// bypassed in every environment, which take `protected` from the
 	// document.
+	//
+	// Every experiment is created exactly as the document has it, its
+	// status, both salts, its timestamps and its decision, so that a unit
+	// keeps its assignment; a draft may leave its salts out and is given two.
+	// It is judged as a create is, and by the history its status leaves
+	// behind. A draft and a running experiment need a flag that is not
+	// archived and a declared unit type, a stopped one a declared unit type,
+	// and an archived one neither. No salt is shared by two experiments, or
+	// by an experiment and a rollout.
 	//
 	// The import applies whole or not at all. A document that breaks a rule
 	// is refused 422 `invalid_document` with every fault found in `errors`,
@@ -28158,8 +28288,27 @@ type ClientWithResponsesInterface interface {
 	// Protection is bypassed in every environment, and only the owner of a
 	// project, never a project token, may import.
 	//
-	// Experiments cannot be imported yet: a document that has any is refused
-	// whole, `unsupported` at each. The import applies whole or not at all;
+	// An experiment the project lacks is created exactly as the document has
+	// it: its status, both salts, its timestamps and its decision, so that
+	// a unit keeps its assignment; a draft may leave its salts out and is
+	// given two. It is judged as a create is, and by the history its status
+	// leaves behind: a started experiment has `started_at` and an
+	// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+	// and a running experiment need a flag that is not archived and a declared
+	// unit type, a stopped one a declared unit type, and an archived one
+	// neither, so a stopped experiment outlives the flag it compared. An
+	// experiment that exists changes only as an ordinary edit of its status
+	// allows, never through its status: a field its status freezes, its
+	// status, its timestamps, its decision and its salts once it is past its
+	// draft are 409 `frozen`, naming every such field in `errors`, and a
+	// smaller traffic allocation of a running experiment is 409
+	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+	// the environments holding its rules and is recorded as
+	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// experiment is accepted. No salt is shared by two experiments, or by an
+	// experiment and a rollout.
+	//
+	// The import applies whole or not at all;
 	// a document that breaks a rule is 422 `invalid_document` with every fault
 	// found in `errors`, each pointing into the document.
 	//
@@ -28212,8 +28361,27 @@ type ClientWithResponsesInterface interface {
 	// Protection is bypassed in every environment, and only the owner of a
 	// project, never a project token, may import.
 	//
-	// Experiments cannot be imported yet: a document that has any is refused
-	// whole, `unsupported` at each. The import applies whole or not at all;
+	// An experiment the project lacks is created exactly as the document has
+	// it: its status, both salts, its timestamps and its decision, so that
+	// a unit keeps its assignment; a draft may leave its salts out and is
+	// given two. It is judged as a create is, and by the history its status
+	// leaves behind: a started experiment has `started_at` and an
+	// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+	// and a running experiment need a flag that is not archived and a declared
+	// unit type, a stopped one a declared unit type, and an archived one
+	// neither, so a stopped experiment outlives the flag it compared. An
+	// experiment that exists changes only as an ordinary edit of its status
+	// allows, never through its status: a field its status freezes, its
+	// status, its timestamps, its decision and its salts once it is past its
+	// draft are 409 `frozen`, naming every such field in `errors`, and a
+	// smaller traffic allocation of a running experiment is 409
+	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+	// the environments holding its rules and is recorded as
+	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// experiment is accepted. No salt is shared by two experiments, or by an
+	// experiment and a rollout.
+	//
+	// The import applies whole or not at all;
 	// a document that breaks a rule is 422 `invalid_document` with every fault
 	// found in `errors`, each pointing into the document.
 	//
@@ -44726,8 +44894,8 @@ func (c *ClientWithResponses) CreateProjectWithResponse(ctx context.Context, bod
 // ImportNewProjectWithBodyWithResponse Create a project from a project document
 //
 // Creates a project holding exactly the document: its environments (at
-// least one), unit types, declared attributes, segments and flags with
-// their configuration in every environment, besides the standard
+// least one), unit types, declared attributes, segments, flags with
+// their configuration in every environment and experiments, besides the standard
 // attributes every project has; no default environment or unit type is
 // added. The document is sent as `application/json` or
 // `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -44742,6 +44910,15 @@ func (c *ClientWithResponses) CreateProjectWithResponse(ctx context.Context, bod
 // the answer warns `owner_replaced` with the address. Protection is
 // bypassed in every environment, which take `protected` from the
 // document.
+//
+// Every experiment is created exactly as the document has it, its
+// status, both salts, its timestamps and its decision, so that a unit
+// keeps its assignment; a draft may leave its salts out and is given two.
+// It is judged as a create is, and by the history its status leaves
+// behind. A draft and a running experiment need a flag that is not
+// archived and a declared unit type, a stopped one a declared unit type,
+// and an archived one neither. No salt is shared by two experiments, or
+// by an experiment and a rollout.
 //
 // The import applies whole or not at all. A document that breaks a rule
 // is refused 422 `invalid_document` with every fault found in `errors`,
@@ -44768,8 +44945,8 @@ func (c *ClientWithResponses) ImportNewProjectWithBodyWithResponse(ctx context.C
 // ImportNewProjectWithResponse Create a project from a project document
 //
 // Creates a project holding exactly the document: its environments (at
-// least one), unit types, declared attributes, segments and flags with
-// their configuration in every environment, besides the standard
+// least one), unit types, declared attributes, segments, flags with
+// their configuration in every environment and experiments, besides the standard
 // attributes every project has; no default environment or unit type is
 // added. The document is sent as `application/json` or
 // `application/yaml`, as `GET /projects/{project}/export` writes it, and
@@ -44784,6 +44961,15 @@ func (c *ClientWithResponses) ImportNewProjectWithBodyWithResponse(ctx context.C
 // the answer warns `owner_replaced` with the address. Protection is
 // bypassed in every environment, which take `protected` from the
 // document.
+//
+// Every experiment is created exactly as the document has it, its
+// status, both salts, its timestamps and its decision, so that a unit
+// keeps its assignment; a draft may leave its salts out and is given two.
+// It is judged as a create is, and by the history its status leaves
+// behind. A draft and a running experiment need a flag that is not
+// archived and a declared unit type, a stopped one a declared unit type,
+// and an archived one neither. No salt is shared by two experiments, or
+// by an experiment and a rollout.
 //
 // The import applies whole or not at all. A document that breaks a rule
 // is refused 422 `invalid_document` with every fault found in `errors`,
@@ -47131,8 +47317,27 @@ func (c *ClientWithResponses) CheckHashUniformityWithResponse(ctx context.Contex
 // Protection is bypassed in every environment, and only the owner of a
 // project, never a project token, may import.
 //
-// Experiments cannot be imported yet: a document that has any is refused
-// whole, `unsupported` at each. The import applies whole or not at all;
+// An experiment the project lacks is created exactly as the document has
+// it: its status, both salts, its timestamps and its decision, so that
+// a unit keeps its assignment; a draft may leave its salts out and is
+// given two. It is judged as a create is, and by the history its status
+// leaves behind: a started experiment has `started_at` and an
+// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+// and a running experiment need a flag that is not archived and a declared
+// unit type, a stopped one a declared unit type, and an archived one
+// neither, so a stopped experiment outlives the flag it compared. An
+// experiment that exists changes only as an ordinary edit of its status
+// allows, never through its status: a field its status freezes, its
+// status, its timestamps, its decision and its salts once it is past its
+// draft are 409 `frozen`, naming every such field in `errors`, and a
+// smaller traffic allocation of a running experiment is 409
+// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+// the environments holding its rules and is recorded as
+// `experiment.traffic_allocation_changed`. A rule serving an archived
+// experiment is accepted. No salt is shared by two experiments, or by an
+// experiment and a rollout.
+//
+// The import applies whole or not at all;
 // a document that breaks a rule is 422 `invalid_document` with every fault
 // found in `errors`, each pointing into the document.
 //
@@ -47191,8 +47396,27 @@ func (c *ClientWithResponses) ImportProjectWithBodyWithResponse(ctx context.Cont
 // Protection is bypassed in every environment, and only the owner of a
 // project, never a project token, may import.
 //
-// Experiments cannot be imported yet: a document that has any is refused
-// whole, `unsupported` at each. The import applies whole or not at all;
+// An experiment the project lacks is created exactly as the document has
+// it: its status, both salts, its timestamps and its decision, so that
+// a unit keeps its assignment; a draft may leave its salts out and is
+// given two. It is judged as a create is, and by the history its status
+// leaves behind: a started experiment has `started_at` and an
+// `expected_end_at`, a stopped one `stopped_at` and a decision. A draft
+// and a running experiment need a flag that is not archived and a declared
+// unit type, a stopped one a declared unit type, and an archived one
+// neither, so a stopped experiment outlives the flag it compared. An
+// experiment that exists changes only as an ordinary edit of its status
+// allows, never through its status: a field its status freezes, its
+// status, its timestamps, its decision and its salts once it is past its
+// draft are 409 `frozen`, naming every such field in `errors`, and a
+// smaller traffic allocation of a running experiment is 409
+// `traffic_allocation_decrease`. A larger one moves on the rulesets of
+// the environments holding its rules and is recorded as
+// `experiment.traffic_allocation_changed`. A rule serving an archived
+// experiment is accepted. No salt is shared by two experiments, or by an
+// experiment and a rollout.
+//
+// The import applies whole or not at all;
 // a document that breaks a rule is 422 `invalid_document` with every fault
 // found in `errors`, each pointing into the document.
 //

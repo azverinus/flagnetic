@@ -19,20 +19,22 @@ import (
 
 // ImportIntoProjectDeps are what ImportIntoProject runs on.
 type ImportIntoProjectDeps struct {
-	Tx        Transactor
-	Projects  ProjectLocker
-	Workspace Workspace
-	Flags     Flags
-	Members   Members
-	History   History
+	Tx          Transactor
+	Projects    ProjectLocker
+	Workspace   Workspace
+	Flags       Flags
+	Experiments Experiments
+	Members     Members
+	History     History
 
-	WorkspaceImport WorkspaceImport
-	FlagsImport     FlagsImport
-	Owners          Owners
-	Rulesets        Rulesets
-	Audit           AuditLog
-	Clock           clock.Clock
-	IDs             *id.Source
+	WorkspaceImport   WorkspaceImport
+	FlagsImport       FlagsImport
+	ExperimentsImport ExperimentsImport
+	Owners            Owners
+	Rulesets          Rulesets
+	Audit             AuditLog
+	Clock             clock.Clock
+	IDs               *id.Source
 }
 
 // ImportIntoProject applies a project document to a project that exists.
@@ -124,8 +126,7 @@ func (h *ImportIntoProject) Handle(ctx context.Context, cmd ImportIntoProjectCom
 }
 
 // read returns what the project holds that a merge compares the document
-// with, in the unit of work ctx carries. The experiments are not read: a
-// merge cannot import them yet.
+// with, in the unit of work ctx carries.
 func (h *ImportIntoProject) read(ctx context.Context, project workspace.Project) (transfer.Snapshot, error) {
 	s := transfer.Snapshot{Project: project}
 	reads := []func() (err error){
@@ -135,15 +136,19 @@ func (h *ImportIntoProject) read(ctx context.Context, project workspace.Project)
 		func() (err error) { s.Segments, err = h.d.Flags.Segments(ctx, project.ID); return },
 		func() (err error) { s.Flags, err = h.d.Flags.ProjectFlags(ctx, project.ID); return },
 		func() (err error) { s.Configurations, err = h.d.Flags.ProjectConfigurations(ctx, project.ID); return },
+		func() (err error) { s.Experiments, err = h.d.Experiments.ProjectExperiments(ctx, project.ID); return },
 	}
 	for _, read := range reads {
 		if err := read(); err != nil {
 			return s, err
 		}
 	}
-	owners := make([]access.MemberID, len(s.Flags))
-	for i, f := range s.Flags {
-		owners[i] = f.Owner
+	owners := make([]access.MemberID, 0, len(s.Flags)+len(s.Experiments))
+	for _, f := range s.Flags {
+		owners = append(owners, f.Owner)
+	}
+	for _, e := range s.Experiments {
+		owners = append(owners, e.Owner)
 	}
 	var err error
 	s.Emails, err = h.d.Members.MemberEmails(ctx, owners)
@@ -167,8 +172,8 @@ type mergeRun struct {
 	// key.
 	environments map[string]workspace.Environment
 	// owners are the members to own the flags the document gives a new owner,
-	// by flag key.
-	owners map[string]*access.MemberID
+	// by flag key, and experimentOwners the same for experiments.
+	owners, experimentOwners map[string]*access.MemberID
 	// known are the flags that exist once the flags are written, by key,
 	// and touched the ones the import changed.
 	known, touched map[string]bool
@@ -205,7 +210,7 @@ func (r *mergeRun) apply(ctx context.Context) (ImportResult, error) {
 	}
 	steps := []func(context.Context) error{
 		r.updateProject, r.writeEnvironments, r.writeUnitTypes, r.writeAttributes, r.writeSegments, r.writeFlags,
-		r.configureFlags, r.archiveFlags,
+		r.writeExperiments, r.configureFlags, r.archiveFlags,
 	}
 	for _, step := range steps {
 		if err := step(ctx); err != nil {
@@ -231,7 +236,7 @@ func (r *mergeRun) apply(ctx context.Context) (ImportResult, error) {
 // existing environment keeps its protection, a difference warned, and an
 // owner who cannot own is not one, for an existing flag as for a new one.
 func (r *mergeRun) resolve(ctx context.Context) error {
-	r.owners = map[string]*access.MemberID{}
+	r.owners, r.experimentOwners = map[string]*access.MemberID{}, map[string]*access.MemberID{}
 	have := make(map[string]transfer.Environment, len(r.current.Environments))
 	for _, e := range r.current.Environments {
 		have[e.Key] = e
@@ -284,6 +289,47 @@ func (r *mergeRun) resolve(ctx context.Context) error {
 			continue
 		}
 		r.owners[f.Key] = &member
+	}
+	return r.resolveExperimentOwners(ctx)
+}
+
+// resolveExperimentOwners settles the owners of the experiments as it settles
+// the flags': a new experiment is owned by whoever the document's email
+// resolves to, else by the importer, and an existing one keeps its owner
+// unless the email resolves to someone who may own it.
+func (r *mergeRun) resolveExperimentOwners(ctx context.Context) error {
+	existing := make(map[string]transfer.Experiment, len(r.current.Experiments))
+	for _, e := range r.current.Experiments {
+		existing[e.Key] = e
+	}
+	if r.eff.Experiments != nil {
+		r.eff.Experiments = slices.Clone(r.eff.Experiments)
+	}
+	for i, e := range r.eff.Experiments {
+		at := transfer.Pointer("experiments", i, "owner")
+		was, ok := existing[e.Key]
+		if !ok {
+			owner, err := r.ownerOf(ctx, e.Owner, at)
+			if err != nil {
+				return err
+			}
+			r.experimentOwners[e.Key] = owner
+			continue
+		}
+		if e.Owner == "" || strings.EqualFold(e.Owner, was.Owner) {
+			r.eff.Experiments[i].Owner = was.Owner
+			continue
+		}
+		member, ok, err := r.lookupOwner(ctx, e.Owner)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			r.warnOwnerReplaced(e.Owner, at, "the experiment keeps its owner")
+			r.eff.Experiments[i].Owner = was.Owner
+			continue
+		}
+		r.experimentOwners[e.Key] = &member
 	}
 	return nil
 }
@@ -569,6 +615,79 @@ func (r *mergeRun) tookFlag(key string, e Effect) {
 	r.took(e)
 	if e.Changed {
 		r.touched[key] = true
+	}
+}
+
+// writeExperiments creates the experiments the project lacks exactly as the
+// document has them and changes the ones that differ as far as an edit of
+// their status allows, before the configurations are written, since a rule
+// serves an experiment only once it exists. An experiment whose flag the
+// document names but the import refused is skipped, its fault being the
+// flag's. The traffic allocation of a running experiment grown moves on the
+// ruleset of the environments holding its rules.
+func (r *mergeRun) writeExperiments(ctx context.Context) error {
+	e := r.h.d.ExperimentsImport
+	named := map[string]bool{}
+	for _, f := range r.doc.Flags {
+		named[f.Key] = true
+	}
+	avoid := saltsOf(r.eff)
+	// write sends the experiment at index to the port, and reports whether it
+	// was written. A refusal the document is to be told of is noted, and is not
+	// an error.
+	write := func(index int, create bool) (Effect, bool, error) {
+		at := transfer.Pointer("experiments", index)
+		ex := r.eff.Experiments[index]
+		if r.isRefused(at) || (named[ex.Flag] && !r.known[ex.Flag]) {
+			return Effect{}, false, nil
+		}
+		in := experimentImport(r.project.ID, ex, r.experimentOwners[ex.Key], r.caller, avoid, r.req)
+		write := e.UpdateExperiment
+		if create {
+			write = e.CreateExperiment
+		}
+		effect, err := write(ctx, in)
+		if ferr := r.fault(err, at); ferr != nil {
+			return effect, false, ferr
+		}
+		return effect, err == nil, nil
+	}
+	for _, c := range r.plan.Experiments.Created {
+		_, ok, err := write(c.Index, true)
+		if err != nil {
+			return err
+		}
+		if ok {
+			r.changes.Experiments.Created = append(r.changes.Experiments.Created, c.Key)
+			r.wrote = true
+		}
+	}
+	for _, c := range r.plan.Experiments.Updated {
+		effect, ok, err := write(c.Index, false)
+		if err != nil {
+			return err
+		}
+		if ok && effect.Changed {
+			r.changes.Experiments.Updated = append(r.changes.Experiments.Updated, transfer.Update{Key: c.Key, Patch: c.Patch})
+			r.wrote = true
+			r.moveEnvironments(effect.Environments)
+		}
+	}
+	if len(r.plan.Experiments.Created)+len(r.plan.Experiments.Updated) == 0 {
+		return nil
+	}
+	return e.CheckSalts(ctx)
+}
+
+// moveEnvironments notes that the ruleset of each of the environments moves
+// on.
+func (r *mergeRun) moveEnvironments(ids []workspace.EnvironmentID) {
+	for _, id := range ids {
+		for key, env := range r.environments {
+			if env.ID == id {
+				r.moved[key] = true
+			}
+		}
 	}
 }
 

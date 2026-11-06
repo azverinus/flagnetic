@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/experiments"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -54,6 +55,11 @@ type WorkspaceImport interface {
 type Effect struct {
 	Changed  bool
 	Rulesets bool
+	// Environments are the environments whose ruleset the ordinary write
+	// would have moved on, for a write that moves only some: a running
+	// experiment's traffic allocation grown moves the ones holding its
+	// rules.
+	Environments []workspace.EnvironmentID
 }
 
 // SegmentImport is a segment to create.
@@ -133,6 +139,52 @@ type FlagsImport interface {
 	// WriteConfiguration writes the configuration whole; one the flag has
 	// already is not written.
 	WriteConfiguration(ctx context.Context, in ConfigurationImport) (Effect, error)
+}
+
+// ExperimentImport is an experiment as a document gives it, to create or to
+// change. Owner is the member the document's owner resolved to, nil for none:
+// the importing member owns a new experiment then, and an existing one keeps
+// its owner.
+type ExperimentImport struct {
+	Project           workspace.ProjectID
+	Key               string
+	Name              string
+	Hypothesis        string
+	Owner             *access.MemberID
+	Caller            *access.MemberID
+	Tags              []string
+	Flag              string
+	UnitType          string
+	Variations        []experiments.Weight
+	TrafficAllocation int
+	// InclusionSalt and VariationSalt are the document's, "" for one it
+	// leaves out: a new draft is given them, an existing experiment keeps
+	// them.
+	InclusionSalt string
+	VariationSalt string
+	Status        experiments.Status
+	ExpectedEndAt *time.Time
+	StartedAt     *time.Time
+	StoppedAt     *time.Time
+	ArchivedAt    *time.Time
+	Decision      *experiments.Decision
+	// Avoid are the salts the import gives rollouts, which no salt drawn for a
+	// new draft may be.
+	Avoid   []string
+	Request governance.Request
+}
+
+// ExperimentsImport writes what the experiments context owns, as
+// WorkspaceImport does. It creates an experiment exactly as the document has
+// it, and changes one that exists only as an edit of its status allows,
+// refusing frozen otherwise: it never moves an experiment through its status.
+type ExperimentsImport interface {
+	CreateExperiment(ctx context.Context, in ExperimentImport) (Effect, error)
+	UpdateExperiment(ctx context.Context, in ExperimentImport) (Effect, error)
+	// CheckSalts refuses two experiments of a project sharing a salt once
+	// every experiment is written: until then one may take a salt another
+	// gives up later in the same import.
+	CheckSalts(ctx context.Context) error
 }
 
 // Owners resolves the owners a document names, who are email addresses.

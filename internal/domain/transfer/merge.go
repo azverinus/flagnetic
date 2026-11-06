@@ -5,6 +5,7 @@ import (
 	"maps"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -31,13 +32,14 @@ type SectionPlan struct {
 }
 
 // Plan is what merging a document into a project would create and update. A
-// merge deletes nothing, and the experiments are not in it.
+// merge deletes nothing.
 type Plan struct {
 	Environments SectionPlan
 	UnitTypes    SectionPlan
 	Attributes   SectionPlan
 	Segments     SectionPlan
 	Flags        SectionPlan
+	Experiments  SectionPlan
 }
 
 // Compare returns what applying doc, as Effective leaves it, to the project
@@ -55,6 +57,8 @@ func Compare(current, doc Document) Plan {
 			func(a Attribute) bool { _, standard := workspace.StandardAttributeType(a.Key); return standard }),
 		Segments: compareSection(current.Segments, doc.Segments, func(s Segment) string { return s.Key }, segmentEntry, nil),
 		Flags:    compareSection(current.Flags, doc.Flags, func(f Flag) string { return f.Key }, flagEntry, nil),
+		Experiments: compareSection(current.Experiments, doc.Experiments, func(e Experiment) string { return e.Key }, experimentEntry,
+			nil),
 	}
 }
 
@@ -89,6 +93,12 @@ func segmentEntry(v any) any {
 	return entryValue(s)
 }
 
+func experimentEntry(v any) any {
+	e := v.(Experiment)
+	e.Tags, e.Variations = nonNil(e.Tags), nonNil(e.Variations)
+	return entryValue(e)
+}
+
 func flagEntry(v any) any {
 	f, err := v.(Flag).canonical()
 	if err != nil {
@@ -109,17 +119,23 @@ func flagEntry(v any) any {
 // order of overrides and prerequisites is the project's where the same
 // ones are named, since it carries no meaning a document can write.
 func Effective(current, doc Document) Document {
+	out := doc
+	out.Flags = effectiveFlags(current, doc)
+	out.Experiments = effectiveExperiments(current, doc)
+	return out
+}
+
+func effectiveFlags(current, doc Document) []Flag {
 	if doc.Flags == nil {
-		return doc
+		return nil
 	}
 	have := make(map[string]Flag, len(current.Flags))
 	for _, f := range current.Flags {
 		have[f.Key] = f
 	}
-	out := doc
-	out.Flags = make([]Flag, len(doc.Flags))
+	out := make([]Flag, len(doc.Flags))
 	for i, f := range doc.Flags {
-		out.Flags[i] = f
+		out[i] = f
 		before, ok := have[f.Key]
 		if !ok {
 			continue
@@ -132,9 +148,46 @@ func Effective(current, doc Document) Document {
 			}
 			merged[env] = c
 		}
-		out.Flags[i].Configurations = merged
+		out[i].Configurations = merged
 	}
 	return out
+}
+
+// effectiveExperiments returns the experiments of doc as they apply to the
+// project: an experiment that exists keeps the salt its document leaves out,
+// and every timestamp is the instant the project keeps, to the microsecond in
+// UTC, so that one written to the nanosecond is the one stored. A draft that
+// is new and lacks its salts is given them when it is written.
+func effectiveExperiments(current, doc Document) []Experiment {
+	if doc.Experiments == nil {
+		return nil
+	}
+	have := make(map[string]Experiment, len(current.Experiments))
+	for _, e := range current.Experiments {
+		have[e.Key] = e
+	}
+	out := make([]Experiment, len(doc.Experiments))
+	for i, e := range doc.Experiments {
+		e.StartedAt, e.StoppedAt, e.ArchivedAt = microsecond(e.StartedAt), microsecond(e.StoppedAt), microsecond(e.ArchivedAt)
+		if before, ok := have[e.Key]; ok {
+			if e.InclusionSalt == "" {
+				e.InclusionSalt = before.InclusionSalt
+			}
+			if e.VariationSalt == "" {
+				e.VariationSalt = before.VariationSalt
+			}
+		}
+		out[i] = e
+	}
+	return out
+}
+
+func microsecond(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	u := t.UTC().Truncate(time.Microsecond)
+	return &u
 }
 
 // adopting returns c, a configuration a document gives, as it applies to
@@ -248,20 +301,17 @@ func normalizedRuleID(s string) (string, bool) {
 // is required.
 //
 // It judges what no context judges alone, as CheckCreate does, and besides
-// a type that changes, which an existing flag or attribute never does, and
-// an experiment, which a merge cannot import yet.
+// a type that changes, which an existing flag or attribute never does.
 func CheckMerge(d, current Document) error {
 	var f faults
-	for i := range d.Experiments {
-		f.add(Pointer("experiments", i), "unsupported", "a merge cannot import experiments yet", nil)
-	}
 	f.uniqueKeys(d)
 	f.declarations(d)
 	f.mergedConfigurations(d, current)
 	f.types(d, current)
 	// The salts are judged as the merge writes them: a rule the document
-	// gives without its salt keeps the one the project's rule has, which no
-	// other rollout may then take.
+	// gives without its salt keeps the one the project's rule has, an
+	// experiment the same, and no other rollout or experiment may then take
+	// it.
 	f.salts(adoptedConfigurations(d, current), keptSalts(d, current))
 	if len(f) == 0 {
 		return nil
@@ -275,6 +325,7 @@ func CheckMerge(d, current Document) error {
 func adoptedConfigurations(d, current Document) Document {
 	eff := Effective(current, d)
 	out := d
+	out.Experiments = eff.Experiments
 	out.Flags = slices.Clone(d.Flags)
 	for i, f := range d.Flags {
 		named := make(map[string]Configuration, len(f.Configurations))
@@ -329,9 +380,10 @@ func (f *faults) types(d, current Document) {
 	}
 }
 
-// keptSalts returns the rollout salts the project keeps once d is merged: the
-// ones of every configuration the document does not give, which no rollout
-// of the document may reuse unless it is the same rule of the same flag.
+// keptSalts returns the salts the project keeps once d is merged: the rollout
+// salts of every configuration the document does not give, which no rollout
+// of the document may reuse unless it is the same rule of the same flag, and
+// both salts of every experiment it does not name, which nothing may reuse.
 func keptSalts(d, current Document) map[string]saltOwner {
 	named := map[string]map[string]Configuration{}
 	for _, f := range d.Flags {
@@ -350,6 +402,20 @@ func keptSalts(d, current Document) map[string]saltOwner {
 				if _, taken := kept[r.Serve.Salt]; !taken {
 					kept[r.Serve.Salt] = saltOwner{flag: fl.Key, rule: r.ID}
 				}
+			}
+		}
+	}
+	namedExperiments := map[string]bool{}
+	for _, e := range d.Experiments {
+		namedExperiments[e.Key] = true
+	}
+	for _, e := range current.Experiments {
+		if namedExperiments[e.Key] {
+			continue
+		}
+		for _, salt := range []string{e.InclusionSalt, e.VariationSalt} {
+			if _, taken := kept[salt]; !taken {
+				kept[salt] = experimentSaltOwner(e.Key)
 			}
 		}
 	}

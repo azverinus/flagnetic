@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/transfer"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
@@ -206,7 +207,14 @@ func compareStrings(a, b string) int {
 // mergeFaultsOf returns the pointer and code of each violation CheckMerge finds.
 func mergeFaultsOf(t *testing.T, d transfer.Document) [][2]string {
 	t.Helper()
-	err := transfer.CheckMerge(d, existing())
+	return mergeFaultsOfProject(t, d, existing())
+}
+
+// mergeFaultsOfProject returns the pointer and code of each violation
+// CheckMerge finds merging d into the project whose document is current.
+func mergeFaultsOfProject(t *testing.T, d, current transfer.Document) [][2]string {
+	t.Helper()
+	err := transfer.CheckMerge(d, current)
 	if err == nil {
 		return nil
 	}
@@ -227,10 +235,121 @@ func TestAMergeNeedsNoSection(t *testing.T) {
 	}
 }
 
-func TestAMergeRefusesExperimentsUntilTheyAreImported(t *testing.T) {
-	d := transfer.Document{SchemaVersion: transfer.Version, Experiments: []transfer.Experiment{{Key: "a"}, {Key: "b"}}}
-	want := [][2]string{{"/experiments/0", "unsupported"}, {"/experiments/1", "unsupported"}}
+// withExperiments is existing() with a draft, a running and a stopped
+// experiment of the flag checkout.
+func withExperiments() transfer.Document {
+	d := existing()
+	started := time.Date(2026, time.March, 1, 10, 0, 0, 0, time.UTC)
+	stopped := started.Add(48 * time.Hour)
+	end := transfer.Date{Time: time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)}
+	draft := experiment("draft", "0000000000000001", "0000000000000002")
+	run := experiment("run", "0000000000000003", "0000000000000004")
+	run.Hypothesis, run.Status, run.StartedAt, run.ExpectedEndAt = "Wins.", "running", &started, &end
+	done := run
+	done.Key, done.Name, done.Status, done.StoppedAt = "done", "done", "stopped", &stopped
+	done.InclusionSalt, done.VariationSalt = "0000000000000005", "0000000000000006"
+	done.Decision = &transfer.Decision{Outcome: "winner", WinnerVariation: "true", Note: "True wins."}
+	d.Experiments = []transfer.Experiment{done, draft, run}
+	return d
+}
+
+func TestMergingTheExperimentsTheProjectHasPlansNothing(t *testing.T) {
+	cur := withExperiments()
+	plan := transfer.Compare(cur, transfer.Effective(cur, clone(t, cur)))
+	if len(plan.Experiments.Created)+len(plan.Experiments.Updated) != 0 {
+		t.Errorf("plan = %+v, want nothing", plan.Experiments)
+	}
+}
+
+func TestAnExperimentTheProjectLacksIsCreatedAndOneThatDiffersIsUpdatedWithItsPatch(t *testing.T) {
+	cur := withExperiments()
+	doc := clone(t, cur)
+	doc.Experiments[2].TrafficAllocation = 9000
+	doc.Experiments = append(doc.Experiments, experiment("fresh", "", ""))
+	plan := transfer.Compare(cur, transfer.Effective(cur, doc))
+	if got := keys(plan.Experiments.Created); !slices.Equal(got, []string{"fresh"}) || plan.Experiments.Created[0].Index != 3 {
+		t.Errorf("created = %+v, want fresh at index 3", plan.Experiments.Created)
+	}
+	if got := plan.Experiments.Updated; len(got) != 1 || got[0].Key != "run" || len(got[0].Patch) != 1 ||
+		got[0].Patch[0] != (transfer.PatchOperation{Op: "replace", Path: "/traffic_allocation", Value: json.Number("9000")}) {
+		t.Errorf("updated = %+v, want run grown by a replace of /traffic_allocation", got)
+	}
+}
+
+func TestAnExistingExperimentKeepsTheSaltsADocumentLeavesOutAndTheNanosecondsAreDropped(t *testing.T) {
+	cur := withExperiments()
+	doc := clone(t, cur)
+	doc.Experiments[1].InclusionSalt, doc.Experiments[1].VariationSalt = "", ""
+	odd := doc.Experiments[2].StartedAt.Add(123 * time.Nanosecond)
+	doc.Experiments[2].StartedAt = &odd
+	eff := transfer.Effective(cur, doc)
+	if got := eff.Experiments[1]; got.InclusionSalt != "0000000000000001" || got.VariationSalt != "0000000000000002" {
+		t.Errorf("draft salts = %q %q, want the project's", got.InclusionSalt, got.VariationSalt)
+	}
+	if plan := transfer.Compare(cur, eff); len(plan.Experiments.Updated) != 0 {
+		t.Errorf("updated = %+v, want nothing", plan.Experiments.Updated)
+	}
+	if doc.Experiments[1].InclusionSalt != "" {
+		t.Error("Effective changed the document it was given")
+	}
+}
+
+func TestAMergeJudgesExperimentsAsACreateDoes(t *testing.T) {
+	d := transfer.Document{SchemaVersion: transfer.Version, Experiments: []transfer.Experiment{
+		experiment("a", "", ""),
+		experiment("a", "0000000000000011", "0000000000000012"),
+		experiment("c", "NOT-HEX", "0000000000000013"),
+	}}
+	run := experiment("d", "", "")
+	run.Status = "running"
+	d.Experiments = append(d.Experiments, run)
+	want := [][2]string{
+		{"/experiments/1/key", "duplicate"},
+		{"/experiments/2/inclusion_salt", "invalid_value"},
+		{"/experiments/3/inclusion_salt", "required"},
+		{"/experiments/3/variation_salt", "required"},
+	}
 	if got := mergeFaultsOf(t, d); !slices.Equal(got, want) {
+		t.Errorf("faults = %v, want %v", got, want)
+	}
+}
+
+func TestAnExistingNonDraftExperimentMayLeaveItsSaltsOut(t *testing.T) {
+	d := transfer.Document{SchemaVersion: transfer.Version, Experiments: []transfer.Experiment{experiment("run", "", "")}}
+	d.Experiments[0].Status = "running"
+	if got := mergeFaultsOfProject(t, d, withExperiments()); got != nil {
+		t.Errorf("faults = %v, want none: the project's experiment keeps its salts", got)
+	}
+}
+
+func TestTheSaltsOfAnExperimentTheDocumentLeavesAloneAreNotReused(t *testing.T) {
+	cur := withExperiments()
+	// The project's experiment run keeps its salts 03 and 04 where the document
+	// does not name it, so no other experiment takes one.
+	d := transfer.Document{SchemaVersion: transfer.Version, Experiments: []transfer.Experiment{
+		experiment("fresh", "0000000000000003", "0000000000000021"),
+		experiment("other", "0000000000000022", "0000000000000004"),
+	}}
+	want := [][2]string{{"/experiments/0/inclusion_salt", "duplicate"}, {"/experiments/1/variation_salt", "duplicate"}}
+	if got := mergeFaultsOfProject(t, d, cur); !slices.Equal(got, want) {
+		t.Errorf("faults = %v, want %v", got, want)
+	}
+
+	// Naming run releases its salts: it keeps them, and they are its own.
+	d.Experiments = []transfer.Experiment{experiment("run", "", ""), experiment("other", "0000000000000022", "0000000000000023")}
+	d.Experiments[0].Status = "running"
+	if got := mergeFaultsOfProject(t, d, cur); got != nil {
+		t.Errorf("faults = %v, want none", got)
+	}
+}
+
+func TestARolloutMayNotTakeTheSaltOfAnExperiment(t *testing.T) {
+	cur := withExperiments()
+	d := transfer.Document{SchemaVersion: transfer.Version, Flags: []transfer.Flag{
+		flagWith("other", map[string][]transfer.Rule{"development": {rollout(ruleB, "0000000000000001")}}),
+	}}
+	want := [][2]string{{"/flags/0/configurations/development/rules/0/serve/salt", "duplicate"}}
+	if got := mergeFaultsOfProject(t, d, cur); !slices.Equal(got, want) {
 		t.Errorf("faults = %v, want %v", got, want)
 	}
 }

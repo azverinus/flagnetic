@@ -196,11 +196,61 @@ func TestASaltBelongsToTheFirstRolloutThatHasIt(t *testing.T) {
 	}
 }
 
-func TestACreateRefusesExperimentsUntilTheyAreImported(t *testing.T) {
+// experiment is a draft of the flag checkout with the salts given.
+func experiment(key, inclusion, variation string) transfer.Experiment {
+	return transfer.Experiment{
+		Key: key, Name: key, Flag: "checkout", UnitType: "user", Status: "draft", TrafficAllocation: 10000,
+		Variations:    []transfer.ExperimentVariation{{Variation: "true", Weight: 5000}, {Variation: "false", Weight: 5000}},
+		InclusionSalt: inclusion, VariationSalt: variation,
+	}
+}
+
+func TestADocumentMayHoldExperimentsAndADraftMayLeaveItsSaltsOut(t *testing.T) {
 	d := creating()
-	d.Experiments = []transfer.Experiment{{Key: "e"}}
-	if got := faultsOf(t, d); !slices.Equal(got, [][2]string{{"/experiments/0", "unsupported"}}) {
-		t.Errorf("faults = %v", got)
+	d.Experiments = []transfer.Experiment{experiment("a", "", ""), experiment("b", "0123456789abcdef", "fedcba9876543210")}
+	if got := faultsOf(t, d); got != nil {
+		t.Errorf("faults = %v, want none", got)
+	}
+}
+
+func TestAnExperimentPastItsDraftNeedsBothSalts(t *testing.T) {
+	d := creating()
+	running := experiment("a", "", "fedcba9876543210")
+	running.Status = "running"
+	d.Experiments = []transfer.Experiment{running}
+	want := [][2]string{{"/experiments/0/inclusion_salt", "required"}}
+	if got := faultsOf(t, d); !slices.Equal(got, want) {
+		t.Errorf("faults = %v, want %v", got, want)
+	}
+}
+
+func TestTheSaltsOfExperimentsAreWellFormedAndDistinctFromEveryOtherSaltOfTheProject(t *testing.T) {
+	const (
+		shared = "abcdef0123456789"
+		ruleA  = "0192f3a0-0000-7000-8000-0000000000c1"
+	)
+	d := creating()
+	d.Flags = []transfer.Flag{flagWith("checkout", map[string][]transfer.Rule{"production": {rollout(ruleA, shared)}})}
+	d.Experiments = []transfer.Experiment{
+		experiment("malformed", "NOT-HEX", "0000000000000001"),
+		experiment("same", "0000000000000002", "0000000000000002"),
+		experiment("rolled", shared, "0000000000000003"),
+		experiment("first", "0000000000000004", "0000000000000005"),
+		experiment("second", "0000000000000006", "0000000000000004"),
+		experiment("repeated", "0000000000000007", "0000000000000008"),
+		experiment("repeated", "0000000000000009", "000000000000000a"),
+	}
+	got := faultsOf(t, d)
+	want := [][2]string{
+		{"/experiments/0/inclusion_salt", "invalid_value"},
+		{"/experiments/1/variation_salt", "duplicate"},
+		{"/experiments/2/inclusion_salt", "duplicate"},
+		{"/experiments/4/variation_salt", "duplicate"},
+		{"/experiments/6/key", "duplicate"},
+	}
+	slices.SortFunc(got, func(a, b [2]string) int { return compareStrings(a[0], b[0]) })
+	if !slices.Equal(got, want) {
+		t.Errorf("faults = %v, want %v", got, want)
 	}
 }
 
