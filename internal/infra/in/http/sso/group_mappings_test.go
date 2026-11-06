@@ -3,8 +3,10 @@ package sso_test
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -604,4 +606,45 @@ func TestADeactivatedMemberKeepsNoGrantOfTheProviderAndGainsNone(t *testing.T) {
 	}
 	e.wantGrants(t, alpha, member, management.GrantSourceSso, slug)
 	e.wantGrants(t, beta, member, management.GrantSourceSso, slug)
+}
+
+func TestPeopleSigningInForTheFirstTimeAtOnceAreAllGrantedWhatTheirGroupsMapTo(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	slug := e.forged(t, idp, nil)
+	alpha := e.project(t)
+	e.mapGroups(t, slug, projectMapping("eng", alpha, "developer"))
+	// Each person is held just before completing, so that every completion
+	// then provisions a member, links them and applies their groups at the
+	// same moment as the others.
+	const people = 8
+	browsers := make([]*testkit.Browser, people)
+	completions := make([]string, people)
+	for i := range people {
+		email := uniqueEmail()
+		idp.NextClaims(map[string]any{"sub": "sub-" + email, "email": email, "groups": []any{"eng"}})
+		browsers[i] = testkit.NewBrowser(t, e.srv.URL)
+		o := e.opts()
+		o.Stop = func(u *url.URL) bool { return strings.HasPrefix(u.Path, "/sso/complete/") }
+		held := e.signIn(t, browsers[i], slug, "", o)
+		if !strings.HasPrefix(held.URL.Path, "/sso/complete/") {
+			t.Fatalf("the sign-in reached %s before completing", held.URL)
+		}
+		completions[i] = held.URL.String()
+	}
+
+	ended := make([]testkit.Visit, people)
+	var wg sync.WaitGroup
+	for i := range people {
+		wg.Go(func() { ended[i] = browsers[i].Visit(t, completions[i], e.opts()) })
+	}
+	wg.Wait()
+
+	for i, v := range ended {
+		if v.URL.Path != "/" {
+			t.Errorf("sign-in %d ended at %s", i, v.URL)
+			continue
+		}
+		e.wantGrants(t, alpha, idOf(t, browsers[i]), management.GrantSourceSso, slug, "developer")
+	}
 }

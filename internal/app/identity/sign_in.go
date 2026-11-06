@@ -453,6 +453,19 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 		linked identity.Identity
 		member MemberRecord
 	)
+	if claims.HasGroups {
+		// Replacing the mappings holds the provider until it has run them for
+		// every claim stored, so a sign-in waits for it and then applies the
+		// new ones: otherwise it could store its claim just after the
+		// replacement looked for claims, and apply the mappings that are gone.
+		// The provider is held before anything is written: linking an
+		// identity or storing the claim refers to the provider's row, and two
+		// sign-ins that each referred to it first would then wait on each
+		// other to hold it.
+		if _, err := h.d.Providers.LockProvider(ctx, p.Slug); err != nil {
+			return secret.String{}, err
+		}
+	}
 	found, err := h.d.Identities.IdentityBySubject(ctx, p.ID, claims.Subject)
 	hasIdentity := err == nil
 	if err != nil && !errors.Is(err, ErrNotFound) {
@@ -518,15 +531,6 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 func (h *CompleteSignIn) applyGroups(ctx context.Context, now time.Time, p identity.Provider, member MemberRecord,
 	claims identity.VerifiedClaims, requestID string,
 ) error {
-	if claims.HasGroups {
-		// Replacing the mappings holds the provider until it has run them for
-		// every claim stored, so a sign-in waits for it and then applies the
-		// new ones: otherwise it could store its claim just after the
-		// replacement looked for claims, and apply the mappings that are gone.
-		if _, err := h.d.Providers.LockProvider(ctx, p.Slug); err != nil {
-			return err
-		}
-	}
 	mappings, err := h.d.Mappings.GroupMappings(ctx, p.ID)
 	if err != nil {
 		return err
