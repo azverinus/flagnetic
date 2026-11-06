@@ -22,7 +22,7 @@ Set `DATABASE_URL` to an existing PostgreSQL to skip testcontainers.
 
 `task build` builds the console, then the binary that embeds it. `go build` alone needs no Node: a binary built without the console serves a placeholder page in its place, and says so in its log. `task web:dev` serves the console with live reload on port 5173, sending API requests to a binary running on `FLAGNETIC_URL` (default `http://localhost:8080`).
 
-`task web:e2e` runs the console end to end: Playwright builds the binary with the console embedded, starts it against a throwaway PostgreSQL in Docker, bootstraps an instance admin through the CLI, seeds through the generated client, and drives Chromium (`pnpm --dir web e2e:install` downloads it once). The binary runs under a test clock: a spec moves the server's time by writing a duration into the offset file (`advanceClock` in `web/e2e/support/instance.ts`), which `serve` accepts only with `FLAGNETIC_TEST_HARNESS=playwright` and listening on loopback.
+`task web:e2e` runs the console end to end: Playwright builds the binary with the console embedded, starts Dex (an OpenID Connect provider the specs sign in through) and a throwaway PostgreSQL in Docker, starts it against them, bootstraps an instance admin through the CLI, seeds through the generated client, and drives Chromium (`pnpm --dir web e2e:install` downloads it once). The binary runs under a test clock: a spec moves the server's time by writing a duration into the offset file (`advanceClock` in `web/e2e/support/instance.ts`), which `serve` accepts only with `FLAGNETIC_TEST_HARNESS=playwright` and listening on loopback.
 
 ### Strings in the console
 
@@ -60,7 +60,7 @@ A test package that needs PostgreSQL calls `testkit.Main` from its `TestMain`: i
 
 - **Conventional Commits.** `type(scope): summary` in the imperative, under 72 characters. Types: `feat`, `fix`, `perf`, `deps`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `revert`. Scopes are the contexts (`flags`, `experiments`, `delivery`, `events`, `governance`, `access`, `workspace`, `integrations`), the SDKs (`sdk-go`, `sdk-go-openfeature`, `sdk-js`, `sdk-dart`, `sdk-flutter`, `sdk-ruby`, `sdk-ruby-openfeature`, `sdk-python`), and `api`, `eval`, `conformance`, `console`, `platform`, `release`, `ci`, `docs`.
 - **Sign-off (DCO).** Every commit carries a `Signed-off-by:` line matching its author: `git commit -s`. By signing off you certify the [Developer Certificate of Origin](https://developercertificate.org/): that you wrote the change or otherwise have the right to submit it under the project's license. CI rejects commits without it.
-- Explain *why* in the body when the subject cannot. Keep commits self-contained; each one should build and pass tests.
+- Explain _why_ in the body when the subject cannot. Keep commits self-contained; each one should build and pass tests.
 
 ## Pull requests
 

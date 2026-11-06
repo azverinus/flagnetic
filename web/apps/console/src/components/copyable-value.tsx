@@ -1,4 +1,4 @@
-import { Trans } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useId, useState } from "react";
 
@@ -17,6 +17,7 @@ export type CopyableValueProps = {
  * leaves the member the value on the screen.
  */
 export function CopyableValue({ label, value }: CopyableValueProps) {
+  const { t } = useLingui();
   const id = useId();
   const [copy, setCopy] = useState<"idle" | "copied" | "refused">("idle");
   const toClipboard = async () => {
@@ -39,7 +40,12 @@ export function CopyableValue({ label, value }: CopyableValueProps) {
         >
           {value}
         </code>
-        <Button variant="outline" size="sm" aria-label={label} onClick={() => void toClipboard()}>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label={t`Copy ${label}`}
+          onClick={() => void toClipboard()}
+        >
           <CopyIcon aria-hidden />
           <Trans>Copy</Trans>
         </Button>

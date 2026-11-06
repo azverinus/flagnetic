@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import {
+  createAuthProvider,
   createChangeRequest,
   createExperiment,
   createInstanceWebhook,
@@ -41,6 +42,7 @@ type Seeded = {
   changeRequest: string;
   webhook: string;
   instanceWebhook: string;
+  authProvider: string;
 };
 
 /** The key of the flag the sweep creates in its project. */
@@ -93,6 +95,16 @@ const signedIn: Route[] = [
     name: "instance auth settings",
     route: "/admin/auth-settings",
     path: () => "/admin/auth-settings",
+  },
+  {
+    name: "instance auth providers",
+    route: "/admin/auth-providers",
+    path: () => "/admin/auth-providers",
+  },
+  {
+    name: "instance auth provider",
+    route: "/admin/auth-providers/$provider",
+    path: (s: Seeded) => `/admin/auth-providers/${s.authProvider}`,
   },
   { name: "instance audit log", route: "/admin/audit", path: () => "/admin/audit" },
   { name: "instance webhooks", route: "/admin/webhooks", path: () => "/admin/webhooks" },
@@ -283,6 +295,24 @@ async function seed(): Promise<Seeded> {
       },
     }),
   );
+  // Disabled, so the sign-in page of every spec after this one is as it was.
+  const authProvider = `${project}-idp`;
+  must(
+    "adding an auth provider",
+    await createAuthProvider({
+      client: managementClient(),
+      body: {
+        slug: authProvider,
+        kind: "oidc",
+        display_name: "Sweep provider",
+        enabled: false,
+        domains: ["sweep.test"],
+        issuer: "https://login.sweep.test",
+        client_id: "flagnetic",
+        client_secret: "unused",
+      },
+    }),
+  );
   const audit = must(
     `listing the audit log of ${project}`,
     await listProjectAuditEntries({ client: managementClient(), path: { project } }),
@@ -297,6 +327,7 @@ async function seed(): Promise<Seeded> {
     changeRequest: changeRequest.id,
     webhook: webhook.id,
     instanceWebhook: instanceWebhook.id,
+    authProvider,
   };
 }
 

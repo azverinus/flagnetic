@@ -1715,6 +1715,10 @@ msgstr "Скопировано в буфер обмена."
 msgid "Copy"
 msgstr "Копировать"
 
+#: src/components/copyable-value.tsx
+msgid "Copy {label}"
+msgstr "Копировать: {label}"
+
 #: src/components/compare-environments.tsx
 msgid "Copy {other} here"
 msgstr "Скопировать {other} сюда"

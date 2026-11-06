@@ -49,7 +49,7 @@ describe("an auth provider's page", () => {
     const user = userEvent.setup();
 
     expect(await screen.findByText("https://flags.example/sso/acme/callback")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Redirect URI" }));
+    await user.click(screen.getByRole("button", { name: "Copy Redirect URI" }));
 
     expect(await navigator.clipboard.readText()).toBe("https://flags.example/sso/acme/callback");
     expect(await screen.findByText("Copied to the clipboard.")).toBeVisible();

@@ -1715,6 +1715,10 @@ msgstr "Copied to the clipboard."
 msgid "Copy"
 msgstr "Copy"
 
+#: src/components/copyable-value.tsx
+msgid "Copy {label}"
+msgstr "Copy {label}"
+
 #: src/components/compare-environments.tsx
 msgid "Copy {other} here"
 msgstr "Copy {other} here"

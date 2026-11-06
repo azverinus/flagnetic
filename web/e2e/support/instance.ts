@@ -147,9 +147,16 @@ export function advanceClock(offset: string): void {
   writeFileSync(clockPath, offset);
 }
 
-/** Starts the binary and waits until it reports itself ready. */
-export async function serve(binary: string): Promise<{ baseURL: string; child: ChildProcess }> {
-  const port = await freePort();
+/**
+ * Starts the binary and waits until it reports itself ready. `port` is the
+ * one the run chose beforehand when something needs the instance's address
+ * before it starts, as Dex's redirect URI does.
+ */
+export async function serve(
+  binary: string,
+  port?: number,
+): Promise<{ baseURL: string; child: ChildProcess }> {
+  port ??= await freePort();
   const baseURL = `http://127.0.0.1:${port}`;
   rmSync(clockPath, { force: true });
   const child = spawn(binary, ["serve"], {
