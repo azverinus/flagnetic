@@ -82,23 +82,25 @@ type Handlers struct {
 	ProjectPermissions  *appaccess.ProjectPermissions
 	WorkingProjects     *appaccess.WorkingProjects
 
-	ListMemberAuthMethods    *appidentity.ListMemberAuthMethods
-	StartLink                *appidentity.StartLink
-	UnlinkIdentity           *appidentity.UnlinkIdentity
-	ListAuthProviders        *appidentity.ListProviders
-	ListEnabledAuthProviders *appidentity.ListEnabledProviders
-	CreateAuthProvider       *appidentity.CreateProvider
-	GetAuthProvider          *appidentity.GetProvider
-	UpdateAuthProvider       *appidentity.UpdateProvider
-	DeleteAuthProvider       *appidentity.DeleteProvider
-	EnableAuthProvider       *appidentity.EnableProvider
-	DisableAuthProvider      *appidentity.DisableProvider
-	TestAuthProvider         *appidentity.TestProvider
-	GetGroupMappings         *appidentity.GetGroupMappings
-	ReplaceGroupMappings     *appidentity.ReplaceGroupMappings
-	ListSCIMTokens           *appidentity.ListSCIMTokens
-	CreateSCIMToken          *appidentity.CreateSCIMToken
-	RevokeSCIMToken          *appidentity.RevokeSCIMToken
+	ListMemberAuthMethods                   *appidentity.ListMemberAuthMethods
+	StartLink                               *appidentity.StartLink
+	UnlinkIdentity                          *appidentity.UnlinkIdentity
+	ListAuthProviders                       *appidentity.ListProviders
+	ListEnabledAuthProviders                *appidentity.ListEnabledProviders
+	CreateAuthProvider                      *appidentity.CreateProvider
+	GetAuthProvider                         *appidentity.GetProvider
+	UpdateAuthProvider                      *appidentity.UpdateProvider
+	DeleteAuthProvider                      *appidentity.DeleteProvider
+	EnableAuthProvider                      *appidentity.EnableProvider
+	DisableAuthProvider                     *appidentity.DisableProvider
+	RotateAuthProviderCertificate           *appidentity.RotateCertificate
+	CompleteAuthProviderCertificateRotation *appidentity.CompleteCertificateRotation
+	TestAuthProvider                        *appidentity.TestProvider
+	GetGroupMappings                        *appidentity.GetGroupMappings
+	ReplaceGroupMappings                    *appidentity.ReplaceGroupMappings
+	ListSCIMTokens                          *appidentity.ListSCIMTokens
+	CreateSCIMToken                         *appidentity.CreateSCIMToken
+	RevokeSCIMToken                         *appidentity.RevokeSCIMToken
 
 	FindProject   *appworkspace.FindProject
 	ListProjects  *appworkspace.ListProjects

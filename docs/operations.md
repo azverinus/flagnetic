@@ -106,6 +106,8 @@ In the console, an instance admin does all of this under **Members** in the inst
 
 Every replica runs the auth retention worker once an hour. It deletes ended sessions (revoked, or past the idle or absolute timeout in force), an email's failed sign-ins a day after the last one once no lock holds it (those from a known source too), a source's failures once its fifteen-minute window is over, a member's known source 30 days after they last signed in from it, invitations used, replaced or expired more than 30 days ago, except each member's latest, and password resets used, ended or expired more than 30 days ago, a thousand rows per transaction until nothing is left. Each batch runs under an advisory lock, so one replica purges at a time; a replica that finds another purging leaves the rest of its round to it.
 
+Every replica runs the `saml_metadata_refresh` worker once an hour. It reads again the metadata of each enabled SAML auth provider whose metadata comes from a URL and was read a day ago, one replica at a time under an advisory lock, and applies new certificates, refuses a changed entity ID and logs a fetch that failed; see [Refreshing the metadata](sso.md#refreshing-the-metadata).
+
 Every replica also runs the `token_last_use` worker once a minute. A replica gathers in memory when and from where each API token it authenticates was used, and the worker writes the latest use of each, at most one per token a minute across replicas. A replica that stops loses at most its last minute of uses; a write that fails is dropped and the token's next use is recorded instead. See [Access](access.md) for API tokens themselves.
 
 ## The console

@@ -53,6 +53,15 @@ export const zIdPCertificate = z.object({
   not_after: z.iso.datetime(),
 });
 
+/**
+ * A certificate the instance presents to a SAML identity provider.
+ */
+export const zSpCertificate = z.object({
+  sha256: z.string(),
+  not_after: z.iso.datetime(),
+  status: z.enum(["current", "next"]),
+});
+
 export const zAuthProvider = z.object({
   id: z.uuid(),
   slug: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
@@ -79,6 +88,8 @@ export const zAuthProvider = z.object({
   acs_url: z.string().optional(),
   entity_id: z.string().optional(),
   metadata_url: z.string().optional(),
+  sp_certificates: z.array(zSpCertificate).optional(),
+  rotation_pending: z.boolean().optional(),
   created_at: z.iso.datetime(),
   updated_at: z.iso.datetime(),
   version: z.coerce
@@ -4794,6 +4805,24 @@ export const zDisableAuthProviderPath = z.object({
  * The auth provider, disabled.
  */
 export const zDisableAuthProviderResponse = zAuthProvider;
+
+export const zRotateAuthProviderCertificatePath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * The auth provider, with the next certificate in `sp_certificates`.
+ */
+export const zRotateAuthProviderCertificateResponse = zAuthProvider;
+
+export const zCompleteAuthProviderCertificateRotationPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * The auth provider, with the new certificate current and no other.
+ */
+export const zCompleteAuthProviderCertificateRotationResponse = zAuthProvider;
 
 export const zGetAuthProviderGroupMappingsPath = z.object({
   provider: z.string(),

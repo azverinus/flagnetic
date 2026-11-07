@@ -37,6 +37,12 @@ type SAMLConfig struct {
 	// private key, both PEM encoded.
 	SPCertificate string
 	SPKey         secret.String
+	// NextSPCertificate and NextSPKey are the pair a pending rotation will make
+	// current, both empty when none is pending. The SP metadata lists the
+	// certificate and an assertion encrypted to it is accepted; requests are
+	// still signed with the current pair.
+	NextSPCertificate string
+	NextSPKey         secret.String
 	// Now is the time responses are judged at.
 	Now time.Time
 }
@@ -146,12 +152,20 @@ func (d SignInDeps) samlConfig(p identity.Provider, now time.Time) (SAMLConfig, 
 		return SAMLConfig{}, fmt.Errorf("opening the key of %s: %w", p.Slug, err)
 	}
 	s := p.SAML
-	return SAMLConfig{
+	cfg := SAMLConfig{
 		EntityID: identity.MetadataURL(d.BaseURL, p.Slug), ACSURL: identity.ACSURL(d.BaseURL, p.Slug),
 		IDPEntityID: s.IDP.EntityID, IDPSSOURL: s.IDP.SSOURL, IDPCertificates: s.IDP.Certificates,
 		SignRequests: s.SignRequests, NameIDFormat: s.NameIDFormat, Claims: s.Claims,
 		SPCertificate: s.SPCertificate, SPKey: secret.New(string(key)), Now: now,
-	}, nil
+	}
+	if s.RotationPending() {
+		next, err := d.Opener.Open(secret.PurposeSAMLSPKey, s.NextSealedSPKey)
+		if err != nil {
+			return SAMLConfig{}, fmt.Errorf("opening the next key of %s: %w", p.Slug, err)
+		}
+		cfg.NextSPCertificate, cfg.NextSPKey = s.NextSPCertificate, secret.New(string(next))
+	}
+	return cfg, nil
 }
 
 // startSAML creates the attempt of a SAML sign-in and answers where the

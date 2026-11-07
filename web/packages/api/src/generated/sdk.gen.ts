@@ -40,6 +40,9 @@ import type {
   CloneExperimentData,
   CloneExperimentErrors,
   CloneExperimentResponses,
+  CompleteAuthProviderCertificateRotationData,
+  CompleteAuthProviderCertificateRotationErrors,
+  CompleteAuthProviderCertificateRotationResponses,
   CompletePasswordResetData,
   CompletePasswordResetErrors,
   CompletePasswordResetResponses,
@@ -487,6 +490,9 @@ import type {
   RevokeSdkKeyData,
   RevokeSdkKeyErrors,
   RevokeSdkKeyResponses,
+  RotateAuthProviderCertificateData,
+  RotateAuthProviderCertificateErrors,
+  RotateAuthProviderCertificateResponses,
   RotateInstanceWebhookSecretData,
   RotateInstanceWebhookSecretErrors,
   RotateInstanceWebhookSecretResponses,
@@ -5089,6 +5095,79 @@ export const disableAuthProvider = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/instance/auth-providers/{provider}/disable",
+    ...options,
+  });
+
+/**
+ * Start rotating a SAML provider's SP certificate
+ *
+ * Generates the next key pair (an RSA-2048 key and a self-signed certificate
+ * valid for three years) beside the current one. The SP metadata lists both
+ * certificates from then on, so the identity provider can import the new one;
+ * an assertion encrypted to either is accepted, while authentication requests
+ * stay signed with the current key. Complete the rotation once the identity
+ * provider has imported the metadata. Refused `409 rotation_pending` while a
+ * rotation is pending and `422 not_saml` for an OIDC provider. Audited
+ * `auth_provider.certificate_rotation_started`, naming the certificates by
+ * fingerprint.
+ *
+ */
+export const rotateAuthProviderCertificate = <ThrowOnError extends boolean = false>(
+  options: Options<RotateAuthProviderCertificateData, ThrowOnError>,
+): RequestResult<
+  RotateAuthProviderCertificateResponses,
+  RotateAuthProviderCertificateErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    RotateAuthProviderCertificateResponses,
+    RotateAuthProviderCertificateErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}/rotate-certificate",
+    ...options,
+  });
+
+/**
+ * Complete the rotation of a SAML provider's SP certificate
+ *
+ * Makes the next key pair current and destroys the retired private key: from
+ * then on requests are signed with the new key and an assertion encrypted to the
+ * old certificate is refused. Do it once the identity provider has imported the
+ * SP metadata that lists the new certificate. Refused `409 no_rotation_pending`
+ * when none was started and `422 not_saml` for an OIDC provider. Audited
+ * `auth_provider.certificate_rotation_completed`.
+ *
+ */
+export const completeAuthProviderCertificateRotation = <ThrowOnError extends boolean = false>(
+  options: Options<CompleteAuthProviderCertificateRotationData, ThrowOnError>,
+): RequestResult<
+  CompleteAuthProviderCertificateRotationResponses,
+  CompleteAuthProviderCertificateRotationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CompleteAuthProviderCertificateRotationResponses,
+    CompleteAuthProviderCertificateRotationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}/rotate-certificate/complete",
     ...options,
   });
 

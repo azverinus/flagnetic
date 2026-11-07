@@ -145,6 +145,13 @@ func providerValues(p identity.Provider) map[string]any {
 		v["idp_entity_id"], v["idp_sso_url"] = c.IDP.EntityID, c.IDP.SSOURL
 		v["sign_requests"], v["name_id_format"] = c.SignRequests, c.NameIDFormat
 		v["claims"] = map[string]any{"email": c.Claims.Email, "name": c.Claims.Name, "groups": c.Claims.Groups}
+		// The instance's own certificates are named by fingerprint: enough to
+		// tell a rotation from the audit log, and no key.
+		spCerts := []string{}
+		for _, cert := range c.SPCertificates() {
+			spCerts = append(spCerts, cert.SHA256)
+		}
+		v["sp_certificates"], v["rotation_pending"] = spCerts, c.RotationPending()
 		certs := make([]string, 0, len(c.IDP.Certificates))
 		for _, info := range c.IDP.CertificateInfos() {
 			certs = append(certs, info.SHA256)

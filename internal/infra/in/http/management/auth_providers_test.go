@@ -379,14 +379,16 @@ func TestOnlyAnInstanceAdminManagesAuthProviders(t *testing.T) {
 			want = http.StatusUnauthorized
 		}
 		for op, res := range map[string]*http.Response{
-			"list":    do(c.ListAuthProvidersWithResponse(t.Context())).HTTPResponse,
-			"create":  do(c.CreateAuthProviderWithResponse(t.Context(), corporate(providerSlug()))).HTTPResponse,
-			"get":     do(c.GetAuthProviderWithResponse(t.Context(), slug)).HTTPResponse,
-			"update":  do(c.UpdateAuthProviderWithResponse(t.Context(), slug, &management.UpdateAuthProviderParams{IfMatch: ifMatch(1)}, management.AuthProviderPatch{})).HTTPResponse,
-			"delete":  do(c.DeleteAuthProviderWithResponse(t.Context(), slug)).HTTPResponse,
-			"enable":  do(c.EnableAuthProviderWithResponse(t.Context(), slug)).HTTPResponse,
-			"disable": do(c.DisableAuthProviderWithResponse(t.Context(), slug)).HTTPResponse,
-			"test":    do(c.TestAuthProviderWithResponse(t.Context(), slug)).HTTPResponse,
+			"list":              do(c.ListAuthProvidersWithResponse(t.Context())).HTTPResponse,
+			"create":            do(c.CreateAuthProviderWithResponse(t.Context(), corporate(providerSlug()))).HTTPResponse,
+			"get":               do(c.GetAuthProviderWithResponse(t.Context(), slug)).HTTPResponse,
+			"update":            do(c.UpdateAuthProviderWithResponse(t.Context(), slug, &management.UpdateAuthProviderParams{IfMatch: ifMatch(1)}, management.AuthProviderPatch{})).HTTPResponse,
+			"delete":            do(c.DeleteAuthProviderWithResponse(t.Context(), slug)).HTTPResponse,
+			"enable":            do(c.EnableAuthProviderWithResponse(t.Context(), slug)).HTTPResponse,
+			"disable":           do(c.DisableAuthProviderWithResponse(t.Context(), slug)).HTTPResponse,
+			"test":              do(c.TestAuthProviderWithResponse(t.Context(), slug)).HTTPResponse,
+			"rotate":            do(c.RotateAuthProviderCertificateWithResponse(t.Context(), slug)).HTTPResponse,
+			"complete rotation": do(c.CompleteAuthProviderCertificateRotationWithResponse(t.Context(), slug)).HTTPResponse,
 		} {
 			if res.StatusCode != want {
 				t.Errorf("%s: %s = %d, want %d", name, op, res.StatusCode, want)

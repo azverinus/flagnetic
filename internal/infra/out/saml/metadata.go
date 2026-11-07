@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/russellhaering/gosaml2/types"
+	dsigtypes "github.com/russellhaering/goxmldsig/types"
 
 	"github.com/azverinus/flagnetic/internal/domain/identity"
 )
@@ -146,4 +147,22 @@ func refuseDangerousXML(raw []byte) error {
 			}
 		}
 	}
+}
+
+// listNextCertificate adds to the instance's metadata the certificate of the
+// next key pair, for the uses the current one has: an identity provider that
+// imports the metadata then verifies requests signed with, and encrypts to,
+// either.
+func listNextCertificate(d *types.EntityDescriptor, certificatePEM string) error {
+	block, _ := pem.Decode([]byte(certificatePEM))
+	if block == nil {
+		return errors.New("the instance's next certificate is not PEM")
+	}
+	data := base64.StdEncoding.EncodeToString(block.Bytes)
+	sp := d.SPSSODescriptor
+	for _, kd := range slices.Clone(sp.KeyDescriptors) {
+		kd.KeyInfo.X509Data.X509Certificates = []dsigtypes.X509Certificate{{Data: data}}
+		sp.KeyDescriptors = append(sp.KeyDescriptors, kd)
+	}
+	return nil
 }

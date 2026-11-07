@@ -627,6 +627,24 @@ func (e SAMLNameIDFormat) Valid() bool {
 	}
 }
 
+// Defines values for SPCertificateStatus.
+const (
+	SPCertificateStatusCurrent SPCertificateStatus = "current"
+	SPCertificateStatusNext    SPCertificateStatus = "next"
+)
+
+// Valid indicates whether the value is a known member of the SPCertificateStatus enum.
+func (e SPCertificateStatus) Valid() bool {
+	switch e {
+	case SPCertificateStatusCurrent:
+		return true
+	case SPCertificateStatusNext:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SampleRatioSkippedReason.
 const (
 	SampleRatioSkippedReasonBelowMinimumSample SampleRatioSkippedReason = "below_minimum_sample"
@@ -1402,10 +1420,11 @@ type AuthProvider struct {
 	// IdpEntityId SAML only, read from the identity provider's metadata.
 	IdpEntityId *string `json:"idp_entity_id,omitempty"`
 
-	// IdpMetadataRefreshedAt SAML only: when the identity provider's metadata was last read.
+	// IdpMetadataRefreshedAt SAML only: when the identity provider's metadata was last read, at creation, on an edit of its source or by the daily refresh.
 	IdpMetadataRefreshedAt *time.Time `json:"idp_metadata_refreshed_at,omitempty"`
 
-	// IdpMetadataUrl SAML only: where the identity provider's metadata is fetched from; absent when the metadata was pasted.
+	// IdpMetadataUrl SAML only: where the identity provider's metadata is fetched from, and read again daily; absent
+	// when the metadata was pasted, which is never refreshed.
 	IdpMetadataUrl *string `json:"idp_metadata_url,omitempty"`
 
 	// IdpSsoUrl SAML only: the identity provider's HTTP-Redirect single sign-on address, read from its metadata.
@@ -1431,16 +1450,23 @@ type AuthProvider struct {
 	RedirectUri *string `json:"redirect_uri,omitempty"`
 
 	// RequireVerifiedEmail Whether a sign-in whose token does not say the email is verified is refused.
-	RequireVerifiedEmail *bool     `json:"require_verified_email,omitempty"`
-	Scopes               *[]string `json:"scopes,omitempty"`
+	RequireVerifiedEmail *bool `json:"require_verified_email,omitempty"`
+
+	// RotationPending SAML only: whether a certificate rotation was started and not completed.
+	RotationPending *bool     `json:"rotation_pending,omitempty"`
+	Scopes          *[]string `json:"scopes,omitempty"`
 
 	// SignRequests SAML only: whether the authentication requests are signed.
 	SignRequests *bool `json:"sign_requests,omitempty"`
 
 	// Slug Names the provider in sign-in buttons and URLs; never changes.
-	Slug      string    `json:"slug"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Version   int64     `json:"version"`
+	Slug string `json:"slug"`
+
+	// SpCertificates SAML only: the certificates the instance presents, the current one and, while a rotation is
+	// pending, the next. The metadata at `metadata_url` lists them all.
+	SpCertificates *[]SPCertificate `json:"sp_certificates,omitempty"`
+	UpdatedAt      time.Time        `json:"updated_at"`
+	Version        int64            `json:"version"`
 }
 
 // AuthProviderClaims The claims of an OIDC provider's tokens, or the attributes of a SAML provider's assertions, that carry what
@@ -3835,6 +3861,22 @@ type RuleInput struct {
 
 // SAMLNameIDFormat The format of the subject identifier requested of a SAML identity provider.
 type SAMLNameIDFormat string
+
+// SPCertificate A certificate the instance presents to a SAML identity provider.
+type SPCertificate struct {
+	NotAfter time.Time `json:"not_after"`
+
+	// Sha256 The lowercase hex SHA-256 of the certificate.
+	Sha256 string `json:"sha256"`
+
+	// Status `current` signs the authentication requests; `next` is the certificate a pending
+	// rotation will make current.
+	Status SPCertificateStatus `json:"status"`
+}
+
+// SPCertificateStatus `current` signs the authentication requests; `next` is the certificate a pending
+// rotation will make current.
+type SPCertificateStatus string
 
 // SampleRatioAlertDetails defines model for SampleRatioAlertDetails.
 type SampleRatioAlertDetails struct {
@@ -7786,6 +7828,33 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
 	ReplaceAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RotateAuthProviderCertificate Start rotating a SAML provider's SP certificate
+	//
+	// Generates the next key pair (an RSA-2048 key and a self-signed certificate
+	// valid for three years) beside the current one. The SP metadata lists both
+	// certificates from then on, so the identity provider can import the new one;
+	// an assertion encrypted to either is accepted, while authentication requests
+	// stay signed with the current key. Complete the rotation once the identity
+	// provider has imported the metadata. Refused `409 rotation_pending` while a
+	// rotation is pending and `422 not_saml` for an OIDC provider. Audited
+	// `auth_provider.certificate_rotation_started`, naming the certificates by
+	// fingerprint.
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/rotate-certificate (the `RotateAuthProviderCertificate` operationId).
+	RotateAuthProviderCertificate(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteAuthProviderCertificateRotation Complete the rotation of a SAML provider's SP certificate
+	//
+	// Makes the next key pair current and destroys the retired private key: from
+	// then on requests are signed with the new key and an assertion encrypted to the
+	// old certificate is refused. Do it once the identity provider has imported the
+	// SP metadata that lists the new certificate. Refused `409 no_rotation_pending`
+	// when none was started and `422 not_saml` for an OIDC provider. Audited
+	// `auth_provider.certificate_rotation_completed`.
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/rotate-certificate/complete (the `CompleteAuthProviderCertificateRotation` operationId).
+	CompleteAuthProviderCertificateRotation(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// TestAuthProvider Test that an auth provider can be reached
 	//
@@ -11847,6 +11916,53 @@ func (c *Client) ReplaceAuthProviderGroupMappingsWithBody(ctx context.Context, p
 // Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
 func (c *Client) ReplaceAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewReplaceAuthProviderGroupMappingsRequest(c.Server, provider, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RotateAuthProviderCertificate Start rotating a SAML provider's SP certificate
+//
+// Generates the next key pair (an RSA-2048 key and a self-signed certificate
+// valid for three years) beside the current one. The SP metadata lists both
+// certificates from then on, so the identity provider can import the new one;
+// an assertion encrypted to either is accepted, while authentication requests
+// stay signed with the current key. Complete the rotation once the identity
+// provider has imported the metadata. Refused `409 rotation_pending` while a
+// rotation is pending and `422 not_saml` for an OIDC provider. Audited
+// `auth_provider.certificate_rotation_started`, naming the certificates by
+// fingerprint.
+//
+// Corresponds with POST /instance/auth-providers/{provider}/rotate-certificate (the `RotateAuthProviderCertificate` operationId).
+func (c *Client) RotateAuthProviderCertificate(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRotateAuthProviderCertificateRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompleteAuthProviderCertificateRotation Complete the rotation of a SAML provider's SP certificate
+//
+// Makes the next key pair current and destroys the retired private key: from
+// then on requests are signed with the new key and an assertion encrypted to the
+// old certificate is refused. Do it once the identity provider has imported the
+// SP metadata that lists the new certificate. Refused `409 no_rotation_pending`
+// when none was started and `422 not_saml` for an OIDC provider. Audited
+// `auth_provider.certificate_rotation_completed`.
+//
+// Corresponds with POST /instance/auth-providers/{provider}/rotate-certificate/complete (the `CompleteAuthProviderCertificateRotation` operationId).
+func (c *Client) CompleteAuthProviderCertificateRotation(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteAuthProviderCertificateRotationRequest(c.Server, provider)
 	if err != nil {
 		return nil, err
 	}
@@ -18669,6 +18785,74 @@ func NewReplaceAuthProviderGroupMappingsRequestWithBody(server string, provider 
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRotateAuthProviderCertificateRequest constructs an http.Request for the RotateAuthProviderCertificate method
+func NewRotateAuthProviderCertificateRequest(server string, provider AuthProviderSlug) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s/rotate-certificate", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCompleteAuthProviderCertificateRotationRequest constructs an http.Request for the CompleteAuthProviderCertificateRotation method
+func NewCompleteAuthProviderCertificateRotationRequest(server string, provider AuthProviderSlug) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s/rotate-certificate/complete", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -28509,6 +28693,37 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
 	ReplaceAuthProviderGroupMappingsWithResponse(ctx context.Context, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error)
 
+	// RotateAuthProviderCertificateWithResponse Start rotating a SAML provider's SP certificate
+	//
+	// Generates the next key pair (an RSA-2048 key and a self-signed certificate
+	// valid for three years) beside the current one. The SP metadata lists both
+	// certificates from then on, so the identity provider can import the new one;
+	// an assertion encrypted to either is accepted, while authentication requests
+	// stay signed with the current key. Complete the rotation once the identity
+	// provider has imported the metadata. Refused `409 rotation_pending` while a
+	// rotation is pending and `422 not_saml` for an OIDC provider. Audited
+	// `auth_provider.certificate_rotation_started`, naming the certificates by
+	// fingerprint.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/rotate-certificate (the `RotateAuthProviderCertificate` operationId).
+	RotateAuthProviderCertificateWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*RotateAuthProviderCertificateResponse, error)
+
+	// CompleteAuthProviderCertificateRotationWithResponse Complete the rotation of a SAML provider's SP certificate
+	//
+	// Makes the next key pair current and destroys the retired private key: from
+	// then on requests are signed with the new key and an assertion encrypted to the
+	// old certificate is refused. Do it once the identity provider has imported the
+	// SP metadata that lists the new certificate. Refused `409 no_rotation_pending`
+	// when none was started and `422 not_saml` for an OIDC provider. Audited
+	// `auth_provider.certificate_rotation_completed`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /instance/auth-providers/{provider}/rotate-certificate/complete (the `CompleteAuthProviderCertificateRotation` operationId).
+	CompleteAuthProviderCertificateRotationWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*CompleteAuthProviderCertificateRotationResponse, error)
+
 	// TestAuthProviderWithResponse Test that an auth provider can be reached
 	//
 	// Fetches the provider's discovery document now (OIDC), or fetches its
@@ -33700,6 +33915,186 @@ func (r ReplaceAuthProviderGroupMappingsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ReplaceAuthProviderGroupMappingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RotateAuthProviderCertificateResponse200Headers the declared response headers of an HTTP 200 response for RotateAuthProviderCertificate
+type RotateAuthProviderCertificateResponse200Headers struct {
+	ETag *string
+}
+
+// RotateAuthProviderCertificateResponse401Headers the declared response headers of an HTTP 401 response for RotateAuthProviderCertificate
+type RotateAuthProviderCertificateResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RotateAuthProviderCertificateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthProvider
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *RotateAuthProviderCertificateResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RotateAuthProviderCertificateResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RotateAuthProviderCertificateResponse) GetJSON200() *AuthProvider {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RotateAuthProviderCertificateResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RotateAuthProviderCertificateResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RotateAuthProviderCertificateResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RotateAuthProviderCertificateResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r RotateAuthProviderCertificateResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r RotateAuthProviderCertificateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RotateAuthProviderCertificateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RotateAuthProviderCertificateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RotateAuthProviderCertificateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CompleteAuthProviderCertificateRotationResponse200Headers the declared response headers of an HTTP 200 response for CompleteAuthProviderCertificateRotation
+type CompleteAuthProviderCertificateRotationResponse200Headers struct {
+	ETag *string
+}
+
+// CompleteAuthProviderCertificateRotationResponse401Headers the declared response headers of an HTTP 401 response for CompleteAuthProviderCertificateRotation
+type CompleteAuthProviderCertificateRotationResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CompleteAuthProviderCertificateRotationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthProvider
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *CompleteAuthProviderCertificateRotationResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CompleteAuthProviderCertificateRotationResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CompleteAuthProviderCertificateRotationResponse) GetJSON200() *AuthProvider {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CompleteAuthProviderCertificateRotationResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CompleteAuthProviderCertificateRotationResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CompleteAuthProviderCertificateRotationResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CompleteAuthProviderCertificateRotationResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CompleteAuthProviderCertificateRotationResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CompleteAuthProviderCertificateRotationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CompleteAuthProviderCertificateRotationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CompleteAuthProviderCertificateRotationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CompleteAuthProviderCertificateRotationResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -48750,6 +49145,49 @@ func (c *ClientWithResponses) ReplaceAuthProviderGroupMappingsWithResponse(ctx c
 	return ParseReplaceAuthProviderGroupMappingsResponse(rsp)
 }
 
+// RotateAuthProviderCertificateWithResponse Start rotating a SAML provider's SP certificate
+//
+// Generates the next key pair (an RSA-2048 key and a self-signed certificate
+// valid for three years) beside the current one. The SP metadata lists both
+// certificates from then on, so the identity provider can import the new one;
+// an assertion encrypted to either is accepted, while authentication requests
+// stay signed with the current key. Complete the rotation once the identity
+// provider has imported the metadata. Refused `409 rotation_pending` while a
+// rotation is pending and `422 not_saml` for an OIDC provider. Audited
+// `auth_provider.certificate_rotation_started`, naming the certificates by
+// fingerprint.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /instance/auth-providers/{provider}/rotate-certificate (the `RotateAuthProviderCertificate` operationId).
+func (c *ClientWithResponses) RotateAuthProviderCertificateWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*RotateAuthProviderCertificateResponse, error) {
+	rsp, err := c.RotateAuthProviderCertificate(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRotateAuthProviderCertificateResponse(rsp)
+}
+
+// CompleteAuthProviderCertificateRotationWithResponse Complete the rotation of a SAML provider's SP certificate
+//
+// Makes the next key pair current and destroys the retired private key: from
+// then on requests are signed with the new key and an assertion encrypted to the
+// old certificate is refused. Do it once the identity provider has imported the
+// SP metadata that lists the new certificate. Refused `409 no_rotation_pending`
+// when none was started and `422 not_saml` for an OIDC provider. Audited
+// `auth_provider.certificate_rotation_completed`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /instance/auth-providers/{provider}/rotate-certificate/complete (the `CompleteAuthProviderCertificateRotation` operationId).
+func (c *ClientWithResponses) CompleteAuthProviderCertificateRotationWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*CompleteAuthProviderCertificateRotationResponse, error) {
+	rsp, err := c.CompleteAuthProviderCertificateRotation(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCompleteAuthProviderCertificateRotationResponse(rsp)
+}
+
 // TestAuthProviderWithResponse Test that an auth provider can be reached
 //
 // Fetches the provider's discovery document now (OIDC), or fetches its
@@ -55235,6 +55673,174 @@ func ParseReplaceAuthProviderGroupMappingsResponse(rsp *http.Response) (*Replace
 	switch {
 	case rsp.StatusCode == 401:
 		var headers ReplaceAuthProviderGroupMappingsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRotateAuthProviderCertificateResponse parses an HTTP response from a RotateAuthProviderCertificateWithResponse call
+func ParseRotateAuthProviderCertificateResponse(rsp *http.Response) (*RotateAuthProviderCertificateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RotateAuthProviderCertificateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthProvider
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers RotateAuthProviderCertificateResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers RotateAuthProviderCertificateResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCompleteAuthProviderCertificateRotationResponse parses an HTTP response from a CompleteAuthProviderCertificateRotationWithResponse call
+func ParseCompleteAuthProviderCertificateRotationResponse(rsp *http.Response) (*CompleteAuthProviderCertificateRotationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CompleteAuthProviderCertificateRotationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthProvider
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers CompleteAuthProviderCertificateRotationResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers CompleteAuthProviderCertificateRotationResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -68487,6 +69093,12 @@ type ServerInterface interface {
 	// ReplaceAuthProviderGroupMappings Replace an auth provider's group mappings
 	// (PUT /instance/auth-providers/{provider}/group-mappings)
 	ReplaceAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// RotateAuthProviderCertificate Start rotating a SAML provider's SP certificate
+	// (POST /instance/auth-providers/{provider}/rotate-certificate)
+	RotateAuthProviderCertificate(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// CompleteAuthProviderCertificateRotation Complete the rotation of a SAML provider's SP certificate
+	// (POST /instance/auth-providers/{provider}/rotate-certificate/complete)
+	CompleteAuthProviderCertificateRotation(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
 	// TestAuthProvider Test that an auth provider can be reached
 	// (POST /instance/auth-providers/{provider}/test)
 	TestAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
@@ -69808,6 +70420,58 @@ func (siw *ServerInterfaceWrapper) ReplaceAuthProviderGroupMappings(w http.Respo
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ReplaceAuthProviderGroupMappings(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RotateAuthProviderCertificate operation middleware
+func (siw *ServerInterfaceWrapper) RotateAuthProviderCertificate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RotateAuthProviderCertificate(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompleteAuthProviderCertificateRotation operation middleware
+func (siw *ServerInterfaceWrapper) CompleteAuthProviderCertificateRotation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompleteAuthProviderCertificateRotation(w, r, provider)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -77593,6 +78257,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/instance/auth-providers/{provider}", wrapper.UpdateAuthProvider)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/enable", wrapper.EnableAuthProvider)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/disable", wrapper.DisableAuthProvider)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/rotate-certificate", wrapper.RotateAuthProviderCertificate)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/rotate-certificate/complete", wrapper.CompleteAuthProviderCertificateRotation)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-providers/{provider}/group-mappings", wrapper.GetAuthProviderGroupMappings)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/auth-providers/{provider}/group-mappings", wrapper.ReplaceAuthProviderGroupMappings)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/test", wrapper.TestAuthProvider)
@@ -79561,6 +80227,236 @@ type ReplaceAuthProviderGroupMappings422ApplicationProblemPlusJSONResponse struc
 }
 
 func (response ReplaceAuthProviderGroupMappings422ApplicationProblemPlusJSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateAuthProviderCertificateRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+}
+
+type RotateAuthProviderCertificateResponseObject interface {
+	VisitRotateAuthProviderCertificateResponse(w http.ResponseWriter) error
+}
+
+type RotateAuthProviderCertificate200ResponseHeaders struct {
+	ETag *string
+}
+
+type RotateAuthProviderCertificate200JSONResponse struct {
+	Body    AuthProvider
+	Headers RotateAuthProviderCertificate200ResponseHeaders
+}
+
+func (response RotateAuthProviderCertificate200JSONResponse) VisitRotateAuthProviderCertificateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateAuthProviderCertificate401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RotateAuthProviderCertificate401ApplicationProblemPlusJSONResponse) VisitRotateAuthProviderCertificateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateAuthProviderCertificate403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RotateAuthProviderCertificate403ApplicationProblemPlusJSONResponse) VisitRotateAuthProviderCertificateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateAuthProviderCertificate404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RotateAuthProviderCertificate404ApplicationProblemPlusJSONResponse) VisitRotateAuthProviderCertificateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateAuthProviderCertificate409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RotateAuthProviderCertificate409ApplicationProblemPlusJSONResponse) VisitRotateAuthProviderCertificateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateAuthProviderCertificate422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response RotateAuthProviderCertificate422ApplicationProblemPlusJSONResponse) VisitRotateAuthProviderCertificateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteAuthProviderCertificateRotationRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+}
+
+type CompleteAuthProviderCertificateRotationResponseObject interface {
+	VisitCompleteAuthProviderCertificateRotationResponse(w http.ResponseWriter) error
+}
+
+type CompleteAuthProviderCertificateRotation200ResponseHeaders struct {
+	ETag *string
+}
+
+type CompleteAuthProviderCertificateRotation200JSONResponse struct {
+	Body    AuthProvider
+	Headers CompleteAuthProviderCertificateRotation200ResponseHeaders
+}
+
+func (response CompleteAuthProviderCertificateRotation200JSONResponse) VisitCompleteAuthProviderCertificateRotationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteAuthProviderCertificateRotation401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteAuthProviderCertificateRotation401ApplicationProblemPlusJSONResponse) VisitCompleteAuthProviderCertificateRotationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteAuthProviderCertificateRotation403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteAuthProviderCertificateRotation403ApplicationProblemPlusJSONResponse) VisitCompleteAuthProviderCertificateRotationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteAuthProviderCertificateRotation404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteAuthProviderCertificateRotation404ApplicationProblemPlusJSONResponse) VisitCompleteAuthProviderCertificateRotationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteAuthProviderCertificateRotation409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteAuthProviderCertificateRotation409ApplicationProblemPlusJSONResponse) VisitCompleteAuthProviderCertificateRotationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteAuthProviderCertificateRotation422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteAuthProviderCertificateRotation422ApplicationProblemPlusJSONResponse) VisitCompleteAuthProviderCertificateRotationResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -97674,6 +98570,12 @@ type StrictServerInterface interface {
 	// ReplaceAuthProviderGroupMappings Replace an auth provider's group mappings
 	// (PUT /instance/auth-providers/{provider}/group-mappings)
 	ReplaceAuthProviderGroupMappings(ctx context.Context, request ReplaceAuthProviderGroupMappingsRequestObject) (ReplaceAuthProviderGroupMappingsResponseObject, error)
+	// RotateAuthProviderCertificate Start rotating a SAML provider's SP certificate
+	// (POST /instance/auth-providers/{provider}/rotate-certificate)
+	RotateAuthProviderCertificate(ctx context.Context, request RotateAuthProviderCertificateRequestObject) (RotateAuthProviderCertificateResponseObject, error)
+	// CompleteAuthProviderCertificateRotation Complete the rotation of a SAML provider's SP certificate
+	// (POST /instance/auth-providers/{provider}/rotate-certificate/complete)
+	CompleteAuthProviderCertificateRotation(ctx context.Context, request CompleteAuthProviderCertificateRotationRequestObject) (CompleteAuthProviderCertificateRotationResponseObject, error)
 	// TestAuthProvider Test that an auth provider can be reached
 	// (POST /instance/auth-providers/{provider}/test)
 	TestAuthProvider(ctx context.Context, request TestAuthProviderRequestObject) (TestAuthProviderResponseObject, error)
@@ -98774,6 +99676,58 @@ func (sh *strictHandler) ReplaceAuthProviderGroupMappings(w http.ResponseWriter,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ReplaceAuthProviderGroupMappingsResponseObject); ok {
 		if err := validResponse.VisitReplaceAuthProviderGroupMappingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RotateAuthProviderCertificate operation middleware
+func (sh *strictHandler) RotateAuthProviderCertificate(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request RotateAuthProviderCertificateRequestObject
+
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RotateAuthProviderCertificate(ctx, request.(RotateAuthProviderCertificateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RotateAuthProviderCertificate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RotateAuthProviderCertificateResponseObject); ok {
+		if err := validResponse.VisitRotateAuthProviderCertificateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CompleteAuthProviderCertificateRotation operation middleware
+func (sh *strictHandler) CompleteAuthProviderCertificateRotation(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request CompleteAuthProviderCertificateRotationRequestObject
+
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompleteAuthProviderCertificateRotation(ctx, request.(CompleteAuthProviderCertificateRotationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompleteAuthProviderCertificateRotation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompleteAuthProviderCertificateRotationResponseObject); ok {
+		if err := validResponse.VisitCompleteAuthProviderCertificateRotationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
