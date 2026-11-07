@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.3.0](https://github.com/azverinus/flagnetic/compare/v0.2.0...v0.3.0) (2026-11-07)
+
+
+### Features
+
+* **access:** configure the instance's SMTP server and send a test mail ([#192](https://github.com/azverinus/flagnetic/issues/192)) ([ef8d974](https://github.com/azverinus/flagnetic/commit/ef8d9746d5d81e9efebb297d8570a87e803a7dd6))
+* **access:** invite a newcomer to a project with a role ([#205](https://github.com/azverinus/flagnetic/issues/205)) ([6260ba3](https://github.com/azverinus/flagnetic/commit/6260ba38294f765e45fc7ae7d8391ed82cff352c))
+* **access:** let a member ask for a password reset by mail ([#219](https://github.com/azverinus/flagnetic/issues/219)) ([65dd199](https://github.com/azverinus/flagnetic/commit/65dd1998075e0d9bba677bf9c780b249eb319074))
+* **access:** reset a member's password with a link an instance admin issues ([#214](https://github.com/azverinus/flagnetic/issues/214)) ([6ed8043](https://github.com/azverinus/flagnetic/commit/6ed80438b31a1c99d9e3d5db1e0029c16a6cc1d7))
+* **console:** manage auth providers and sign in through them ([#212](https://github.com/azverinus/flagnetic/issues/212)) ([955c634](https://github.com/azverinus/flagnetic/commit/955c634afa65e63c9a1e17af51bb17d95ff64b90))
+* **governance:** add the sink health events to the catalogue ([#195](https://github.com/azverinus/flagnetic/issues/195)) ([2582a0e](https://github.com/azverinus/flagnetic/commit/2582a0e4b0df72e2831df698c86832c6b3427212))
+* **identity:** add the auth provider resource ([#191](https://github.com/azverinus/flagnetic/issues/191)) ([a169535](https://github.com/azverinus/flagnetic/commit/a16953593783054f200aaefa5f58087f858a2576))
+* **identity:** grant access through an auth provider's group mappings ([#215](https://github.com/azverinus/flagnetic/issues/215)) ([d2f9c55](https://github.com/azverinus/flagnetic/commit/d2f9c55f40bfebeef91dfb5d4c56dfd5f202e2b0))
+* **identity:** link, unlink and list a member's identities and remove a password ([#221](https://github.com/azverinus/flagnetic/issues/221)) ([3cf4c3a](https://github.com/azverinus/flagnetic/commit/3cf4c3ad6ae13297df770d05ad3768e5ccc12fbb))
+* **identity:** provision members through SCIM tokens and Users ([#220](https://github.com/azverinus/flagnetic/issues/220)) ([3af7e60](https://github.com/azverinus/flagnetic/commit/3af7e60347c39bd0417234bed05dc61a58007961))
+* **identity:** refresh SAML metadata daily and rotate the SP certificate ([#222](https://github.com/azverinus/flagnetic/issues/222)) ([76d6d89](https://github.com/azverinus/flagnetic/commit/76d6d89b358428963642bf8ad7054a34fe8bd711))
+* **identity:** sign in through a SAML auth provider ([#209](https://github.com/azverinus/flagnetic/issues/209)) ([c1bd6a6](https://github.com/azverinus/flagnetic/commit/c1bd6a68b7cd6219d1426ead6bf2541570de86c2))
+* **identity:** sign in through an OIDC auth provider ([#201](https://github.com/azverinus/flagnetic/issues/201)) ([029cec8](https://github.com/azverinus/flagnetic/commit/029cec87b7c2f31e6bebd54f1d803da0023c5ef3))
+* **sinks:** add the sink resource and the sink.manage permission ([#189](https://github.com/azverinus/flagnetic/issues/189)) ([40af907](https://github.com/azverinus/flagnetic/commit/40af9079d0c8e0fceb5eacd60b1e62be3119f245))
+* **sinks:** deliver a project's events to a webhook sink ([#210](https://github.com/azverinus/flagnetic/issues/210)) ([807d4a3](https://github.com/azverinus/flagnetic/commit/807d4a3396f1a271b55883b7f50a2d667ae30ff7))
+* **sinks:** guard sink transports by kind and record failures by class ([#198](https://github.com/azverinus/flagnetic/issues/198)) ([0ef4a48](https://github.com/azverinus/flagnetic/commit/0ef4a489dbdb53032e62ac0f778543834a619abc))
+* **sinks:** read the rows of the export schema from the raw event tables ([#200](https://github.com/azverinus/flagnetic/issues/200)) ([2cab13d](https://github.com/azverinus/flagnetic/commit/2cab13d66bae9e34022c215860f96bdbb2da78f0))
+* **sinks:** replay a sink from a time and send it sample rows ([#216](https://github.com/azverinus/flagnetic/issues/216)) ([5fb265d](https://github.com/azverinus/flagnetic/commit/5fb265dbc7dc0fcdfaafcd2c3eeacd6e8b78183e))
+* **sinks:** set rejected batches aside as dead letters and stop sinks ([#213](https://github.com/azverinus/flagnetic/issues/213)) ([79dc383](https://github.com/azverinus/flagnetic/commit/79dc38349c891eed6bee650ba3cee91739bce2ae))
+* **transfer:** create a project from a project document ([#204](https://github.com/azverinus/flagnetic/issues/204)) ([a6bf202](https://github.com/azverinus/flagnetic/commit/a6bf2029345762e26a9e95e59cba71883230f531))
+* **transfer:** export a project as a project document ([#190](https://github.com/azverinus/flagnetic/issues/190)) ([bcc0cab](https://github.com/azverinus/flagnetic/commit/bcc0cabaf910fdf6f3c85c8611d7f760a605e937))
+* **transfer:** import experiments with a project document ([#211](https://github.com/azverinus/flagnetic/issues/211)) ([ed2505d](https://github.com/azverinus/flagnetic/commit/ed2505d922571ea13a4db7a264f4a41bb928374a))
+* **transfer:** merge a project document into a project ([#208](https://github.com/azverinus/flagnetic/issues/208)) ([6122233](https://github.com/azverinus/flagnetic/commit/612223326f709f39a537de52973e83e2705ee324))
+
+
+### Bug Fixes
+
+* **deps:** bump go-jose to 4.1.8 ([#193](https://github.com/azverinus/flagnetic/issues/193)) ([de73599](https://github.com/azverinus/flagnetic/commit/de73599411ab9053a2b8b6a1ffffd154c89ec49c))
+* **events:** check the window against the event_id time plus the skew ([#185](https://github.com/azverinus/flagnetic/issues/185)) ([41bcf63](https://github.com/azverinus/flagnetic/commit/41bcf63c96d845c80b458507a3775a5be6a22355))
+* **experiments:** take the final sample-ratio check after the rollup watermark ([#187](https://github.com/azverinus/flagnetic/issues/187)) ([f7ba3d6](https://github.com/azverinus/flagnetic/commit/f7ba3d640d302526fb9c1a523bcf9b6337f71a5a))
+* **identity:** redirect the forging provider to a listed origin ([#207](https://github.com/azverinus/flagnetic/issues/207)) ([45baa91](https://github.com/azverinus/flagnetic/commit/45baa9172610c3499314188f79dc4090d4c917d8))
+
+
+### Dependencies
+
+* **console:** Bump the console group in /web with 10 updates ([#199](https://github.com/azverinus/flagnetic/issues/199)) ([2120d0a](https://github.com/azverinus/flagnetic/commit/2120d0affbbb82614c19e3cf3aff28e5903b1a8b))
+* resolve minimatch 11.0.1 in the console and the JavaScript SDK ([#202](https://github.com/azverinus/flagnetic/issues/202)) ([169cbb0](https://github.com/azverinus/flagnetic/commit/169cbb04c916c60c1b187ff3a3c311377dcae0f1))
+
 ## [0.2.0](https://github.com/azverinus/flagnetic/compare/v0.1.0...v0.2.0) (2026-10-29)
 
 
