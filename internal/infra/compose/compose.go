@@ -394,8 +394,12 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// signs in, the access context opens the session.
 	ssoAccess := appaccess.NewSSO(accessStore, settings, audit, d.Clock, d.IDs, rand.Reader, sessionKey)
 	oidcClient := oidc.NewClient()
+	identities := identityDirectory{store: identityStore}
+	waysIn := appaccess.NewWaysIn(accessStore, identities)
+	authenticateSession := appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey)
 	signIn := appidentity.SignInDeps{
-		Tx: tx, Providers: identityStore, Attempts: identityStore, Identities: identityStore, Members: ssoMembers{sso: ssoAccess},
+		Tx: tx, Providers: identityStore, Attempts: identityStore, Identities: identityStore, Members: ssoMembers{sso: ssoAccess, ways: waysIn},
+		Sessions: sessionResolver{authenticate: authenticateSession},
 		Mappings: identityStore, Access: groupMappings.Access, Logger: edge.Logger(),
 		OIDC: oidcClient, SAML: samlClient, Replays: identityStore, Opener: o.Keyring, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, BaseURL: o.BaseURL,
 	}
@@ -403,7 +407,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Start: appidentity.NewStartSignIn(signIn), Callback: appidentity.NewCompleteCallback(signIn), ACS: appidentity.NewCompleteACS(signIn), Metadata: appidentity.NewServeMetadata(signIn),
 		Complete: appidentity.NewCompleteSignIn(signIn),
 	}, sso.Options{
-		SecureCookies: managementOptions.SecureCookies, SessionCookie: management.SessionCookieHeader, Metrics: sso.NewMetrics(reg),
+		SecureCookies: managementOptions.SecureCookies, SessionCookie: management.SessionCookieHeader, SessionCookieName: management.SessionCookie,
+		Metrics: sso.NewMetrics(reg),
 	})
 	scimUsers := appidentity.SCIMUserDeps{Tx: tx, Providers: identityStore, Members: scimMembers{svc: provisioning}}
 	scim.Mount(edge, scim.Handlers{
@@ -430,7 +435,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		CreateSCIMToken:                         appidentity.NewCreateSCIMToken(scimTokens),
 		RevokeSCIMToken:                         appidentity.NewRevokeSCIMToken(scimTokens),
 		AuthenticateToken:                       appaccess.NewAuthenticateToken(accessStore, tokenUses, d.Clock),
-		AuthenticateSession:                     appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey),
+		AuthenticateSession:                     authenticateSession,
 		SignIn: appaccess.NewSignIn(appaccess.SignInDeps{
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 			Random: rand.Reader, Key: sessionKey,
@@ -454,12 +459,16 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		ChangeMyPassword: appaccess.NewChangeMyPassword(appaccess.ChangeMyPasswordDeps{
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 		}),
-		DeactivateMember:  appaccess.NewDeactivateMember(tx, accessStore, audit, d.Clock, d.IDs),
-		ReactivateMember:  appaccess.NewReactivateMember(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
-		InviteMember:      appaccess.NewInviteMember(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
-		InviteToProject:   appaccess.NewInviteToProject(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
-		ReissueInvitation: appaccess.NewReissueInvitation(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
-		GetInvitation:     appaccess.NewGetInvitation(accessStore, d.Clock),
+		DeactivateMember:      appaccess.NewDeactivateMember(tx, accessStore, audit, d.Clock, d.IDs),
+		ReactivateMember:      appaccess.NewReactivateMember(tx, accessStore, waysIn, audit, d.Clock, d.IDs, rand.Reader),
+		RemoveMyPassword:      appaccess.NewRemoveMyPassword(tx, accessStore, waysIn, audit, d.Clock, d.IDs),
+		ListMemberAuthMethods: appidentity.NewListMemberAuthMethods(signIn),
+		StartLink:             appidentity.NewStartLink(signIn),
+		UnlinkIdentity:        appidentity.NewUnlinkIdentity(signIn),
+		InviteMember:          appaccess.NewInviteMember(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
+		InviteToProject:       appaccess.NewInviteToProject(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
+		ReissueInvitation:     appaccess.NewReissueInvitation(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
+		GetInvitation:         appaccess.NewGetInvitation(accessStore, d.Clock),
 		AcceptInvitation: appaccess.NewAcceptInvitation(appaccess.AcceptInvitationDeps{
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 			Random: rand.Reader, Key: sessionKey,

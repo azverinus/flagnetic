@@ -20,10 +20,10 @@ func (s *Store) CreateAttempt(ctx context.Context, a identity.Attempt, now time.
 	}
 	_, err := s.db(ctx).Exec(ctx, `
 		INSERT INTO sso_attempts (id, provider_id, intent, state_hash, nonce, code_verifier, saml_request_id, cookie_hash, return_to,
-		                          created_at, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		                          created_at, expires_at, member_id, session_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 		a.ID.Bytes(), a.Provider.Bytes(), string(a.Intent), a.StateHash[:], a.Nonce, a.CodeVerifier, nonEmpty(a.RequestID),
-		a.CookieHash[:], a.ReturnTo, a.CreatedAt, a.ExpiresAt)
+		a.CookieHash[:], a.ReturnTo, a.CreatedAt, a.ExpiresAt, boundTo(a.Member.IsZero(), a.Member.Bytes()), boundTo(a.Session.IsZero(), a.Session.Bytes()))
 	if err != nil {
 		return fmt.Errorf("creating a sign-in attempt: %w", err)
 	}
@@ -31,7 +31,7 @@ func (s *Store) CreateAttempt(ctx context.Context, a identity.Attempt, now time.
 }
 
 const attemptColumns = `id, provider_id, intent, state_hash, nonce, code_verifier, saml_request_id, cookie_hash, return_to, created_at,
-	expires_at, callback_at, completion_hash, subject, email, email_verified, display_name, groups`
+	expires_at, callback_at, completion_hash, subject, email, email_verified, display_name, groups, member_id, session_id`
 
 func scanAttempt(row pgx.Row) (identity.Attempt, error) {
 	var (
@@ -44,11 +44,18 @@ func scanAttempt(row pgx.Row) (identity.Attempt, error) {
 		requestID             *string
 		verified              *bool
 		groups                []string
+		member, session       *[16]byte
 	)
 	err := row.Scan(&attemptID, &providerID, &intent, &state, &a.Nonce, &a.CodeVerifier, &requestID, &cookie, &a.ReturnTo, &a.CreatedAt,
-		&a.ExpiresAt, &a.CallbackAt, &completion, &subject, &email, &verified, &name, &groups)
+		&a.ExpiresAt, &a.CallbackAt, &completion, &subject, &email, &verified, &name, &groups, &member, &session)
 	if err != nil {
 		return a, err
+	}
+	if member != nil {
+		a.Member = id.FromBytes[identity.Member](*member)
+	}
+	if session != nil {
+		a.Session = id.FromBytes[identity.Session](*session)
 	}
 	a.ID, a.Provider, a.Intent = id.FromBytes[identity.Attempt](attemptID), id.FromBytes[identity.Provider](providerID), identity.Intent(intent)
 	a.StateHash, a.CookieHash, a.RequestID = identity.SecretHash(state), identity.SecretHash(cookie), deref(requestID)
@@ -124,4 +131,13 @@ func groupsOf(c identity.VerifiedClaims) []string {
 		return []string{}
 	}
 	return c.Groups
+}
+
+// boundTo returns the identifier an attempt is bound to, nil when it is bound
+// to none.
+func boundTo(zero bool, b [16]byte) any {
+	if zero {
+		return nil
+	}
+	return b
 }

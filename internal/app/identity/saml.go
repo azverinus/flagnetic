@@ -170,7 +170,7 @@ func (d SignInDeps) samlConfig(p identity.Provider, now time.Time) (SAMLConfig, 
 
 // startSAML creates the attempt of a SAML sign-in and answers where the
 // browser goes: the AuthnRequest, carrying the attempt's state as RelayState.
-func (h *StartSignIn) startSAML(ctx context.Context, p identity.Provider, returnTo string) (Started, error) {
+func (h *StartSignIn) startSAML(ctx context.Context, p identity.Provider, returnTo string, link *linkBinding) (Started, error) {
 	now := h.d.now()
 	cfg, err := h.d.samlConfig(p, now)
 	if err != nil {
@@ -180,7 +180,11 @@ func (h *StartSignIn) startSAML(ctx context.Context, p identity.Provider, return
 	// An XML ID starts with a letter or an underscore; a token may start with
 	// a digit or a hyphen.
 	requestID := "_" + identity.NewToken(h.d.Random)
-	attempt := identity.NewSAMLLoginAttempt(id.New[identity.Attempt](h.d.IDs), p.ID, returnTo, requestID, secrets, now)
+	attemptID := id.New[identity.Attempt](h.d.IDs)
+	attempt := identity.NewSAMLLoginAttempt(attemptID, p.ID, returnTo, requestID, secrets, now)
+	if link != nil {
+		attempt = identity.NewLinkAttempt(attemptID, p.ID, link.member, link.session, returnTo, requestID, secrets, now)
+	}
 	redirect, err := h.d.SAML.AuthnRequestURL(cfg, requestID, secrets.State)
 	if err != nil {
 		return Started{}, fail(CodeSSOFailed, err)
@@ -280,5 +284,5 @@ func (h *CompleteACS) Handle(ctx context.Context, cmd ACSCommand) (token string,
 
 // end deletes an attempt that cannot go on, and returns why.
 func (h *CompleteACS) end(ctx context.Context, a identity.Attempt, why error) error {
-	return errors.Join(why, h.d.Attempts.DeleteAttempt(context.WithoutCancel(ctx), a.ID))
+	return errors.Join(inIntent(a.Intent, why), h.d.Attempts.DeleteAttempt(context.WithoutCancel(ctx), a.ID))
 }

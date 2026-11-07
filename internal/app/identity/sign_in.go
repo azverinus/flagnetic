@@ -36,6 +36,9 @@ const (
 	// CodeAttemptMismatch: the browser completing the sign-in is not the one
 	// that started it.
 	CodeAttemptMismatch FailureCode = "attempt_mismatch"
+	// CodeIdentityLinked: linking an identity found its subject linked to
+	// another member.
+	CodeIdentityLinked FailureCode = "identity_linked"
 )
 
 // SignInFailure ends a sign-in with a code for the sign-in page.
@@ -45,6 +48,10 @@ type SignInFailure struct {
 	// Kind is the protocol of the provider the sign-in was through, empty
 	// when it failed before the provider was known.
 	Kind identity.Kind
+	// Intent is what the attempt was for, empty when it failed before the
+	// attempt was known. The browser of a link lands on the page the member
+	// started it from; one that signs in lands on the sign-in page.
+	Intent identity.Intent
 }
 
 func (f *SignInFailure) Error() string {
@@ -64,6 +71,16 @@ func inKind(kind identity.Kind, err error) error {
 	var f *SignInFailure
 	if errors.As(err, &f) && f.Kind == "" {
 		f.Kind = kind
+	}
+	return err
+}
+
+// inIntent names the intent of the attempt as that of the sign-in err ends, if
+// err is a failure that does not say yet.
+func inIntent(intent identity.Intent, err error) error {
+	var f *SignInFailure
+	if errors.As(err, &f) && f.Intent == "" {
+		f.Intent = intent
 	}
 	return err
 }
@@ -91,9 +108,16 @@ type LinkStore interface {
 	// IdentityBySubject returns the identity linking subject at provider,
 	// locked until the unit of work ends; ErrNotFound when there is none.
 	IdentityBySubject(ctx context.Context, provider identity.ProviderID, subject string) (identity.Identity, error)
+	// CreateIdentity stores i; ErrIdentityLinked when its subject is linked at
+	// its provider already.
 	CreateIdentity(ctx context.Context, i identity.Identity) error
 	// RecordIdentitySignIn stores that the identity signed in at at.
 	RecordIdentitySignIn(ctx context.Context, i identity.ID, at time.Time) error
+	// MemberIdentities returns the identities member holds, oldest first, each
+	// with the provider it is at.
+	MemberIdentities(ctx context.Context, member identity.MemberID) ([]LinkedIdentity, error)
+	// DeleteIdentity deletes the identity.
+	DeleteIdentity(ctx context.Context, i identity.ID) error
 }
 
 // MemberRecord is a member as the identity context sees them.
@@ -101,6 +125,9 @@ type MemberRecord struct {
 	identity.KnownMember
 	Email       string
 	DisplayName string
+	// Provider is the slug of the auth provider whose SCIM token provisioned
+	// the member, "" for one it did not.
+	Provider string
 }
 
 // Members is what the identity context asks of the access context, acting in
@@ -123,7 +150,40 @@ type Members interface {
 	// RecordFailedSignIn records that member could not sign in through
 	// provider, and why.
 	RecordFailedSignIn(ctx context.Context, member MemberRecord, kind identity.Kind, provider, reason, requestID string) error
+	// LockMember returns the member, locked until the unit of work ends, so
+	// the changes to their ways in are made one at a time; false when none has
+	// the identifier.
+	LockMember(ctx context.Context, member identity.MemberID) (MemberRecord, bool, error)
+	// PasswordSetAt returns when the member set the password they hold, nil
+	// when they hold none.
+	PasswordSetAt(ctx context.Context, member identity.MemberID) (*time.Time, error)
+	// EnsureWayIn refuses, with the conflict last_auth_method, unlinking the
+	// identity without ("" for none) when no other usable way in would remain
+	// to member, whom the caller holds locked.
+	EnsureWayIn(ctx context.Context, member MemberRecord, without identity.ID) error
 }
+
+// SessionResolver tells who a session cookie signs in.
+type SessionResolver interface {
+	// SessionOf returns the member and the session the cookie signs in; false
+	// when it signs nobody in.
+	SessionOf(ctx context.Context, cookie string) (identity.MemberID, identity.SessionID, bool, error)
+}
+
+// LinkedIdentity is an identity with the provider it is at.
+type LinkedIdentity struct {
+	identity.Identity
+	ProviderSlug string
+	ProviderName string
+	Kind         identity.Kind
+	// ProviderEnabled is whether the provider is enabled: an identity at a
+	// disabled one signs nobody in.
+	ProviderEnabled bool
+}
+
+// ErrIdentityLinked refuses linking a subject that is linked to a member at
+// its provider already.
+var ErrIdentityLinked = errors.New("identity: the subject is already linked")
 
 // SessionRequest asks for the session of a member who signed in.
 type SessionRequest struct {
@@ -169,6 +229,8 @@ type SignInDeps struct {
 	Attempts   AttemptStore
 	Identities LinkStore
 	Members    Members
+	// Sessions tells who the session a link completes in belongs to.
+	Sessions SessionResolver
 	// Mappings and Access give a member what the provider's group mappings
 	// map the groups they claim to.
 	Mappings MappingStore
@@ -243,14 +305,26 @@ type Started struct {
 // Handle creates an attempt bound to a new cookie and answers the provider's
 // authorization address. A disabled or unknown provider is not found; one the
 // instance cannot reach is SignInFailure sso_failed.
-func (h *StartSignIn) Handle(ctx context.Context, cmd StartCommand) (started Started, err error) {
-	p, err := h.d.enabledProvider(ctx, cmd.Slug)
+func (h *StartSignIn) Handle(ctx context.Context, cmd StartCommand) (Started, error) {
+	return h.start(ctx, cmd.Slug, cmd.ReturnTo, nil)
+}
+
+// linkBinding is the member and session a link attempt is bound to.
+type linkBinding struct {
+	member  identity.MemberID
+	session identity.SessionID
+}
+
+// start creates the attempt of a sign-in, or of a link when link is not nil,
+// and answers where the browser goes.
+func (h *StartSignIn) start(ctx context.Context, slug, returnTo string, link *linkBinding) (started Started, err error) {
+	p, err := h.d.enabledProvider(ctx, slug)
 	if err != nil {
 		return Started{}, err
 	}
 	defer func() { err = inKind(p.Kind, err) }()
 	if p.Kind == identity.KindSAML {
-		return h.startSAML(ctx, p, cmd.ReturnTo)
+		return h.startSAML(ctx, p, returnTo, link)
 	}
 	cfg, err := h.d.oidcConfig(p)
 	if err != nil {
@@ -258,7 +332,11 @@ func (h *StartSignIn) Handle(ctx context.Context, cmd StartCommand) (started Sta
 	}
 	now := h.d.now()
 	secrets := identity.NewSecrets(h.d.Random)
-	attempt := identity.NewLoginAttempt(id.New[identity.Attempt](h.d.IDs), p.ID, cmd.ReturnTo, secrets, now)
+	attemptID := id.New[identity.Attempt](h.d.IDs)
+	attempt := identity.NewLoginAttempt(attemptID, p.ID, returnTo, secrets, now)
+	if link != nil {
+		attempt = identity.NewLinkAttempt(attemptID, p.ID, link.member, link.session, returnTo, "", secrets, now)
+	}
 	redirect, err := h.d.OIDC.AuthorizationURL(ctx, cfg, secrets.State, attempt.Nonce, attempt.CodeVerifier)
 	if err != nil {
 		return Started{}, fail(CodeSSOFailed, err)
@@ -330,7 +408,7 @@ func (h *CompleteCallback) Handle(ctx context.Context, cmd CallbackCommand) (tok
 
 // end deletes an attempt that cannot go on, and returns why.
 func (h *CompleteCallback) end(ctx context.Context, a identity.Attempt, why error) error {
-	return errors.Join(why, h.d.Attempts.DeleteAttempt(context.WithoutCancel(ctx), a.ID))
+	return errors.Join(inIntent(a.Intent, why), h.d.Attempts.DeleteAttempt(context.WithoutCancel(ctx), a.ID))
 }
 
 // CompleteSignIn completes a sign-in in the browser that started it.
@@ -344,10 +422,13 @@ func NewCompleteSignIn(d SignInDeps) *CompleteSignIn { return &CompleteSignIn{d:
 type CompleteCommand struct {
 	Token string
 	// Cookie is the value of the attempt cookie the browser sent, "" for none.
-	Cookie    string
-	ClientIP  netip.Addr
-	UserAgent string
-	RequestID string
+	Cookie string
+	// SessionCookie is the value of the session cookie the browser sent, ""
+	// for none: a link completes only in the session that started it.
+	SessionCookie string
+	ClientIP      netip.Addr
+	UserAgent     string
+	RequestID     string
 }
 
 // SignedIn is the session a sign-in opened and where its browser goes next.
@@ -357,6 +438,9 @@ type SignedIn struct {
 	ReturnTo string
 	// Kind is the protocol of the provider the member signed in through.
 	Kind identity.Kind
+	// Linked is true when the attempt linked an identity to the member signed
+	// in already, who needs no session: Cookie is then empty.
+	Linked bool
 }
 
 // unresolved refuses a person no rule lets in; completion turns it into a
@@ -393,6 +477,7 @@ func (h *CompleteSignIn) Handle(ctx context.Context, cmd CompleteCommand) (signe
 	if err != nil {
 		return SignedIn{}, err
 	}
+	defer func() { err = inIntent(attempt.Intent, err) }()
 	if !attempt.Live(now) || attempt.Claims == nil {
 		return SignedIn{}, fail(CodeSSOFailed, errors.New("the attempt expired"))
 	}
@@ -407,6 +492,9 @@ func (h *CompleteSignIn) Handle(ctx context.Context, cmd CompleteCommand) (signe
 		return SignedIn{}, err
 	}
 	defer func() { err = inKind(p.Kind, err) }()
+	if attempt.Intent == identity.IntentLink {
+		return h.link(ctx, p, attempt, cmd)
+	}
 	out := SignedIn{Kind: p.Kind}
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		var txErr error

@@ -453,6 +453,132 @@ paths:
           $ref: "#/components/responses/TooManyAttempts"
         "503":
           $ref: "#/components/responses/Busy"
+    delete:
+      operationId: removeMyPassword
+      summary: Remove your password
+      description: |
+        Removes the caller's password, so they sign in only through the
+        auth providers they linked. Refused 409 `last_auth_method` when no
+        other usable way in remains: an identity at an enabled auth provider.
+        A member who holds no password is answered 204 and nothing is
+        recorded. Removing a password ends the member's open invitations and
+        password resets, as changing it does, so an old link cannot set one
+        again. The caller's sessions stay. Recorded as `password.removed`.
+        Only a session may do this.
+      x-permission: member
+      x-session-required: true
+      tags: [me]
+      responses:
+        "204":
+          description: Removed, or the caller held no password.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /me/identities:
+    get:
+      operationId: listMyIdentities
+      summary: Your ways to sign in
+      description: |
+        Whether the caller holds a password and when they set it, and the
+        identities they linked at auth providers, oldest first, with when
+        each last signed in. An identity at a disabled auth provider is
+        listed with `provider_enabled` false: it is no way in until the
+        provider is enabled again.
+      x-permission: member
+      tags: [me]
+      responses:
+        "200":
+          description: The caller's password status and identities.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberAuthMethods"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /me/identities/{provider}/link:
+    parameters:
+      - $ref: "#/components/parameters/AuthProviderSlug"
+    post:
+      operationId: linkMyIdentity
+      summary: Link an auth provider to your account
+      description: |
+        Starts linking an identity at an enabled auth provider to the caller,
+        answered with the address to send the browser to. The attempt is bound
+        to the browser through the same cookie a sign-in sets, and to the
+        session this request is signed in to: completing it from another
+        browser, or after that session ended, links nothing. Completing it
+        links the subject the provider vouches for to the caller, whatever its
+        email, and returns the browser to `return_to`, a path of this
+        instance, `/settings` when absent or not one. Recorded as
+        `identity.linked`. When the subject is already linked to another
+        member nothing is linked and the browser lands on the settings page
+        with `error=identity_linked`; any other failure lands there with its
+        sign-in code. A disabled or unknown provider is not found. Only a
+        session may do this.
+      x-permission: member
+      x-session-required: true
+      tags: [me]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IdentityLinkStart"
+      responses:
+        "200":
+          description: Where to send the browser.
+          headers:
+            Set-Cookie:
+              description: The cookie that binds the attempt to this browser.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdentityLinkStarted"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+  /me/identities/{identity}:
+    parameters:
+      - $ref: "#/components/parameters/IdentityID"
+    delete:
+      operationId: unlinkMyIdentity
+      summary: Unlink one of your identities
+      description: |
+        Unlinks an identity of the caller. Refused 409 `last_auth_method`
+        when it is the caller's last usable way in: the other ways are a
+        password and identities at enabled auth providers. Unlinking an
+        identity at a disabled auth provider is always allowed, since it was
+        no way in. An identity of another member, or an identifier that names
+        none, is not found. Recorded as `identity.unlinked`. Only a session
+        may do this.
+      x-permission: member
+      x-session-required: true
+      tags: [me]
+      responses:
+        "204":
+          description: Unlinked.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /me/sessions:
     get:
       operationId: listMySessions
@@ -5091,6 +5217,58 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /members/{member}/identities:
+    parameters:
+      - $ref: "#/components/parameters/MemberID"
+    get:
+      operationId: listMemberIdentities
+      summary: A member's ways to sign in
+      description: |
+        Whether the member holds a password and when they set it, and the
+        identities they linked at auth providers, as `/me/identities` lists
+        them.
+      x-permission: instance_admin
+      tags: [members]
+      responses:
+        "200":
+          description: The member's password status and identities.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberAuthMethods"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /members/{member}/identities/{identity}:
+    parameters:
+      - $ref: "#/components/parameters/MemberID"
+      - $ref: "#/components/parameters/IdentityID"
+    delete:
+      operationId: unlinkMemberIdentity
+      summary: Unlink a member's identity
+      description: |
+        Unlinks an identity of the member, under the rules of a member
+        unlinking their own: refused 409 `last_auth_method` when it is the
+        member's last usable way in, except for a deactivated member, who
+        signs in nowhere. An identity that does not belong to the member is
+        not found. Recorded as `identity.unlinked` with the instance admin as
+        its actor.
+      x-permission: instance_admin
+      tags: [members]
+      responses:
+        "204":
+          description: Unlinked.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /members/{member}/sessions:
     parameters:
       - $ref: "#/components/parameters/MemberID"
@@ -7420,6 +7598,13 @@ components:
       description: The session's identifier, in either case.
       schema:
         type: string
+    IdentityID:
+      name: identity
+      in: path
+      required: true
+      description: The identity's identifier.
+      schema:
+        type: string
     MemberID:
       name: member
       in: path
@@ -8253,6 +8438,70 @@ components:
         password:
           type: string
           format: password
+    PasswordStatus:
+      type: object
+      description: Whether a member holds a password.
+      required: [set]
+      properties:
+        set:
+          type: boolean
+        set_at:
+          type: string
+          format: date-time
+          description: When the password was last set; absent when none is.
+    LinkedIdentity:
+      type: object
+      description: The subject an auth provider knows a member by.
+      required: [id, provider, provider_name, kind, provider_enabled, subject, linked_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          description: The slug of the auth provider.
+        provider_name:
+          type: string
+          description: The auth provider's display name.
+        kind:
+          $ref: "#/components/schemas/AuthProviderKind"
+        provider_enabled:
+          type: boolean
+          description: Whether the auth provider is enabled; an identity at a disabled one is no way in.
+        subject:
+          type: string
+          description: The provider's identifier of the person.
+        linked_at:
+          type: string
+          format: date-time
+        last_sign_in_at:
+          type: string
+          format: date-time
+          description: When the member last signed in through the identity; absent until they do.
+    MemberAuthMethods:
+      type: object
+      description: The ways a member holds to sign in.
+      required: [password, identities]
+      properties:
+        password:
+          $ref: "#/components/schemas/PasswordStatus"
+        identities:
+          type: array
+          items:
+            $ref: "#/components/schemas/LinkedIdentity"
+    IdentityLinkStart:
+      type: object
+      properties:
+        return_to:
+          type: string
+          description: A path of this instance to return the browser to once linked; `/settings` when absent or not a path of this instance.
+    IdentityLinkStarted:
+      type: object
+      required: [start_url]
+      properties:
+        start_url:
+          type: string
+          description: Where to send the browser to authenticate at the auth provider.
     IssuedPasswordReset:
       type: object
       description: A password reset just issued. Its link is shown this once.

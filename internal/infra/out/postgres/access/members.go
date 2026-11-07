@@ -123,8 +123,34 @@ func (s *Store) MemberEmails(ctx context.Context, members []access.MemberID) (ma
 
 // SetPasswordHash replaces the password hash of member.
 func (s *Store) SetPasswordHash(ctx context.Context, member access.MemberID, hash string, at time.Time) error {
-	_, err := s.db(ctx).Exec(ctx, `UPDATE members SET password_hash = $2, updated_at = $3 WHERE id = $1`, member.Bytes(), hash, at)
+	_, err := s.db(ctx).Exec(ctx, `UPDATE members SET password_hash = $2, password_set_at = $3, updated_at = $3 WHERE id = $1`,
+		member.Bytes(), hash, at)
 	return err
+}
+
+// ClearPasswordHash removes the password of member.
+func (s *Store) ClearPasswordHash(ctx context.Context, member access.MemberID, at time.Time) error {
+	_, err := s.db(ctx).Exec(ctx, `UPDATE members SET password_hash = NULL, password_set_at = NULL, updated_at = $2 WHERE id = $1`,
+		member.Bytes(), at)
+	return err
+}
+
+// PasswordSetAt returns when member set the password they hold; nil when
+// they hold none. ErrNotFound when no member has the identifier.
+func (s *Store) PasswordSetAt(ctx context.Context, member access.MemberID) (*time.Time, error) {
+	var at *time.Time
+	err := s.db(ctx).QueryRow(ctx, `SELECT password_set_at FROM members WHERE id = $1`, member.Bytes()).Scan(&at)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, appaccess.ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("reading when a member set their password: %w", err)
+	}
+	if at != nil {
+		utc := at.UTC()
+		at = &utc
+	}
+	return at, nil
 }
 
 // RecordSignIn records that member signed in at.

@@ -301,6 +301,44 @@ export const zInvitationAcceptance = z.object({
 });
 
 /**
+ * Whether a member holds a password.
+ */
+export const zPasswordStatus = z.object({
+  set: z.boolean(),
+  set_at: z.iso.datetime().optional(),
+});
+
+/**
+ * The subject an auth provider knows a member by.
+ */
+export const zLinkedIdentity = z.object({
+  id: z.uuid(),
+  provider: z.string(),
+  provider_name: z.string(),
+  kind: zAuthProviderKind,
+  provider_enabled: z.boolean(),
+  subject: z.string(),
+  linked_at: z.iso.datetime(),
+  last_sign_in_at: z.iso.datetime().optional(),
+});
+
+/**
+ * The ways a member holds to sign in.
+ */
+export const zMemberAuthMethods = z.object({
+  password: zPasswordStatus,
+  identities: z.array(zLinkedIdentity),
+});
+
+export const zIdentityLinkStart = z.object({
+  return_to: z.string().optional(),
+});
+
+export const zIdentityLinkStarted = z.object({
+  start_url: z.string(),
+});
+
+/**
  * A password reset just issued. Its link is shown this once.
  */
 export const zIssuedPasswordReset = z.object({
@@ -3041,6 +3079,11 @@ export const zAttributeKey = z.string();
 export const zSessionId = z.string();
 
 /**
+ * The identity's identifier.
+ */
+export const zIdentityId = z.string();
+
+/**
  * The member's identifier.
  */
 export const zMemberId = z.string();
@@ -3136,12 +3179,42 @@ export const zUpdateMeBody = zMePatch;
  */
 export const zUpdateMeResponse = zMe;
 
+/**
+ * Removed, or the caller held no password.
+ */
+export const zRemoveMyPasswordResponse = z.void();
+
 export const zChangeMyPasswordBody = zPasswordChange;
 
 /**
  * Changed; every other session is revoked.
  */
 export const zChangeMyPasswordResponse = z.void();
+
+/**
+ * The caller's password status and identities.
+ */
+export const zListMyIdentitiesResponse = zMemberAuthMethods;
+
+export const zLinkMyIdentityBody = zIdentityLinkStart;
+
+export const zLinkMyIdentityPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * Where to send the browser.
+ */
+export const zLinkMyIdentityResponse = zIdentityLinkStarted;
+
+export const zUnlinkMyIdentityPath = z.object({
+  identity: z.string(),
+});
+
+/**
+ * Unlinked.
+ */
+export const zUnlinkMyIdentityResponse = z.void();
 
 export const zRevokeMySessionsQuery = z.object({
   include_current: z.boolean().optional().default(false),
@@ -4601,6 +4674,25 @@ export const zIssuePasswordResetPath = z.object({
  * The password reset's one-time link.
  */
 export const zIssuePasswordResetResponse = zIssuedPasswordReset;
+
+export const zListMemberIdentitiesPath = z.object({
+  member: z.string(),
+});
+
+/**
+ * The member's password status and identities.
+ */
+export const zListMemberIdentitiesResponse = zMemberAuthMethods;
+
+export const zUnlinkMemberIdentityPath = z.object({
+  member: z.string(),
+  identity: z.string(),
+});
+
+/**
+ * Unlinked.
+ */
+export const zUnlinkMemberIdentityResponse = z.void();
 
 export const zRevokeMemberSessionsPath = z.object({
   member: z.string(),

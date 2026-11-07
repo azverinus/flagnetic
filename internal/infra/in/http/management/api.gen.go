@@ -3124,6 +3124,18 @@ type IdPCertificate struct {
 	Sha256 string `json:"sha256"`
 }
 
+// IdentityLinkStart defines model for IdentityLinkStart.
+type IdentityLinkStart struct {
+	// ReturnTo A path of this instance to return the browser to once linked; `/settings` when absent or not a path of this instance.
+	ReturnTo *string `json:"return_to,omitempty"`
+}
+
+// IdentityLinkStarted defines model for IdentityLinkStarted.
+type IdentityLinkStarted struct {
+	// StartUrl Where to send the browser to authenticate at the auth provider.
+	StartUrl string `json:"start_url"`
+}
+
 // ImportChanges The keys of the entities an import created, updated and deleted, by kind. Standard attributes are never in it.
 type ImportChanges struct {
 	Attributes   ImportKindChanges `json:"attributes"`
@@ -3274,6 +3286,30 @@ type LastEvaluatedAt = time.Time
 // Lifetime A temporary flag is meant to be removed by its expected removal date; a permanent one stays.
 type Lifetime string
 
+// LinkedIdentity The subject an auth provider knows a member by.
+type LinkedIdentity struct {
+	Id openapi_types.UUID `json:"id"`
+
+	// Kind The protocol the provider speaks.
+	Kind AuthProviderKind `json:"kind"`
+
+	// LastSignInAt When the member last signed in through the identity; absent until they do.
+	LastSignInAt *time.Time `json:"last_sign_in_at,omitempty"`
+	LinkedAt     time.Time  `json:"linked_at"`
+
+	// Provider The slug of the auth provider.
+	Provider string `json:"provider"`
+
+	// ProviderEnabled Whether the auth provider is enabled; an identity at a disabled one is no way in.
+	ProviderEnabled bool `json:"provider_enabled"`
+
+	// ProviderName The auth provider's display name.
+	ProviderName string `json:"provider_name"`
+
+	// Subject The provider's identifier of the person.
+	Subject string `json:"subject"`
+}
+
 // Me defines model for Me.
 type Me struct {
 	// ClientIp The address the request came from, as the server sees it behind its trusted proxies.
@@ -3331,6 +3367,14 @@ type Member struct {
 	// refused 409 `member_provisioned`.
 	Provider *string      `json:"provider"`
 	Status   MemberStatus `json:"status"`
+}
+
+// MemberAuthMethods The ways a member holds to sign in.
+type MemberAuthMethods struct {
+	Identities []LinkedIdentity `json:"identities"`
+
+	// Password Whether a member holds a password.
+	Password PasswordStatus `json:"password"`
 }
 
 // MemberInvitation defines model for MemberInvitation.
@@ -3444,6 +3488,14 @@ type PasswordResetCompletion struct {
 type PasswordResetRequest struct {
 	// Email The email the member signs in with, whatever its case.
 	Email string `json:"email"`
+}
+
+// PasswordStatus Whether a member holds a password.
+type PasswordStatus struct {
+	Set bool `json:"set"`
+
+	// SetAt When the password was last set; absent when none is.
+	SetAt *time.Time `json:"set_at,omitempty"`
 }
 
 // PastExpectedEndAlertDetails defines model for PastExpectedEndAlertDetails.
@@ -5162,6 +5214,9 @@ type FlagKey = string
 // GrantID defines model for GrantID.
 type GrantID = string
 
+// IdentityID defines model for IdentityID.
+type IdentityID = string
+
 // IfMatch defines model for IfMatch.
 type IfMatch = string
 
@@ -6120,6 +6175,9 @@ type UpdateMailSettingsJSONRequestBody = SmtpSettingsUpdate
 
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = MePatch
+
+// LinkMyIdentityJSONRequestBody defines body for LinkMyIdentity for application/json ContentType.
+type LinkMyIdentityJSONRequestBody = IdentityLinkStart
 
 // ChangeMyPasswordJSONRequestBody defines body for ChangeMyPassword for application/json ContentType.
 type ChangeMyPasswordJSONRequestBody = PasswordChange
@@ -7997,6 +8055,86 @@ type ClientInterface interface {
 	// Corresponds with PATCH /me (the `UpdateMe` operationId).
 	UpdateMe(ctx context.Context, body UpdateMeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListMyIdentities Your ways to sign in
+	//
+	// Whether the caller holds a password and when they set it, and the
+	// identities they linked at auth providers, oldest first, with when
+	// each last signed in. An identity at a disabled auth provider is
+	// listed with `provider_enabled` false: it is no way in until the
+	// provider is enabled again.
+	//
+	// Corresponds with GET /me/identities (the `ListMyIdentities` operationId).
+	ListMyIdentities(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UnlinkMyIdentity Unlink one of your identities
+	//
+	// Unlinks an identity of the caller. Refused 409 `last_auth_method`
+	// when it is the caller's last usable way in: the other ways are a
+	// password and identities at enabled auth providers. Unlinking an
+	// identity at a disabled auth provider is always allowed, since it was
+	// no way in. An identity of another member, or an identifier that names
+	// none, is not found. Recorded as `identity.unlinked`. Only a session
+	// may do this.
+	//
+	// Corresponds with DELETE /me/identities/{identity} (the `UnlinkMyIdentity` operationId).
+	UnlinkMyIdentity(ctx context.Context, identity IdentityID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LinkMyIdentityWithBody Link an auth provider to your account
+	//
+	// Starts linking an identity at an enabled auth provider to the caller,
+	// answered with the address to send the browser to. The attempt is bound
+	// to the browser through the same cookie a sign-in sets, and to the
+	// session this request is signed in to: completing it from another
+	// browser, or after that session ended, links nothing. Completing it
+	// links the subject the provider vouches for to the caller, whatever its
+	// email, and returns the browser to `return_to`, a path of this
+	// instance, `/settings` when absent or not one. Recorded as
+	// `identity.linked`. When the subject is already linked to another
+	// member nothing is linked and the browser lands on the settings page
+	// with `error=identity_linked`; any other failure lands there with its
+	// sign-in code. A disabled or unknown provider is not found. Only a
+	// session may do this.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /me/identities/{provider}/link (the `LinkMyIdentity` operationId).
+	LinkMyIdentityWithBody(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LinkMyIdentity Link an auth provider to your account
+	//
+	// Starts linking an identity at an enabled auth provider to the caller,
+	// answered with the address to send the browser to. The attempt is bound
+	// to the browser through the same cookie a sign-in sets, and to the
+	// session this request is signed in to: completing it from another
+	// browser, or after that session ended, links nothing. Completing it
+	// links the subject the provider vouches for to the caller, whatever its
+	// email, and returns the browser to `return_to`, a path of this
+	// instance, `/settings` when absent or not one. Recorded as
+	// `identity.linked`. When the subject is already linked to another
+	// member nothing is linked and the browser lands on the settings page
+	// with `error=identity_linked`; any other failure lands there with its
+	// sign-in code. A disabled or unknown provider is not found. Only a
+	// session may do this.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /me/identities/{provider}/link (the `LinkMyIdentity` operationId).
+	LinkMyIdentity(ctx context.Context, provider AuthProviderSlug, body LinkMyIdentityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RemoveMyPassword Remove your password
+	//
+	// Removes the caller's password, so they sign in only through the
+	// auth providers they linked. Refused 409 `last_auth_method` when no
+	// other usable way in remains: an identity at an enabled auth provider.
+	// A member who holds no password is answered 204 and nothing is
+	// recorded. Removing a password ends the member's open invitations and
+	// password resets, as changing it does, so an old link cannot set one
+	// again. The caller's sessions stay. Recorded as `password.removed`.
+	// Only a session may do this.
+	//
+	// Corresponds with DELETE /me/password (the `RemoveMyPassword` operationId).
+	RemoveMyPassword(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ChangeMyPasswordWithBody Change your password
 	//
 	// Sets a new password once the current one is proved, and revokes
@@ -8216,6 +8354,27 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /members/{member}/deactivate (the `DeactivateMember` operationId).
 	DeactivateMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMemberIdentities A member's ways to sign in
+	//
+	// Whether the member holds a password and when they set it, and the
+	// identities they linked at auth providers, as `/me/identities` lists
+	// them.
+	//
+	// Corresponds with GET /members/{member}/identities (the `ListMemberIdentities` operationId).
+	ListMemberIdentities(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UnlinkMemberIdentity Unlink a member's identity
+	//
+	// Unlinks an identity of the member, under the rules of a member
+	// unlinking their own: refused 409 `last_auth_method` when it is the
+	// member's last usable way in, except for a deactivated member, who
+	// signs in nowhere. An identity that does not belong to the member is
+	// not found. Recorded as `identity.unlinked` with the instance admin as
+	// its actor.
+	//
+	// Corresponds with DELETE /members/{member}/identities/{identity} (the `UnlinkMemberIdentity` operationId).
+	UnlinkMemberIdentity(ctx context.Context, member MemberID, identity IdentityID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ReissueInvitation Replace an invited member's link
 	//
@@ -12173,6 +12332,136 @@ func (c *Client) UpdateMe(ctx context.Context, body UpdateMeJSONRequestBody, req
 	return c.Client.Do(req)
 }
 
+// ListMyIdentities Your ways to sign in
+//
+// Whether the caller holds a password and when they set it, and the
+// identities they linked at auth providers, oldest first, with when
+// each last signed in. An identity at a disabled auth provider is
+// listed with `provider_enabled` false: it is no way in until the
+// provider is enabled again.
+//
+// Corresponds with GET /me/identities (the `ListMyIdentities` operationId).
+func (c *Client) ListMyIdentities(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListMyIdentitiesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UnlinkMyIdentity Unlink one of your identities
+//
+// Unlinks an identity of the caller. Refused 409 `last_auth_method`
+// when it is the caller's last usable way in: the other ways are a
+// password and identities at enabled auth providers. Unlinking an
+// identity at a disabled auth provider is always allowed, since it was
+// no way in. An identity of another member, or an identifier that names
+// none, is not found. Recorded as `identity.unlinked`. Only a session
+// may do this.
+//
+// Corresponds with DELETE /me/identities/{identity} (the `UnlinkMyIdentity` operationId).
+func (c *Client) UnlinkMyIdentity(ctx context.Context, identity IdentityID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUnlinkMyIdentityRequest(c.Server, identity)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// LinkMyIdentityWithBody Link an auth provider to your account
+//
+// Starts linking an identity at an enabled auth provider to the caller,
+// answered with the address to send the browser to. The attempt is bound
+// to the browser through the same cookie a sign-in sets, and to the
+// session this request is signed in to: completing it from another
+// browser, or after that session ended, links nothing. Completing it
+// links the subject the provider vouches for to the caller, whatever its
+// email, and returns the browser to `return_to`, a path of this
+// instance, `/settings` when absent or not one. Recorded as
+// `identity.linked`. When the subject is already linked to another
+// member nothing is linked and the browser lands on the settings page
+// with `error=identity_linked`; any other failure lands there with its
+// sign-in code. A disabled or unknown provider is not found. Only a
+// session may do this.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /me/identities/{provider}/link (the `LinkMyIdentity` operationId).
+func (c *Client) LinkMyIdentityWithBody(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLinkMyIdentityRequestWithBody(c.Server, provider, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// LinkMyIdentity Link an auth provider to your account
+//
+// Starts linking an identity at an enabled auth provider to the caller,
+// answered with the address to send the browser to. The attempt is bound
+// to the browser through the same cookie a sign-in sets, and to the
+// session this request is signed in to: completing it from another
+// browser, or after that session ended, links nothing. Completing it
+// links the subject the provider vouches for to the caller, whatever its
+// email, and returns the browser to `return_to`, a path of this
+// instance, `/settings` when absent or not one. Recorded as
+// `identity.linked`. When the subject is already linked to another
+// member nothing is linked and the browser lands on the settings page
+// with `error=identity_linked`; any other failure lands there with its
+// sign-in code. A disabled or unknown provider is not found. Only a
+// session may do this.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /me/identities/{provider}/link (the `LinkMyIdentity` operationId).
+func (c *Client) LinkMyIdentity(ctx context.Context, provider AuthProviderSlug, body LinkMyIdentityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLinkMyIdentityRequest(c.Server, provider, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RemoveMyPassword Remove your password
+//
+// Removes the caller's password, so they sign in only through the
+// auth providers they linked. Refused 409 `last_auth_method` when no
+// other usable way in remains: an identity at an enabled auth provider.
+// A member who holds no password is answered 204 and nothing is
+// recorded. Removing a password ends the member's open invitations and
+// password resets, as changing it does, so an old link cannot set one
+// again. The caller's sessions stay. Recorded as `password.removed`.
+// Only a session may do this.
+//
+// Corresponds with DELETE /me/password (the `RemoveMyPassword` operationId).
+func (c *Client) RemoveMyPassword(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRemoveMyPasswordRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ChangeMyPasswordWithBody Change your password
 //
 // Sets a new password once the current one is proved, and revokes
@@ -12543,6 +12832,47 @@ func (c *Client) UpdateMember(ctx context.Context, member MemberID, body UpdateM
 // Corresponds with POST /members/{member}/deactivate (the `DeactivateMember` operationId).
 func (c *Client) DeactivateMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeactivateMemberRequest(c.Server, member)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListMemberIdentities A member's ways to sign in
+//
+// Whether the member holds a password and when they set it, and the
+// identities they linked at auth providers, as `/me/identities` lists
+// them.
+//
+// Corresponds with GET /members/{member}/identities (the `ListMemberIdentities` operationId).
+func (c *Client) ListMemberIdentities(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListMemberIdentitiesRequest(c.Server, member)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UnlinkMemberIdentity Unlink a member's identity
+//
+// Unlinks an identity of the member, under the rules of a member
+// unlinking their own: refused 409 `last_auth_method` when it is the
+// member's last usable way in, except for a deactivated member, who
+// signs in nowhere. An identity that does not belong to the member is
+// not found. Recorded as `identity.unlinked` with the instance admin as
+// its actor.
+//
+// Corresponds with DELETE /members/{member}/identities/{identity} (the `UnlinkMemberIdentity` operationId).
+func (c *Client) UnlinkMemberIdentity(ctx context.Context, member MemberID, identity IdentityID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUnlinkMemberIdentityRequest(c.Server, member, identity)
 	if err != nil {
 		return nil, err
 	}
@@ -18917,6 +19247,141 @@ func NewUpdateMeRequestWithBody(server string, contentType string, body io.Reade
 	return req, nil
 }
 
+// NewListMyIdentitiesRequest constructs an http.Request for the ListMyIdentities method
+func NewListMyIdentitiesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/identities")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUnlinkMyIdentityRequest constructs an http.Request for the UnlinkMyIdentity method
+func NewUnlinkMyIdentityRequest(server string, identity IdentityID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "identity", identity, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/identities/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewLinkMyIdentityRequest calls the generic LinkMyIdentity builder with application/json body
+func NewLinkMyIdentityRequest(server string, provider AuthProviderSlug, body LinkMyIdentityJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewLinkMyIdentityRequestWithBody(server, provider, "application/json", bodyReader)
+}
+
+// NewLinkMyIdentityRequestWithBody constructs an http.Request for the LinkMyIdentity method, with any body, and a specified content type
+func NewLinkMyIdentityRequestWithBody(server string, provider AuthProviderSlug, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/identities/%s/link", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRemoveMyPasswordRequest constructs an http.Request for the RemoveMyPassword method
+func NewRemoveMyPasswordRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/password")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewChangeMyPasswordRequest calls the generic ChangeMyPassword builder with application/json body
 func NewChangeMyPasswordRequest(server string, body ChangeMyPasswordJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -19387,6 +19852,81 @@ func NewDeactivateMemberRequest(server string, member MemberID) (*http.Request, 
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListMemberIdentitiesRequest constructs an http.Request for the ListMemberIdentities method
+func NewListMemberIdentitiesRequest(server string, member MemberID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s/identities", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUnlinkMemberIdentityRequest constructs an http.Request for the UnlinkMemberIdentity method
+func NewUnlinkMemberIdentityRequest(server string, member MemberID, identity IdentityID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "identity", identity, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s/identities/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -28399,6 +28939,92 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /me (the `UpdateMe` operationId).
 	UpdateMeWithResponse(ctx context.Context, body UpdateMeJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMeResponse, error)
 
+	// ListMyIdentitiesWithResponse Your ways to sign in
+	//
+	// Whether the caller holds a password and when they set it, and the
+	// identities they linked at auth providers, oldest first, with when
+	// each last signed in. An identity at a disabled auth provider is
+	// listed with `provider_enabled` false: it is no way in until the
+	// provider is enabled again.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /me/identities (the `ListMyIdentities` operationId).
+	ListMyIdentitiesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMyIdentitiesResponse, error)
+
+	// UnlinkMyIdentityWithResponse Unlink one of your identities
+	//
+	// Unlinks an identity of the caller. Refused 409 `last_auth_method`
+	// when it is the caller's last usable way in: the other ways are a
+	// password and identities at enabled auth providers. Unlinking an
+	// identity at a disabled auth provider is always allowed, since it was
+	// no way in. An identity of another member, or an identifier that names
+	// none, is not found. Recorded as `identity.unlinked`. Only a session
+	// may do this.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /me/identities/{identity} (the `UnlinkMyIdentity` operationId).
+	UnlinkMyIdentityWithResponse(ctx context.Context, identity IdentityID, reqEditors ...RequestEditorFn) (*UnlinkMyIdentityResponse, error)
+
+	// LinkMyIdentityWithBodyWithResponse Link an auth provider to your account
+	//
+	// Starts linking an identity at an enabled auth provider to the caller,
+	// answered with the address to send the browser to. The attempt is bound
+	// to the browser through the same cookie a sign-in sets, and to the
+	// session this request is signed in to: completing it from another
+	// browser, or after that session ended, links nothing. Completing it
+	// links the subject the provider vouches for to the caller, whatever its
+	// email, and returns the browser to `return_to`, a path of this
+	// instance, `/settings` when absent or not one. Recorded as
+	// `identity.linked`. When the subject is already linked to another
+	// member nothing is linked and the browser lands on the settings page
+	// with `error=identity_linked`; any other failure lands there with its
+	// sign-in code. A disabled or unknown provider is not found. Only a
+	// session may do this.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /me/identities/{provider}/link (the `LinkMyIdentity` operationId).
+	LinkMyIdentityWithBodyWithResponse(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LinkMyIdentityResponse, error)
+
+	// LinkMyIdentityWithResponse Link an auth provider to your account
+	//
+	// Starts linking an identity at an enabled auth provider to the caller,
+	// answered with the address to send the browser to. The attempt is bound
+	// to the browser through the same cookie a sign-in sets, and to the
+	// session this request is signed in to: completing it from another
+	// browser, or after that session ended, links nothing. Completing it
+	// links the subject the provider vouches for to the caller, whatever its
+	// email, and returns the browser to `return_to`, a path of this
+	// instance, `/settings` when absent or not one. Recorded as
+	// `identity.linked`. When the subject is already linked to another
+	// member nothing is linked and the browser lands on the settings page
+	// with `error=identity_linked`; any other failure lands there with its
+	// sign-in code. A disabled or unknown provider is not found. Only a
+	// session may do this.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /me/identities/{provider}/link (the `LinkMyIdentity` operationId).
+	LinkMyIdentityWithResponse(ctx context.Context, provider AuthProviderSlug, body LinkMyIdentityJSONRequestBody, reqEditors ...RequestEditorFn) (*LinkMyIdentityResponse, error)
+
+	// RemoveMyPasswordWithResponse Remove your password
+	//
+	// Removes the caller's password, so they sign in only through the
+	// auth providers they linked. Refused 409 `last_auth_method` when no
+	// other usable way in remains: an identity at an enabled auth provider.
+	// A member who holds no password is answered 204 and nothing is
+	// recorded. Removing a password ends the member's open invitations and
+	// password resets, as changing it does, so an old link cannot set one
+	// again. The caller's sessions stay. Recorded as `password.removed`.
+	// Only a session may do this.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /me/password (the `RemoveMyPassword` operationId).
+	RemoveMyPasswordWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RemoveMyPasswordResponse, error)
+
 	// ChangeMyPasswordWithBodyWithResponse Change your password
 	//
 	// Sets a new password once the current one is proved, and revokes
@@ -28634,6 +29260,31 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /members/{member}/deactivate (the `DeactivateMember` operationId).
 	DeactivateMemberWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*DeactivateMemberResponse, error)
+
+	// ListMemberIdentitiesWithResponse A member's ways to sign in
+	//
+	// Whether the member holds a password and when they set it, and the
+	// identities they linked at auth providers, as `/me/identities` lists
+	// them.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /members/{member}/identities (the `ListMemberIdentities` operationId).
+	ListMemberIdentitiesWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ListMemberIdentitiesResponse, error)
+
+	// UnlinkMemberIdentityWithResponse Unlink a member's identity
+	//
+	// Unlinks an identity of the member, under the rules of a member
+	// unlinking their own: refused 409 `last_auth_method` when it is the
+	// member's last usable way in, except for a deactivated member, who
+	// signs in nowhere. An identity that does not belong to the member is
+	// not found. Recorded as `identity.unlinked` with the instance admin as
+	// its actor.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /members/{member}/identities/{identity} (the `UnlinkMemberIdentity` operationId).
+	UnlinkMemberIdentityWithResponse(ctx context.Context, member MemberID, identity IdentityID, reqEditors ...RequestEditorFn) (*UnlinkMemberIdentityResponse, error)
 
 	// ReissueInvitationWithResponse Replace an invited member's link
 	//
@@ -34250,6 +34901,289 @@ func (r UpdateMeResponse) ContentType() string {
 	return ""
 }
 
+// ListMyIdentitiesResponse401Headers the declared response headers of an HTTP 401 response for ListMyIdentities
+type ListMyIdentitiesResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListMyIdentitiesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MemberAuthMethods
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListMyIdentitiesResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMyIdentitiesResponse) GetJSON200() *MemberAuthMethods {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListMyIdentitiesResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListMyIdentitiesResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMyIdentitiesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMyIdentitiesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMyIdentitiesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMyIdentitiesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UnlinkMyIdentityResponse401Headers the declared response headers of an HTTP 401 response for UnlinkMyIdentity
+type UnlinkMyIdentityResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UnlinkMyIdentityResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UnlinkMyIdentityResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UnlinkMyIdentityResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UnlinkMyIdentityResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UnlinkMyIdentityResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r UnlinkMyIdentityResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r UnlinkMyIdentityResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UnlinkMyIdentityResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UnlinkMyIdentityResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UnlinkMyIdentityResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// LinkMyIdentityResponse200Headers the declared response headers of an HTTP 200 response for LinkMyIdentity
+type LinkMyIdentityResponse200Headers struct {
+	SetCookie *string
+}
+
+// LinkMyIdentityResponse401Headers the declared response headers of an HTTP 401 response for LinkMyIdentity
+type LinkMyIdentityResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type LinkMyIdentityResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *IdentityLinkStarted
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *LinkMyIdentityResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *LinkMyIdentityResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r LinkMyIdentityResponse) GetJSON200() *IdentityLinkStarted {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r LinkMyIdentityResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r LinkMyIdentityResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r LinkMyIdentityResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r LinkMyIdentityResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r LinkMyIdentityResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r LinkMyIdentityResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r LinkMyIdentityResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r LinkMyIdentityResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r LinkMyIdentityResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RemoveMyPasswordResponse401Headers the declared response headers of an HTTP 401 response for RemoveMyPassword
+type RemoveMyPasswordResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RemoveMyPasswordResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RemoveMyPasswordResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RemoveMyPasswordResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RemoveMyPasswordResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RemoveMyPasswordResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r RemoveMyPasswordResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RemoveMyPasswordResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RemoveMyPasswordResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RemoveMyPasswordResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ChangeMyPasswordResponse401Headers the declared response headers of an HTTP 401 response for ChangeMyPassword
 type ChangeMyPasswordResponse401Headers struct {
 	WWWAuthenticate *string
@@ -35114,6 +36048,144 @@ func (r DeactivateMemberResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r DeactivateMemberResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListMemberIdentitiesResponse401Headers the declared response headers of an HTTP 401 response for ListMemberIdentities
+type ListMemberIdentitiesResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListMemberIdentitiesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MemberAuthMethods
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListMemberIdentitiesResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMemberIdentitiesResponse) GetJSON200() *MemberAuthMethods {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListMemberIdentitiesResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListMemberIdentitiesResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListMemberIdentitiesResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMemberIdentitiesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMemberIdentitiesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMemberIdentitiesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMemberIdentitiesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UnlinkMemberIdentityResponse401Headers the declared response headers of an HTTP 401 response for UnlinkMemberIdentity
+type UnlinkMemberIdentityResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UnlinkMemberIdentityResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UnlinkMemberIdentityResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UnlinkMemberIdentityResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UnlinkMemberIdentityResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UnlinkMemberIdentityResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r UnlinkMemberIdentityResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r UnlinkMemberIdentityResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UnlinkMemberIdentityResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UnlinkMemberIdentityResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UnlinkMemberIdentityResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -48427,6 +49499,122 @@ func (c *ClientWithResponses) UpdateMeWithResponse(ctx context.Context, body Upd
 	return ParseUpdateMeResponse(rsp)
 }
 
+// ListMyIdentitiesWithResponse Your ways to sign in
+//
+// Whether the caller holds a password and when they set it, and the
+// identities they linked at auth providers, oldest first, with when
+// each last signed in. An identity at a disabled auth provider is
+// listed with `provider_enabled` false: it is no way in until the
+// provider is enabled again.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/identities (the `ListMyIdentities` operationId).
+func (c *ClientWithResponses) ListMyIdentitiesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMyIdentitiesResponse, error) {
+	rsp, err := c.ListMyIdentities(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMyIdentitiesResponse(rsp)
+}
+
+// UnlinkMyIdentityWithResponse Unlink one of your identities
+//
+// Unlinks an identity of the caller. Refused 409 `last_auth_method`
+// when it is the caller's last usable way in: the other ways are a
+// password and identities at enabled auth providers. Unlinking an
+// identity at a disabled auth provider is always allowed, since it was
+// no way in. An identity of another member, or an identifier that names
+// none, is not found. Recorded as `identity.unlinked`. Only a session
+// may do this.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /me/identities/{identity} (the `UnlinkMyIdentity` operationId).
+func (c *ClientWithResponses) UnlinkMyIdentityWithResponse(ctx context.Context, identity IdentityID, reqEditors ...RequestEditorFn) (*UnlinkMyIdentityResponse, error) {
+	rsp, err := c.UnlinkMyIdentity(ctx, identity, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUnlinkMyIdentityResponse(rsp)
+}
+
+// LinkMyIdentityWithBodyWithResponse Link an auth provider to your account
+//
+// Starts linking an identity at an enabled auth provider to the caller,
+// answered with the address to send the browser to. The attempt is bound
+// to the browser through the same cookie a sign-in sets, and to the
+// session this request is signed in to: completing it from another
+// browser, or after that session ended, links nothing. Completing it
+// links the subject the provider vouches for to the caller, whatever its
+// email, and returns the browser to `return_to`, a path of this
+// instance, `/settings` when absent or not one. Recorded as
+// `identity.linked`. When the subject is already linked to another
+// member nothing is linked and the browser lands on the settings page
+// with `error=identity_linked`; any other failure lands there with its
+// sign-in code. A disabled or unknown provider is not found. Only a
+// session may do this.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/identities/{provider}/link (the `LinkMyIdentity` operationId).
+func (c *ClientWithResponses) LinkMyIdentityWithBodyWithResponse(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LinkMyIdentityResponse, error) {
+	rsp, err := c.LinkMyIdentityWithBody(ctx, provider, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLinkMyIdentityResponse(rsp)
+}
+
+// LinkMyIdentityWithResponse Link an auth provider to your account
+//
+// Starts linking an identity at an enabled auth provider to the caller,
+// answered with the address to send the browser to. The attempt is bound
+// to the browser through the same cookie a sign-in sets, and to the
+// session this request is signed in to: completing it from another
+// browser, or after that session ended, links nothing. Completing it
+// links the subject the provider vouches for to the caller, whatever its
+// email, and returns the browser to `return_to`, a path of this
+// instance, `/settings` when absent or not one. Recorded as
+// `identity.linked`. When the subject is already linked to another
+// member nothing is linked and the browser lands on the settings page
+// with `error=identity_linked`; any other failure lands there with its
+// sign-in code. A disabled or unknown provider is not found. Only a
+// session may do this.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/identities/{provider}/link (the `LinkMyIdentity` operationId).
+func (c *ClientWithResponses) LinkMyIdentityWithResponse(ctx context.Context, provider AuthProviderSlug, body LinkMyIdentityJSONRequestBody, reqEditors ...RequestEditorFn) (*LinkMyIdentityResponse, error) {
+	rsp, err := c.LinkMyIdentity(ctx, provider, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLinkMyIdentityResponse(rsp)
+}
+
+// RemoveMyPasswordWithResponse Remove your password
+//
+// Removes the caller's password, so they sign in only through the
+// auth providers they linked. Refused 409 `last_auth_method` when no
+// other usable way in remains: an identity at an enabled auth provider.
+// A member who holds no password is answered 204 and nothing is
+// recorded. Removing a password ends the member's open invitations and
+// password resets, as changing it does, so an old link cannot set one
+// again. The caller's sessions stay. Recorded as `password.removed`.
+// Only a session may do this.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /me/password (the `RemoveMyPassword` operationId).
+func (c *ClientWithResponses) RemoveMyPasswordWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RemoveMyPasswordResponse, error) {
+	rsp, err := c.RemoveMyPassword(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRemoveMyPasswordResponse(rsp)
+}
+
 // ChangeMyPasswordWithBodyWithResponse Change your password
 //
 // Sets a new password once the current one is proved, and revokes
@@ -48757,6 +49945,43 @@ func (c *ClientWithResponses) DeactivateMemberWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseDeactivateMemberResponse(rsp)
+}
+
+// ListMemberIdentitiesWithResponse A member's ways to sign in
+//
+// Whether the member holds a password and when they set it, and the
+// identities they linked at auth providers, as `/me/identities` lists
+// them.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /members/{member}/identities (the `ListMemberIdentities` operationId).
+func (c *ClientWithResponses) ListMemberIdentitiesWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ListMemberIdentitiesResponse, error) {
+	rsp, err := c.ListMemberIdentities(ctx, member, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMemberIdentitiesResponse(rsp)
+}
+
+// UnlinkMemberIdentityWithResponse Unlink a member's identity
+//
+// Unlinks an identity of the member, under the rules of a member
+// unlinking their own: refused 409 `last_auth_method` when it is the
+// member's last usable way in, except for a deactivated member, who
+// signs in nowhere. An identity that does not belong to the member is
+// not found. Recorded as `identity.unlinked` with the instance admin as
+// its actor.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /members/{member}/identities/{identity} (the `UnlinkMemberIdentity` operationId).
+func (c *ClientWithResponses) UnlinkMemberIdentityWithResponse(ctx context.Context, member MemberID, identity IdentityID, reqEditors ...RequestEditorFn) (*UnlinkMemberIdentityResponse, error) {
+	rsp, err := c.UnlinkMemberIdentity(ctx, member, identity, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUnlinkMemberIdentityResponse(rsp)
 }
 
 // ReissueInvitationWithResponse Replace an invited member's link
@@ -55330,6 +56555,262 @@ func ParseUpdateMeResponse(rsp *http.Response) (*UpdateMeResponse, error) {
 	return response, nil
 }
 
+// ParseListMyIdentitiesResponse parses an HTTP response from a ListMyIdentitiesWithResponse call
+func ParseListMyIdentitiesResponse(rsp *http.Response) (*ListMyIdentitiesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListMyIdentitiesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MemberAuthMethods
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListMyIdentitiesResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUnlinkMyIdentityResponse parses an HTTP response from a UnlinkMyIdentityWithResponse call
+func ParseUnlinkMyIdentityResponse(rsp *http.Response) (*UnlinkMyIdentityResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UnlinkMyIdentityResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers UnlinkMyIdentityResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseLinkMyIdentityResponse parses an HTTP response from a LinkMyIdentityWithResponse call
+func ParseLinkMyIdentityResponse(rsp *http.Response) (*LinkMyIdentityResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &LinkMyIdentityResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest IdentityLinkStarted
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers LinkMyIdentityResponse200Headers
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers LinkMyIdentityResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRemoveMyPasswordResponse parses an HTTP response from a RemoveMyPasswordWithResponse call
+func ParseRemoveMyPasswordResponse(rsp *http.Response) (*RemoveMyPasswordResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RemoveMyPasswordResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers RemoveMyPasswordResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseChangeMyPasswordResponse parses an HTTP response from a ChangeMyPasswordWithResponse call
 func ParseChangeMyPasswordResponse(rsp *http.Response) (*ChangeMyPasswordResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -56100,6 +57581,129 @@ func ParseDeactivateMemberResponse(rsp *http.Response) (*DeactivateMemberRespons
 	switch {
 	case rsp.StatusCode == 401:
 		var headers DeactivateMemberResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListMemberIdentitiesResponse parses an HTTP response from a ListMemberIdentitiesWithResponse call
+func ParseListMemberIdentitiesResponse(rsp *http.Response) (*ListMemberIdentitiesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListMemberIdentitiesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MemberAuthMethods
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListMemberIdentitiesResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUnlinkMemberIdentityResponse parses an HTTP response from a UnlinkMemberIdentityWithResponse call
+func ParseUnlinkMemberIdentityResponse(rsp *http.Response) (*UnlinkMemberIdentityResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UnlinkMemberIdentityResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers UnlinkMemberIdentityResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -67531,6 +69135,18 @@ type ServerInterface interface {
 	// UpdateMe Rename yourself or choose your console language
 	// (PATCH /me)
 	UpdateMe(w http.ResponseWriter, r *http.Request)
+	// ListMyIdentities Your ways to sign in
+	// (GET /me/identities)
+	ListMyIdentities(w http.ResponseWriter, r *http.Request)
+	// UnlinkMyIdentity Unlink one of your identities
+	// (DELETE /me/identities/{identity})
+	UnlinkMyIdentity(w http.ResponseWriter, r *http.Request, identity IdentityID)
+	// LinkMyIdentity Link an auth provider to your account
+	// (POST /me/identities/{provider}/link)
+	LinkMyIdentity(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// RemoveMyPassword Remove your password
+	// (DELETE /me/password)
+	RemoveMyPassword(w http.ResponseWriter, r *http.Request)
 	// ChangeMyPassword Change your password
 	// (POST /me/password)
 	ChangeMyPassword(w http.ResponseWriter, r *http.Request)
@@ -67567,6 +69183,12 @@ type ServerInterface interface {
 	// DeactivateMember Offboard a member
 	// (POST /members/{member}/deactivate)
 	DeactivateMember(w http.ResponseWriter, r *http.Request, member MemberID)
+	// ListMemberIdentities A member's ways to sign in
+	// (GET /members/{member}/identities)
+	ListMemberIdentities(w http.ResponseWriter, r *http.Request, member MemberID)
+	// UnlinkMemberIdentity Unlink a member's identity
+	// (DELETE /members/{member}/identities/{identity})
+	UnlinkMemberIdentity(w http.ResponseWriter, r *http.Request, member MemberID, identity IdentityID)
 	// ReissueInvitation Replace an invited member's link
 	// (POST /members/{member}/invitation)
 	ReissueInvitation(w http.ResponseWriter, r *http.Request, member MemberID)
@@ -69051,6 +70673,86 @@ func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
+// ListMyIdentities operation middleware
+func (siw *ServerInterfaceWrapper) ListMyIdentities(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMyIdentities(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnlinkMyIdentity operation middleware
+func (siw *ServerInterfaceWrapper) UnlinkMyIdentity(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "identity" -------------
+	var identity IdentityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "identity", r.PathValue("identity"), &identity, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "identity", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnlinkMyIdentity(w, r, identity)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// LinkMyIdentity operation middleware
+func (siw *ServerInterfaceWrapper) LinkMyIdentity(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.LinkMyIdentity(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveMyPassword operation middleware
+func (siw *ServerInterfaceWrapper) RemoveMyPassword(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveMyPassword(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ChangeMyPassword operation middleware
 func (siw *ServerInterfaceWrapper) ChangeMyPassword(w http.ResponseWriter, r *http.Request) {
 
@@ -69321,6 +71023,67 @@ func (siw *ServerInterfaceWrapper) DeactivateMember(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeactivateMember(w, r, member)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMemberIdentities operation middleware
+func (siw *ServerInterfaceWrapper) ListMemberIdentities(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMemberIdentities(w, r, member)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnlinkMemberIdentity operation middleware
+func (siw *ServerInterfaceWrapper) UnlinkMemberIdentity(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "identity" -------------
+	var identity IdentityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "identity", r.PathValue("identity"), &identity, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "identity", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnlinkMemberIdentity(w, r, member, identity)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -76357,7 +78120,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/password-reset/{secret}", wrapper.CompletePasswordReset)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/me", wrapper.UpdateMe)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/password", wrapper.RemoveMyPassword)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/password", wrapper.ChangeMyPassword)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/identities", wrapper.ListMyIdentities)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/identities/{provider}/link", wrapper.LinkMyIdentity)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/identities/{identity}", wrapper.UnlinkMyIdentity)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/sessions", wrapper.RevokeMySessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/sessions", wrapper.ListMySessions)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/sessions/{session}", wrapper.RevokeMySession)
@@ -76475,6 +78242,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members/{member}/reactivate", wrapper.ReactivateMember)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members/{member}/invitation", wrapper.ReissueInvitation)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members/{member}/password-reset", wrapper.IssuePasswordReset)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}/identities", wrapper.ListMemberIdentities)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/members/{member}/identities/{identity}", wrapper.UnlinkMemberIdentity)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/members/{member}/sessions", wrapper.RevokeMemberSessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}/sessions", wrapper.ListMemberSessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}/tokens", wrapper.ListMemberTokens)
@@ -79535,6 +81304,327 @@ func (response UpdateMe422ApplicationProblemPlusJSONResponse) VisitUpdateMeRespo
 	return err
 }
 
+type ListMyIdentitiesRequestObject struct {
+}
+
+type ListMyIdentitiesResponseObject interface {
+	VisitListMyIdentitiesResponse(w http.ResponseWriter) error
+}
+
+type ListMyIdentities200JSONResponse MemberAuthMethods
+
+func (response ListMyIdentities200JSONResponse) VisitListMyIdentitiesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMyIdentities401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListMyIdentities401ApplicationProblemPlusJSONResponse) VisitListMyIdentitiesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMyIdentities403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListMyIdentities403ApplicationProblemPlusJSONResponse) VisitListMyIdentitiesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkMyIdentityRequestObject struct {
+	Identity IdentityID `json:"identity"`
+}
+
+type UnlinkMyIdentityResponseObject interface {
+	VisitUnlinkMyIdentityResponse(w http.ResponseWriter) error
+}
+
+type UnlinkMyIdentity204Response struct {
+}
+
+func (response UnlinkMyIdentity204Response) VisitUnlinkMyIdentityResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type UnlinkMyIdentity401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkMyIdentity401ApplicationProblemPlusJSONResponse) VisitUnlinkMyIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkMyIdentity403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkMyIdentity403ApplicationProblemPlusJSONResponse) VisitUnlinkMyIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkMyIdentity404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkMyIdentity404ApplicationProblemPlusJSONResponse) VisitUnlinkMyIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkMyIdentity409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkMyIdentity409ApplicationProblemPlusJSONResponse) VisitUnlinkMyIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkMyIdentityRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+	Body     *LinkMyIdentityJSONRequestBody
+}
+
+type LinkMyIdentityResponseObject interface {
+	VisitLinkMyIdentityResponse(w http.ResponseWriter) error
+}
+
+type LinkMyIdentity200ResponseHeaders struct {
+	SetCookie *string
+}
+
+type LinkMyIdentity200JSONResponse struct {
+	Body    IdentityLinkStarted
+	Headers LinkMyIdentity200ResponseHeaders
+}
+
+func (response LinkMyIdentity200JSONResponse) VisitLinkMyIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkMyIdentity401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response LinkMyIdentity401ApplicationProblemPlusJSONResponse) VisitLinkMyIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkMyIdentity403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response LinkMyIdentity403ApplicationProblemPlusJSONResponse) VisitLinkMyIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkMyIdentity404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response LinkMyIdentity404ApplicationProblemPlusJSONResponse) VisitLinkMyIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkMyIdentity422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response LinkMyIdentity422ApplicationProblemPlusJSONResponse) VisitLinkMyIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkMyIdentity502ApplicationProblemPlusJSONResponse struct {
+	BadGatewayApplicationProblemPlusJSONResponse
+}
+
+func (response LinkMyIdentity502ApplicationProblemPlusJSONResponse) VisitLinkMyIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveMyPasswordRequestObject struct {
+}
+
+type RemoveMyPasswordResponseObject interface {
+	VisitRemoveMyPasswordResponse(w http.ResponseWriter) error
+}
+
+type RemoveMyPassword204Response struct {
+}
+
+func (response RemoveMyPassword204Response) VisitRemoveMyPasswordResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RemoveMyPassword401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveMyPassword401ApplicationProblemPlusJSONResponse) VisitRemoveMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveMyPassword403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveMyPassword403ApplicationProblemPlusJSONResponse) VisitRemoveMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveMyPassword409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveMyPassword409ApplicationProblemPlusJSONResponse) VisitRemoveMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ChangeMyPasswordRequestObject struct {
 	Body *ChangeMyPasswordJSONRequestBody
 }
@@ -80485,6 +82575,163 @@ type DeactivateMember409ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response DeactivateMember409ApplicationProblemPlusJSONResponse) VisitDeactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberIdentitiesRequestObject struct {
+	Member MemberID `json:"member"`
+}
+
+type ListMemberIdentitiesResponseObject interface {
+	VisitListMemberIdentitiesResponse(w http.ResponseWriter) error
+}
+
+type ListMemberIdentities200JSONResponse MemberAuthMethods
+
+func (response ListMemberIdentities200JSONResponse) VisitListMemberIdentitiesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberIdentities401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListMemberIdentities401ApplicationProblemPlusJSONResponse) VisitListMemberIdentitiesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberIdentities403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListMemberIdentities403ApplicationProblemPlusJSONResponse) VisitListMemberIdentitiesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberIdentities404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListMemberIdentities404ApplicationProblemPlusJSONResponse) VisitListMemberIdentitiesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkMemberIdentityRequestObject struct {
+	Member   MemberID   `json:"member"`
+	Identity IdentityID `json:"identity"`
+}
+
+type UnlinkMemberIdentityResponseObject interface {
+	VisitUnlinkMemberIdentityResponse(w http.ResponseWriter) error
+}
+
+type UnlinkMemberIdentity204Response struct {
+}
+
+func (response UnlinkMemberIdentity204Response) VisitUnlinkMemberIdentityResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type UnlinkMemberIdentity401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkMemberIdentity401ApplicationProblemPlusJSONResponse) VisitUnlinkMemberIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkMemberIdentity403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkMemberIdentity403ApplicationProblemPlusJSONResponse) VisitUnlinkMemberIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkMemberIdentity404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkMemberIdentity404ApplicationProblemPlusJSONResponse) VisitUnlinkMemberIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkMemberIdentity409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkMemberIdentity409ApplicationProblemPlusJSONResponse) VisitUnlinkMemberIdentityResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -96365,6 +98612,18 @@ type StrictServerInterface interface {
 	// UpdateMe Rename yourself or choose your console language
 	// (PATCH /me)
 	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
+	// ListMyIdentities Your ways to sign in
+	// (GET /me/identities)
+	ListMyIdentities(ctx context.Context, request ListMyIdentitiesRequestObject) (ListMyIdentitiesResponseObject, error)
+	// UnlinkMyIdentity Unlink one of your identities
+	// (DELETE /me/identities/{identity})
+	UnlinkMyIdentity(ctx context.Context, request UnlinkMyIdentityRequestObject) (UnlinkMyIdentityResponseObject, error)
+	// LinkMyIdentity Link an auth provider to your account
+	// (POST /me/identities/{provider}/link)
+	LinkMyIdentity(ctx context.Context, request LinkMyIdentityRequestObject) (LinkMyIdentityResponseObject, error)
+	// RemoveMyPassword Remove your password
+	// (DELETE /me/password)
+	RemoveMyPassword(ctx context.Context, request RemoveMyPasswordRequestObject) (RemoveMyPasswordResponseObject, error)
 	// ChangeMyPassword Change your password
 	// (POST /me/password)
 	ChangeMyPassword(ctx context.Context, request ChangeMyPasswordRequestObject) (ChangeMyPasswordResponseObject, error)
@@ -96401,6 +98660,12 @@ type StrictServerInterface interface {
 	// DeactivateMember Offboard a member
 	// (POST /members/{member}/deactivate)
 	DeactivateMember(ctx context.Context, request DeactivateMemberRequestObject) (DeactivateMemberResponseObject, error)
+	// ListMemberIdentities A member's ways to sign in
+	// (GET /members/{member}/identities)
+	ListMemberIdentities(ctx context.Context, request ListMemberIdentitiesRequestObject) (ListMemberIdentitiesResponseObject, error)
+	// UnlinkMemberIdentity Unlink a member's identity
+	// (DELETE /members/{member}/identities/{identity})
+	UnlinkMemberIdentity(ctx context.Context, request UnlinkMemberIdentityRequestObject) (UnlinkMemberIdentityResponseObject, error)
 	// ReissueInvitation Replace an invited member's link
 	// (POST /members/{member}/invitation)
 	ReissueInvitation(ctx context.Context, request ReissueInvitationRequestObject) (ReissueInvitationResponseObject, error)
@@ -97790,6 +100055,116 @@ func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListMyIdentities operation middleware
+func (sh *strictHandler) ListMyIdentities(w http.ResponseWriter, r *http.Request) {
+	var request ListMyIdentitiesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMyIdentities(ctx, request.(ListMyIdentitiesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMyIdentities")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMyIdentitiesResponseObject); ok {
+		if err := validResponse.VisitListMyIdentitiesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnlinkMyIdentity operation middleware
+func (sh *strictHandler) UnlinkMyIdentity(w http.ResponseWriter, r *http.Request, identity IdentityID) {
+	var request UnlinkMyIdentityRequestObject
+
+	request.Identity = identity
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnlinkMyIdentity(ctx, request.(UnlinkMyIdentityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnlinkMyIdentity")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnlinkMyIdentityResponseObject); ok {
+		if err := validResponse.VisitUnlinkMyIdentityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// LinkMyIdentity operation middleware
+func (sh *strictHandler) LinkMyIdentity(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request LinkMyIdentityRequestObject
+
+	request.Provider = provider
+
+	var body LinkMyIdentityJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.LinkMyIdentity(ctx, request.(LinkMyIdentityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "LinkMyIdentity")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LinkMyIdentityResponseObject); ok {
+		if err := validResponse.VisitLinkMyIdentityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveMyPassword operation middleware
+func (sh *strictHandler) RemoveMyPassword(w http.ResponseWriter, r *http.Request) {
+	var request RemoveMyPasswordRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveMyPassword(ctx, request.(RemoveMyPasswordRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveMyPassword")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveMyPasswordResponseObject); ok {
+		if err := validResponse.VisitRemoveMyPasswordResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ChangeMyPassword operation middleware
 func (sh *strictHandler) ChangeMyPassword(w http.ResponseWriter, r *http.Request) {
 	var request ChangeMyPasswordRequestObject
@@ -98113,6 +100488,59 @@ func (sh *strictHandler) DeactivateMember(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(DeactivateMemberResponseObject); ok {
 		if err := validResponse.VisitDeactivateMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMemberIdentities operation middleware
+func (sh *strictHandler) ListMemberIdentities(w http.ResponseWriter, r *http.Request, member MemberID) {
+	var request ListMemberIdentitiesRequestObject
+
+	request.Member = member
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMemberIdentities(ctx, request.(ListMemberIdentitiesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMemberIdentities")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMemberIdentitiesResponseObject); ok {
+		if err := validResponse.VisitListMemberIdentitiesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnlinkMemberIdentity operation middleware
+func (sh *strictHandler) UnlinkMemberIdentity(w http.ResponseWriter, r *http.Request, member MemberID, identity IdentityID) {
+	var request UnlinkMemberIdentityRequestObject
+
+	request.Member = member
+	request.Identity = identity
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnlinkMemberIdentity(ctx, request.(UnlinkMemberIdentityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnlinkMemberIdentity")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnlinkMemberIdentityResponseObject); ok {
+		if err := validResponse.VisitUnlinkMemberIdentityResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

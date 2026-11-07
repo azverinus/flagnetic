@@ -304,12 +304,13 @@ func (m Member) Deactivated() Member {
 	return m
 }
 
-// Reactivated returns m back on the instance: active when they hold a
-// password to sign in with, invited otherwise, to set one through an
-// invitation. Nothing revoked at their deactivation comes back.
-func (m Member) Reactivated(holdsPassword bool) Member {
+// Reactivated returns m back on the instance: active when they hold a way to
+// sign in with, a password or an identity at an auth provider, invited
+// otherwise, to set a password through an invitation. Nothing revoked at
+// their deactivation comes back.
+func (m Member) Reactivated(holdsWayIn bool) Member {
 	m.Status = MemberInvited
-	if holdsPassword {
+	if holdsWayIn {
 		m.Status = MemberActive
 	}
 	return m
