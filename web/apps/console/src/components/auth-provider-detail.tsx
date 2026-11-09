@@ -18,6 +18,13 @@ import { AuthProviderKind, AuthProviderStateBadge } from "@/components/auth-prov
 import { AuthProviderForm } from "@/components/auth-provider-form";
 import { CopyableValue } from "@/components/copyable-value";
 import { QueryError } from "@/components/query-error";
+import {
+  IdPCertificates,
+  SamlCertificates,
+  SamlIdentityProvider,
+  SamlRegistration,
+} from "@/components/saml-provider-detail";
+import { SamlProviderForm } from "@/components/saml-provider-form";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/ui/page-header";
@@ -98,6 +105,13 @@ function AuthProviderPage({
       toast.success(saved.enabled ? t`${name} is enabled.` : t`${name} is disabled.`);
     },
   });
+  const settingsSaved = (answer: AuthProvider) => {
+    remember(answer);
+    // A test answered for the settings before the save; test again.
+    test.reset();
+    const { display_name: savedName } = answer;
+    toast.success(t`${savedName} is saved.`);
+  };
   const test = useMutation({
     mutationFn: () => authProviderApi.test(provider.slug),
     meta: { toast: false },
@@ -178,33 +192,43 @@ function AuthProviderPage({
             </p>
           )}
         </section>
-      ) : null}
+      ) : (
+        <SamlRegistration provider={provider} />
+      )}
       <TestResult
         pending={test.isPending}
         result={test.data}
         failure={test.error instanceof ApiError ? test.error : undefined}
       />
-      {provider.kind === "oidc" ? (
-        <section aria-labelledby="settings" className="flex flex-col gap-4">
-          <h2 id="settings" className="text-base font-semibold">
-            <Trans>Settings</Trans>
-          </h2>
-          {/* A new version starts the form over from what was saved. */}
+      {provider.kind === "saml" ? (
+        <>
+          <SamlIdentityProvider provider={provider} />
+          <SamlCertificates provider={provider} onChanged={remember} onReload={onReload} />
+        </>
+      ) : null}
+      <section aria-labelledby="settings" className="flex flex-col gap-4">
+        <h2 id="settings" className="text-base font-semibold">
+          <Trans>Settings</Trans>
+        </h2>
+        {/* A new version starts the form over from what was saved. */}
+        {provider.kind === "oidc" ? (
           <AuthProviderForm
             key={provider.version}
             provider={provider}
             layout="page"
-            onSaved={(saved) => {
-              remember(saved);
-              // A test answered for the settings before the save; test again.
-              test.reset();
-              const { display_name: savedName } = saved;
-              toast.success(t`${savedName} is saved.`);
-            }}
+            onSaved={settingsSaved}
             onReload={onReload}
           />
-        </section>
-      ) : null}
+        ) : (
+          <SamlProviderForm
+            key={provider.version}
+            provider={provider}
+            layout="page"
+            onSaved={settingsSaved}
+            onReload={onReload}
+          />
+        )}
+      </section>
       <ConfirmDialog
         open={deleting}
         onOpenChange={(open) => {
@@ -233,7 +257,8 @@ function AuthProviderPage({
 
 /**
  * What the identity provider answered when the instance asked: the
- * endpoints its discovery document names, or why it could not be reached.
+ * endpoints its discovery document names, or what its SAML metadata says
+ * now, or why it could not be reached.
  * Sign-in needs PKCE with S256, so a provider that lists its methods
  * without it is flagged here, before a member meets the failure.
  */
@@ -266,6 +291,26 @@ function TestResult({
     );
   }
   if (!result) return null;
+  if (result.idp_entity_id !== undefined) {
+    return (
+      <section aria-labelledby="test-result" className="flex flex-col gap-3">
+        <h2 id="test-result" className="flex items-center gap-2 text-base font-semibold">
+          <CircleCheckIcon aria-hidden className="size-4 text-primary" />
+          <Trans>The identity provider answered</Trans>
+        </h2>
+        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
+          <Row term={<Trans>Entity ID</Trans>} value={result.idp_entity_id} />
+          <Row term={<Trans>Sign-on URL</Trans>} value={result.idp_sso_url} />
+          <dt className="text-muted-foreground">
+            <Trans>Signing certificates</Trans>
+          </dt>
+          <dd>
+            <IdPCertificates certificates={result.idp_certificates ?? []} />
+          </dd>
+        </dl>
+      </section>
+    );
+  }
   const methods = result.code_challenge_methods_supported;
   const lacksS256 = methods !== undefined && !methods.includes("S256");
   return (

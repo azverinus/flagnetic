@@ -9,6 +9,7 @@ import {
 } from "@flagnetic/api";
 
 import { startDex, stopDex } from "./support/dex";
+import { startKeycloak, stopKeycloak } from "./support/keycloak";
 import { startMailpit, stopMailpit } from "./support/mailpit";
 import {
   bootstrap,
@@ -22,8 +23,8 @@ import {
 } from "./support/instance";
 
 /**
- * Builds the console and the binary that embeds it, starts Dex and Mailpit
- * in Docker, starts the binary against PostgreSQL with the test clock,
+ * Builds the console and the binary that embeds it, starts Dex, Keycloak
+ * and Mailpit in Docker, starts the binary against PostgreSQL with the test clock,
  * bootstraps an instance admin through the CLI, and seeds through the
  * management API with the generated client: two projects and a viewer of
  * the first.
@@ -31,14 +32,21 @@ import {
 export default async function globalSetup(): Promise<void> {
   const binary = await build();
   const token = await bootstrap(binary);
-  // Dex redirects the browser back to the instance, so it is configured
-  // with the address the instance is about to listen on.
+  // Dex and Keycloak send the browser back to the instance, so they are
+  // configured with the address the instance is about to listen on.
+  // Keycloak takes the longest to start: the three start at once.
   const port = await freePort();
-  await startDex(`http://127.0.0.1:${port}`);
+  const instance = `http://127.0.0.1:${port}`;
   try {
     // Nothing mails until a spec configures the SMTP server; Mailpit only
     // waits for it.
-    await startMailpit();
+    const started = await Promise.allSettled([
+      startDex(instance),
+      startKeycloak(instance),
+      startMailpit(),
+    ]);
+    const failed = started.find((result) => result.status === "rejected");
+    if (failed) throw failed.reason;
     const { baseURL } = await serve(binary, port);
     const client = createClient(
       createConfig({
@@ -93,6 +101,7 @@ export default async function globalSetup(): Promise<void> {
   } catch (error) {
     // A failed setup is not followed by the teardown.
     await stopMailpit();
+    await stopKeycloak();
     await stopDex();
     throw error;
   }

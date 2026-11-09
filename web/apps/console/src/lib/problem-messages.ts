@@ -187,7 +187,7 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       );
     case "base_url_required":
       return i18n._(
-        msg`Set the instance's public address first (FLAGNETIC_BASE_URL): the redirect URI the identity provider is told is built from it.`,
+        msg`Set the instance's public address first (FLAGNETIC_BASE_URL): the addresses the identity provider is told are built from it.`,
       );
     case "provider_unreachable": {
       const failure = error.problem.failure;
@@ -197,6 +197,14 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
           )
         : i18n._(msg`The identity provider could not be reached or did not answer as expected.`);
     }
+    case "rotation_pending":
+      return i18n._(
+        msg`A certificate rotation is already pending. Complete it before starting another.`,
+      );
+    case "no_rotation_pending":
+      return i18n._(msg`No certificate rotation is pending: start one first.`);
+    case "not_saml":
+      return i18n._(msg`Only a SAML provider has a certificate to rotate.`);
     case "provider_in_use": {
       const uses = providerUses(i18n, error);
       return uses
@@ -399,6 +407,28 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
       return i18n._(
         msg`Use an https URL. Plain http is accepted only on a loopback address such as localhost.`,
       );
+    case "metadata_required":
+      return i18n._(msg`Enter the URL of the identity provider's metadata, or paste it.`);
+    case "metadata_conflict":
+      return i18n._(msg`Give the metadata as a URL or pasted, not both.`);
+    case "metadata_too_large":
+      return i18n._(msg`The metadata is at most 1 MiB.`);
+    case "invalid_metadata_url":
+      return i18n._(
+        msg`Enter the http or https URL of the metadata, without credentials or a fragment.`,
+      );
+    case "invalid_metadata":
+      return i18n._(
+        msg`This is not the metadata of a SAML identity provider the instance can use: check that it is the identity provider's EntityDescriptor, without a DOCTYPE, with readable certificates and an https sign-on address.`,
+      );
+    case "no_redirect_binding":
+      return i18n._(
+        msg`The identity provider offers no single sign-on service with the HTTP-Redirect binding, which the instance signs in through.`,
+      );
+    case "no_signing_certificate":
+      return i18n._(msg`The metadata holds no signing certificate to check responses with.`);
+    case "unknown_name_id_format":
+      return i18n._(msg`Choose one of the offered name identifier formats.`);
     case "invalid_client_id":
       return i18n._(msg`Enter a client ID of 1 to 512 characters.`);
     case "invalid_client_secret":

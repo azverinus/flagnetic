@@ -382,6 +382,10 @@ msgstr "7 дней"
 msgid "A boolean flag always has exactly the variations true and false."
 msgstr "У логического флага всегда ровно два варианта: true и false."
 
+#: src/lib/problem-messages.ts
+msgid "A certificate rotation is already pending. Complete it before starting another."
+msgstr "Ротация сертификата уже начата. Завершите её, прежде чем начинать новую."
+
 #: src/lib/flag-detail.ts
 msgid "A chain of prerequisites has at most 5 steps: {path}."
 msgstr "Цепочка предусловий — не длиннее 5 шагов: {path}."
@@ -417,6 +421,10 @@ msgstr "Отключённой подписке ничего не отправл
 #: src/components/webhook-detail.tsx
 msgid "A disabled webhook is sent nothing."
 msgstr "Отключённому вебхуку ничего не отправляется."
+
+#: src/components/saml-provider-form.tsx
+msgid "A first sign-in whose email is in the domains above is linked to the existing member with that email. Anyone who controls such an address at the identity provider then signs in as that member, so turn it on only for a provider you trust with these domains."
+msgstr "Первый вход, почта которого относится к доменам выше, привязывается к существующему участнику с этой почтой. Тогда любой, кто управляет таким адресом у провайдера идентификации, входит как этот участник, поэтому включайте это только для провайдера, которому доверяете эти домены."
 
 #: src/components/auth-provider-form.tsx
 msgid "A first sign-in whose verified email is in the domains above is linked to the existing member with that email. Anyone who controls such an address at the provider then signs in as that member, so turn it on only for a provider you trust with these domains."
@@ -469,6 +477,10 @@ msgstr "Новая ссылка-приглашение для участника
 msgid "A new invitation link is issued."
 msgstr "Выпущена новая ссылка-приглашение."
 
+#: src/components/saml-provider-detail.tsx
+msgid "A new key pair is generated beside the current one, valid for three years. The SP metadata lists both certificates, and assertions encrypted to either are accepted, so sign-ins keep working while the identity provider imports the new metadata."
+msgstr "Рядом с текущей создаётся новая пара ключей сроком на три года. Метаданные SP перечисляют оба сертификата, и утверждения, зашифрованные для любого из них, принимаются, поэтому вход продолжает работать, пока провайдер идентификации импортирует новые метаданные."
+
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "A new project starts with the environments development, staging and production, the unit types user and anonymous, and the standard attributes."
 msgstr "Новый проект создаётся с окружениями development, staging и production, типами единиц user и anonymous и стандартными атрибутами."
@@ -510,6 +522,7 @@ msgid "A protected environment cannot be deleted. Stop protecting it on its page
 msgstr "Защищённое окружение нельзя удалить. Сначала снимите с него защиту на его странице."
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "A provider with this slug already exists."
 msgstr "Провайдер с таким слагом уже существует."
 
@@ -525,6 +538,10 @@ msgstr "Требуемый флаг не отдаёт нужный вариан�
 #: src/components/session-list.tsx
 msgid "A revoked device is signed out at its next request."
 msgstr "Устройство с отозванным сеансом выходит из системы при следующем запросе."
+
+#: src/components/saml-provider-detail.tsx
+msgid "A rotation is pending. Import the SP metadata at the identity provider again, so that it knows the next certificate, then complete the rotation. Until then nothing changes for the identity provider."
+msgstr "Ротация начата. Снова импортируйте метаданные SP у провайдера идентификации, чтобы он узнал следующий сертификат, затем завершите ротацию. До тех пор для провайдера идентификации ничего не меняется."
 
 #: src/lib/rule-editor.ts
 msgid "A rule has at most {max} conditions."
@@ -589,6 +606,10 @@ msgstr "Через столько времени после входа сеан�
 #: src/components/auth-settings-form.tsx
 msgid "A session ends this long after its last request."
 msgstr "Через столько времени после последнего запроса сеанс завершается."
+
+#: src/components/saml-provider-form.tsx
+msgid "A sign-in whose email is in the domains above and has no member yet creates one, active, who holds no access until a project grants them a role."
+msgstr "Вход, почта которого относится к доменам выше и у которого ещё нет участника, создаёт его активным; доступа у него нет, пока проект не выдаст ему роль."
 
 #: src/components/auth-provider-form.tsx
 msgid "A sign-in whose verified email is in the domains above and has no member yet creates one, active, who holds no access until a project grants them a role."
@@ -672,6 +693,10 @@ msgstr "Подтвердить"
 msgid "Acknowledged"
 msgstr "Подтверждён"
 
+#: src/components/saml-provider-detail.tsx
+msgid "ACS URL"
+msgstr "URL ACS"
+
 #: src/components/audit-entry-sheet.tsx
 #: src/components/audit-log.tsx
 msgid "Action"
@@ -739,6 +764,7 @@ msgid "Add prerequisite condition"
 msgstr "Добавить условие-предусловие"
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "Add provider"
 msgstr "Добавить провайдера"
 
@@ -1148,6 +1174,7 @@ msgid "Attribute updated"
 msgstr "Атрибут изменён"
 
 #: src/components/navigation.tsx
+#: src/components/saml-provider-form.tsx
 #: src/components/tester-panel.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Attributes"
@@ -1285,6 +1312,10 @@ msgstr "Отменить запрос на изменение"
 #: src/lib/change-requests.ts
 msgid "Cancelled"
 msgstr "Отменён"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Certificates"
+msgstr "Сертификаты"
 
 #: src/lib/personal-tokens.ts
 msgid "Change experiments."
@@ -1522,6 +1553,10 @@ msgid "Choose one of the offered members."
 msgstr "Выберите одного из предложенных участников."
 
 #: src/lib/problem-messages.ts
+msgid "Choose one of the offered name identifier formats."
+msgstr "Выберите один из предложенных форматов идентификатора имени."
+
+#: src/lib/problem-messages.ts
 msgid "Choose one of the offered roles."
 msgstr "Выберите одну из предложенных ролей."
 
@@ -1655,6 +1690,14 @@ msgstr "Сравнивайте от 2 до 50 вариантов."
 msgid "Compare environments"
 msgstr "Сравнить окружения"
 
+#: src/components/saml-provider-detail.tsx
+msgid "Complete certificate rotation"
+msgstr "Завершение ротации сертификата"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Complete rotation"
+msgstr "Завершить ротацию"
+
 #: src/components/change-request-diff.tsx
 #: src/components/condition-row.tsx
 msgid "Condition {position}"
@@ -1786,6 +1829,7 @@ msgid "Create key"
 msgstr "Создать ключ"
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "Create members on first sign-in"
 msgstr "Создавать участников при первом входе"
 
@@ -1827,6 +1871,10 @@ msgstr "Создан"
 #: src/components/project-token-list.tsx
 msgid "Created by"
 msgstr "Создатель"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Current"
+msgstr "Текущий"
 
 #: src/components/password-form.tsx
 msgid "Current password"
@@ -2110,6 +2158,7 @@ msgstr "не равно"
 
 #: src/components/auth-provider-form.tsx
 #: src/components/auth-provider-list.tsx
+#: src/components/saml-provider-form.tsx
 msgid "Domains"
 msgstr "Домены"
 
@@ -2124,6 +2173,10 @@ msgstr "Скачать JSON Lines"
 #: src/components/download-ruleset.tsx
 msgid "Download ruleset"
 msgstr "Скачать набор правил"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Download SP metadata"
+msgstr "Скачать метаданные SP"
 
 #: src/components/download-audit.tsx
 msgid "Download the audit log"
@@ -2216,6 +2269,14 @@ msgstr "изменять проект"
 msgid "Email"
 msgstr "Электронная почта"
 
+#: src/components/saml-provider-form.tsx
+msgid "Email address"
+msgstr "Адрес почты"
+
+#: src/components/saml-provider-form.tsx
+msgid "Email attribute"
+msgstr "Атрибут с почтой"
+
 #: src/components/auth-provider-form.tsx
 msgid "Email claim"
 msgstr "Утверждение с почтой"
@@ -2241,6 +2302,7 @@ msgstr "Включить {name}"
 
 #: src/components/auth-provider-badges.tsx
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 #: src/components/webhook-editor.tsx
 #: src/components/webhook-status.tsx
 msgid "Enabled"
@@ -2374,6 +2436,14 @@ msgstr "Введите полный URL, например https://example.com/fl
 msgid "Enter an absolute URL, such as https://login.example.com."
 msgstr "Введите абсолютный URL, например https://login.example.com."
 
+#: src/lib/saml-providers.ts
+msgid "Enter an attribute name of 1 to 256 characters."
+msgstr "Введите имя атрибута длиной от 1 до 256 символов."
+
+#: src/lib/saml-providers.ts
+msgid "Enter an attribute name."
+msgstr "Введите имя атрибута."
+
 #: src/components/member-form.tsx
 msgid "Enter an email address."
 msgstr "Введите адрес электронной почты."
@@ -2415,6 +2485,10 @@ msgstr "Введите секрет клиента."
 msgid "Enter the http or https URL of the identity provider, without credentials, a query or a fragment."
 msgstr "Введите http- или https-адрес провайдера идентификации — без учётных данных, запроса и фрагмента."
 
+#: src/lib/problem-messages.ts
+msgid "Enter the http or https URL of the metadata, without credentials or a fragment."
+msgstr "Введите http- или https-URL метаданных без учётных данных и фрагмента."
+
 #: src/lib/auth-providers.ts
 msgid "Enter the issuer's URL."
 msgstr "Введите URL эмитента."
@@ -2430,6 +2504,14 @@ msgstr "Введите имя хоста или адрес SMTP-сервера."
 #: src/lib/flag-detail.ts
 msgid "Enter the unit's ID."
 msgstr "Введите ID единицы."
+
+#: src/lib/problem-messages.ts
+msgid "Enter the URL of the identity provider's metadata, or paste it."
+msgstr "Введите URL метаданных провайдера идентификации или вставьте их."
+
+#: src/lib/saml-providers.ts
+msgid "Enter the URL of the identity provider's metadata."
+msgstr "Введите URL метаданных провайдера идентификации."
 
 #: src/components/webhook-editor.tsx
 msgid "Enter the URL the events are posted to."
@@ -2451,6 +2533,11 @@ msgstr "Введите пароль."
 #: src/components/audit-log.tsx
 msgid "Entity"
 msgstr "Объект"
+
+#: src/components/auth-provider-detail.tsx
+#: src/components/saml-provider-detail.tsx
+msgid "Entity ID"
+msgstr "Entity ID"
 
 #. A kind of entity in the audit log.
 #: src/components/experiment-alerts.tsx
@@ -2812,6 +2899,10 @@ msgstr "Вариант без совпадений"
 msgid "Fallthrough variation changed from <0>{before}</0> to <1>{after}</1>."
 msgstr "Вариант без совпадений изменён: был <0>{before}</0>, стал <1>{after}</1>."
 
+#: src/components/saml-provider-form.tsx
+msgid "Fetch from a URL"
+msgstr "Загружать по URL"
+
 #: src/components/audit-entry-sheet.tsx
 msgid "Field"
 msgstr "Поле"
@@ -2986,6 +3077,14 @@ msgstr "Пропуск"
 msgid "Gaps"
 msgstr "Пропуски"
 
+#: src/components/saml-provider-detail.tsx
+msgid "Generate next certificate"
+msgstr "Создать следующий сертификат"
+
+#: src/lib/problem-messages.ts
+msgid "Give the metadata as a URL or pasted, not both."
+msgstr "Укажите метаданные либо URL, либо вставкой, но не тем и другим."
+
 #: src/components/auth-provider-detail.tsx
 msgid "Go to the auth providers"
 msgstr "К провайдерам входа"
@@ -3051,6 +3150,10 @@ msgstr "Выдать роль"
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Grants"
 msgstr "Роли"
+
+#: src/components/saml-provider-form.tsx
+msgid "Groups attribute"
+msgstr "Атрибут с группами"
 
 #: src/components/auth-provider-form.tsx
 msgid "Groups claim"
@@ -3125,9 +3228,21 @@ msgstr "Гипотеза изменена."
 msgid "I have stored it somewhere safe"
 msgstr "Я сохранил это в надёжном месте"
 
+#: src/components/saml-provider-detail.tsx
+msgid "Identity provider"
+msgstr "Провайдер идентификации"
+
+#: src/components/saml-provider-form.tsx
+msgid "Identity provider metadata"
+msgstr "Метаданные провайдера идентификации"
+
 #: src/lib/access-names.ts
 msgid "import a project document into the project"
 msgstr "импортировать документ проекта в проект"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Import the SP metadata at the identity provider, or enter the ACS URL and the entity ID by hand."
+msgstr "Импортируйте метаданные SP у провайдера идентификации или введите URL ACS и entity ID вручную."
 
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "in {environment}"
@@ -3421,6 +3536,10 @@ msgstr "Последнее вычисление"
 msgid "Last evaluated by an SDK: <0/>"
 msgstr "Последнее вычисление в SDK: <0/>"
 
+#: src/components/saml-provider-detail.tsx
+msgid "Last read"
+msgstr "Прочитаны"
+
 #: src/components/sdk-inventory.tsx
 msgid "Last ruleset version"
 msgstr "Последняя версия набора правил"
@@ -3516,6 +3635,7 @@ msgid "Light"
 msgstr "Светлая"
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "Link members by email"
 msgstr "Привязывать участников по почте"
 
@@ -3533,6 +3653,7 @@ msgid "Load older deliveries"
 msgstr "Загрузить более старые доставки"
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "Load their version"
 msgstr "Загрузить их версию"
 
@@ -3710,6 +3831,19 @@ msgstr "Участники, которые могут одобрять запр�
 msgid "Membership (condition {position})"
 msgstr "Принадлежность (условие {position})"
 
+#: src/components/saml-provider-detail.tsx
+#: src/components/saml-provider-form.tsx
+msgid "Metadata"
+msgstr "Метаданные"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Metadata from a URL is read again every day."
+msgstr "Метаданные по URL перечитываются каждый день."
+
+#: src/components/saml-provider-form.tsx
+msgid "Metadata URL"
+msgstr "URL метаданных"
+
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Mine"
 msgstr "Мои"
@@ -3740,6 +3874,7 @@ msgstr "Переместить правило {position} выше"
 #: src/components/experiment-transitions.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
+#: src/components/saml-provider-form.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/segment-fields.tsx
 #: src/components/token-create-form.tsx
@@ -3757,6 +3892,10 @@ msgstr "Переместить правило {position} выше"
 msgid "Name"
 msgstr "Название"
 
+#: src/components/saml-provider-form.tsx
+msgid "Name attribute"
+msgstr "Атрибут с именем"
+
 #: src/components/structural-diff-view.tsx
 msgid "Name changed from “{before}” to “{after}”."
 msgstr "Название изменено: было «{before}», стало «{after}»."
@@ -3764,6 +3903,10 @@ msgstr "Название изменено: было «{before}», стало «{
 #: src/components/auth-provider-form.tsx
 msgid "Name claim"
 msgstr "Утверждение с именем"
+
+#: src/components/saml-provider-form.tsx
+msgid "Name identifier format"
+msgstr "Формат идентификатора имени"
 
 #: src/components/search-field.tsx
 msgid "Name or email"
@@ -3776,6 +3919,10 @@ msgstr "Имя эксперимента в правилах и в показах
 #: src/components/auth-provider-form.tsx
 msgid "Names the provider in sign-in addresses and in the redirect URI. It never changes."
 msgstr "Называет провайдера в адресах входа и в URI перенаправления. Никогда не меняется."
+
+#: src/components/saml-provider-form.tsx
+msgid "Names the provider in sign-in addresses, in the ACS URL and in the entity ID. It never changes."
+msgstr "Называет провайдера в адресах входа, в URL ACS и в entity ID. Никогда не меняется."
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Needs attention"
@@ -3877,6 +4024,11 @@ msgstr "Самые новые записи"
 msgid "Next"
 msgstr "Далее"
 
+#: src/components/saml-provider-detail.tsx
+msgctxt "certificate"
+msgid "Next"
+msgstr "Следующий"
+
 #: src/components/webhook-deliveries.tsx
 #: src/components/webhook-delivery-sheet.tsx
 msgid "Next attempt"
@@ -3897,6 +4049,10 @@ msgstr "Попыток ещё не было."
 #: src/components/auth-provider-list.tsx
 msgid "No auth provider yet."
 msgstr "Пока нет ни одного провайдера входа."
+
+#: src/lib/problem-messages.ts
+msgid "No certificate rotation is pending: start one first."
+msgstr "Ротация сертификата не начата: сначала начните её."
 
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "No change request awaits your decision."
@@ -4242,6 +4398,7 @@ msgid "Off variation changed from <0>{before}</0> to <1>{after}</1>."
 msgstr "Вариант при выключении изменён: был <0>{before}</0>, стал <1>{after}</1>."
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "Offer the provider on the sign-in page now. Turn it off to test it first."
 msgstr "Предлагать провайдера на странице входа сразу. Выключите, чтобы сначала проверить его."
 
@@ -4296,6 +4453,10 @@ msgid "Only a running experiment can be stopped."
 msgstr "Остановить можно только запущенный эксперимент."
 
 #: src/lib/problem-messages.ts
+msgid "Only a SAML provider has a certificate to rotate."
+msgstr "Сертификат для ротации есть только у SAML-провайдера."
+
+#: src/lib/problem-messages.ts
 msgid "Only a signed-in session can do this, not an API token."
 msgstr "Это можно сделать только в сеансе входа, а не с API-токеном."
 
@@ -4336,6 +4497,7 @@ msgid "Open the change request for review"
 msgstr "Открыть запрос на изменение на проверку"
 
 #: src/components/auth-provider-badges.tsx
+#: src/components/new-auth-provider.tsx
 #: src/components/session-list.tsx
 msgid "OpenID Connect"
 msgstr "OpenID Connect"
@@ -4495,6 +4657,22 @@ msgstr "После ожидаемого окончания"
 msgid "Past expected removal"
 msgstr "Пора удалить"
 
+#: src/lib/saml-providers.ts
+msgid "Paste the identity provider's metadata."
+msgstr "Вставьте метаданные провайдера идентификации."
+
+#: src/components/saml-provider-form.tsx
+msgid "Paste the metadata"
+msgstr "Вставить метаданные"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Pasted"
+msgstr "Вставлены"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Pasted metadata is never read again; paste a new document to change it."
+msgstr "Вставленные метаданные не перечитываются; чтобы изменить их, вставьте новый документ."
+
 #: src/lib/webhooks.ts
 msgid "Pending"
 msgstr "Ожидает"
@@ -4521,6 +4699,10 @@ msgstr "постоянный"
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Permanent"
 msgstr "Постоянный"
+
+#: src/components/saml-provider-form.tsx
+msgid "Persistent: the same at every sign-in"
+msgstr "Постоянный: один и тот же при каждом входе"
 
 #: src/components/personal-menu.tsx
 #: src/routes/_signed-in/settings/route.tsx
@@ -4687,6 +4869,10 @@ msgstr "Защищено"
 msgid "Protection"
 msgstr "Защита"
 
+#: src/components/new-auth-provider.tsx
+msgid "Protocol"
+msgstr "Протокол"
+
 #: src/lib/problem-messages.ts
 msgid "provisioned members"
 msgstr "созданные участники"
@@ -4820,6 +5006,7 @@ msgid "Regenerate the salt?"
 msgstr "Сменить соль?"
 
 #: src/components/auth-provider-detail.tsx
+#: src/components/saml-provider-detail.tsx
 msgid "Register the instance at the identity provider"
 msgstr "Зарегистрируйте экземпляр у провайдера идентификации"
 
@@ -5192,6 +5379,7 @@ msgid "Salt <0>{salt}</0>"
 msgstr "Соль <0>{salt}</0>"
 
 #: src/components/auth-provider-badges.tsx
+#: src/components/new-auth-provider.tsx
 #: src/components/session-list.tsx
 msgid "SAML"
 msgstr "SAML"
@@ -5210,6 +5398,7 @@ msgstr "Нарушение соотношения выборки"
 #: src/components/mail-settings.tsx
 #: src/components/member-actions.tsx
 #: src/components/profile-form.tsx
+#: src/components/saml-provider-form.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/ui/unsaved-changes-bar.tsx
 #: src/components/webhook-editor.tsx
@@ -5454,8 +5643,8 @@ msgid "Set the instance's public address first (FLAGNETIC_BASE_URL): every link 
 msgstr "Сначала задайте публичный адрес экземпляра (FLAGNETIC_BASE_URL): из него строится каждая ссылка, которую экземпляр отправляет по почте."
 
 #: src/lib/problem-messages.ts
-msgid "Set the instance's public address first (FLAGNETIC_BASE_URL): the redirect URI the identity provider is told is built from it."
-msgstr "Сначала задайте публичный адрес экземпляра (FLAGNETIC_BASE_URL): из него строится URI перенаправления, который сообщается провайдеру идентификации."
+msgid "Set the instance's public address first (FLAGNETIC_BASE_URL): the addresses the identity provider is told are built from it."
+msgstr "Сначала задайте публичный адрес экземпляра (FLAGNETIC_BASE_URL): из него строятся адреса, которые сообщаются провайдеру идентификации."
 
 #: src/components/auth-provider-detail.tsx
 #: src/components/navigation.tsx
@@ -5463,6 +5652,10 @@ msgstr "Сначала задайте публичный адрес экземп
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "Settings"
 msgstr "Настройки"
+
+#: src/components/saml-provider-detail.tsx
+msgid "SHA-256 fingerprint, expires {expires}"
+msgstr "Отпечаток SHA-256, действует до {expires}"
 
 #: src/components/experiment-exposures.tsx
 msgid "Shares against the weights"
@@ -5497,6 +5690,10 @@ msgstr "Боковая панель"
 msgid "Sign {name} out everywhere"
 msgstr "Завершить все сеансы участника {name}"
 
+#: src/components/saml-provider-form.tsx
+msgid "Sign authentication requests"
+msgstr "Подписывать запросы аутентификации"
+
 #: src/components/invitation-acceptance.tsx
 #: src/components/sign-in-form.tsx
 #: src/routes/sign-in.tsx
@@ -5515,6 +5712,10 @@ msgstr "Войти через провайдера"
 msgid "Sign out"
 msgstr "Выйти"
 
+#: src/components/saml-provider-form.tsx
+msgid "Sign the requests the instance sends with its current key, for an identity provider that checks them against the certificate in the SP metadata."
+msgstr "Подписывать отправляемые экземпляром запросы текущим ключом — для провайдера идентификации, который проверяет их по сертификату из метаданных SP."
+
 #: src/components/member-credentials.tsx
 msgid "Sign yourself out everywhere"
 msgstr "Завершить все свои сеансы"
@@ -5522,6 +5723,11 @@ msgstr "Завершить все свои сеансы"
 #: src/lib/audit.ts
 msgid "Sign-in failed"
 msgstr "Неудачный вход"
+
+#: src/components/auth-provider-detail.tsx
+#: src/components/saml-provider-detail.tsx
+msgid "Sign-on URL"
+msgstr "URL входа"
 
 #: src/components/session-list.tsx
 #: src/lib/audit.ts
@@ -5535,6 +5741,11 @@ msgstr "Способ входа"
 #: src/lib/audit.ts
 msgid "Signed out"
 msgstr "Выход выполнен"
+
+#: src/components/auth-provider-detail.tsx
+#: src/components/saml-provider-detail.tsx
+msgid "Signing certificates"
+msgstr "Сертификаты подписи"
 
 #: src/lib/sso-errors.ts
 msgid "Signing in did not work ({code}). Try again, or ask your instance admin."
@@ -5570,6 +5781,7 @@ msgstr "Пропущена: проверке нужно 1 000 впервые п�
 
 #: src/components/auth-provider-form.tsx
 #: src/components/auth-provider-list.tsx
+#: src/components/saml-provider-form.tsx
 msgid "Slug"
 msgstr "Слаг"
 
@@ -5613,6 +5825,14 @@ msgstr "Сортировка"
 msgid "Source"
 msgstr "Источник"
 
+#: src/components/saml-provider-detail.tsx
+msgid "SP certificates"
+msgstr "Сертификаты SP"
+
+#: src/components/saml-provider-detail.tsx
+msgid "SP metadata URL"
+msgstr "URL метаданных SP"
+
 #: src/components/weights-input.tsx
 msgid "Split evenly"
 msgstr "Поровну"
@@ -5642,6 +5862,10 @@ msgstr "Запустить"
 #: src/components/experiment-transitions.tsx
 msgid "Start {key}"
 msgstr "Запустить {key}"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Start certificate rotation"
+msgstr "Начать ротацию сертификата"
 
 #: src/components/experiment-transitions.tsx
 msgid "Start experiment"
@@ -5862,6 +6086,10 @@ msgstr "Это не ваш текущий пароль."
 msgid "That sign-in was started in another browser or window, so it was not completed. Start it again from here."
 msgstr "Этот вход был начат в другом браузере или окне, поэтому не завершён. Начните его заново отсюда."
 
+#: src/components/saml-provider-detail.tsx
+msgid "The ACS URL and the entity ID are built from the instance's public address (FLAGNETIC_BASE_URL), which is not set. Set it, and the addresses show here."
+msgstr "URL ACS и entity ID строятся из публичного адреса экземпляра (FLAGNETIC_BASE_URL), который не задан. Задайте его — и адреса появятся здесь."
+
 #: src/components/experiment-alerts.tsx
 msgid "The alert is acknowledged."
 msgstr "Алерт подтверждён."
@@ -6011,6 +6239,10 @@ msgstr "Черновик будет удалён. Это нельзя отмен
 #: src/components/experiment-transitions.tsx
 msgid "The draft never starts and nothing about it changes any more; no ruleset changes. Archived experiments are listed only on request; it can still be cloned."
 msgstr "Черновик уже не запустится, и в нём больше ничего не меняется; наборы правил не меняются. Архивные эксперименты показываются в списке только по запросу; клонировать его по-прежнему можно."
+
+#: src/components/saml-provider-form.tsx
+msgid "The email domains this provider vouches for, one per line or separated by spaces. A subdomain is not included. An email counts as verified, and linking and creating members apply, only inside these domains."
+msgstr "Почтовые домены, за которые ручается провайдер, по одному на строку или через пробел. Поддомены не входят. Только в этих доменах почта считается подтверждённой и действуют привязка и создание участников."
 
 #: src/components/auth-provider-form.tsx
 msgid "The email domains this provider vouches for, one per line or separated by spaces. A subdomain is not included. Linking and creating members apply to these emails only."
@@ -6185,6 +6417,10 @@ msgstr "Флаги требовали бы друг друга по кругу: 
 msgid "The flags would require each other in a cycle."
 msgstr "Флаги требовали бы друг друга по кругу."
 
+#: src/components/saml-provider-form.tsx
+msgid "The format the instance asks the identity provider for. The name identifier links the person to their member; with the email address format it is also their email."
+msgstr "Формат, который экземпляр запрашивает у провайдера идентификации. Идентификатор имени связывает человека с его участником; в формате адреса почты он же и его почта."
+
 #: src/components/auth-settings-form.tsx
 msgid "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
 msgstr "На какой наибольший срок можно создать новый API-токен. У созданных раньше токенов срок не изменится."
@@ -6201,6 +6437,10 @@ msgstr "Провайдер идентификации недоступен ил�
 msgid "The identity provider could not be reached or did not answer as expected."
 msgstr "Провайдер идентификации недоступен или ответил не так, как ожидалось."
 
+#: src/lib/problem-messages.ts
+msgid "The identity provider offers no single sign-on service with the HTTP-Redirect binding, which the instance signs in through."
+msgstr "Провайдер идентификации не предлагает службу единого входа с привязкой HTTP-Redirect, через которую входит экземпляр."
+
 #: src/lib/sso-errors.ts
 msgid "The identity provider refused the sign-in. Ask whoever runs it, or your instance admin."
 msgstr "Провайдер идентификации отклонил вход. Обратитесь к тем, кто его обслуживает, или к администратору экземпляра."
@@ -6208,6 +6448,10 @@ msgstr "Провайдер идентификации отклонил вход.
 #: src/components/auth-provider-form.tsx
 msgid "The identity provider's issuer URL; its discovery document is read from it. Plain http is accepted only on a loopback address."
 msgstr "URL эмитента провайдера идентификации; из него читается документ обнаружения. Простой http допустим только для адреса обратной петли."
+
+#: src/components/saml-provider-form.tsx
+msgid "The identity provider's metadata document, at most 1 MiB."
+msgstr "Документ метаданных провайдера идентификации, не больше 1 МиБ."
 
 #: src/components/auth-provider-list.tsx
 msgid "The identity providers members sign in through. Each is offered on the sign-in page and vouches only for the email domains you give it."
@@ -6220,6 +6464,18 @@ msgstr "Тайм-аут бездействия не может быть боль
 #: src/lib/mail-settings.ts
 msgid "The instance could not reach the SMTP server, or the connection broke. Check the host and the port, and that the server accepts connections from the instance."
 msgstr "Экземпляр не смог подключиться к SMTP-серверу, или соединение оборвалось. Проверьте хост и порт, а также что сервер принимает подключения от экземпляра."
+
+#: src/components/saml-provider-form.tsx
+msgid "The instance reads the identity provider's entity ID, sign-on address and signing certificates from it. Metadata fetched from a URL is read again every day, so the identity provider's certificate rotations reach the instance; pasted metadata is never read again."
+msgstr "Из них экземпляр читает entity ID провайдера идентификации, адрес входа и сертификаты подписи. Метаданные по URL перечитываются каждый день, поэтому ротации сертификатов провайдера доходят до экземпляра; вставленные метаданные не перечитываются."
+
+#: src/components/saml-provider-detail.tsx
+msgid "The instance serves the SP metadata only while the provider is enabled. Enable it to download the metadata or let the identity provider fetch it."
+msgstr "Экземпляр отдаёт метаданные SP, только пока провайдер включён. Включите его, чтобы скачать метаданные или дать провайдеру идентификации загрузить их."
+
+#: src/components/saml-provider-detail.tsx
+msgid "The instance signs its requests with the current certificate's key and decrypts assertions encrypted to any certificate listed here. The SP metadata lists them all."
+msgstr "Экземпляр подписывает свои запросы ключом текущего сертификата и расшифровывает утверждения, зашифрованные для любого из перечисленных здесь сертификатов. Метаданные SP перечисляют их все."
 
 #: src/components/mail-settings.tsx
 msgid "The instance stops mailing, and members can no longer reset a forgotten password themselves. The stored password is deleted."
@@ -6262,9 +6518,21 @@ msgstr "Участник, чей API-токен — {token}"
 msgid "The members holding a role in this project. A member may hold several, and can do whatever any of them allows."
 msgstr "Участники, у которых есть роль в этом проекте. Ролей может быть несколько, и участник может делать всё, что разрешает любая из них."
 
+#: src/lib/problem-messages.ts
+msgid "The metadata holds no signing certificate to check responses with."
+msgstr "В метаданных нет сертификата подписи, по которому можно проверять ответы."
+
+#: src/lib/problem-messages.ts
+msgid "The metadata is at most 1 MiB."
+msgstr "Метаданные не больше 1 МиБ."
+
 #: src/components/project-audit.tsx
 msgid "The most recent changes in this project"
 msgstr "Самые недавние изменения в этом проекте"
+
+#: src/components/saml-provider-form.tsx
+msgid "The names of the assertion attributes the instance reads, matched by name or friendly name. The email is the name identifier when its format is email address."
+msgstr "Имена атрибутов утверждения, которые читает экземпляр; сравниваются по имени или понятному имени. Почта — это идентификатор имени, если его формат — адрес почты."
 
 #: src/components/auth-provider-form.tsx
 msgid "The names of the claims the instance reads from the identity provider's tokens."
@@ -6281,6 +6549,14 @@ msgstr "Токен проекта создан"
 #: src/components/sdk-keys.tsx
 msgid "The new SDK key"
 msgstr "Новый SDK-ключ"
+
+#: src/components/saml-provider-detail.tsx
+msgid "The next certificate becomes current and the old key is destroyed. An identity provider that still encrypts assertions to the old certificate can no longer sign anyone in, so complete the rotation only once it has imported the new SP metadata. This cannot be undone."
+msgstr "Следующий сертификат становится текущим, а старый ключ уничтожается. Провайдер идентификации, который ещё шифрует утверждения для старого сертификата, больше никого не сможет впустить, поэтому завершайте ротацию только после того, как он импортировал новые метаданные SP. Это нельзя отменить."
+
+#: src/components/saml-provider-detail.tsx
+msgid "The next certificate of {name} is generated."
+msgstr "Следующий сертификат {name} создан."
 
 #: src/components/overrides-section.tsx
 msgid "The override of {unit} is removed."
@@ -6305,6 +6581,10 @@ msgstr "Пароль не должен содержать ваш адрес эл
 #: src/components/invitation-acceptance.tsx
 msgid "The passwords do not match."
 msgstr "Пароли не совпадают."
+
+#: src/components/saml-provider-form.tsx
+msgid "The pasted metadata is stored and not shown again. Leave this empty to keep it, or paste a new document to replace it."
+msgstr "Вставленные метаданные сохранены и больше не показываются. Оставьте поле пустым, чтобы сохранить их, или вставьте новый документ, чтобы заменить."
 
 #: src/components/webhook-detail.tsx
 msgid "The platform disabled this webhook after its receiver kept failing, and dropped the deliveries that were waiting. Enable it once the receiver is back; a dropped delivery can then be redelivered from the log."
@@ -6392,6 +6672,10 @@ msgstr "Предложенная конфигурация сразу запис�
 msgid "The provider does not list the S256 PKCE method, which sign-in needs. Sign-ins through it will fail."
 msgstr "Провайдер не перечисляет метод PKCE S256, который нужен для входа. Входы через него не удадутся."
 
+#: src/components/saml-provider-detail.tsx
+msgid "The provider is disabled, so the instance does not serve its SP metadata: enable it before the identity provider imports the metadata."
+msgstr "Провайдер выключен, поэтому экземпляр не отдаёт его метаданные SP: включите его, прежде чем провайдер идентификации импортирует метаданные."
+
 #: src/lib/problem-messages.ts
 msgid "The provider is still in use. Disable it instead: that stops its sign-ins and keeps its members, identities and grants."
 msgstr "Провайдер всё ещё используется. Отключите его: входы через него прекратятся, а участники, учётные записи и выданные роли сохранятся."
@@ -6437,6 +6721,10 @@ msgstr "Роль включает право {name}, которого у вас 
 #: src/components/configuration-editor.tsx
 msgid "The rollout has a new salt."
 msgstr "У раскатки новая соль."
+
+#: src/components/saml-provider-detail.tsx
+msgid "The rotation of {name} is complete."
+msgstr "Ротация {name} завершена."
 
 #: src/components/experiment-transitions.tsx
 msgid "The ruleset of each of these environments changes at once:"
@@ -6519,6 +6807,7 @@ msgid "The sites the key may be used from, such as https://app.example.com. Leav
 msgstr "Сайты, откуда можно использовать ключ, например https://app.example.com. Оставьте пустым, чтобы разрешить любой источник."
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "The slug never changes."
 msgstr "Слаг никогда не меняется."
 
@@ -6717,6 +7006,10 @@ msgstr "Это уже есть в списке."
 #: src/lib/problem-messages.ts
 msgid "This is further ahead than this instance allows."
 msgstr "Это дальше, чем разрешает этот экземпляр."
+
+#: src/lib/problem-messages.ts
+msgid "This is not the metadata of a SAML identity provider the instance can use: check that it is the identity provider's EntityDescriptor, without a DOCTYPE, with readable certificates and an https sign-on address."
+msgstr "Это не метаданные SAML-провайдера идентификации, которые экземпляр может использовать: проверьте, что это EntityDescriptor провайдера идентификации без DOCTYPE, с читаемыми сертификатами и https-адресом входа."
 
 #: src/lib/problem-messages.ts
 msgid "This is the instance's last active instance admin. Make another member instance admin first."
@@ -6927,6 +7220,10 @@ msgstr "Охват (%)"
 msgid "Traffic allocation changed from {before} % to {after} %."
 msgstr "Охват изменён: был {before} %, стал {after} %."
 
+#: src/components/saml-provider-form.tsx
+msgid "Transient: new at every sign-in, so nothing stays linked"
+msgstr "Временный: новый при каждом входе, поэтому ничего не остаётся привязанным"
+
 #: src/components/navigation.tsx
 #: src/components/query-error.tsx
 msgid "Try again"
@@ -7053,6 +7350,10 @@ msgstr "Неизвестное устройство"
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Unsaved changes"
 msgstr "Несохранённые изменения"
+
+#: src/components/saml-provider-form.tsx
+msgid "Unspecified: the identity provider chooses"
+msgstr "Не указан: выбирает провайдер идентификации"
 
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -7288,6 +7589,7 @@ msgid "What the project is called and what it is for."
 msgstr "Как называется проект и для чего он."
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "What the sign-in button says: “Sign in with …”."
 msgstr "Что написано на кнопке входа: «Войти через …»."
 
@@ -7314,6 +7616,10 @@ msgstr "Всё, что пользуется токеном, с этого мом
 #: src/components/webhook-editor.tsx
 msgid "Where every event is posted, signed with the subscription's secret."
 msgstr "Куда отправляется каждое событие, подписанное секретом подписки."
+
+#: src/components/saml-provider-form.tsx
+msgid "Where the identity provider publishes its metadata. Plain http is accepted only on a loopback address."
+msgstr "Где провайдер идентификации публикует свои метаданные. Обычный http принимается только на loopback-адресе."
 
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Where the project serves from. A key is fixed once created; the name can change."
