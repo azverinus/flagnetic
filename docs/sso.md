@@ -47,12 +47,12 @@ Create an OpenID Connect client in the realm, with **Client authentication** on 
 ## Setting up a SAML provider
 
 1. Set `FLAGNETIC_BASE_URL`, as for an OIDC provider.
-2. As an instance admin, add the provider with `POST /instance/auth-providers`: a `slug`, `kind: saml`, the `domains` it vouches for, and the identity provider's metadata, either as `idp_metadata_url` (fetched now) or pasted as `idp_metadata_xml`; give one of the two. The answer carries the three addresses to register at the identity provider:
+2. As an instance admin, add the provider under **Auth providers** in the console (**New provider**, protocol **SAML**; its page shows the three addresses to copy and a **Download SP metadata** button), or with `POST /instance/auth-providers`: a `slug`, `kind: saml`, the `domains` it vouches for, and the identity provider's metadata, either as `idp_metadata_url` (fetched now) or pasted as `idp_metadata_xml`; give one of the two. The answer carries the three addresses to register at the identity provider:
    - `entity_id`, the instance's entity ID for this provider (the audience of its assertions): `<base URL>/sso/<slug>/metadata`;
-   - `metadata_url`, where the instance serves its SAML metadata, which is the same address (`GET /sso/<slug>/metadata`, `application/samlmetadata+xml`), for an identity provider that imports metadata from a URL;
+   - `metadata_url`, where the instance serves its SAML metadata, which is the same address (`GET /sso/<slug>/metadata`, `application/samlmetadata+xml`), for an identity provider that imports metadata from a URL. It is served only while the provider is enabled;
    - `acs_url`, the assertion consumer service the identity provider posts its responses to: `<base URL>/sso/<slug>/acs`.
 3. Register the instance at the identity provider with those addresses, or by importing the metadata. Several identity providers insist on the entity ID and the ACS being entered by hand; they must be exactly as answered.
-4. Check it with `POST /instance/auth-providers/{slug}/test`, which reads the identity provider's metadata again (fetching it when it came from a URL) and answers what it found: `idp_entity_id`, `idp_sso_url` and the `idp_certificates` (their `sha256` and `not_after`). Nothing is stored.
+4. Check it with **Test** on the provider's page, or `POST /instance/auth-providers/{slug}/test`, which reads the identity provider's metadata again (fetching it when it came from a URL) and answers what it found: `idp_entity_id`, `idp_sso_url` and the `idp_certificates` (their `sha256` and `not_after`). Nothing is stored.
 
 The provider appears as a button on the sign-in page, and `GET /sso/<slug>/start` begins a sign-in.
 
@@ -81,7 +81,7 @@ Creating a SAML provider generates a key pair for it: an RSA-2048 key and a self
 
 ### Rotating the certificate
 
-Before the certificate expires, or if its key may have leaked, replace the pair in two steps, so that sign-in never breaks while the identity provider catches up:
+Before the certificate expires, or if its key may have leaked, replace the pair in two steps, so that sign-in never breaks while the identity provider catches up. In the console, the provider's page lists its certificates under **Certificates**, with **Start certificate rotation** and, once started, **Complete rotation**; through the API:
 
 1. `POST /instance/auth-providers/{slug}/rotate-certificate` generates the next pair beside the current one. The answer has `rotation_pending: true` and two `sp_certificates`, `current` and `next`. The SP metadata now lists both certificates, each for signing and for encryption; an assertion encrypted to either is decrypted, while authentication requests are still signed with the current key. A second start is refused `409 rotation_pending`.
 2. Give the identity provider the new SP metadata (re-import `metadata_url`, or upload the `next` certificate as the encryption certificate and, if it verifies requests, as the request signing certificate). Until it has, nothing changes for it.

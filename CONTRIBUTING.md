@@ -25,7 +25,7 @@ Set `DATABASE_URL` to an existing PostgreSQL to skip testcontainers.
 
 `task build` builds the console, then the binary that embeds it. `go build` alone needs no Node: a binary built without the console serves a placeholder page in its place, and says so in its log. `task web:dev` serves the console with live reload on port 5173, sending API requests to a binary running on `FLAGNETIC_URL` (default `http://localhost:8080`).
 
-`task web:e2e` runs the console end to end: Playwright builds the binary with the console embedded, starts Dex (an OpenID Connect provider the specs sign in through) and a throwaway PostgreSQL in Docker, starts it against them, bootstraps an instance admin through the CLI, seeds through the generated client, and drives Chromium (`pnpm --dir web e2e:install` downloads it once). The binary runs under a test clock: a spec moves the server's time by writing a duration into the offset file (`advanceClock` in `web/e2e/support/instance.ts`), which `serve` accepts only with `FLAGNETIC_TEST_HARNESS=playwright` and listening on loopback.
+`task web:e2e` runs the console end to end: Playwright builds the binary with the console embedded, starts Dex and Keycloak (the OpenID Connect and SAML identity providers the specs sign in through), Mailpit and a throwaway PostgreSQL in Docker, starts it against them, bootstraps an instance admin through the CLI, seeds through the generated client, and drives Chromium (`pnpm --dir web e2e:install` downloads it once). The binary runs under a test clock: a spec moves the server's time by writing a duration into the offset file (`advanceClock` in `web/e2e/support/instance.ts`), which `serve` accepts only with `FLAGNETIC_TEST_HARNESS=playwright` and listening on loopback.
 
 ### Strings in the console
 

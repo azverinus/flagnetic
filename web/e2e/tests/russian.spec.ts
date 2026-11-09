@@ -24,6 +24,7 @@ import {
 import { choose, seedFlag, stringFlag, writeConfiguration } from "../support/flags";
 import { admin } from "../support/instance";
 import { runningExperimentInProduction } from "../support/experiments";
+import { readKeycloak } from "../support/keycloak";
 import { configureSmtp, removeSmtp } from "../support/mailpit";
 import { sdkRequest, seedSdkKey } from "../support/sdk";
 
@@ -647,6 +648,66 @@ test.describe("the console in Russian", () => {
     await expect(page.getByText(/Провайдер отключён/)).toBeVisible();
     await expect(page.getByText("/sso/acme-ru/callback")).toBeVisible();
     await expectNoSeriousViolations(page, "an auth provider's page in Russian");
+  });
+
+  test("reads a SAML provider's page, its form and its certificate rotation in Russian", async ({
+    page,
+  }) => {
+    must(
+      "adding a SAML provider",
+      await createAuthProvider({
+        client: managementClient(),
+        body: {
+          slug: "keycloak-ru",
+          kind: "saml",
+          display_name: "Кейклок",
+          enabled: false,
+          domains: ["keycloak-ru.test"],
+          idp_metadata_url: readKeycloak().metadataURL,
+        },
+      }),
+    );
+    await signIn(page, admin, russian);
+
+    await page.goto("/admin/auth-providers");
+    await page.getByRole("button", { name: "Новый провайдер" }).click();
+    const dialog = page.getByRole("dialog", { name: "Новый провайдер входа" });
+    await dialog.getByRole("radio", { name: "SAML" }).check();
+    await dialog.getByRole("button", { name: "Добавить провайдера" }).click();
+    await expect(
+      dialog.getByText("Введите URL метаданных провайдера идентификации."),
+    ).toBeVisible();
+    await expectNoSeriousViolations(page, "the new SAML provider dialog in Russian");
+    await dialog.getByRole("button", { name: "Отмена" }).click();
+
+    await page.goto("/admin/auth-providers/keycloak-ru");
+    await expect(page.getByRole("heading", { name: "Кейклок", level: 1 })).toBeVisible();
+    await expect(page.getByText("/sso/keycloak-ru/acs")).toBeVisible();
+    await expect(
+      page.getByText(/отдаёт метаданные SP, только пока провайдер включён/),
+    ).toBeVisible();
+    await expect(page.getByRole("region", { name: "Провайдер идентификации" })).toContainText(
+      "Метаданные по URL перечитываются каждый день.",
+    );
+    await expect(page.getByLabel("URL метаданных", { exact: true })).toHaveValue(
+      readKeycloak().metadataURL,
+    );
+    await expectNoSeriousViolations(page, "a SAML provider's page in Russian");
+
+    await page.getByRole("button", { name: "Начать ротацию сертификата" }).click();
+    const start = page.getByRole("dialog", { name: "Начать ротацию сертификата" });
+    await start.getByRole("button", { name: "Создать следующий сертификат" }).click();
+    // A toast is checked once it has faded in: halfway, its text is paler.
+    const generated = page.locator("[data-sonner-toast]").filter({ hasText: "Кейклок создан." });
+    await expect(generated).toHaveCSS("opacity", "1");
+    await expect(
+      page.getByRole("list", { name: "Сертификаты SP" }).getByRole("listitem"),
+    ).toHaveCount(2);
+    await expect(page.getByText(/Ротация начата/)).toBeVisible();
+    await page.getByRole("button", { name: "Завершить ротацию" }).click();
+    const complete = page.getByRole("dialog", { name: "Завершение ротации сертификата" });
+    await expect(complete).toContainText("старый ключ уничтожается");
+    await expectNoSeriousViolations(page, "the completion of a certificate rotation in Russian");
   });
 
   test("reads the mail settings, a failed test mail and the removal in Russian", async ({
