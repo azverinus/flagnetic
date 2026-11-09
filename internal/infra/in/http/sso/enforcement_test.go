@@ -504,3 +504,41 @@ func TestDisablingLocalLoginNeedsAnIdentityTheSameChangeStillLetsIn(t *testing.T
 		t.Errorf("holding the enforced provider's identity = %d: %s", res.StatusCode(), res.Body)
 	}
 }
+
+func TestEnforcingADomainWhileLocalLoginIsOffNeedsAnIdentityItStillLetsIn(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := startIsolated(t)
+	corp := e.forged(t, idp, noFallback("corp.example"))
+	other := e.forged(t, idp, noFallback("corp.example"))
+	keeper := testkit.NewMember(t, e.pool, testkit.AsInstanceAdmin(), testkit.WithEmail("keeper@corp.example"))
+	keeperAt := testkit.NewBrowser(t, e.srv.URL)
+	keeperAt.SignIn(t, keeper.Email, keeper.Password)
+	e.link(t, idp, keeperAt, other, "sub-keeper-other", nil)
+	if res := putSettings(t, keeperAt.ClientWithResponses, func(s *management.AuthSettings) { s.LocalLoginEnabled = false }); res.JSON200 == nil {
+		t.Fatalf("closing local login while holding an identity = %d: %s", res.StatusCode(), res.Body)
+	}
+
+	// Local login is off already: enforcing the keeper's own domain to corp
+	// would leave them no way in, the same as closing local login would.
+	enforceCorp := func(s *management.AuthSettings) {
+		s.LocalLoginEnabled = false
+		s.SsoEnforcedDomains = []management.SsoEnforcedDomain{{Domain: "corp.example", Provider: corp}}
+	}
+	res := putSettings(t, keeperAt.ClientWithResponses, enforceCorp)
+	wantRefused(t, "enforcing their domain to a provider they hold no identity at", res.StatusCode(), res.Body, res.ApplicationproblemJSON422,
+		http.StatusUnprocessableEntity, "identity_required", "")
+
+	// A change that touches neither local login nor the enforced domains is
+	// not judged by the caller's ways in.
+	if res = putSettings(t, keeperAt.ClientWithResponses, func(s *management.AuthSettings) {
+		s.LocalLoginEnabled = false
+		s.PasswordMinLength = 14
+	}); res.JSON200 == nil {
+		t.Errorf("raising the password minimum while local login is off = %d: %s", res.StatusCode(), res.Body)
+	}
+
+	e.link(t, idp, keeperAt, corp, "sub-keeper-corp", nil)
+	if res = putSettings(t, keeperAt.ClientWithResponses, enforceCorp); res.JSON200 == nil {
+		t.Errorf("enforcing with the enforced provider's identity held = %d: %s", res.StatusCode(), res.Body)
+	}
+}

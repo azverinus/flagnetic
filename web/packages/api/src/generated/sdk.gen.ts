@@ -4889,9 +4889,12 @@ export const getAuthSettings = <ThrowOnError extends boolean = false>(
  * minimum length from 12 to 128, and each enforced domain named once,
  * to an enabled auth provider that lists it among its domains.
  * `sso_enforced_domains` is the whole list: a domain left out is
- * lifted. Disabling local login is refused `identity_required` unless
- * the caller holds an identity at an enabled auth provider, so whoever
- * closes the door keeps a way through it; `flagnetic admin unlock`
+ * lifted. Disabling local login, or changing the enforced domains while
+ * it is disabled, is refused `identity_required` unless the caller
+ * holds an identity that signs them in under the new settings: at an
+ * enabled auth provider and, when their own email domain is enforced,
+ * at the provider it is enforced to. Whoever closes the door keeps a
+ * way through it; `flagnetic admin unlock`
  * enables it again from the server's side. Audited
  * `auth_settings.updated`.
  *

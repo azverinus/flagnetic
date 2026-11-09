@@ -123,7 +123,13 @@ func (h *UpdateAuthSettings) Handle(ctx context.Context, cmd UpdateAuthSettingsC
 		if err = h.checkProviders(ctx, s.SSOEnforcedDomains); err != nil {
 			return err
 		}
-		if before.LocalLoginEnabled && !s.LocalLoginEnabled {
+		// Whoever closes local login, or moves enforced domains while it is
+		// closed, must keep a way through what they set: otherwise they
+		// lock themselves out. A change to anything else is not judged by
+		// the caller's ways in, so an instance admin who signs in with an
+		// API token can still edit the timeouts.
+		closing := before.LocalLoginEnabled || !slices.Equal(before.SSOEnforcedDomains, s.SSOEnforcedDomains)
+		if !s.LocalLoginEnabled && closing {
 			if err = h.requireIdentity(ctx, cmd.Caller, s); err != nil {
 				return err
 			}
