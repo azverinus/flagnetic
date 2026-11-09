@@ -600,6 +600,10 @@ export type Invitation = {
    */
   password_allowed: boolean;
   enforced_provider?: AuthMethodProvider;
+  /**
+   * The enabled auth providers signing in through which accepts the invitation, ordered by display name; those whose domains hold the invited email, only `enforced_provider` when the email's domain is enforced to it, and none when no provider vouches for the email.
+   */
+  providers: Array<AuthMethodProvider>;
 };
 
 /**

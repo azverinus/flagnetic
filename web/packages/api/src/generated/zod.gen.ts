@@ -301,6 +301,7 @@ export const zInvitation = z.object({
   invited_by: z.string().optional(),
   password_allowed: z.boolean(),
   enforced_provider: zAuthMethodProvider.optional(),
+  providers: z.array(zAuthMethodProvider),
 });
 
 export const zInvitationAcceptance = z.object({

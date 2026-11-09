@@ -215,13 +215,14 @@ func (a *api) GetInvitation(ctx context.Context, req GetInvitationRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	out := GetInvitation200JSONResponse{Email: v.MaskedEmail, DisplayName: v.DisplayName, ExpiresAt: v.ExpiresAt, PasswordAllowed: v.PasswordAllowed}
-	if v.EnforcedProvider != "" {
-		enabled, listErr := a.h.ListEnabledAuthProviders.Handle(ctx)
-		if listErr != nil {
-			return nil, listErr
-		}
-		out.EnforcedProvider = enforcedProvider(enabled, v.EnforcedProvider)
+	enabled, err := a.h.ListEnabledAuthProviders.Handle(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := GetInvitation200JSONResponse{
+		Email: v.MaskedEmail, DisplayName: v.DisplayName, ExpiresAt: v.ExpiresAt, PasswordAllowed: v.PasswordAllowed,
+		EnforcedProvider: enforcedProvider(enabled, v.EnforcedProvider),
+		Providers:        each(identity.InvitationProviders(enabled, v.Email, v.EnforcedProvider), authMethodProvider),
 	}
 	if v.InvitedBy != "" {
 		out.InvitedBy = &v.InvitedBy

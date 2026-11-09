@@ -25,6 +25,18 @@ type SSOStore interface {
 	// provisioned with externalID; ErrNotFound when none.
 	MemberByExternalID(ctx context.Context, provider, externalID string) (access.Member, error)
 	CreateMember(ctx context.Context, m access.Member, passwordHash string) error
+	// LockMember returns the member, locked until the unit of work ends, and
+	// whether they hold a password; ErrNotFound when none has the identifier.
+	LockMember(ctx context.Context, member access.MemberID) (access.Member, bool, error)
+	// PendingInvitation returns the latest invitation of member not consumed
+	// yet, expired or not, locked until the unit of work ends; ErrNotFound
+	// when the member has none.
+	PendingInvitation(ctx context.Context, member access.MemberID) (access.Invitation, error)
+	SaveMember(ctx context.Context, m access.Member, at time.Time) error
+	// ConsumeInvitations marks every open invitation of member consumed at
+	// at and returns how many it marked.
+	ConsumeInvitations(ctx context.Context, member access.MemberID, at time.Time) (int, error)
+	invitationGrantStore
 	RecordSignIn(ctx context.Context, member access.MemberID, at time.Time) error
 	knownSourceRecorder
 	CreateSession(ctx context.Context, s access.Session) error
@@ -98,6 +110,63 @@ func (s *SSO) ProvisionMember(ctx context.Context, email, displayName string, me
 		After:  map[string]any{"email": m.Email, "display_name": m.DisplayName, "method": string(method), "provider": provider},
 	})
 	return m, err
+}
+
+// ErrNotInvited refuses activating a member who is no longer invited: they
+// accepted their invitation, or were deactivated, since they were read.
+var ErrNotInvited = errors.New("access: the member is not invited")
+
+// SSOActivation is an invited member activated by signing in through an
+// auth provider.
+type SSOActivation struct {
+	Member access.MemberID
+	// Method is the protocol of the auth provider, Provider its slug.
+	Method    access.SignInMethod
+	Provider  string
+	RequestID string
+}
+
+// ActivateInvited makes the invited member active, as accepting their
+// invitation does: their invitations are consumed, and their pending one,
+// while it is open, makes the grant it carries. An expired one activates
+// them all the same, granting nothing: the provider vouching for them proves
+// what the link would have. It records member.invitation_accepted with the
+// method and the provider, by the member. A member who is no longer invited
+// is ErrNotInvited. The member is locked before their invitation, the order
+// accepting and reissuing take.
+func (s *SSO) ActivateInvited(ctx context.Context, in SSOActivation) (access.Member, error) {
+	m, _, err := s.store.LockMember(ctx, in.Member)
+	if errors.Is(err, ErrNotFound) {
+		return access.Member{}, ErrNotInvited
+	}
+	if err != nil {
+		return access.Member{}, err
+	}
+	if m.Status != access.MemberInvited {
+		return access.Member{}, ErrNotInvited
+	}
+	now := s.clock.Now()
+	pending, err := s.store.PendingInvitation(ctx, m.ID)
+	live := err == nil && pending.Open(now, m)
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return access.Member{}, err
+	}
+	joined := m.Joined()
+	if err = s.store.SaveMember(ctx, joined, now); err != nil {
+		return access.Member{}, err
+	}
+	if _, err = s.store.ConsumeInvitations(ctx, m.ID, now); err != nil {
+		return access.Member{}, err
+	}
+	err = recordAll(ctx, s.audit, s.ids, now, governance.Request{Actor: memberActor(joined), ID: in.RequestID}, governance.Record{
+		Action: "member.invitation_accepted", Entity: memberEntity(joined),
+		Before: map[string]any{"status": m.Status},
+		After:  map[string]any{"status": joined.Status, "method": string(in.Method), "provider": in.Provider},
+	})
+	if err != nil || !live {
+		return joined, err
+	}
+	return joined, grantInvitation(ctx, s.store, s.audit, s.ids, pending, joined, in.RequestID, now)
 }
 
 // SSOSignIn is one single sign-on opening a session.

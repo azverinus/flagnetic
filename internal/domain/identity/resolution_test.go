@@ -2,6 +2,7 @@ package identity_test
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/azverinus/flagnetic/internal/domain/identity"
@@ -34,7 +35,7 @@ func TestResolutionFollowsItsRulesInOrder(t *testing.T) {
 	}{
 		{"a linked subject signs in", identity.ResolveInput{Provider: provider(false, false, true), Claims: claims("x@elsewhere.org", false), Linked: known(identity.MemberActive)}, identity.SignInLinked, nil},
 		{"a linked deactivated member is refused", identity.ResolveInput{Provider: provider(true, true, true), Claims: claims("x@example.com", true), Linked: known(identity.MemberDeactivated)}, 0, identity.ErrMemberDeactivated},
-		{"a link to an invited member signs nobody in", identity.ResolveInput{Provider: provider(true, true, true), Claims: claims("x@example.com", true), Linked: known(identity.MemberInvited)}, 0, identity.ErrMemberNotFound},
+		{"a link to an invited member activates them, however the email reads", identity.ResolveInput{Provider: provider(false, false, true), Claims: claims("x@elsewhere.org", false), Linked: known(identity.MemberInvited)}, identity.ActivateLinked, nil},
 		{"a provisioned member is linked by the external ID, whatever their email", identity.ResolveInput{Provider: provider(false, false, true), Claims: claims("x@elsewhere.org", false), Provisioned: known(identity.MemberActive)}, identity.LinkProvisioned, nil},
 		{"a linked subject beats a provisioned member", identity.ResolveInput{Provider: provider(false, false, true), Claims: claims("x@example.com", true), Linked: known(identity.MemberActive), Provisioned: known(identity.MemberActive)}, identity.SignInLinked, nil},
 		{"a provisioned member beats the email's", identity.ResolveInput{Provider: provider(true, true, true), Claims: claims("x@example.com", true), Provisioned: known(identity.MemberActive), ByEmail: known(identity.MemberActive)}, identity.LinkProvisioned, nil},
@@ -48,7 +49,10 @@ func TestResolutionFollowsItsRulesInOrder(t *testing.T) {
 		{"a subdomain is not the domain", identity.ResolveInput{Provider: provider(true, true, true), Claims: claims("x@mail.example.com", true)}, 0, identity.ErrMemberNotFound},
 		{"a deactivated member holding the email is refused as such", identity.ResolveInput{Provider: provider(false, false, true), Claims: claims("x@example.com", true), ByEmail: known(identity.MemberDeactivated)}, 0, identity.ErrMemberDeactivated},
 		{"a deactivated member outside the domains is not revealed", identity.ResolveInput{Provider: provider(true, true, true), Claims: claims("x@other.com", true), ByEmail: known(identity.MemberDeactivated)}, 0, identity.ErrMemberNotFound},
-		{"an invited member is not signed in", identity.ResolveInput{Provider: provider(true, true, true), Claims: claims("x@example.com", true), ByEmail: known(identity.MemberInvited)}, 0, identity.ErrMemberNotFound},
+		{"a verified email in the domains activates an invited member, linking by email off", identity.ResolveInput{Provider: provider(false, false, true), Claims: claims("X@Example.com", true), ByEmail: known(identity.MemberInvited)}, identity.ActivateInvited, nil},
+		{"an unverified email activates no invited member", identity.ResolveInput{Provider: provider(true, true, true), Claims: claims("x@example.com", false), ByEmail: known(identity.MemberInvited)}, 0, identity.ErrMemberNotFound},
+		{"an unverified email activates an invited member where verification is not required", identity.ResolveInput{Provider: provider(false, false, false), Claims: claims("x@example.com", false), ByEmail: known(identity.MemberInvited)}, identity.ActivateInvited, nil},
+		{"an email outside the domains activates no invited member", identity.ResolveInput{Provider: provider(true, true, true), Claims: claims("x@other.com", true), ByEmail: known(identity.MemberInvited)}, 0, identity.ErrMemberNotFound},
 		{"an unknown email is provisioned", identity.ResolveInput{Provider: provider(false, true, true), Claims: claims("x@example.com", true)}, identity.Provision, nil},
 		{"an unknown email is not provisioned unless the provider provisions", identity.ResolveInput{Provider: provider(true, false, true), Claims: claims("x@example.com", true)}, 0, identity.ErrMemberNotFound},
 		{"a malformed email is nobody's", identity.ResolveInput{Provider: provider(true, true, false), Claims: claims("example.com", true)}, 0, identity.ErrMemberNotFound},
@@ -57,6 +61,35 @@ func TestResolutionFollowsItsRulesInOrder(t *testing.T) {
 			got, err := identity.Resolve(tc.in)
 			if !errors.Is(err, tc.wantErr) || got.Action != tc.want {
 				t.Errorf("Resolve = %v, %v; want action %v, error %v", got.Action, err, tc.want, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestTheProvidersAcceptingAnInvitationVouchForItsEmail(t *testing.T) {
+	corp := identity.Provider{Slug: "corp", Domains: []string{"corp.example"}}
+	both := identity.Provider{Slug: "both", Domains: []string{"example.com", "corp.example"}}
+	other := identity.Provider{Slug: "other", Domains: []string{"elsewhere.org"}}
+	slugs := func(ps []identity.Provider) []string {
+		out := []string{}
+		for _, p := range ps {
+			out = append(out, p.Slug)
+		}
+		return out
+	}
+	for _, tc := range []struct {
+		name, email, enforced string
+		want                  []string
+	}{
+		{"those holding the domain, in their order", "Carol@Corp.Example", "", []string{"corp", "both"}},
+		{"only the enforced provider", "carol@corp.example", "both", []string{"both"}},
+		{"none for a domain no provider holds", "carol@unknown.example", "", []string{}},
+		{"none for a subdomain", "carol@mail.corp.example", "", []string{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := identity.InvitationProviders([]identity.Provider{corp, both, other}, tc.email, tc.enforced)
+			if got == nil || !slices.Equal(slugs(got), tc.want) {
+				t.Errorf("InvitationProviders(%s, %q) = %v, want %v", tc.email, tc.enforced, slugs(got), tc.want)
 			}
 		})
 	}

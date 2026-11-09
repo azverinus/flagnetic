@@ -60,6 +60,16 @@ func (a ssoMembers) ProvisionMember(ctx context.Context, email, displayName stri
 	return recordOf(m), err
 }
 
+func (a ssoMembers) ActivateInvited(ctx context.Context, member identity.MemberID, kind identity.Kind, provider, requestID string) (appidentity.MemberRecord, error) {
+	m, err := a.sso.ActivateInvited(ctx, appaccess.SSOActivation{
+		Member: id.FromBytes[access.Member](member.Bytes()), Method: access.SignInMethod(kind), Provider: provider, RequestID: requestID,
+	})
+	if errors.Is(err, appaccess.ErrNotInvited) {
+		return appidentity.MemberRecord{}, identity.ErrMemberNotFound
+	}
+	return recordOf(m), err
+}
+
 func (a ssoMembers) OpenSession(ctx context.Context, s appidentity.SessionRequest) (secret.String, error) {
 	return a.sso.OpenSession(ctx, appaccess.SSOSignIn{
 		Member: memberOf(s.Member), Method: access.SignInMethod(s.Kind), Provider: s.Provider, ClientIP: s.ClientIP, UserAgent: s.UserAgent, RequestID: s.RequestID,

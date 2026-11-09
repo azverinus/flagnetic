@@ -3220,6 +3220,9 @@ type Invitation struct {
 	// Project The project an invitation grants a role in. Absent once the invitation's grant was dropped.
 	Project *InvitationProject `json:"project,omitempty"`
 
+	// Providers The enabled auth providers signing in through which accepts the invitation, ordered by display name; those whose domains hold the invited email, only `enforced_provider` when the email's domain is enforced to it, and none when no provider vouches for the email.
+	Providers []AuthMethodProvider `json:"providers"`
+
 	// Role The built-in role accepting grants in `project`; absent with it.
 	Role *string `json:"role,omitempty"`
 }
@@ -7503,6 +7506,10 @@ type ClientInterface interface {
 	// `password_allowed` says whether the invitation can be accepted with
 	// a password; when the invited email's domain is enforced to an auth
 	// provider, `enforced_provider` names it, the only way to accept.
+	// `providers` lists the auth providers signing in through which
+	// accepts it: those whose domains hold the invited email. Signing in
+	// through one activates the invited member and makes the grant the
+	// invitation carries, without a password.
 	//
 	// Corresponds with GET /auth/invitations/{secret} (the `GetInvitation` operationId).
 	GetInvitation(ctx context.Context, secret string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -11427,6 +11434,10 @@ func (c *Client) ExportAuditEntries(ctx context.Context, params *ExportAuditEntr
 // `password_allowed` says whether the invitation can be accepted with
 // a password; when the invited email's domain is enforced to an auth
 // provider, `enforced_provider` names it, the only way to accept.
+// `providers` lists the auth providers signing in through which
+// accepts it: those whose domains hold the invited email. Signing in
+// through one activates the invited member and makes the grant the
+// invitation carries, without a password.
 //
 // Corresponds with GET /auth/invitations/{secret} (the `GetInvitation` operationId).
 func (c *Client) GetInvitation(ctx context.Context, secret string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -28508,6 +28519,10 @@ type ClientWithResponsesInterface interface {
 	// `password_allowed` says whether the invitation can be accepted with
 	// a password; when the invited email's domain is enforced to an auth
 	// provider, `enforced_provider` names it, the only way to accept.
+	// `providers` lists the auth providers signing in through which
+	// accepts it: those whose domains hold the invited email. Signing in
+	// through one activates the invited member and makes the grant the
+	// invitation carries, without a password.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -48918,6 +48933,10 @@ func (c *ClientWithResponses) ExportAuditEntriesWithResponse(ctx context.Context
 // `password_allowed` says whether the invitation can be accepted with
 // a password; when the invited email's domain is enforced to an auth
 // provider, `enforced_provider` names it, the only way to accept.
+// `providers` lists the auth providers signing in through which
+// accepts it: those whose domains hold the invited email. Signing in
+// through one activates the invited member and makes the grant the
+// invitation carries, without a password.
 //
 // Returns a wrapper object for the known response body format(s).
 //

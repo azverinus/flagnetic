@@ -167,6 +167,11 @@ type Members interface {
 	// ProvisionMember creates an active member without a password and records
 	// that provider provisioned them.
 	ProvisionMember(ctx context.Context, email, displayName string, kind identity.Kind, provider, requestID string) (MemberRecord, error)
+	// ActivateInvited makes the invited member active through provider, as
+	// accepting their invitation would, redeeming it and the grant it carries
+	// while it is open; identity.ErrMemberNotFound when they are no longer
+	// invited.
+	ActivateInvited(ctx context.Context, member identity.MemberID, kind identity.Kind, provider, requestID string) (MemberRecord, error)
 	// OpenSession opens a session of member signed in through provider and
 	// returns the value of its cookie.
 	OpenSession(ctx context.Context, s SessionRequest) (secret.String, error)
@@ -640,12 +645,24 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 	}
 	now := h.d.now()
 	switch res.Action {
+	case identity.ActivateInvited, identity.ActivateLinked:
+		activated, activateErr := h.d.Members.ActivateInvited(ctx, member.ID, p.Kind, p.Slug, cmd.RequestID)
+		if errors.Is(activateErr, identity.ErrMemberNotFound) {
+			// Accepted or deactivated since they were read: who they are
+			// now is for the next sign-in to judge.
+			return secret.String{}, &unresolved{err: activateErr}
+		}
+		if activateErr != nil {
+			return secret.String{}, activateErr
+		}
+		member = activated
 	case identity.Provision:
 		if member, err = h.d.Members.ProvisionMember(ctx, claims.Email, claims.MemberName(), p.Kind, p.Slug, cmd.RequestID); err != nil {
 			return secret.String{}, err
 		}
-		fallthrough
-	case identity.LinkByEmail, identity.LinkProvisioned:
+	}
+	switch res.Action {
+	case identity.Provision, identity.ActivateInvited, identity.LinkByEmail, identity.LinkProvisioned:
 		linked = identity.Identity{
 			ID: id.New[identity.Identity](h.d.IDs), Provider: p.ID, Subject: claims.Subject, Member: member.ID, LinkedAt: now,
 		}

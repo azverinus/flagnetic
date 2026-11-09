@@ -17,13 +17,25 @@ The issuer, and every endpoint its discovery document names, must be `https`, ex
 
 A provider vouches only for the email domains it names. A domain is the part of the address after the `@`, compared whatever its case; a subdomain is not its parent (`mail.example.com` is not `example.com`).
 
-- A person whose identity is already linked signs in whatever their email says: the link is the proof.
+- A person whose identity is already linked signs in whatever their email says: the link is the proof. A member it links who is invited (reactivated while their only way in was at a disabled provider, say) is activated, as accepting their invitation would.
 - So does a person whose subject is the `externalId` of a member the provider [provisioned through SCIM](scim.md#signing-in): the directory named them itself, so the sign-in is linked to that member, at this provider only, with `link_by_email` and `auto_provision` off.
 - Otherwise the email must be in one of the provider's domains, and verified (the provider's `email_verified` claim is exactly `true`) unless `require_verified_email` is switched off.
+- An **invited** member holding the email [accepts their invitation](#accepting-an-invitation-through-a-provider) by signing in, whether `link_by_email` is on or not.
 - With `link_by_email` on, an **active** member holding the email is then linked to the person and signed in. With it off, they are not found.
 - With `auto_provision` on, an email no member holds creates a new **active** member, named after the `name` claim or else the email, with no password.
 - Anything else is `member_not_found`. A member who was deactivated is `member_deactivated`, whichever rule would have matched them.
-- An invited member is not signed in by a provider yet: they accept their invitation.
+
+### Accepting an invitation through a provider
+
+An invited person never needs a password when a provider vouches for their email. Signing in through it (the email in its domains, and verified as above) makes the invited member active, links the person's identity to them and opens their session, in one step:
+
+- Their invitations are used up, and the open one makes the grant in a project it carries, by hand and in the name of the member who invited, as [accepting it with a password](access.md#inviting-to-a-project) does; an inviter who can no longer hand it out grants nothing (`invitation.grant_revoked`).
+- An invitation that expired still activates the person, since the provider proves what the link would have, but grants nothing.
+- An email the provider does not vouch for (outside its domains, or unverified where verification is required) is `member_not_found`, and the invitation stays open.
+- For an email in an [enforced domain](#sso-enforcement-and-local-login), only the enforced provider accepts it; another one is `sso_required`.
+- The acceptance is recorded as `member.invitation_accepted` with its `method` (`oidc` or `saml`) and `provider`, beside `identity.linked`, `grant.created` in the project and `auth.signed_in`.
+
+`GET /auth/invitations/{secret}` answers in `providers` the enabled providers that accept the invitation (`{slug, display_name, kind}`, ordered by display name): those whose domains hold the invited email, only the enforced one when its domain is enforced, none when no provider vouches for it.
 
 If the ID token carries no email, the instance asks the provider's UserInfo endpoint for it, and trusts the answer only when its `sub` is the token's; its `email_verified` is judged on its own.
 
@@ -221,7 +233,7 @@ Every failure redirects to `/sign-in?error=<code>`:
 |---|---|---|
 | `sso_failed` | The sign-in could not be verified: the state was unknown, used or expired, the token's signature, issuer, audience, expiry or nonce was wrong, the code exchange was refused (check the client secret), a SAML response failed one of the [checks above](#what-the-instance-checks-of-a-response) (not signed by the provider's certificate, another audience or destination, not an answer to the request, expired, replayed, wrapped), the provider could not be reached, or the attempt was gone when it was completed. | Try again. If it repeats, `POST …/test` the provider and read the server's log: a record `single sign-on failed` carries the cause. |
 | `idp_error` | The identity provider refused the sign-in itself, for example the person denied access. | Ask the identity provider's administrator. |
-| `member_not_found` | No member matches the person: their email is outside the provider's domains or (OIDC) unverified, linking by email is off, provisioning is off, or they hold an invitation they have not accepted. | Add the domain, switch `link_by_email` or `auto_provision` on, or invite the person. |
+| `member_not_found` | No member matches the person: their email is outside the provider's domains or (OIDC) unverified, linking by email is off, or provisioning is off. | Add the domain, switch `link_by_email` or `auto_provision` on, or invite the person. |
 | `member_deactivated` | The member was deactivated. The failure is audited as `auth.sign_in_failed`. | An instance admin may reactivate them. |
 | `sso_required` | The person's email domain is enforced to another auth provider, whose slug is in `provider`. | Sign in through that provider. |
 | `attempt_mismatch` | The browser completing the sign-in is not the one that started it. | Start again in the same browser. |
@@ -229,6 +241,6 @@ Every failure redirects to `/sign-in?error=<code>`:
 
 ## Audit and metrics
 
-A first sign-in records `member.provisioned` or `identity.linked` (or both), unlinking an identity `identity.unlinked`, the access the member's groups gave or took away as [group mappings](#group-mappings) record it, and every sign-in `auth.signed_in` with its `method` (`oidc` or `saml`) and `provider`; a refused sign-in of a known member (one the subject is linked to, or one holding an email the provider vouches for) records `auth.sign_in_failed` with the `reason`: the member's status when it refuses them (`deactivated`, `invited`), or `not_linked` for an active member when the provider does not link by email.
+A first sign-in records `member.provisioned` or `identity.linked` (or both), and `member.invitation_accepted` for an invited member, unlinking an identity `identity.unlinked`, the access the member's groups gave or took away as [group mappings](#group-mappings) record it, and every sign-in `auth.signed_in` with its `method` (`oidc` or `saml`) and `provider`; a refused sign-in of a known member (one the subject is linked to, or one holding an email the provider vouches for) records `auth.sign_in_failed` with the `reason`: the member's status when it refuses them (`deactivated`, `invited`), or `not_linked` for an active member when the provider does not link by email.
 
 `flagnetic_sso_sign_ins_total{kind,result}` counts sign-ins that ended, by `kind` (`oidc` or `saml`, `unknown` when the sign-in failed before its provider was known) and `result`: `succeeded`, `linked` for a link that completed, or the code above.
