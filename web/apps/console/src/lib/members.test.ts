@@ -23,8 +23,15 @@ describe("what an instance admin may do to a member", () => {
     expect(memberActions({ status: "active", instance_admin: true })).toEqual([
       "edit",
       "demote",
+      "reset",
       "deactivate",
     ]);
+  });
+
+  it("issues a password reset link only to an active member, who has joined and may sign in", () => {
+    expect(memberActions({ status: "active", instance_admin: false })).toContain("reset");
+    expect(memberActions({ status: "invited", instance_admin: false })).not.toContain("reset");
+    expect(memberActions({ status: "deactivated", instance_admin: false })).not.toContain("reset");
   });
 
   it("edits or brings back a deactivated member, and never promotes them", () => {

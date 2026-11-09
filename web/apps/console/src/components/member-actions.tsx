@@ -1,5 +1,7 @@
 import {
   deactivateMember,
+  type IssuedPasswordReset,
+  issuePasswordReset,
   type Member,
   type MemberInvitation,
   type MemberPatch,
@@ -14,6 +16,7 @@ import { toast } from "sonner";
 
 import { InvitationLinkDialog } from "@/components/invitation-link-dialog";
 import { MemberForm, type MemberValues } from "@/components/member-form";
+import { PasswordResetLinkDialog } from "@/components/password-reset-link-dialog";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
@@ -33,8 +36,8 @@ export type MemberActionsProps = {
 
 /**
  * What an instance admin does to one member: edit them, make them instance
- * admin or not, replace their invitation link, and deactivate or
- * reactivate them. Each change but editing is confirmed first, saying what
+ * admin or not, replace their invitation link, issue a password reset
+ * link, and deactivate or reactivate them. Each change but editing is confirmed first, saying what
  * it does; a refusal, such as the last instance admin's, is explained in
  * the dialog that asked for it.
  */
@@ -47,12 +50,14 @@ export function MemberActions({ member, self }: MemberActionsProps) {
     answer: MemberInvitation;
     kind: "reissued" | "reactivated";
   }>();
+  const [resetLink, setResetLink] = useState<IssuedPasswordReset>();
   const name = memberName(member);
 
   const doneMessage: Record<Confirmed, string> = {
     promote: t`${name} is an instance admin.`,
     demote: t`${name} is no longer an instance admin.`,
     reissue: t`A new invitation link is issued.`,
+    reset: t`A password reset link is issued.`,
     deactivate: t`${name} is deactivated.`,
     reactivate: t`${name} is reactivated.`,
   };
@@ -74,7 +79,9 @@ export function MemberActions({ member, self }: MemberActionsProps) {
     },
   });
   const change = useMutation({
-    mutationFn: async (action: Confirmed): Promise<MemberInvitation | undefined> => {
+    mutationFn: async (
+      action: Confirmed,
+    ): Promise<MemberInvitation | IssuedPasswordReset | undefined> => {
       const path = { member: member.id };
       switch (action) {
         case "promote":
@@ -83,6 +90,8 @@ export function MemberActions({ member, self }: MemberActionsProps) {
           return undefined;
         case "reissue":
           return unwrap(reissueInvitation({ path }));
+        case "reset":
+          return unwrap(issuePasswordReset({ path }));
         case "deactivate":
           await unwrap(deactivateMember({ path }));
           return undefined;
@@ -100,6 +109,10 @@ export function MemberActions({ member, self }: MemberActionsProps) {
       // time the mutation cache drops it, answer included, so the link is
       // gone once that dialog closes.
       change.reset();
+      if (answer && "url" in answer) {
+        setResetLink(answer);
+        return;
+      }
       if (answer?.invitation) {
         setIssued({ answer, kind: action === "reissue" ? "reissued" : "reactivated" });
         return;
@@ -113,6 +126,7 @@ export function MemberActions({ member, self }: MemberActionsProps) {
     promote: t`Make instance admin`,
     demote: t`Revoke instance admin`,
     reissue: t`Issue a new invitation link`,
+    reset: t`Issue a password reset link`,
     deactivate: t`Deactivate`,
     reactivate: t`Reactivate`,
   };
@@ -132,6 +146,11 @@ export function MemberActions({ member, self }: MemberActionsProps) {
     reissue: {
       title: t`Issue a new invitation link for ${name}`,
       consequence: t`Every earlier link for ${name} stops working. The new one is shown once.`,
+      confirm: t`Issue link`,
+    },
+    reset: {
+      title: t`Issue a password reset link for ${name}`,
+      consequence: t`Whoever opens the link chooses a new password for ${name} and is signed in as them, and every other session of theirs ends. The link is shown once and works for an hour; earlier links keep working until one is used.`,
       confirm: t`Issue link`,
     },
     deactivate: {
@@ -220,6 +239,11 @@ export function MemberActions({ member, self }: MemberActionsProps) {
         issued={issued?.answer}
         kind={issued?.kind ?? "reissued"}
         onClose={() => setIssued(undefined)}
+      />
+      <PasswordResetLinkDialog
+        issued={resetLink}
+        name={name}
+        onClose={() => setResetLink(undefined)}
       />
     </>
   );

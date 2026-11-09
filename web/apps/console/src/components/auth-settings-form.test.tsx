@@ -125,4 +125,21 @@ describe("the auth settings form", () => {
       "true",
     );
   });
+
+  it("switches self-service password reset off, saying it also takes an SMTP server", async () => {
+    const saved = { ...fresh, self_service_password_reset: false };
+    const server = fakeServer({ "PUT /instance/auth-settings": { status: 200, body: saved } });
+    await renderWithRouter(() => <AuthSettingsForm settings={fresh} />);
+
+    const toggle = screen.getByRole("switch", { name: "Self-service password reset" });
+    expect(toggle).toBeChecked();
+    expect(toggle).toHaveAccessibleDescription(/only while an SMTP server is configured/);
+    expect(screen.getByRole("link", { name: "Mail" })).toHaveAttribute("href", "/admin/mail");
+    const user = userEvent.setup();
+    await user.click(toggle);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(server.requests).toHaveLength(1));
+    expect(await server.requests[0]!.json()).toEqual(saved);
+  });
 });
