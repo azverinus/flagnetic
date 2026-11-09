@@ -33,9 +33,7 @@ func TestAMemberKeepsAWayInWhileOneUsableRemains(t *testing.T) {
 		{"an identity at a disabled provider is no way in", access.AuthMethods{
 			Status: access.MemberActive, Identities: []access.IdentityMethod{disabled, enabled},
 		}, false, "enabled", false},
-		{"removing what is no way in takes nothing away", access.AuthMethods{
-			Status: access.MemberActive, Identities: []access.IdentityMethod{disabled},
-		}, false, "disabled", true},
+		{"nothing at all", access.AuthMethods{Status: access.MemberActive}, false, "", false},
 		{"a deactivated member needs none", access.AuthMethods{Status: access.MemberDeactivated}, true, "", true},
 	}
 	for _, tc := range tests {
@@ -120,7 +118,7 @@ func TestEnforcementAndLocalLoginDecideWhichWaysInAreUsable(t *testing.T) {
 	}
 }
 
-func TestRemovingAWayInEnforcementRefusesTakesNothingAway(t *testing.T) {
+func TestRemovingAWayInLeavesAUsableOneUnderEnforcement(t *testing.T) {
 	set := time.Date(2026, 11, 9, 0, 0, 0, 0, time.UTC)
 	enforced := access.DefaultAuthSettings
 	enforced.SSOEnforcedDomains = []access.EnforcedDomain{{Domain: "corp.example", Provider: "corp"}}
@@ -136,5 +134,21 @@ func TestRemovingAWayInEnforcementRefusesTakesNothingAway(t *testing.T) {
 	}
 	if m.KeepsWayIn(false, "corp") {
 		t.Error("unlinking the enforced provider's identity, the last usable way in, was allowed")
+	}
+
+	// A refused password is still what unlock gives back, so it stays while
+	// nothing usable would remain.
+	off := access.DefaultAuthSettings
+	off.LocalLoginEnabled = false
+	passwordOnly := access.AuthMethods{Status: access.MemberActive, PasswordSetAt: &set}.UnderSettings(off, "ann@example.com")
+	if passwordOnly.KeepsWayIn(true, "") {
+		t.Error("removing the only password while local login is off was allowed")
+	}
+	refusedOnly := access.AuthMethods{
+		Status: access.MemberActive, PasswordSetAt: &set,
+		Identities: []access.IdentityMethod{{ID: "other", Provider: "other", ProviderEnabled: true}},
+	}.UnderSettings(enforced, "ann@corp.example")
+	if refusedOnly.KeepsWayIn(false, "other") || refusedOnly.KeepsWayIn(true, "") {
+		t.Error("removing a way in enforcement refuses was allowed while no usable way in remains")
 	}
 }

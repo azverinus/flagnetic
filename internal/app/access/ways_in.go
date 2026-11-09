@@ -121,10 +121,11 @@ type RemoveMyPasswordCommand struct {
 // Handle removes the caller's password, ends their open invitations and
 // password resets so no old link sets one again, and records
 // password.removed, in one unit of work. It is refused ErrLastAuthMethod when
-// the password is a usable way in and no identity at an enabled auth provider
-// that enforcement allows remains; a member who holds no password changes
-// nothing. Only a session removes a password, so a leaked
-// token cannot lock its owner out of signing in with it.
+// no identity at an enabled auth provider that enforcement allows remains,
+// even while local login or enforcement refuses the password: unlock makes it
+// a way in again. A member who holds no password changes nothing. Only a
+// session removes a password, so a leaked token cannot lock its owner out of
+// signing in with it.
 func (h *RemoveMyPassword) Handle(ctx context.Context, cmd RemoveMyPasswordCommand) error {
 	if cmd.Caller.Member == nil || cmd.Caller.Session == nil {
 		return access.ErrSessionRequired

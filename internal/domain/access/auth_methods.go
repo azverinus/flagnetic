@@ -68,14 +68,16 @@ func (m AuthMethods) identityUsable(i IdentityMethod) bool {
 // password is removed (withoutPassword) and the identity named by
 // withoutIdentity ("" for none) is unlinked. A usable way in is a password
 // local login accepts for the member's email, or an identity at an enabled
-// provider that enforcement does not refuse them. Removing only what is no
-// way in takes nothing away, so it keeps whatever the member had. A
+// provider that enforcement does not refuse them. A password local login or
+// enforcement refuses today still counts as what the member would lose:
+// `flagnetic admin unlock` makes it a way in again, so removing it while no
+// usable way in remains could strand the member past the break-glass. A
 // deactivated member signs in nowhere, so they need none.
 func (m AuthMethods) KeepsWayIn(withoutPassword bool, withoutIdentity string) bool {
 	if m.Status == MemberDeactivated {
 		return true
 	}
-	return m.usable(withoutPassword, withoutIdentity) || !m.usable(false, "")
+	return m.usable(withoutPassword, withoutIdentity)
 }
 
 // HoldsUsableWayIn reports whether the member holds a usable way in,

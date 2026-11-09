@@ -204,8 +204,10 @@ func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 		if enforced == unlinking.ProviderSlug {
 			return errProviderEnforced
 		}
-		if err = h.d.Members.EnsureWayIn(ctx, m, identityID); err != nil {
-			return err
+		if unlinking.ProviderEnabled {
+			if err = h.d.Members.EnsureWayIn(ctx, m, identityID); err != nil {
+				return err
+			}
 		}
 		if err = h.d.Identities.DeleteIdentity(ctx, identityID); err != nil {
 			return err
