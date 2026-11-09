@@ -107,6 +107,14 @@ An owner brings someone who has no account into their project in one step, inste
 - Reissuing an invitation (`POST /members/{member}/invitation`) keeps its role and the member who invited, who is the one the grant is made in the name of, only while that member still holds `grant.manage` in the project; a reissue never widens access.
 - The project's audit log records the invitation (`member.invited`, or `member.invitation_reissued` for a second one) and, when the link is accepted, `grant.created` with the inviter as actor; the acceptance itself, `member.invitation_accepted`, is the member's own and belongs to the instance.
 
+### Inviting with mail
+
+Once the instance has an [SMTP server](mail.md), every invitation is mailed to the person it invites instead of shown: an instance admin's (`POST /members`), one to a project (`POST /projects/{project}/invitations`), a reissue (`POST /members/{member}/invitation`, or inviting a person to the same project again) and the one a reactivation issues. The answer's `invitation` then says `mailed: true` and carries `expires_at` but no `url`, so the link reaches only the person invited and accepting it proves they hold the address. Without an SMTP server the answer says `mailed: false` and carries the link in `url`, as described above.
+
+- The mail names who invited, when someone did, and for an invitation to a project the project and the role accepting grants there; it carries the link, `FLAGNETIC_BASE_URL` followed by `/invitations/<secret>`, and when it expires.
+- It is written in the invited person's language when the instance knows it (a member reactivated who chose one), else in the language of the member who invited, else in `FLAGNETIC_DEFAULT_LOCALE` (see [Languages](mail.md#languages)).
+- The mail leaves after the invitation is stored. A send that fails never undoes the invitation: it is logged and counted (see [Mail](mail.md#what-happens-when-a-send-fails)), and reissuing the invitation mails a fresh link and kills the one that was lost.
+
 ## Resetting a member's password
 
 A member who cannot sign in gets a new password through a password reset: a one-time link that lets them set one. An instance admin issues it with `POST /members/{member}/password-reset`, which answers `201` with the link in `url` and when it stops working in `expires_at`. The link is shown that once and never mailed, so the instance admin passes it on: it is `FLAGNETIC_BASE_URL` (or, when unset, the origin the request came to) followed by `/password-reset/<secret>`. It works once and for an hour.

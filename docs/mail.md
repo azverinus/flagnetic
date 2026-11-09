@@ -1,6 +1,6 @@
 # Mail
 
-An instance admin configures one SMTP server, and the instance sends its mail through it: a test mail to whoever asks for one and the password reset a member asks for, and later the invitations that would otherwise be shown as links. Mail is optional. Without an SMTP server nothing is mailed and every link is shown to the admin who made it.
+An instance admin configures one SMTP server, and the instance sends its mail through it: a test mail to whoever asks for one, the password reset a member asks for, and every invitation, which would otherwise be shown as a link. Mail is optional. Without an SMTP server nothing is mailed and every link is shown to whoever made it.
 
 ## Configuring the SMTP server
 
@@ -50,9 +50,10 @@ The answer never carries the password.
 | Kind | Sent to | When |
 |---|---|---|
 | `test` | the instance admin who asks | `POST /instance/smtp/test`; the one mail sent while the caller waits. |
+| `invitation` | the person invited | An instance admin invites someone (`POST /members`), a member holding `grant.manage` invites someone to a project (`POST /projects/{project}/invitations`), an invitation is reissued (`POST /members/{member}/invitation`, or inviting a person to the same project again), or a member who never set a password is reactivated and so invited again. It names who invited (when someone did) and, for an invitation to a project, the project and the role accepting grants there, and carries a link to `FLAGNETIC_BASE_URL/invitations/<secret>` that works once for seven days, and when it expires in UTC. The answer says `mailed: true` and shows no link, so accepting proves the person holds the address; see [Inviting with mail](access.md#inviting-with-mail). |
 | `password_reset` | a member | They ask for a reset with `POST /auth/password-reset`, the instance lets them (`self_service_password_reset`), and none was issued for them in the last 5 minutes; see [Asking for a password reset by mail](access.md#asking-for-a-password-reset-by-mail). It carries a link to `FLAGNETIC_BASE_URL/password-reset/<secret>` that works once for an hour, and when it expires in UTC. |
 
-A password reset an instance admin issues is never mailed: its link is shown to them once.
+A password reset an instance admin issues is never mailed: its link is shown to them once. An invitation is mailed only while `FLAGNETIC_BASE_URL` is set, as every mailed link is built from it; an instance whose SMTP server outlived the setting shows the link instead.
 
 ## Languages
 
