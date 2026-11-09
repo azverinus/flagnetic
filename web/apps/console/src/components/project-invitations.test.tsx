@@ -92,9 +92,9 @@ describe("inviting to a project", () => {
       display_name: "Grace Hopper",
       role: "developer",
     });
-    expect(
-      queryClient.getQueryState(["projects", "checkout", "invitations"])?.isInvalidated,
-    ).toBe(true);
+    expect(queryClient.getQueryState(["projects", "checkout", "invitations"])?.isInvalidated).toBe(
+      true,
+    );
   });
 
   it.each([
@@ -109,9 +109,7 @@ describe("inviting to a project", () => {
     await choose(user, "Role", "Viewer");
     await user.click(screen.getByRole("button", { name: "Invite" }));
 
-    await waitFor(() =>
-      expect(screen.getByLabelText("Email")).toHaveAccessibleDescription(text),
-    );
+    await waitFor(() => expect(screen.getByLabelText("Email")).toHaveAccessibleDescription(text));
     expect(onInvited).not.toHaveBeenCalled();
   });
 
@@ -150,16 +148,21 @@ const pending: ProjectInvitation[] = [
   },
 ];
 
-function renderInvited(routes: Record<string, FakeAnswer>) {
+function renderInvited(
+  routes: Record<string, FakeAnswer>,
+  held: string[] = roles.flatMap((role) => role.permissions),
+) {
   const server = fakeServer(routes);
   const onReissued = vi.fn();
   renderWithProviders(
-    <InvitedMembers
-      project="checkout"
-      names={new Map([["m1", "Ada Lovelace"]])}
-      namesPending={false}
-      onReissued={onReissued}
-    />,
+    <AccessContext.Provider value={{ roles, permissions: new Set(held) }}>
+      <InvitedMembers
+        project="checkout"
+        names={new Map([["m1", "Ada Lovelace"]])}
+        namesPending={false}
+        onReissued={onReissued}
+      />
+    </AccessContext.Provider>,
   );
   return { server, onReissued, user: userEvent.setup() };
 }
@@ -209,6 +212,26 @@ describe("the members invited to a project", () => {
       display_name: "Grace Hopper",
       role: "developer",
     });
+  });
+
+  it("offers no invitation again of a role the caller may not grant", async () => {
+    renderInvited(
+      {
+        "GET /projects/checkout/invitations": {
+          status: 200,
+          body: {
+            items: pending.map((invitation) =>
+              invitation.member === "m7" ? { ...invitation, role: "maintainer" } : invitation,
+            ),
+          },
+        },
+      },
+      ["project.read", "grant.manage"],
+    );
+    expect(
+      await screen.findByRole("button", { name: "Invite linus@example.com again" }),
+    ).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Invite Grace Hopper again" })).toBeNull();
   });
 
   it("keeps the confirmation open with a refusal", async () => {

@@ -293,6 +293,10 @@ msgid "{name} keeps only the roles their grants give them in each project."
 msgstr "У участника {name} останутся только роли, выданные ему в проектах."
 
 #: src/components/invitation-link-dialog.tsx
+msgid "{name} never set a password, so they join again through the mailed link."
+msgstr "Участник {name} так и не задал пароль, поэтому присоединится заново по ссылке из письма."
+
+#: src/components/invitation-link-dialog.tsx
 msgid "{name} never set a password, so they join again through this link."
 msgstr "Участник {name} так и не задал пароль, поэтому присоединится заново по этой ссылке."
 

@@ -50,6 +50,21 @@ describe("the result of an invitation", () => {
     expect(dialog).toHaveTextContent("Every earlier link for Grace Hopper no longer works.");
   });
 
+  it("says a mailed reactivation is joined through the mailed link", () => {
+    renderWithProviders(
+      <InvitationLinkDialog
+        issued={{ member, invitation: { mailed: true, expires_at: "2026-11-16T10:00:00Z" } }}
+        kind="reactivated"
+        onClose={() => {}}
+      />,
+    );
+    const dialog = screen.getByRole("dialog", { name: "Grace Hopper is invited again" });
+    expect(dialog).toHaveTextContent(
+      "Grace Hopper never set a password, so they join again through the mailed link.",
+    );
+    expect(dialog).not.toHaveTextContent(/through this link/);
+  });
+
   it("shows a link that is not mailed once, to pass on", () => {
     const url = "http://console.test/invitations/s3cret";
     renderWithProviders(

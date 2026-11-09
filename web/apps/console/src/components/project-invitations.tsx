@@ -60,7 +60,12 @@ export type ProjectInviteDialogProps = {
  * Inviting someone the instance does not know yet to the project, with one
  * of the roles the caller may grant here, which accepting grants them.
  */
-export function ProjectInviteDialog({ project, open, onClose, onInvited }: ProjectInviteDialogProps) {
+export function ProjectInviteDialog({
+  project,
+  open,
+  onClose,
+  onInvited,
+}: ProjectInviteDialogProps) {
   const { t } = useLingui();
   const { roles, permissions } = useContext(AccessContext);
   const offered = useMemo(() => grantableRoles(roles, permissions), [roles, permissions]);
@@ -87,9 +92,7 @@ export function ProjectInviteDialog({ project, open, onClose, onInvited }: Proje
           pending={invite.isPending}
           refusal={invite.error}
           onCancel={close}
-          onSubmit={({ email, display_name, role }) =>
-            invite.mutate({ email, display_name, role })
-          }
+          onSubmit={({ email, display_name, role }) => invite.mutate({ email, display_name, role })}
         />
       ) : null}
     </Dialog>
@@ -109,11 +112,17 @@ export type InvitedMembersProps = {
 /**
  * The members invited to the project who have not accepted yet, each with
  * the role accepting grants them, who invited them and until when the link
- * works. Inviting one again replaces their link, with the same role.
+ * works. Inviting one again replaces their link, with the same role, and
+ * is offered only for a role the caller may grant.
  * Nothing is shown while nobody is invited.
  */
 export function InvitedMembers({ project, names, namesPending, onReissued }: InvitedMembersProps) {
   const { i18n, t } = useLingui();
+  const { roles, permissions } = useContext(AccessContext);
+  const grantable = useMemo(
+    () => new Set(grantableRoles(roles, permissions).map((role) => role.name)),
+    [roles, permissions],
+  );
   const invited = useQuery(projectInvitationsQuery(project));
   const [reissuing, setReissuing] = useState<ProjectInvitation>();
   const now = useNowPassing((invited.data ?? []).map((invitation) => invitation.expires_at));
@@ -162,6 +171,9 @@ export function InvitedMembers({ project, names, namesPending, onReissued }: Inv
       },
     ];
     return withRowActions(columns, true, (row) => {
+      // Inviting again carries the same role, which the server refuses
+      // from an inviter who does not hold every permission it gives.
+      if (!grantable.has(row.role)) return null;
       const name = memberName(row);
       return (
         <RowAction
@@ -171,7 +183,7 @@ export function InvitedMembers({ project, names, namesPending, onReissued }: Inv
         />
       );
     });
-  }, [i18n, names, now, t]);
+  }, [grantable, i18n, names, now, t]);
 
   if (invited.isError) {
     return <QueryError error={invited.error} onRetry={() => void invited.refetch()} />;

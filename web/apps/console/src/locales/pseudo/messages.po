@@ -293,6 +293,10 @@ msgid "{name} keeps only the roles their grants give them in each project."
 msgstr ""
 
 #: src/components/invitation-link-dialog.tsx
+msgid "{name} never set a password, so they join again through the mailed link."
+msgstr ""
+
+#: src/components/invitation-link-dialog.tsx
 msgid "{name} never set a password, so they join again through this link."
 msgstr ""
 

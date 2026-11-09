@@ -48,7 +48,11 @@ export function InvitationLinkDialog({ issued, kind, onClose }: InvitationLinkDi
       ) : null}
       {kind === "reactivated" ? (
         <p className="mt-2">
-          <Trans>{name} never set a password, so they join again through this link.</Trans>
+          {mailed ? (
+            <Trans>{name} never set a password, so they join again through the mailed link.</Trans>
+          ) : (
+            <Trans>{name} never set a password, so they join again through this link.</Trans>
+          )}
         </p>
       ) : null}
     </>
