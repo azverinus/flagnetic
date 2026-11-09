@@ -319,6 +319,8 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
       return i18n._(msg`Choose one of the offered members.`);
     case "unknown_role":
       return i18n._(msg`Choose one of the offered roles.`);
+    case "unknown_project":
+      return i18n._(msg`Choose one of the offered projects.`);
     case "unknown_locale":
       return i18n._(msg`Choose one of the offered languages.`);
     case "scope_not_allowed":

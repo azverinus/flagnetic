@@ -20,12 +20,14 @@ import {
   type Invitation,
   type MemberStatus,
   listProjectAuditEntries,
+  listProjectInvitations,
   listProjectMembers,
   listProjectTokens,
   type ProjectToken,
   type AuditEntry,
   type AuditEntryList,
   type Member,
+  type ProjectInvitation,
   type ProjectMember,
   getMe,
   getProject,
@@ -551,6 +553,17 @@ export function projectMembersQuery(project: string) {
   return queryOptions<ProjectMember[]>({
     queryKey: ["projects", project, "members"],
     queryFn: async () => (await unwrap(listProjectMembers({ path: { project } }))).items,
+  });
+}
+
+/**
+ * The members invited to a project with the role their invitation grants
+ * there, by email; read only by whoever manages the project's grants.
+ */
+export function projectInvitationsQuery(project: string) {
+  return queryOptions<ProjectInvitation[]>({
+    queryKey: ["projects", project, "invitations"],
+    queryFn: async () => (await unwrap(listProjectInvitations({ path: { project } }))).items,
   });
 }
 

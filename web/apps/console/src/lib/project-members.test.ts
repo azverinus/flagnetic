@@ -2,7 +2,14 @@ import type { Member, ProjectMember } from "@flagnetic/api";
 import { i18n } from "@lingui/core";
 import { describe, expect, it } from "vitest";
 
-import { grantCandidates, grantOrigin, madeBy, memberNames } from "./project-members";
+import {
+  grantableRoles,
+  grantCandidates,
+  grantOrigin,
+  invitationExpired,
+  madeBy,
+  memberNames,
+} from "./project-members";
 
 const projectMember: ProjectMember = {
   member: "m2",
@@ -75,5 +82,32 @@ describe("where a grant comes from", () => {
     expect(grantOrigin(i18n, names, mapped)).toMatch(
       /^From the group mappings of okta, granted on /,
     );
+  });
+});
+
+describe("the roles an invitation may carry", () => {
+  const roles = [
+    { name: "owner" as const, permissions: ["project.read", "grant.manage", "project.update"] },
+    { name: "maintainer" as const, permissions: ["project.read", "environment.manage"] },
+    { name: "viewer" as const, permissions: ["project.read"] },
+  ];
+
+  it("are those whose every permission the inviter holds, in the server's order", () => {
+    const held = new Set(["project.read", "grant.manage", "environment.manage"]);
+    expect(grantableRoles(roles, held).map((role) => role.name)).toEqual(["maintainer", "viewer"]);
+  });
+
+  it("are every role for an inviter holding every permission", () => {
+    const held = new Set(roles.flatMap((role) => role.permissions));
+    expect(grantableRoles(roles, held)).toHaveLength(3);
+  });
+});
+
+describe("an invitation's expiry", () => {
+  it("is past once its moment is reached", () => {
+    const now = Date.parse("2026-11-09T10:00:00Z");
+    expect(invitationExpired("2026-11-09T09:59:59Z", now)).toBe(true);
+    expect(invitationExpired("2026-11-09T10:00:00Z", now)).toBe(true);
+    expect(invitationExpired("2026-11-09T10:00:01Z", now)).toBe(false);
   });
 });

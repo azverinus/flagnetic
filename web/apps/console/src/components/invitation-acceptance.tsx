@@ -4,6 +4,7 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -14,6 +15,7 @@ import { FormRefusal } from "@/components/ui/form-page";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateTime } from "@/i18n/format";
+import { roleName } from "@/lib/access-names";
 import { ApiError, unwrap } from "@/lib/errors";
 import { formRefusal } from "@/lib/problem-messages";
 import { invitationQuery } from "@/lib/queries";
@@ -98,6 +100,7 @@ function AcceptForm({
       <h1 className="text-xl font-semibold">
         <Trans>Accept your invitation</Trans>
       </h1>
+      <InvitedBy invitation={invitation} />
       <p className="text-sm text-muted-foreground">
         <Trans>
           You are invited to this Flagnetic instance as {name} ({email}). Choose a password to join;
@@ -142,6 +145,37 @@ function AcceptForm({
       </form>
     </div>
   );
+}
+
+/**
+ * Who invited the person and, while the invitation still grants one, the
+ * role it grants in which project, so they know what they accept. An
+ * invitation of the instance alone, or whose grant was dropped, names no
+ * project.
+ */
+function InvitedBy({ invitation }: { invitation: Invitation }) {
+  const { i18n } = useLingui();
+  const { project, invited_by: inviter } = invitation;
+  const role = invitation.role === undefined ? undefined : roleName(i18n, invitation.role);
+  let sentence: ReactNode = null;
+  if (project && role !== undefined) {
+    const projectName = project.name;
+    sentence = inviter ? (
+      <Trans>
+        {inviter} invites you to the project {projectName} as {role}. Accepting grants you that
+        role there.
+      </Trans>
+    ) : (
+      <Trans>
+        You are invited to the project {projectName} as {role}. Accepting grants you that role
+        there.
+      </Trans>
+    );
+  } else if (inviter) {
+    sentence = <Trans>{inviter} invites you to this instance.</Trans>;
+  }
+  if (sentence === null) return null;
+  return <p className="text-sm">{sentence}</p>;
 }
 
 function InvitationGone() {

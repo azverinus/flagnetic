@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { ReactNode } from "react";
@@ -18,6 +19,32 @@ import { formRefusal, violationMessage } from "@/lib/problem-messages";
  */
 const emailMax = 254;
 const displayNameMax = 200;
+
+/**
+ * The checks of a member's email and display name, as the server makes
+ * them, for every form that names a member: inviting someone, to the
+ * instance or to a project, and editing a member.
+ */
+export function memberFields(i18n: I18n) {
+  const tooLong = (pointer: string, max: number) =>
+    violationMessage(i18n, { pointer, code: "too_long", detail: "", params: { max } });
+  return {
+    email: z
+      .string()
+      .trim()
+      .min(1, i18n._(msg`Enter an email address.`))
+      .max(emailMax, tooLong("/email", emailMax))
+      .refine(
+        (value) => /^[^\s@]+@[^\s@]+$/.test(value),
+        violationMessage(i18n, { pointer: "/email", code: "invalid_email", detail: "" }),
+      ),
+    display_name: z
+      .string()
+      .trim()
+      .min(1, i18n._(msg`Enter a display name.`))
+      .max(displayNameMax, tooLong("/display_name", displayNameMax)),
+  };
+}
 
 /** The fields of a member an instance admin sets. */
 export type MemberValues = { email: string; display_name: string };
@@ -50,24 +77,7 @@ export function MemberForm({
   onCancel,
 }: MemberFormProps) {
   const { i18n, t } = useLingui();
-  const tooLong = (pointer: string, max: number) =>
-    violationMessage(i18n, { pointer, code: "too_long", detail: "", params: { max } });
-  const schema = z.object({
-    email: z
-      .string()
-      .trim()
-      .min(1, i18n._(msg`Enter an email address.`))
-      .max(emailMax, tooLong("/email", emailMax))
-      .refine(
-        (value) => /^[^\s@]+@[^\s@]+$/.test(value),
-        violationMessage(i18n, { pointer: "/email", code: "invalid_email", detail: "" }),
-      ),
-    display_name: z
-      .string()
-      .trim()
-      .min(1, i18n._(msg`Enter a display name.`))
-      .max(displayNameMax, tooLong("/display_name", displayNameMax)),
-  });
+  const schema = z.object(memberFields(i18n));
   const form = useForm<MemberValues>({ resolver: zodResolver(schema), defaultValues: initial });
   const taken = refusal instanceof ApiError && refusal.code === "already_exists";
   const { errors } = form.formState;
