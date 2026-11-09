@@ -89,21 +89,15 @@ func (a *api) ListProjectInvitations(ctx context.Context, _ ListProjectInvitatio
 	if err != nil {
 		return nil, err
 	}
-	items := make([]ProjectInvitation, 0, len(invited))
-	for _, pi := range invited {
-		g := pi.Invitation.Grant
-		if g == nil {
-			// The store lists only invitations granting a role.
-			continue
-		}
-		item := ProjectInvitation{
+	items := make([]ProjectInvitation, len(invited))
+	for i, pi := range invited {
+		items[i] = ProjectInvitation{
 			Member: openapi_types.UUID(pi.Member.ID.Bytes()), Email: pi.Member.Email, DisplayName: pi.Member.DisplayName,
-			Role: RoleName(g.Role), ExpiresAt: pi.Invitation.ExpiresAt,
+			Role: RoleName(pi.Role), ExpiresAt: pi.ExpiresAt,
 		}
-		if by := pi.Invitation.InvitedBy; !by.IsZero() {
-			item.InvitedBy = new(openapi_types.UUID(by.Bytes()))
+		if !pi.InvitedBy.IsZero() {
+			items[i].InvitedBy = new(openapi_types.UUID(pi.InvitedBy.Bytes()))
 		}
-		items = append(items, item)
 	}
 	return ListProjectInvitations200JSONResponse{Items: items}, nil
 }

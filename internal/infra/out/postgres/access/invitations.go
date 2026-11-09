@@ -130,7 +130,9 @@ func (s *Store) ProjectInvitations(ctx context.Context, project workspace.Projec
 		if scanErr := row.Scan(append(invDest, dest...)...); scanErr != nil {
 			return appaccess.ProjectInvitation{}, scanErr
 		}
-		return appaccess.ProjectInvitation{Invitation: invitation(), Member: member()}, nil
+		// The query keeps only invitations granting a role, so each has one.
+		inv := invitation()
+		return appaccess.ProjectInvitation{Member: member(), Role: inv.Grant.Role, InvitedBy: inv.InvitedBy, ExpiresAt: inv.ExpiresAt}, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("listing a project's invitations: %w", err)

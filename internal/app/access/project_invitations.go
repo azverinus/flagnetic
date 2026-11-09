@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -145,11 +146,14 @@ func (h *InviteToProject) memberToInvite(ctx context.Context, invited access.Mem
 	return existing, "member.invitation_reissued", nil
 }
 
-// ProjectInvitation is a member invited with a role in a project, with the
-// invitation that grants it once accepted.
+// ProjectInvitation is a member invited with a role in a project, which
+// their pending invitation grants once accepted.
 type ProjectInvitation struct {
-	Member     access.Member
-	Invitation access.Invitation
+	Member access.Member
+	Role   access.RoleName
+	// InvitedBy is the member who issued the invitation; zero when none did.
+	InvitedBy access.MemberID
+	ExpiresAt time.Time
 }
 
 // ProjectInvitationDirectory reads who is invited to projects.
