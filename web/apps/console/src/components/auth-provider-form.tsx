@@ -29,6 +29,8 @@ export type AuthProviderFormProps = {
   provider?: AuthProvider;
   /** Whether the form is a dialog's content or a page's. */
   layout: "dialog" | "page";
+  /** Whether a dialog's form takes the focus when it opens; default true. */
+  autoFocus?: boolean;
   onCancel?: () => void;
   /** The provider as it is now. */
   onSaved: (saved: AuthProvider) => void;
@@ -46,6 +48,7 @@ export type AuthProviderFormProps = {
 export function AuthProviderForm({
   provider,
   layout,
+  autoFocus = true,
   onCancel,
   onSaved,
   onReload,
@@ -82,7 +85,7 @@ export function AuthProviderForm({
       >
         <Input
           autoComplete="off"
-          autoFocus={layout === "dialog"}
+          autoFocus={autoFocus && layout === "dialog"}
           {...form.register("display_name")}
         />
       </Field>

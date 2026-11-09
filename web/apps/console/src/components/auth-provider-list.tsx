@@ -6,9 +6,9 @@ import { PlusIcon, PowerIcon, PowerOffIcon, ShieldCheckIcon, Trash2Icon } from "
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { AuthProviderForm } from "@/components/auth-provider-form";
 import { AuthProviderKind, AuthProviderStateBadge } from "@/components/auth-provider-badges";
 import { QueryError } from "@/components/query-error";
+import { NewAuthProvider } from "@/components/new-auth-provider";
 import { DeleteRowDialog, RowAction, withRowActions } from "@/components/row-dialogs";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -21,8 +21,8 @@ import { authProviderApi, authProvidersKey, authProvidersQuery } from "@/lib/aut
 /**
  * The instance's auth providers: which protocol each speaks, whether it is
  * offered on the sign-in page and the email domains it vouches for. Adding
- * an OIDC provider, enabling and disabling one in a click, and deleting one
- * that nothing depends on.
+ * an OIDC or a SAML provider, enabling and disabling one in a click, and
+ * deleting one that nothing depends on.
  */
 export function AuthProviderList() {
   const { t } = useLingui();
@@ -146,13 +146,12 @@ export function AuthProviderList() {
       )}
 
       <Dialog open={creating} onOpenChange={setCreating} title={t`New auth provider`}>
-        <AuthProviderForm
-          layout="dialog"
+        <NewAuthProvider
           onCancel={() => setCreating(false)}
           onSaved={(saved) => {
             setCreating(false);
             void queryClient.invalidateQueries({ queryKey: authMethodsQuery.queryKey });
-            // Its page is where the redirect URI to register is.
+            // Its page is where the addresses to register are.
             void navigate({
               to: "/admin/auth-providers/$provider",
               params: { provider: saved.slug },

@@ -2,12 +2,14 @@ import {
   type AuthProvider,
   type AuthProviderCreateWritable,
   type AuthProviderPatchWritable,
+  completeAuthProviderCertificateRotation,
   createAuthProvider,
   deleteAuthProvider,
   disableAuthProvider,
   enableAuthProvider,
   getAuthProvider,
   listAuthProviders,
+  rotateAuthProviderCertificate,
   testAuthProvider,
   updateAuthProvider,
 } from "@flagnetic/api";
@@ -52,6 +54,11 @@ export const authProviderApi = {
   enable: (slug: string) => unwrap(enableAuthProvider({ path: { provider: slug } })),
   disable: (slug: string) => unwrap(disableAuthProvider({ path: { provider: slug } })),
   test: (slug: string) => unwrap(testAuthProvider({ path: { provider: slug } })),
+  /** Starts a SAML provider's certificate rotation: the next key pair beside the current one. */
+  rotate: (slug: string) => unwrap(rotateAuthProviderCertificate({ path: { provider: slug } })),
+  /** Makes the next key pair current and destroys the retired one. */
+  completeRotation: (slug: string) =>
+    unwrap(completeAuthProviderCertificateRotation({ path: { provider: slug } })),
 };
 
 /** The scopes and claim names a provider is created with unless told otherwise. */
@@ -74,7 +81,7 @@ function domainOf(word: string): string {
 }
 
 /** The domains a field holds, in the form the server stores them. */
-function domainsOf(text: string): string[] {
+export function domainsOf(text: string): string[] {
   return [...new Set(wordsOf(text).map(domainOf))];
 }
 
@@ -141,7 +148,7 @@ export function bodyOf(values: OidcProviderForm): AuthProviderCreateWritable {
   };
 }
 
-function sameList(a: readonly string[], b: readonly string[]): boolean {
+export function sameList(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((item, index) => item === b[index]);
 }
 
@@ -203,7 +210,7 @@ export const pointerOf = {
 type PointedField = keyof typeof pointerOf;
 
 /** Whether pointer is the field's or inside it, as `/domains/2` is inside `/domains`. */
-function within(pointer: string, field: string): boolean {
+export function within(pointer: string, field: string): boolean {
   return pointer === field || pointer.startsWith(`${field}/`);
 }
 
@@ -225,15 +232,33 @@ export function fieldsExplain(refusal: unknown): boolean {
   return refusal.violations.every((v) => fields.some((field) => within(v.pointer, field)));
 }
 
+/** Whether value is an absolute http or https URL. */
+function isHttpURL(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+/** A field holding an absolute http or https URL, asked for with required. */
+export function httpURLField(i18n: I18n, required: string) {
+  return z
+    .string()
+    .trim()
+    .min(1, required)
+    .refine(isHttpURL, i18n._(msg`Enter an absolute URL, such as https://login.example.com.`));
+}
+
 /**
- * The form's checks before it asks the server, in the words the server's
- * violations are shown in. A provider that exists has its slug and keeps
- * its secret, so neither is asked for again.
+ * The checks every kind of provider shares: its slug while it is new, its
+ * name and its domains, in the words the server's violations are shown in.
  */
-export function oidcFormSchema(i18n: I18n, { creating }: { creating: boolean }) {
+export function providerFields(i18n: I18n, { creating }: { creating: boolean }) {
   const violation = (pointer: string, code: string) =>
     violationMessage(i18n, { pointer, code, detail: "" });
-  return z.object({
+  return {
     slug: creating
       ? z
           .string()
@@ -252,21 +277,29 @@ export function oidcFormSchema(i18n: I18n, { creating }: { creating: boolean }) 
       .trim()
       .min(1, i18n._(msg`Enter a name.`))
       .max(200, violation("/display_name", "invalid_display_name")),
-    issuer: z
-      .string()
-      .trim()
-      .min(1, i18n._(msg`Enter the issuer's URL.`))
-      .refine(
-        (value) => {
-          try {
-            const url = new URL(value);
-            return url.protocol === "https:" || url.protocol === "http:";
-          } catch {
-            return false;
-          }
-        },
-        i18n._(msg`Enter an absolute URL, such as https://login.example.com.`),
-      ),
+    domains: z.string().superRefine((value, ctx) => {
+      const domains = domainsOf(value);
+      if (domains.length === 0) {
+        ctx.addIssue({ code: "custom", message: i18n._(msg`Enter at least one email domain.`) });
+      } else if (domains.some((domain) => !domainPattern.test(domain))) {
+        ctx.addIssue({ code: "custom", message: violation("/domains/0", "invalid_domain") });
+      }
+    }),
+    link_by_email: z.boolean(),
+    auto_provision: z.boolean(),
+    enabled: z.boolean(),
+  };
+}
+
+/**
+ * The form's checks before it asks the server, in the words the server's
+ * violations are shown in. A provider that exists has its slug and keeps
+ * its secret, so neither is asked for again.
+ */
+export function oidcFormSchema(i18n: I18n, { creating }: { creating: boolean }) {
+  return z.object({
+    ...providerFields(i18n, { creating }),
+    issuer: httpURLField(i18n, i18n._(msg`Enter the issuer's URL.`)),
     client_id: z
       .string()
       .trim()
@@ -290,18 +323,7 @@ export function oidcFormSchema(i18n: I18n, { creating }: { creating: boolean }) 
       .string()
       .trim()
       .min(1, i18n._(msg`Enter a claim name.`)),
-    domains: z.string().superRefine((value, ctx) => {
-      const domains = domainsOf(value);
-      if (domains.length === 0) {
-        ctx.addIssue({ code: "custom", message: i18n._(msg`Enter at least one email domain.`) });
-      } else if (domains.some((domain) => !domainPattern.test(domain))) {
-        ctx.addIssue({ code: "custom", message: violation("/domains/0", "invalid_domain") });
-      }
-    }),
-    link_by_email: z.boolean(),
-    auto_provision: z.boolean(),
     require_verified_email: z.boolean(),
-    enabled: z.boolean(),
   });
 }
 

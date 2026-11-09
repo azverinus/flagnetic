@@ -66,6 +66,26 @@ describe("the auth provider list", () => {
     expect(screen.getByRole("button", { name: "New provider" })).toBeInTheDocument();
   });
 
+  it("asks for the protocol first, and the fields of a SAML provider once it is chosen", async () => {
+    fakeServer({ "GET /instance/auth-providers": { status: 200, body: { items: [] } } });
+    await renderList();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "New provider" }));
+    const dialog = await screen.findByRole("dialog", { name: "New auth provider" });
+    expect(screen.getByRole("radio", { name: "OpenID Connect" })).toBeChecked();
+    expect(screen.getByLabelText("Issuer")).toBeInTheDocument();
+
+    const saml = screen.getByRole("radio", { name: "SAML" });
+    await user.click(saml);
+
+    expect(saml).toBeChecked();
+    expect(saml).toHaveFocus();
+    expect(screen.queryByLabelText("Issuer")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Metadata URL")).toBeInTheDocument();
+    expect(dialog).toContainElement(screen.getByRole("button", { name: "Add provider" }));
+  });
+
   it("enables and disables a provider in a click", async () => {
     let items = [acme, globex];
     const server = fakeServer({
