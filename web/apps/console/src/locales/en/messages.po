@@ -448,8 +448,8 @@ msgid "A key never changes once it is set."
 msgstr "A key never changes once it is set."
 
 #: src/components/auth-settings-form.tsx
-msgid "A member who forgot their password asks for a reset link by mail from the sign-in page. It works only while an SMTP server is configured under <0>Mail</0>. An instance admin can issue a reset link from a member's page either way."
-msgstr "A member who forgot their password asks for a reset link by mail from the sign-in page. It works only while an SMTP server is configured under <0>Mail</0>. An instance admin can issue a reset link from a member's page either way."
+msgid "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under <0>Mail</0>. An instance admin can issue a password reset link from a member's page either way."
+msgstr "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under <0>Mail</0>. An instance admin can issue a password reset link from a member's page either way."
 
 #: src/lib/project-members.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -509,6 +509,10 @@ msgstr "A password reset link for {name}"
 msgid "A password reset link is issued."
 msgstr "A password reset link is issued."
 
+#: src/components/password-reset-completion.tsx
+msgid "A password reset link works once, for an hour, and ends when the password is changed. Ask for a new link, or sign in if you remember your password."
+msgstr "A password reset link works once, for an hour, and ends when the password is changed. Ask for a new link, or sign in if you remember your password."
+
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "A project owner or an instance admin can grant you a role in it."
 msgstr "A project owner or an instance admin can grant you a role in it."
@@ -545,10 +549,6 @@ msgstr "A replacement key is created with the same kind, name and allowed origin
 #: src/components/tester-panel.tsx
 msgid "A required flag does not serve the variation required: the off variation is served."
 msgstr "A required flag does not serve the variation required: the off variation is served."
-
-#: src/components/password-reset-completion.tsx
-msgid "A reset link works once, for an hour, and ends when the password is changed. Ask for a new link, or sign in if you remember your password."
-msgstr "A reset link works once, for an hour, and ends when the password is changed. Ask for a new link, or sign in if you remember your password."
 
 #: src/components/member-credentials.tsx
 #: src/components/session-list.tsx
@@ -5606,6 +5606,10 @@ msgstr "Self-service password reset"
 msgid "Semantic version"
 msgstr "Semantic version"
 
+#: src/components/password-reset-request.tsx
+msgid "Send a password reset link"
+msgstr "Send a password reset link"
+
 #: src/components/mail-settings.tsx
 msgid "Send a test mail"
 msgstr "Send a test mail"
@@ -5621,10 +5625,6 @@ msgstr "Send it as a bearer token in the Authorization header. Keep it where onl
 #: src/components/webhook-editor.tsx
 msgid "Send only the events of the environments you tick; tick none for every environment. An event of no environment is always sent."
 msgstr "Send only the events of the environments you tick; tick none for every environment. An event of no environment is always sent."
-
-#: src/components/password-reset-request.tsx
-msgid "Send reset link"
-msgstr "Send reset link"
 
 #: src/components/webhook-detail.tsx
 msgid "Send test"
@@ -7066,8 +7066,8 @@ msgid "This instance already has a project with that key."
 msgstr "This instance already has a project with that key."
 
 #: src/components/password-reset-request.tsx
-msgid "This instance does not mail password resets. Ask an instance admin for a reset link."
-msgstr "This instance does not mail password resets. Ask an instance admin for a reset link."
+msgid "This instance does not mail password resets. Ask an instance admin for a password reset link."
+msgstr "This instance does not mail password resets. Ask an instance admin for a password reset link."
 
 #: src/lib/problem-messages.ts
 msgid "This instance does not reach targets on its own network. Use a public address, or ask the operator to allow private networks."
@@ -7134,6 +7134,14 @@ msgstr "This operator does not apply to the attribute's type."
 msgid "This password is too common. Choose another."
 msgstr "This password is too common. Choose another."
 
+#: src/components/password-reset-completion.tsx
+msgid "This password reset link no longer works"
+msgstr "This password reset link no longer works"
+
+#: src/lib/problem-messages.ts
+msgid "This password reset link no longer works: it was used, ended by a password change, or it expired."
+msgstr "This password reset link no longer works: it was used, ended by a password change, or it expired."
+
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "This project already has a flag with that key."
 msgstr "This project already has a flag with that key."
@@ -7186,14 +7194,6 @@ msgstr "This project has no unit type yet."
 #: src/components/auth-provider-detail.tsx
 msgid "This provider is disabled: it is not offered on the sign-in page, and its sign-ins are refused. Its members, identities and grants are kept."
 msgstr "This provider is disabled: it is not offered on the sign-in page, and its sign-ins are refused. Its members, identities and grants are kept."
-
-#: src/components/password-reset-completion.tsx
-msgid "This reset link no longer works"
-msgstr "This reset link no longer works"
-
-#: src/lib/problem-messages.ts
-msgid "This reset link no longer works: it was used, ended by a password change, or it expired."
-msgstr "This reset link no longer works: it was used, ended by a password change, or it expired."
 
 #: src/lib/flag-detail.ts
 msgid "This rule is no longer in the configuration."

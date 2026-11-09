@@ -217,7 +217,7 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
     }
     case "reset_gone":
       return i18n._(
-        msg`This reset link no longer works: it was used, ended by a password change, or it expired.`,
+        msg`This password reset link no longer works: it was used, ended by a password change, or it expired.`,
       );
     case "member_not_active":
       return i18n._(

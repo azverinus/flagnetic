@@ -18,7 +18,7 @@ const answer =
 async function ask(email: string) {
   const user = userEvent.setup();
   await user.type(await screen.findByLabelText("Email"), email);
-  await user.click(screen.getByRole("button", { name: "Send reset link" }));
+  await user.click(screen.getByRole("button", { name: "Send a password reset link" }));
 }
 
 describe("asking for a password reset", () => {
@@ -49,7 +49,9 @@ describe("asking for a password reset", () => {
     const server = fakeServer({ "GET /auth/methods": available });
     await renderWithRouter(() => <PasswordResetRequest />);
 
-    await userEvent.setup().click(await screen.findByRole("button", { name: "Send reset link" }));
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: "Send a password reset link" }));
 
     expect(await screen.findByText("Enter your email.")).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toHaveAttribute("aria-invalid", "true");
@@ -67,7 +69,7 @@ describe("asking for a password reset", () => {
 
     expect(
       await screen.findByText(
-        "This instance does not mail password resets. Ask an instance admin for a reset link.",
+        "This instance does not mail password resets. Ask an instance admin for a password reset link.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
@@ -103,7 +105,7 @@ describe("asking for a password reset", () => {
       expect(await screen.findByRole("heading", { name: "Забыли пароль?" })).toBeVisible();
       const user = userEvent.setup();
       await user.type(await screen.findByLabelText("Электронная почта"), "ada@flagnetic.test");
-      await user.click(screen.getByRole("button", { name: "Отправить ссылку" }));
+      await user.click(screen.getByRole("button", { name: "Отправить ссылку для сброса пароля" }));
 
       await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
     } finally {

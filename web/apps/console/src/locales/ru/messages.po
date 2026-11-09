@@ -448,8 +448,8 @@ msgid "A key never changes once it is set."
 msgstr "Ключ, однажды заданный, больше не меняется."
 
 #: src/components/auth-settings-form.tsx
-msgid "A member who forgot their password asks for a reset link by mail from the sign-in page. It works only while an SMTP server is configured under <0>Mail</0>. An instance admin can issue a reset link from a member's page either way."
-msgstr ""
+msgid "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under <0>Mail</0>. An instance admin can issue a password reset link from a member's page either way."
+msgstr "Участник, забывший пароль, запрашивает сброс пароля по почте со страницы входа. Это работает, только пока SMTP-сервер настроен в разделе <0>Почта</0>. Администратор экземпляра может выпустить ссылку для сброса пароля на странице участника в любом случае."
 
 #: src/lib/project-members.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -509,6 +509,10 @@ msgstr "Ссылка для сброса пароля участника {name}"
 msgid "A password reset link is issued."
 msgstr "Ссылка для сброса пароля выпущена."
 
+#: src/components/password-reset-completion.tsx
+msgid "A password reset link works once, for an hour, and ends when the password is changed. Ask for a new link, or sign in if you remember your password."
+msgstr "Ссылка для сброса пароля срабатывает один раз, действует час и перестаёт работать, когда пароль меняется. Запросите новую ссылку или войдите, если помните пароль."
+
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "A project owner or an instance admin can grant you a role in it."
 msgstr "Выдать вам роль в нём может владелец проекта или администратор экземпляра."
@@ -545,10 +549,6 @@ msgstr "Создаётся ключ на замену с тем же видом,
 #: src/components/tester-panel.tsx
 msgid "A required flag does not serve the variation required: the off variation is served."
 msgstr "Требуемый флаг не отдаёт нужный вариант: отдаётся вариант при выключении."
-
-#: src/components/password-reset-completion.tsx
-msgid "A reset link works once, for an hour, and ends when the password is changed. Ask for a new link, or sign in if you remember your password."
-msgstr ""
 
 #: src/components/member-credentials.tsx
 #: src/components/session-list.tsx
@@ -5606,6 +5606,10 @@ msgstr "Самостоятельный сброс пароля"
 msgid "Semantic version"
 msgstr "Семантическая версия"
 
+#: src/components/password-reset-request.tsx
+msgid "Send a password reset link"
+msgstr "Отправить ссылку для сброса пароля"
+
 #: src/components/mail-settings.tsx
 msgid "Send a test mail"
 msgstr "Отправить тестовое письмо"
@@ -5621,10 +5625,6 @@ msgstr "Передавайте его как токен Bearer в заголов
 #: src/components/webhook-editor.tsx
 msgid "Send only the events of the environments you tick; tick none for every environment. An event of no environment is always sent."
 msgstr "Отправлять только события отмеченных окружений; не отмечайте ничего, чтобы получать события всех окружений. Событие без окружения отправляется всегда."
-
-#: src/components/password-reset-request.tsx
-msgid "Send reset link"
-msgstr ""
 
 #: src/components/webhook-detail.tsx
 msgid "Send test"
@@ -7066,8 +7066,8 @@ msgid "This instance already has a project with that key."
 msgstr "В этом экземпляре уже есть проект с таким ключом."
 
 #: src/components/password-reset-request.tsx
-msgid "This instance does not mail password resets. Ask an instance admin for a reset link."
-msgstr ""
+msgid "This instance does not mail password resets. Ask an instance admin for a password reset link."
+msgstr "Этот экземпляр не отправляет ссылки для сброса пароля по почте. Попросите ссылку для сброса пароля у администратора экземпляра."
 
 #: src/lib/problem-messages.ts
 msgid "This instance does not reach targets on its own network. Use a public address, or ask the operator to allow private networks."
@@ -7134,6 +7134,14 @@ msgstr "Этот оператор не подходит к типу атрибу
 msgid "This password is too common. Choose another."
 msgstr "Этот пароль слишком распространён. Выберите другой."
 
+#: src/components/password-reset-completion.tsx
+msgid "This password reset link no longer works"
+msgstr "Эта ссылка для сброса пароля больше не действует"
+
+#: src/lib/problem-messages.ts
+msgid "This password reset link no longer works: it was used, ended by a password change, or it expired."
+msgstr "Эта ссылка для сброса пароля больше не действует: ею уже воспользовались, пароль с тех пор сменили или срок её действия истёк."
+
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "This project already has a flag with that key."
 msgstr "В этом проекте уже есть флаг с таким ключом."
@@ -7186,14 +7194,6 @@ msgstr "В этом проекте пока нет типов единиц."
 #: src/components/auth-provider-detail.tsx
 msgid "This provider is disabled: it is not offered on the sign-in page, and its sign-ins are refused. Its members, identities and grants are kept."
 msgstr "Провайдер отключён: он не предлагается на странице входа, а входы через него отклоняются. Участники, учётные записи и выданные роли сохраняются."
-
-#: src/components/password-reset-completion.tsx
-msgid "This reset link no longer works"
-msgstr ""
-
-#: src/lib/problem-messages.ts
-msgid "This reset link no longer works: it was used, ended by a password change, or it expired."
-msgstr ""
 
 #: src/lib/flag-detail.ts
 msgid "This rule is no longer in the configuration."

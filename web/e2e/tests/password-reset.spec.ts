@@ -27,7 +27,7 @@ function masked(email: string): string {
   return `${local.charAt(0)}***@${domain}`;
 }
 
-/** The reset link a mail carries. */
+/** The password reset link a mail carries. */
 function linkIn(text: string): string {
   const link = /https?:\/\/\S+\/password-reset\/\S+/.exec(text)?.[0];
   if (!link) throw new Error(`no password reset link in the mail:\n${text}`);
@@ -89,7 +89,7 @@ test.describe("resetting a forgotten password", () => {
     await expect(page.getByRole("heading", { name: "Forgot your password?" })).toBeVisible();
     await expectNoSeriousViolations(page, "the forgotten-password page");
     await page.getByLabel("Email").fill(member.email);
-    await page.getByRole("button", { name: "Send reset link" }).click();
+    await page.getByRole("button", { name: "Send a password reset link" }).click();
     await expect(page.getByRole("status")).toHaveText(sameAnswer);
     await expectNoSeriousViolations(page, "the forgotten-password page once sent");
 
@@ -131,7 +131,7 @@ test.describe("resetting a forgotten password", () => {
     const again = await freshPage(browser);
     await again.goto(pathOf(link));
     await expect(
-      again.getByRole("heading", { name: "This reset link no longer works" }),
+      again.getByRole("heading", { name: "This password reset link no longer works" }),
     ).toBeVisible();
     await expect(again.getByLabel("New password", { exact: true })).toHaveCount(0);
     await expectNoSeriousViolations(again, "a password reset link that no longer works");
@@ -145,7 +145,7 @@ test.describe("resetting a forgotten password", () => {
     const nobody = `nobody-${Date.now().toString(36)}@flagnetic.test`;
     await page.goto("/forgot-password");
     await page.getByLabel("Email").fill(nobody);
-    await page.getByRole("button", { name: "Send reset link" }).click();
+    await page.getByRole("button", { name: "Send a password reset link" }).click();
 
     await expect(page.getByRole("status")).toHaveText(sameAnswer);
     expect(await mailsTo(nobody)).toEqual([]);
@@ -172,7 +172,7 @@ test.describe("resetting a forgotten password", () => {
       await visitor.goto("/forgot-password");
       await expect(
         visitor.getByText(
-          "This instance does not mail password resets. Ask an instance admin for a reset link.",
+          "This instance does not mail password resets. Ask an instance admin for a password reset link.",
         ),
       ).toBeVisible();
       await expect(visitor.getByLabel("Email")).toHaveCount(0);
@@ -182,7 +182,7 @@ test.describe("resetting a forgotten password", () => {
     }
   });
 
-  test("lets an instance admin issue a reset link, shown once, for an active member only", async ({
+  test("lets an instance admin issue a password reset link, shown once, for an active member only", async ({
     page,
     browser,
   }) => {
@@ -232,13 +232,13 @@ test.describe("resetting a forgotten password", () => {
     await page.getByRole("link", { name: "Забыли пароль?" }).click();
     await expect(page.getByRole("heading", { name: "Забыли пароль?" })).toBeVisible();
     await page.getByLabel("Электронная почта").fill("nobody@flagnetic.test");
-    await page.getByRole("button", { name: "Отправить ссылку" }).click();
+    await page.getByRole("button", { name: "Отправить ссылку для сброса пароля" }).click();
     await expect(page.getByRole("status")).toContainText("ссылка для сброса уже в пути");
     await expectNoSeriousViolations(page, "the forgotten-password page in Russian");
 
     await page.goto("/password-reset/not-a-secret-anyone-issued");
     await expect(
-      page.getByRole("heading", { name: "Эта ссылка для сброса больше не действует" }),
+      page.getByRole("heading", { name: "Эта ссылка для сброса пароля больше не действует" }),
     ).toBeVisible();
     await expectNoSeriousViolations(page, "a gone password reset link in Russian");
     await context.close();

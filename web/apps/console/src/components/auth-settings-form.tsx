@@ -176,12 +176,13 @@ export function AuthSettingsForm({ settings }: { settings: AuthSettings }) {
                 </Label>
                 <p id={`${selfServiceReset}-hint`} className="text-sm text-muted-foreground">
                   <Trans>
-                    A member who forgot their password asks for a reset link by mail from the
+                    A member who forgot their password asks for a password reset by mail from the
                     sign-in page. It works only while an SMTP server is configured under{" "}
                     <Link to="/admin/mail" className="font-medium underline">
                       Mail
                     </Link>
-                    . An instance admin can issue a reset link from a member's page either way.
+                    . An instance admin can issue a password reset link from a member's page either
+                    way.
                   </Trans>
                 </p>
               </div>

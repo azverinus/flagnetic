@@ -148,12 +148,12 @@ function ResetGone() {
   return (
     <div className="flex flex-col gap-3">
       <h1 className="text-xl font-semibold">
-        <Trans>This reset link no longer works</Trans>
+        <Trans>This password reset link no longer works</Trans>
       </h1>
       <p className="text-sm text-muted-foreground">
         <Trans>
-          A reset link works once, for an hour, and ends when the password is changed. Ask for a new
-          link, or sign in if you remember your password.
+          A password reset link works once, for an hour, and ends when the password is changed. Ask
+          for a new link, or sign in if you remember your password.
         </Trans>
       </p>
       <div className="flex flex-wrap gap-2">

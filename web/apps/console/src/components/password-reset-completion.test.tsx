@@ -92,7 +92,7 @@ describe("completing a password reset", () => {
     await renderWithRouter(() => <PasswordResetCompletion secret="used" onReset={() => {}} />);
 
     expect(
-      await screen.findByRole("heading", { name: "This reset link no longer works" }),
+      await screen.findByRole("heading", { name: "This password reset link no longer works" }),
     ).toBeVisible();
     expect(screen.getByText(/works once, for an hour/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Ask for a new link" })).toHaveAttribute(
@@ -113,7 +113,7 @@ describe("completing a password reset", () => {
     await choose("violet-harbour-lantern-4471");
 
     expect(
-      await screen.findByRole("heading", { name: "This reset link no longer works" }),
+      await screen.findByRole("heading", { name: "This password reset link no longer works" }),
     ).toBeVisible();
   });
 

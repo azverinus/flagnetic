@@ -40,7 +40,8 @@ export function PasswordResetRequest() {
         <>
           <p className="text-sm text-muted-foreground">
             <Trans>
-              This instance does not mail password resets. Ask an instance admin for a reset link.
+              This instance does not mail password resets. Ask an instance admin for a password
+              reset link.
             </Trans>
           </p>
           <BackToSignIn />
@@ -117,7 +118,7 @@ function RequestForm() {
           <Input type="email" autoComplete="username" autoFocus {...form.register("email")} />
         </Field>
         <Button type="submit" disabled={send.isPending}>
-          {send.isPending ? <Trans>Sending…</Trans> : <Trans>Send reset link</Trans>}
+          {send.isPending ? <Trans>Sending…</Trans> : <Trans>Send a password reset link</Trans>}
         </Button>
       </form>
       <BackToSignIn />
