@@ -24,6 +24,7 @@ import {
 import { choose, seedFlag, stringFlag, writeConfiguration } from "../support/flags";
 import { admin } from "../support/instance";
 import { runningExperimentInProduction } from "../support/experiments";
+import { configureSmtp, removeSmtp } from "../support/mailpit";
 import { sdkRequest, seedSdkKey } from "../support/sdk";
 
 /**
@@ -646,6 +647,33 @@ test.describe("the console in Russian", () => {
     await expect(page.getByText(/Провайдер отключён/)).toBeVisible();
     await expect(page.getByText("/sso/acme-ru/callback")).toBeVisible();
     await expectNoSeriousViolations(page, "an auth provider's page in Russian");
+  });
+
+  test("reads the mail settings, a failed test mail and the removal in Russian", async ({
+    page,
+  }) => {
+    // A wrong password: the test mail fails at authentication.
+    await configureSmtp("not-the-relay-password");
+    try {
+      await signIn(page, admin, russian);
+      await page.goto("/admin/mail");
+
+      await expect(page.getByRole("heading", { name: "Почта", level: 1 })).toBeVisible();
+      await expect(page.getByText(/Пароль сохранён и больше не показывается/)).toBeVisible();
+      await page.getByRole("button", { name: "Отправить тестовое письмо" }).click();
+      await expect(page.getByRole("alert")).toHaveText(
+        "SMTP-сервер отклонил имя пользователя и пароль. Проверьте их, затем сохраните и проверьте снова.",
+      );
+      await expectNoSeriousViolations(page, "the mail settings in Russian");
+
+      await page.getByRole("button", { name: "Удалить", exact: true }).click();
+      const dialog = page.getByRole("dialog", { name: "Удаление SMTP-сервера" });
+      await expect(dialog).toContainText("Экземпляр перестанет отправлять почту");
+      await dialog.getByRole("button", { name: "Удалить SMTP-сервер" }).click();
+      await expect(page.getByText(/SMTP-сервер не настроен/)).toBeVisible();
+    } finally {
+      await removeSmtp();
+    }
   });
 
   test("explains a failed single sign-on on the sign-in page in Russian", async ({ page }) => {

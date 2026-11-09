@@ -9,6 +9,7 @@ import {
 } from "@flagnetic/api";
 
 import { startDex, stopDex } from "./support/dex";
+import { startMailpit, stopMailpit } from "./support/mailpit";
 import {
   bootstrap,
   build,
@@ -21,10 +22,11 @@ import {
 } from "./support/instance";
 
 /**
- * Builds the console and the binary that embeds it, starts Dex in Docker,
- * starts the binary against PostgreSQL with the test clock, bootstraps an
- * instance admin through the CLI, and seeds through the management API with
- * the generated client: two projects and a viewer of the first.
+ * Builds the console and the binary that embeds it, starts Dex and Mailpit
+ * in Docker, starts the binary against PostgreSQL with the test clock,
+ * bootstraps an instance admin through the CLI, and seeds through the
+ * management API with the generated client: two projects and a viewer of
+ * the first.
  */
 export default async function globalSetup(): Promise<void> {
   const binary = await build();
@@ -34,6 +36,9 @@ export default async function globalSetup(): Promise<void> {
   const port = await freePort();
   await startDex(`http://127.0.0.1:${port}`);
   try {
+    // Nothing mails until a spec configures the SMTP server; Mailpit only
+    // waits for it.
+    await startMailpit();
     const { baseURL } = await serve(binary, port);
     const client = createClient(
       createConfig({
@@ -87,6 +92,7 @@ export default async function globalSetup(): Promise<void> {
     remember({ baseURL, token });
   } catch (error) {
     // A failed setup is not followed by the teardown.
+    await stopMailpit();
     await stopDex();
     throw error;
   }

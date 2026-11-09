@@ -106,6 +106,7 @@ const signedIn: Route[] = [
     route: "/admin/auth-providers/$provider",
     path: (s: Seeded) => `/admin/auth-providers/${s.authProvider}`,
   },
+  { name: "instance mail", route: "/admin/mail", path: () => "/admin/mail" },
   { name: "instance audit log", route: "/admin/audit", path: () => "/admin/audit" },
   { name: "instance webhooks", route: "/admin/webhooks", path: () => "/admin/webhooks" },
   ...["settings", "deliveries"].map((tab) => ({

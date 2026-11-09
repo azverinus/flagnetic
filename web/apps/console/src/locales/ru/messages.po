@@ -477,6 +477,14 @@ msgstr "Новый проект создаётся с окружениями dev
 msgid "A new secret signs from now on. The one it replaces keeps signing beside it for a day, so the receiver can switch to the new secret without refusing an event."
 msgstr "Подписывать начнёт новый секрет. Прежний подписывает ещё сутки рядом с ним, поэтому получатель может перейти на новый секрет, не отклонив ни одного события."
 
+#: src/components/mail-settings.tsx
+msgid "A password is stored and never shown again. Leave this empty to keep it, or type a new one to replace it. Clearing the username removes both."
+msgstr "Пароль сохранён и больше не показывается. Оставьте поле пустым, чтобы сохранить его, или введите новый, чтобы заменить. Если очистить имя пользователя, будут удалены оба."
+
+#: src/lib/problem-messages.ts
+msgid "A password needs a username."
+msgstr "Для пароля нужно имя пользователя."
+
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "A project owner or an instance admin can grant you a role in it."
 msgstr "Выдать вам роль в нём может владелец проекта или администратор экземпляра."
@@ -619,6 +627,14 @@ msgstr "ID единицы — не более {max} байт."
 #: src/lib/experiment-health.ts
 msgid "A unit ID is at most 256 bytes."
 msgstr "ID единицы — не более 256 байт."
+
+#: src/lib/problem-messages.ts
+msgid "A username and password are sent only over STARTTLS or TLS, unless the SMTP server is this machine."
+msgstr "Имя пользователя и пароль отправляются только через STARTTLS или TLS, если SMTP-сервер не находится на этой же машине."
+
+#: src/lib/problem-messages.ts
+msgid "A username needs a password."
+msgstr "Для имени пользователя нужен пароль."
 
 #: src/components/condition-row.tsx
 msgid "A value, then Enter"
@@ -1514,6 +1530,10 @@ msgid "Choose one of the offered scopes."
 msgstr "Выберите одну из предложенных областей доступа."
 
 #: src/lib/problem-messages.ts
+msgid "Choose one of the offered security modes."
+msgstr "Выберите один из предложенных режимов защиты."
+
+#: src/lib/problem-messages.ts
 msgid "Choose one of the offered types."
 msgstr "Выберите один из предложенных типов."
 
@@ -2268,6 +2288,10 @@ msgid "Enter a full semantic version, such as 1.41.0."
 msgstr "Введите полную семантическую версию, например 1.41.0."
 
 #: src/lib/problem-messages.ts
+msgid "Enter a host name or address of at most 253 characters, without spaces."
+msgstr "Введите имя хоста или адрес не длиннее 253 символов, без пробелов."
+
+#: src/lib/problem-messages.ts
 msgid "Enter a name of 1 to 200 characters."
 msgstr "Введите название от 1 до 200 символов."
 
@@ -2317,6 +2341,10 @@ msgstr "Введите заголовок."
 #: src/lib/experiment-health.ts
 msgid "Enter a unit ID."
 msgstr "Введите ID единицы."
+
+#: src/lib/problem-messages.ts
+msgid "Enter a username of at most 256 characters on one line."
+msgstr "Введите имя пользователя не длиннее 256 символов в одну строку."
 
 #: src/lib/problem-messages.ts
 msgid "Enter a valid email address."
@@ -2371,6 +2399,10 @@ msgstr "Введите JSON, отличный от null."
 msgid "Enter more than {from} %: the traffic allocation only grows."
 msgstr "Введите больше {from} %: охват только растёт."
 
+#: src/lib/problem-messages.ts
+msgid "Enter one address, optionally with a name, such as Flagnetic <flags@example.com>."
+msgstr "Введите один адрес, при необходимости с именем, например Flagnetic <flags@example.com>."
+
 #: src/lib/auth-providers.ts
 msgid "Enter the client ID."
 msgstr "Введите идентификатор клиента."
@@ -2386,6 +2418,14 @@ msgstr "Введите http- или https-адрес провайдера иде
 #: src/lib/auth-providers.ts
 msgid "Enter the issuer's URL."
 msgstr "Введите URL эмитента."
+
+#: src/lib/mail-settings.ts
+msgid "Enter the sender's address."
+msgstr "Введите адрес отправителя."
+
+#: src/lib/mail-settings.ts
+msgid "Enter the SMTP server's host name or address."
+msgstr "Введите имя хоста или адрес SMTP-сервера."
 
 #: src/lib/flag-detail.ts
 msgid "Enter the unit's ID."
@@ -3048,6 +3088,10 @@ msgstr "История флага"
 msgid "Holding environments"
 msgstr "Окружения с правилом"
 
+#: src/components/mail-settings.tsx
+msgid "Host"
+msgstr "Хост"
+
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "How code names the flag, such as checkout.newFlow: letters, digits, ., - and _. It never changes."
 msgstr "Имя флага в коде, например checkout.newFlow: буквы, цифры, ., - и _. Не меняется."
@@ -3422,6 +3466,10 @@ msgstr "Последний ответ"
 msgid "Leave"
 msgstr "Уйти"
 
+#: src/components/mail-settings.tsx
+msgid "Leave empty when the server takes mail without signing in."
+msgstr "Оставьте пустым, если сервер принимает почту без входа."
+
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Leave without saving?"
 msgstr "Уйти без сохранения?"
@@ -3514,6 +3562,12 @@ msgstr "Назначен администратором экземпляра"
 #: src/components/structural-diff-view.tsx
 msgid "Made private."
 msgstr "Сделан приватным."
+
+#: src/components/mail-settings.tsx
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/admin/mail.tsx
+msgid "Mail"
+msgstr "Почта"
 
 #. The name of a built-in role.
 #: src/lib/access-names.ts
@@ -4004,6 +4058,14 @@ msgstr "За эти дни ни один SDK не сообщил о вычисл
 msgid "No segment matches these filters."
 msgstr "Нет сегментов, подходящих под эти фильтры."
 
+#: src/components/mail-settings.tsx
+msgid "No SMTP server is configured, so the instance mails nothing, and members cannot reset a forgotten password themselves."
+msgstr "SMTP-сервер не настроен, поэтому экземпляр ничего не отправляет по почте, а участники не могут сами сбросить забытый пароль."
+
+#: src/lib/mail-settings.ts
+msgid "No SMTP server is configured. Save the settings first."
+msgstr "SMTP-сервер не настроен. Сначала сохраните настройки."
+
 #: src/components/discovered-attributes.tsx
 msgid "No undeclared attribute has been seen."
 msgstr "Необъявленных атрибутов пока не встречалось."
@@ -4056,6 +4118,10 @@ msgstr "не выбран"
 #: src/lib/sdk-keys.ts
 msgid "None, end the old key now"
 msgstr "Нет, отключить старый ключ сразу"
+
+#: src/components/mail-settings.tsx
+msgid "None, usually port 25"
+msgstr "Нет, обычно порт 25"
 
 #: src/components/experiment-exposures.tsx
 msgid "Not checked yet: a running experiment is checked every 10 minutes in each environment holding its rule, and once more at its stop."
@@ -4405,6 +4471,7 @@ msgid "Part"
 msgstr "Часть"
 
 #: src/components/invitation-acceptance.tsx
+#: src/components/mail-settings.tsx
 #: src/components/session-list.tsx
 #: src/components/sign-in-form.tsx
 #: src/routes/_signed-in/settings/profile.tsx
@@ -4467,6 +4534,10 @@ msgstr "Методы PKCE"
 #: src/components/sdk-inventory.tsx
 msgid "Platform"
 msgstr "Платформа"
+
+#: src/components/mail-settings.tsx
+msgid "Port"
+msgstr "Порт"
 
 #: src/components/tester-panel.tsx
 msgid "Prerequisite"
@@ -4783,6 +4854,10 @@ msgstr "Перезагрузить и перенести мой черновик
 msgid "Remote evaluations"
 msgstr "Удалённые вычисления"
 
+#: src/components/mail-settings.tsx
+msgid "Remove"
+msgstr "Удалить"
+
 #: src/components/condition-row.tsx
 msgid "Remove {entry}"
 msgstr "Удалить {entry}"
@@ -4811,6 +4886,10 @@ msgstr "Удалить предусловие {position}"
 msgid "Remove rule {position}"
 msgstr "Удалить правило {position}"
 
+#: src/components/mail-settings.tsx
+msgid "Remove SMTP server"
+msgstr "Удалить SMTP-сервер"
+
 #: src/components/tags-input.tsx
 msgid "Remove tag {tag}"
 msgstr "Удалить тег {tag}"
@@ -4818,6 +4897,10 @@ msgstr "Удалить тег {tag}"
 #: src/components/overrides-section.tsx
 msgid "Remove the override of {unit}"
 msgstr "Удалить переопределение {unit}"
+
+#: src/components/mail-settings.tsx
+msgid "Remove the SMTP server"
+msgstr "Удаление SMTP-сервера"
 
 #: src/components/tester-panel.tsx
 msgid "Remove unit {n}"
@@ -5124,6 +5207,7 @@ msgstr "Нарушение соотношения выборки"
 #: src/components/auth-provider-form.tsx
 #: src/components/auth-settings-form.tsx
 #: src/components/change-request-actions.tsx
+#: src/components/mail-settings.tsx
 #: src/components/member-actions.tsx
 #: src/components/profile-form.tsx
 #: src/components/sdk-keys.tsx
@@ -5223,6 +5307,10 @@ msgstr "Поиск"
 msgid "Search projects"
 msgstr "Поиск проектов"
 
+#: src/components/mail-settings.tsx
+msgid "Security"
+msgstr "Защита"
+
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
@@ -5262,6 +5350,10 @@ msgstr "Сегменты"
 msgid "Semantic version"
 msgstr "Семантическая версия"
 
+#: src/components/mail-settings.tsx
+msgid "Send a test mail"
+msgstr "Отправить тестовое письмо"
+
 #: src/components/project-token-list.tsx
 msgid "Send it as a bearer token in the Authorization header. Keep it where only the pipeline that uses it can read it."
 msgstr "Передавайте его как токен Bearer в заголовке Authorization. Храните его там, где его может прочитать только конвейер, который им пользуется."
@@ -5277,6 +5369,18 @@ msgstr "Отправлять только события отмеченных о
 #: src/components/webhook-detail.tsx
 msgid "Send test"
 msgstr "Отправить тест"
+
+#: src/components/mail-settings.tsx
+msgid "Sender"
+msgstr "Отправитель"
+
+#: src/components/mail-settings.tsx
+msgid "Sending a test mail through the saved settings…"
+msgstr "Отправляем тестовое письмо через сохранённые настройки…"
+
+#: src/components/mail-settings.tsx
+msgid "Sending…"
+msgstr "Отправляем…"
 
 #: src/components/webhook-detail.tsx
 msgid "Sent"
@@ -5344,6 +5448,10 @@ msgstr "Тайм-аут бездействия сеанса"
 #: src/routes/_signed-in/settings/sessions.tsx
 msgid "Sessions"
 msgstr "Сеансы"
+
+#: src/lib/mail-settings.ts
+msgid "Set the instance's public address first (FLAGNETIC_BASE_URL): every link the instance mails is built from it."
+msgstr "Сначала задайте публичный адрес экземпляра (FLAGNETIC_BASE_URL): из него строится каждая ссылка, которую экземпляр отправляет по почте."
 
 #: src/lib/problem-messages.ts
 msgid "Set the instance's public address first (FLAGNETIC_BASE_URL): the redirect URI the identity provider is told is built from it."
@@ -5565,6 +5673,14 @@ msgstr "Запускает эксперимент: он попадает в на
 msgid "starts with"
 msgstr "начинается с"
 
+#: src/components/mail-settings.tsx
+msgid "STARTTLS and TLS need TLS 1.2 or later and verify the server's certificate. With none, nothing is encrypted, and a username and password are sent only to a server on this machine."
+msgstr "STARTTLS и TLS требуют TLS 1.2 или новее и проверяют сертификат сервера. Без защиты ничего не шифруется, а имя пользователя и пароль отправляются только серверу на этой же машине."
+
+#: src/components/mail-settings.tsx
+msgid "STARTTLS, usually port 587"
+msgstr "STARTTLS, обычно порт 587"
+
 #: src/components/token-list.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -5618,6 +5734,7 @@ msgid "Stops the experiment and ships the winner <0>{winner}</0>."
 msgstr "Останавливает эксперимент и выкатывает победителя <0>{winner}</0>."
 
 #: src/components/auth-provider-form.tsx
+#: src/components/mail-settings.tsx
 msgid "Stored encrypted and never shown again."
 msgstr "Хранится в зашифрованном виде и больше не показывается."
 
@@ -6100,9 +6217,21 @@ msgstr "Провайдеры идентификации, через которы
 msgid "The idle timeout cannot be longer than the absolute timeout."
 msgstr "Тайм-аут бездействия не может быть больше абсолютного тайм-аута."
 
+#: src/lib/mail-settings.ts
+msgid "The instance could not reach the SMTP server, or the connection broke. Check the host and the port, and that the server accepts connections from the instance."
+msgstr "Экземпляр не смог подключиться к SMTP-серверу, или соединение оборвалось. Проверьте хост и порт, а также что сервер принимает подключения от экземпляра."
+
+#: src/components/mail-settings.tsx
+msgid "The instance stops mailing, and members can no longer reset a forgotten password themselves. The stored password is deleted."
+msgstr "Экземпляр перестанет отправлять почту, а участники больше не смогут сами сбросить забытый пароль. Сохранённый пароль удаляется."
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
 msgstr "Виды единиц, которым отдаётся флаг, например пользователь или устройство. Ключ не должен совпадать с ключами атрибутов и никогда не меняется."
+
+#: src/components/mail-settings.tsx
+msgid "The mail settings are saved."
+msgstr "Настройки почты сохранены."
 
 #: src/components/experiment-fields.tsx
 msgid "The member accountable for the experiment."
@@ -6333,6 +6462,10 @@ msgstr "SDK, которые запрашивали у этого окружен�
 msgid "The secret it replaces keeps signing beside this one for a day, so the receiver can take the new one without refusing an event."
 msgstr "Прежний секрет подписывает ещё сутки рядом с этим, поэтому получатель может перейти на новый, не отклонив ни одного события."
 
+#: src/lib/mail-settings.ts
+msgid "The secure connection to the SMTP server failed: it does not offer STARTTLS, or the TLS handshake or its certificate failed. Check the security and the port."
+msgstr "Не удалось установить защищённое соединение с SMTP-сервером: он не предлагает STARTTLS, или не прошло TLS-рукопожатие либо проверка его сертификата. Проверьте режим защиты и порт."
+
 #: src/lib/problem-messages.ts
 msgid "the segment {key}"
 msgstr "сегмент {key}"
@@ -6388,6 +6521,38 @@ msgstr "Сайты, откуда можно использовать ключ, �
 #: src/components/auth-provider-form.tsx
 msgid "The slug never changes."
 msgstr "Слаг никогда не меняется."
+
+#: src/components/mail-settings.tsx
+msgid "The SMTP server accepted a test mail to {recipient}. Check that it arrived."
+msgstr "SMTP-сервер принял тестовое письмо для {recipient}. Проверьте, что оно пришло."
+
+#: src/lib/mail-settings.ts
+msgid "The SMTP server did not accept the test mail."
+msgstr "SMTP-сервер не принял тестовое письмо."
+
+#: src/components/mail-settings.tsx
+msgid "The SMTP server is removed."
+msgstr "SMTP-сервер удалён."
+
+#: src/lib/mail-settings.ts
+msgid "The SMTP server refused the sender, the recipient or the mail. Check that the server accepts mail from the sender address and to your address."
+msgstr "SMTP-сервер отклонил отправителя, получателя или само письмо. Проверьте, что сервер принимает почту от адреса отправителя и на ваш адрес."
+
+#: src/lib/mail-settings.ts
+msgid "The SMTP server refused the username and password. Check them, then save and test again."
+msgstr "SMTP-сервер отклонил имя пользователя и пароль. Проверьте их, затем сохраните и проверьте снова."
+
+#: src/components/mail-settings.tsx
+msgid "The SMTP server the instance sends its mail through."
+msgstr "SMTP-сервер, через который экземпляр отправляет почту."
+
+#: src/components/mail-settings.tsx
+msgid "The SMTP server's host name or address."
+msgstr "Имя хоста или адрес SMTP-сервера."
+
+#: src/components/mail-settings.tsx
+msgid "The test mail goes to {recipient} through the saved settings."
+msgstr "Тестовое письмо уходит на {recipient} через сохранённые настройки."
 
 #: src/lib/problem-messages.ts
 msgid "The token in use does not carry the scope this needs."
@@ -6677,6 +6842,10 @@ msgstr "Раз встречался"
 msgid "Title"
 msgstr "Заголовок"
 
+#: src/components/mail-settings.tsx
+msgid "TLS from the first byte, usually port 465"
+msgstr "TLS с первого байта, обычно порт 465"
+
 #: src/components/audit-log.tsx
 #: src/components/webhook-deliveries.tsx
 msgid "To"
@@ -6924,6 +7093,10 @@ msgstr "Используют флаги и сегменты"
 msgid "User info endpoint"
 msgstr "Точка сведений о пользователе"
 
+#: src/components/mail-settings.tsx
+msgid "Username"
+msgstr "Имя пользователя"
+
 #: src/components/tester-panel.tsx
 #: src/components/variations-editor.tsx
 msgid "Value"
@@ -7161,6 +7334,10 @@ msgstr "Какой вариант эксперимент даёт единице
 #: src/components/rule-editor.tsx
 msgid "While the experiment is a draft, SDKs do not receive this rule: units continue to the next rule until it starts."
 msgstr "Пока эксперимент в черновике, SDK не получают это правило: единицы переходят к следующему правилу, пока он не запущен."
+
+#: src/components/mail-settings.tsx
+msgid "Who every mail comes from: one address, optionally with a name, such as Flagnetic <flags@example.com>."
+msgstr "От кого приходит каждое письмо: один адрес, при необходимости с именем, например Flagnetic <flags@example.com>."
 
 #: src/components/experiment-alerts.tsx
 msgid "Whole experiment"
