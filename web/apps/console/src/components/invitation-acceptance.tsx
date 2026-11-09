@@ -162,8 +162,8 @@ function InvitedBy({ invitation }: { invitation: Invitation }) {
     const projectName = project.name;
     sentence = inviter ? (
       <Trans>
-        {inviter} invites you to the project {projectName} as {role}. Accepting grants you that
-        role there.
+        {inviter} invites you to the project {projectName} as {role}. Accepting grants you that role
+        there.
       </Trans>
     ) : (
       <Trans>
