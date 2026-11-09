@@ -343,7 +343,8 @@ func TestAnInvitationToAnEnforcedDomainIsNotAcceptedWithAPassword(t *testing.T) 
 		t.Fatal(err)
 	}
 	wantRefused(t, "accepting with a password", accepted.StatusCode(), accepted.Body, accepted.ApplicationproblemJSON403, http.StatusForbidden, "sso_required", corp)
-	if again, err := anyone.GetInvitationWithResponse(t.Context(), carol); err != nil || again.JSON200 == nil {
+	again, err := anyone.GetInvitationWithResponse(t.Context(), carol)
+	if err != nil || again.JSON200 == nil {
 		t.Errorf("the invitation after the refusal = %v: %v; want it open still", again.StatusCode(), err)
 	}
 
