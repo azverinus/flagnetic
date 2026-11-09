@@ -1,4 +1,4 @@
-import type { AuthSettings, Violation } from "@flagnetic/api";
+import type { AuthSettings, SsoEnforcedDomain, Violation } from "@flagnetic/api";
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { z } from "zod";
@@ -59,6 +59,10 @@ export type AuthSettingsValues = Record<DurationField, Duration> & {
   password_min_length: string;
   /** Not edited here: the form sends back what it was given, as the server replaces every setting. */
   self_service_password_reset: boolean;
+  /** Not edited here, sent back as given. */
+  local_login_enabled: boolean;
+  /** Not edited here, sent back as given. */
+  sso_enforced_domains: SsoEnforcedDomain[];
 };
 
 /** The form's fields that hold a duration. */
@@ -77,6 +81,8 @@ export const pointerOf: Record<keyof AuthSettingsValues, string> = {
   token_expiry_required: "/token_expiry_required",
   password_min_length: "/password_min_length",
   self_service_password_reset: "/self_service_password_reset",
+  local_login_enabled: "/local_login_enabled",
+  sso_enforced_domains: "/sso_enforced_domains",
 };
 
 export function formOf(settings: AuthSettings): AuthSettingsValues {
@@ -87,6 +93,8 @@ export function formOf(settings: AuthSettings): AuthSettingsValues {
     token_expiry_required: settings.token_expiry_required,
     password_min_length: String(settings.password_min_length),
     self_service_password_reset: settings.self_service_password_reset,
+    local_login_enabled: settings.local_login_enabled,
+    sso_enforced_domains: settings.sso_enforced_domains,
   };
 }
 
@@ -99,6 +107,8 @@ export function settingsOf(values: AuthSettingsValues): AuthSettings {
     token_expiry_required: values.token_expiry_required,
     password_min_length: Number(values.password_min_length.trim()),
     self_service_password_reset: values.self_service_password_reset,
+    local_login_enabled: values.local_login_enabled,
+    sso_enforced_domains: values.sso_enforced_domains,
   };
 }
 
@@ -144,6 +154,8 @@ export function authSettingsSchema(i18n: I18n) {
       token_expiry_required: z.boolean(),
       password_min_length: z.string(),
       self_service_password_reset: z.boolean(),
+      local_login_enabled: z.boolean(),
+      sso_enforced_domains: z.array(z.object({ domain: z.string(), provider: z.string() })),
     })
     .superRefine((values, context) => {
       for (const field of durationFields) {

@@ -169,7 +169,7 @@ func TestAdminBootstrapRefusesAWrongCommandLine(t *testing.T) {
 		"unknown flag":    {"admin", "bootstrap", "--email", "a@example.com", "--admin"},
 		"stray argument":  {"admin", "bootstrap", "--email", "a@example.com", "extra"},
 		"invalid email":   {"admin", "bootstrap", "--email", "not-an-email"},
-		"unknown command": {"admin", "unlock"},
+		"unknown command": {"admin", "lock"},
 		"no command":      {"admin"},
 	} {
 		if name == "invalid email" {
