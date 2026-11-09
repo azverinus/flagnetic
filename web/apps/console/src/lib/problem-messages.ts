@@ -411,6 +411,25 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
       return i18n._(msg`A scope is a word without spaces.`);
     case "invalid_claim":
       return i18n._(msg`Enter a claim name of 1 to 256 characters.`);
+    case "invalid_host":
+      return i18n._(msg`Enter a host name or address of at most 253 characters, without spaces.`);
+    case "unknown_security":
+      return i18n._(msg`Choose one of the offered security modes.`);
+    case "invalid_sender":
+      return i18n._(
+        msg`Enter one address, optionally with a name, such as Flagnetic <flags@example.com>.`,
+      );
+    case "invalid_username":
+      return i18n._(msg`Enter a username of at most 256 characters on one line.`);
+    case "credentials_together":
+      // The server names the field that is missing its partner.
+      return violation.pointer === "/username"
+        ? i18n._(msg`A password needs a username.`)
+        : i18n._(msg`A username needs a password.`);
+    case "insecure_credentials":
+      return i18n._(
+        msg`A username and password are sent only over STARTTLS or TLS, unless the SMTP server is this machine.`,
+      );
     case "too_soon":
       return i18n._(msg`Choose a later time: the server needs some lead to apply it.`);
     case "too_late":
