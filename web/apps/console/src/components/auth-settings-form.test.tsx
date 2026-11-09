@@ -134,7 +134,6 @@ describe("the auth settings form", () => {
     const toggle = screen.getByRole("switch", { name: "Self-service password reset" });
     expect(toggle).toBeChecked();
     expect(toggle).toHaveAccessibleDescription(/only while an SMTP server is configured/);
-    expect(screen.getByRole("link", { name: "Mail" })).toHaveAttribute("href", "/admin/mail");
     const user = userEvent.setup();
     await user.click(toggle);
     await user.click(screen.getByRole("button", { name: "Save" }));

@@ -2,7 +2,6 @@ import { type AuthSettings, updateAuthSettings } from "@flagnetic/api";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import { useEffect, useId, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -177,12 +176,9 @@ export function AuthSettingsForm({ settings }: { settings: AuthSettings }) {
                 <p id={`${selfServiceReset}-hint`} className="text-sm text-muted-foreground">
                   <Trans>
                     A member who forgot their password asks for a password reset by mail from the
-                    sign-in page. It works only while an SMTP server is configured under{" "}
-                    <Link to="/admin/mail" className="font-medium underline">
-                      Mail
-                    </Link>
-                    . An instance admin can issue a password reset link from a member's page either
-                    way.
+                    sign-in page. It works only while an SMTP server is configured under Mail in the
+                    instance navigation. An instance admin can issue a password reset link from a
+                    member's page either way.
                   </Trans>
                 </p>
               </div>

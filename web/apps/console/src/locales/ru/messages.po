@@ -448,8 +448,8 @@ msgid "A key never changes once it is set."
 msgstr "Ключ, однажды заданный, больше не меняется."
 
 #: src/components/auth-settings-form.tsx
-msgid "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under <0>Mail</0>. An instance admin can issue a password reset link from a member's page either way."
-msgstr "Участник, забывший пароль, запрашивает сброс пароля по почте со страницы входа. Это работает, только пока SMTP-сервер настроен в разделе <0>Почта</0>. Администратор экземпляра может выпустить ссылку для сброса пароля на странице участника в любом случае."
+msgid "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
+msgstr "Участник, забывший пароль, запрашивает сброс пароля по почте со страницы входа. Это работает, только пока SMTP-сервер настроен в разделе «Почта» навигации экземпляра. Администратор экземпляра может выпустить ссылку для сброса пароля на странице участника в любом случае."
 
 #: src/lib/project-members.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx

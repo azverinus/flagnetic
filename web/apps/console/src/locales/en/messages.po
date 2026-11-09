@@ -448,8 +448,8 @@ msgid "A key never changes once it is set."
 msgstr "A key never changes once it is set."
 
 #: src/components/auth-settings-form.tsx
-msgid "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under <0>Mail</0>. An instance admin can issue a password reset link from a member's page either way."
-msgstr "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under <0>Mail</0>. An instance admin can issue a password reset link from a member's page either way."
+msgid "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
+msgstr "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
 
 #: src/lib/project-members.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
