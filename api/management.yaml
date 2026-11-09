@@ -8384,12 +8384,20 @@ components:
           description: One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`, each a role the caller holds every permission of in the project.
     IssuedInvitation:
       type: object
-      description: An invitation just issued. Its link is shown this once.
-      required: [url, expires_at]
+      description: >-
+        An invitation just issued. With SMTP configured and `FLAGNETIC_BASE_URL` set it is mailed to the invited
+        person and its link is never shown; otherwise its link is shown this once, for the issuer to pass on.
+      required: [mailed, expires_at]
       properties:
+        mailed:
+          type: boolean
+          description: >-
+            Whether the link is being mailed to the invited person, which it is whenever the instance has an SMTP
+            server and `FLAGNETIC_BASE_URL` is set. A mail that does not arrive is replaced by reissuing the
+            invitation.
         url:
           type: string
-          description: The one-time link to pass on to the invited person.
+          description: The one-time link to pass on to the invited person; absent when the link is mailed.
         expires_at:
           type: string
           format: date-time

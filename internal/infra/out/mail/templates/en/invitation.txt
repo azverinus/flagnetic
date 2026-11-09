@@ -1,0 +1,10 @@
+{{define "role"}}{{if eq . "owner"}}Owner{{else if eq . "maintainer"}}Maintainer{{else if eq . "developer"}}Developer{{else if eq . "viewer"}}Viewer{{else}}{{.}}{{end}}{{end -}}
+Hello {{.Recipient.Name}},
+
+{{with .Data}}{{if .InvitedBy}}{{.InvitedBy}} invited you{{else}}You are invited{{end}} to join Flagnetic{{if .Project}}, with the role {{template "role" .Role}} in the project {{.Project}}{{end}}.{{end}} Your account will be {{.Recipient.Email}}. Open this link and choose a password to accept:
+
+{{.Data.URL}}
+
+The link works once and expires at {{.Data.ExpiresAt.UTC.Format "2006-01-02 15:04"}} UTC. If it has expired, ask whoever invited you to send a new one.
+
+If you did not expect this invitation, ignore this mail: nothing happens unless you open the link.

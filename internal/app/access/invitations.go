@@ -24,10 +24,14 @@ type InvitationStore interface {
 }
 
 // IssuedInvitation is an invitation just issued, with its secret, shown
-// once to whoever issued it.
+// once to whoever issued it unless it is mailed.
 type IssuedInvitation struct {
 	access.Invitation
+	// Secret is the invitation's secret; empty when the invitation is
+	// mailed, as only the mail carries it.
 	Secret secret.String
+	// Mailed reports whether the link is mailed to the person invited.
+	Mailed bool
 }
 
 // invitationOrigin is who issues an invitation, and the role in a project it
@@ -76,11 +80,15 @@ type InviteMember struct {
 	clock  clock.Clock
 	ids    *id.Source
 	random io.Reader
+	mailer *InvitationMailer
 }
 
-// NewInviteMember returns the handler; random draws invitation secrets.
-func NewInviteMember(tx Transactor, store InviteStore, audit AuditLog, c clock.Clock, ids *id.Source, random io.Reader) *InviteMember {
-	return &InviteMember{tx: tx, store: store, audit: audit, clock: c, ids: ids, random: random}
+// NewInviteMember returns the handler; random draws invitation secrets and
+// mailer mails them when the instance can.
+func NewInviteMember(tx Transactor, store InviteStore, audit AuditLog, c clock.Clock, ids *id.Source, random io.Reader,
+	mailer *InvitationMailer,
+) *InviteMember {
+	return &InviteMember{tx: tx, store: store, audit: audit, clock: c, ids: ids, random: random, mailer: mailer}
 }
 
 // InviteMemberCommand names the person to invite.
@@ -95,7 +103,8 @@ type InviteMemberCommand struct {
 }
 
 // Handle creates an invited member and their invitation, recording
-// member.invited; an email the instance holds is refused already_exists. An
+// member.invited, and mails it when the instance can; an email the instance
+// holds is refused already_exists. An
 // instance admin may hold every permission in a project, so the invitation
 // may carry any role of it; a role that is none of the built-in ones is
 // refused invalid_grant.
@@ -120,12 +129,15 @@ func (h *InviteMember) Handle(ctx context.Context, cmd InviteMemberCommand) (Inv
 		if issued, err = issueInvitation(ctx, h.store, h.ids, h.random, m.ID, now, origin); err != nil {
 			return err
 		}
-		res.Invitation = &issued
 		if err = recordAll(ctx, h.audit, h.ids, now, cmd.Request, invitationRecord("member.invited", m, issued, map[string]any{
 			"email": m.Email, "display_name": m.DisplayName, "status": m.Status, "instance_admin": m.InstanceAdmin,
 		})); err != nil {
 			return err
 		}
+		if issued, err = h.mailer.mail(ctx, m, issued, cmd.Request.ID); err != nil {
+			return err
+		}
+		res.Invitation = &issued
 		res.Member, err = viewOf(ctx, h.store, m.ID)
 		return err
 	})
@@ -175,16 +187,20 @@ type ReissueInvitation struct {
 	clock  clock.Clock
 	ids    *id.Source
 	random io.Reader
+	mailer *InvitationMailer
 }
 
-// NewReissueInvitation returns the handler; random draws invitation secrets.
+// NewReissueInvitation returns the handler; random draws invitation secrets
+// and mailer mails them when the instance can.
 func NewReissueInvitation(tx Transactor, store ReissueStore, audit AuditLog, c clock.Clock, ids *id.Source, random io.Reader,
+	mailer *InvitationMailer,
 ) *ReissueInvitation {
-	return &ReissueInvitation{tx: tx, store: store, audit: audit, clock: c, ids: ids, random: random}
+	return &ReissueInvitation{tx: tx, store: store, audit: audit, clock: c, ids: ids, random: random, mailer: mailer}
 }
 
 // Handle issues the member a fresh invitation, which kills every earlier
-// one, recording member.invitation_reissued. A member who is not invited is
+// one, recording member.invitation_reissued, and mails it when the instance
+// can. A member who is not invited is
 // refused member_not_invited. The fresh invitation is issued by whoever
 // issued the last one, and keeps its grant only while that member still
 // holds grant.manage in its project: a grant lost since is dropped and
@@ -211,11 +227,14 @@ func (h *ReissueInvitation) Handle(ctx context.Context, member access.MemberID, 
 		if err != nil {
 			return err
 		}
-		res.Invitation = &issued
 		if err = recordAll(ctx, h.audit, h.ids, now, req,
 			append(revoked, invitationRecord("member.invitation_reissued", m, issued, nil))...); err != nil {
 			return err
 		}
+		if issued, err = h.mailer.mail(ctx, m, issued, req.ID); err != nil {
+			return err
+		}
+		res.Invitation = &issued
 		res.Member, err = viewOf(ctx, h.store, m.ID)
 		return err
 	})
@@ -230,9 +249,7 @@ type InvitationReader interface {
 	// InvitationByHash returns the invitation and its member; ErrNotFound
 	// when no invitation has the hash.
 	InvitationByHash(ctx context.Context, hash access.InvitationHash) (access.Invitation, access.Member, error)
-	// InvitationDetails returns what the page of the invitation shows
-	// besides its member; ErrNotFound when none has the identifier.
-	InvitationDetails(ctx context.Context, invitation access.InvitationID) (InvitationDetails, error)
+	InvitationDetailsReader
 }
 
 // InvitationView is what the page an invitation opens shows.
@@ -264,6 +281,9 @@ type InvitationDetails struct {
 	ProjectName string
 	// InvitedBy is the display name of whoever issued the invitation.
 	InvitedBy string
+	// InviterLocale is the language whoever issued the invitation chose, ""
+	// when they chose none or none issued it.
+	InviterLocale string
 }
 
 // GetInvitation answers what an invitation's link opens, before anyone is

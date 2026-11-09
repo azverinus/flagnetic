@@ -358,20 +358,22 @@ type ReactivateMember struct {
 	clock  clock.Clock
 	ids    *id.Source
 	random io.Reader
+	mailer *InvitationMailer
 }
 
-// NewReactivateMember returns the handler; random draws invitation secrets.
+// NewReactivateMember returns the handler; random draws invitation secrets
+// and mailer mails them when the instance can.
 func NewReactivateMember(tx Transactor, store ReactivationStore, ways *WaysIn, audit AuditLog, c clock.Clock, ids *id.Source,
-	random io.Reader,
+	random io.Reader, mailer *InvitationMailer,
 ) *ReactivateMember {
-	return &ReactivateMember{tx: tx, store: store, ways: ways, audit: audit, clock: c, ids: ids, random: random}
+	return &ReactivateMember{tx: tx, store: store, ways: ways, audit: audit, clock: c, ids: ids, random: random, mailer: mailer}
 }
 
 // Handle makes a deactivated member active when they hold a usable way to
 // sign in, a password or an identity at an enabled auth provider, recording
 // member.reactivated. One who holds neither is invited again, with a fresh
 // invitation, since the one they had was consumed when they were
-// deactivated. What their deactivation revoked stays revoked. A
+// deactivated, mailed when the instance can. What their deactivation revoked stays revoked. A
 // member who is not deactivated is left as they are.
 func (h *ReactivateMember) Handle(ctx context.Context, member access.MemberID, req governance.Request) (InvitedMember, error) {
 	var issued *IssuedInvitation
@@ -399,8 +401,12 @@ func (h *ReactivateMember) Handle(ctx context.Context, member access.MemberID, r
 			if err != nil {
 				return access.Member{}, nil, err
 			}
+			records := []governance.Record{record, invitationRecord("member.invitation_reissued", after, inv, nil)}
+			if inv, err = h.mailer.mail(ctx, after, inv, req.ID); err != nil {
+				return access.Member{}, nil, err
+			}
 			issued = &inv
-			return after, []governance.Record{record, invitationRecord("member.invitation_reissued", after, inv, nil)}, nil
+			return after, records, nil
 		})
 	if err != nil {
 		return InvitedMember{}, err

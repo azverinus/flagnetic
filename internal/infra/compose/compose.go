@@ -356,6 +356,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	if o.BaseURL != nil {
 		publicURL = strings.TrimSuffix(o.BaseURL.String(), "/")
 	}
+	invitationMail := appaccess.NewInvitationMailer(postman, smtpSettings, accessStore, publicURL)
 	// One hasher serves every use case of the replica, so its bound is the
 	// replica's.
 	hasher := password.NewBoundedHasher(password.DefaultParams,
@@ -460,14 +461,14 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 		}),
 		DeactivateMember:      appaccess.NewDeactivateMember(tx, accessStore, audit, d.Clock, d.IDs),
-		ReactivateMember:      appaccess.NewReactivateMember(tx, accessStore, waysIn, audit, d.Clock, d.IDs, rand.Reader),
+		ReactivateMember:      appaccess.NewReactivateMember(tx, accessStore, waysIn, audit, d.Clock, d.IDs, rand.Reader, invitationMail),
 		RemoveMyPassword:      appaccess.NewRemoveMyPassword(tx, accessStore, waysIn, audit, d.Clock, d.IDs),
 		ListMemberAuthMethods: appidentity.NewListMemberAuthMethods(signIn),
 		StartLink:             appidentity.NewStartLink(signIn),
 		UnlinkIdentity:        appidentity.NewUnlinkIdentity(signIn),
-		InviteMember:          appaccess.NewInviteMember(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
-		InviteToProject:       appaccess.NewInviteToProject(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
-		ReissueInvitation:     appaccess.NewReissueInvitation(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
+		InviteMember:          appaccess.NewInviteMember(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader, invitationMail),
+		InviteToProject:       appaccess.NewInviteToProject(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader, invitationMail),
+		ReissueInvitation:     appaccess.NewReissueInvitation(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader, invitationMail),
 		GetInvitation:         appaccess.NewGetInvitation(accessStore, d.Clock),
 		AcceptInvitation: appaccess.NewAcceptInvitation(appaccess.AcceptInvitationDeps{
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,

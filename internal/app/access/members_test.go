@@ -71,8 +71,8 @@ func TestAcceptingAnInvitationWhileItIsReplacedOrItsMemberDeactivatedEndsCleanly
 	c := clock.System{}
 	tx, store, audit := postgres.NewTransactor(pool), pgaccess.NewStore(pool), testkit.Record(pool)
 	ids := id.NewSource(c)
-	invite := appaccess.NewInviteMember(tx, store, audit, c, ids, rand.Reader)
-	reissue := appaccess.NewReissueInvitation(tx, store, audit, c, ids, rand.Reader)
+	invite := appaccess.NewInviteMember(tx, store, audit, c, ids, rand.Reader, nil)
+	reissue := appaccess.NewReissueInvitation(tx, store, audit, c, ids, rand.Reader, nil)
 	deactivate := appaccess.NewDeactivateMember(tx, store, audit, c, ids)
 	accept := appaccess.NewAcceptInvitation(appaccess.AcceptInvitationDeps{
 		Tx: tx, Store: store, Settings: store, Hasher: password.NewHasher(cheap), Audit: audit,

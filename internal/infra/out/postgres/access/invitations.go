@@ -155,14 +155,14 @@ func (s *Store) InvitationDetails(ctx context.Context, invitation access.Invitat
 	var (
 		d                       appaccess.InvitationDetails
 		projectKey, projectName *string
-		inviter                 *string
+		inviter, inviterLocale  *string
 	)
 	err := s.db(ctx).QueryRow(ctx, `
-		SELECT p.key, p.name, m.display_name
+		SELECT p.key, p.name, m.display_name, m.locale
 		FROM invitations i
 		LEFT JOIN projects p ON p.id = i.project_id AND i.role IS NOT NULL
 		LEFT JOIN members m ON m.id = i.invited_by
-		WHERE i.id = $1`, invitation.Bytes()).Scan(&projectKey, &projectName, &inviter)
+		WHERE i.id = $1`, invitation.Bytes()).Scan(&projectKey, &projectName, &inviter, &inviterLocale)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return appaccess.InvitationDetails{}, appaccess.ErrNotFound
 	}
@@ -174,6 +174,9 @@ func (s *Store) InvitationDetails(ctx context.Context, invitation access.Invitat
 	}
 	if inviter != nil {
 		d.InvitedBy = *inviter
+	}
+	if inviterLocale != nil {
+		d.InviterLocale = *inviterLocale
 	}
 	return d, nil
 }

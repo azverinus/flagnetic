@@ -39,12 +39,15 @@ type InviteToProject struct {
 	clock  clock.Clock
 	ids    *id.Source
 	random io.Reader
+	mailer *InvitationMailer
 }
 
-// NewInviteToProject returns the handler; random draws invitation secrets.
+// NewInviteToProject returns the handler; random draws invitation secrets
+// and mailer mails them when the instance can.
 func NewInviteToProject(tx Transactor, store InviteToProjectStore, audit AuditLog, c clock.Clock, ids *id.Source, random io.Reader,
+	mailer *InvitationMailer,
 ) *InviteToProject {
-	return &InviteToProject{tx: tx, store: store, audit: audit, clock: c, ids: ids, random: random}
+	return &InviteToProject{tx: tx, store: store, audit: audit, clock: c, ids: ids, random: random, mailer: mailer}
 }
 
 // InviteToProjectCommand names the person to invite and the role to invite
@@ -61,7 +64,8 @@ type InviteToProjectCommand struct {
 
 // Handle invites the person to the instance with the role, which accepting
 // the invitation grants them in the project, recording member.invited in the
-// project's log. A role holding a permission the caller lacks in the project
+// project's log, and mails the invitation, naming the project, the role and
+// the caller, when the instance can. A role holding a permission the caller lacks in the project
 // is refused role_not_allowed. A person the instance holds is refused
 // already_exists, except a member invited who has a pending invitation to this
 // project, who is invited again with the new role: a fresh invitation then
@@ -91,7 +95,6 @@ func (h *InviteToProject) Handle(ctx context.Context, cmd InviteToProjectCommand
 		if issued, err = issueInvitation(ctx, h.store, h.ids, h.random, member.ID, now, origin); err != nil {
 			return err
 		}
-		res.Invitation = &issued
 		after := map[string]any{}
 		if action == "member.invited" {
 			after = map[string]any{
@@ -101,6 +104,10 @@ func (h *InviteToProject) Handle(ctx context.Context, cmd InviteToProjectCommand
 		if err = recordAll(ctx, h.audit, h.ids, now, cmd.Request, invitationRecord(action, member, issued, after)); err != nil {
 			return err
 		}
+		if issued, err = h.mailer.mail(ctx, member, issued, cmd.Request.ID); err != nil {
+			return err
+		}
+		res.Invitation = &issued
 		res.Member, err = viewOf(ctx, h.store, member.ID)
 		return err
 	})

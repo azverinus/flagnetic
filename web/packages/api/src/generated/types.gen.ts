@@ -549,13 +549,17 @@ export type ProjectInvitationCreate = {
 };
 
 /**
- * An invitation just issued. Its link is shown this once.
+ * An invitation just issued. With SMTP configured and `FLAGNETIC_BASE_URL` set it is mailed to the invited person and its link is never shown; otherwise its link is shown this once, for the issuer to pass on.
  */
 export type IssuedInvitation = {
   /**
-   * The one-time link to pass on to the invited person.
+   * Whether the link is being mailed to the invited person, which it is whenever the instance has an SMTP server and `FLAGNETIC_BASE_URL` is set. A mail that does not arrive is replaced by reissuing the invitation.
    */
-  url: string;
+  mailed: boolean;
+  /**
+   * The one-time link to pass on to the invited person; absent when the link is mailed.
+   */
+  url?: string;
   expires_at: string;
 };
 

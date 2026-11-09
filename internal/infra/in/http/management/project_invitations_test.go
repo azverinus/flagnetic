@@ -172,7 +172,7 @@ func TestAnOwnerInvitesToTheirProjectAndAcceptingGrantsTheRole(t *testing.T) {
 	if !mi.Invitation.ExpiresAt.Equal(c.Now().Add(7 * 24 * time.Hour)) {
 		t.Errorf("expires at %v, want in seven days", mi.Invitation.ExpiresAt)
 	}
-	link := mi.Invitation.Url
+	link := *mi.Invitation.Url
 	if !strings.HasPrefix(link, srv.URL+"/invitations/") || len(secretOf(link)) != 43 {
 		t.Errorf("link = %q, want the console's /invitations/ and 43 base64url characters", link)
 	}
@@ -233,7 +233,7 @@ func TestAnInvitationOfTheInstanceAloneStillShowsNoProject(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	mi := invite(t, admin, "Instance Only")
-	wantShownWithoutProject(t, srv, mi.Invitation.Url)
+	wantShownWithoutProject(t, srv, *mi.Invitation.Url)
 }
 
 func TestAnInstanceAdminsInvitationMayCarryAGrant(t *testing.T) {
@@ -250,12 +250,12 @@ func TestAnInstanceAdminsInvitationMayCarryAGrant(t *testing.T) {
 		t.Fatalf("POST /members with a grant = %d: %s", res.StatusCode(), res.Body)
 	}
 	recordLink(t, res.JSON201)
-	got := opened(t, srv, res.JSON201.Invitation.Url)
+	got := opened(t, srv, *res.JSON201.Invitation.Url)
 	if got.JSON200 == nil || got.JSON200.Project == nil || got.JSON200.Project.Key != p.Key || got.JSON200.Role == nil ||
 		*got.JSON200.Role != "maintainer" {
 		t.Fatalf("invitation = %s, want maintainer in %s", got.Body, p.Key)
 	}
-	acceptedBy(t, srv, res.JSON201.Invitation.Url)
+	acceptedBy(t, srv, *res.JSON201.Invitation.Url)
 	grants := grantsOf(t, admin, p.Key, email)
 	if len(grants) != 1 || grants[0].Role != "maintainer" || grants[0].CreatedBy == nil || *grants[0].CreatedBy != adminID {
 		t.Errorf("grants = %+v, want one maintainer grant made by the instance admin", grants)
@@ -375,7 +375,7 @@ func TestInvitingAMemberTheInstanceHasIsRefusedAndPointsAtGranting(t *testing.T)
 		mi := invite(t, admin, "Instance Only")
 		refused(t, mi.Member.Email)
 		// Their invitation stands.
-		if got := opened(t, srv, mi.Invitation.Url); got.JSON200 == nil {
+		if got := opened(t, srv, *mi.Invitation.Url); got.JSON200 == nil {
 			t.Errorf("their invitation = %d: %s", got.StatusCode(), got.Body)
 		}
 	})
@@ -383,7 +383,7 @@ func TestInvitingAMemberTheInstanceHasIsRefusedAndPointsAtGranting(t *testing.T)
 		mi, email := inviteTo(t, admin, other.Key, "developer")
 		refused(t, email)
 		// The earlier invitation is untouched and grants its own role.
-		acceptedBy(t, srv, mi.Invitation.Url)
+		acceptedBy(t, srv, *mi.Invitation.Url)
 		if g := grantsOf(t, admin, other.Key, email); len(g) != 1 || g[0].Role != "developer" {
 			t.Errorf("grants in %s = %+v, want developer", other.Key, g)
 		}
@@ -404,12 +404,12 @@ func TestInvitingSomebodyToTheSameProjectAgainReplacesTheInvitation(t *testing.T
 	if second.Member.Id != first.Member.Id {
 		t.Fatalf("the second invitation made member %s, want %s again", second.Member.Id, first.Member.Id)
 	}
-	wantGone(t, srv, first.Invitation.Url, "the first link")
+	wantGone(t, srv, *first.Invitation.Url, "the first link")
 	if g := grantsOf(t, admin, p.Key, email); len(g) != 0 {
 		t.Errorf("the replaced link granted %+v", g)
 	}
 
-	acceptedBy(t, srv, second.Invitation.Url)
+	acceptedBy(t, srv, *second.Invitation.Url)
 	if g := grantsOf(t, admin, p.Key, email); len(g) != 1 || g[0].Role != "maintainer" {
 		t.Errorf("grants = %+v, want the maintainer role of the second invitation alone", g)
 	}
@@ -427,7 +427,7 @@ func TestAnInstanceAdminsReissueKeepsTheGrantAndItsInviter(t *testing.T) {
 	mi, email := inviteTo(t, owner.ClientWithResponses, p.Key, "developer")
 
 	link := reissue(t, admin, mi.Member)
-	wantGone(t, srv, mi.Invitation.Url, "the replaced link")
+	wantGone(t, srv, *mi.Invitation.Url, "the replaced link")
 	got := opened(t, srv, link)
 	if got.JSON200 == nil || got.JSON200.Project == nil || got.JSON200.Project.Key != p.Key || got.JSON200.Role == nil ||
 		*got.JSON200.Role != "developer" {
@@ -449,7 +449,7 @@ func TestAnInvitationNoLongerAcceptableGrantsNothing(t *testing.T) {
 	t.Run("expired", func(t *testing.T) {
 		mi, email := inviteTo(t, admin, p.Key, "viewer")
 		c.Advance(7*24*time.Hour + time.Minute)
-		wantGone(t, srv, mi.Invitation.Url, "an expired link")
+		wantGone(t, srv, *mi.Invitation.Url, "an expired link")
 		if g := grantsOf(t, admin, p.Key, email); len(g) != 0 {
 			t.Errorf("an expired invitation granted %+v", g)
 		}
@@ -459,7 +459,7 @@ func TestAnInvitationNoLongerAcceptableGrantsNothing(t *testing.T) {
 		if res := do(admin.DeactivateMemberWithResponse(t.Context(), mi.Member.Id.String())); res.JSON200 == nil {
 			t.Fatalf("deactivating = %d: %s", res.StatusCode(), res.Body)
 		}
-		wantGone(t, srv, mi.Invitation.Url, "a deactivated member's link")
+		wantGone(t, srv, *mi.Invitation.Url, "a deactivated member's link")
 		if g := grantsOf(t, admin, p.Key, email); len(g) != 0 {
 			t.Errorf("a deactivated member's invitation granted %+v", g)
 		}
@@ -474,7 +474,7 @@ func TestAnInvitationGrantsBesideWhatTheMemberWasGivenMeanwhile(t *testing.T) {
 	t.Run("another role", func(t *testing.T) {
 		mi, email := inviteTo(t, admin, p.Key, "owner")
 		grant(t, admin, p.Key, memberRef(mi.Member.Id), "viewer")
-		acceptedBy(t, srv, mi.Invitation.Url)
+		acceptedBy(t, srv, *mi.Invitation.Url)
 		if g := rolesOf(grantsOf(t, admin, p.Key, email)); len(g) != 2 {
 			t.Errorf("roles = %v, want the viewer given by hand and the owner invited with", g)
 		}
@@ -482,7 +482,7 @@ func TestAnInvitationGrantsBesideWhatTheMemberWasGivenMeanwhile(t *testing.T) {
 	t.Run("the same role", func(t *testing.T) {
 		mi, email := inviteTo(t, admin, p.Key, "viewer")
 		grant(t, admin, p.Key, memberRef(mi.Member.Id), "viewer")
-		acceptedBy(t, srv, mi.Invitation.Url)
+		acceptedBy(t, srv, *mi.Invitation.Url)
 		if g := rolesOf(grantsOf(t, admin, p.Key, email)); len(g) != 1 || g[0] != "viewer" {
 			t.Errorf("roles = %v, want the one viewer grant", g)
 		}
@@ -502,8 +502,8 @@ func TestDeletingTheProjectDropsWhatItsInvitationsGranted(t *testing.T) {
 	if res := deleteProject(t, signedIn(t, srv, operator).ClientWithResponses, p.Key, p.Version); res.StatusCode() != http.StatusNoContent {
 		t.Fatalf("deleting the project = %d: %s", res.StatusCode(), res.Body)
 	}
-	wantShownWithoutProject(t, srv, mi.Invitation.Url)
-	acceptedBy(t, srv, mi.Invitation.Url)
+	wantShownWithoutProject(t, srv, *mi.Invitation.Url)
+	acceptedBy(t, srv, *mi.Invitation.Url)
 	if m := memberOf(t, admin, memberIDByEmail(t, admin, email)); m.Status != management.MemberStatusActive || m.ProjectCount != 0 {
 		t.Errorf("member = %+v, want active in no project", m)
 	}
@@ -545,8 +545,8 @@ func TestAnInvitationLosesItsGrantWhenItsInviterLosesGrantManage(t *testing.T) {
 	}
 
 	// The invitation still activates the member and grants nothing.
-	wantShownWithoutProject(t, srv, dropped.Invitation.Url)
-	acceptedBy(t, srv, dropped.Invitation.Url)
+	wantShownWithoutProject(t, srv, *dropped.Invitation.Url)
+	acceptedBy(t, srv, *dropped.Invitation.Url)
 	wantActiveWithoutGrant(t, admin, p.Key, droppedEmail)
 
 	for name, tc := range map[string]struct {
@@ -558,7 +558,7 @@ func TestAnInvitationLosesItsGrantWhenItsInviterLosesGrantManage(t *testing.T) {
 		"the same owner's, to a project they own": {keptElsewhere, elsewhere.Key, elsewhereEmail, "viewer"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			acceptedBy(t, srv, tc.mi.Invitation.Url)
+			acceptedBy(t, srv, *tc.mi.Invitation.Url)
 			if g := grantsOf(t, admin, tc.project, tc.mail); len(g) != 1 || string(g[0].Role) != tc.role {
 				t.Errorf("grants = %+v, want %s", g, tc.role)
 			}
@@ -583,7 +583,7 @@ func TestAnInvitationLosesItsGrantWhenItsInviterIsDeactivated(t *testing.T) {
 		t.Fatalf("deactivating the owner = %d: %s", res.StatusCode(), res.Body)
 	}
 	wantGrantRevoked(t, admin, p.Key, email, "developer", "inviter_deactivated")
-	wantShownWithoutProject(t, srv, mi.Invitation.Url)
+	wantShownWithoutProject(t, srv, *mi.Invitation.Url)
 
 	// A reissue carries nothing forward either.
 	link := reissue(t, admin, mi.Member)
@@ -615,7 +615,7 @@ func TestAnInstanceAdminsInvitationOutlivesTheirGrants(t *testing.T) {
 	}
 	wantNoGrantRevoked(t, admin, p.Key)
 
-	acceptedBy(t, srv, mi.Invitation.Url)
+	acceptedBy(t, srv, *mi.Invitation.Url)
 	if g := grantsOf(t, admin, p.Key, email); len(g) != 1 || g[0].Role != "developer" || g[0].CreatedBy == nil || *g[0].CreatedBy != inviter.ID.Bytes() {
 		t.Errorf("grants = %+v, want the developer grant made by the instance admin", g)
 	}
@@ -626,7 +626,7 @@ func TestAnInstanceAdminsInvitationOutlivesTheirGrants(t *testing.T) {
 		t.Fatalf("deactivating the instance admin = %d: %s", res.StatusCode(), res.Body)
 	}
 	wantGrantRevoked(t, admin, p.Key, againEmail, "viewer", "inviter_deactivated")
-	wantShownWithoutProject(t, srv, again.Invitation.Url)
+	wantShownWithoutProject(t, srv, *again.Invitation.Url)
 }
 
 func TestDemotingAnInstanceAdminDropsTheGrantsOfInvitationsToProjectsTheyDoNotManage(t *testing.T) {
@@ -647,9 +647,9 @@ func TestDemotingAnInstanceAdminDropsTheGrantsOfInvitationsToProjectsTheyDoNotMa
 	wantGrantRevoked(t, admin, p.Key, lostEmail, "viewer", "inviter_lost_permission")
 	wantNoGrantRevoked(t, admin, owned.Key)
 
-	acceptedBy(t, srv, lost.Invitation.Url)
+	acceptedBy(t, srv, *lost.Invitation.Url)
 	wantActiveWithoutGrant(t, admin, p.Key, lostEmail)
-	acceptedBy(t, srv, kept.Invitation.Url)
+	acceptedBy(t, srv, *kept.Invitation.Url)
 	if g := grantsOf(t, admin, owned.Key, keptEmail); len(g) != 1 {
 		t.Errorf("grants = %+v, want the viewer grant of the project they still own", g)
 	}

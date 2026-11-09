@@ -13,11 +13,14 @@ const (
 	// MailPasswordReset carries the link a member asked for to set a new
 	// password.
 	MailPasswordReset MailKind = "password_reset"
+	// MailInvitation carries the link that lets a person invited to the
+	// instance, or to a project in it, set their first password.
+	MailInvitation MailKind = "invitation"
 )
 
 // MailKinds are every kind of mail the instance sends; each has a template
 // in every language of MailLocales.
-var MailKinds = []MailKind{MailTest, MailPasswordReset}
+var MailKinds = []MailKind{MailTest, MailPasswordReset, MailInvitation}
 
 // MailLocales are the languages mail is written in, the console's.
 var MailLocales = []string{"en", "ru"}
