@@ -307,7 +307,7 @@ func TestAcceptingAnInvitationMakesItsSourceKnown(t *testing.T) {
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	mi := invite(t, admin, "Ada Lovelace")
 	home := someAddress()
-	if res := accept(t, fromAddress(t, srv, home), mi.Invitation.Url, newPassword); res.JSON200 == nil {
+	if res := accept(t, fromAddress(t, srv, home), *mi.Invitation.Url, newPassword); res.JSON200 == nil {
 		t.Fatalf("accept = %d: %s", res.StatusCode(), res.Body)
 	}
 	lockEmail(t, srv, mi.Member.Email)

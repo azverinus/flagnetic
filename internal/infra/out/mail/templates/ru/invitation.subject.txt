@@ -1,0 +1,1 @@
+{{with .Data}}{{if .InvitedBy}}{{.InvitedBy}} приглашает вас {{if .Project}}в проект {{.Project}} {{end}}во Flagnetic{{else}}Приглашение {{if .Project}}в проект {{.Project}} {{end}}во Flagnetic{{end}}{{end}}

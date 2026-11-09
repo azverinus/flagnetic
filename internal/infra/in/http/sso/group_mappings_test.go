@@ -573,7 +573,7 @@ func TestAMemberWhoLosesGrantManageThroughAMappingLosesTheGrantsOfTheirInvitatio
 	if err != nil || res.JSON201 == nil || res.JSON201.Invitation == nil {
 		t.Fatalf("inviting: %v, %d: %s", err, res.StatusCode(), res.Body)
 	}
-	link := res.JSON201.Invitation.Url
+	link := *res.JSON201.Invitation.Url
 	testkit.RecordSecret(link[strings.LastIndex(link, "/")+1:])
 
 	e.forgedPerson(t, idp, slug, email, map[string]any{"groups": []any{}})

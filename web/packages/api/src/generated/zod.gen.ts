@@ -264,10 +264,11 @@ export const zProjectInvitationCreate = z.object({
 });
 
 /**
- * An invitation just issued. Its link is shown this once.
+ * An invitation just issued. With SMTP configured it is mailed to the invited person and its link is never shown; without, its link is shown this once, for the issuer to pass on.
  */
 export const zIssuedInvitation = z.object({
-  url: z.string(),
+  mailed: z.boolean(),
+  url: z.string().optional(),
   expires_at: z.iso.datetime(),
 });
 

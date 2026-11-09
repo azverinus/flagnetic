@@ -158,12 +158,14 @@ const invitationLinkPath = "/invitations/"
 
 // memberInvitationOf answers res to the request ctx belongs to, with the
 // link of the invitation issued, which the console opens at
-// /invitations/<secret>.
+// /invitations/<secret>, unless the invitation is mailed: its link then
+// reaches only the person invited.
 func memberInvitationOf(ctx context.Context, res appaccess.InvitedMember) MemberInvitation {
 	out := MemberInvitation{Member: memberOf(res.Member)}
 	if inv := res.Invitation; inv != nil {
-		out.Invitation = &IssuedInvitation{
-			Url: browserOf(ctx).console + invitationLinkPath + inv.Secret.Reveal(), ExpiresAt: inv.ExpiresAt,
+		out.Invitation = &IssuedInvitation{Mailed: inv.Mailed, ExpiresAt: inv.ExpiresAt}
+		if !inv.Mailed {
+			out.Invitation.Url = new(browserOf(ctx).console + invitationLinkPath + inv.Secret.Reveal())
 		}
 	}
 	return out

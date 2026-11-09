@@ -35,13 +35,13 @@ func invite(t *testing.T, admin *management.ClientWithResponses, name string) ma
 }
 
 // recordLink records the secret of the link mi carries for the audit guard,
-// failing unless it carries one.
+// failing unless it shows one.
 func recordLink(t *testing.T, mi *management.MemberInvitation) {
 	t.Helper()
-	if mi.Invitation == nil {
-		t.Fatalf("no invitation in %+v", mi)
+	if mi.Invitation == nil || mi.Invitation.Url == nil || mi.Invitation.Mailed {
+		t.Fatalf("no invitation link shown in %+v", mi)
 	}
-	testkit.RecordSecret(secretOf(mi.Invitation.Url))
+	testkit.RecordSecret(secretOf(*mi.Invitation.Url))
 }
 
 // secretOf returns the secret an invitation link ends with.
@@ -55,7 +55,7 @@ func reissue(t *testing.T, admin *management.ClientWithResponses, m management.M
 		t.Fatalf("POST /members/%s/invitation = %d: %s", m.Id, res.StatusCode(), res.Body)
 	}
 	recordLink(t, res.JSON201)
-	return res.JSON201.Invitation.Url
+	return *res.JSON201.Invitation.Url
 }
 
 // accept accepts the invitation link opens through b, setting password.
@@ -93,7 +93,7 @@ func TestInviteThenSetAPasswordThenSignIn(t *testing.T) {
 		m.ProjectCount != 0 {
 		t.Errorf("invited = %+v", m)
 	}
-	link := mi.Invitation.Url
+	link := *mi.Invitation.Url
 	if !regexp.MustCompile(`^` + regexp.QuoteMeta(srv.URL) + `/invitations/[A-Za-z0-9_-]{43}$`).MatchString(link) {
 		t.Errorf("link = %q, want the console's origin, /invitations/ and 43 base64url characters", link)
 	}
@@ -145,7 +145,7 @@ func TestInviteThenSetAPasswordThenSignIn(t *testing.T) {
 func TestAnInvitationLinkStartsWithTheBaseURL(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithBaseURL("https://flags.example.com/"))
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
-	if link := invite(t, admin, "Behind A Proxy").Invitation.Url; !strings.HasPrefix(link, "https://flags.example.com/invitations/") {
+	if link := *invite(t, admin, "Behind A Proxy").Invitation.Url; !strings.HasPrefix(link, "https://flags.example.com/invitations/") {
 		t.Errorf("link = %q, want it under the base URL", link)
 	}
 }
@@ -157,11 +157,11 @@ func TestAnInvitationExpiresAfterSevenDays(t *testing.T) {
 	mi := invite(t, admin, "Late Comer")
 
 	c.Advance(7*24*time.Hour - time.Minute)
-	if got := opened(t, srv, mi.Invitation.Url); got.StatusCode() != http.StatusOK {
+	if got := opened(t, srv, *mi.Invitation.Url); got.StatusCode() != http.StatusOK {
 		t.Errorf("a minute before it expires: GET = %d", got.StatusCode())
 	}
 	c.Advance(2 * time.Minute)
-	wantGone(t, srv, mi.Invitation.Url, "an expired link")
+	wantGone(t, srv, *mi.Invitation.Url, "an expired link")
 	if got := memberOf(t, admin, id.FromBytes[access.Member](mi.Member.Id)); got.Status != management.MemberStatusInvited {
 		t.Errorf("member = %s, want still invited", got.Status)
 	}
@@ -172,10 +172,10 @@ func TestReissuingAnInvitationInvalidatesTheOldLink(t *testing.T) {
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	mi := invite(t, admin, "Second Chance")
 	fresh := reissue(t, admin, mi.Member)
-	if fresh == mi.Invitation.Url {
+	if fresh == *mi.Invitation.Url {
 		t.Fatal("the reissued link is the old one")
 	}
-	wantGone(t, srv, mi.Invitation.Url, "a replaced link")
+	wantGone(t, srv, *mi.Invitation.Url, "a replaced link")
 	if res := accept(t, testkit.NewBrowser(t, srv.URL), fresh, newPassword); res.JSON200 == nil ||
 		res.JSON200.Member.Status != management.MemberStatusActive {
 		t.Errorf("accepting the new link = %d %s", res.StatusCode(), res.Body)
@@ -226,7 +226,7 @@ func TestAcceptingAnInvitationAppliesThePasswordPolicy(t *testing.T) {
 		"my-" + local + "-pass":  "email",
 		"administrator":          "common",
 	} {
-		res := accept(t, testkit.NewBrowser(t, srv.URL), mi.Invitation.Url, password)
+		res := accept(t, testkit.NewBrowser(t, srv.URL), *mi.Invitation.Url, password)
 		p := assertProblem(t, rule, res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "weak_password")
 		if p.Errors == nil || len(*p.Errors) != 1 || (*p.Errors)[0].Params == nil || (*(*p.Errors)[0].Params)["rule"] != rule {
 			t.Errorf("%s: violations = %+v, want the rule %s", rule, p.Errors, rule)
@@ -238,7 +238,7 @@ func TestAcceptingAnInvitationAppliesThePasswordPolicy(t *testing.T) {
 	if got := memberOf(t, admin, id.FromBytes[access.Member](mi.Member.Id)); got.Status != management.MemberStatusInvited {
 		t.Errorf("member = %s, want still invited", got.Status)
 	}
-	if res := accept(t, testkit.NewBrowser(t, srv.URL), mi.Invitation.Url, newPassword); res.StatusCode() != http.StatusOK {
+	if res := accept(t, testkit.NewBrowser(t, srv.URL), *mi.Invitation.Url, newPassword); res.StatusCode() != http.StatusOK {
 		t.Errorf("a good password = %d %s, want 200", res.StatusCode(), res.Body)
 	}
 }
@@ -260,13 +260,13 @@ func TestAcceptingAnInvitationIsRefusedAsAForm(t *testing.T) {
 	b.Header.Set("Sec-Fetch-Site", "cross-site")
 	b.Header.Set("Origin", "https://evil.example")
 	for _, contentType := range []string{"text/plain", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x", ""} {
-		res, body := b.Do(t, http.MethodPost, management.BaseURL+"/auth/invitations/"+secretOf(mi.Invitation.Url), contentType,
+		res, body := b.Do(t, http.MethodPost, management.BaseURL+"/auth/invitations/"+secretOf(*mi.Invitation.Url), contentType,
 			`{"password":"`+newPassword+`"}`)
 		if res.StatusCode != http.StatusUnsupportedMediaType || !strings.Contains(body, "unsupported_media_type") || len(res.Cookies()) != 0 {
 			t.Errorf("accepting as %q = %d %s, want 415 unsupported_media_type and no cookie", contentType, res.StatusCode, body)
 		}
 	}
-	if got := opened(t, srv, mi.Invitation.Url); got.StatusCode() != http.StatusOK {
+	if got := opened(t, srv, *mi.Invitation.Url); got.StatusCode() != http.StatusOK {
 		t.Errorf("the link after refused forms = %d, want still open", got.StatusCode())
 	}
 }
@@ -275,12 +275,12 @@ func TestAnInvitationSecretNeverReachesALogLine(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	mi := invite(t, admin, "Quiet One")
-	secret := secretOf(mi.Invitation.Url)
-	opened(t, srv, mi.Invitation.Url)
+	secret := secretOf(*mi.Invitation.Url)
+	opened(t, srv, *mi.Invitation.Url)
 	b := testkit.NewBrowser(t, srv.URL)
 	b.Do(t, http.MethodPut, management.BaseURL+"/auth/invitations/"+secret, "application/json", `{}`)
-	b.Do(t, http.MethodGet, strings.TrimPrefix(mi.Invitation.Url, srv.URL), "", "") // the link itself, as the invitee opens it
-	accept(t, b, mi.Invitation.Url, newPassword)
+	b.Do(t, http.MethodGet, strings.TrimPrefix(*mi.Invitation.Url, srv.URL), "", "") // the link itself, as the invitee opens it
+	accept(t, b, *mi.Invitation.Url, newPassword)
 
 	paths := map[string]bool{}
 	for _, r := range srv.Logs.Records() {
@@ -335,7 +335,7 @@ func TestReactivatingAMemberWhoNeverSetAPasswordInvitesThemAgain(t *testing.T) {
 	if res := do(admin.DeactivateMemberWithResponse(t.Context(), id)); res.StatusCode() != http.StatusOK {
 		t.Fatalf("deactivate = %d: %s", res.StatusCode(), res.Body)
 	}
-	wantGone(t, srv, mi.Invitation.Url, "the link of a deactivated member")
+	wantGone(t, srv, *mi.Invitation.Url, "the link of a deactivated member")
 
 	res := do(admin.ReactivateMemberWithResponse(t.Context(), id))
 	if res.JSON200 == nil {
@@ -345,8 +345,8 @@ func TestReactivatingAMemberWhoNeverSetAPasswordInvitesThemAgain(t *testing.T) {
 		t.Fatalf("reactivated = %+v, want invited with a fresh invitation", res.JSON200)
 	}
 	recordLink(t, res.JSON200)
-	wantGone(t, srv, mi.Invitation.Url, "the link consumed at deactivation, after reactivation")
-	if acc := accept(t, testkit.NewBrowser(t, srv.URL), res.JSON200.Invitation.Url, newPassword); acc.StatusCode() != http.StatusOK {
+	wantGone(t, srv, *mi.Invitation.Url, "the link consumed at deactivation, after reactivation")
+	if acc := accept(t, testkit.NewBrowser(t, srv.URL), *res.JSON200.Invitation.Url, newPassword); acc.StatusCode() != http.StatusOK {
 		t.Errorf("accepting the fresh link = %d %s", acc.StatusCode(), acc.Body)
 	}
 	if again := reissueStatus(t, admin, mi.Member); again != http.StatusConflict {
@@ -391,7 +391,7 @@ func TestThePerAddressThrottleCoversInvitationAcceptance(t *testing.T) {
 	if code, problem, _ := signInAs(t, b, "nobody@example.com", "not-the-password-9"); code != http.StatusTooManyRequests || problem != "rate_limited" {
 		t.Errorf("the next sign-in = %d %s, want 429 rate_limited", code, problem)
 	}
-	res := accept(t, b, mi.Invitation.Url, newPassword)
+	res := accept(t, b, *mi.Invitation.Url, newPassword)
 	assertProblem(t, "accepting a good link while throttled", res.StatusCode(), res.Body, http.StatusTooManyRequests, "rate_limited")
 	if got := memberOf(t, admin, id.FromBytes[access.Member](mi.Member.Id)); got.Status != management.MemberStatusInvited {
 		t.Errorf("member = %s, want still invited", got.Status)
@@ -406,10 +406,10 @@ func TestAnAcceptedInvitationCountsNoFailureOfItsAddress(t *testing.T) {
 		signInAs(t, b, "nobody-"+rand.Text()+"@example.com", "not-the-password-9")
 	}
 	mi := invite(t, admin, "Weak Then Strong")
-	if res := accept(t, b, mi.Invitation.Url, "short"); res.StatusCode() != http.StatusUnprocessableEntity {
+	if res := accept(t, b, *mi.Invitation.Url, "short"); res.StatusCode() != http.StatusUnprocessableEntity {
 		t.Fatalf("a weak password = %d %s", res.StatusCode(), res.Body)
 	}
-	if res := accept(t, b, mi.Invitation.Url, newPassword); res.StatusCode() != http.StatusOK {
+	if res := accept(t, b, *mi.Invitation.Url, newPassword); res.StatusCode() != http.StatusOK {
 		t.Fatalf("accepting = %d %s", res.StatusCode(), res.Body)
 	}
 	if code, problem, _ := signInAs(t, b, "nobody@example.com", "not-the-password-9"); code != http.StatusUnauthorized {
@@ -453,11 +453,11 @@ func TestTheRetentionWorkerPurgesInvitationsLongPastUse(t *testing.T) {
 		link string
 		kept bool
 	}{
-		"replaced before it was accepted, long ago": {accepted.Invitation.Url, false},
-		"replaced long ago":                         {expired.Invitation.Url, false},
+		"replaced before it was accepted, long ago": {*accepted.Invitation.Url, false},
+		"replaced long ago":                         {*expired.Invitation.Url, false},
 		"accepted long ago, the member's latest":    {acceptedLatest, true},
 		"expired long ago, the member's latest":     {expiredLatest, true},
-		"replaced two days ago":                     {recent.Invitation.Url, true},
+		"replaced two days ago":                     {*recent.Invitation.Url, true},
 	} {
 		if got := kept(tc.link); got != tc.kept {
 			t.Errorf("%s: kept = %t, want %t", name, got, tc.kept)

@@ -1,0 +1,11 @@
+{{define "role"}}{{if eq . "owner"}}Владелец{{else if eq . "maintainer"}}Сопровождающий{{else if eq . "developer"}}Разработчик{{else if eq . "viewer"}}Наблюдатель{{else}}{{.}}{{end}}{{end -}}
+<!doctype html>
+<html lang="ru">
+<body>
+<p>Здравствуйте, {{.Recipient.Name}}!</p>
+<p>{{with .Data}}{{if .InvitedBy}}{{.InvitedBy}} приглашает вас{{else}}Вас приглашают{{end}} во Flagnetic{{if .Project}}: в проект <strong>{{.Project}}</strong> с ролью <strong>«{{template "role" .Role}}»</strong>{{end}}.{{end}} Ваша учётная запись: {{.Recipient.Email}}. Чтобы принять приглашение, откройте ссылку и выберите пароль:</p>
+<p><a href="{{.Data.URL}}">{{.Data.URL}}</a></p>
+<p>Ссылка работает один раз и действует до {{.Data.ExpiresAt.UTC.Format "2006-01-02 15:04"}} UTC. Если срок истёк, попросите пригласившего отправить новую.</p>
+<p>Если вы не ждали этого приглашения, проигнорируйте письмо: пока ссылка не открыта, ничего не произойдёт.</p>
+</body>
+</html>

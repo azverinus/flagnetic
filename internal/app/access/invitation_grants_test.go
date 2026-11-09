@@ -51,7 +51,7 @@ func newInvitationGrants(t *testing.T) invitationGrants {
 	tx, store, audit := postgres.NewTransactor(pool), pgaccess.NewStore(pool), testkit.Record(pool)
 	return invitationGrants{
 		pool: pool, store: store, project: project.ID,
-		invite: appaccess.NewInviteToProject(tx, store, audit, c, ids, rand.Reader),
+		invite: appaccess.NewInviteToProject(tx, store, audit, c, ids, rand.Reader, nil),
 		accept: appaccess.NewAcceptInvitation(appaccess.AcceptInvitationDeps{
 			Tx: tx, Store: store, Settings: store, Hasher: password.NewHasher(cheap), Audit: audit,
 			Clock: c, IDs: ids, Random: rand.Reader, Key: bytes.Repeat([]byte{1}, 32),
@@ -59,7 +59,7 @@ func newInvitationGrants(t *testing.T) invitationGrants {
 		deactivate: appaccess.NewDeactivateMember(tx, store, audit, c, ids),
 		update:     appaccess.NewUpdateMember(tx, store, audit, c, ids),
 		deleteG:    appaccess.NewDeleteGrant(tx, store, audit, c, ids),
-		reissue:    appaccess.NewReissueInvitation(tx, store, audit, c, ids, rand.Reader),
+		reissue:    appaccess.NewReissueInvitation(tx, store, audit, c, ids, rand.Reader, nil),
 	}
 }
 

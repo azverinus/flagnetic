@@ -19,6 +19,10 @@ var samples = map[access.MailKind]any{
 	access.MailPasswordReset: appaccess.PasswordResetMailData{
 		URL: "https://flags.example.com/password-reset/c2VjcmV0", ExpiresAt: time.Date(2026, 11, 6, 15, 4, 0, 0, time.UTC),
 	},
+	access.MailInvitation: appaccess.InvitationMailData{
+		URL: "https://flags.example.com/invitations/c2VjcmV0", ExpiresAt: time.Date(2026, 11, 13, 15, 4, 0, 0, time.UTC),
+		InvitedBy: "Grace Hopper", Project: "Checkout", Role: access.RoleDeveloper,
+	},
 }
 
 func TestEveryKindHasEveryLanguageAndPart(t *testing.T) {
@@ -131,5 +135,95 @@ func TestThePasswordResetMailCarriesItsLinkAndWhenItExpires(t *testing.T) {
 	ru, _ := r.Render(appaccess.Mail{Kind: access.MailPasswordReset, Locale: "ru", Data: appaccess.PasswordResetMailData{URL: link}})
 	if !strings.Contains(ru.Subject, "Сброс пароля") {
 		t.Errorf("Russian subject = %q", ru.Subject)
+	}
+}
+
+func TestTheInvitationMailNamesWhoInvitesAndToWhat(t *testing.T) {
+	r, err := mail.NewRenderer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	const link = "https://flags.example.com/invitations/c2VjcmV0-_"
+	expires := time.Date(2026, 11, 13, 15, 4, 0, 0, time.FixedZone("x", 3*3600))
+	for _, tc := range []struct {
+		locale, subject string
+		data            appaccess.InvitationMailData
+		want, absent    []string
+	}{{
+		locale: "en", subject: "Grace Hopper invited you to Flagnetic",
+		data: appaccess.InvitationMailData{URL: link, ExpiresAt: expires, InvitedBy: "Grace Hopper"},
+		want: []string{"Grace Hopper", "2026-11-13 12:04 UTC"}, absent: []string{"project", "the role"},
+	}, {
+		locale: "en", subject: "You are invited to Flagnetic",
+		data: appaccess.InvitationMailData{URL: link, ExpiresAt: expires},
+		want: []string{"2026-11-13 12:04 UTC"}, absent: []string{"project", "invited you to join"},
+	}, {
+		locale: "en", subject: "Grace Hopper invited you to Checkout on Flagnetic",
+		data: appaccess.InvitationMailData{
+			URL: link, ExpiresAt: expires, InvitedBy: "Grace Hopper", Project: "Checkout", Role: access.RoleDeveloper,
+		},
+		want: []string{"Grace Hopper", "Checkout", "Developer", "2026-11-13 12:04 UTC"},
+	}, {
+		locale: "ru", subject: "Grace Hopper приглашает вас во Flagnetic",
+		data: appaccess.InvitationMailData{URL: link, ExpiresAt: expires, InvitedBy: "Grace Hopper"},
+		want: []string{"Grace Hopper", "2026-11-13 12:04 UTC"}, absent: []string{"проект", "с ролью"},
+	}, {
+		locale: "ru", subject: "Приглашение во Flagnetic",
+		data: appaccess.InvitationMailData{URL: link, ExpiresAt: expires},
+		want: []string{"2026-11-13 12:04 UTC"}, absent: []string{"проект", "приглашает"},
+	}, {
+		locale: "ru", subject: "Grace Hopper приглашает вас в проект Checkout во Flagnetic",
+		data: appaccess.InvitationMailData{
+			URL: link, ExpiresAt: expires, InvitedBy: "Grace Hopper", Project: "Checkout", Role: access.RoleDeveloper,
+		},
+		want: []string{"Grace Hopper", "Checkout", "Разработчик", "2026-11-13 12:04 UTC"},
+	}} {
+		got, err := r.Render(appaccess.Mail{
+			Kind: access.MailInvitation, Locale: tc.locale, To: appaccess.MailRecipient{Name: "Ada", Email: "ada@example.com"},
+			Data: tc.data,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Subject != tc.subject {
+			t.Errorf("%s: subject = %q, want %q", tc.locale, got.Subject, tc.subject)
+		}
+		for _, part := range []string{got.Text, got.HTML} {
+			for _, want := range append([]string{link, "Ada"}, tc.want...) {
+				if !strings.Contains(part, want) {
+					t.Errorf("%s %q: a part lacks %q:\n%s", tc.locale, tc.subject, want, part)
+				}
+			}
+			for _, absent := range tc.absent {
+				if strings.Contains(strings.ToLower(part), absent) {
+					t.Errorf("%s %q: a part names %q, which this invitation has none of:\n%s", tc.locale, tc.subject, absent, part)
+				}
+			}
+		}
+		if !strings.Contains(got.HTML, `href="`+link+`"`) {
+			t.Errorf("%s: the HTML does not link to the invitation: %s", tc.locale, got.HTML)
+		}
+	}
+}
+
+func TestTheInvitationMailEscapesWhatItIsGivenInHTML(t *testing.T) {
+	r, err := mail.NewRenderer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, locale := range access.MailLocales {
+		got, err := r.Render(appaccess.Mail{
+			Kind: access.MailInvitation, Locale: locale, To: appaccess.MailRecipient{Name: "Ada", Email: "ada@example.com"},
+			Data: appaccess.InvitationMailData{
+				URL: "https://flags.example.com/invitations/x", InvitedBy: "<b>Mallory</b>", Project: "<i>Checkout</i>",
+				Role: access.RoleViewer,
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(got.HTML, "<b>") || strings.Contains(got.HTML, "<i>") || !strings.Contains(got.HTML, "&lt;b&gt;Mallory") {
+			t.Errorf("%s: the HTML part does not escape the inviter and the project: %s", locale, got.HTML)
+		}
 	}
 }

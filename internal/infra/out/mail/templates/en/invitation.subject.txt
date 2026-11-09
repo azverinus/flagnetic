@@ -1,0 +1,1 @@
+{{with .Data}}{{if .InvitedBy}}{{.InvitedBy}} invited you to {{if .Project}}{{.Project}} on {{end}}Flagnetic{{else}}You are invited to {{if .Project}}{{.Project}} on {{end}}Flagnetic{{end}}{{end}}
