@@ -463,6 +463,10 @@ msgstr "Флаг появится здесь, когда переживёт ож
 msgid "A key never changes once it is set."
 msgstr "Ключ, однажды заданный, больше не меняется."
 
+#: src/components/auth-settings-form.tsx
+msgid "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
+msgstr "Участник, забывший пароль, запрашивает сброс пароля по почте со страницы входа. Это работает, только пока SMTP-сервер настроен в разделе «Почта» навигации экземпляра. Администратор экземпляра может выпустить ссылку для сброса пароля на странице участника в любом случае."
+
 #: src/lib/project-members.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -516,6 +520,18 @@ msgstr "Пароль сохранён и больше не показывает�
 #: src/lib/problem-messages.ts
 msgid "A password needs a username."
 msgstr "Для пароля нужно имя пользователя."
+
+#: src/components/password-reset-link-dialog.tsx
+msgid "A password reset link for {name}"
+msgstr "Ссылка для сброса пароля участника {name}"
+
+#: src/components/member-actions.tsx
+msgid "A password reset link is issued."
+msgstr "Ссылка для сброса пароля выпущена."
+
+#: src/components/password-reset-completion.tsx
+msgid "A password reset link works once, for an hour, and ends when the password is changed. Ask for a new link, or sign in if you remember your password."
+msgstr "Ссылка для сброса пароля срабатывает один раз, действует час и перестаёт работать, когда пароль меняется. Запросите новую ссылку или войдите, если помните пароль."
 
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "A project owner or an instance admin can grant you a role in it."
@@ -1110,6 +1126,10 @@ msgstr "Только архивные флаги"
 msgid "Archived."
 msgstr "Отправлен в архив."
 
+#: src/components/password-reset-completion.tsx
+msgid "Ask for a new link"
+msgstr "Запросить новую ссылку"
+
 #: src/components/auth-provider-detail.tsx
 msgid "Asking the identity provider…"
 msgstr "Запрашиваем провайдера идентификации…"
@@ -1128,6 +1148,7 @@ msgstr "в запланированное время"
 
 #: src/components/invitation-acceptance.tsx
 #: src/components/password-form.tsx
+#: src/components/password-reset-completion.tsx
 msgid "At least 12 characters, or as many as this instance asks for. Length is what makes a password hard to guess."
 msgstr "Не меньше 12 символов или столько, сколько требует этот экземпляр. Подобрать пароль мешает именно длина."
 
@@ -1288,6 +1309,10 @@ msgstr "Ждут удаления кода"
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Awaiting my decision"
 msgstr "Ждут моего решения"
+
+#: src/components/password-reset-request.tsx
+msgid "Back to sign in"
+msgstr "Вернуться ко входу"
 
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 msgid "Based on"
@@ -1480,7 +1505,16 @@ msgstr "Выберите участника"
 msgid "Choose a member."
 msgstr "Выберите участника."
 
+#: src/components/password-reset-completion.tsx
+msgid "Choose a new password"
+msgstr "Выберите новый пароль"
+
+#: src/components/password-reset-completion.tsx
+msgid "Choose a new password for {name} ({email}); the link works until {until}. Setting it signs you out everywhere else."
+msgstr "Выберите новый пароль для {name} ({email}); ссылка действует до {until}. Новый пароль завершит все остальные ваши сеансы."
+
 #: src/components/invitation-acceptance.tsx
+#: src/components/password-reset-completion.tsx
 msgid "Choose a password."
 msgstr "Придумайте пароль."
 
@@ -1771,6 +1805,7 @@ msgid "Configuration updated"
 msgstr "Конфигурация изменена"
 
 #: src/components/password-form.tsx
+#: src/components/password-reset-completion.tsx
 msgid "Confirm the new password"
 msgstr "Повторите новый пароль"
 
@@ -2304,6 +2339,7 @@ msgstr "изменять проект"
 
 #: src/components/invite-form.tsx
 #: src/components/member-form.tsx
+#: src/components/password-reset-request.tsx
 #: src/components/profile-form.tsx
 #: src/components/sign-in-form.tsx
 msgid "Email"
@@ -2521,6 +2557,10 @@ msgstr "Введите идентификатор клиента."
 msgid "Enter the client secret."
 msgstr "Введите секрет клиента."
 
+#: src/components/password-reset-request.tsx
+msgid "Enter the email you sign in with, and a link to choose a new password is mailed."
+msgstr "Введите адрес электронной почты, с которым вы входите, и мы отправим на него ссылку для выбора нового пароля."
+
 #: src/lib/problem-messages.ts
 msgid "Enter the http or https URL of the identity provider, without credentials, a query or a fragment."
 msgstr "Введите http- или https-адрес провайдера идентификации — без учётных данных, запроса и фрагмента."
@@ -2561,6 +2601,7 @@ msgstr "Введите URL, на который отправляются соб�
 msgid "Enter your current password."
 msgstr "Введите текущий пароль."
 
+#: src/components/password-reset-request.tsx
 #: src/components/sign-in-form.tsx
 msgid "Enter your email."
 msgstr "Введите адрес электронной почты."
@@ -3091,6 +3132,11 @@ msgstr "Флаги, которые должны отдавать указанн�
 msgid "Follow the browser"
 msgstr "Как в браузере"
 
+#: src/components/password-reset-request.tsx
+#: src/components/sign-in-form.tsx
+msgid "Forgot your password?"
+msgstr "Забыли пароль?"
+
 #: src/components/variations-editor.tsx
 msgid "Format"
 msgstr "Отформатировать"
@@ -3244,8 +3290,8 @@ msgid "How code names the flag, such as checkout.newFlow: letters, digits, ., - 
 msgstr "Имя флага в коде, например checkout.newFlow: буквы, цифры, ., - и _. Не меняется."
 
 #: src/routes/_signed-in/admin/auth-settings.tsx
-msgid "How long sessions last, how long API tokens may live, and how long passwords must be. Every replica of the instance applies a change within a second."
-msgstr "Сколько длятся сеансы, сколько могут жить API-токены и какой длины должны быть пароли. Каждая реплика экземпляра применяет изменение в течение секунды."
+msgid "How long sessions last, how long API tokens may live, how long passwords must be, and whether members reset a forgotten password by mail. Every replica of the instance applies a change within a second."
+msgstr "Сколько длятся сеансы, сколько могут жить API-токены, какой длины должны быть пароли и могут ли участники сбросить забытый пароль по почте. Каждая реплика экземпляра применяет изменение в течение секунды."
 
 #: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
 msgid "How rules name the segment. It never changes."
@@ -3279,6 +3325,10 @@ msgstr "Провайдер идентификации"
 #: src/components/saml-provider-form.tsx
 msgid "Identity provider metadata"
 msgstr "Метаданные провайдера идентификации"
+
+#: src/components/password-reset-request.tsx
+msgid "If this email belongs to a member who can reset their password, a link to reset it is on its way. It works for an hour."
+msgstr "Если этот адрес принадлежит участнику, который может сбросить пароль, ссылка для сброса уже в пути. Она действует час."
 
 #: src/lib/access-names.ts
 msgid "import a project document into the project"
@@ -3452,6 +3502,14 @@ msgstr "Выпустить новую ссылку-приглашение"
 #: src/components/member-actions.tsx
 msgid "Issue a new invitation link for {name}"
 msgstr "Выпустить новую ссылку-приглашение для участника {name}"
+
+#: src/components/member-actions.tsx
+msgid "Issue a password reset link"
+msgstr "Выпустить ссылку для сброса пароля"
+
+#: src/components/member-actions.tsx
+msgid "Issue a password reset link for {name}"
+msgstr "Выпустить ссылку для сброса пароля участника {name}"
 
 #: src/components/member-actions.tsx
 msgid "Issue link"
@@ -4052,6 +4110,7 @@ msgid "New flag"
 msgstr "Новый флаг"
 
 #: src/components/password-form.tsx
+#: src/components/password-reset-completion.tsx
 msgid "New password"
 msgstr "Новый пароль"
 
@@ -5519,6 +5578,10 @@ msgstr "Сохраните или отмените правки, прежде ч
 msgid "Save with usages?"
 msgstr "Сохранить сегмент, который используется?"
 
+#: src/components/password-reset-completion.tsx
+msgid "Saving…"
+msgstr "Сохраняем…"
+
 #: src/components/change-request-actions.tsx
 msgid "Say why, so the author knows what to change."
 msgstr "Объясните причину, чтобы автор знал, что исправить."
@@ -5624,10 +5687,18 @@ msgstr "Сегмент изменён"
 msgid "Segments"
 msgstr "Сегменты"
 
+#: src/components/auth-settings-form.tsx
+msgid "Self-service password reset"
+msgstr "Самостоятельный сброс пароля"
+
 #. An attribute type.
 #: src/lib/attribute-types.ts
 msgid "Semantic version"
 msgstr "Семантическая версия"
+
+#: src/components/password-reset-request.tsx
+msgid "Send a password reset link"
+msgstr "Отправить ссылку для сброса пароля"
 
 #: src/components/mail-settings.tsx
 msgid "Send a test mail"
@@ -5658,6 +5729,7 @@ msgid "Sending a test mail through the saved settings…"
 msgstr "Отправляем тестовое письмо через сохранённые настройки…"
 
 #: src/components/mail-settings.tsx
+#: src/components/password-reset-request.tsx
 msgid "Sending…"
 msgstr "Отправляем…"
 
@@ -5728,6 +5800,10 @@ msgstr "Тайм-аут бездействия сеанса"
 msgid "Sessions"
 msgstr "Сеансы"
 
+#: src/components/password-reset-completion.tsx
+msgid "Set password"
+msgstr "Сохранить пароль"
+
 #: src/lib/mail-settings.ts
 msgid "Set the instance's public address first (FLAGNETIC_BASE_URL): every link the instance mails is built from it."
 msgstr "Сначала задайте публичный адрес экземпляра (FLAGNETIC_BASE_URL): из него строится каждая ссылка, которую экземпляр отправляет по почте."
@@ -5785,6 +5861,7 @@ msgid "Sign authentication requests"
 msgstr "Подписывать запросы аутентификации"
 
 #: src/components/invitation-acceptance.tsx
+#: src/components/password-reset-completion.tsx
 #: src/components/sign-in-form.tsx
 #: src/routes/sign-in.tsx
 msgid "Sign in"
@@ -6559,6 +6636,10 @@ msgstr "Тайм-аут бездействия не может быть боль
 msgid "The instance could not reach the SMTP server, or the connection broke. Check the host and the port, and that the server accepts connections from the instance."
 msgstr "Экземпляр не смог подключиться к SMTP-серверу, или соединение оборвалось. Проверьте хост и порт, а также что сервер принимает подключения от экземпляра."
 
+#: src/components/password-reset-link-dialog.tsx
+msgid "The instance does not mail this link, so pass it to {name} yourself, over a channel only they read. It works once, until {until}."
+msgstr "Экземпляр не отправляет эту ссылку по почте, поэтому передайте её участнику {name} сами, по каналу, который читает только он. Она сработает один раз, до {until}."
+
 #: src/components/saml-provider-form.tsx
 msgid "The instance reads the identity provider's entity ID, sign-on address and signing certificates from it. Metadata fetched from a URL is read again every day, so the identity provider's certificate rotations reach the instance; pasted metadata is never read again."
 msgstr "Из них экземпляр читает entity ID провайдера идентификации, адрес входа и сертификаты подписи. Метаданные по URL перечитываются каждый день, поэтому ротации сертификатов провайдера доходят до экземпляра; вставленные метаданные не перечитываются."
@@ -6599,6 +6680,10 @@ msgstr "Участник, отвечающий за флаг."
 #: src/lib/problem-messages.ts
 msgid "The member already holds this role in the project."
 msgstr "У участника уже есть эта роль в проекте."
+
+#: src/lib/problem-messages.ts
+msgid "The member has not joined yet, so they have no password to reset. Issue a new invitation link instead."
+msgstr "Участник ещё не присоединился, поэтому сбрасывать ему нечего. Вместо этого выпустите новую ссылку-приглашение."
 
 #: src/lib/problem-messages.ts
 msgid "The member is deactivated. Reactivate them first."
@@ -6677,6 +6762,7 @@ msgid "The password must not contain your email address."
 msgstr "Пароль не должен содержать ваш адрес электронной почты."
 
 #: src/components/invitation-acceptance.tsx
+#: src/components/password-reset-completion.tsx
 msgid "The passwords do not match."
 msgstr "Пароли не совпадают."
 
@@ -7077,6 +7163,10 @@ msgstr "Наибольший срок действия токена на это�
 msgid "This instance already has a project with that key."
 msgstr "В этом экземпляре уже есть проект с таким ключом."
 
+#: src/components/password-reset-request.tsx
+msgid "This instance does not mail password resets. Ask an instance admin for a password reset link."
+msgstr "Этот экземпляр не отправляет ссылки для сброса пароля по почте. Попросите ссылку для сброса пароля у администратора экземпляра."
+
 #: src/lib/problem-messages.ts
 msgid "This instance does not reach targets on its own network. Use a public address, or ask the operator to allow private networks."
 msgstr "Этот экземпляр не обращается к адресам в своей сети. Используйте публичный адрес или попросите оператора разрешить частные сети."
@@ -7088,6 +7178,10 @@ msgstr "На этом экземпляре у каждого токена дол
 #: src/components/invitation-link-dialog.tsx
 msgid "This instance sends no mail, so pass this link to {name} yourself. It works once, until {until}."
 msgstr "Этот экземпляр не отправляет почту, поэтому передайте ссылку участнику {name} сами. Она сработает один раз, до {until}."
+
+#: src/lib/problem-messages.ts
+msgid "This instance signs nobody in with a password. Sign in through your identity provider instead."
+msgstr "В этом экземпляре никто не входит по паролю. Войдите через провайдера идентификации."
 
 #: src/lib/problem-messages.ts
 msgid "This invitation link no longer works: it was used, replaced by a newer one, or it expired."
@@ -7137,6 +7231,14 @@ msgstr "Этот оператор не подходит к типу атрибу
 #: src/lib/problem-messages.ts
 msgid "This password is too common. Choose another."
 msgstr "Этот пароль слишком распространён. Выберите другой."
+
+#: src/components/password-reset-completion.tsx
+msgid "This password reset link no longer works"
+msgstr "Эта ссылка для сброса пароля больше не действует"
+
+#: src/lib/problem-messages.ts
+msgid "This password reset link no longer works: it was used, ended by a password change, or it expired."
+msgstr "Эта ссылка для сброса пароля больше не действует: ею уже воспользовались, пароль с тех пор сменили или срок её действия истёк."
 
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "This project already has a flag with that key."
@@ -7743,6 +7845,10 @@ msgstr "Пока эксперимент в черновике, SDK не полу
 msgid "Who every mail comes from: one address, optionally with a name, such as Flagnetic <flags@example.com>."
 msgstr "От кого приходит каждое письмо: один адрес, при необходимости с именем, например Flagnetic <flags@example.com>."
 
+#: src/components/member-actions.tsx
+msgid "Whoever opens the link chooses a new password for {name} and is signed in as them, and every other session of theirs ends. The link is shown once and works for an hour; earlier links keep working until one is used."
+msgstr "Тот, кто откроет ссылку, выберет новый пароль для участника {name} и войдёт от его имени, а все остальные сеансы участника завершатся. Ссылка показывается один раз и действует час; прежние ссылки работают, пока одной из них не воспользуются."
+
 #: src/components/experiment-alerts.tsx
 msgid "Whole experiment"
 msgstr "Весь эксперимент"
@@ -7873,6 +7979,10 @@ msgstr "Изменения на этой странице будут потер�
 msgid "Your email address signs in through {providerName} only. Use its button."
 msgstr "Ваша почта входит только через {providerName}. Нажмите его кнопку."
 
+#: src/lib/problem-messages.ts
+msgid "Your email address signs in through your company's identity provider only, so a password would not let you in."
+msgstr "Ваш адрес электронной почты входит только через провайдера идентификации вашей компании, поэтому пароль не позволит войти."
+
 #: src/lib/sso-errors.ts
 msgid "Your email address signs in through your company's identity provider only. Use its button."
 msgstr "Ваша почта входит только через провайдера идентификации вашей компании. Нажмите его кнопку."
@@ -7880,6 +7990,10 @@ msgstr "Ваша почта входит только через провайд�
 #: src/components/token-list.tsx
 msgid "Your new API token"
 msgstr "Ваш новый API-токен"
+
+#: src/routes/password-reset.$secret.tsx
+msgid "Your new password is set. Every other session of yours is signed out."
+msgstr "Новый пароль сохранён. Все остальные ваши сеансы завершены."
 
 #: src/components/password-form.tsx
 msgid "Your password is changed. Every other device is signed out."

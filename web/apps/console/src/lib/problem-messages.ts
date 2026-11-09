@@ -215,6 +215,22 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
             msg`The provider is still in use. Disable it instead: that stops its sign-ins and keeps its members, identities and grants.`,
           );
     }
+    case "reset_gone":
+      return i18n._(
+        msg`This password reset link no longer works: it was used, ended by a password change, or it expired.`,
+      );
+    case "member_not_active":
+      return i18n._(
+        msg`The member has not joined yet, so they have no password to reset. Issue a new invitation link instead.`,
+      );
+    case "local_login_disabled":
+      return i18n._(
+        msg`This instance signs nobody in with a password. Sign in through your identity provider instead.`,
+      );
+    case "sso_required":
+      return i18n._(
+        msg`Your email address signs in through your company's identity provider only, so a password would not let you in.`,
+      );
     case "invitation_gone":
       return i18n._(
         msg`This invitation link no longer works: it was used, replaced by a newer one, or it expired.`,

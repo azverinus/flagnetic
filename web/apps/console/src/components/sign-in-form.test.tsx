@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { fakeServer, problem } from "@/test/fake-server";
-import { renderWithProviders } from "@/test/render";
+import { renderWithProviders, renderWithRouter } from "@/test/render";
 
 import { SignInForm } from "./sign-in-form";
 
@@ -170,6 +170,36 @@ describe("the sign-in form", () => {
       expect(await screen.findByRole("alert")).toHaveTextContent(
         "Your email address signs in through Acme SSO only. Use its button.",
       );
+    });
+  });
+
+  describe("a forgotten password", () => {
+    it("offers the forgotten-password page when the instance mails resets", async () => {
+      fakeServer({
+        "GET /auth/methods": {
+          status: 200,
+          body: { local_login_enabled: true, password_reset_available: true, providers: [] },
+        },
+      });
+      await renderWithRouter(() => <SignInForm onSignedIn={vi.fn()} />);
+
+      expect(await screen.findByRole("link", { name: "Forgot your password?" })).toHaveAttribute(
+        "href",
+        "/forgot-password",
+      );
+    });
+
+    it("offers nothing that would lead to a dead end when it mails none", async () => {
+      fakeServer({
+        "GET /auth/methods": {
+          status: 200,
+          body: { local_login_enabled: true, password_reset_available: false, providers: [] },
+        },
+      });
+      await renderWithRouter(() => <SignInForm onSignedIn={vi.fn()} />);
+
+      expect(await screen.findByLabelText("Password")).toBeVisible();
+      expect(screen.queryByRole("link", { name: "Forgot your password?" })).not.toBeInTheDocument();
     });
   });
 });

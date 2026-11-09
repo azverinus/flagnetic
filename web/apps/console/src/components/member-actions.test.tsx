@@ -102,6 +102,71 @@ describe("what an instance admin does to a member", () => {
     );
   });
 
+  it("shows a password reset link once, never mailed, and nowhere after it is closed", async () => {
+    const url = "http://console.test/password-reset/fresh-secret";
+    const server = fakeServer({
+      "POST /members/m1/password-reset": {
+        status: 201,
+        body: { url, expires_at: "2026-10-28T10:00:00Z" },
+      },
+    });
+    const { queryClient } = renderWithProviders(<MemberActions member={member()} self={false} />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Issue a password reset link" }));
+    const confirm = await screen.findByRole("dialog", {
+      name: "Issue a password reset link for Grace Hopper",
+    });
+    expect(confirm).toHaveTextContent("Whoever opens the link chooses a new password");
+    await user.click(within(confirm).getByRole("button", { name: "Issue link" }));
+
+    const reveal = await screen.findByRole("dialog", {
+      name: "A password reset link for Grace Hopper",
+    });
+    expect(reveal).toHaveTextContent(url);
+    expect(reveal).toHaveTextContent("The instance does not mail this link");
+    expect(server.requests).toHaveLength(1);
+    await user.click(within(reveal).getByLabelText("I have stored it somewhere safe"));
+    await user.click(within(reveal).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => expect(reveal).not.toBeInTheDocument());
+    expect(document.body).not.toHaveTextContent(url);
+    await waitFor(() =>
+      expect(
+        JSON.stringify(
+          queryClient
+            .getMutationCache()
+            .getAll()
+            .map((m) => m.state),
+        ),
+      ).not.toContain(url),
+    );
+  });
+
+  it("explains why a password reset link is refused, in the dialog that asked for it", async () => {
+    const refusals: [string, string][] = [
+      [
+        "member_not_active",
+        "The member has not joined yet, so they have no password to reset. Issue a new invitation link instead.",
+      ],
+      ["member_deactivated", "The member is deactivated. Reactivate them first."],
+    ];
+    for (const [code, sentence] of refusals) {
+      fakeServer({ "POST /members/m1/password-reset": problem(409, code) });
+      const view = renderWithProviders(<MemberActions member={member()} self={false} />);
+      const user = userEvent.setup();
+
+      await user.click(screen.getByRole("button", { name: "Issue a password reset link" }));
+      const dialog = await screen.findByRole("dialog", {
+        name: "Issue a password reset link for Grace Hopper",
+      });
+      await user.click(within(dialog).getByRole("button", { name: "Issue link" }));
+
+      expect(await within(dialog).findByRole("alert")).toHaveTextContent(sentence);
+      view.unmount();
+    }
+  });
+
   it("shows the link a reactivation issues to a member who never set a password", async () => {
     const url = "http://console.test/invitations/again";
     fakeServer({

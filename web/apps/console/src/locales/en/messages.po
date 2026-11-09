@@ -463,6 +463,10 @@ msgstr "A flag shows up here once it outlives its expected removal, stops being 
 msgid "A key never changes once it is set."
 msgstr "A key never changes once it is set."
 
+#: src/components/auth-settings-form.tsx
+msgid "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
+msgstr "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
+
 #: src/lib/project-members.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -516,6 +520,18 @@ msgstr "A password is stored and never shown again. Leave this empty to keep it,
 #: src/lib/problem-messages.ts
 msgid "A password needs a username."
 msgstr "A password needs a username."
+
+#: src/components/password-reset-link-dialog.tsx
+msgid "A password reset link for {name}"
+msgstr "A password reset link for {name}"
+
+#: src/components/member-actions.tsx
+msgid "A password reset link is issued."
+msgstr "A password reset link is issued."
+
+#: src/components/password-reset-completion.tsx
+msgid "A password reset link works once, for an hour, and ends when the password is changed. Ask for a new link, or sign in if you remember your password."
+msgstr "A password reset link works once, for an hour, and ends when the password is changed. Ask for a new link, or sign in if you remember your password."
 
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "A project owner or an instance admin can grant you a role in it."
@@ -1110,6 +1126,10 @@ msgstr "Archived flags instead"
 msgid "Archived."
 msgstr "Archived."
 
+#: src/components/password-reset-completion.tsx
+msgid "Ask for a new link"
+msgstr "Ask for a new link"
+
 #: src/components/auth-provider-detail.tsx
 msgid "Asking the identity provider…"
 msgstr "Asking the identity provider…"
@@ -1128,6 +1148,7 @@ msgstr "at its scheduled time"
 
 #: src/components/invitation-acceptance.tsx
 #: src/components/password-form.tsx
+#: src/components/password-reset-completion.tsx
 msgid "At least 12 characters, or as many as this instance asks for. Length is what makes a password hard to guess."
 msgstr "At least 12 characters, or as many as this instance asks for. Length is what makes a password hard to guess."
 
@@ -1288,6 +1309,10 @@ msgstr "Awaiting code removal"
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Awaiting my decision"
 msgstr "Awaiting my decision"
+
+#: src/components/password-reset-request.tsx
+msgid "Back to sign in"
+msgstr "Back to sign in"
 
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 msgid "Based on"
@@ -1480,7 +1505,16 @@ msgstr "Choose a member"
 msgid "Choose a member."
 msgstr "Choose a member."
 
+#: src/components/password-reset-completion.tsx
+msgid "Choose a new password"
+msgstr "Choose a new password"
+
+#: src/components/password-reset-completion.tsx
+msgid "Choose a new password for {name} ({email}); the link works until {until}. Setting it signs you out everywhere else."
+msgstr "Choose a new password for {name} ({email}); the link works until {until}. Setting it signs you out everywhere else."
+
 #: src/components/invitation-acceptance.tsx
+#: src/components/password-reset-completion.tsx
 msgid "Choose a password."
 msgstr "Choose a password."
 
@@ -1771,6 +1805,7 @@ msgid "Configuration updated"
 msgstr "Configuration updated"
 
 #: src/components/password-form.tsx
+#: src/components/password-reset-completion.tsx
 msgid "Confirm the new password"
 msgstr "Confirm the new password"
 
@@ -2304,6 +2339,7 @@ msgstr "edit the project"
 
 #: src/components/invite-form.tsx
 #: src/components/member-form.tsx
+#: src/components/password-reset-request.tsx
 #: src/components/profile-form.tsx
 #: src/components/sign-in-form.tsx
 msgid "Email"
@@ -2521,6 +2557,10 @@ msgstr "Enter the client ID."
 msgid "Enter the client secret."
 msgstr "Enter the client secret."
 
+#: src/components/password-reset-request.tsx
+msgid "Enter the email you sign in with, and a link to choose a new password is mailed."
+msgstr "Enter the email you sign in with, and a link to choose a new password is mailed."
+
 #: src/lib/problem-messages.ts
 msgid "Enter the http or https URL of the identity provider, without credentials, a query or a fragment."
 msgstr "Enter the http or https URL of the identity provider, without credentials, a query or a fragment."
@@ -2561,6 +2601,7 @@ msgstr "Enter the URL the events are posted to."
 msgid "Enter your current password."
 msgstr "Enter your current password."
 
+#: src/components/password-reset-request.tsx
 #: src/components/sign-in-form.tsx
 msgid "Enter your email."
 msgstr "Enter your email."
@@ -3091,6 +3132,11 @@ msgstr "Flags that must serve a variation for this flag to be evaluated here; ot
 msgid "Follow the browser"
 msgstr "Follow the browser"
 
+#: src/components/password-reset-request.tsx
+#: src/components/sign-in-form.tsx
+msgid "Forgot your password?"
+msgstr "Forgot your password?"
+
 #: src/components/variations-editor.tsx
 msgid "Format"
 msgstr "Format"
@@ -3244,8 +3290,8 @@ msgid "How code names the flag, such as checkout.newFlow: letters, digits, ., - 
 msgstr "How code names the flag, such as checkout.newFlow: letters, digits, ., - and _. It never changes."
 
 #: src/routes/_signed-in/admin/auth-settings.tsx
-msgid "How long sessions last, how long API tokens may live, and how long passwords must be. Every replica of the instance applies a change within a second."
-msgstr "How long sessions last, how long API tokens may live, and how long passwords must be. Every replica of the instance applies a change within a second."
+msgid "How long sessions last, how long API tokens may live, how long passwords must be, and whether members reset a forgotten password by mail. Every replica of the instance applies a change within a second."
+msgstr "How long sessions last, how long API tokens may live, how long passwords must be, and whether members reset a forgotten password by mail. Every replica of the instance applies a change within a second."
 
 #: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
 msgid "How rules name the segment. It never changes."
@@ -3279,6 +3325,10 @@ msgstr "Identity provider"
 #: src/components/saml-provider-form.tsx
 msgid "Identity provider metadata"
 msgstr "Identity provider metadata"
+
+#: src/components/password-reset-request.tsx
+msgid "If this email belongs to a member who can reset their password, a link to reset it is on its way. It works for an hour."
+msgstr "If this email belongs to a member who can reset their password, a link to reset it is on its way. It works for an hour."
 
 #: src/lib/access-names.ts
 msgid "import a project document into the project"
@@ -3452,6 +3502,14 @@ msgstr "Issue a new invitation link"
 #: src/components/member-actions.tsx
 msgid "Issue a new invitation link for {name}"
 msgstr "Issue a new invitation link for {name}"
+
+#: src/components/member-actions.tsx
+msgid "Issue a password reset link"
+msgstr "Issue a password reset link"
+
+#: src/components/member-actions.tsx
+msgid "Issue a password reset link for {name}"
+msgstr "Issue a password reset link for {name}"
 
 #: src/components/member-actions.tsx
 msgid "Issue link"
@@ -4052,6 +4110,7 @@ msgid "New flag"
 msgstr "New flag"
 
 #: src/components/password-form.tsx
+#: src/components/password-reset-completion.tsx
 msgid "New password"
 msgstr "New password"
 
@@ -5519,6 +5578,10 @@ msgstr "Save or discard your edits before changing the experiment's status."
 msgid "Save with usages?"
 msgstr "Save with usages?"
 
+#: src/components/password-reset-completion.tsx
+msgid "Saving…"
+msgstr "Saving…"
+
 #: src/components/change-request-actions.tsx
 msgid "Say why, so the author knows what to change."
 msgstr "Say why, so the author knows what to change."
@@ -5624,10 +5687,18 @@ msgstr "Segment updated"
 msgid "Segments"
 msgstr "Segments"
 
+#: src/components/auth-settings-form.tsx
+msgid "Self-service password reset"
+msgstr "Self-service password reset"
+
 #. An attribute type.
 #: src/lib/attribute-types.ts
 msgid "Semantic version"
 msgstr "Semantic version"
+
+#: src/components/password-reset-request.tsx
+msgid "Send a password reset link"
+msgstr "Send a password reset link"
 
 #: src/components/mail-settings.tsx
 msgid "Send a test mail"
@@ -5658,6 +5729,7 @@ msgid "Sending a test mail through the saved settings…"
 msgstr "Sending a test mail through the saved settings…"
 
 #: src/components/mail-settings.tsx
+#: src/components/password-reset-request.tsx
 msgid "Sending…"
 msgstr "Sending…"
 
@@ -5728,6 +5800,10 @@ msgstr "Session idle timeout"
 msgid "Sessions"
 msgstr "Sessions"
 
+#: src/components/password-reset-completion.tsx
+msgid "Set password"
+msgstr "Set password"
+
 #: src/lib/mail-settings.ts
 msgid "Set the instance's public address first (FLAGNETIC_BASE_URL): every link the instance mails is built from it."
 msgstr "Set the instance's public address first (FLAGNETIC_BASE_URL): every link the instance mails is built from it."
@@ -5785,6 +5861,7 @@ msgid "Sign authentication requests"
 msgstr "Sign authentication requests"
 
 #: src/components/invitation-acceptance.tsx
+#: src/components/password-reset-completion.tsx
 #: src/components/sign-in-form.tsx
 #: src/routes/sign-in.tsx
 msgid "Sign in"
@@ -6559,6 +6636,10 @@ msgstr "The idle timeout cannot be longer than the absolute timeout."
 msgid "The instance could not reach the SMTP server, or the connection broke. Check the host and the port, and that the server accepts connections from the instance."
 msgstr "The instance could not reach the SMTP server, or the connection broke. Check the host and the port, and that the server accepts connections from the instance."
 
+#: src/components/password-reset-link-dialog.tsx
+msgid "The instance does not mail this link, so pass it to {name} yourself, over a channel only they read. It works once, until {until}."
+msgstr "The instance does not mail this link, so pass it to {name} yourself, over a channel only they read. It works once, until {until}."
+
 #: src/components/saml-provider-form.tsx
 msgid "The instance reads the identity provider's entity ID, sign-on address and signing certificates from it. Metadata fetched from a URL is read again every day, so the identity provider's certificate rotations reach the instance; pasted metadata is never read again."
 msgstr "The instance reads the identity provider's entity ID, sign-on address and signing certificates from it. Metadata fetched from a URL is read again every day, so the identity provider's certificate rotations reach the instance; pasted metadata is never read again."
@@ -6599,6 +6680,10 @@ msgstr "The member accountable for the flag."
 #: src/lib/problem-messages.ts
 msgid "The member already holds this role in the project."
 msgstr "The member already holds this role in the project."
+
+#: src/lib/problem-messages.ts
+msgid "The member has not joined yet, so they have no password to reset. Issue a new invitation link instead."
+msgstr "The member has not joined yet, so they have no password to reset. Issue a new invitation link instead."
 
 #: src/lib/problem-messages.ts
 msgid "The member is deactivated. Reactivate them first."
@@ -6677,6 +6762,7 @@ msgid "The password must not contain your email address."
 msgstr "The password must not contain your email address."
 
 #: src/components/invitation-acceptance.tsx
+#: src/components/password-reset-completion.tsx
 msgid "The passwords do not match."
 msgstr "The passwords do not match."
 
@@ -7077,6 +7163,10 @@ msgstr "This instance allows a token at most {lifetime} ahead."
 msgid "This instance already has a project with that key."
 msgstr "This instance already has a project with that key."
 
+#: src/components/password-reset-request.tsx
+msgid "This instance does not mail password resets. Ask an instance admin for a password reset link."
+msgstr "This instance does not mail password resets. Ask an instance admin for a password reset link."
+
 #: src/lib/problem-messages.ts
 msgid "This instance does not reach targets on its own network. Use a public address, or ask the operator to allow private networks."
 msgstr "This instance does not reach targets on its own network. Use a public address, or ask the operator to allow private networks."
@@ -7088,6 +7178,10 @@ msgstr "This instance requires every token to expire."
 #: src/components/invitation-link-dialog.tsx
 msgid "This instance sends no mail, so pass this link to {name} yourself. It works once, until {until}."
 msgstr "This instance sends no mail, so pass this link to {name} yourself. It works once, until {until}."
+
+#: src/lib/problem-messages.ts
+msgid "This instance signs nobody in with a password. Sign in through your identity provider instead."
+msgstr "This instance signs nobody in with a password. Sign in through your identity provider instead."
 
 #: src/lib/problem-messages.ts
 msgid "This invitation link no longer works: it was used, replaced by a newer one, or it expired."
@@ -7137,6 +7231,14 @@ msgstr "This operator does not apply to the attribute's type."
 #: src/lib/problem-messages.ts
 msgid "This password is too common. Choose another."
 msgstr "This password is too common. Choose another."
+
+#: src/components/password-reset-completion.tsx
+msgid "This password reset link no longer works"
+msgstr "This password reset link no longer works"
+
+#: src/lib/problem-messages.ts
+msgid "This password reset link no longer works: it was used, ended by a password change, or it expired."
+msgstr "This password reset link no longer works: it was used, ended by a password change, or it expired."
 
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "This project already has a flag with that key."
@@ -7743,6 +7845,10 @@ msgstr "While the experiment is a draft, SDKs do not receive this rule: units co
 msgid "Who every mail comes from: one address, optionally with a name, such as Flagnetic <flags@example.com>."
 msgstr "Who every mail comes from: one address, optionally with a name, such as Flagnetic <flags@example.com>."
 
+#: src/components/member-actions.tsx
+msgid "Whoever opens the link chooses a new password for {name} and is signed in as them, and every other session of theirs ends. The link is shown once and works for an hour; earlier links keep working until one is used."
+msgstr "Whoever opens the link chooses a new password for {name} and is signed in as them, and every other session of theirs ends. The link is shown once and works for an hour; earlier links keep working until one is used."
+
 #: src/components/experiment-alerts.tsx
 msgid "Whole experiment"
 msgstr "Whole experiment"
@@ -7873,6 +7979,10 @@ msgstr "Your changes on this page will be lost."
 msgid "Your email address signs in through {providerName} only. Use its button."
 msgstr "Your email address signs in through {providerName} only. Use its button."
 
+#: src/lib/problem-messages.ts
+msgid "Your email address signs in through your company's identity provider only, so a password would not let you in."
+msgstr "Your email address signs in through your company's identity provider only, so a password would not let you in."
+
 #: src/lib/sso-errors.ts
 msgid "Your email address signs in through your company's identity provider only. Use its button."
 msgstr "Your email address signs in through your company's identity provider only. Use its button."
@@ -7880,6 +7990,10 @@ msgstr "Your email address signs in through your company's identity provider onl
 #: src/components/token-list.tsx
 msgid "Your new API token"
 msgstr "Your new API token"
+
+#: src/routes/password-reset.$secret.tsx
+msgid "Your new password is set. Every other session of yours is signed out."
+msgstr "Your new password is set. Every other session of yours is signed out."
 
 #: src/components/password-form.tsx
 msgid "Your password is changed. Every other device is signed out."

@@ -13,6 +13,7 @@ import {
   listMembers,
   getAuthSettings,
   getInvitation,
+  getPasswordReset,
   getMember,
   listMemberSessions,
   listMemberTokens,
@@ -78,6 +79,7 @@ import {
   type Environment,
   type FlagList,
   type Me,
+  type PasswordReset,
   type Project,
   type ProjectMe,
   type Role,
@@ -625,6 +627,21 @@ export function invitationQuery(secret: string) {
   return queryOptions<Invitation>({
     queryKey: ["invitations", secret],
     queryFn: () => unwrap(getInvitation({ path: { secret } })),
+    retry: false,
+    staleTime: Infinity,
+    gcTime: 0,
+  });
+}
+
+/**
+ * What a password reset's link opens, read before anyone is signed in.
+ * Like an invitation's, it is read once and forgotten with the page: its
+ * key holds the secret.
+ */
+export function passwordResetQuery(secret: string) {
+  return queryOptions<PasswordReset>({
+    queryKey: ["password-resets", secret],
+    queryFn: () => unwrap(getPasswordReset({ path: { secret } })),
     retry: false,
     staleTime: Infinity,
     gcTime: 0,

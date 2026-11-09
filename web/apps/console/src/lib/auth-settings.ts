@@ -57,9 +57,8 @@ export function secondsOf(duration: Duration): number | undefined {
 export type AuthSettingsValues = Record<DurationField, Duration> & {
   token_expiry_required: boolean;
   password_min_length: string;
-  /** Not edited here: the form sends back what it was given, as the server replaces every setting. */
   self_service_password_reset: boolean;
-  /** Not edited here, sent back as given. */
+  /** Not edited here: the form sends back what it was given, as the server replaces every setting. */
   local_login_enabled: boolean;
   /** Not edited here, sent back as given. */
   sso_enforced_domains: SsoEnforcedDomain[];

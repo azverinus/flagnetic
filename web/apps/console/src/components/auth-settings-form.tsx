@@ -24,10 +24,11 @@ import {
 } from "@/lib/auth-settings";
 import { ApiError, unwrap } from "@/lib/errors";
 import { formRefusal } from "@/lib/problem-messages";
-import { authSettingsQuery, meQuery } from "@/lib/queries";
+import { authMethodsQuery, authSettingsQuery, meQuery } from "@/lib/queries";
 
 /**
- * The instance's rules for sessions, API tokens and passwords. Every
+ * The instance's rules for sessions, API tokens, passwords and their
+ * self-service reset. Every
  * replica applies a change within a second; a lowered timeout ends the
  * sessions already past it.
  */
@@ -35,6 +36,7 @@ export function AuthSettingsForm({ settings }: { settings: AuthSettings }) {
   const { i18n, t } = useLingui();
   const queryClient = useQueryClient();
   const expiryRequired = useId();
+  const selfServiceReset = useId();
   const values = useMemo(() => formOf(settings), [settings]);
   const form = useForm<AuthSettingsValues>({
     resolver: zodResolver(authSettingsSchema(i18n)),
@@ -49,8 +51,10 @@ export function AuthSettingsForm({ settings }: { settings: AuthSettings }) {
       // An explicit reset replaces the edits, which the form otherwise
       // keeps when the settings it was given change under it.
       form.reset(formOf(saved), { keepDirtyValues: false });
-      // Every member reads the token policy from `GET /me`.
+      // Every member reads the token policy from `GET /me`, and the
+      // sign-in page whether to offer a forgotten password from the methods.
       await queryClient.invalidateQueries({ queryKey: meQuery.queryKey });
+      await queryClient.invalidateQueries({ queryKey: authMethodsQuery.queryKey });
       toast.success(t`The auth settings are saved.`);
     },
   });
@@ -160,6 +164,35 @@ export function AuthSettingsForm({ settings }: { settings: AuthSettings }) {
             {...form.register("password_min_length")}
           />
         </Field>
+        <Controller
+          control={form.control}
+          name="self_service_password_reset"
+          render={({ field }) => (
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor={selfServiceReset}>
+                  <Trans>Self-service password reset</Trans>
+                </Label>
+                <p id={`${selfServiceReset}-hint`} className="text-sm text-muted-foreground">
+                  <Trans>
+                    A member who forgot their password asks for a password reset by mail from the
+                    sign-in page. It works only while an SMTP server is configured under Mail in the
+                    instance navigation. An instance admin can issue a password reset link from a
+                    member's page either way.
+                  </Trans>
+                </p>
+              </div>
+              <Switch
+                id={selfServiceReset}
+                aria-describedby={`${selfServiceReset}-hint`}
+                ref={field.ref}
+                checked={field.value}
+                onCheckedChange={field.onChange}
+                onBlur={field.onBlur}
+              />
+            </div>
+          )}
+        />
       </FormPage>
       <UnsavedChangesBar
         dirty={isDirty}

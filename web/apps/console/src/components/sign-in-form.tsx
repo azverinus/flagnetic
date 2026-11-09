@@ -4,6 +4,7 @@ import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { CircleAlertIcon, InfoIcon } from "lucide-react";
 import { useId, useMemo } from "react";
 import { useForm } from "react-hook-form";
@@ -34,7 +35,8 @@ export type SignInFormProps = {
 
 /**
  * The ways to sign in: email and password when the instance allows them,
- * and a link to each enabled auth provider's sign-in. The reason for a
+ * with the forgotten-password page when the instance mails resets, and a
+ * link to each enabled auth provider's sign-in. The reason for a
  * refusal, or for a single sign-on that failed, is given in the member's
  * language. Every refusal the server gives is explained here rather than
  * toasted, because the member has nothing else on the page.
@@ -128,6 +130,14 @@ export function SignInForm({ ended, returnTo, error, errorProvider, onSignedIn }
           <Button type="submit" disabled={submit.isPending}>
             {submit.isPending ? <Trans>Signing in…</Trans> : <Trans>Sign in</Trans>}
           </Button>
+          {methods.data?.password_reset_available ? (
+            <Link
+              to="/forgot-password"
+              className="self-center text-sm text-primary underline-offset-4 hover:underline"
+            >
+              <Trans>Forgot your password?</Trans>
+            </Link>
+          ) : null}
         </form>
       ) : null}
       {providers.length > 0 ? (

@@ -35,21 +35,24 @@ export function memberName(member: Pick<Member, "display_name" | "email">): stri
 }
 
 /** The actions an instance admin may take on a member in their status. */
-export type MemberAction = "edit" | "promote" | "demote" | "reissue" | "deactivate" | "reactivate";
+export type MemberAction =
+  "edit" | "promote" | "demote" | "reissue" | "reset" | "deactivate" | "reactivate";
 
 /**
  * What can be done to a member as they are: an invited member's link can
- * be replaced; a deactivated member is edited or brought back, and an
- * instance admin among them can lose the role without being brought back
- * first, so a reactivation never returns it unasked. A deactivated member
- * is never promoted, since they cannot sign in to use it.
+ * be replaced, and an active member given a password reset link (an
+ * invited one joins through their invitation instead); a deactivated
+ * member is edited or brought back, and an instance admin among them can
+ * lose the role without being brought back first, so a reactivation never
+ * returns it unasked. A deactivated member is never promoted, since they
+ * cannot sign in to use it.
  */
 export function memberActions(member: Pick<Member, "status" | "instance_admin">): MemberAction[] {
   if (member.status === "deactivated") {
     return member.instance_admin ? ["edit", "demote", "reactivate"] : ["edit", "reactivate"];
   }
   const actions: MemberAction[] = ["edit", member.instance_admin ? "demote" : "promote"];
-  if (member.status === "invited") actions.push("reissue");
+  actions.push(member.status === "invited" ? "reissue" : "reset");
   actions.push("deactivate");
   return actions;
 }

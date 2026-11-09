@@ -7,6 +7,7 @@ import {
   createInstanceWebhook,
   createSegment,
   createWebhook,
+  issuePasswordReset,
   listProjectAuditEntries,
 } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
@@ -17,6 +18,7 @@ import {
   must,
   pathOf,
   seedInvitation,
+  seedMember,
   seedProject,
   signIn,
 } from "../support/console";
@@ -38,6 +40,7 @@ type Seeded = {
   project: string;
   member: string;
   invitation: string;
+  passwordReset: string;
   auditEntry: string;
   changeRequest: string;
   webhook: string;
@@ -68,6 +71,13 @@ const signedOut: Route[] = [
     name: "invitation (unknown secret)",
     route: "/invitations/$secret",
     path: () => "/invitations/not-a-secret",
+  },
+  { name: "forgotten password", route: "/forgot-password", path: () => "/forgot-password" },
+  { name: "password reset", route: "/password-reset/$secret", path: (s) => s.passwordReset },
+  {
+    name: "password reset (unknown secret)",
+    route: "/password-reset/$secret",
+    path: () => "/password-reset/not-a-secret",
   },
 ];
 
@@ -218,10 +228,18 @@ function routedPaths(): string[] {
   return [...to.matchAll(/'([^']*)'/g)].map((match) => match[1]!);
 }
 
-/** A project and an invited member of the sweep's own, so no other spec's changes show. */
+/**
+ * A project, an invited member and an active one with a password reset of
+ * the sweep's own, so no other spec's changes show.
+ */
 async function seed(): Promise<Seeded> {
   const project = await seedProject("sweep");
   const invited = await seedInvitation("sweep", "Sweep Invitee");
+  const active = await seedMember("sweep-reset", "Sweep Member", "harness-sweep-reset-6172");
+  const reset = must(
+    "issuing a password reset",
+    await issuePasswordReset({ client: managementClient(), path: { member: active.id } }),
+  );
   await seedFlag(project, stringFlag(sweepFlag));
   must(
     `creating ${sweepSegment}`,
@@ -324,6 +342,7 @@ async function seed(): Promise<Seeded> {
     project,
     member: invited.id,
     invitation: pathOf(invited.link),
+    passwordReset: pathOf(reset.url),
     auditEntry,
     changeRequest: changeRequest.id,
     webhook: webhook.id,
