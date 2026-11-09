@@ -3648,6 +3648,20 @@ type ProjectDocument struct {
 // ProjectDocumentSchemaVersion defines model for ProjectDocument.SchemaVersion.
 type ProjectDocumentSchemaVersion int
 
+// ProjectInvitation A member invited with a role in a project, which accepting their invitation grants them.
+type ProjectInvitation struct {
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+
+	// ExpiresAt When the invitation's link stops working; a member whose link expired is invited again for a fresh one.
+	ExpiresAt time.Time `json:"expires_at"`
+
+	// InvitedBy The member who issued the invitation; null when none did.
+	InvitedBy *openapi_types.UUID `json:"invited_by"`
+	Member    openapi_types.UUID  `json:"member"`
+	Role      RoleName            `json:"role"`
+}
+
 // ProjectInvitationCreate defines model for ProjectInvitationCreate.
 type ProjectInvitationCreate struct {
 	// DisplayName Not blank, at most 200 characters.
@@ -3658,6 +3672,11 @@ type ProjectInvitationCreate struct {
 
 	// Role One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`, each a role the caller holds every permission of in the project.
 	Role string `json:"role"`
+}
+
+// ProjectInvitationList defines model for ProjectInvitationList.
+type ProjectInvitationList struct {
+	Items []ProjectInvitation `json:"items"`
 }
 
 // ProjectList defines model for ProjectList.
@@ -10371,6 +10390,18 @@ type ClientInterface interface {
 	// Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
 	ImportProject(ctx context.Context, project ProjectKey, params *ImportProjectParams, body ImportProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListProjectInvitations The people invited to a project
+	//
+	// Every member still invited whose latest invitation grants a role in
+	// the project once accepted, expired or not, ordered by email. An
+	// invitation whose grant was dropped, or that grants a role elsewhere,
+	// is not listed; an accepted one is a grant of the project. A member
+	// listed here is invited again, with the same or another role, by
+	// inviting their email to the project once more.
+	//
+	// Corresponds with GET /projects/{project}/invitations (the `ListProjectInvitations` operationId).
+	ListProjectInvitations(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// InviteProjectMemberWithBody Invite someone to a project
 	//
 	// Invites a person who has no account to the instance with one of the
@@ -16149,6 +16180,28 @@ func (c *Client) ImportProjectWithBody(ctx context.Context, project ProjectKey, 
 // Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
 func (c *Client) ImportProject(ctx context.Context, project ProjectKey, params *ImportProjectParams, body ImportProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewImportProjectRequest(c.Server, project, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListProjectInvitations The people invited to a project
+//
+// Every member still invited whose latest invitation grants a role in
+// the project once accepted, expired or not, ordered by email. An
+// invitation whose grant was dropped, or that grants a role elsewhere,
+// is not listed; an accepted one is a grant of the project. A member
+// listed here is invited again, with the same or another role, by
+// inviting their email to the project once more.
+//
+// Corresponds with GET /projects/{project}/invitations (the `ListProjectInvitations` operationId).
+func (c *Client) ListProjectInvitations(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListProjectInvitationsRequest(c.Server, project)
 	if err != nil {
 		return nil, err
 	}
@@ -25629,6 +25682,40 @@ func NewImportProjectRequestWithBody(server string, project ProjectKey, params *
 	return req, nil
 }
 
+// NewListProjectInvitationsRequest constructs an http.Request for the ListProjectInvitations method
+func NewListProjectInvitationsRequest(server string, project ProjectKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/invitations", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewInviteProjectMemberRequest calls the generic InviteProjectMember builder with application/json body
 func NewInviteProjectMemberRequest(server string, project ProjectKey, body InviteProjectMemberJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -31569,6 +31656,20 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
 	ImportProjectWithResponse(ctx context.Context, project ProjectKey, params *ImportProjectParams, body ImportProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportProjectResponse, error)
+
+	// ListProjectInvitationsWithResponse The people invited to a project
+	//
+	// Every member still invited whose latest invitation grants a role in
+	// the project once accepted, expired or not, ordered by email. An
+	// invitation whose grant was dropped, or that grants a role elsewhere,
+	// is not listed; an accepted one is a grant of the project. A member
+	// listed here is invited again, with the same or another role, by
+	// inviting their email to the project once more.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/invitations (the `ListProjectInvitations` operationId).
+	ListProjectInvitationsWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListProjectInvitationsResponse, error)
 
 	// InviteProjectMemberWithBodyWithResponse Invite someone to a project
 	//
@@ -44261,6 +44362,75 @@ func (r ImportProjectResponse) ContentType() string {
 	return ""
 }
 
+// ListProjectInvitationsResponse401Headers the declared response headers of an HTTP 401 response for ListProjectInvitations
+type ListProjectInvitationsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListProjectInvitationsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ProjectInvitationList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListProjectInvitationsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListProjectInvitationsResponse) GetJSON200() *ProjectInvitationList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListProjectInvitationsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListProjectInvitationsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListProjectInvitationsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListProjectInvitationsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListProjectInvitationsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListProjectInvitationsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListProjectInvitationsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // InviteProjectMemberResponse401Headers the declared response headers of an HTTP 401 response for InviteProjectMember
 type InviteProjectMemberResponse401Headers struct {
 	WWWAuthenticate *string
@@ -53098,6 +53268,26 @@ func (c *ClientWithResponses) ImportProjectWithResponse(ctx context.Context, pro
 		return nil, err
 	}
 	return ParseImportProjectResponse(rsp)
+}
+
+// ListProjectInvitationsWithResponse The people invited to a project
+//
+// Every member still invited whose latest invitation grants a role in
+// the project once accepted, expired or not, ordered by email. An
+// invitation whose grant was dropped, or that grants a role elsewhere,
+// is not listed; an accepted one is a grant of the project. A member
+// listed here is invited again, with the same or another role, by
+// inviting their email to the project once more.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/invitations (the `ListProjectInvitations` operationId).
+func (c *ClientWithResponses) ListProjectInvitationsWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListProjectInvitationsResponse, error) {
+	rsp, err := c.ListProjectInvitations(ctx, project, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListProjectInvitationsResponse(rsp)
 }
 
 // InviteProjectMemberWithBodyWithResponse Invite someone to a project
@@ -65268,6 +65458,66 @@ func ParseImportProjectResponse(rsp *http.Response) (*ImportProjectResponse, err
 	return response, nil
 }
 
+// ParseListProjectInvitationsResponse parses an HTTP response from a ListProjectInvitationsWithResponse call
+func ParseListProjectInvitationsResponse(rsp *http.Response) (*ListProjectInvitationsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListProjectInvitationsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ProjectInvitationList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListProjectInvitationsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseInviteProjectMemberResponse parses an HTTP response from a InviteProjectMemberWithResponse call
 func ParseInviteProjectMemberResponse(rsp *http.Response) (*InviteProjectMemberResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -69879,6 +70129,9 @@ type ServerInterface interface {
 	// ImportProject Merge a project document into a project
 	// (POST /projects/{project}/import)
 	ImportProject(w http.ResponseWriter, r *http.Request, project ProjectKey, params ImportProjectParams)
+	// ListProjectInvitations The people invited to a project
+	// (GET /projects/{project}/invitations)
+	ListProjectInvitations(w http.ResponseWriter, r *http.Request, project ProjectKey)
 	// InviteProjectMember Invite someone to a project
 	// (POST /projects/{project}/invitations)
 	InviteProjectMember(w http.ResponseWriter, r *http.Request, project ProjectKey)
@@ -76211,6 +76464,32 @@ func (siw *ServerInterfaceWrapper) ImportProject(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// ListProjectInvitations operation middleware
+func (siw *ServerInterfaceWrapper) ListProjectInvitations(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListProjectInvitations(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // InviteProjectMember operation middleware
 func (siw *ServerInterfaceWrapper) InviteProjectMember(w http.ResponseWriter, r *http.Request) {
 
@@ -78668,6 +78947,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/grants", wrapper.ListGrants)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/grants", wrapper.CreateGrant)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/grants/{grant}", wrapper.DeleteGrant)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/invitations", wrapper.ListProjectInvitations)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/invitations", wrapper.InviteProjectMember)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/tokens", wrapper.ListProjectTokens)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/tokens", wrapper.CreateProjectToken)
@@ -93456,6 +93736,79 @@ func (response ImportProject422ApplicationProblemPlusJSONResponse) VisitImportPr
 	return err
 }
 
+type ListProjectInvitationsRequestObject struct {
+	Project ProjectKey `json:"project"`
+}
+
+type ListProjectInvitationsResponseObject interface {
+	VisitListProjectInvitationsResponse(w http.ResponseWriter) error
+}
+
+type ListProjectInvitations200JSONResponse ProjectInvitationList
+
+func (response ListProjectInvitations200JSONResponse) VisitListProjectInvitationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListProjectInvitations401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListProjectInvitations401ApplicationProblemPlusJSONResponse) VisitListProjectInvitationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListProjectInvitations403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListProjectInvitations403ApplicationProblemPlusJSONResponse) VisitListProjectInvitationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListProjectInvitations404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListProjectInvitations404ApplicationProblemPlusJSONResponse) VisitListProjectInvitationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type InviteProjectMemberRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Body    *InviteProjectMemberJSONRequestBody
@@ -99458,6 +99811,9 @@ type StrictServerInterface interface {
 	// ImportProject Merge a project document into a project
 	// (POST /projects/{project}/import)
 	ImportProject(ctx context.Context, request ImportProjectRequestObject) (ImportProjectResponseObject, error)
+	// ListProjectInvitations The people invited to a project
+	// (GET /projects/{project}/invitations)
+	ListProjectInvitations(ctx context.Context, request ListProjectInvitationsRequestObject) (ListProjectInvitationsResponseObject, error)
 	// InviteProjectMember Invite someone to a project
 	// (POST /projects/{project}/invitations)
 	InviteProjectMember(ctx context.Context, request InviteProjectMemberRequestObject) (InviteProjectMemberResponseObject, error)
@@ -103739,6 +104095,32 @@ func (sh *strictHandler) ImportProject(w http.ResponseWriter, r *http.Request, p
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ImportProjectResponseObject); ok {
 		if err := validResponse.VisitImportProjectResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListProjectInvitations operation middleware
+func (sh *strictHandler) ListProjectInvitations(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request ListProjectInvitationsRequestObject
+
+	request.Project = project
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListProjectInvitations(ctx, request.(ListProjectInvitationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListProjectInvitations")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListProjectInvitationsResponseObject); ok {
+		if err := validResponse.VisitListProjectInvitationsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

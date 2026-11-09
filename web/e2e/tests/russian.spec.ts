@@ -741,6 +741,45 @@ test.describe("the console in Russian", () => {
     }
   });
 
+  test("invites to a project and reads the invitation page in Russian", async ({
+    page,
+    browser,
+  }) => {
+    const email = `vera-${Date.now().toString(36)}@flagnetic.test`;
+    const name = "Вера Фигнер";
+    await signIn(page, admin, russian);
+    await page.goto(`/projects/${project}/members`);
+    await page.getByRole("button", { name: "Пригласить по почте" }).first().click();
+    const dialog = page.getByRole("dialog", { name: "Пригласить в проект" });
+    await dialog.getByLabel("Электронная почта").fill(email);
+    await dialog.getByLabel("Отображаемое имя").fill(name);
+    await dialog.getByRole("combobox", { name: "Роль" }).click();
+    await page.getByRole("option", { name: "Наблюдатель", exact: true }).click();
+    await dialog.getByRole("button", { name: "Пригласить", exact: true }).click();
+
+    const reveal = page.getByRole("dialog", { name: `Участник ${name} приглашён` });
+    const link = (await reveal.locator("code").textContent()) ?? "";
+    await reveal.getByLabel("Я сохранил это в надёжном месте").check();
+    await reveal.getByRole("button", { name: "Закрыть" }).click();
+    const invited = page.getByRole("table", { name: "Участники, приглашённые в проект" });
+    await expect(invited.getByRole("row", { name: new RegExp(name) })).toContainText("Наблюдатель");
+    await expectNoSeriousViolations(page, "the invited members in Russian");
+
+    const context = await browser.newContext({ locale: "ru-RU" });
+    const invitee = await context.newPage();
+    await invitee.goto(new URL(link).pathname);
+    await expect(invitee.getByRole("heading", { name: "Примите приглашение" })).toBeVisible();
+    await expect(
+      invitee.getByText(
+        `${admin.name} приглашает вас в проект Project tula с ролью «Наблюдатель».`,
+        {
+          exact: false,
+        },
+      ),
+    ).toBeVisible();
+    await context.close();
+  });
+
   test("explains a failed single sign-on on the sign-in page in Russian", async ({ page }) => {
     await page.goto("/sign-in?error=member_not_found");
 

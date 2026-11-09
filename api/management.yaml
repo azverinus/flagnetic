@@ -4672,6 +4672,31 @@ paths:
   /projects/{project}/invitations:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listProjectInvitations
+      summary: The people invited to a project
+      description: |
+        Every member still invited whose latest invitation grants a role in
+        the project once accepted, expired or not, ordered by email. An
+        invitation whose grant was dropped, or that grants a role elsewhere,
+        is not listed; an accepted one is a grant of the project. A member
+        listed here is invited again, with the same or another role, by
+        inviting their email to the project once more.
+      x-permission: grant.manage
+      tags: [grants]
+      responses:
+        "200":
+          description: The invited members and the role each invitation grants.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectInvitationList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
     post:
       operationId: inviteProjectMember
       summary: Invite someone to a project
@@ -8460,6 +8485,37 @@ components:
         role:
           type: string
           description: One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`, each a role the caller holds every permission of in the project.
+    ProjectInvitation:
+      type: object
+      description: A member invited with a role in a project, which accepting their invitation grants them.
+      required: [member, email, display_name, role, invited_by, expires_at]
+      properties:
+        member:
+          type: string
+          format: uuid
+        email:
+          type: string
+        display_name:
+          type: string
+        role:
+          $ref: "#/components/schemas/RoleName"
+        invited_by:
+          type: string
+          format: uuid
+          nullable: true
+          description: The member who issued the invitation; null when none did.
+        expires_at:
+          type: string
+          format: date-time
+          description: When the invitation's link stops working; a member whose link expired is invited again for a fresh one.
+    ProjectInvitationList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectInvitation"
     IssuedInvitation:
       type: object
       description: >-

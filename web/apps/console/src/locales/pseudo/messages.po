@@ -148,6 +148,14 @@ msgstr ""
 msgid "{inclusion}, not below the traffic allocation of {allocation}: left out"
 msgstr ""
 
+#: src/components/invitation-acceptance.tsx
+msgid "{inviter} invites you to the project {projectName} as {role}. Accepting grants you that role there."
+msgstr ""
+
+#: src/components/invitation-acceptance.tsx
+msgid "{inviter} invites you to this instance."
+msgstr ""
+
 #: src/components/kill-switch-dialog.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "{key} is off in {name}."
@@ -207,6 +215,10 @@ msgstr ""
 
 #: src/components/member-actions.tsx
 msgid "{name} can sign in again. What deactivation revoked stays revoked: their sessions and API tokens do not come back."
+msgstr ""
+
+#: src/components/project-invitations.tsx
+msgid "{name} gets a fresh invitation as {role}, and their earlier link stops working."
 msgstr ""
 
 #: src/components/member-credentials.tsx
@@ -278,6 +290,10 @@ msgstr ""
 
 #: src/components/member-actions.tsx
 msgid "{name} keeps only the roles their grants give them in each project."
+msgstr ""
+
+#: src/components/invitation-link-dialog.tsx
+msgid "{name} never set a password, so they join again through the mailed link."
 msgstr ""
 
 #: src/components/invitation-link-dialog.tsx
@@ -467,6 +483,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "A new flag is off in every environment until it is switched on."
+msgstr ""
+
+#: src/components/invitation-link-dialog.tsx
+msgid "A new invitation for {name}"
 msgstr ""
 
 #: src/components/invitation-link-dialog.tsx
@@ -894,8 +914,13 @@ msgstr ""
 msgid "An override serves this unit ID; rules are not consulted."
 msgstr ""
 
+#: src/components/invite-form.tsx
 #: src/components/member-form.tsx
 msgid "Another member already has this email address."
+msgstr ""
+
+#: src/components/invite-form.tsx
+msgid "Another member already has this email address. Grant them a role instead."
 msgstr ""
 
 #: src/lib/experiments.ts
@@ -1459,11 +1484,16 @@ msgstr ""
 msgid "Choose a password."
 msgstr ""
 
+#: src/components/invite-form.tsx
+msgid "Choose a project first."
+msgstr ""
+
 #: src/components/role-field.tsx
 msgid "Choose a role"
 msgstr ""
 
 #: src/components/grant-form.tsx
+#: src/components/invite-form.tsx
 #: src/components/token-create-form.tsx
 msgid "Choose a role."
 msgstr ""
@@ -1554,6 +1584,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered name identifier formats."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Choose one of the offered projects."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -2143,6 +2177,7 @@ msgstr ""
 msgid "Dismiss attribute"
 msgstr ""
 
+#: src/components/invite-form.tsx
 #: src/components/member-form.tsx
 #: src/components/profile-form.tsx
 msgid "Display name"
@@ -2160,6 +2195,10 @@ msgstr ""
 #: src/components/auth-provider-list.tsx
 #: src/components/saml-provider-form.tsx
 msgid "Domains"
+msgstr ""
+
+#: src/components/invitation-link-dialog.tsx
+msgid "Done"
 msgstr ""
 
 #: src/components/download-audit.tsx
@@ -2263,6 +2302,7 @@ msgstr ""
 msgid "edit the project"
 msgstr ""
 
+#: src/components/invite-form.tsx
 #: src/components/member-form.tsx
 #: src/components/profile-form.tsx
 #: src/components/sign-in-form.tsx
@@ -2856,6 +2896,10 @@ msgstr ""
 msgid "Expired"
 msgstr ""
 
+#: src/components/project-invitations.tsx
+msgid "Expired on {until}"
+msgstr ""
+
 #: src/components/sdk-keys.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
@@ -3135,7 +3179,7 @@ msgid "Grant a role to {name}"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/members.tsx
-msgid "Grant members of the instance the roles their work in it needs."
+msgid "Grant members of the instance the roles their work in it needs, or invite someone by email."
 msgstr ""
 
 #: src/lib/audit.ts
@@ -3305,20 +3349,44 @@ msgstr ""
 msgid "Invitation issued again"
 msgstr ""
 
-#: src/routes/_signed-in/admin/members/index.tsx
+#: src/components/invite-form.tsx
 msgid "Invite"
+msgstr ""
+
+#: src/components/project-invitations.tsx
+msgid "Invite {name} again"
 msgstr ""
 
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Invite a member"
 msgstr ""
 
+#: src/components/project-invitations.tsx
+msgid "Invite again"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Invite by email"
+msgstr ""
+
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Invite member"
 msgstr ""
 
+#: src/components/project-invitations.tsx
+msgid "Invite to the project"
+msgstr ""
+
 #: src/lib/members.ts
 msgid "Invited"
+msgstr ""
+
+#: src/components/project-invitations.tsx
+msgid "Invited by"
+msgstr ""
+
+#: src/components/project-invitations.tsx
+msgid "Invited members"
 msgstr ""
 
 #: src/components/session-list.tsx
@@ -3634,6 +3702,10 @@ msgstr ""
 msgid "Light"
 msgstr ""
 
+#: src/components/project-invitations.tsx
+msgid "Link"
+msgstr ""
+
 #: src/components/auth-provider-form.tsx
 #: src/components/saml-provider-form.tsx
 msgid "Link members by email"
@@ -3771,6 +3843,7 @@ msgstr ""
 #. A kind of entity in the audit log.
 #: src/components/audit-log.tsx
 #: src/components/grant-form.tsx
+#: src/components/project-invitations.tsx
 #: src/lib/audit.ts
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
@@ -3817,6 +3890,10 @@ msgstr ""
 #: src/components/auth-provider-detail.tsx
 #: src/components/auth-provider-list.tsx
 msgid "Members can no longer sign in through it. A provider that members have signed in through cannot be deleted; disable it instead. This cannot be undone."
+msgstr ""
+
+#: src/components/project-invitations.tsx
+msgid "Members invited to the project"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/members.tsx
@@ -4153,6 +4230,10 @@ msgstr ""
 
 #: src/components/prerequisites-section.tsx
 msgid "No prerequisites."
+msgstr ""
+
+#: src/components/invite-form.tsx
+msgid "No project"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/route.tsx
@@ -4514,6 +4595,10 @@ msgstr ""
 msgid "Optional; the author and the audit log see it."
 msgstr ""
 
+#: src/components/invite-form.tsx
+msgid "Optional. Accepting the invitation grants the role you choose in this project."
+msgstr ""
+
 #: src/components/sign-in-form.tsx
 msgid "or"
 msgstr ""
@@ -4793,6 +4878,7 @@ msgid "Profile"
 msgstr ""
 
 #. A kind of entity in the audit log.
+#: src/components/invite-form.tsx
 #: src/components/navigation.tsx
 #: src/lib/audit.ts
 #: src/routes/_signed-in/admin/audit.$entry.tsx
@@ -5263,6 +5349,10 @@ msgstr ""
 
 #: src/lib/audit.ts
 msgid "Role granted"
+msgstr ""
+
+#: src/components/project-invitations.tsx
+msgid "Role on acceptance"
 msgstr ""
 
 #: src/components/rule-editor.tsx
@@ -5811,6 +5901,10 @@ msgstr ""
 
 #: src/components/conflict-banner.tsx
 msgid "Someone saved this configuration after this draft was loaded."
+msgstr ""
+
+#: src/components/project-invitations.tsx
+msgid "Someone without an account here joins the instance through the invitation, and accepting it grants them the role. A member of the instance is granted a role instead."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -6481,6 +6575,10 @@ msgstr ""
 msgid "The instance stops mailing, and members can no longer reset a forgotten password themselves. The stored password is deleted."
 msgstr ""
 
+#: src/components/invitation-link-dialog.tsx
+msgid "The invitation is mailed to {email}. Its link works once, until {until}. If the mail does not arrive, issue the invitation again."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
 msgstr ""
@@ -6927,7 +7025,7 @@ msgid "There is nothing at this address. The link may be old or mistyped."
 msgstr ""
 
 #: src/routes/_signed-in/admin/members/index.tsx
-msgid "They get a link to set their password, shown to you once. What they may do in a project comes from the grants a project owner gives them."
+msgid "They get a link to set their password, mailed to them when the instance can send mail and shown to you once otherwise. A role in a project, if you choose one, is granted when they accept."
 msgstr ""
 
 #: src/lib/flag-detail.ts
@@ -7674,6 +7772,10 @@ msgstr ""
 msgid "With"
 msgstr ""
 
+#: src/components/project-invitations.tsx
+msgid "Works until <0>{until}</0>"
+msgstr ""
+
 #: src/lib/experiments.ts
 msgid "Write the hypothesis: an experiment starts only with one."
 msgstr ""
@@ -7688,6 +7790,10 @@ msgstr ""
 
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "Yes"
+msgstr ""
+
+#: src/components/invitation-acceptance.tsx
+msgid "You are invited to the project {projectName} as {role}. Accepting grants you that role there."
 msgstr ""
 
 #: src/components/invitation-acceptance.tsx

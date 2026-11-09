@@ -1,6 +1,6 @@
 import type { Role } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { Ref } from "react";
+import type { ReactNode, Ref } from "react";
 
 import { Field } from "@/components/ui/field";
 import { Select, SelectItem } from "@/components/ui/select";
@@ -17,8 +17,13 @@ export type RoleFieldProps = {
   ref?: Ref<HTMLButtonElement>;
   /** An error the form found itself, such as no role chosen. */
   error?: string;
-  /** The refusal of the last submission, whose violation at `/role` is shown here. */
+  /** The refusal of the last submission, whose violation at `pointer` is shown here. */
   refusal?: unknown;
+  /** Where the server points at the role in a refusal; `/role` unless said. */
+  pointer?: string;
+  /** A note under the label, in place of what the chosen role lets its holder do while none is chosen. */
+  hint?: ReactNode;
+  disabled?: boolean;
 };
 
 /**
@@ -26,22 +31,34 @@ export type RoleFieldProps = {
  * saying under it what the chosen role lets its holder do. Nothing is
  * chosen first, so a role is always picked on purpose.
  */
-export function RoleField({ roles, value, onChange, onBlur, ref, error, refusal }: RoleFieldProps) {
+export function RoleField({
+  roles,
+  value,
+  onChange,
+  onBlur,
+  ref,
+  error,
+  refusal,
+  pointer = "/role",
+  hint,
+  disabled,
+}: RoleFieldProps) {
   const { i18n, t } = useLingui();
   const role = roles.find((candidate) => candidate.name === value);
   return (
     <Field
       label={<Trans>Role</Trans>}
-      hint={role ? roleSummary(i18n, role) : undefined}
+      hint={role ? roleSummary(i18n, role) : hint}
       error={error}
       refusal={refusal}
-      pointer="/role"
+      pointer={pointer}
     >
       <Select
         ref={ref}
         onBlur={onBlur}
         value={value}
         onValueChange={onChange}
+        disabled={disabled}
         placeholder={t`Choose a role`}
       >
         {roles.map((candidate) => (

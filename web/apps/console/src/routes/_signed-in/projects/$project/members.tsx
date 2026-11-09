@@ -1,12 +1,14 @@
-import { deleteGrant, type Grant, type ProjectMember } from "@flagnetic/api";
+import { deleteGrant, type Grant, type MemberInvitation, type ProjectMember } from "@flagnetic/api";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { createFileRoute } from "@tanstack/react-router";
-import { PlusIcon, Trash2Icon, UserPlusIcon, UsersIcon } from "lucide-react";
+import { MailIcon, PlusIcon, Trash2Icon, UserPlusIcon, UsersIcon } from "lucide-react";
 import { useContext, useMemo, useState } from "react";
 
 import { Can } from "@/components/can";
 import { GrantForm } from "@/components/grant-form";
+import { InvitationLinkDialog } from "@/components/invitation-link-dialog";
+import { InvitedMembers, ProjectInviteDialog } from "@/components/project-invitations";
 import { QueryError } from "@/components/query-error";
 import { RowAction, RowDialog, withRowActions } from "@/components/row-dialogs";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +60,11 @@ function Members() {
   const [granting, setGranting] = useState(false);
   const [grantingTo, setGrantingTo] = useState<ProjectMember>();
   const [removing, setRemoving] = useState<GrantOf>();
+  const [inviting, setInviting] = useState(false);
+  const [issued, setIssued] = useState<{
+    answer: MemberInvitation;
+    kind: "invited" | "reissued";
+  }>();
 
   const columns = useMemo(() => {
     const columns: TableColumn<ProjectMember>[] = [
@@ -115,12 +122,20 @@ function Members() {
   }, [canManage, i18n, names, t]);
 
   const grantRole = (
-    <Can permission={permission} whenMissing="disable">
-      <Button onClick={() => setGranting(true)}>
-        <PlusIcon aria-hidden />
-        <Trans>Grant a role</Trans>
-      </Button>
-    </Can>
+    <div className="flex flex-wrap gap-2">
+      <Can permission={permission} whenMissing="disable">
+        <Button variant="outline" onClick={() => setInviting(true)}>
+          <MailIcon aria-hidden />
+          <Trans>Invite by email</Trans>
+        </Button>
+      </Can>
+      <Can permission={permission} whenMissing="disable">
+        <Button onClick={() => setGranting(true)}>
+          <PlusIcon aria-hidden />
+          <Trans>Grant a role</Trans>
+        </Button>
+      </Can>
+    </div>
   );
   const grantForm = (member?: string, onDone = () => setGranting(false)) => (
     <GrantForm
@@ -152,7 +167,10 @@ function Members() {
           icon={<UsersIcon />}
           title={<Trans>Nobody holds a role in this project yet.</Trans>}
           description={
-            <Trans>Grant members of the instance the roles their work in it needs.</Trans>
+            <Trans>
+              Grant members of the instance the roles their work in it needs, or invite someone by
+              email.
+            </Trans>
           }
           action={grantRole}
         />
@@ -168,6 +186,29 @@ function Members() {
         />
       )}
 
+      {canManage ? (
+        <InvitedMembers
+          project={project}
+          names={names}
+          namesPending={known.names === undefined}
+          onReissued={(answer) => setIssued({ answer, kind: "reissued" })}
+        />
+      ) : null}
+
+      <ProjectInviteDialog
+        project={project}
+        open={inviting}
+        onClose={() => setInviting(false)}
+        onInvited={(answer) => {
+          setInviting(false);
+          setIssued({ answer, kind: "invited" });
+        }}
+      />
+      <InvitationLinkDialog
+        issued={issued?.answer}
+        kind={issued?.kind ?? "invited"}
+        onClose={() => setIssued(undefined)}
+      />
       <Dialog open={granting} onOpenChange={setGranting} title={t`Grant a role`}>
         {granting ? grantForm() : null}
       </Dialog>

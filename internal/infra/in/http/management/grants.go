@@ -82,6 +82,26 @@ func (a *api) InviteProjectMember(ctx context.Context, req InviteProjectMemberRe
 	return InviteProjectMember201JSONResponse(memberInvitationOf(ctx, res)), nil
 }
 
+// ListProjectInvitations answers the members invited to the project with
+// the role their invitation grants there.
+func (a *api) ListProjectInvitations(ctx context.Context, _ ListProjectInvitationsRequestObject) (ListProjectInvitationsResponseObject, error) {
+	invited, err := a.h.ListProjectInvitations.Handle(ctx, projectOf(ctx).project.ID)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]ProjectInvitation, len(invited))
+	for i, pi := range invited {
+		items[i] = ProjectInvitation{
+			Member: openapi_types.UUID(pi.Member.ID.Bytes()), Email: pi.Member.Email, DisplayName: pi.Member.DisplayName,
+			Role: RoleName(pi.Role), ExpiresAt: pi.ExpiresAt,
+		}
+		if !pi.InvitedBy.IsZero() {
+			items[i].InvitedBy = new(openapi_types.UUID(pi.InvitedBy.Bytes()))
+		}
+	}
+	return ListProjectInvitations200JSONResponse{Items: items}, nil
+}
+
 func grantOf(g access.Grant) Grant {
 	out := Grant{
 		Id: openapi_types.UUID(g.ID.Bytes()), Member: openapi_types.UUID(g.Member.Bytes()), Role: RoleName(g.Role),

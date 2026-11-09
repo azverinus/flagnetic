@@ -137,3 +137,20 @@ export function roleSummary(i18n: I18n, role: Role): string {
   );
   return i18n._(msg`Lets the holder ${list}.`);
 }
+
+/**
+ * The roles a member may grant or invite with in a project: those whose
+ * every permission they hold there, as the server allows no grant or
+ * invitation to carry more than its maker holds. In the server's order.
+ */
+export function grantableRoles(roles: readonly Role[], held: ReadonlySet<string>): Role[] {
+  return roles.filter((role) => role.permissions.every((permission) => held.has(permission)));
+}
+
+/**
+ * Whether an invitation's link stopped working: the server refuses it
+ * from the moment it expires.
+ */
+export function invitationExpired(expiresAt: string, now: number): boolean {
+  return Date.parse(expiresAt) <= now;
+}

@@ -33,6 +33,60 @@ describe("accepting an invitation", () => {
     expect(screen.getByText(/as Grace Hopper \(g\*\*\*@flagnetic\.test\)/)).toBeInTheDocument();
   });
 
+  it("names who invited, and the role it grants in which project", async () => {
+    fakeServer({
+      "GET /auth/invitations/s3cret": {
+        status: 200,
+        body: {
+          ...invitation.body,
+          project: { key: "checkout", name: "Checkout" },
+          role: "developer",
+          invited_by: "Ada Lovelace",
+        },
+      },
+    });
+    await renderWithRouter(() => <InvitationAcceptance secret="s3cret" onAccepted={() => {}} />);
+
+    expect(
+      await screen.findByText(
+        "Ada Lovelace invites you to the project Checkout as Developer. Accepting grants you that role there.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("names only who invited when the invitation grants no role", async () => {
+    fakeServer({
+      "GET /auth/invitations/s3cret": {
+        status: 200,
+        body: { ...invitation.body, invited_by: "Ada Lovelace" },
+      },
+    });
+    await renderWithRouter(() => <InvitationAcceptance secret="s3cret" onAccepted={() => {}} />);
+
+    expect(
+      await screen.findByText("Ada Lovelace invites you to this instance."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/project/)).toBeNull();
+  });
+
+  it("names the project and role in Russian", async () => {
+    activateForTests("ru");
+    fakeServer({
+      "GET /auth/invitations/s3cret": {
+        status: 200,
+        body: {
+          ...invitation.body,
+          project: { key: "checkout", name: "Checkout" },
+          role: "viewer",
+        },
+      },
+    });
+    await renderWithRouter(() => <InvitationAcceptance secret="s3cret" onAccepted={() => {}} />);
+
+    expect(await screen.findByText(/Checkout/)).toHaveTextContent("Наблюдатель");
+    activateForTests("en");
+  });
+
   it("sends the password alone and hands on the member it signed in", async () => {
     const me = { member: { id: "m1" } } as Me;
     const server = fakeServer({

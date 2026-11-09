@@ -2,6 +2,7 @@ import {
   inviteMember,
   type Member,
   type MemberInvitation,
+  type MemberInvite,
   type MemberStatus,
 } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -11,7 +12,7 @@ import { UserPlusIcon } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 
 import { InvitationLinkDialog } from "@/components/invitation-link-dialog";
-import { MemberForm } from "@/components/member-form";
+import { InviteForm, type InviteProjects, type InviteValues } from "@/components/invite-form";
 import { QueryError } from "@/components/query-error";
 import { SearchField } from "@/components/search-field";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +31,12 @@ import {
   memberStatusName,
   validateMemberSearch,
 } from "@/lib/members";
-import { memberSearchQuery } from "@/lib/queries";
+import {
+  memberSearchQuery,
+  projectInvitationsQuery,
+  projectsQuery,
+  rolesQuery,
+} from "@/lib/queries";
 import { forgetsSecret } from "@/lib/mutations";
 
 export const Route = createFileRoute("/_signed-in/admin/members/")({
@@ -43,8 +49,8 @@ const everyStatus = "all";
 
 /**
  * Every member of the instance, found by name or email and filtered by
- * status, with inviting someone: the invitation's one-time link is shown
- * once, to pass on.
+ * status, with inviting someone: the invitation is mailed, or its one-time
+ * link is shown once, to pass on.
  */
 function Members() {
   const { i18n, t } = useLingui();
@@ -201,7 +207,11 @@ function MembersTable({
   );
 }
 
-/** Inviting someone by email and name; the answer carries their one-time link. */
+/**
+ * Inviting someone by email and name, with a role in a project if the
+ * instance admin chooses one; the answer says the invitation was mailed or
+ * carries its one-time link.
+ */
 function InviteDialog({
   open,
   onClose,
@@ -213,12 +223,20 @@ function InviteDialog({
 }) {
   const { t } = useLingui();
   const queryClient = useQueryClient();
+  const roles = useQuery({ ...rolesQuery, enabled: open });
+  const projects = useQuery({ ...projectsQuery, enabled: open });
   const invite = useMutation({
-    mutationFn: (body: { email: string; display_name: string }) => unwrap(inviteMember({ body })),
+    mutationFn: (body: MemberInvite) => unwrap(inviteMember({ body })),
     ...forgetsSecret,
     meta: { toast: false },
-    onSuccess: async (answer) => {
+    onSuccess: async (answer, body) => {
       await queryClient.invalidateQueries({ queryKey: ["members"] });
+      // An invitation granting a role lists its member among the project's invited members.
+      if (body.grant) {
+        await queryClient.invalidateQueries({
+          queryKey: projectInvitationsQuery(body.grant.project).queryKey,
+        });
+      }
       // The link lives in the dialog that shows it, never in the
       // mutation's state: reset detaches the mutation, and with no cache
       // time the mutation cache drops it, answer included, so the link is
@@ -231,6 +249,20 @@ function InviteDialog({
     invite.reset();
     onClose();
   };
+  // A project is chosen only once both the projects and the roles to
+  // grant there are read: a project without roles to choose from would
+  // leave the form asking for a role it cannot offer.
+  const offered: InviteProjects = projects.isError
+    ? { status: "error", error: projects.error, retry: () => void projects.refetch() }
+    : roles.isError
+      ? { status: "error", error: roles.error, retry: () => void roles.refetch() }
+      : projects.data === undefined || roles.data === undefined
+        ? { status: "pending" }
+        : { status: "success", projects: projects.data };
+  const submit = ({ email, display_name, project, role }: InviteValues) =>
+    invite.mutate(
+      project === "" ? { email, display_name } : { email, display_name, grant: { project, role } },
+    );
   return (
     <Dialog
       open={open}
@@ -238,19 +270,20 @@ function InviteDialog({
       title={t`Invite a member`}
       description={
         <Trans>
-          They get a link to set their password, shown to you once. What they may do in a project
-          comes from the grants a project owner gives them.
+          They get a link to set their password, mailed to them when the instance can send mail and
+          shown to you once otherwise. A role in a project, if you choose one, is granted when they
+          accept.
         </Trans>
       }
     >
       {open ? (
-        <MemberForm
-          initial={{ email: "", display_name: "" }}
-          submitLabel={<Trans>Invite</Trans>}
+        <InviteForm
+          roles={roles.data ?? []}
+          projects={offered}
           pending={invite.isPending}
           refusal={invite.error}
           onCancel={close}
-          onSubmit={(values) => invite.mutate(values)}
+          onSubmit={submit}
         />
       ) : null}
     </Dialog>
