@@ -320,10 +320,10 @@ func TestAnInvitationToAnEnforcedDomainIsNotAcceptedWithAPassword(t *testing.T) 
 	invite := func(email string) string {
 		t.Helper()
 		res, err := e.admin.InviteMemberWithResponse(t.Context(), management.MemberInvite{Email: email, DisplayName: "Carol"})
-		if err != nil || res.JSON201 == nil || res.JSON201.Invitation == nil {
+		if err != nil || res.JSON201 == nil || res.JSON201.Invitation == nil || res.JSON201.Invitation.Url == nil {
 			t.Fatalf("inviting %s = %v: %v", email, res.StatusCode(), err)
 		}
-		link := res.JSON201.Invitation.Url
+		link := *res.JSON201.Invitation.Url
 		secret := link[strings.LastIndex(link, "/")+1:]
 		testkit.RecordSecret(secret)
 		return secret
@@ -399,10 +399,11 @@ func TestDisablingLocalLoginNeedsAnIdentityAndRefusesEveryPassword(t *testing.T)
 
 	e.link(t, idp, adminAt, corp, "sub-admin", nil)
 	invited, err := e.admin.InviteMemberWithResponse(t.Context(), management.MemberInvite{Email: "erin@example.com", DisplayName: "Erin"})
-	if err != nil || invited.JSON201 == nil || invited.JSON201.Invitation == nil {
+	if err != nil || invited.JSON201 == nil || invited.JSON201.Invitation == nil || invited.JSON201.Invitation.Url == nil {
 		t.Fatalf("inviting = %v: %v", invited.StatusCode(), err)
 	}
-	invitation := invited.JSON201.Invitation.Url[strings.LastIndex(invited.JSON201.Invitation.Url, "/")+1:]
+	url := *invited.JSON201.Invitation.Url
+	invitation := url[strings.LastIndex(url, "/")+1:]
 	testkit.RecordSecret(invitation)
 	if res = putSettings(t, adminAt.ClientWithResponses, disable); res.JSON200 == nil || res.JSON200.LocalLoginEnabled {
 		t.Fatalf("disabling local login holding an identity = %d: %s", res.StatusCode(), res.Body)
