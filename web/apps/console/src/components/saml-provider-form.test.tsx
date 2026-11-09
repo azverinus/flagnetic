@@ -124,7 +124,9 @@ describe("the SAML provider form", () => {
     await fillNew(user);
     await user.click(screen.getByRole("button", { name: "Add provider" }));
 
-    expect(await screen.findByText(/no single sign-on service with the HTTP-Redirect/)).toBeVisible();
+    expect(
+      await screen.findByText(/no single sign-on service with the HTTP-Redirect/),
+    ).toBeVisible();
     expect(screen.getByLabelText("Metadata URL")).toHaveAttribute("aria-invalid", "true");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });

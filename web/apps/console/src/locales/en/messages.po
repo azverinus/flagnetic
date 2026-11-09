@@ -382,6 +382,10 @@ msgstr "7 days"
 msgid "A boolean flag always has exactly the variations true and false."
 msgstr "A boolean flag always has exactly the variations true and false."
 
+#: src/lib/problem-messages.ts
+msgid "A certificate rotation is already pending. Complete it before starting another."
+msgstr "A certificate rotation is already pending. Complete it before starting another."
+
 #: src/lib/flag-detail.ts
 msgid "A chain of prerequisites has at most 5 steps: {path}."
 msgstr "A chain of prerequisites has at most 5 steps: {path}."
@@ -417,6 +421,10 @@ msgstr "A disabled subscription is sent nothing until it is enabled again."
 #: src/components/webhook-detail.tsx
 msgid "A disabled webhook is sent nothing."
 msgstr "A disabled webhook is sent nothing."
+
+#: src/components/saml-provider-form.tsx
+msgid "A first sign-in whose email is in the domains above is linked to the existing member with that email. Anyone who controls such an address at the identity provider then signs in as that member, so turn it on only for a provider you trust with these domains."
+msgstr "A first sign-in whose email is in the domains above is linked to the existing member with that email. Anyone who controls such an address at the identity provider then signs in as that member, so turn it on only for a provider you trust with these domains."
 
 #: src/components/auth-provider-form.tsx
 msgid "A first sign-in whose verified email is in the domains above is linked to the existing member with that email. Anyone who controls such an address at the provider then signs in as that member, so turn it on only for a provider you trust with these domains."
@@ -469,6 +477,10 @@ msgstr "A new invitation link for {name}"
 msgid "A new invitation link is issued."
 msgstr "A new invitation link is issued."
 
+#: src/components/saml-provider-detail.tsx
+msgid "A new key pair is generated beside the current one, valid for three years. The SP metadata lists both certificates, and assertions encrypted to either are accepted, so sign-ins keep working while the identity provider imports the new metadata."
+msgstr "A new key pair is generated beside the current one, valid for three years. The SP metadata lists both certificates, and assertions encrypted to either are accepted, so sign-ins keep working while the identity provider imports the new metadata."
+
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "A new project starts with the environments development, staging and production, the unit types user and anonymous, and the standard attributes."
 msgstr "A new project starts with the environments development, staging and production, the unit types user and anonymous, and the standard attributes."
@@ -510,6 +522,7 @@ msgid "A protected environment cannot be deleted. Stop protecting it on its page
 msgstr "A protected environment cannot be deleted. Stop protecting it on its page first."
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "A provider with this slug already exists."
 msgstr "A provider with this slug already exists."
 
@@ -525,6 +538,10 @@ msgstr "A required flag does not serve the variation required: the off variation
 #: src/components/session-list.tsx
 msgid "A revoked device is signed out at its next request."
 msgstr "A revoked device is signed out at its next request."
+
+#: src/components/saml-provider-detail.tsx
+msgid "A rotation is pending. Import the SP metadata at the identity provider again, so that it knows the next certificate, then complete the rotation. Until then nothing changes for the identity provider."
+msgstr "A rotation is pending. Import the SP metadata at the identity provider again, so that it knows the next certificate, then complete the rotation. Until then nothing changes for the identity provider."
 
 #: src/lib/rule-editor.ts
 msgid "A rule has at most {max} conditions."
@@ -589,6 +606,10 @@ msgstr "A session ends this long after it opened, however much it is used. Lower
 #: src/components/auth-settings-form.tsx
 msgid "A session ends this long after its last request."
 msgstr "A session ends this long after its last request."
+
+#: src/components/saml-provider-form.tsx
+msgid "A sign-in whose email is in the domains above and has no member yet creates one, active, who holds no access until a project grants them a role."
+msgstr "A sign-in whose email is in the domains above and has no member yet creates one, active, who holds no access until a project grants them a role."
 
 #: src/components/auth-provider-form.tsx
 msgid "A sign-in whose verified email is in the domains above and has no member yet creates one, active, who holds no access until a project grants them a role."
@@ -672,6 +693,10 @@ msgstr "Acknowledge"
 msgid "Acknowledged"
 msgstr "Acknowledged"
 
+#: src/components/saml-provider-detail.tsx
+msgid "ACS URL"
+msgstr "ACS URL"
+
 #: src/components/audit-entry-sheet.tsx
 #: src/components/audit-log.tsx
 msgid "Action"
@@ -739,6 +764,7 @@ msgid "Add prerequisite condition"
 msgstr "Add prerequisite condition"
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "Add provider"
 msgstr "Add provider"
 
@@ -1148,6 +1174,7 @@ msgid "Attribute updated"
 msgstr "Attribute updated"
 
 #: src/components/navigation.tsx
+#: src/components/saml-provider-form.tsx
 #: src/components/tester-panel.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Attributes"
@@ -1285,6 +1312,10 @@ msgstr "Cancel the change request"
 #: src/lib/change-requests.ts
 msgid "Cancelled"
 msgstr "Cancelled"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Certificates"
+msgstr "Certificates"
 
 #: src/lib/personal-tokens.ts
 msgid "Change experiments."
@@ -1522,6 +1553,10 @@ msgid "Choose one of the offered members."
 msgstr "Choose one of the offered members."
 
 #: src/lib/problem-messages.ts
+msgid "Choose one of the offered name identifier formats."
+msgstr "Choose one of the offered name identifier formats."
+
+#: src/lib/problem-messages.ts
 msgid "Choose one of the offered roles."
 msgstr "Choose one of the offered roles."
 
@@ -1655,6 +1690,14 @@ msgstr "Compare 2 to 50 variations."
 msgid "Compare environments"
 msgstr "Compare environments"
 
+#: src/components/saml-provider-detail.tsx
+msgid "Complete certificate rotation"
+msgstr "Complete certificate rotation"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Complete rotation"
+msgstr "Complete rotation"
+
 #: src/components/change-request-diff.tsx
 #: src/components/condition-row.tsx
 msgid "Condition {position}"
@@ -1786,6 +1829,7 @@ msgid "Create key"
 msgstr "Create key"
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "Create members on first sign-in"
 msgstr "Create members on first sign-in"
 
@@ -1827,6 +1871,10 @@ msgstr "Created"
 #: src/components/project-token-list.tsx
 msgid "Created by"
 msgstr "Created by"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Current"
+msgstr "Current"
 
 #: src/components/password-form.tsx
 msgid "Current password"
@@ -2110,6 +2158,7 @@ msgstr "does not equal"
 
 #: src/components/auth-provider-form.tsx
 #: src/components/auth-provider-list.tsx
+#: src/components/saml-provider-form.tsx
 msgid "Domains"
 msgstr "Domains"
 
@@ -2124,6 +2173,10 @@ msgstr "Download JSON Lines"
 #: src/components/download-ruleset.tsx
 msgid "Download ruleset"
 msgstr "Download ruleset"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Download SP metadata"
+msgstr "Download SP metadata"
 
 #: src/components/download-audit.tsx
 msgid "Download the audit log"
@@ -2216,6 +2269,14 @@ msgstr "edit the project"
 msgid "Email"
 msgstr "Email"
 
+#: src/components/saml-provider-form.tsx
+msgid "Email address"
+msgstr "Email address"
+
+#: src/components/saml-provider-form.tsx
+msgid "Email attribute"
+msgstr "Email attribute"
+
 #: src/components/auth-provider-form.tsx
 msgid "Email claim"
 msgstr "Email claim"
@@ -2241,6 +2302,7 @@ msgstr "Enable {name}"
 
 #: src/components/auth-provider-badges.tsx
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 #: src/components/webhook-editor.tsx
 #: src/components/webhook-status.tsx
 msgid "Enabled"
@@ -2374,6 +2436,14 @@ msgstr "Enter an absolute URL, such as https://example.com/flagnetic."
 msgid "Enter an absolute URL, such as https://login.example.com."
 msgstr "Enter an absolute URL, such as https://login.example.com."
 
+#: src/lib/saml-providers.ts
+msgid "Enter an attribute name of 1 to 256 characters."
+msgstr "Enter an attribute name of 1 to 256 characters."
+
+#: src/lib/saml-providers.ts
+msgid "Enter an attribute name."
+msgstr "Enter an attribute name."
+
 #: src/components/member-form.tsx
 msgid "Enter an email address."
 msgstr "Enter an email address."
@@ -2415,6 +2485,10 @@ msgstr "Enter the client secret."
 msgid "Enter the http or https URL of the identity provider, without credentials, a query or a fragment."
 msgstr "Enter the http or https URL of the identity provider, without credentials, a query or a fragment."
 
+#: src/lib/problem-messages.ts
+msgid "Enter the http or https URL of the metadata, without credentials or a fragment."
+msgstr "Enter the http or https URL of the metadata, without credentials or a fragment."
+
 #: src/lib/auth-providers.ts
 msgid "Enter the issuer's URL."
 msgstr "Enter the issuer's URL."
@@ -2430,6 +2504,14 @@ msgstr "Enter the SMTP server's host name or address."
 #: src/lib/flag-detail.ts
 msgid "Enter the unit's ID."
 msgstr "Enter the unit's ID."
+
+#: src/lib/problem-messages.ts
+msgid "Enter the URL of the identity provider's metadata, or paste it."
+msgstr "Enter the URL of the identity provider's metadata, or paste it."
+
+#: src/lib/saml-providers.ts
+msgid "Enter the URL of the identity provider's metadata."
+msgstr "Enter the URL of the identity provider's metadata."
 
 #: src/components/webhook-editor.tsx
 msgid "Enter the URL the events are posted to."
@@ -2451,6 +2533,11 @@ msgstr "Enter your password."
 #: src/components/audit-log.tsx
 msgid "Entity"
 msgstr "Entity"
+
+#: src/components/auth-provider-detail.tsx
+#: src/components/saml-provider-detail.tsx
+msgid "Entity ID"
+msgstr "Entity ID"
 
 #. A kind of entity in the audit log.
 #: src/components/experiment-alerts.tsx
@@ -2812,6 +2899,10 @@ msgstr "Fallthrough variation"
 msgid "Fallthrough variation changed from <0>{before}</0> to <1>{after}</1>."
 msgstr "Fallthrough variation changed from <0>{before}</0> to <1>{after}</1>."
 
+#: src/components/saml-provider-form.tsx
+msgid "Fetch from a URL"
+msgstr "Fetch from a URL"
+
 #: src/components/audit-entry-sheet.tsx
 msgid "Field"
 msgstr "Field"
@@ -2986,6 +3077,14 @@ msgstr "Gap"
 msgid "Gaps"
 msgstr "Gaps"
 
+#: src/components/saml-provider-detail.tsx
+msgid "Generate next certificate"
+msgstr "Generate next certificate"
+
+#: src/lib/problem-messages.ts
+msgid "Give the metadata as a URL or pasted, not both."
+msgstr "Give the metadata as a URL or pasted, not both."
+
 #: src/components/auth-provider-detail.tsx
 msgid "Go to the auth providers"
 msgstr "Go to the auth providers"
@@ -3051,6 +3150,10 @@ msgstr "Grant role"
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Grants"
 msgstr "Grants"
+
+#: src/components/saml-provider-form.tsx
+msgid "Groups attribute"
+msgstr "Groups attribute"
 
 #: src/components/auth-provider-form.tsx
 msgid "Groups claim"
@@ -3125,9 +3228,21 @@ msgstr "Hypothesis changed."
 msgid "I have stored it somewhere safe"
 msgstr "I have stored it somewhere safe"
 
+#: src/components/saml-provider-detail.tsx
+msgid "Identity provider"
+msgstr "Identity provider"
+
+#: src/components/saml-provider-form.tsx
+msgid "Identity provider metadata"
+msgstr "Identity provider metadata"
+
 #: src/lib/access-names.ts
 msgid "import a project document into the project"
 msgstr "import a project document into the project"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Import the SP metadata at the identity provider, or enter the ACS URL and the entity ID by hand."
+msgstr "Import the SP metadata at the identity provider, or enter the ACS URL and the entity ID by hand."
 
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "in {environment}"
@@ -3421,6 +3536,10 @@ msgstr "Last evaluated"
 msgid "Last evaluated by an SDK: <0/>"
 msgstr "Last evaluated by an SDK: <0/>"
 
+#: src/components/saml-provider-detail.tsx
+msgid "Last read"
+msgstr "Last read"
+
 #: src/components/sdk-inventory.tsx
 msgid "Last ruleset version"
 msgstr "Last ruleset version"
@@ -3516,6 +3635,7 @@ msgid "Light"
 msgstr "Light"
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "Link members by email"
 msgstr "Link members by email"
 
@@ -3533,6 +3653,7 @@ msgid "Load older deliveries"
 msgstr "Load older deliveries"
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "Load their version"
 msgstr "Load their version"
 
@@ -3710,6 +3831,19 @@ msgstr "Members who may approve change requests can then approve or reject it. I
 msgid "Membership (condition {position})"
 msgstr "Membership (condition {position})"
 
+#: src/components/saml-provider-detail.tsx
+#: src/components/saml-provider-form.tsx
+msgid "Metadata"
+msgstr "Metadata"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Metadata from a URL is read again every day."
+msgstr "Metadata from a URL is read again every day."
+
+#: src/components/saml-provider-form.tsx
+msgid "Metadata URL"
+msgstr "Metadata URL"
+
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Mine"
 msgstr "Mine"
@@ -3740,6 +3874,7 @@ msgstr "Move rule {position} up"
 #: src/components/experiment-transitions.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
+#: src/components/saml-provider-form.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/segment-fields.tsx
 #: src/components/token-create-form.tsx
@@ -3757,6 +3892,10 @@ msgstr "Move rule {position} up"
 msgid "Name"
 msgstr "Name"
 
+#: src/components/saml-provider-form.tsx
+msgid "Name attribute"
+msgstr "Name attribute"
+
 #: src/components/structural-diff-view.tsx
 msgid "Name changed from “{before}” to “{after}”."
 msgstr "Name changed from “{before}” to “{after}”."
@@ -3764,6 +3903,10 @@ msgstr "Name changed from “{before}” to “{after}”."
 #: src/components/auth-provider-form.tsx
 msgid "Name claim"
 msgstr "Name claim"
+
+#: src/components/saml-provider-form.tsx
+msgid "Name identifier format"
+msgstr "Name identifier format"
 
 #: src/components/search-field.tsx
 msgid "Name or email"
@@ -3776,6 +3919,10 @@ msgstr "Names the experiment in rules and in the exposures SDKs report: letters,
 #: src/components/auth-provider-form.tsx
 msgid "Names the provider in sign-in addresses and in the redirect URI. It never changes."
 msgstr "Names the provider in sign-in addresses and in the redirect URI. It never changes."
+
+#: src/components/saml-provider-form.tsx
+msgid "Names the provider in sign-in addresses, in the ACS URL and in the entity ID. It never changes."
+msgstr "Names the provider in sign-in addresses, in the ACS URL and in the entity ID. It never changes."
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Needs attention"
@@ -3870,6 +4017,7 @@ msgid "Newest entries"
 msgstr "Newest entries"
 
 #: src/components/flag-history.tsx
+#: src/components/saml-provider-detail.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -3897,6 +4045,10 @@ msgstr "No attempt has been made yet."
 #: src/components/auth-provider-list.tsx
 msgid "No auth provider yet."
 msgstr "No auth provider yet."
+
+#: src/lib/problem-messages.ts
+msgid "No certificate rotation is pending: start one first."
+msgstr "No certificate rotation is pending: start one first."
 
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "No change request awaits your decision."
@@ -4242,6 +4394,7 @@ msgid "Off variation changed from <0>{before}</0> to <1>{after}</1>."
 msgstr "Off variation changed from <0>{before}</0> to <1>{after}</1>."
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "Offer the provider on the sign-in page now. Turn it off to test it first."
 msgstr "Offer the provider on the sign-in page now. Turn it off to test it first."
 
@@ -4296,6 +4449,10 @@ msgid "Only a running experiment can be stopped."
 msgstr "Only a running experiment can be stopped."
 
 #: src/lib/problem-messages.ts
+msgid "Only a SAML provider has a certificate to rotate."
+msgstr "Only a SAML provider has a certificate to rotate."
+
+#: src/lib/problem-messages.ts
 msgid "Only a signed-in session can do this, not an API token."
 msgstr "Only a signed-in session can do this, not an API token."
 
@@ -4336,6 +4493,7 @@ msgid "Open the change request for review"
 msgstr "Open the change request for review"
 
 #: src/components/auth-provider-badges.tsx
+#: src/components/new-auth-provider.tsx
 #: src/components/session-list.tsx
 msgid "OpenID Connect"
 msgstr "OpenID Connect"
@@ -4495,6 +4653,22 @@ msgstr "Past expected end"
 msgid "Past expected removal"
 msgstr "Past expected removal"
 
+#: src/lib/saml-providers.ts
+msgid "Paste the identity provider's metadata."
+msgstr "Paste the identity provider's metadata."
+
+#: src/components/saml-provider-form.tsx
+msgid "Paste the metadata"
+msgstr "Paste the metadata"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Pasted"
+msgstr "Pasted"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Pasted metadata is never read again; paste a new document to change it."
+msgstr "Pasted metadata is never read again; paste a new document to change it."
+
 #: src/lib/webhooks.ts
 msgid "Pending"
 msgstr "Pending"
@@ -4521,6 +4695,10 @@ msgstr "permanent"
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Permanent"
 msgstr "Permanent"
+
+#: src/components/saml-provider-form.tsx
+msgid "Persistent: the same at every sign-in"
+msgstr "Persistent: the same at every sign-in"
 
 #: src/components/personal-menu.tsx
 #: src/routes/_signed-in/settings/route.tsx
@@ -4687,6 +4865,10 @@ msgstr "Protected"
 msgid "Protection"
 msgstr "Protection"
 
+#: src/components/new-auth-provider.tsx
+msgid "Protocol"
+msgstr "Protocol"
+
 #: src/lib/problem-messages.ts
 msgid "provisioned members"
 msgstr "provisioned members"
@@ -4820,6 +5002,7 @@ msgid "Regenerate the salt?"
 msgstr "Regenerate the salt?"
 
 #: src/components/auth-provider-detail.tsx
+#: src/components/saml-provider-detail.tsx
 msgid "Register the instance at the identity provider"
 msgstr "Register the instance at the identity provider"
 
@@ -5192,6 +5375,7 @@ msgid "Salt <0>{salt}</0>"
 msgstr "Salt <0>{salt}</0>"
 
 #: src/components/auth-provider-badges.tsx
+#: src/components/new-auth-provider.tsx
 #: src/components/session-list.tsx
 msgid "SAML"
 msgstr "SAML"
@@ -5210,6 +5394,7 @@ msgstr "Sample-ratio mismatch"
 #: src/components/mail-settings.tsx
 #: src/components/member-actions.tsx
 #: src/components/profile-form.tsx
+#: src/components/saml-provider-form.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/ui/unsaved-changes-bar.tsx
 #: src/components/webhook-editor.tsx
@@ -5454,8 +5639,8 @@ msgid "Set the instance's public address first (FLAGNETIC_BASE_URL): every link 
 msgstr "Set the instance's public address first (FLAGNETIC_BASE_URL): every link the instance mails is built from it."
 
 #: src/lib/problem-messages.ts
-msgid "Set the instance's public address first (FLAGNETIC_BASE_URL): the redirect URI the identity provider is told is built from it."
-msgstr "Set the instance's public address first (FLAGNETIC_BASE_URL): the redirect URI the identity provider is told is built from it."
+msgid "Set the instance's public address first (FLAGNETIC_BASE_URL): the addresses the identity provider is told are built from it."
+msgstr "Set the instance's public address first (FLAGNETIC_BASE_URL): the addresses the identity provider is told are built from it."
 
 #: src/components/auth-provider-detail.tsx
 #: src/components/navigation.tsx
@@ -5463,6 +5648,10 @@ msgstr "Set the instance's public address first (FLAGNETIC_BASE_URL): the redire
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "Settings"
 msgstr "Settings"
+
+#: src/components/saml-provider-detail.tsx
+msgid "SHA-256 fingerprint, expires {expires}"
+msgstr "SHA-256 fingerprint, expires {expires}"
 
 #: src/components/experiment-exposures.tsx
 msgid "Shares against the weights"
@@ -5497,6 +5686,10 @@ msgstr "Sidebar"
 msgid "Sign {name} out everywhere"
 msgstr "Sign {name} out everywhere"
 
+#: src/components/saml-provider-form.tsx
+msgid "Sign authentication requests"
+msgstr "Sign authentication requests"
+
 #: src/components/invitation-acceptance.tsx
 #: src/components/sign-in-form.tsx
 #: src/routes/sign-in.tsx
@@ -5515,6 +5708,10 @@ msgstr "Sign in with a provider"
 msgid "Sign out"
 msgstr "Sign out"
 
+#: src/components/saml-provider-form.tsx
+msgid "Sign the requests the instance sends with its current key, for an identity provider that checks them against the certificate in the SP metadata."
+msgstr "Sign the requests the instance sends with its current key, for an identity provider that checks them against the certificate in the SP metadata."
+
 #: src/components/member-credentials.tsx
 msgid "Sign yourself out everywhere"
 msgstr "Sign yourself out everywhere"
@@ -5522,6 +5719,11 @@ msgstr "Sign yourself out everywhere"
 #: src/lib/audit.ts
 msgid "Sign-in failed"
 msgstr "Sign-in failed"
+
+#: src/components/auth-provider-detail.tsx
+#: src/components/saml-provider-detail.tsx
+msgid "Sign-on URL"
+msgstr "Sign-on URL"
 
 #: src/components/session-list.tsx
 #: src/lib/audit.ts
@@ -5535,6 +5737,11 @@ msgstr "Signed in with"
 #: src/lib/audit.ts
 msgid "Signed out"
 msgstr "Signed out"
+
+#: src/components/auth-provider-detail.tsx
+#: src/components/saml-provider-detail.tsx
+msgid "Signing certificates"
+msgstr "Signing certificates"
 
 #: src/lib/sso-errors.ts
 msgid "Signing in did not work ({code}). Try again, or ask your instance admin."
@@ -5570,6 +5777,7 @@ msgstr "Skipped: the check needs 1,000 units first exposed; units first exposed 
 
 #: src/components/auth-provider-form.tsx
 #: src/components/auth-provider-list.tsx
+#: src/components/saml-provider-form.tsx
 msgid "Slug"
 msgstr "Slug"
 
@@ -5613,6 +5821,14 @@ msgstr "Sort by"
 msgid "Source"
 msgstr "Source"
 
+#: src/components/saml-provider-detail.tsx
+msgid "SP certificates"
+msgstr "SP certificates"
+
+#: src/components/saml-provider-detail.tsx
+msgid "SP metadata URL"
+msgstr "SP metadata URL"
+
 #: src/components/weights-input.tsx
 msgid "Split evenly"
 msgstr "Split evenly"
@@ -5642,6 +5858,10 @@ msgstr "Start"
 #: src/components/experiment-transitions.tsx
 msgid "Start {key}"
 msgstr "Start {key}"
+
+#: src/components/saml-provider-detail.tsx
+msgid "Start certificate rotation"
+msgstr "Start certificate rotation"
 
 #: src/components/experiment-transitions.tsx
 msgid "Start experiment"
@@ -5862,6 +6082,10 @@ msgstr "That is not your current password."
 msgid "That sign-in was started in another browser or window, so it was not completed. Start it again from here."
 msgstr "That sign-in was started in another browser or window, so it was not completed. Start it again from here."
 
+#: src/components/saml-provider-detail.tsx
+msgid "The ACS URL and the entity ID are built from the instance's public address (FLAGNETIC_BASE_URL), which is not set. Set it, and the addresses show here."
+msgstr "The ACS URL and the entity ID are built from the instance's public address (FLAGNETIC_BASE_URL), which is not set. Set it, and the addresses show here."
+
 #: src/components/experiment-alerts.tsx
 msgid "The alert is acknowledged."
 msgstr "The alert is acknowledged."
@@ -6011,6 +6235,10 @@ msgstr "The draft is deleted. This cannot be taken back; its audit entries stay.
 #: src/components/experiment-transitions.tsx
 msgid "The draft never starts and nothing about it changes any more; no ruleset changes. Archived experiments are listed only on request; it can still be cloned."
 msgstr "The draft never starts and nothing about it changes any more; no ruleset changes. Archived experiments are listed only on request; it can still be cloned."
+
+#: src/components/saml-provider-form.tsx
+msgid "The email domains this provider vouches for, one per line or separated by spaces. A subdomain is not included. An email counts as verified, and linking and creating members apply, only inside these domains."
+msgstr "The email domains this provider vouches for, one per line or separated by spaces. A subdomain is not included. An email counts as verified, and linking and creating members apply, only inside these domains."
 
 #: src/components/auth-provider-form.tsx
 msgid "The email domains this provider vouches for, one per line or separated by spaces. A subdomain is not included. Linking and creating members apply to these emails only."
@@ -6185,6 +6413,10 @@ msgstr "The flags would require each other in a cycle: {path}."
 msgid "The flags would require each other in a cycle."
 msgstr "The flags would require each other in a cycle."
 
+#: src/components/saml-provider-form.tsx
+msgid "The format the instance asks the identity provider for. The name identifier links the person to their member; with the email address format it is also their email."
+msgstr "The format the instance asks the identity provider for. The name identifier links the person to their member; with the email address format it is also their email."
+
 #: src/components/auth-settings-form.tsx
 msgid "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
 msgstr "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
@@ -6201,6 +6433,10 @@ msgstr "The identity provider could not be reached or did not answer as expected
 msgid "The identity provider could not be reached or did not answer as expected."
 msgstr "The identity provider could not be reached or did not answer as expected."
 
+#: src/lib/problem-messages.ts
+msgid "The identity provider offers no single sign-on service with the HTTP-Redirect binding, which the instance signs in through."
+msgstr "The identity provider offers no single sign-on service with the HTTP-Redirect binding, which the instance signs in through."
+
 #: src/lib/sso-errors.ts
 msgid "The identity provider refused the sign-in. Ask whoever runs it, or your instance admin."
 msgstr "The identity provider refused the sign-in. Ask whoever runs it, or your instance admin."
@@ -6208,6 +6444,10 @@ msgstr "The identity provider refused the sign-in. Ask whoever runs it, or your 
 #: src/components/auth-provider-form.tsx
 msgid "The identity provider's issuer URL; its discovery document is read from it. Plain http is accepted only on a loopback address."
 msgstr "The identity provider's issuer URL; its discovery document is read from it. Plain http is accepted only on a loopback address."
+
+#: src/components/saml-provider-form.tsx
+msgid "The identity provider's metadata document, at most 1 MiB."
+msgstr "The identity provider's metadata document, at most 1 MiB."
 
 #: src/components/auth-provider-list.tsx
 msgid "The identity providers members sign in through. Each is offered on the sign-in page and vouches only for the email domains you give it."
@@ -6220,6 +6460,18 @@ msgstr "The idle timeout cannot be longer than the absolute timeout."
 #: src/lib/mail-settings.ts
 msgid "The instance could not reach the SMTP server, or the connection broke. Check the host and the port, and that the server accepts connections from the instance."
 msgstr "The instance could not reach the SMTP server, or the connection broke. Check the host and the port, and that the server accepts connections from the instance."
+
+#: src/components/saml-provider-form.tsx
+msgid "The instance reads the identity provider's entity ID, sign-on address and signing certificates from it. Metadata fetched from a URL is read again every day, so the identity provider's certificate rotations reach the instance; pasted metadata is never read again."
+msgstr "The instance reads the identity provider's entity ID, sign-on address and signing certificates from it. Metadata fetched from a URL is read again every day, so the identity provider's certificate rotations reach the instance; pasted metadata is never read again."
+
+#: src/components/saml-provider-detail.tsx
+msgid "The instance serves the SP metadata only while the provider is enabled. Enable it to download the metadata or let the identity provider fetch it."
+msgstr "The instance serves the SP metadata only while the provider is enabled. Enable it to download the metadata or let the identity provider fetch it."
+
+#: src/components/saml-provider-detail.tsx
+msgid "The instance signs its requests with the current certificate's key and decrypts assertions encrypted to any certificate listed here. The SP metadata lists them all."
+msgstr "The instance signs its requests with the current certificate's key and decrypts assertions encrypted to any certificate listed here. The SP metadata lists them all."
 
 #: src/components/mail-settings.tsx
 msgid "The instance stops mailing, and members can no longer reset a forgotten password themselves. The stored password is deleted."
@@ -6262,9 +6514,21 @@ msgstr "The member whose API token is {token}"
 msgid "The members holding a role in this project. A member may hold several, and can do whatever any of them allows."
 msgstr "The members holding a role in this project. A member may hold several, and can do whatever any of them allows."
 
+#: src/lib/problem-messages.ts
+msgid "The metadata holds no signing certificate to check responses with."
+msgstr "The metadata holds no signing certificate to check responses with."
+
+#: src/lib/problem-messages.ts
+msgid "The metadata is at most 1 MiB."
+msgstr "The metadata is at most 1 MiB."
+
 #: src/components/project-audit.tsx
 msgid "The most recent changes in this project"
 msgstr "The most recent changes in this project"
+
+#: src/components/saml-provider-form.tsx
+msgid "The names of the assertion attributes the instance reads, matched by name or friendly name. The email is the name identifier when its format is email address."
+msgstr "The names of the assertion attributes the instance reads, matched by name or friendly name. The email is the name identifier when its format is email address."
 
 #: src/components/auth-provider-form.tsx
 msgid "The names of the claims the instance reads from the identity provider's tokens."
@@ -6281,6 +6545,14 @@ msgstr "The new project token"
 #: src/components/sdk-keys.tsx
 msgid "The new SDK key"
 msgstr "The new SDK key"
+
+#: src/components/saml-provider-detail.tsx
+msgid "The next certificate becomes current and the old key is destroyed. An identity provider that still encrypts assertions to the old certificate can no longer sign anyone in, so complete the rotation only once it has imported the new SP metadata. This cannot be undone."
+msgstr "The next certificate becomes current and the old key is destroyed. An identity provider that still encrypts assertions to the old certificate can no longer sign anyone in, so complete the rotation only once it has imported the new SP metadata. This cannot be undone."
+
+#: src/components/saml-provider-detail.tsx
+msgid "The next certificate of {name} is generated."
+msgstr "The next certificate of {name} is generated."
 
 #: src/components/overrides-section.tsx
 msgid "The override of {unit} is removed."
@@ -6305,6 +6577,10 @@ msgstr "The password must not contain your email address."
 #: src/components/invitation-acceptance.tsx
 msgid "The passwords do not match."
 msgstr "The passwords do not match."
+
+#: src/components/saml-provider-form.tsx
+msgid "The pasted metadata is stored and not shown again. Leave this empty to keep it, or paste a new document to replace it."
+msgstr "The pasted metadata is stored and not shown again. Leave this empty to keep it, or paste a new document to replace it."
 
 #: src/components/webhook-detail.tsx
 msgid "The platform disabled this webhook after its receiver kept failing, and dropped the deliveries that were waiting. Enable it once the receiver is back; a dropped delivery can then be redelivered from the log."
@@ -6438,6 +6714,10 @@ msgstr "The role includes the permission to {name}, which you do not hold yourse
 msgid "The rollout has a new salt."
 msgstr "The rollout has a new salt."
 
+#: src/components/saml-provider-detail.tsx
+msgid "The rotation of {name} is complete."
+msgstr "The rotation of {name} is complete."
+
 #: src/components/experiment-transitions.tsx
 msgid "The ruleset of each of these environments changes at once:"
 msgstr "The ruleset of each of these environments changes at once:"
@@ -6519,6 +6799,7 @@ msgid "The sites the key may be used from, such as https://app.example.com. Leav
 msgstr "The sites the key may be used from, such as https://app.example.com. Leave it empty to allow any origin."
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "The slug never changes."
 msgstr "The slug never changes."
 
@@ -6717,6 +6998,10 @@ msgstr "This is already in the list."
 #: src/lib/problem-messages.ts
 msgid "This is further ahead than this instance allows."
 msgstr "This is further ahead than this instance allows."
+
+#: src/lib/problem-messages.ts
+msgid "This is not the metadata of a SAML identity provider the instance can use: check that it is the identity provider's EntityDescriptor, without a DOCTYPE, with readable certificates and an https sign-on address."
+msgstr "This is not the metadata of a SAML identity provider the instance can use: check that it is the identity provider's EntityDescriptor, without a DOCTYPE, with readable certificates and an https sign-on address."
 
 #: src/lib/problem-messages.ts
 msgid "This is the instance's last active instance admin. Make another member instance admin first."
@@ -6927,6 +7212,10 @@ msgstr "Traffic allocation (%)"
 msgid "Traffic allocation changed from {before} % to {after} %."
 msgstr "Traffic allocation changed from {before} % to {after} %."
 
+#: src/components/saml-provider-form.tsx
+msgid "Transient: new at every sign-in, so nothing stays linked"
+msgstr "Transient: new at every sign-in, so nothing stays linked"
+
 #: src/components/navigation.tsx
 #: src/components/query-error.tsx
 msgid "Try again"
@@ -7053,6 +7342,10 @@ msgstr "Unknown device"
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Unsaved changes"
 msgstr "Unsaved changes"
+
+#: src/components/saml-provider-form.tsx
+msgid "Unspecified: the identity provider chooses"
+msgstr "Unspecified: the identity provider chooses"
 
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -7288,6 +7581,7 @@ msgid "What the project is called and what it is for."
 msgstr "What the project is called and what it is for."
 
 #: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
 msgid "What the sign-in button says: “Sign in with …”."
 msgstr "What the sign-in button says: “Sign in with …”."
 
@@ -7314,6 +7608,10 @@ msgstr "Whatever uses the token is refused from now on. This cannot be undone."
 #: src/components/webhook-editor.tsx
 msgid "Where every event is posted, signed with the subscription's secret."
 msgstr "Where every event is posted, signed with the subscription's secret."
+
+#: src/components/saml-provider-form.tsx
+msgid "Where the identity provider publishes its metadata. Plain http is accepted only on a loopback address."
+msgstr "Where the identity provider publishes its metadata. Plain http is accepted only on a loopback address."
 
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Where the project serves from. A key is fixed once created; the name can change."

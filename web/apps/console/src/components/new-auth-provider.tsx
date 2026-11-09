@@ -53,9 +53,19 @@ export function NewAuthProvider({ onCancel, onSaved }: NewAuthProviderProps) {
         </div>
       </fieldset>
       {kind === "oidc" ? (
-        <AuthProviderForm layout="dialog" autoFocus={!chosen} onCancel={onCancel} onSaved={onSaved} />
+        <AuthProviderForm
+          layout="dialog"
+          autoFocus={!chosen}
+          onCancel={onCancel}
+          onSaved={onSaved}
+        />
       ) : (
-        <SamlProviderForm layout="dialog" autoFocus={!chosen} onCancel={onCancel} onSaved={onSaved} />
+        <SamlProviderForm
+          layout="dialog"
+          autoFocus={!chosen}
+          onCancel={onCancel}
+          onSaved={onSaved}
+        />
       )}
     </div>
   );

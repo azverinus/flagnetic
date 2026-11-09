@@ -1,7 +1,7 @@
 import type { AuthProvider } from "@flagnetic/api";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { DialogForm } from "@/components/ui/dialog-form";
@@ -75,7 +75,7 @@ export function SamlProviderForm({
   // A slug already taken has no violation to point at: say it under the slug.
   const taken = refusal?.code === "already_exists";
   const error = (field: keyof SamlForm) => errors[field]?.message;
-  const source = form.watch("metadata_source");
+  const source = useWatch({ control: form.control, name: "metadata_source" });
   const keepsDocument = provider !== undefined && pastedMetadata(provider);
 
   const fields = (
@@ -96,8 +96,8 @@ export function SamlProviderForm({
         hint={
           creating ? (
             <Trans>
-              Names the provider in sign-in addresses, in the ACS URL and in the entity ID. It
-              never changes.
+              Names the provider in sign-in addresses, in the ACS URL and in the entity ID. It never
+              changes.
             </Trans>
           ) : (
             <Trans>The slug never changes.</Trans>
@@ -193,7 +193,6 @@ export function SamlProviderForm({
             autoComplete="off"
             spellCheck={false}
             className="font-mono text-xs"
-            placeholder="<EntityDescriptor …>"
             {...form.register("idp_metadata_xml")}
           />
         </Field>
@@ -203,8 +202,8 @@ export function SamlProviderForm({
         hint={
           <Trans>
             The email domains this provider vouches for, one per line or separated by spaces. A
-            subdomain is not included. An email counts as verified, and linking and creating
-            members apply, only inside these domains.
+            subdomain is not included. An email counts as verified, and linking and creating members
+            apply, only inside these domains.
           </Trans>
         }
         error={error("domains") ?? samlFieldViolation(i18n, refusal, "domains")}
@@ -229,9 +228,7 @@ export function SamlProviderForm({
                 the person to their member; with the email address format it is also their email.
               </Trans>
             }
-            error={
-              error("name_id_format") ?? samlFieldViolation(i18n, refusal, "name_id_format")
-            }
+            error={error("name_id_format") ?? samlFieldViolation(i18n, refusal, "name_id_format")}
           >
             <Select
               ref={field.ref}
