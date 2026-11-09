@@ -562,18 +562,22 @@ func TestAnEmailIsLinkedToAnExistingMemberOnlyWhenTheProviderVouchesForIt(t *tes
 	}
 }
 
-func TestAnInvitedMemberDoesNotSignInThroughAProvider(t *testing.T) {
+func TestAnInvitedMemberIsNotActivatedByAnEmailTheProviderDoesNotVouchFor(t *testing.T) {
 	idp := testkit.StartForgingIDP(t)
 	e := start(t)
 	slug := e.forged(t, idp, func(p *provider) { p.linkByEmail = true })
 	invited := testkit.NewMember(t, testkit.Pool(t), testkit.WithStatus(access.MemberInvited))
-	idp.NextClaims(map[string]any{"email": invited.Email})
+	idp.NextClaims(map[string]any{"email": invited.Email, "email_verified": false})
 	b := testkit.NewBrowser(t, e.srv.URL)
 
 	wantError(t, e.signIn(t, b, slug, "", e.opts()), b, "member_not_found")
-	failed := e.audited(t, "auth.sign_in_failed", "email", invited.Email)
-	if len(failed) != 1 || failed[0]["method"] != "oidc" || failed[0]["provider"] != slug || failed[0]["reason"] != "invited" {
-		t.Errorf("auth.sign_in_failed = %v", failed)
+	// Anyone can claim an address the provider does not verify, so the
+	// refusal fills no member's audit trail.
+	if failed := e.audited(t, "auth.sign_in_failed", "email", invited.Email); len(failed) != 0 {
+		t.Errorf("auth.sign_in_failed = %v, want none", failed)
+	}
+	if got := e.statusOf(t, invited.ID); got != management.MemberStatusInvited {
+		t.Errorf("the invited member is %s, want invited still", got)
 	}
 }
 

@@ -215,13 +215,20 @@ func (a *api) GetInvitation(ctx context.Context, req GetInvitationRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	out := GetInvitation200JSONResponse{Email: v.MaskedEmail, DisplayName: v.DisplayName, ExpiresAt: v.ExpiresAt, PasswordAllowed: v.PasswordAllowed}
-	if v.EnforcedProvider != "" {
-		enabled, listErr := a.h.ListEnabledAuthProviders.Handle(ctx)
-		if listErr != nil {
-			return nil, listErr
+	enabled, err := a.h.ListEnabledAuthProviders.Handle(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := GetInvitation200JSONResponse{
+		Email: v.MaskedEmail, DisplayName: v.DisplayName, ExpiresAt: v.ExpiresAt, PasswordAllowed: v.PasswordAllowed,
+		EnforcedProvider: enforcedProvider(enabled, v.EnforcedProvider), Providers: []AuthMethodProvider{},
+	}
+	// Signing in through a provider vouching for the invited email accepts
+	// the invitation; an enforced domain signs in through its provider alone.
+	for _, p := range enabled {
+		if p.VouchesForEmail(v.Email) && (v.EnforcedProvider == "" || p.Slug == v.EnforcedProvider) {
+			out.Providers = append(out.Providers, authMethodProvider(p))
 		}
-		out.EnforcedProvider = enforcedProvider(enabled, v.EnforcedProvider)
 	}
 	if v.InvitedBy != "" {
 		out.InvitedBy = &v.InvitedBy

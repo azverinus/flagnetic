@@ -53,6 +53,12 @@ const (
 	LinkProvisioned
 	// Provision creates an active member for the subject and links it.
 	Provision
+	// ActivateInvited activates the invited member holding the subject's
+	// email, redeeming their invitation, and links the subject to them.
+	ActivateInvited
+	// ActivateLinked activates the invited member the subject is linked to
+	// already, redeeming their invitation.
+	ActivateLinked
 )
 
 // ResolveInput is what resolution judges.
@@ -82,7 +88,8 @@ type Resolution struct {
 // rule that holds:
 //
 //  1. the subject is linked: that member, however the email reads now, and no
-//     provider domain is asked for, since the link itself is the proof;
+//     provider domain is asked for, since the link itself is the proof; an
+//     invited one is activated, as accepting their invitation would;
 //  2. the subject is the external ID of a member the provider provisioned: that
 //     member, active, however the email reads and whether or not it is the
 //     provider's to vouch for: the directory named the person itself;
@@ -90,7 +97,8 @@ type Resolution struct {
 //     verified when the provider requires it): no member;
 //  4. a member holds the email: a deactivated one is refused as such, an
 //     active one is linked when the provider links by email, and an invited
-//     one is not signed in (their invitation is how they arrive);
+//     one is activated and linked whether or not it does, since the provider
+//     vouching for the address proves what accepting the invitation would;
 //  5. the provider provisions: a new member.
 //
 // Anything else is ErrMemberNotFound; a deactivated member is
@@ -100,10 +108,10 @@ func Resolve(in ResolveInput) (Resolution, error) {
 		if l.Status == MemberDeactivated {
 			return Resolution{}, ErrMemberDeactivated
 		}
-		if l.Status == MemberActive {
-			return Resolution{Action: SignInLinked, Member: l.ID}, nil
+		if l.Status == MemberInvited {
+			return Resolution{Action: ActivateLinked, Member: l.ID}, nil
 		}
-		return Resolution{}, ErrMemberNotFound
+		return Resolution{Action: SignInLinked, Member: l.ID}, nil
 	}
 	if p := in.Provisioned; p != nil {
 		switch p.Status {
@@ -121,7 +129,9 @@ func Resolve(in ResolveInput) (Resolution, error) {
 		switch {
 		case m.Status == MemberDeactivated:
 			return Resolution{}, ErrMemberDeactivated
-		case m.Status == MemberActive && in.Provider.LinkByEmail:
+		case m.Status == MemberInvited:
+			return Resolution{Action: ActivateInvited, Member: m.ID}, nil
+		case in.Provider.LinkByEmail:
 			return Resolution{Action: LinkByEmail, Member: m.ID}, nil
 		}
 		return Resolution{}, ErrMemberNotFound

@@ -256,6 +256,9 @@ type InvitationReader interface {
 type InvitationView struct {
 	// MaskedEmail is the member's email with most of its local part hidden.
 	MaskedEmail string
+	// Email is the member's email, which the page never shows: the auth
+	// providers that may accept the invitation are those vouching for it.
+	Email       string
 	DisplayName string
 	ExpiresAt   time.Time
 	// Grant is the role in a project accepting makes the member hold; nil
@@ -321,7 +324,7 @@ func (h *GetInvitation) Handle(ctx context.Context, s secret.String) (Invitation
 		return InvitationView{}, err
 	}
 	view := InvitationView{
-		MaskedEmail: access.MaskEmail(m.Email), DisplayName: m.DisplayName, ExpiresAt: inv.ExpiresAt, InvitedBy: details.InvitedBy,
+		MaskedEmail: access.MaskEmail(m.Email), Email: m.Email, DisplayName: m.DisplayName, ExpiresAt: inv.ExpiresAt, InvitedBy: details.InvitedBy,
 	}
 	if g := inv.Grant; g != nil && details.ProjectKey != "" {
 		view.Grant = &InvitationGrantView{ProjectKey: details.ProjectKey, ProjectName: details.ProjectName, Role: g.Role}
@@ -367,15 +370,7 @@ type AcceptStore interface {
 	// work ends, and its member; ErrNotFound when none has the hash.
 	LockInvitationByHash(ctx context.Context, hash access.InvitationHash) (access.Invitation, access.Member, error)
 	SaveMember(ctx context.Context, m access.Member, at time.Time) error
-	// MemberByID returns the member with the identifier; ErrNotFound when
-	// none has it.
-	MemberByID(ctx context.Context, member access.MemberID) (access.Member, error)
-	// MemberGrants returns the grants member holds in project, oldest
-	// first.
-	MemberGrants(ctx context.Context, member access.MemberID, project workspace.ProjectID) ([]access.Grant, error)
-	// CreateGrantUnlessHeld stores g, unless the member holds the role in
-	// the project from the same source already, and reports whether it did.
-	CreateGrantUnlessHeld(ctx context.Context, g access.Grant) (bool, error)
+	invitationGrantStore
 	SetPasswordHash(ctx context.Context, member access.MemberID, hash string, at time.Time) error
 	RecordSignIn(ctx context.Context, member access.MemberID, at time.Time) error
 	knownSourceRecorder
@@ -525,7 +520,7 @@ func (h *AcceptInvitation) join(ctx context.Context, cmd AcceptInvitationCommand
 	if _, err := h.d.Store.ConsumeInvitations(ctx, m.ID, now); err != nil {
 		return SignInResult{}, err
 	}
-	if err := h.grant(ctx, inv, joined, cmd.RequestID, now); err != nil {
+	if err := grantInvitation(ctx, h.d.Store, h.d.Audit, h.d.IDs, inv, joined, cmd.RequestID, now); err != nil {
 		return SignInResult{}, err
 	}
 	if err := h.d.Store.ReleaseAttempt(ctx, reserved); err != nil {
@@ -555,41 +550,56 @@ func (h *AcceptInvitation) join(ctx context.Context, cmd AcceptInvitationCommand
 		authRecord("auth.signed_in", joined, nil))
 }
 
-// grant makes the grant inv carries for joined, the member it activates, by
-// hand and by the member who invited them, who is the actor of its audit
-// record. A member who holds the role by hand already is left as they are.
-// An inviter who may no longer hand the grant out makes none, and the drop
-// is recorded as invitation.grant_revoked by the member joining: losing
-// grant.manage drops the grants of the invitations committed by then, but
-// one issued while its inviter was losing it commits after that drop, so the
-// rule is applied once more where the grant would be made.
-func (h *AcceptInvitation) grant(ctx context.Context, inv access.Invitation, joined access.Member, requestID string, now time.Time,
+// invitationGrantStore is what making the grant an invitation carries
+// needs.
+type invitationGrantStore interface {
+	// MemberByID returns the member with the identifier; ErrNotFound when
+	// none has it.
+	MemberByID(ctx context.Context, member access.MemberID) (access.Member, error)
+	// MemberGrants returns the grants member holds in project, oldest
+	// first.
+	MemberGrants(ctx context.Context, member access.MemberID, project workspace.ProjectID) ([]access.Grant, error)
+	// CreateGrantUnlessHeld stores g, unless the member holds the role in
+	// the project from the same source already, and reports whether it did.
+	CreateGrantUnlessHeld(ctx context.Context, g access.Grant) (bool, error)
+}
+
+// grantInvitation makes the grant inv carries for joined, the member it
+// activates, by hand and by the member who invited them, who is the actor of
+// its audit record. A member who holds the role by hand already is left as
+// they are. An inviter who may no longer hand the grant out makes none, and
+// the drop is recorded as invitation.grant_revoked by the member joining:
+// losing grant.manage drops the grants of the invitations committed by then,
+// but one issued while its inviter was losing it commits after that drop, so
+// the rule is applied once more where the grant would be made.
+func grantInvitation(ctx context.Context, store invitationGrantStore, audit AuditLog, ids *id.Source, inv access.Invitation,
+	joined access.Member, requestID string, now time.Time,
 ) error {
 	if inv.Grant == nil {
 		return nil
 	}
-	inviter, err := h.d.Store.MemberByID(ctx, inv.InvitedBy)
+	inviter, err := store.MemberByID(ctx, inv.InvitedBy)
 	if err != nil {
 		return err
 	}
-	held, err := h.d.Store.MemberGrants(ctx, inviter.ID, inv.Grant.Project)
+	held, err := store.MemberGrants(ctx, inviter.ID, inv.Grant.Project)
 	if err != nil {
 		return err
 	}
 	if reason, drop := access.GrantDrop(inviter, held); drop {
-		return recordAll(ctx, h.d.Audit, h.d.IDs, now, governance.Request{Actor: memberActor(joined), ID: requestID},
+		return recordAll(ctx, audit, ids, now, governance.Request{Actor: memberActor(joined), ID: requestID},
 			grantRevokedRecord(inv, joined, reason))
 	}
-	g, err := access.NewGrant(id.New[access.Grant](h.d.IDs), access.NewGrantInput{
+	g, err := access.NewGrant(id.New[access.Grant](ids), access.NewGrantInput{
 		Project: inv.Grant.Project, Member: joined, Role: inv.Grant.Role, CreatedBy: inviter.ID, Now: now,
 	})
 	if err != nil {
 		return err
 	}
-	made, err := h.d.Store.CreateGrantUnlessHeld(ctx, g)
+	made, err := store.CreateGrantUnlessHeld(ctx, g)
 	if err != nil || !made {
 		return err
 	}
-	return recordAll(ctx, h.d.Audit, h.d.IDs, now, governance.Request{Actor: memberActor(inviter), ID: requestID},
+	return recordAll(ctx, audit, ids, now, governance.Request{Actor: memberActor(inviter), ID: requestID},
 		grantRecord("grant.created", ProjectRef{ID: g.Project}, g, joined, false))
 }

@@ -186,6 +186,10 @@ paths:
         `password_allowed` says whether the invitation can be accepted with
         a password; when the invited email's domain is enforced to an auth
         provider, `enforced_provider` names it, the only way to accept.
+        `providers` lists the auth providers signing in through which
+        accepts it: those whose domains hold the invited email. Signing in
+        through one activates the invited member and makes the grant the
+        invitation carries, without a password.
       x-permission: public
       security: []
       tags: [auth]
@@ -8486,7 +8490,7 @@ components:
     Invitation:
       type: object
       description: What an invitation's link opens.
-      required: [email, display_name, expires_at, password_allowed]
+      required: [email, display_name, expires_at, password_allowed, providers]
       properties:
         email:
           type: string
@@ -8509,6 +8513,11 @@ components:
           description: Whether the invitation can be accepted with a password; false while local login is disabled or when the invited email's domain is enforced to an auth provider.
         enforced_provider:
           $ref: "#/components/schemas/AuthMethodProvider"
+        providers:
+          type: array
+          description: The enabled auth providers signing in through which accepts the invitation, ordered by display name; those whose domains hold the invited email, only `enforced_provider` when the email's domain is enforced to it, and none when no provider vouches for the email.
+          items:
+            $ref: "#/components/schemas/AuthMethodProvider"
     InvitationProject:
       type: object
       description: The project an invitation grants a role in. Absent once the invitation's grant was dropped.

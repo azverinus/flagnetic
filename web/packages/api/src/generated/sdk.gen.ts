@@ -717,6 +717,10 @@ export const getAuthMethods = <ThrowOnError extends boolean = false>(
  * `password_allowed` says whether the invitation can be accepted with
  * a password; when the invited email's domain is enforced to an auth
  * provider, `enforced_provider` names it, the only way to accept.
+ * `providers` lists the auth providers signing in through which
+ * accepts it: those whose domains hold the invited email. Signing in
+ * through one activates the invited member and makes the grant the
+ * invitation carries, without a password.
  *
  */
 export const getInvitation = <ThrowOnError extends boolean = false>(
