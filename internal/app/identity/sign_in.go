@@ -625,8 +625,8 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 }
 
 // applyGroups stores the groups the person claimed and gives member what the
-// provider's mappings map them to, replacing what the provider granted
-// before. A claim that is absent or not a list of strings changes nothing: a
+// provider's mappings map them and the member's SCIM groups at the provider
+// to, replacing what the provider granted before. A claim that is absent or not a list of strings changes nothing: a
 // misconfigured identity provider cannot strip everyone of their access.
 func (h *CompleteSignIn) applyGroups(ctx context.Context, now time.Time, p identity.Provider, member MemberRecord,
 	claims identity.VerifiedClaims, requestID string,
@@ -650,8 +650,15 @@ func (h *CompleteSignIn) applyGroups(ctx context.Context, now time.Time, p ident
 		// runs them for everyone who claimed groups.
 		return nil
 	}
+	// The member's SCIM groups at the provider count beside the claim, so a
+	// sign-in keeps what a SCIM group grants and a SCIM change what a claim
+	// grants.
+	groups, err := h.d.Mappings.GroupsOf(ctx, p.ID, member.ID)
+	if err != nil {
+		return err
+	}
 	deps := GroupMappingDeps{Access: h.d.Access, Logger: h.d.Logger}
-	_, err = deps.replaceAccess(ctx, p, member.ID, mappings, claims.Groups, requestID)
+	_, err = deps.replaceAccess(ctx, p, member.ID, mappings, groups, governance.Actor{}, requestID)
 	return err
 }
 

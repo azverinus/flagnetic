@@ -31,7 +31,8 @@ func (a providerAccess) ReplaceAccess(ctx context.Context, cmd appidentity.Acces
 	}
 	res, err := a.svc.Replace(ctx, appaccess.ProviderAccessCommand{
 		Provider: appaccess.ProviderRef{ID: cmd.Provider.ID.String(), Slug: cmd.Provider.Slug},
-		Member:   id.FromBytes[access.Member](cmd.Member.Bytes()), Grants: grants, InstanceAdmin: cmd.InstanceAdmin, RequestID: cmd.RequestID,
+		Member:   id.FromBytes[access.Member](cmd.Member.Bytes()), Grants: grants, InstanceAdmin: cmd.InstanceAdmin, Actor: cmd.Actor,
+		RequestID: cmd.RequestID,
 	})
 	return appidentity.AccessChange{Granted: res.Granted, Revoked: res.Revoked, KeptInstanceAdmin: res.KeptInstanceAdmin}, err
 }

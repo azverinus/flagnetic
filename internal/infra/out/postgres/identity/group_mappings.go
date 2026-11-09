@@ -90,12 +90,24 @@ func (s *Store) StoreGroupClaim(ctx context.Context, provider identity.ProviderI
 	return nil
 }
 
-// GroupClaims returns what every member who claimed groups at the provider
-// last claimed, ordered by member.
-func (s *Store) GroupClaims(ctx context.Context, provider identity.ProviderID) ([]appidentity.GroupClaim, error) {
-	rows, err := s.db(ctx).Query(ctx, `SELECT member_id, groups FROM group_claims WHERE provider_id = $1 ORDER BY member_id`,
-		provider.Bytes())
-	return collectRows(rows, err, "group claims", func(row pgx.CollectableRow) (appidentity.GroupClaim, error) {
+// KnownGroups returns the groups of every member who claimed groups at the
+// provider or is in one of its SCIM groups, the union of both, ordered by
+// member. A member whose claim was empty is listed with no groups, so that
+// running the mappings for them takes away what the provider granted.
+func (s *Store) KnownGroups(ctx context.Context, provider identity.ProviderID) ([]appidentity.GroupClaim, error) {
+	rows, err := s.db(ctx).Query(ctx, `
+		WITH memberships AS (
+			SELECT member_id, groups FROM group_claims WHERE provider_id = $1
+			UNION ALL
+			SELECT sm.member_id, ARRAY[g.display_name]
+			FROM scim_group_members sm JOIN scim_groups g ON g.id = sm.group_id
+			WHERE g.provider_id = $1
+		)
+		SELECT m.member_id, coalesce(array_agg(DISTINCT x.g ORDER BY x.g) FILTER (WHERE x.g IS NOT NULL), '{}')
+		FROM memberships m LEFT JOIN LATERAL unnest(m.groups) AS x(g) ON true
+		GROUP BY m.member_id
+		ORDER BY m.member_id`, provider.Bytes())
+	return collectRows(rows, err, "known groups", func(row pgx.CollectableRow) (appidentity.GroupClaim, error) {
 		var (
 			c      appidentity.GroupClaim
 			member [16]byte
@@ -104,4 +116,23 @@ func (s *Store) GroupClaims(ctx context.Context, provider identity.ProviderID) (
 		c.Member = id.FromBytes[identity.Member](member)
 		return c, err
 	})
+}
+
+// GroupsOf returns the groups member is in at provider: the union of what
+// they last claimed there and the names of its SCIM groups they are in,
+// ordered by name.
+func (s *Store) GroupsOf(ctx context.Context, provider identity.ProviderID, member identity.MemberID) ([]string, error) {
+	var groups []string
+	err := s.db(ctx).QueryRow(ctx, `
+		SELECT coalesce(array_agg(DISTINCT u.g ORDER BY u.g), '{}') FROM (
+			SELECT unnest(groups) AS g FROM group_claims WHERE provider_id = $1 AND member_id = $2
+			UNION ALL
+			SELECT g.display_name
+			FROM scim_group_members sm JOIN scim_groups g ON g.id = sm.group_id
+			WHERE g.provider_id = $1 AND sm.member_id = $2
+		) u`, provider.Bytes(), member.Bytes()).Scan(&groups)
+	if err != nil {
+		return nil, fmt.Errorf("reading a member's groups: %w", err)
+	}
+	return groups, nil
 }

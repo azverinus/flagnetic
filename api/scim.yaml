@@ -18,7 +18,7 @@ info:
     brute-force throttle of the address it comes from, shared with local
     sign-in, invitation acceptance and password reset.
 
-    `/Users` provisions members. A created member is active, belongs to the
+    `/Users` provisions members and `/Groups` the groups they are in. A created member is active, belongs to the
     token's provider and holds no password; the management API refuses to
     change a provisioned member's email, name or status by hand (409
     `member_provisioned`). A member the instance already knows by email, in
@@ -28,6 +28,15 @@ info:
     ending their sessions, personal tokens, invitations and password resets
     before the response is sent, and `active: true` reactivates them. Every
     write is recorded with the SCIM token as actor.
+
+    A group belongs to the token's provider, its `displayName` and
+    `externalId` unique among that provider's groups only, and only the
+    provider's provisioned members join it. The provider's group mappings
+    name groups by `displayName`: every change of a group runs them again,
+    in the same transaction, for each member it adds or removes (for every
+    member when it is renamed or deleted), from the union of the groups the
+    member last claimed signing in through the provider and the provider's
+    groups they are in.
 
     Bodies are at most 64 KiB. Errors follow RFC 7644 §3.12:
     `application/scim+json`, `schemas` naming
@@ -226,6 +235,145 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+  /Groups:
+    get:
+      operationId: listGroups
+      summary: List the provider's groups
+      description: |
+        `filter` compares attributes with `eq`, alone or joined by `and`:
+        `displayName`, `externalId` or `id`, each exactly; any other filter
+        is 400 `invalidFilter`. Paging as for `/Users`; groups are ordered by
+        `displayName`. `excludedAttributes=members` leaves the members out.
+      parameters:
+        - $ref: "#/components/parameters/Filter"
+        - $ref: "#/components/parameters/StartIndex"
+        - $ref: "#/components/parameters/Count"
+        - $ref: "#/components/parameters/ExcludedAttributes"
+      responses:
+        "200":
+          description: A page of matching groups.
+          content:
+            application/scim+json:
+              schema:
+                $ref: "#/components/schemas/GroupListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createGroup
+      summary: Create a group
+      description: |
+        Creates a group of the token's provider. Each member is a User the
+        provider provisions, or the request is 400 `invalidValue`. A
+        `displayName` or `externalId` another group of the provider has is
+        409 `uniqueness`.
+      requestBody:
+        required: true
+        content:
+          application/scim+json:
+            schema:
+              $ref: "#/components/schemas/Group"
+      responses:
+        "201":
+          description: The created group.
+          content:
+            application/scim+json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /Groups/{id}:
+    parameters:
+      - $ref: "#/components/parameters/GroupID"
+    get:
+      operationId: getGroup
+      summary: Read one of the provider's groups
+      parameters:
+        - $ref: "#/components/parameters/ExcludedAttributes"
+      responses:
+        "200":
+          description: The group.
+          content:
+            application/scim+json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: replaceGroup
+      summary: Replace a group
+      description: |
+        Replaces the `displayName` and the members (none when `members` is
+        absent), and the `externalId` when it is sent.
+      requestBody:
+        required: true
+        content:
+          application/scim+json:
+            schema:
+              $ref: "#/components/schemas/Group"
+      responses:
+        "200":
+          description: The group as it now is.
+          content:
+            application/scim+json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    patch:
+      operationId: patchGroup
+      summary: Patch a group
+      description: |
+        `add`, `replace` and `remove` on `members` (a list of `{value}`;
+        `remove` without a value empties the group), `remove` on
+        `members[value eq "<id>"]`, and `add` or `replace` on `displayName`
+        and `externalId`, with or without a path. Applied in order as one
+        change.
+      requestBody:
+        required: true
+        content:
+          application/scim+json:
+            schema:
+              $ref: "#/components/schemas/PatchOp"
+      responses:
+        "200":
+          description: The group as it now is.
+          content:
+            application/scim+json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deleteGroup
+      summary: Delete a group
+      description: Removes the group and answers 204; its members leave it.
+      responses:
+        "204":
+          description: The group was deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   securitySchemes:
     scimToken:
@@ -241,6 +389,20 @@ components:
       schema:
         type: string
         format: uuid
+    GroupID:
+      name: id
+      in: path
+      required: true
+      description: The group's `id`, as `GET /Groups` lists it.
+      schema:
+        type: string
+        format: uuid
+    ExcludedAttributes:
+      name: excludedAttributes
+      in: query
+      description: Attributes to leave out, separated by commas; only `members` is understood, others are ignored.
+      schema:
+        type: string
     Filter:
       name: filter
       in: query
@@ -284,15 +446,16 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
     NotFound:
-      description: No member of the token's provider has this id.
+      description: No member or group of the token's provider has this id.
       content:
         application/scim+json:
           schema:
             $ref: "#/components/schemas/Error"
     Conflict:
       description: |
-        Another member already holds this email or this `externalId`, or the
-        email belongs to a member who cannot be adopted (`uniqueness`).
+        Another member already holds this email or this `externalId`, the
+        email belongs to a member who cannot be adopted, or another group of
+        the provider has this `displayName` or `externalId` (`uniqueness`).
       content:
         application/scim+json:
           schema:
@@ -356,7 +519,7 @@ components:
         groups:
           type: array
           readOnly: true
-          description: The groups the member belongs to; read only.
+          description: The provider's groups the member is in, by `displayName`; read only.
           items:
             $ref: "#/components/schemas/ResourceRef"
         meta:
@@ -375,6 +538,46 @@ components:
         $ref:
           type: string
           readOnly: true
+    Group:
+      type: object
+      description: A group of the token's provider.
+      properties:
+        schemas:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        externalId:
+          type: [string, "null"]
+        displayName:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResourceRef"
+        meta:
+          $ref: "#/components/schemas/Meta"
+    GroupListResponse:
+      type: object
+      required: [schemas, totalResults, Resources]
+      properties:
+        schemas:
+          type: array
+          items:
+            type: string
+        totalResults:
+          type: integer
+        startIndex:
+          type: integer
+        itemsPerPage:
+          type: integer
+        Resources:
+          type: array
+          items:
+            $ref: "#/components/schemas/Group"
     UserListResponse:
       type: object
       required: [schemas, totalResults, Resources]

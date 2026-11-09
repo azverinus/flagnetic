@@ -45,6 +45,12 @@ type Handlers struct {
 	ReplaceUser  *appidentity.ReplaceSCIMUser
 	PatchUser    *appidentity.PatchSCIMUser
 	DeleteUser   *appidentity.DeleteSCIMUser
+	ListGroups   *appidentity.ListSCIMGroups
+	GetGroup     *appidentity.GetSCIMGroup
+	CreateGroup  *appidentity.CreateSCIMGroup
+	ReplaceGroup *appidentity.ReplaceSCIMGroup
+	PatchGroup   *appidentity.PatchSCIMGroup
+	DeleteGroup  *appidentity.DeleteSCIMGroup
 }
 
 // api serves the operations of the SCIM API. Every request that reaches an
@@ -137,7 +143,7 @@ func (a *api) parameterError(w http.ResponseWriter, _ *http.Request, err error) 
 	var format *InvalidParamFormatError
 	if errors.As(err, &format) && format.ParamName == "id" {
 		// An identifier that is none names no resource.
-		writeError(w, http.StatusNotFound, "", "no member this provider provisions has this id")
+		writeError(w, http.StatusNotFound, "", "no resource of this provider has this id")
 		return
 	}
 	writeError(w, http.StatusBadRequest, "invalidValue", err.Error())
@@ -199,6 +205,8 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusConflict, "uniqueness", "a member with this email exists and cannot be taken over by this provider")
 	case errors.Is(err, appidentity.ErrExternalIDTaken):
 		writeError(w, http.StatusConflict, "uniqueness", "another member of this provider holds this externalId")
+	case errors.Is(err, appidentity.ErrGroupNameTaken), errors.Is(err, appidentity.ErrGroupExternalIDTaken):
+		writeError(w, http.StatusConflict, "uniqueness", appErr.Detail)
 	case !isAppErr:
 		a.log.ErrorContext(r.Context(), "SCIM request failed", "error", err.Error())
 		writeError(w, http.StatusInternalServerError, "", "internal error")
@@ -209,7 +217,7 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 		w.Header().Set("Retry-After", strconv.Itoa(int(appErr.RetryAfter.Seconds())+1))
 		writeError(w, http.StatusTooManyRequests, "", appErr.Detail)
 	case appErr.Kind == apperrors.KindNotFound:
-		writeError(w, http.StatusNotFound, "", "no member this provider provisions has this id")
+		writeError(w, http.StatusNotFound, "", appErr.Detail)
 	case appErr.Kind == apperrors.KindConflict:
 		writeError(w, http.StatusConflict, "", appErr.Detail)
 	case appErr.Kind == apperrors.KindInvalid:
@@ -286,9 +294,11 @@ func (a *api) GetServiceProviderConfig(w http.ResponseWriter, _ *http.Request) {
 
 // ListResourceTypes answers the resource types served.
 func (a *api) ListResourceTypes(w http.ResponseWriter, _ *http.Request) {
+	resourceType := []string{"urn:ietf:params:scim:schemas:core:2.0:ResourceType"}
 	resources := []ResourceType{{
-		Schemas: &[]string{"urn:ietf:params:scim:schemas:core:2.0:ResourceType"},
-		Id:      new("User"), Name: new("User"), Endpoint: new("/Users"), Schema: new(identity.UserSchema),
+		Schemas: &resourceType, Id: new("User"), Name: new("User"), Endpoint: new("/Users"), Schema: new(identity.UserSchema),
+	}, {
+		Schemas: &resourceType, Id: new("Group"), Name: new("Group"), Endpoint: new("/Groups"), Schema: new(identity.GroupSchema),
 	}}
 	write(w, http.StatusOK, ResourceTypeListResponse{
 		Schemas: []string{listSchema}, TotalResults: len(resources), StartIndex: new(1), ItemsPerPage: new(len(resources)), Resources: resources,
@@ -313,9 +323,16 @@ func (a *api) ListSchemas(w http.ResponseWriter, _ *http.Request) {
 		attribute("displayName", "string", false, "readWrite"), attribute("emails", "complex", true, "readWrite"),
 		attribute("active", "boolean", false, "readWrite"), attribute("groups", "complex", true, "readOnly"),
 	}
+	groupAttrs := []schemaAttribute{
+		attribute("displayName", "string", false, "readWrite"), attribute("externalId", "string", false, "readWrite"),
+		attribute("members", "complex", true, "readWrite"),
+	}
 	resources := []Schema{{
 		Id: new(identity.UserSchema), Name: new("User"), Description: new("A member of the instance, provisioned by SCIM."),
 		Attributes: &attrs,
+	}, {
+		Id: new(identity.GroupSchema), Name: new("Group"), Description: new("A group of the provider, which its group mappings may map to access."),
+		Attributes: &groupAttrs,
 	}}
 	write(w, http.StatusOK, SchemaListResponse{
 		Schemas: []string{listSchema}, TotalResults: len(resources), StartIndex: new(1), ItemsPerPage: new(len(resources)), Resources: resources,
@@ -329,7 +346,7 @@ func userOut(m appidentity.ProvisionedMember) User {
 	uid := uuid.UUID(m.ID.Bytes())
 	out := User{
 		Schemas: &[]string{identity.UserSchema}, Id: &uid, UserName: &m.Email, DisplayName: &m.DisplayName,
-		Emails: &[]Email{{Value: &m.Email, Primary: yes()}}, Active: &m.Active, Groups: &[]ResourceRef{},
+		Emails: &[]Email{{Value: &m.Email, Primary: yes()}}, Active: &m.Active, Groups: groupRefs(m.Groups),
 		Meta: &Meta{ResourceType: new("User"), Created: &m.CreatedAt, Location: new(BaseURL + "/Users/" + uid.String())},
 	}
 	if m.ExternalID != "" {
@@ -430,6 +447,16 @@ func (a *api) PatchUser(w http.ResponseWriter, r *http.Request, user UserID) {
 		a.fail(w, r, err)
 		return
 	}
+	m, err := a.h.PatchUser.Handle(r.Context(), requestOf(r), memberID(user), patchOperations(body))
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	write(w, http.StatusOK, userOut(m))
+}
+
+// patchOperations reads the operations of a PatchOp.
+func patchOperations(body PatchOp) []identity.PatchOperation {
 	ops := make([]identity.PatchOperation, len(body.Operations))
 	for i, o := range body.Operations {
 		ops[i] = identity.PatchOperation{Op: string(o.Op), Value: o.Value}
@@ -437,12 +464,7 @@ func (a *api) PatchUser(w http.ResponseWriter, r *http.Request, user UserID) {
 			ops[i].Path = *o.Path
 		}
 	}
-	m, err := a.h.PatchUser.Handle(r.Context(), requestOf(r), memberID(user), ops)
-	if err != nil {
-		a.fail(w, r, err)
-		return
-	}
-	write(w, http.StatusOK, userOut(m))
+	return ops
 }
 
 // DeleteUser deactivates a member.

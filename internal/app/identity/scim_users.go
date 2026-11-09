@@ -20,6 +20,8 @@ type ProvisionedMember struct {
 	// ExternalID is the provider's identifier of the person, "" for none.
 	ExternalID string
 	CreatedAt  time.Time
+	// Groups are the provider's SCIM groups the member is in, by name.
+	Groups []GroupRef
 }
 
 // HeldMember is a member the instance holds, as adopting one needs to judge
@@ -115,6 +117,31 @@ type SCIMUserDeps struct {
 	Tx        Transactor
 	Providers ProviderStore
 	Members   SCIMMembers
+	Groups    SCIMGroupStore
+}
+
+// withGroups fills in the groups of the caller's provider each member is in.
+func (d SCIMUserDeps) withGroups(ctx context.Context, caller SCIMCaller, members ...*ProvisionedMember) error {
+	ids := make([]identity.MemberID, len(members))
+	for i, m := range members {
+		ids[i] = m.ID
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	groups, err := d.Groups.GroupsOfMembers(ctx, caller.Provider, ids)
+	for _, m := range members {
+		m.Groups = groups[m.ID]
+	}
+	return err
+}
+
+// answer is out with its groups, unless err.
+func (d SCIMUserDeps) answer(ctx context.Context, caller SCIMCaller, out ProvisionedMember, err error) (ProvisionedMember, error) {
+	if err != nil {
+		return out, err
+	}
+	return out, d.withGroups(ctx, caller, &out)
 }
 
 // SCIMRequest is a request of a SCIM token: the caller and the request it
@@ -154,7 +181,14 @@ func (h *ListSCIMUsers) Handle(ctx context.Context, caller SCIMCaller, rawFilter
 		return Page{}, err
 	}
 	members, total, err := h.d.Members.List(ctx, caller.ProviderSlug, f, max(startIndex, 1), count)
-	return Page{Members: members, Total: total}, err
+	if err != nil {
+		return Page{}, err
+	}
+	refs := make([]*ProvisionedMember, len(members))
+	for i := range members {
+		refs[i] = &members[i]
+	}
+	return Page{Members: members, Total: total}, h.d.withGroups(ctx, caller, refs...)
 }
 
 // GetSCIMUser reads one member a provider provisions.
@@ -166,7 +200,8 @@ func NewGetSCIMUser(d SCIMUserDeps) *GetSCIMUser { return &GetSCIMUser{d: d} }
 // Handle returns the member; identity.ErrUserNotFound when the caller's
 // provider does not provision them.
 func (h *GetSCIMUser) Handle(ctx context.Context, caller SCIMCaller, member identity.MemberID) (ProvisionedMember, error) {
-	return h.d.Members.Get(ctx, caller.ProviderSlug, member)
+	m, err := h.d.Members.Get(ctx, caller.ProviderSlug, member)
+	return h.d.answer(ctx, caller, m, err)
 }
 
 // CreateSCIMUser provisions or adopts a member.
@@ -201,7 +236,7 @@ func (h *CreateSCIMUser) Handle(ctx context.Context, req SCIMRequest, attrs iden
 		}
 		return txErr
 	})
-	return out, err
+	return h.d.answer(ctx, req.Caller, out, err)
 }
 
 // provisionOrAdopt creates the member holding no email yet, and adopts the one
@@ -259,7 +294,8 @@ func (h *ReplaceSCIMUser) Handle(ctx context.Context, req SCIMRequest, member id
 		cmd.ExternalID = &externalID
 		cmd.ClearExternalID = externalID == ""
 	}
-	return applyUserChange(ctx, h.d, req, cmd, attrs.Active)
+	out, err := applyUserChange(ctx, h.d, req, cmd, attrs.Active)
+	return h.d.answer(ctx, req.Caller, out, err)
 }
 
 // applyUserChange updates the member and sets them active or not as asked,
@@ -321,7 +357,7 @@ func (h *PatchSCIMUser) Handle(ctx context.Context, req SCIMRequest, member iden
 		out, txErr = applyUserChange(ctx, h.d, req, cmd, patch.Active)
 		return txErr
 	})
-	return out, err
+	return h.d.answer(ctx, req.Caller, out, err)
 }
 
 // DeleteSCIMUser deprovisions a member.
