@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
 	"github.com/azverinus/flagnetic/internal/domain/identity"
 	pgidentity "github.com/azverinus/flagnetic/internal/infra/out/postgres/identity"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -28,7 +29,31 @@ func TestGroupMappingStoreOperationsFailWhenTheDatabaseCannotBeReached(t *testin
 	if err := store.StoreGroupClaim(ctx, provider, member, nil, testkit.Start); err == nil {
 		t.Error("StoreGroupClaim succeeded")
 	}
-	if _, err := store.GroupClaims(ctx, provider); err == nil {
-		t.Error("GroupClaims succeeded")
+	if _, err := store.KnownGroups(ctx, provider); err == nil {
+		t.Error("KnownGroups succeeded")
+	}
+	if _, err := store.GroupsOf(ctx, provider, member); err == nil {
+		t.Error("GroupsOf succeeded")
+	}
+
+	group := appidentity.SCIMGroupRecord{ID: id.New[identity.SCIMGroup](ids), Provider: provider}
+	group.DisplayName, group.Members = "eng", []identity.MemberID{member}
+	if err := store.CreateSCIMGroup(ctx, group); err == nil {
+		t.Error("CreateSCIMGroup succeeded")
+	}
+	if err := store.SaveSCIMGroup(ctx, group); err == nil {
+		t.Error("SaveSCIMGroup succeeded")
+	}
+	if err := store.DeleteSCIMGroup(ctx, group.ID); err == nil {
+		t.Error("DeleteSCIMGroup succeeded")
+	}
+	if _, err := store.SCIMGroup(ctx, provider, group.ID); err == nil {
+		t.Error("SCIMGroup succeeded")
+	}
+	if _, _, err := store.SCIMGroups(ctx, provider, identity.GroupFilter{}, 1, 10); err == nil {
+		t.Error("SCIMGroups succeeded")
+	}
+	if _, err := store.GroupsOfMembers(ctx, provider, []identity.MemberID{member}); err == nil {
+		t.Error("GroupsOfMembers succeeded")
 	}
 }

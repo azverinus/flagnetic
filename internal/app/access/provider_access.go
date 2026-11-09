@@ -65,7 +65,10 @@ type ProviderAccessCommand struct {
 	// Grants are the roles in projects the mappings give, each once.
 	Grants        []ProviderRole
 	InstanceAdmin bool
-	RequestID     string
+	// Actor is who the audit trail names for the changes; the provider when
+	// it is the zero actor. A SCIM group change names the SCIM token.
+	Actor     governance.Actor
+	RequestID string
 }
 
 // ProviderAccessResult is what replacing a member's access changed.
@@ -86,7 +89,7 @@ type ProviderAccessResult struct {
 // are left alone, so each source owns what it granted. A deactivated member
 // keeps none of the provider's grants and gains none. The last active
 // instance admin is never demoted: that is reported, not refused. Every
-// change is recorded for the provider as the actor. A member who loses
+// change is recorded for the command's actor, the provider by default. A member who loses
 // grant.manage in a project loses the grant of each invitation they issued
 // to it.
 func (a *ProviderAccess) Replace(ctx context.Context, cmd ProviderAccessCommand) (ProviderAccessResult, error) {
@@ -177,7 +180,10 @@ func (a *ProviderAccess) Replace(ctx context.Context, cmd ProviderAccessCommand)
 		}
 		records = append(records, dropped...)
 	}
-	req := governance.Request{Actor: governance.SSOActor(cmd.Provider.ID, cmd.Provider.Slug), ID: cmd.RequestID}
+	req := governance.Request{Actor: cmd.Actor, ID: cmd.RequestID}
+	if req.Actor.Kind == "" {
+		req.Actor = governance.SSOActor(cmd.Provider.ID, cmd.Provider.Slug)
+	}
 	return res, recordAll(ctx, a.audit, a.ids, now, req, records...)
 }
 

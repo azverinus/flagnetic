@@ -15,7 +15,9 @@ import (
 )
 
 // MappingStore keeps the group mappings of auth providers and the groups the
-// members last claimed at them.
+// members last claimed at them, and reads the groups a member is in at a
+// provider: those they last claimed and the provider's SCIM groups they are
+// members of.
 type MappingStore interface {
 	// GroupMappings returns the provider's mappings in order.
 	GroupMappings(ctx context.Context, provider identity.ProviderID) ([]identity.GroupMapping, error)
@@ -24,12 +26,16 @@ type MappingStore interface {
 	// StoreGroupClaim stores groups as what member claimed at provider at at,
 	// replacing the claim before.
 	StoreGroupClaim(ctx context.Context, provider identity.ProviderID, member identity.MemberID, groups []string, at time.Time) error
-	// GroupClaims returns what every member who claimed groups at the
-	// provider last claimed.
-	GroupClaims(ctx context.Context, provider identity.ProviderID) ([]GroupClaim, error)
+	// KnownGroups returns the groups of every member who claimed groups at the
+	// provider or is a member of one of its SCIM groups: the union of both.
+	KnownGroups(ctx context.Context, provider identity.ProviderID) ([]GroupClaim, error)
+	// GroupsOf returns the groups member is in at provider: the union of what
+	// they last claimed there and the names of its SCIM groups they are
+	// members of.
+	GroupsOf(ctx context.Context, provider identity.ProviderID, member identity.MemberID) ([]string, error)
 }
 
-// GroupClaim is the groups a member claimed at a provider.
+// GroupClaim is the groups a member is in at a provider.
 type GroupClaim struct {
 	Member identity.MemberID
 	Groups []string
@@ -58,7 +64,10 @@ type AccessCommand struct {
 	Member        identity.MemberID
 	Grants        []identity.ProjectRole
 	InstanceAdmin bool
-	RequestID     string
+	// Actor is who the audit trail names for the changes: the provider when
+	// it is the zero actor, the SCIM token for a SCIM group change.
+	Actor     governance.Actor
+	RequestID string
 }
 
 // AccessChange is what replacing a member's access changed; see the access
@@ -84,13 +93,14 @@ type GroupMappingDeps struct {
 func (d GroupMappingDeps) now() time.Time { return d.Clock.Now().UTC().Truncate(time.Microsecond) }
 
 // replaceAccess gives member what the mappings give a person in groups at
-// provider p, and logs when the last active instance admin was kept.
+// provider p, and logs when the last active instance admin was kept. The
+// changes are recorded for actor, the provider when it is the zero actor.
 func (d GroupMappingDeps) replaceAccess(ctx context.Context, p identity.Provider, member identity.MemberID,
-	mappings []identity.GroupMapping, groups []string, requestID string,
+	mappings []identity.GroupMapping, groups []string, actor governance.Actor, requestID string,
 ) (AccessChange, error) {
 	entitled := identity.Entitle(mappings, groups)
 	change, err := d.Access.ReplaceAccess(ctx, AccessCommand{
-		Provider: p, Member: member, Grants: entitled.Grants, InstanceAdmin: entitled.InstanceAdmin, RequestID: requestID,
+		Provider: p, Member: member, Grants: entitled.Grants, InstanceAdmin: entitled.InstanceAdmin, Actor: actor, RequestID: requestID,
 	})
 	if err == nil && change.KeptInstanceAdmin {
 		d.Logger.WarnContext(ctx, "an auth provider's group mapping no longer makes a member instance admin, but they are the last active instance admin, so they stay",
@@ -144,8 +154,8 @@ type GroupMappingsRun struct {
 }
 
 // Handle replaces the provider's mappings and, in the same unit of work, runs
-// them again for every member who claimed groups at the provider, so a
-// mapping removed stops granting at once. An unknown provider is not found;
+// them again for every member who claimed groups at the provider or is in one
+// of its SCIM groups, so a mapping removed stops granting at once. An unknown provider is not found;
 // mappings that break a rule, or name a project no instance holds, are
 // invalid_group_mappings. It records group_mappings.updated unless nothing
 // changed.
@@ -171,12 +181,12 @@ func (h *ReplaceGroupMappings) Handle(ctx context.Context, cmd ReplaceGroupMappi
 		if err = h.d.Mappings.ReplaceGroupMappings(ctx, p.ID, mappings); err != nil {
 			return err
 		}
-		claims, err := h.d.Mappings.GroupClaims(ctx, p.ID)
+		claims, err := h.d.Mappings.KnownGroups(ctx, p.ID)
 		if err != nil {
 			return err
 		}
 		for _, c := range claims {
-			change, replaceErr := h.d.replaceAccess(ctx, p, c.Member, mappings, c.Groups, cmd.Request.ID)
+			change, replaceErr := h.d.replaceAccess(ctx, p, c.Member, mappings, c.Groups, governance.Actor{}, cmd.Request.ID)
 			if replaceErr != nil {
 				return replaceErr
 			}

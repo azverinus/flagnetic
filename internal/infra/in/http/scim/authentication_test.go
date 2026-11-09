@@ -24,17 +24,15 @@ func TestDiscoveryDocumentsAreRFCListResponsesBehindABearer(t *testing.T) {
 		t.Errorf("ServiceProviderConfig = %d %s, want patch and filter supported, bulk and sort not", config.status, config.body)
 	}
 
-	for path, want := range map[string]string{
-		"/ResourceTypes": "urn:ietf:params:scim:schemas:core:2.0:User",
-		"/Schemas":       "urn:ietf:params:scim:schemas:core:2.0:User",
-	} {
+	for _, path := range []string{"/ResourceTypes", "/Schemas"} {
 		r := e.call(t, token, http.MethodGet, path, "")
 		doc := r.json(t)
 		resources, _ := doc["Resources"].([]any)
-		if r.status != http.StatusOK || doc["totalResults"] != 1.0 || len(resources) != 1 ||
+		if r.status != http.StatusOK || doc["totalResults"] != 2.0 || len(resources) != 2 ||
 			doc["schemas"].([]any)[0] != "urn:ietf:params:scim:api:messages:2.0:ListResponse" ||
-			!strings.Contains(string(r.body), want) {
-			t.Errorf("%s = %d %s, want a list response of the User resource", path, r.status, r.body)
+			!strings.Contains(string(r.body), "urn:ietf:params:scim:schemas:core:2.0:User") ||
+			!strings.Contains(string(r.body), "urn:ietf:params:scim:schemas:core:2.0:Group") {
+			t.Errorf("%s = %d %s, want a list response of the User and Group resources", path, r.status, r.body)
 		}
 	}
 }

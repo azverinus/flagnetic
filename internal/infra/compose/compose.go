@@ -411,12 +411,22 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		SecureCookies: managementOptions.SecureCookies, SessionCookie: management.SessionCookieHeader, SessionCookieName: management.SessionCookie,
 		Metrics: sso.NewMetrics(reg),
 	})
-	scimUsers := appidentity.SCIMUserDeps{Tx: tx, Providers: identityStore, Members: scimMembers{svc: provisioning}}
+	scimUsers := appidentity.SCIMUserDeps{
+		Tx: tx, Providers: identityStore, Members: scimMembers{svc: provisioning}, Groups: identityStore,
+		Mappings: identityStore, Access: groupMappings.Access, Logger: edge.Logger(),
+	}
+	scimGroups := appidentity.SCIMGroupDeps{
+		Tx: tx, Providers: identityStore, Groups: identityStore, Members: scimUsers.Members, Mappings: identityStore,
+		Access: groupMappings.Access, Audit: audit, Clock: d.Clock, IDs: d.IDs, Logger: edge.Logger(),
+	}
 	scim.Mount(edge, scim.Handlers{
 		Authenticate: appidentity.NewAuthenticateSCIM(scimTokens, sourceThrottle{svc: appaccess.NewSourceThrottle(tx, accessStore)}, o.Keyring, edge.Logger()),
 		ListUsers:    appidentity.NewListSCIMUsers(scimUsers), GetUser: appidentity.NewGetSCIMUser(scimUsers),
 		CreateUser: appidentity.NewCreateSCIMUser(scimUsers), ReplaceUser: appidentity.NewReplaceSCIMUser(scimUsers),
 		PatchUser: appidentity.NewPatchSCIMUser(scimUsers), DeleteUser: appidentity.NewDeleteSCIMUser(scimUsers),
+		ListGroups: appidentity.NewListSCIMGroups(scimGroups), GetGroup: appidentity.NewGetSCIMGroup(scimGroups),
+		CreateGroup: appidentity.NewCreateSCIMGroup(scimGroups), ReplaceGroup: appidentity.NewReplaceSCIMGroup(scimGroups),
+		PatchGroup: appidentity.NewPatchSCIMGroup(scimGroups), DeleteGroup: appidentity.NewDeleteSCIMGroup(scimGroups),
 	})
 	management.Mount(edge, management.Handlers{
 		ListAuthProviders:                       appidentity.NewListProviders(identityStore),

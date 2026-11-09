@@ -57,6 +57,25 @@ type Error struct {
 	Status   string   `json:"status"`
 }
 
+// Group A group of the token's provider.
+type Group struct {
+	DisplayName *string             `json:"displayName,omitempty"`
+	ExternalId  *string             `json:"externalId,omitempty"`
+	Id          *openapi_types.UUID `json:"id,omitempty"`
+	Members     *[]ResourceRef      `json:"members,omitempty"`
+	Meta        *Meta               `json:"meta,omitempty"`
+	Schemas     *[]string           `json:"schemas,omitempty"`
+}
+
+// GroupListResponse defines model for GroupListResponse.
+type GroupListResponse struct {
+	Resources    []Group  `json:"Resources"`
+	ItemsPerPage *int     `json:"itemsPerPage,omitempty"`
+	Schemas      []string `json:"schemas"`
+	StartIndex   *int     `json:"startIndex,omitempty"`
+	TotalResults int      `json:"totalResults"`
+}
+
 // Meta defines model for Meta.
 type Meta struct {
 	Created      *time.Time `json:"created,omitempty"`
@@ -169,7 +188,7 @@ type User struct {
 	Emails      *[]Email `json:"emails,omitempty"`
 	ExternalId  *string  `json:"externalId,omitempty"`
 
-	// Groups The groups the member belongs to; read only.
+	// Groups The provider's groups the member is in, by `displayName`; read only.
 	Groups   *[]ResourceRef      `json:"groups,omitempty"`
 	Id       *openapi_types.UUID `json:"id,omitempty"`
 	Meta     *Meta               `json:"meta,omitempty"`
@@ -190,8 +209,14 @@ type UserListResponse struct {
 // Count defines model for Count.
 type Count = int
 
+// ExcludedAttributes defines model for ExcludedAttributes.
+type ExcludedAttributes = string
+
 // Filter defines model for Filter.
 type Filter = string
+
+// GroupID defines model for GroupID.
+type GroupID = openapi_types.UUID
 
 // StartIndex defines model for StartIndex.
 type StartIndex = int
@@ -211,6 +236,27 @@ type NotFound = Error
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Error
 
+// ListGroupsParams defines parameters for ListGroups.
+type ListGroupsParams struct {
+	// Filter An equality filter, for example `userName eq "jo@example.com"`.
+	Filter *Filter `form:"filter,omitempty" json:"filter,omitempty"`
+
+	// StartIndex 1-based index of the first result to return; 1 when absent.
+	StartIndex *StartIndex `form:"startIndex,omitempty" json:"startIndex,omitempty"`
+
+	// Count How many results to return at most, from 0 to 100; 100 when absent.
+	Count *Count `form:"count,omitempty" json:"count,omitempty"`
+
+	// ExcludedAttributes Attributes to leave out, separated by commas; only `members` is understood, others are ignored.
+	ExcludedAttributes *ExcludedAttributes `form:"excludedAttributes,omitempty" json:"excludedAttributes,omitempty"`
+}
+
+// GetGroupParams defines parameters for GetGroup.
+type GetGroupParams struct {
+	// ExcludedAttributes Attributes to leave out, separated by commas; only `members` is understood, others are ignored.
+	ExcludedAttributes *ExcludedAttributes `form:"excludedAttributes,omitempty" json:"excludedAttributes,omitempty"`
+}
+
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
 	// Filter An equality filter, for example `userName eq "jo@example.com"`.
@@ -222,6 +268,15 @@ type ListUsersParams struct {
 	// Count How many results to return at most, from 0 to 100; 100 when absent.
 	Count *Count `form:"count,omitempty" json:"count,omitempty"`
 }
+
+// CreateGroupApplicationScimPlusJSONRequestBody defines body for CreateGroup for application/scim+json ContentType.
+type CreateGroupApplicationScimPlusJSONRequestBody = Group
+
+// PatchGroupApplicationScimPlusJSONRequestBody defines body for PatchGroup for application/scim+json ContentType.
+type PatchGroupApplicationScimPlusJSONRequestBody = PatchOp
+
+// ReplaceGroupApplicationScimPlusJSONRequestBody defines body for ReplaceGroup for application/scim+json ContentType.
+type ReplaceGroupApplicationScimPlusJSONRequestBody = Group
 
 // CreateUserApplicationScimPlusJSONRequestBody defines body for CreateUser for application/scim+json ContentType.
 type CreateUserApplicationScimPlusJSONRequestBody = User
@@ -305,6 +360,98 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+
+	// ListGroups List the provider's groups
+	//
+	// `filter` compares attributes with `eq`, alone or joined by `and`:
+	// `displayName`, `externalId` or `id`, each exactly; any other filter
+	// is 400 `invalidFilter`. Paging as for `/Users`; groups are ordered by
+	// `displayName`. `excludedAttributes=members` leaves the members out.
+	//
+	// Corresponds with GET /Groups (the `ListGroups` operationId).
+	ListGroups(ctx context.Context, params *ListGroupsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateGroupWithBody Create a group
+	//
+	// Creates a group of the token's provider. Each member is a User the
+	// provider provisions, or the request is 400 `invalidValue`. A
+	// `displayName` or `externalId` another group of the provider has is
+	// 409 `uniqueness`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /Groups (the `CreateGroup` operationId).
+	CreateGroupWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateGroupWithApplicationScimPlusJSONBody Create a group
+	//
+	// Creates a group of the token's provider. Each member is a User the
+	// provider provisions, or the request is 400 `invalidValue`. A
+	// `displayName` or `externalId` another group of the provider has is
+	// 409 `uniqueness`.
+	//
+	// Takes a body of the `application/scim+json` content type.
+	//
+	// Corresponds with POST /Groups (the `CreateGroup` operationId).
+	CreateGroupWithApplicationScimPlusJSONBody(ctx context.Context, body CreateGroupApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteGroup Delete a group
+	//
+	// Removes the group and answers 204; its members leave it.
+	//
+	// Corresponds with DELETE /Groups/{id} (the `DeleteGroup` operationId).
+	DeleteGroup(ctx context.Context, id GroupID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetGroup Read one of the provider's groups
+	//
+	// Corresponds with GET /Groups/{id} (the `GetGroup` operationId).
+	GetGroup(ctx context.Context, id GroupID, params *GetGroupParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchGroupWithBody Patch a group
+	//
+	// `add`, `replace` and `remove` on `members` (a list of `{value}`;
+	// `remove` without a value empties the group), `remove` on
+	// `members[value eq "<id>"]`, and `add` or `replace` on `displayName`
+	// and `externalId`, with or without a path. Applied in order as one
+	// change.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /Groups/{id} (the `PatchGroup` operationId).
+	PatchGroupWithBody(ctx context.Context, id GroupID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchGroupWithApplicationScimPlusJSONBody Patch a group
+	//
+	// `add`, `replace` and `remove` on `members` (a list of `{value}`;
+	// `remove` without a value empties the group), `remove` on
+	// `members[value eq "<id>"]`, and `add` or `replace` on `displayName`
+	// and `externalId`, with or without a path. Applied in order as one
+	// change.
+	//
+	// Takes a body of the `application/scim+json` content type.
+	//
+	// Corresponds with PATCH /Groups/{id} (the `PatchGroup` operationId).
+	PatchGroupWithApplicationScimPlusJSONBody(ctx context.Context, id GroupID, body PatchGroupApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReplaceGroupWithBody Replace a group
+	//
+	// Replaces the `displayName` and the members (none when `members` is
+	// absent), and the `externalId` when it is sent.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /Groups/{id} (the `ReplaceGroup` operationId).
+	ReplaceGroupWithBody(ctx context.Context, id GroupID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReplaceGroupWithApplicationScimPlusJSONBody Replace a group
+	//
+	// Replaces the `displayName` and the members (none when `members` is
+	// absent), and the `externalId` when it is sent.
+	//
+	// Takes a body of the `application/scim+json` content type.
+	//
+	// Corresponds with PUT /Groups/{id} (the `ReplaceGroup` operationId).
+	ReplaceGroupWithApplicationScimPlusJSONBody(ctx context.Context, id GroupID, body ReplaceGroupApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListResourceTypes The resource types this server exposes
 	//
@@ -425,6 +572,188 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /Users/{id} (the `ReplaceUser` operationId).
 	ReplaceUserWithApplicationScimPlusJSONBody(ctx context.Context, id UserID, body ReplaceUserApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// ListGroups List the provider's groups
+//
+// `filter` compares attributes with `eq`, alone or joined by `and`:
+// `displayName`, `externalId` or `id`, each exactly; any other filter
+// is 400 `invalidFilter`. Paging as for `/Users`; groups are ordered by
+// `displayName`. `excludedAttributes=members` leaves the members out.
+//
+// Corresponds with GET /Groups (the `ListGroups` operationId).
+func (c *Client) ListGroups(ctx context.Context, params *ListGroupsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListGroupsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateGroupWithBody Create a group
+//
+// Creates a group of the token's provider. Each member is a User the
+// provider provisions, or the request is 400 `invalidValue`. A
+// `displayName` or `externalId` another group of the provider has is
+// 409 `uniqueness`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /Groups (the `CreateGroup` operationId).
+func (c *Client) CreateGroupWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateGroupRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateGroupWithApplicationScimPlusJSONBody Create a group
+//
+// Creates a group of the token's provider. Each member is a User the
+// provider provisions, or the request is 400 `invalidValue`. A
+// `displayName` or `externalId` another group of the provider has is
+// 409 `uniqueness`.
+//
+// Takes a body of the `application/scim+json` content type.
+//
+// Corresponds with POST /Groups (the `CreateGroup` operationId).
+func (c *Client) CreateGroupWithApplicationScimPlusJSONBody(ctx context.Context, body CreateGroupApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateGroupRequestWithApplicationScimPlusJSONBody(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteGroup Delete a group
+//
+// Removes the group and answers 204; its members leave it.
+//
+// Corresponds with DELETE /Groups/{id} (the `DeleteGroup` operationId).
+func (c *Client) DeleteGroup(ctx context.Context, id GroupID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteGroupRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetGroup Read one of the provider's groups
+//
+// Corresponds with GET /Groups/{id} (the `GetGroup` operationId).
+func (c *Client) GetGroup(ctx context.Context, id GroupID, params *GetGroupParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetGroupRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PatchGroupWithBody Patch a group
+//
+// `add`, `replace` and `remove` on `members` (a list of `{value}`;
+// `remove` without a value empties the group), `remove` on
+// `members[value eq "<id>"]`, and `add` or `replace` on `displayName`
+// and `externalId`, with or without a path. Applied in order as one
+// change.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /Groups/{id} (the `PatchGroup` operationId).
+func (c *Client) PatchGroupWithBody(ctx context.Context, id GroupID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchGroupRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PatchGroupWithApplicationScimPlusJSONBody Patch a group
+//
+// `add`, `replace` and `remove` on `members` (a list of `{value}`;
+// `remove` without a value empties the group), `remove` on
+// `members[value eq "<id>"]`, and `add` or `replace` on `displayName`
+// and `externalId`, with or without a path. Applied in order as one
+// change.
+//
+// Takes a body of the `application/scim+json` content type.
+//
+// Corresponds with PATCH /Groups/{id} (the `PatchGroup` operationId).
+func (c *Client) PatchGroupWithApplicationScimPlusJSONBody(ctx context.Context, id GroupID, body PatchGroupApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchGroupRequestWithApplicationScimPlusJSONBody(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReplaceGroupWithBody Replace a group
+//
+// Replaces the `displayName` and the members (none when `members` is
+// absent), and the `externalId` when it is sent.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /Groups/{id} (the `ReplaceGroup` operationId).
+func (c *Client) ReplaceGroupWithBody(ctx context.Context, id GroupID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaceGroupRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReplaceGroupWithApplicationScimPlusJSONBody Replace a group
+//
+// Replaces the `displayName` and the members (none when `members` is
+// absent), and the `externalId` when it is sent.
+//
+// Takes a body of the `application/scim+json` content type.
+//
+// Corresponds with PUT /Groups/{id} (the `ReplaceGroup` operationId).
+func (c *Client) ReplaceGroupWithApplicationScimPlusJSONBody(ctx context.Context, id GroupID, body ReplaceGroupApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaceGroupRequestWithApplicationScimPlusJSONBody(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 // ListResourceTypes The resource types this server exposes
@@ -665,6 +994,325 @@ func (c *Client) ReplaceUserWithApplicationScimPlusJSONBody(ctx context.Context,
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewListGroupsRequest constructs an http.Request for the ListGroups method
+func NewListGroupsRequest(server string, params *ListGroupsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/Groups")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Filter != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "filter", *params.Filter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.StartIndex != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "startIndex", *params.StartIndex, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Count != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "count", *params.Count, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ExcludedAttributes != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "excludedAttributes", *params.ExcludedAttributes, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateGroupRequestWithApplicationScimPlusJSONBody calls the generic CreateGroup builder with application/scim+json body
+func NewCreateGroupRequestWithApplicationScimPlusJSONBody(server string, body CreateGroupApplicationScimPlusJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateGroupRequestWithBody(server, "application/scim+json", bodyReader)
+}
+
+// NewCreateGroupRequestWithBody constructs an http.Request for the CreateGroup method, with any body, and a specified content type
+func NewCreateGroupRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/Groups")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteGroupRequest constructs an http.Request for the DeleteGroup method
+func NewDeleteGroupRequest(server string, id GroupID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/Groups/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetGroupRequest constructs an http.Request for the GetGroup method
+func NewGetGroupRequest(server string, id GroupID, params *GetGroupParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/Groups/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.ExcludedAttributes != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "excludedAttributes", *params.ExcludedAttributes, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPatchGroupRequestWithApplicationScimPlusJSONBody calls the generic PatchGroup builder with application/scim+json body
+func NewPatchGroupRequestWithApplicationScimPlusJSONBody(server string, id GroupID, body PatchGroupApplicationScimPlusJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPatchGroupRequestWithBody(server, id, "application/scim+json", bodyReader)
+}
+
+// NewPatchGroupRequestWithBody constructs an http.Request for the PatchGroup method, with any body, and a specified content type
+func NewPatchGroupRequestWithBody(server string, id GroupID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/Groups/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewReplaceGroupRequestWithApplicationScimPlusJSONBody calls the generic ReplaceGroup builder with application/scim+json body
+func NewReplaceGroupRequestWithApplicationScimPlusJSONBody(server string, id GroupID, body ReplaceGroupApplicationScimPlusJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewReplaceGroupRequestWithBody(server, id, "application/scim+json", bodyReader)
+}
+
+// NewReplaceGroupRequestWithBody constructs an http.Request for the ReplaceGroup method, with any body, and a specified content type
+func NewReplaceGroupRequestWithBody(server string, id GroupID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/Groups/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
 }
 
 // NewListResourceTypesRequest constructs an http.Request for the ListResourceTypes method
@@ -1072,6 +1720,104 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
+	// ListGroupsWithResponse List the provider's groups
+	//
+	// `filter` compares attributes with `eq`, alone or joined by `and`:
+	// `displayName`, `externalId` or `id`, each exactly; any other filter
+	// is 400 `invalidFilter`. Paging as for `/Users`; groups are ordered by
+	// `displayName`. `excludedAttributes=members` leaves the members out.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /Groups (the `ListGroups` operationId).
+	ListGroupsWithResponse(ctx context.Context, params *ListGroupsParams, reqEditors ...RequestEditorFn) (*ListGroupsResponse, error)
+
+	// CreateGroupWithBodyWithResponse Create a group
+	//
+	// Creates a group of the token's provider. Each member is a User the
+	// provider provisions, or the request is 400 `invalidValue`. A
+	// `displayName` or `externalId` another group of the provider has is
+	// 409 `uniqueness`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /Groups (the `CreateGroup` operationId).
+	CreateGroupWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateGroupResponse, error)
+
+	// CreateGroupWithApplicationScimPlusJSONBodyWithResponse Create a group
+	//
+	// Creates a group of the token's provider. Each member is a User the
+	// provider provisions, or the request is 400 `invalidValue`. A
+	// `displayName` or `externalId` another group of the provider has is
+	// 409 `uniqueness`.
+	//
+	// Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /Groups (the `CreateGroup` operationId).
+	CreateGroupWithApplicationScimPlusJSONBodyWithResponse(ctx context.Context, body CreateGroupApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateGroupResponse, error)
+
+	// DeleteGroupWithResponse Delete a group
+	//
+	// Removes the group and answers 204; its members leave it.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /Groups/{id} (the `DeleteGroup` operationId).
+	DeleteGroupWithResponse(ctx context.Context, id GroupID, reqEditors ...RequestEditorFn) (*DeleteGroupResponse, error)
+
+	// GetGroupWithResponse Read one of the provider's groups
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /Groups/{id} (the `GetGroup` operationId).
+	GetGroupWithResponse(ctx context.Context, id GroupID, params *GetGroupParams, reqEditors ...RequestEditorFn) (*GetGroupResponse, error)
+
+	// PatchGroupWithBodyWithResponse Patch a group
+	//
+	// `add`, `replace` and `remove` on `members` (a list of `{value}`;
+	// `remove` without a value empties the group), `remove` on
+	// `members[value eq "<id>"]`, and `add` or `replace` on `displayName`
+	// and `externalId`, with or without a path. Applied in order as one
+	// change.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /Groups/{id} (the `PatchGroup` operationId).
+	PatchGroupWithBodyWithResponse(ctx context.Context, id GroupID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchGroupResponse, error)
+
+	// PatchGroupWithApplicationScimPlusJSONBodyWithResponse Patch a group
+	//
+	// `add`, `replace` and `remove` on `members` (a list of `{value}`;
+	// `remove` without a value empties the group), `remove` on
+	// `members[value eq "<id>"]`, and `add` or `replace` on `displayName`
+	// and `externalId`, with or without a path. Applied in order as one
+	// change.
+	//
+	// Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /Groups/{id} (the `PatchGroup` operationId).
+	PatchGroupWithApplicationScimPlusJSONBodyWithResponse(ctx context.Context, id GroupID, body PatchGroupApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchGroupResponse, error)
+
+	// ReplaceGroupWithBodyWithResponse Replace a group
+	//
+	// Replaces the `displayName` and the members (none when `members` is
+	// absent), and the `externalId` when it is sent.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /Groups/{id} (the `ReplaceGroup` operationId).
+	ReplaceGroupWithBodyWithResponse(ctx context.Context, id GroupID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceGroupResponse, error)
+
+	// ReplaceGroupWithApplicationScimPlusJSONBodyWithResponse Replace a group
+	//
+	// Replaces the `displayName` and the members (none when `members` is
+	// absent), and the `externalId` when it is sent.
+	//
+	// Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /Groups/{id} (the `ReplaceGroup` operationId).
+	ReplaceGroupWithApplicationScimPlusJSONBodyWithResponse(ctx context.Context, id GroupID, body ReplaceGroupApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceGroupResponse, error)
+
 	// ListResourceTypesWithResponse The resource types this server exposes
 	//
 	// The resource types served, as an RFC 7644 list response.
@@ -1203,6 +1949,406 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PUT /Users/{id} (the `ReplaceUser` operationId).
 	ReplaceUserWithApplicationScimPlusJSONBodyWithResponse(ctx context.Context, id UserID, body ReplaceUserApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceUserResponse, error)
+}
+
+// ListGroupsResponse401Headers the declared response headers of an HTTP 401 response for ListGroups
+type ListGroupsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListGroupsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationscimJSON200 the response for an HTTP 200 `application/scim+json` response
+	ApplicationscimJSON200 *GroupListResponse
+	// ApplicationscimJSON400 the response for an HTTP 400 `application/scim+json` response
+	ApplicationscimJSON400 *BadRequest
+	// ApplicationscimJSON401 the response for an HTTP 401 `application/scim+json` response
+	ApplicationscimJSON401 *Unauthorized
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListGroupsResponse401Headers
+}
+
+// GetApplicationscimJSON200 returns the response for an HTTP 200 `application/scim+json` response
+func (r ListGroupsResponse) GetApplicationscimJSON200() *GroupListResponse {
+	return r.ApplicationscimJSON200
+}
+
+// GetApplicationscimJSON400 returns the response for an HTTP 400 `application/scim+json` response
+func (r ListGroupsResponse) GetApplicationscimJSON400() *BadRequest {
+	return r.ApplicationscimJSON400
+}
+
+// GetApplicationscimJSON401 returns the response for an HTTP 401 `application/scim+json` response
+func (r ListGroupsResponse) GetApplicationscimJSON401() *Unauthorized {
+	return r.ApplicationscimJSON401
+}
+
+// GetBody returns the raw response body bytes
+func (r ListGroupsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListGroupsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListGroupsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListGroupsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateGroupResponse401Headers the declared response headers of an HTTP 401 response for CreateGroup
+type CreateGroupResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateGroupResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationscimJSON201 the response for an HTTP 201 `application/scim+json` response
+	ApplicationscimJSON201 *Group
+	// ApplicationscimJSON400 the response for an HTTP 400 `application/scim+json` response
+	ApplicationscimJSON400 *BadRequest
+	// ApplicationscimJSON401 the response for an HTTP 401 `application/scim+json` response
+	ApplicationscimJSON401 *Unauthorized
+	// ApplicationscimJSON409 the response for an HTTP 409 `application/scim+json` response
+	ApplicationscimJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateGroupResponse401Headers
+}
+
+// GetApplicationscimJSON201 returns the response for an HTTP 201 `application/scim+json` response
+func (r CreateGroupResponse) GetApplicationscimJSON201() *Group {
+	return r.ApplicationscimJSON201
+}
+
+// GetApplicationscimJSON400 returns the response for an HTTP 400 `application/scim+json` response
+func (r CreateGroupResponse) GetApplicationscimJSON400() *BadRequest {
+	return r.ApplicationscimJSON400
+}
+
+// GetApplicationscimJSON401 returns the response for an HTTP 401 `application/scim+json` response
+func (r CreateGroupResponse) GetApplicationscimJSON401() *Unauthorized {
+	return r.ApplicationscimJSON401
+}
+
+// GetApplicationscimJSON409 returns the response for an HTTP 409 `application/scim+json` response
+func (r CreateGroupResponse) GetApplicationscimJSON409() *Conflict {
+	return r.ApplicationscimJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateGroupResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateGroupResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateGroupResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateGroupResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeleteGroupResponse401Headers the declared response headers of an HTTP 401 response for DeleteGroup
+type DeleteGroupResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DeleteGroupResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationscimJSON401 the response for an HTTP 401 `application/scim+json` response
+	ApplicationscimJSON401 *Unauthorized
+	// ApplicationscimJSON404 the response for an HTTP 404 `application/scim+json` response
+	ApplicationscimJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeleteGroupResponse401Headers
+}
+
+// GetApplicationscimJSON401 returns the response for an HTTP 401 `application/scim+json` response
+func (r DeleteGroupResponse) GetApplicationscimJSON401() *Unauthorized {
+	return r.ApplicationscimJSON401
+}
+
+// GetApplicationscimJSON404 returns the response for an HTTP 404 `application/scim+json` response
+func (r DeleteGroupResponse) GetApplicationscimJSON404() *NotFound {
+	return r.ApplicationscimJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteGroupResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteGroupResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteGroupResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteGroupResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetGroupResponse401Headers the declared response headers of an HTTP 401 response for GetGroup
+type GetGroupResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetGroupResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationscimJSON200 the response for an HTTP 200 `application/scim+json` response
+	ApplicationscimJSON200 *Group
+	// ApplicationscimJSON401 the response for an HTTP 401 `application/scim+json` response
+	ApplicationscimJSON401 *Unauthorized
+	// ApplicationscimJSON404 the response for an HTTP 404 `application/scim+json` response
+	ApplicationscimJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetGroupResponse401Headers
+}
+
+// GetApplicationscimJSON200 returns the response for an HTTP 200 `application/scim+json` response
+func (r GetGroupResponse) GetApplicationscimJSON200() *Group {
+	return r.ApplicationscimJSON200
+}
+
+// GetApplicationscimJSON401 returns the response for an HTTP 401 `application/scim+json` response
+func (r GetGroupResponse) GetApplicationscimJSON401() *Unauthorized {
+	return r.ApplicationscimJSON401
+}
+
+// GetApplicationscimJSON404 returns the response for an HTTP 404 `application/scim+json` response
+func (r GetGroupResponse) GetApplicationscimJSON404() *NotFound {
+	return r.ApplicationscimJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetGroupResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetGroupResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetGroupResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetGroupResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PatchGroupResponse401Headers the declared response headers of an HTTP 401 response for PatchGroup
+type PatchGroupResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type PatchGroupResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationscimJSON200 the response for an HTTP 200 `application/scim+json` response
+	ApplicationscimJSON200 *Group
+	// ApplicationscimJSON400 the response for an HTTP 400 `application/scim+json` response
+	ApplicationscimJSON400 *BadRequest
+	// ApplicationscimJSON401 the response for an HTTP 401 `application/scim+json` response
+	ApplicationscimJSON401 *Unauthorized
+	// ApplicationscimJSON404 the response for an HTTP 404 `application/scim+json` response
+	ApplicationscimJSON404 *NotFound
+	// ApplicationscimJSON409 the response for an HTTP 409 `application/scim+json` response
+	ApplicationscimJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *PatchGroupResponse401Headers
+}
+
+// GetApplicationscimJSON200 returns the response for an HTTP 200 `application/scim+json` response
+func (r PatchGroupResponse) GetApplicationscimJSON200() *Group {
+	return r.ApplicationscimJSON200
+}
+
+// GetApplicationscimJSON400 returns the response for an HTTP 400 `application/scim+json` response
+func (r PatchGroupResponse) GetApplicationscimJSON400() *BadRequest {
+	return r.ApplicationscimJSON400
+}
+
+// GetApplicationscimJSON401 returns the response for an HTTP 401 `application/scim+json` response
+func (r PatchGroupResponse) GetApplicationscimJSON401() *Unauthorized {
+	return r.ApplicationscimJSON401
+}
+
+// GetApplicationscimJSON404 returns the response for an HTTP 404 `application/scim+json` response
+func (r PatchGroupResponse) GetApplicationscimJSON404() *NotFound {
+	return r.ApplicationscimJSON404
+}
+
+// GetApplicationscimJSON409 returns the response for an HTTP 409 `application/scim+json` response
+func (r PatchGroupResponse) GetApplicationscimJSON409() *Conflict {
+	return r.ApplicationscimJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r PatchGroupResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PatchGroupResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PatchGroupResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PatchGroupResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ReplaceGroupResponse401Headers the declared response headers of an HTTP 401 response for ReplaceGroup
+type ReplaceGroupResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ReplaceGroupResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationscimJSON200 the response for an HTTP 200 `application/scim+json` response
+	ApplicationscimJSON200 *Group
+	// ApplicationscimJSON400 the response for an HTTP 400 `application/scim+json` response
+	ApplicationscimJSON400 *BadRequest
+	// ApplicationscimJSON401 the response for an HTTP 401 `application/scim+json` response
+	ApplicationscimJSON401 *Unauthorized
+	// ApplicationscimJSON404 the response for an HTTP 404 `application/scim+json` response
+	ApplicationscimJSON404 *NotFound
+	// ApplicationscimJSON409 the response for an HTTP 409 `application/scim+json` response
+	ApplicationscimJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ReplaceGroupResponse401Headers
+}
+
+// GetApplicationscimJSON200 returns the response for an HTTP 200 `application/scim+json` response
+func (r ReplaceGroupResponse) GetApplicationscimJSON200() *Group {
+	return r.ApplicationscimJSON200
+}
+
+// GetApplicationscimJSON400 returns the response for an HTTP 400 `application/scim+json` response
+func (r ReplaceGroupResponse) GetApplicationscimJSON400() *BadRequest {
+	return r.ApplicationscimJSON400
+}
+
+// GetApplicationscimJSON401 returns the response for an HTTP 401 `application/scim+json` response
+func (r ReplaceGroupResponse) GetApplicationscimJSON401() *Unauthorized {
+	return r.ApplicationscimJSON401
+}
+
+// GetApplicationscimJSON404 returns the response for an HTTP 404 `application/scim+json` response
+func (r ReplaceGroupResponse) GetApplicationscimJSON404() *NotFound {
+	return r.ApplicationscimJSON404
+}
+
+// GetApplicationscimJSON409 returns the response for an HTTP 409 `application/scim+json` response
+func (r ReplaceGroupResponse) GetApplicationscimJSON409() *Conflict {
+	return r.ApplicationscimJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r ReplaceGroupResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ReplaceGroupResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReplaceGroupResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReplaceGroupResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
 }
 
 // ListResourceTypesResponse401Headers the declared response headers of an HTTP 401 response for ListResourceTypes
@@ -1770,6 +2916,158 @@ func (r ReplaceUserResponse) ContentType() string {
 	return ""
 }
 
+// ListGroupsWithResponse List the provider's groups
+//
+// `filter` compares attributes with `eq`, alone or joined by `and`:
+// `displayName`, `externalId` or `id`, each exactly; any other filter
+// is 400 `invalidFilter`. Paging as for `/Users`; groups are ordered by
+// `displayName`. `excludedAttributes=members` leaves the members out.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /Groups (the `ListGroups` operationId).
+func (c *ClientWithResponses) ListGroupsWithResponse(ctx context.Context, params *ListGroupsParams, reqEditors ...RequestEditorFn) (*ListGroupsResponse, error) {
+	rsp, err := c.ListGroups(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListGroupsResponse(rsp)
+}
+
+// CreateGroupWithBodyWithResponse Create a group
+//
+// Creates a group of the token's provider. Each member is a User the
+// provider provisions, or the request is 400 `invalidValue`. A
+// `displayName` or `externalId` another group of the provider has is
+// 409 `uniqueness`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /Groups (the `CreateGroup` operationId).
+func (c *ClientWithResponses) CreateGroupWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateGroupResponse, error) {
+	rsp, err := c.CreateGroupWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateGroupResponse(rsp)
+}
+
+// CreateGroupWithApplicationScimPlusJSONBodyWithResponse Create a group
+//
+// Creates a group of the token's provider. Each member is a User the
+// provider provisions, or the request is 400 `invalidValue`. A
+// `displayName` or `externalId` another group of the provider has is
+// 409 `uniqueness`.
+//
+// Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /Groups (the `CreateGroup` operationId).
+func (c *ClientWithResponses) CreateGroupWithApplicationScimPlusJSONBodyWithResponse(ctx context.Context, body CreateGroupApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateGroupResponse, error) {
+	rsp, err := c.CreateGroupWithApplicationScimPlusJSONBody(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateGroupResponse(rsp)
+}
+
+// DeleteGroupWithResponse Delete a group
+//
+// Removes the group and answers 204; its members leave it.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /Groups/{id} (the `DeleteGroup` operationId).
+func (c *ClientWithResponses) DeleteGroupWithResponse(ctx context.Context, id GroupID, reqEditors ...RequestEditorFn) (*DeleteGroupResponse, error) {
+	rsp, err := c.DeleteGroup(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteGroupResponse(rsp)
+}
+
+// GetGroupWithResponse Read one of the provider's groups
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /Groups/{id} (the `GetGroup` operationId).
+func (c *ClientWithResponses) GetGroupWithResponse(ctx context.Context, id GroupID, params *GetGroupParams, reqEditors ...RequestEditorFn) (*GetGroupResponse, error) {
+	rsp, err := c.GetGroup(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetGroupResponse(rsp)
+}
+
+// PatchGroupWithBodyWithResponse Patch a group
+//
+// `add`, `replace` and `remove` on `members` (a list of `{value}`;
+// `remove` without a value empties the group), `remove` on
+// `members[value eq "<id>"]`, and `add` or `replace` on `displayName`
+// and `externalId`, with or without a path. Applied in order as one
+// change.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /Groups/{id} (the `PatchGroup` operationId).
+func (c *ClientWithResponses) PatchGroupWithBodyWithResponse(ctx context.Context, id GroupID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchGroupResponse, error) {
+	rsp, err := c.PatchGroupWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchGroupResponse(rsp)
+}
+
+// PatchGroupWithApplicationScimPlusJSONBodyWithResponse Patch a group
+//
+// `add`, `replace` and `remove` on `members` (a list of `{value}`;
+// `remove` without a value empties the group), `remove` on
+// `members[value eq "<id>"]`, and `add` or `replace` on `displayName`
+// and `externalId`, with or without a path. Applied in order as one
+// change.
+//
+// Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /Groups/{id} (the `PatchGroup` operationId).
+func (c *ClientWithResponses) PatchGroupWithApplicationScimPlusJSONBodyWithResponse(ctx context.Context, id GroupID, body PatchGroupApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchGroupResponse, error) {
+	rsp, err := c.PatchGroupWithApplicationScimPlusJSONBody(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchGroupResponse(rsp)
+}
+
+// ReplaceGroupWithBodyWithResponse Replace a group
+//
+// Replaces the `displayName` and the members (none when `members` is
+// absent), and the `externalId` when it is sent.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /Groups/{id} (the `ReplaceGroup` operationId).
+func (c *ClientWithResponses) ReplaceGroupWithBodyWithResponse(ctx context.Context, id GroupID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceGroupResponse, error) {
+	rsp, err := c.ReplaceGroupWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReplaceGroupResponse(rsp)
+}
+
+// ReplaceGroupWithApplicationScimPlusJSONBodyWithResponse Replace a group
+//
+// Replaces the `displayName` and the members (none when `members` is
+// absent), and the `externalId` when it is sent.
+//
+// Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /Groups/{id} (the `ReplaceGroup` operationId).
+func (c *ClientWithResponses) ReplaceGroupWithApplicationScimPlusJSONBodyWithResponse(ctx context.Context, id GroupID, body ReplaceGroupApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceGroupResponse, error) {
+	rsp, err := c.ReplaceGroupWithApplicationScimPlusJSONBody(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReplaceGroupResponse(rsp)
+}
+
 // ListResourceTypesWithResponse The resource types this server exposes
 //
 // The resource types served, as an RFC 7644 list response.
@@ -1972,6 +3270,355 @@ func (c *ClientWithResponses) ReplaceUserWithApplicationScimPlusJSONBodyWithResp
 		return nil, err
 	}
 	return ParseReplaceUserResponse(rsp)
+}
+
+// ParseListGroupsResponse parses an HTTP response from a ListGroupsWithResponse call
+func ParseListGroupsResponse(rsp *http.Response) (*ListGroupsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListGroupsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GroupListResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON401 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListGroupsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateGroupResponse parses an HTTP response from a CreateGroupWithResponse call
+func ParseCreateGroupResponse(rsp *http.Response) (*CreateGroupResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateGroupResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Group
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers CreateGroupResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeleteGroupResponse parses an HTTP response from a DeleteGroupWithResponse call
+func ParseDeleteGroupResponse(rsp *http.Response) (*DeleteGroupResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteGroupResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DeleteGroupResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetGroupResponse parses an HTTP response from a GetGroupWithResponse call
+func ParseGetGroupResponse(rsp *http.Response) (*GetGroupResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetGroupResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Group
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetGroupResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePatchGroupResponse parses an HTTP response from a PatchGroupWithResponse call
+func ParsePatchGroupResponse(rsp *http.Response) (*PatchGroupResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PatchGroupResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Group
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers PatchGroupResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseReplaceGroupResponse parses an HTTP response from a ReplaceGroupWithResponse call
+func ParseReplaceGroupResponse(rsp *http.Response) (*ReplaceGroupResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReplaceGroupResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Group
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationscimJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ReplaceGroupResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
 }
 
 // ParseListResourceTypesResponse parses an HTTP response from a ListResourceTypesWithResponse call
@@ -2463,6 +4110,24 @@ func ParseReplaceUserResponse(rsp *http.Response) (*ReplaceUserResponse, error) 
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListGroups List the provider's groups
+	// (GET /Groups)
+	ListGroups(w http.ResponseWriter, r *http.Request, params ListGroupsParams)
+	// CreateGroup Create a group
+	// (POST /Groups)
+	CreateGroup(w http.ResponseWriter, r *http.Request)
+	// DeleteGroup Delete a group
+	// (DELETE /Groups/{id})
+	DeleteGroup(w http.ResponseWriter, r *http.Request, id GroupID)
+	// GetGroup Read one of the provider's groups
+	// (GET /Groups/{id})
+	GetGroup(w http.ResponseWriter, r *http.Request, id GroupID, params GetGroupParams)
+	// PatchGroup Patch a group
+	// (PATCH /Groups/{id})
+	PatchGroup(w http.ResponseWriter, r *http.Request, id GroupID)
+	// ReplaceGroup Replace a group
+	// (PUT /Groups/{id})
+	ReplaceGroup(w http.ResponseWriter, r *http.Request, id GroupID)
 	// ListResourceTypes The resource types this server exposes
 	// (GET /ResourceTypes)
 	ListResourceTypes(w http.ResponseWriter, r *http.Request)
@@ -2500,6 +4165,212 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListGroups operation middleware
+func (siw *ServerInterfaceWrapper) ListGroups(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListGroupsParams
+
+	// ------------- Optional query parameter "filter" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "filter", r.URL.Query(), &params.Filter, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "filter"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "filter", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "startIndex" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "startIndex", r.URL.Query(), &params.StartIndex, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "startIndex"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "startIndex", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "count" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "count", r.URL.Query(), &params.Count, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "count"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "count", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "excludedAttributes" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "excludedAttributes", r.URL.Query(), &params.ExcludedAttributes, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "excludedAttributes"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "excludedAttributes", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListGroups(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateGroup operation middleware
+func (siw *ServerInterfaceWrapper) CreateGroup(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateGroup(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteGroup operation middleware
+func (siw *ServerInterfaceWrapper) DeleteGroup(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id GroupID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteGroup(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetGroup operation middleware
+func (siw *ServerInterfaceWrapper) GetGroup(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id GroupID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetGroupParams
+
+	// ------------- Optional query parameter "excludedAttributes" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "excludedAttributes", r.URL.Query(), &params.ExcludedAttributes, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "excludedAttributes"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "excludedAttributes", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetGroup(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchGroup operation middleware
+func (siw *ServerInterfaceWrapper) PatchGroup(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id GroupID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchGroup(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReplaceGroup operation middleware
+func (siw *ServerInterfaceWrapper) ReplaceGroup(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id GroupID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReplaceGroup(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListResourceTypes operation middleware
 func (siw *ServerInterfaceWrapper) ListResourceTypes(w http.ResponseWriter, r *http.Request) {
@@ -2849,6 +4720,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/Users/{id}", wrapper.GetUser)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/Users/{id}", wrapper.PatchUser)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/Users/{id}", wrapper.ReplaceUser)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/Groups", wrapper.ListGroups)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/Groups", wrapper.CreateGroup)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/Groups/{id}", wrapper.DeleteGroup)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/Groups/{id}", wrapper.GetGroup)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/Groups/{id}", wrapper.PatchGroup)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/Groups/{id}", wrapper.ReplaceGroup)
 
 	return m
 }
