@@ -103,7 +103,7 @@ func TestPatchingAGroupsNameAndExternalID(t *testing.T) {
 		"externalId removed":      {[]identity.PatchOperation{{Op: "remove", Path: "externalId"}}, "eng", ""},
 		"externalId blanked":      {[]identity.PatchOperation{{Op: "replace", Path: "externalId", Value: " "}}, "eng", ""},
 		"externalId nulled":       {[]identity.PatchOperation{{Op: "replace", Path: "externalId", Value: nil}}, "eng", ""},
-		"the name trimmed":        {[]identity.PatchOperation{{Op: "add", Path: "displayName", Value: "  ops "}}, "ops", "ext"},
+		"the name kept as sent":   {[]identity.PatchOperation{{Op: "add", Path: "displayName", Value: "  ops "}}, "  ops ", "ext"},
 		"schema-prefixed path":    {[]identity.PatchOperation{{Op: "replace", Path: "urn:ietf:params:scim:schemas:core:2.0:Group:displayName", Value: "ops"}}, "ops", "ext"},
 	} {
 		got, err := identity.ApplyGroupPatch(base, self, c.ops)
@@ -151,9 +151,11 @@ func TestPatchingAGroupRefusesWhatItCannotDo(t *testing.T) {
 
 func TestAGroupStateIsChecked(t *testing.T) {
 	m := memberIDs(1)
+	// The name is kept as the directory sent it: group mappings and filters
+	// match it exactly.
 	got, err := identity.NewGroupState("  eng ", " ", []string{m[0].String(), m[0].String()})
-	if err != nil || got.DisplayName != "eng" || got.ExternalID != "" || !slices.Equal(got.Members, m) {
-		t.Errorf("NewGroupState = %+v, %v; want eng, no externalId, one member", got, err)
+	if err != nil || got.DisplayName != "  eng " || got.ExternalID != "" || !slices.Equal(got.Members, m) {
+		t.Errorf("NewGroupState = %+v, %v; want \"  eng \", no externalId, one member", got, err)
 	}
 	for name, c := range map[string]struct {
 		name, ext string

@@ -115,9 +115,12 @@ func NewGroupState(displayName, externalID string, members []string) (GroupState
 	return g, nil
 }
 
+// setGroupName stores the name as the directory sent it, spaces included:
+// group mappings and filters match a group's name exactly, so a trimmed name
+// would match neither a mapping written as the directory names the group nor
+// the directory's own lookup of it.
 func setGroupName(g *GroupState, name string) error {
-	name = strings.TrimSpace(name)
-	if name == "" || utf8.RuneCountInString(name) > maxGroupNameLength {
+	if strings.TrimSpace(name) == "" || utf8.RuneCountInString(name) > maxGroupNameLength {
 		return scimErr("invalidValue", "displayName is required, with at most %d characters", maxGroupNameLength)
 	}
 	g.DisplayName = name
