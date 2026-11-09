@@ -37,7 +37,8 @@ const InvitationRetention = 30 * 24 * time.Hour
 const invitationSecretLength = 32
 
 // Invitation is the one-time link that lets an invited member set their
-// first password.
+// first password; signing in through an auth provider that vouches for their
+// email accepts it too.
 type Invitation struct {
 	ID        InvitationID
 	Member    MemberID

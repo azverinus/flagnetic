@@ -35,7 +35,7 @@ An invited person never needs a password when a provider vouches for their email
 - For an email in an [enforced domain](#sso-enforcement-and-local-login), only the enforced provider accepts it; another one is `sso_required`.
 - The acceptance is recorded as `member.invitation_accepted` with its `method` (`oidc` or `saml`) and `provider`, beside `identity.linked`, `grant.created` in the project and `auth.signed_in`.
 
-`GET /auth/invitations/{secret}` answers in `providers` the enabled providers that accept the invitation (`{slug, display_name, kind}`, ordered by display name): those whose domains hold the invited email, only the enforced one when its domain is enforced, none when no provider vouches for it. The invitation page offers them beside, or instead of, setting a password.
+`GET /auth/invitations/{secret}` answers in `providers` the enabled providers that accept the invitation (`{slug, display_name, kind}`, ordered by display name): those whose domains hold the invited email, only the enforced one when its domain is enforced, none when no provider vouches for it.
 
 If the ID token carries no email, the instance asks the provider's UserInfo endpoint for it, and trusts the answer only when its `sub` is the token's; its `email_verified` is judged on its own.
 

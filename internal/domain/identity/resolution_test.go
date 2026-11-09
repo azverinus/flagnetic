@@ -2,6 +2,7 @@ package identity_test
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/azverinus/flagnetic/internal/domain/identity"
@@ -60,6 +61,35 @@ func TestResolutionFollowsItsRulesInOrder(t *testing.T) {
 			got, err := identity.Resolve(tc.in)
 			if !errors.Is(err, tc.wantErr) || got.Action != tc.want {
 				t.Errorf("Resolve = %v, %v; want action %v, error %v", got.Action, err, tc.want, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestTheProvidersAcceptingAnInvitationVouchForItsEmail(t *testing.T) {
+	corp := identity.Provider{Slug: "corp", Domains: []string{"corp.example"}}
+	both := identity.Provider{Slug: "both", Domains: []string{"example.com", "corp.example"}}
+	other := identity.Provider{Slug: "other", Domains: []string{"elsewhere.org"}}
+	slugs := func(ps []identity.Provider) []string {
+		out := []string{}
+		for _, p := range ps {
+			out = append(out, p.Slug)
+		}
+		return out
+	}
+	for _, tc := range []struct {
+		name, email, enforced string
+		want                  []string
+	}{
+		{"those holding the domain, in their order", "Carol@Corp.Example", "", []string{"corp", "both"}},
+		{"only the enforced provider", "carol@corp.example", "both", []string{"both"}},
+		{"none for a domain no provider holds", "carol@unknown.example", "", []string{}},
+		{"none for a subdomain", "carol@mail.corp.example", "", []string{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := identity.InvitationProviders([]identity.Provider{corp, both, other}, tc.email, tc.enforced)
+			if got == nil || !slices.Equal(slugs(got), tc.want) {
+				t.Errorf("InvitationProviders(%s, %q) = %v, want %v", tc.email, tc.enforced, slugs(got), tc.want)
 			}
 		})
 	}

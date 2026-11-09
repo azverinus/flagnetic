@@ -45,7 +45,9 @@ func slug() string { return "p" + strings.ToLower(rand.Text()[:12]) }
 
 // provider describes an auth provider to create.
 type provider struct {
-	slug                           string
+	slug string
+	// displayName is the provider's name; "Corporate SSO" when empty.
+	displayName                    string
 	issuer, clientID, clientSecret string
 	domains                        []string
 	linkByEmail, autoProvision     bool
@@ -58,7 +60,7 @@ func (e env) create(t *testing.T, p provider) string {
 	t.Helper()
 	testkit.RecordSecret(p.clientSecret)
 	body := management.AuthProviderCreate{
-		Slug: cmp.Or(p.slug, slug()), Kind: management.AuthProviderKindOidc, DisplayName: "Corporate SSO", Domains: p.domains,
+		Slug: cmp.Or(p.slug, slug()), Kind: management.AuthProviderKindOidc, DisplayName: cmp.Or(p.displayName, "Corporate SSO"), Domains: p.domains,
 		Issuer: &p.issuer, ClientId: &p.clientID, ClientSecret: &p.clientSecret,
 		LinkByEmail: &p.linkByEmail, AutoProvision: &p.autoProvision,
 	}

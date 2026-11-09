@@ -152,6 +152,21 @@ func (p Provider) Vouches(c VerifiedClaims) bool {
 	return p.VouchesForEmail(c.Email)
 }
 
+// InvitationProviders returns those of providers signing in through which
+// accepts the invitation of email, in their order: those vouching for the
+// email, as resolution activates an invited member they vouch for, and only
+// enforced, the slug of the provider the email's domain is enforced to when
+// it is, since signing in elsewhere is refused then.
+func InvitationProviders(providers []Provider, email, enforced string) []Provider {
+	out := make([]Provider, 0, len(providers))
+	for _, p := range providers {
+		if p.VouchesForEmail(email) && (enforced == "" || p.Slug == enforced) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // VouchesForEmail reports whether email's domain is one of the provider's;
 // a subdomain is not the domain.
 func (p Provider) VouchesForEmail(email string) bool {

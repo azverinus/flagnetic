@@ -215,14 +215,17 @@ func TestAnInvitedMemberLinkedAtAProviderIsActivatedSigningInThroughIt(t *testin
 func TestAnInvitationAnswersTheProvidersThatMayAcceptIt(t *testing.T) {
 	idp := testkit.StartForgingIDP(t)
 	e := startIsolated(t)
-	corp := e.forged(t, idp, noFallback("corp.example"))
-	other := e.forged(t, idp, noFallback("corp.example", "example.com"))
-	elsewhere := e.forged(t, idp, noFallback("elsewhere.org"))
-	disabled := e.forged(t, idp, noFallback("corp.example"))
+	named := func(name string, domains ...string) func(*provider) {
+		return func(p *provider) { noFallback(domains...)(p); p.displayName = name }
+	}
+	// Created out of the order of their names, which the answer follows.
+	corp := e.forged(t, idp, named("Zeta SSO", "corp.example"))
+	other := e.forged(t, idp, named("Alpha SSO", "corp.example", "example.com"))
+	e.forged(t, idp, named("Beta SSO", "elsewhere.org"))
+	disabled := e.forged(t, idp, named("Gamma SSO", "corp.example"))
 	if d, err := e.admin.DisableAuthProviderWithResponse(t.Context(), disabled); err != nil || d.StatusCode() != http.StatusOK {
 		t.Fatalf("disabling a provider: %v, %d", err, d.StatusCode())
 	}
-	_ = elsewhere
 	anyone := testkit.NewBrowser(t, e.srv.URL)
 	providersOf := func(secret string) []string {
 		t.Helper()
@@ -230,23 +233,21 @@ func TestAnInvitationAnswersTheProvidersThatMayAcceptIt(t *testing.T) {
 		if err != nil || res.JSON200 == nil {
 			t.Fatalf("GET the invitation = %d: %v", res.StatusCode(), err)
 		}
-		var slugs []string
+		slugs := []string{}
 		for _, p := range res.JSON200.Providers {
 			if p.Kind != management.AuthProviderKindOidc || p.DisplayName == "" {
 				t.Errorf("a provider answers %+v", p)
 			}
 			slugs = append(slugs, p.Slug)
 		}
-		slices.Sort(slugs)
 		return slugs
 	}
-	carol, _ := e.inviteTo(t, "carol@corp.example", "", "")
+	carolEmail := "carol@corp.example"
+	carol, invited := e.inviteTo(t, carolEmail, "", "")
 	nobody, _ := e.inviteTo(t, "nobody@unknown.example", "", "")
 
-	want := []string{corp, other}
-	slices.Sort(want)
-	if got := providersOf(carol); !slices.Equal(got, want) {
-		t.Errorf("an invitation to corp.example offers %v, want %v", got, want)
+	if got, want := providersOf(carol), []string{other, corp}; !slices.Equal(got, want) {
+		t.Errorf("an invitation to corp.example offers %v, want %v, ordered by display name", got, want)
 	}
 	if got := providersOf(nobody); len(got) != 0 {
 		t.Errorf("an invitation to a domain no provider holds offers %v", got)
@@ -255,5 +256,21 @@ func TestAnInvitationAnswersTheProvidersThatMayAcceptIt(t *testing.T) {
 	enforce(t, e.admin, "corp.example", corp)
 	if got := providersOf(carol); !slices.Equal(got, []string{corp}) {
 		t.Errorf("an invitation to an enforced domain offers %v, want only %s", got, corp)
+	}
+
+	// Another provider vouching for the email does not accept it once its
+	// domain is enforced; the enforced one does.
+	idp.NextClaims(map[string]any{"sub": "sub-carol-other", "email": carolEmail, "email_verified": true})
+	b := testkit.NewBrowser(t, e.srv.URL)
+	v := e.signIn(t, b, other, "", e.opts())
+	wantError(t, v, b, "sso_required")
+	if v.Query("provider") != corp {
+		t.Errorf("the refusal names %q, want %s", v.Query("provider"), corp)
+	}
+	if got := e.statusOf(t, invited.Id); got != management.MemberStatusInvited {
+		t.Errorf("the invited member is %s after another provider's sign-in, want invited still", got)
+	}
+	if got := idOf(t, e.forgedPerson(t, idp, corp, carolEmail, map[string]any{"email_verified": true})); got != invited.Id {
+		t.Errorf("signed in through the enforced provider as %v, want the invited member %v", got, invited.Id)
 	}
 }
