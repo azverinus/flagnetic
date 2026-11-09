@@ -68,40 +68,61 @@ func scimErr(kind, format string, args ...any) *ScimError {
 // User. Anything but `eq` on a known attribute, joined by `and`, is
 // invalidFilter, naming what was not understood.
 func ParseUserFilter(raw string) (UserFilter, error) {
+	conds, err := parseEqualities(raw, func(p filter.AttributePath) (string, bool) {
+		a, ok := userAttribute(p)
+		return string(a), ok
+	}, "userName, emails.value, externalId, displayName and id")
+	var f UserFilter
+	for _, c := range conds {
+		f.Conditions = append(f.Conditions, UserCondition{Attribute: UserAttribute(c.attribute), Value: c.value})
+	}
+	return f, err
+}
+
+// equality is one `eq` comparison of a filter, the attribute named as the
+// resource's resolver names it.
+type equality struct {
+	attribute string
+	value     string
+}
+
+// parseEqualities reads raw as `eq` comparisons joined by `and`, resolving
+// each attribute with resolve; known lists the attributes a refusal names.
+func parseEqualities(raw string, resolve func(filter.AttributePath) (string, bool), known string) ([]equality, error) {
 	if strings.TrimSpace(raw) == "" {
-		return UserFilter{}, nil
+		return nil, nil
 	}
 	if len(raw) > maxFilterLength {
-		return UserFilter{}, scimErr("invalidFilter", "a filter has at most %d characters", maxFilterLength)
+		return nil, scimErr("invalidFilter", "a filter has at most %d characters", maxFilterLength)
 	}
 	expr, err := filter.ParseFilter([]byte(raw))
 	if err != nil {
-		return UserFilter{}, scimErr("invalidFilter", "the filter is not valid: %v", err)
+		return nil, scimErr("invalidFilter", "the filter is not valid: %v", err)
 	}
-	var f UserFilter
-	if err = collectConditions(expr, &f); err != nil {
-		return UserFilter{}, err
+	var out []equality
+	if err = collectConditions(expr, resolve, known, &out); err != nil {
+		return nil, err
 	}
-	return f, nil
+	return out, nil
 }
 
-func collectConditions(e filter.Expression, f *UserFilter) error {
+func collectConditions(e filter.Expression, resolve func(filter.AttributePath) (string, bool), known string, out *[]equality) error {
 	switch x := e.(type) {
 	case *filter.LogicalExpression:
 		if x.Operator != filter.AND {
 			return scimErr("invalidFilter", "only `and` joins comparisons")
 		}
-		if err := collectConditions(x.Left, f); err != nil {
+		if err := collectConditions(x.Left, resolve, known, out); err != nil {
 			return err
 		}
-		return collectConditions(x.Right, f)
+		return collectConditions(x.Right, resolve, known, out)
 	case *filter.AttributeExpression:
-		return collectComparison(x, f)
+		return collectComparison(x, resolve, known, out)
 	}
 	return scimErr("invalidFilter", "only `eq` comparisons, joined by `and`, are understood")
 }
 
-func collectComparison(x *filter.AttributeExpression, f *UserFilter) error {
+func collectComparison(x *filter.AttributeExpression, resolve func(filter.AttributePath) (string, bool), known string, out *[]equality) error {
 	if x.Operator != filter.EQ {
 		return scimErr("invalidFilter", "the operator %q is not understood; only `eq` is", x.Operator)
 	}
@@ -109,11 +130,11 @@ func collectComparison(x *filter.AttributeExpression, f *UserFilter) error {
 	if !ok {
 		return scimErr("invalidFilter", "the value compared with %s is a string", x.AttributePath)
 	}
-	attr, ok := userAttribute(x.AttributePath)
+	attr, ok := resolve(x.AttributePath)
 	if !ok {
-		return scimErr("invalidFilter", "the attribute %s cannot be filtered on; userName, emails.value, externalId, displayName and id can", x.AttributePath)
+		return scimErr("invalidFilter", "the attribute %s cannot be filtered on; %s can", x.AttributePath, known)
 	}
-	f.Conditions = append(f.Conditions, UserCondition{Attribute: attr, Value: unescape(value)})
+	*out = append(*out, equality{attribute: attr, value: unescape(value)})
 	return nil
 }
 
