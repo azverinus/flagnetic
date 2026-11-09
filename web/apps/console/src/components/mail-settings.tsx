@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlertIcon, CircleCheckIcon, SendIcon, Trash2Icon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -81,15 +81,28 @@ function MailSettingsPage({
   const test = useMutation({
     mutationFn: mailSettingsApi.test,
     meta: { toast: false },
+    onError: (error) => {
+      // Another admin removed the server since the page read it: the
+      // refusal says so, and the page reads what is stored again.
+      if (error instanceof ApiError && error.code === "smtp_not_configured") {
+        void queryClient.invalidateQueries({ queryKey: mailSettingsQuery.queryKey });
+      }
+    },
   });
+  const removed = () => {
+    setRemoving(false);
+    test.reset();
+    remember(null);
+    toast.success(t`The SMTP server is removed.`);
+  };
   const remove = useMutation({
     mutationFn: mailSettingsApi.remove,
     meta: { toast: false },
-    onSuccess: () => {
-      setRemoving(false);
-      test.reset();
-      remember(null);
-      toast.success(t`The SMTP server is removed.`);
+    onSuccess: removed,
+    onError: (error) => {
+      // Nothing to remove means another admin removed it first, which is
+      // what was asked for.
+      if (error instanceof ApiError && error.status === 404) removed();
     },
   });
 
@@ -132,9 +145,9 @@ function MailSettingsPage({
           </Trans>
         </p>
       )}
-      {/* A save or a removal starts the form over from what is stored. */}
+      {/* Configuring or removing the server starts the form over. */}
       <MailSettingsForm
-        key={settings?.updated_at ?? "none"}
+        key={settings ? "configured" : "none"}
         settings={settings}
         onSaved={(saved) => {
           // A test answered for the settings before the save; test again.
@@ -181,16 +194,26 @@ function MailSettingsForm({
 }) {
   const { i18n, t } = useLingui();
   const passwordSet = settings?.password_set ?? false;
+  const values = useMemo(() => formOf(settings), [settings]);
   const form = useForm<MailForm>({
     resolver: zodResolver(mailFormSchema(i18n, { passwordSet })),
-    defaultValues: formOf(settings),
+    values,
+    // Settings read again while the form holds edits, after another admin
+    // saved, change only the fields not edited here.
+    resetOptions: { keepDirtyValues: true },
   });
   const save = useMutation({
     mutationFn: (values: MailForm) => mailSettingsApi.save(bodyOf(values)),
     // The variables carry the password.
     ...forgetsSecret,
     meta: { toast: false },
-    onSuccess: onSaved,
+    onSuccess: (saved) => {
+      // An explicit reset replaces the edits with what was stored, even when
+      // the save changed nothing and the settings given to the form stay
+      // the same.
+      form.reset(formOf(saved), { keepDirtyValues: false });
+      onSaved(saved);
+    },
   });
   // A refusal answers what was submitted: once a field is edited, the
   // server's word on what it held no longer stands under it.
@@ -205,7 +228,9 @@ function MailSettingsForm({
       }),
     [form, forgetRefusal],
   );
-  const { errors, isDirty } = form.formState;
+  const { errors, dirtyFields } = form.formState;
+  // A reset that keeps the edits clears isDirty but keeps the edited fields.
+  const isDirty = Object.keys(dirtyFields).length > 0;
   const refusal = save.error instanceof ApiError ? save.error : undefined;
   // A refusal the fields do not say themselves is explained above the actions.
   const fieldsExplain =
@@ -322,7 +347,11 @@ function MailSettingsForm({
         </Field>
         {refusal && !fieldsExplain ? <MailRefusal error={refusal} /> : null}
       </FormPage>
-      <UnsavedChangesBar dirty={isDirty} onDiscard={() => form.reset()} pending={save.isPending} />
+      <UnsavedChangesBar
+        dirty={isDirty}
+        onDiscard={() => form.reset(undefined, { keepDirtyValues: false })}
+        pending={save.isPending}
+      />
     </>
   );
 }

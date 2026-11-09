@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 
@@ -74,6 +74,7 @@ export async function startMailpit(): Promise<MailpitState> {
     api: `http://127.0.0.1:${httpPort}`,
     container,
   };
+  mkdirSync(workDir, { recursive: true });
   writeFileSync(statePath, JSON.stringify(state, null, 2));
 
   const deadline = Date.now() + 60_000;

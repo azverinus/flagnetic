@@ -85,6 +85,85 @@ describe("the mail settings", () => {
     expect(body).toMatchObject({ port: 2525, username: "relay" });
   });
 
+  it("starts the form over from the answer of a save that changed nothing", async () => {
+    // The server trims the host, finds nothing changed and answers the
+    // stored settings with the same time of change.
+    fakeServer({
+      "GET /instance/smtp": { status: 200, body: stored },
+      "PUT /instance/smtp": { status: 200, body: stored },
+    });
+    await render();
+    await screen.findByLabelText("Host");
+
+    const user = await retype("Host", "smtp.example.com ");
+    expect(screen.getByRole("region", { name: "Unsaved changes" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText("Host")).toHaveValue("smtp.example.com");
+  });
+
+  it("keeps the edits when the stored settings are read again", async () => {
+    let current = stored;
+    fakeServer({ "GET /instance/smtp": () => ({ status: 200, body: current }) });
+    const { queryClient } = await render();
+    await screen.findByLabelText("Host");
+
+    await retype("Port", "2525");
+    current = { ...stored, from: "flags@example.org", updated_at: "2026-11-02T10:00:00Z" };
+    await queryClient.invalidateQueries({ queryKey: ["instance", "smtp"] });
+
+    await waitFor(() => expect(screen.getByLabelText("Sender")).toHaveValue("flags@example.org"));
+    expect(screen.getByLabelText("Port")).toHaveValue("2525");
+    const bar = screen.getByRole("region", { name: "Unsaved changes" });
+
+    await userEvent.click(within(bar).getByRole("button", { name: "Discard" }));
+    expect(screen.getByLabelText("Port")).toHaveValue("587");
+    expect(screen.getByLabelText("Sender")).toHaveValue("flags@example.org");
+    expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
+  });
+
+  it("shows the server as removed when the test finds none configured", async () => {
+    let current: typeof stored | null = stored;
+    fakeServer({
+      "GET /instance/smtp": () =>
+        current ? { status: 200, body: current } : problem(404, "not_found"),
+      "POST /instance/smtp/test": () => {
+        current = null;
+        return problem(409, "smtp_not_configured");
+      },
+    });
+    await render();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Send a test mail" }));
+
+    expect(await screen.findByText(/the instance mails nothing/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Send a test mail" })).not.toBeInTheDocument();
+  });
+
+  it("shows the server as removed when another admin removed it first", async () => {
+    let current: typeof stored | null = stored;
+    fakeServer({
+      "GET /instance/smtp": () =>
+        current ? { status: 200, body: current } : problem(404, "not_found"),
+      "DELETE /instance/smtp": () => {
+        current = null;
+        return problem(404, "not_found");
+      },
+    });
+    await render();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Remove" }));
+    const dialog = screen.getByRole("dialog", { name: "Remove the SMTP server" });
+    await user.click(within(dialog).getByRole("button", { name: "Remove SMTP server" }));
+
+    expect(await screen.findByText(/the instance mails nothing/)).toBeVisible();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("says the server's refusal of a field under it", async () => {
     fakeServer({
       "GET /instance/smtp": { status: 200, body: stored },
