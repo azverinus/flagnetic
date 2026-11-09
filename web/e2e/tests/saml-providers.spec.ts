@@ -74,7 +74,9 @@ test.describe("SAML providers", () => {
     await expect(idp).toContainText(keycloak.entityID);
     await expect(idp).toContainText("read again every day");
     await expect(certificates(page).getByRole("listitem")).toHaveCount(1);
-    await expect(page.getByLabel("Metadata URL", { exact: true })).toHaveValue(keycloak.metadataURL);
+    await expect(page.getByLabel("Metadata URL", { exact: true })).toHaveValue(
+      keycloak.metadataURL,
+    );
   });
 
   test("downloads the SP metadata to import at the identity provider", async ({ page }) => {
