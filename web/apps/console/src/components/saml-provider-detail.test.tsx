@@ -152,11 +152,27 @@ describe("a SAML provider's page", () => {
       "Next",
     );
     expect(screen.getByText(/Import the SP metadata at the identity provider again/)).toBeVisible();
+    expect(screen.queryByText(/The provider is disabled/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Complete rotation" })).toBeVisible();
     expect(
       screen.queryByRole("button", { name: "Start certificate rotation" }),
     ).not.toBeInTheDocument();
     expect(server.requests.filter((r) => r.method === "POST")).toHaveLength(1);
+  });
+
+  it("says to enable a disabled provider before the identity provider imports the metadata of a rotation", async () => {
+    fakeServer({
+      "GET /instance/auth-providers/corp": {
+        status: 200,
+        body: { ...rotating, enabled: false },
+      },
+    });
+    await renderScreen();
+
+    const notice = await screen.findByText(/A rotation is pending/);
+    expect(notice).toHaveTextContent(
+      /The provider is disabled, so the instance does not serve its SP metadata: enable it/,
+    );
   });
 
   it("completes a pending rotation, warning that the old key is destroyed", async () => {

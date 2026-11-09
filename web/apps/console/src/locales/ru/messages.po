@@ -4017,13 +4017,17 @@ msgid "Newest entries"
 msgstr "Самые новые записи"
 
 #: src/components/flag-history.tsx
-#: src/components/saml-provider-detail.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Next"
 msgstr "Далее"
+
+#: src/components/saml-provider-detail.tsx
+msgctxt "certificate"
+msgid "Next"
+msgstr "Следующий"
 
 #: src/components/webhook-deliveries.tsx
 #: src/components/webhook-delivery-sheet.tsx
@@ -6667,6 +6671,10 @@ msgstr "Предложенная конфигурация сразу запис�
 #: src/components/auth-provider-detail.tsx
 msgid "The provider does not list the S256 PKCE method, which sign-in needs. Sign-ins through it will fail."
 msgstr "Провайдер не перечисляет метод PKCE S256, который нужен для входа. Входы через него не удадутся."
+
+#: src/components/saml-provider-detail.tsx
+msgid "The provider is disabled, so the instance does not serve its SP metadata: enable it before the identity provider imports the metadata."
+msgstr "Провайдер выключен, поэтому экземпляр не отдаёт его метаданные SP: включите его, прежде чем провайдер идентификации импортирует метаданные."
 
 #: src/lib/problem-messages.ts
 msgid "The provider is still in use. Disable it instead: that stops its sign-ins and keeps its members, identities and grants."

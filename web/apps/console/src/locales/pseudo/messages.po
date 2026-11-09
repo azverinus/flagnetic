@@ -4017,11 +4017,15 @@ msgid "Newest entries"
 msgstr ""
 
 #: src/components/flag-history.tsx
-#: src/components/saml-provider-detail.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
+msgid "Next"
+msgstr ""
+
+#: src/components/saml-provider-detail.tsx
+msgctxt "certificate"
 msgid "Next"
 msgstr ""
 
@@ -6666,6 +6670,10 @@ msgstr ""
 
 #: src/components/auth-provider-detail.tsx
 msgid "The provider does not list the S256 PKCE method, which sign-in needs. Sign-ins through it will fail."
+msgstr ""
+
+#: src/components/saml-provider-detail.tsx
+msgid "The provider is disabled, so the instance does not serve its SP metadata: enable it before the identity provider imports the metadata."
 msgstr ""
 
 #: src/lib/problem-messages.ts

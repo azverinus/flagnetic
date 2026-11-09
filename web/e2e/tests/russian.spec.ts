@@ -703,7 +703,11 @@ test.describe("the console in Russian", () => {
     await expect(
       page.getByRole("list", { name: "Сертификаты SP" }).getByRole("listitem"),
     ).toHaveCount(2);
-    await expect(page.getByText(/Ротация начата/)).toBeVisible();
+    await expect(
+      page.getByRole("list", { name: "Сертификаты SP" }).getByRole("listitem").nth(1),
+    ).toContainText("Следующий");
+    // The provider is disabled, so the notice says to enable it first.
+    await expect(page.getByText(/Ротация начата/)).toContainText("Провайдер выключен");
     await page.getByRole("button", { name: "Завершить ротацию" }).click();
     const complete = page.getByRole("dialog", { name: "Завершение ротации сертификата" });
     await expect(complete).toContainText("старый ключ уничтожается");

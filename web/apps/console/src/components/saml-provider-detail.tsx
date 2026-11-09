@@ -212,6 +212,15 @@ export function SamlCertificates({
             knows the next certificate, then complete the rotation. Until then nothing changes for
             the identity provider.
           </Trans>
+          {provider.enabled ? null : (
+            <>
+              {" "}
+              <Trans>
+                The provider is disabled, so the instance does not serve its SP metadata: enable it
+                before the identity provider imports the metadata.
+              </Trans>
+            </>
+          )}
         </p>
       ) : null}
       <div>
@@ -279,7 +288,8 @@ function SpCertificateItem({ certificate }: { certificate: SpCertificate }) {
           </Badge>
         ) : (
           <Badge variant="muted">
-            <Trans>Next</Trans>
+            {/* Its own message: the bare "Next" is the pagination button's. */}
+            <Trans context="certificate">Next</Trans>
           </Badge>
         )}
       </span>
