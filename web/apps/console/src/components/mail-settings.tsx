@@ -110,11 +110,7 @@ function MailSettingsPage({
     <>
       <PageHeader
         title={t`Mail`}
-        description={
-          <Trans>
-            The SMTP server the instance mails invitations, password resets and notices through.
-          </Trans>
-        }
+        description={<Trans>The SMTP server the instance sends its mail through.</Trans>}
         actions={
           settings ? (
             <>
@@ -140,8 +136,8 @@ function MailSettingsPage({
       ) : (
         <p className="max-w-2xl rounded-md border bg-muted p-3 text-sm">
           <Trans>
-            No SMTP server is configured, so the instance mails nothing: invitation links are shown
-            to whoever issues them, and members cannot reset a forgotten password themselves.
+            No SMTP server is configured, so the instance mails nothing, and members cannot reset a
+            forgotten password themselves.
           </Trans>
         </p>
       )}
@@ -174,9 +170,8 @@ function MailSettingsPage({
       >
         <p>
           <Trans>
-            The instance stops mailing: invitation links are shown to whoever issues them again, and
-            members can no longer reset a forgotten password themselves. The stored password is
-            deleted.
+            The instance stops mailing, and members can no longer reset a forgotten password
+            themselves. The stored password is deleted.
           </Trans>
         </p>
       </ConfirmDialog>

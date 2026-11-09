@@ -4059,8 +4059,8 @@ msgid "No segment matches these filters."
 msgstr "No segment matches these filters."
 
 #: src/components/mail-settings.tsx
-msgid "No SMTP server is configured, so the instance mails nothing: invitation links are shown to whoever issues them, and members cannot reset a forgotten password themselves."
-msgstr "No SMTP server is configured, so the instance mails nothing: invitation links are shown to whoever issues them, and members cannot reset a forgotten password themselves."
+msgid "No SMTP server is configured, so the instance mails nothing, and members cannot reset a forgotten password themselves."
+msgstr "No SMTP server is configured, so the instance mails nothing, and members cannot reset a forgotten password themselves."
 
 #: src/lib/mail-settings.ts
 msgid "No SMTP server is configured. Save the settings first."
@@ -6222,8 +6222,8 @@ msgid "The instance could not reach the SMTP server, or the connection broke. Ch
 msgstr "The instance could not reach the SMTP server, or the connection broke. Check the host and the port, and that the server accepts connections from the instance."
 
 #: src/components/mail-settings.tsx
-msgid "The instance stops mailing: invitation links are shown to whoever issues them again, and members can no longer reset a forgotten password themselves. The stored password is deleted."
-msgstr "The instance stops mailing: invitation links are shown to whoever issues them again, and members can no longer reset a forgotten password themselves. The stored password is deleted."
+msgid "The instance stops mailing, and members can no longer reset a forgotten password themselves. The stored password is deleted."
+msgstr "The instance stops mailing, and members can no longer reset a forgotten password themselves. The stored password is deleted."
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
@@ -6543,8 +6543,8 @@ msgid "The SMTP server refused the username and password. Check them, then save 
 msgstr "The SMTP server refused the username and password. Check them, then save and test again."
 
 #: src/components/mail-settings.tsx
-msgid "The SMTP server the instance mails invitations, password resets and notices through."
-msgstr "The SMTP server the instance mails invitations, password resets and notices through."
+msgid "The SMTP server the instance sends its mail through."
+msgstr "The SMTP server the instance sends its mail through."
 
 #: src/components/mail-settings.tsx
 msgid "The SMTP server's host name or address."

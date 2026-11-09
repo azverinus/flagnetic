@@ -4059,7 +4059,7 @@ msgid "No segment matches these filters."
 msgstr ""
 
 #: src/components/mail-settings.tsx
-msgid "No SMTP server is configured, so the instance mails nothing: invitation links are shown to whoever issues them, and members cannot reset a forgotten password themselves."
+msgid "No SMTP server is configured, so the instance mails nothing, and members cannot reset a forgotten password themselves."
 msgstr ""
 
 #: src/lib/mail-settings.ts
@@ -6222,7 +6222,7 @@ msgid "The instance could not reach the SMTP server, or the connection broke. Ch
 msgstr ""
 
 #: src/components/mail-settings.tsx
-msgid "The instance stops mailing: invitation links are shown to whoever issues them again, and members can no longer reset a forgotten password themselves. The stored password is deleted."
+msgid "The instance stops mailing, and members can no longer reset a forgotten password themselves. The stored password is deleted."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
@@ -6543,7 +6543,7 @@ msgid "The SMTP server refused the username and password. Check them, then save 
 msgstr ""
 
 #: src/components/mail-settings.tsx
-msgid "The SMTP server the instance mails invitations, password resets and notices through."
+msgid "The SMTP server the instance sends its mail through."
 msgstr ""
 
 #: src/components/mail-settings.tsx
