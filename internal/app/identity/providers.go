@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"slices"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -97,6 +98,64 @@ type ProviderDeps struct {
 	SPKeys SPKeyGenerator
 	// References are what keeps a provider from being deleted.
 	References []ProviderReference
+	// Settings tell what the auth settings ask of a provider: the domains
+	// enforced to it, and whether local login leaves another way in.
+	Settings ProviderSettings
+}
+
+// ProviderSettings is what changing an auth provider asks of the auth
+// settings, which the access context keeps.
+type ProviderSettings interface {
+	// LockProviderSettings locks the auth settings until the unit of work
+	// ends and returns what they ask of the provider with the slug. It is
+	// taken before the provider's own lock, as changing the settings takes
+	// it before reading the providers they name, so neither change can
+	// leave the settings sending people to a provider that let them down.
+	LockProviderSettings(ctx context.Context, slug string) (SettingsOfProvider, error)
+}
+
+// SettingsOfProvider is what the auth settings ask of one auth provider.
+type SettingsOfProvider struct {
+	// LocalLoginEnabled is whether members may sign in with a password.
+	LocalLoginEnabled bool
+	// EnforcedDomains are the email domains enforced to the provider.
+	EnforcedDomains []string
+}
+
+// What a provider_in_use refusal names besides what ProviderReference does:
+// the enforced domains that send people to the provider, and its being the
+// only way in while local login is disabled.
+const (
+	usedByEnforcedDomains = "enforced domains"
+	usedByOnlyWayIn       = "only way in"
+)
+
+func providerInUse(detail string, uses []string) error {
+	return apperrors.Conflict("provider_in_use", detail).WithExtension("used_by", uses)
+}
+
+// settingsUses names what the auth settings ask of p that taking it away,
+// by disabling or deleting it, would break: the domains enforced to it, and
+// its being the only enabled provider while local login is disabled. The
+// settings were locked with LockProviderSettings.
+func (d ProviderDeps) settingsUses(ctx context.Context, p identity.Provider, rules SettingsOfProvider) ([]string, error) {
+	var uses []string
+	if len(rules.EnforcedDomains) > 0 {
+		uses = append(uses, usedByEnforcedDomains)
+	}
+	if !p.Enabled || rules.LocalLoginEnabled {
+		return uses, nil
+	}
+	enabled, err := d.Store.EnabledProviders(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, other := range enabled {
+		if other.ID != p.ID {
+			return uses, nil
+		}
+	}
+	return append(uses, usedByOnlyWayIn), nil
 }
 
 func (d ProviderDeps) now() time.Time { return d.Clock.Now().UTC().Truncate(time.Microsecond) }
@@ -337,6 +396,10 @@ func (h *UpdateProvider) Handle(ctx context.Context, cmd UpdateProviderCommand) 
 	now := h.d.now()
 	var out identity.Provider
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
+		rules, err := h.d.Settings.LockProviderSettings(ctx, cmd.Slug)
+		if err != nil {
+			return err
+		}
 		before, err := lockProvider(ctx, h.d.Store, cmd.Slug)
 		if err != nil {
 			return err
@@ -348,6 +411,12 @@ func (h *UpdateProvider) Handle(ctx context.Context, cmd UpdateProviderCommand) 
 		after, err := before.CheckChange(cmd.Change)
 		if err != nil {
 			return err
+		}
+		for _, d := range rules.EnforcedDomains {
+			if !slices.Contains(after.Domains, d) {
+				return providerInUse("an enforced domain names this provider, which would no longer vouch for it; lift the enforcement first",
+					[]string{usedByEnforcedDomains})
+			}
 		}
 		if meta != nil && after.SAML != nil {
 			after = after.WithIDPMetadata(*meta, now)
@@ -398,7 +467,9 @@ func NewDisableProvider(d ProviderDeps) *DisableProvider { return &DisableProvid
 // Handle disables the provider, which stops its sign-ins and leaves its
 // members, identities and grants as they are, and records
 // auth_provider.disabled; a disabled provider is returned as it is and
-// nothing is recorded.
+// nothing is recorded. A provider an enforced domain names, or the only
+// enabled one while local login is disabled, is refused provider_in_use:
+// nobody could sign in where the settings send them.
 func (h *DisableProvider) Handle(ctx context.Context, cmd ProviderCommand) (identity.Provider, error) {
 	return setEnabled(ctx, h.d, cmd, false)
 }
@@ -407,9 +478,22 @@ func setEnabled(ctx context.Context, d ProviderDeps, cmd ProviderCommand, enable
 	now := d.now()
 	var out identity.Provider
 	err := d.Tx.Within(ctx, func(ctx context.Context) error {
+		rules, err := d.Settings.LockProviderSettings(ctx, cmd.Slug)
+		if err != nil {
+			return err
+		}
 		before, err := lockProvider(ctx, d.Store, cmd.Slug)
 		if err != nil {
 			return err
+		}
+		if !enabled {
+			uses, usesErr := d.settingsUses(ctx, before, rules)
+			if usesErr != nil {
+				return usesErr
+			}
+			if len(uses) > 0 {
+				return providerInUse("people are sent to this provider: lift the enforcement of its domains, or enable local login or another provider, first", uses)
+			}
 		}
 		after, changed := before.Disable(now)
 		action := "auth_provider.disabled"
@@ -436,15 +520,24 @@ func NewDeleteProvider(d ProviderDeps) *DeleteProvider { return &DeleteProvider{
 
 // Handle deletes the provider and records auth_provider.deleted, unless
 // something refers to it: then it is refused provider_in_use, naming what
-// does in used_by. A provider in use is disabled instead.
+// does in used_by, such as an enforced domain or its being the only enabled
+// provider while local login is disabled. A provider in use is disabled
+// instead, where the auth settings allow it.
 func (h *DeleteProvider) Handle(ctx context.Context, cmd ProviderCommand) error {
 	now := h.d.now()
 	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
+		rules, err := h.d.Settings.LockProviderSettings(ctx, cmd.Slug)
+		if err != nil {
+			return err
+		}
 		before, err := lockProvider(ctx, h.d.Store, cmd.Slug)
 		if err != nil {
 			return err
 		}
-		var uses []string
+		uses, err := h.d.settingsUses(ctx, before, rules)
+		if err != nil {
+			return err
+		}
 		for _, ref := range h.d.References {
 			u, usesErr := ref.ProviderUses(ctx, before.ID)
 			if usesErr != nil {

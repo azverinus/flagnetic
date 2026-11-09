@@ -2,6 +2,7 @@ package management_test
 
 import (
 	"net/http"
+	"reflect"
 	"slices"
 	"testing"
 	"time"
@@ -29,6 +30,7 @@ func freshInstance(t *testing.T, c clock.Clock) (*testkit.Server, *pgxpool.Pool,
 var defaultSettings = management.AuthSettings{
 	SessionIdleTimeoutSeconds: 86400, SessionAbsoluteTimeoutSeconds: 2592000, TokenMaxLifetimeSeconds: 31536000,
 	TokenExpiryRequired: false, PasswordMinLength: 12, SelfServicePasswordReset: true,
+	LocalLoginEnabled: true, SsoEnforcedDomains: []management.SsoEnforcedDomain{},
 }
 
 func getSettings(t *testing.T, c *management.ClientWithResponses) management.AuthSettings {
@@ -57,7 +59,7 @@ func putSettings(t *testing.T, c *management.ClientWithResponses, s management.A
 
 func TestAuthSettingsDefaultOnAFreshInstance(t *testing.T) {
 	_, _, admin := freshInstance(t, testkit.Clock())
-	if got := getSettings(t, admin); got != defaultSettings {
+	if got := getSettings(t, admin); !reflect.DeepEqual(got, defaultSettings) {
 		t.Errorf("settings = %+v, want %+v", got, defaultSettings)
 	}
 }
@@ -67,11 +69,12 @@ func TestReadingAndUpdatingEveryAuthSetting(t *testing.T) {
 	want := management.AuthSettings{
 		SessionIdleTimeoutSeconds: 7200, SessionAbsoluteTimeoutSeconds: 172800, TokenMaxLifetimeSeconds: 604800,
 		TokenExpiryRequired: true, PasswordMinLength: 16, SelfServicePasswordReset: false,
+		LocalLoginEnabled: true, SsoEnforcedDomains: []management.SsoEnforcedDomain{},
 	}
-	if got := putSettings(t, admin, want); got != want {
+	if got := putSettings(t, admin, want); !reflect.DeepEqual(got, want) {
 		t.Errorf("PUT answered %+v, want %+v", got, want)
 	}
-	if got := getSettings(t, admin); got != want {
+	if got := getSettings(t, admin); !reflect.DeepEqual(got, want) {
 		t.Errorf("GET after PUT = %+v, want %+v", got, want)
 	}
 	putSettings(t, admin, want) // the same settings again change nothing
@@ -129,7 +132,7 @@ func TestAuthSettingsValidationRefusals(t *testing.T) {
 			t.Errorf("%s: PUT = %d %s, want 422 invalid_auth_settings with %s %s", name, res.StatusCode(), res.Body, tc.pointer, tc.code)
 		}
 	}
-	if got := getSettings(t, admin); got != defaultSettings {
+	if got := getSettings(t, admin); !reflect.DeepEqual(got, defaultSettings) {
 		t.Errorf("settings after refusals = %+v, want the defaults", got)
 	}
 }
@@ -211,7 +214,7 @@ func TestAnAuthSettingsChangeIsAppliedByAnotherReplicaWithinASecond(t *testing.T
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if got := getSettings(t, adminOfB); got != defaultSettings { // B now holds its copy
+	if got := getSettings(t, adminOfB); !reflect.DeepEqual(got, defaultSettings) { // B now holds its copy
 		t.Fatalf("B's settings = %+v, want the defaults", got)
 	}
 

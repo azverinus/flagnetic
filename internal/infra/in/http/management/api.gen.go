@@ -1362,7 +1362,7 @@ type AuditEntryList struct {
 	NextCursor *string `json:"next_cursor"`
 }
 
-// AuthMethodProvider defines model for AuthMethodProvider.
+// AuthMethodProvider An auth provider as the sign-in page offers it. As `enforced_provider`, the provider the given email's domain is enforced to, the only way it signs in; absent when the domain is not enforced or no email was given.
 type AuthMethodProvider struct {
 	DisplayName string `json:"display_name"`
 
@@ -1373,10 +1373,13 @@ type AuthMethodProvider struct {
 
 // AuthMethods defines model for AuthMethods.
 type AuthMethods struct {
+	// EnforcedProvider An auth provider as the sign-in page offers it. As `enforced_provider`, the provider the given email's domain is enforced to, the only way it signs in; absent when the domain is not enforced or no email was given.
+	EnforcedProvider *AuthMethodProvider `json:"enforced_provider,omitempty"`
+
 	// LocalLoginEnabled Whether a member signs in with their email and password.
 	LocalLoginEnabled bool `json:"local_login_enabled"`
 
-	// PasswordResetAvailable Whether a member can ask for a password reset by mail (`POST /auth/password-reset`): the instance has an SMTP server and self-service password reset is on. The sign-in page offers the forgotten-password link only then.
+	// PasswordResetAvailable Whether a member can ask for a password reset by mail (`POST /auth/password-reset`): the instance has an SMTP server, self-service password reset is on, local login is enabled and, given an `email`, its domain is not enforced. The sign-in page offers the forgotten-password link only then.
 	PasswordResetAvailable bool `json:"password_reset_available"`
 
 	// Providers The enabled auth providers a member signs in through, ordered by display name.
@@ -1599,6 +1602,9 @@ type AuthProviderTest struct {
 
 // AuthSettings The instance's rules for sessions, API tokens and passwords.
 type AuthSettings struct {
+	// LocalLoginEnabled Whether members may sign in with a password at all. Off, every sign-in, invitation acceptance and password reset by password is refused `local_login_disabled`, and members sign in through auth providers. True on a fresh instance.
+	LocalLoginEnabled bool `json:"local_login_enabled"`
+
 	// PasswordMinLength The fewest characters a password chosen from now on has, never below 12. 12 on a fresh instance.
 	PasswordMinLength int `json:"password_min_length"`
 
@@ -1610,6 +1616,9 @@ type AuthSettings struct {
 
 	// SessionIdleTimeoutSeconds A session ends this long after its last request. 86400 (a day) on a fresh instance.
 	SessionIdleTimeoutSeconds int64 `json:"session_idle_timeout_seconds"`
+
+	// SsoEnforcedDomains The email domains whose people sign in only through one auth provider, in the order given. A password is no way in for them (`sso_required`, naming the provider), nor is any other provider. Empty on a fresh instance.
+	SsoEnforcedDomains []SsoEnforcedDomain `json:"sso_enforced_domains"`
 
 	// TokenExpiryRequired Whether an API token must be created with an expiry. False on a fresh instance.
 	TokenExpiryRequired bool `json:"token_expiry_required"`
@@ -3196,11 +3205,17 @@ type Invitation struct {
 	DisplayName string `json:"display_name"`
 
 	// Email The invited member's email with all but the first character of its local part hidden, such as `g***@example.com`.
-	Email     string    `json:"email"`
-	ExpiresAt time.Time `json:"expires_at"`
+	Email string `json:"email"`
+
+	// EnforcedProvider An auth provider as the sign-in page offers it. As `enforced_provider`, the provider the given email's domain is enforced to, the only way it signs in; absent when the domain is not enforced or no email was given.
+	EnforcedProvider *AuthMethodProvider `json:"enforced_provider,omitempty"`
+	ExpiresAt        time.Time           `json:"expires_at"`
 
 	// InvitedBy The display name of the member who issued the invitation; absent when none did.
 	InvitedBy *string `json:"invited_by,omitempty"`
+
+	// PasswordAllowed Whether the invitation can be accepted with a password; false while local login is disabled or when the invited email's domain is enforced to an auth provider.
+	PasswordAllowed bool `json:"password_allowed"`
 
 	// Project The project an invitation grants a role in. Absent once the invitation's grant was dropped.
 	Project *InvitationProject `json:"project,omitempty"`
@@ -3557,6 +3572,9 @@ type Problem struct {
 	// Permission The permission the caller lacks, for `forbidden`, or the role's permission the caller lacks, for `role_not_allowed`.
 	Permission *string `json:"permission,omitempty"`
 
+	// Provider The slug of the auth provider to sign in through instead, for `sso_required`.
+	Provider *string `json:"provider,omitempty"`
+
 	// References What still names what the write would remove or hide, for `in_use`.
 	References *[]Reference `json:"references,omitempty"`
 	RequestId  string       `json:"request_id"`
@@ -3567,7 +3585,7 @@ type Problem struct {
 	Title      string `json:"title"`
 	Type       string `json:"type"`
 
-	// UsedBy What refers to an auth provider that cannot be deleted, such as `identities`, for `provider_in_use`.
+	// UsedBy What keeps an auth provider from being deleted, disabled or edited, for `provider_in_use`, such as `identities`, `enforced domains` or `only way in` (the only enabled provider while local login is disabled).
 	UsedBy *[]string `json:"used_by,omitempty"`
 }
 
@@ -4785,6 +4803,15 @@ type SmtpSettingsUpdate struct {
 	Username *string `json:"username,omitempty"`
 }
 
+// SsoEnforcedDomain An email domain sent to one auth provider.
+type SsoEnforcedDomain struct {
+	// Domain The domain, such as `example.com`, stored lowercase; its subdomains are not included. It must be one of the provider's domains.
+	Domain string `json:"domain"`
+
+	// Provider The slug of the enabled auth provider its people sign in through.
+	Provider string `json:"provider"`
+}
+
 // StaleExperiment The running experiment past its expected end that makes the flag
 // stale as `experiment_overdue`, present with that reason only. When
 // several are, the one due earliest, then the first by key.
@@ -5283,6 +5310,9 @@ type InvitationGone = Problem
 // NotFound A problem document (RFC 9457). Code-specific values are further members.
 type NotFound = Problem
 
+// PasswordRefused A problem document (RFC 9457). Code-specific values are further members.
+type PasswordRefused = Problem
+
 // PasswordResetGone A problem document (RFC 9457). Code-specific values are further members.
 type PasswordResetGone = Problem
 
@@ -5389,6 +5419,12 @@ type ExportAuditEntriesParams struct {
 
 // ExportAuditEntriesParamsFormat defines parameters for ExportAuditEntries.
 type ExportAuditEntriesParamsFormat string
+
+// GetAuthMethodsParams defines parameters for GetAuthMethods.
+type GetAuthMethodsParams struct {
+	// Email The email the person typed, to learn where it signs in.
+	Email *string `form:"email,omitempty" json:"email,omitempty"`
+}
 
 // UpdateAuthProviderParams defines parameters for UpdateAuthProvider.
 type UpdateAuthProviderParams struct {
@@ -7464,6 +7500,9 @@ type ClientInterface interface {
 	// invitation it is. An invitation that cannot be accepted, whether it
 	// was never issued, has been used or replaced, or has expired, is
 	// `invitation_gone`, alike. The secret never reaches a log line.
+	// `password_allowed` says whether the invitation can be accepted with
+	// a password; when the invited email's domain is enforced to an auth
+	// provider, `enforced_provider` names it, the only way to accept.
 	//
 	// Corresponds with GET /auth/invitations/{secret} (the `GetInvitation` operationId).
 	GetInvitation(ctx context.Context, secret string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -7472,7 +7511,10 @@ type ClientInterface interface {
 	//
 	// Sets the invited member's first password under the password policy
 	// (`weak_password` otherwise), makes them active, uses up the link and
-	// opens a session, setting its cookie. The body must be sent as
+	// opens a session, setting its cookie. A password is refused, and the
+	// invitation stays open, when the invited email's domain is enforced
+	// to an auth provider (`sso_required`, naming the `provider`) or local
+	// login is disabled (`local_login_disabled`). The body must be sent as
 	// `application/json`; anything else is refused
 	// `unsupported_media_type`.
 	//
@@ -7490,7 +7532,10 @@ type ClientInterface interface {
 	//
 	// Sets the invited member's first password under the password policy
 	// (`weak_password` otherwise), makes them active, uses up the link and
-	// opens a session, setting its cookie. The body must be sent as
+	// opens a session, setting its cookie. A password is refused, and the
+	// invitation stays open, when the invited email's domain is enforced
+	// to an auth provider (`sso_required`, naming the `provider`) or local
+	// login is disabled (`local_login_disabled`). The body must be sent as
 	// `application/json`; anything else is refused
 	// `unsupported_media_type`.
 	//
@@ -7507,9 +7552,13 @@ type ClientInterface interface {
 	// GetAuthMethods How members sign in
 	//
 	// The ways the sign-in page offers, read before anyone is signed in.
+	// Given an `email`, it also says where that email signs in: the
+	// `enforced_provider` its domain is enforced to. The answer is judged
+	// from the email's domain alone, so it never tells whether a member
+	// holds the email.
 	//
 	// Corresponds with GET /auth/methods (the `GetAuthMethods` operationId).
-	GetAuthMethods(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetAuthMethods(ctx context.Context, params *GetAuthMethodsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RequestPasswordResetWithBody Ask for a password reset by mail
 	//
@@ -7520,8 +7569,9 @@ type ClientInterface interface {
 	//
 	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
-	// reset is on in the auth settings, the email belongs to an active
-	// member who holds a password, and no self-service reset was issued
+	// reset is on in the auth settings, local login is enabled and the
+	// email's domain is not enforced to an auth provider, the email
+	// belongs to an active member who holds a password, and no self-service reset was issued
 	// for them in the last 5 minutes (a reset counts when it was issued,
 	// even if its mail could not be sent). The link opens
 	// `/password-reset/{secret}` in the console, works once and expires
@@ -7545,8 +7595,9 @@ type ClientInterface interface {
 	//
 	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
-	// reset is on in the auth settings, the email belongs to an active
-	// member who holds a password, and no self-service reset was issued
+	// reset is on in the auth settings, local login is enabled and the
+	// email's domain is not enforced to an auth provider, the email
+	// belongs to an active member who holds a password, and no self-service reset was issued
 	// for them in the last 5 minutes (a reset counts when it was issued,
 	// even if its mail could not be sent). The link opens
 	// `/password-reset/{secret}` in the console, works once and expires
@@ -7577,7 +7628,11 @@ type ClientInterface interface {
 	// Sets the member's new password under the password policy
 	// (`weak_password` otherwise), clears the lockout on their email, signs
 	// them out of every device, ends every other open password reset and
-	// invitation of theirs, and opens a session, setting its cookie. The
+	// invitation of theirs, and opens a session, setting its cookie. A
+	// password is refused, and the reset stays open, when the member's
+	// email domain is enforced to an auth provider (`sso_required`, naming
+	// the `provider`) or local login is disabled
+	// (`local_login_disabled`). The
 	// body must be sent as `application/json`; anything else is refused
 	// `unsupported_media_type`.
 	//
@@ -7596,7 +7651,11 @@ type ClientInterface interface {
 	// Sets the member's new password under the password policy
 	// (`weak_password` otherwise), clears the lockout on their email, signs
 	// them out of every device, ends every other open password reset and
-	// invitation of theirs, and opens a session, setting its cookie. The
+	// invitation of theirs, and opens a session, setting its cookie. A
+	// password is refused, and the reset stays open, when the member's
+	// email domain is enforced to an auth provider (`sso_required`, naming
+	// the `provider`) or local login is disabled
+	// (`local_login_disabled`). The
 	// body must be sent as `application/json`; anything else is refused
 	// `unsupported_media_type`.
 	//
@@ -7630,6 +7689,12 @@ type ClientInterface interface {
 	// same five, so a stranger locking the email does not keep the member
 	// out where they usually sign in.
 	//
+	// A password is no way in for an email whose domain is enforced to an
+	// auth provider (`sso_required`, naming the `provider` to sign in
+	// through) nor, while local login is disabled, for anybody
+	// (`local_login_disabled`). Both are judged from the email alone,
+	// before anything is looked up or counted, whoever holds it.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /auth/sign-in (the `SignIn` operationId).
@@ -7654,6 +7719,12 @@ type ClientInterface interface {
 	// failures on the email are counted apart and lock it alone, after the
 	// same five, so a stranger locking the email does not keep the member
 	// out where they usually sign in.
+	//
+	// A password is no way in for an email whose domain is enforced to an
+	// auth provider (`sso_required`, naming the `provider` to sign in
+	// through) nor, while local login is disabled, for anybody
+	// (`local_login_disabled`). Both are judged from the email alone,
+	// before anything is looked up or counted, whoever holds it.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -7723,7 +7794,9 @@ type ClientInterface interface {
 	//
 	// Refused 409 `provider_in_use` while something depends on the provider;
 	// `used_by` names what (`identities`, `grants` while its group mappings
-	// made a grant or an instance admin, among others). Disable it instead:
+	// made a grant or an instance admin, `enforced domains` while a domain
+	// is enforced to it, `only way in` while it is the only enabled
+	// provider and local login is disabled, among others). Disable it instead:
 	// that stops its sign-ins and leaves its members, identities and grants
 	// as they are. Audited
 	// `auth_provider.deleted`.
@@ -7741,7 +7814,9 @@ type ClientInterface interface {
 	// Changes any property but `slug` and `kind`; each absent one is left as
 	// it is, a sent `client_secret` replaces the stored one, and a `claims`
 	// member names only the claims to rename. Whether the provider is enabled
-	// is changed with `enable` and `disable`. Refused as a creation is.
+	// is changed with `enable` and `disable`. Refused as a creation is, and
+	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
+	// drops a domain enforced to the provider: lift the enforcement first.
 	// Audited `auth_provider.updated`; an edit that changes nothing is not.
 	//
 	// Takes any type of body and a specified content type.
@@ -7754,7 +7829,9 @@ type ClientInterface interface {
 	// Changes any property but `slug` and `kind`; each absent one is left as
 	// it is, a sent `client_secret` replaces the stored one, and a `claims`
 	// member names only the claims to rename. Whether the provider is enabled
-	// is changed with `enable` and `disable`. Refused as a creation is.
+	// is changed with `enable` and `disable`. Refused as a creation is, and
+	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
+	// drops a domain enforced to the provider: lift the enforcement first.
 	// Audited `auth_provider.updated`; an edit that changes nothing is not.
 	//
 	// Takes a body of the `application/json` content type.
@@ -7766,7 +7843,10 @@ type ClientInterface interface {
 	//
 	// Stops the provider's sign-ins and leaves its
 	// members, identities and grants as they are. A disabled provider is
-	// answered as it is. Audited `auth_provider.disabled`.
+	// answered as it is. Refused 409 `provider_in_use` while people are sent
+	// to it: `used_by` names `enforced domains` while a domain is enforced
+	// to it, and `only way in` while it is the only enabled provider and
+	// local login is disabled. Audited `auth_provider.disabled`.
 	//
 	// Corresponds with POST /instance/auth-providers/{provider}/disable (the `DisableAuthProvider` operationId).
 	DisableAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -7885,7 +7965,17 @@ type ClientInterface interface {
 	// one. Refused `invalid_auth_settings` naming each field that breaks a
 	// rule: every duration a whole number of seconds from 60 to 315360000
 	// (ten years), the idle timeout at most the absolute one, the password
-	// minimum length from 12 to 128.
+	// minimum length from 12 to 128, and each enforced domain named once,
+	// to an enabled auth provider that lists it among its domains.
+	// `sso_enforced_domains` is the whole list: a domain left out is
+	// lifted. Disabling local login, or changing the enforced domains while
+	// it is disabled, is refused `identity_required` unless the caller
+	// holds an identity that signs them in under the new settings: at an
+	// enabled auth provider and, when their own email domain is enforced,
+	// at the provider it is enforced to. Whoever closes the door keeps a
+	// way through it; `flagnetic admin unlock`
+	// enables it again from the server's side. Audited
+	// `auth_settings.updated`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -7901,7 +7991,17 @@ type ClientInterface interface {
 	// one. Refused `invalid_auth_settings` naming each field that breaks a
 	// rule: every duration a whole number of seconds from 60 to 315360000
 	// (ten years), the idle timeout at most the absolute one, the password
-	// minimum length from 12 to 128.
+	// minimum length from 12 to 128, and each enforced domain named once,
+	// to an enabled auth provider that lists it among its domains.
+	// `sso_enforced_domains` is the whole list: a domain left out is
+	// lifted. Disabling local login, or changing the enforced domains while
+	// it is disabled, is refused `identity_required` unless the caller
+	// holds an identity that signs them in under the new settings: at an
+	// enabled auth provider and, when their own email domain is enforced,
+	// at the provider it is enforced to. Whoever closes the door keeps a
+	// way through it; `flagnetic admin unlock`
+	// enables it again from the server's side. Audited
+	// `auth_settings.updated`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -8073,9 +8173,11 @@ type ClientInterface interface {
 	//
 	// Unlinks an identity of the caller. Refused 409 `last_auth_method`
 	// when it is the caller's last usable way in: the other ways are a
-	// password and identities at enabled auth providers. Unlinking an
-	// identity at a disabled auth provider is always allowed, since it was
-	// no way in. An identity of another member, or an identifier that names
+	// password local login accepts for the caller's email and identities
+	// at enabled auth providers that SSO enforcement allows. Unlinking an
+	// identity that is no way in, such as one at a disabled auth provider,
+	// is always allowed. The identity at the auth provider the caller's
+	// email domain is enforced to is refused 409 `provider_enforced`. An identity of another member, or an identifier that names
 	// none, is not found. Recorded as `identity.unlinked`. Only a session
 	// may do this.
 	//
@@ -8372,8 +8474,9 @@ type ClientInterface interface {
 	// Unlinks an identity of the member, under the rules of a member
 	// unlinking their own: refused 409 `last_auth_method` when it is the
 	// member's last usable way in, except for a deactivated member, who
-	// signs in nowhere. An identity that does not belong to the member is
-	// not found. Recorded as `identity.unlinked` with the instance admin as
+	// signs in nowhere, and 409 `provider_enforced` for the identity at the
+	// auth provider the member's email domain is enforced to. An identity
+	// that does not belong to the member is not found. Recorded as `identity.unlinked` with the instance admin as
 	// its actor.
 	//
 	// Corresponds with DELETE /members/{member}/identities/{identity} (the `UnlinkMemberIdentity` operationId).
@@ -11321,6 +11424,9 @@ func (c *Client) ExportAuditEntries(ctx context.Context, params *ExportAuditEntr
 // invitation it is. An invitation that cannot be accepted, whether it
 // was never issued, has been used or replaced, or has expired, is
 // `invitation_gone`, alike. The secret never reaches a log line.
+// `password_allowed` says whether the invitation can be accepted with
+// a password; when the invited email's domain is enforced to an auth
+// provider, `enforced_provider` names it, the only way to accept.
 //
 // Corresponds with GET /auth/invitations/{secret} (the `GetInvitation` operationId).
 func (c *Client) GetInvitation(ctx context.Context, secret string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -11339,7 +11445,10 @@ func (c *Client) GetInvitation(ctx context.Context, secret string, reqEditors ..
 //
 // Sets the invited member's first password under the password policy
 // (`weak_password` otherwise), makes them active, uses up the link and
-// opens a session, setting its cookie. The body must be sent as
+// opens a session, setting its cookie. A password is refused, and the
+// invitation stays open, when the invited email's domain is enforced
+// to an auth provider (`sso_required`, naming the `provider`) or local
+// login is disabled (`local_login_disabled`). The body must be sent as
 // `application/json`; anything else is refused
 // `unsupported_media_type`.
 //
@@ -11367,7 +11476,10 @@ func (c *Client) AcceptInvitationWithBody(ctx context.Context, secret string, co
 //
 // Sets the invited member's first password under the password policy
 // (`weak_password` otherwise), makes them active, uses up the link and
-// opens a session, setting its cookie. The body must be sent as
+// opens a session, setting its cookie. A password is refused, and the
+// invitation stays open, when the invited email's domain is enforced
+// to an auth provider (`sso_required`, naming the `provider`) or local
+// login is disabled (`local_login_disabled`). The body must be sent as
 // `application/json`; anything else is refused
 // `unsupported_media_type`.
 //
@@ -11394,10 +11506,14 @@ func (c *Client) AcceptInvitation(ctx context.Context, secret string, body Accep
 // GetAuthMethods How members sign in
 //
 // The ways the sign-in page offers, read before anyone is signed in.
+// Given an `email`, it also says where that email signs in: the
+// `enforced_provider` its domain is enforced to. The answer is judged
+// from the email's domain alone, so it never tells whether a member
+// holds the email.
 //
 // Corresponds with GET /auth/methods (the `GetAuthMethods` operationId).
-func (c *Client) GetAuthMethods(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetAuthMethodsRequest(c.Server)
+func (c *Client) GetAuthMethods(ctx context.Context, params *GetAuthMethodsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuthMethodsRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -11417,8 +11533,9 @@ func (c *Client) GetAuthMethods(ctx context.Context, reqEditors ...RequestEditor
 //
 // A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
-// reset is on in the auth settings, the email belongs to an active
-// member who holds a password, and no self-service reset was issued
+// reset is on in the auth settings, local login is enabled and the
+// email's domain is not enforced to an auth provider, the email
+// belongs to an active member who holds a password, and no self-service reset was issued
 // for them in the last 5 minutes (a reset counts when it was issued,
 // even if its mail could not be sent). The link opens
 // `/password-reset/{secret}` in the console, works once and expires
@@ -11452,8 +11569,9 @@ func (c *Client) RequestPasswordResetWithBody(ctx context.Context, contentType s
 //
 // A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
-// reset is on in the auth settings, the email belongs to an active
-// member who holds a password, and no self-service reset was issued
+// reset is on in the auth settings, local login is enabled and the
+// email's domain is not enforced to an auth provider, the email
+// belongs to an active member who holds a password, and no self-service reset was issued
 // for them in the last 5 minutes (a reset counts when it was issued,
 // even if its mail could not be sent). The link opens
 // `/password-reset/{secret}` in the console, works once and expires
@@ -11504,7 +11622,11 @@ func (c *Client) GetPasswordReset(ctx context.Context, secret string, reqEditors
 // Sets the member's new password under the password policy
 // (`weak_password` otherwise), clears the lockout on their email, signs
 // them out of every device, ends every other open password reset and
-// invitation of theirs, and opens a session, setting its cookie. The
+// invitation of theirs, and opens a session, setting its cookie. A
+// password is refused, and the reset stays open, when the member's
+// email domain is enforced to an auth provider (`sso_required`, naming
+// the `provider`) or local login is disabled
+// (`local_login_disabled`). The
 // body must be sent as `application/json`; anything else is refused
 // `unsupported_media_type`.
 //
@@ -11533,7 +11655,11 @@ func (c *Client) CompletePasswordResetWithBody(ctx context.Context, secret strin
 // Sets the member's new password under the password policy
 // (`weak_password` otherwise), clears the lockout on their email, signs
 // them out of every device, ends every other open password reset and
-// invitation of theirs, and opens a session, setting its cookie. The
+// invitation of theirs, and opens a session, setting its cookie. A
+// password is refused, and the reset stays open, when the member's
+// email domain is enforced to an auth provider (`sso_required`, naming
+// the `provider`) or local login is disabled
+// (`local_login_disabled`). The
 // body must be sent as `application/json`; anything else is refused
 // `unsupported_media_type`.
 //
@@ -11577,6 +11703,12 @@ func (c *Client) CompletePasswordReset(ctx context.Context, secret string, body 
 // same five, so a stranger locking the email does not keep the member
 // out where they usually sign in.
 //
+// A password is no way in for an email whose domain is enforced to an
+// auth provider (`sso_required`, naming the `provider` to sign in
+// through) nor, while local login is disabled, for anybody
+// (`local_login_disabled`). Both are judged from the email alone,
+// before anything is looked up or counted, whoever holds it.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /auth/sign-in (the `SignIn` operationId).
@@ -11611,6 +11743,12 @@ func (c *Client) SignInWithBody(ctx context.Context, contentType string, body io
 // failures on the email are counted apart and lock it alone, after the
 // same five, so a stranger locking the email does not keep the member
 // out where they usually sign in.
+//
+// A password is no way in for an email whose domain is enforced to an
+// auth provider (`sso_required`, naming the `provider` to sign in
+// through) nor, while local login is disabled, for anybody
+// (`local_login_disabled`). Both are judged from the email alone,
+// before anything is looked up or counted, whoever holds it.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -11730,7 +11868,9 @@ func (c *Client) CreateAuthProvider(ctx context.Context, body CreateAuthProvider
 //
 // Refused 409 `provider_in_use` while something depends on the provider;
 // `used_by` names what (`identities`, `grants` while its group mappings
-// made a grant or an instance admin, among others). Disable it instead:
+// made a grant or an instance admin, `enforced domains` while a domain
+// is enforced to it, `only way in` while it is the only enabled
+// provider and local login is disabled, among others). Disable it instead:
 // that stops its sign-ins and leaves its members, identities and grants
 // as they are. Audited
 // `auth_provider.deleted`.
@@ -11768,7 +11908,9 @@ func (c *Client) GetAuthProvider(ctx context.Context, provider AuthProviderSlug,
 // Changes any property but `slug` and `kind`; each absent one is left as
 // it is, a sent `client_secret` replaces the stored one, and a `claims`
 // member names only the claims to rename. Whether the provider is enabled
-// is changed with `enable` and `disable`. Refused as a creation is.
+// is changed with `enable` and `disable`. Refused as a creation is, and
+// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
+// drops a domain enforced to the provider: lift the enforcement first.
 // Audited `auth_provider.updated`; an edit that changes nothing is not.
 //
 // Takes any type of body and a specified content type.
@@ -11791,7 +11933,9 @@ func (c *Client) UpdateAuthProviderWithBody(ctx context.Context, provider AuthPr
 // Changes any property but `slug` and `kind`; each absent one is left as
 // it is, a sent `client_secret` replaces the stored one, and a `claims`
 // member names only the claims to rename. Whether the provider is enabled
-// is changed with `enable` and `disable`. Refused as a creation is.
+// is changed with `enable` and `disable`. Refused as a creation is, and
+// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
+// drops a domain enforced to the provider: lift the enforcement first.
 // Audited `auth_provider.updated`; an edit that changes nothing is not.
 //
 // Takes a body of the `application/json` content type.
@@ -11813,7 +11957,10 @@ func (c *Client) UpdateAuthProvider(ctx context.Context, provider AuthProviderSl
 //
 // Stops the provider's sign-ins and leaves its
 // members, identities and grants as they are. A disabled provider is
-// answered as it is. Audited `auth_provider.disabled`.
+// answered as it is. Refused 409 `provider_in_use` while people are sent
+// to it: `used_by` names `enforced domains` while a domain is enforced
+// to it, and `only way in` while it is the only enabled provider and
+// local login is disabled. Audited `auth_provider.disabled`.
 //
 // Corresponds with POST /instance/auth-providers/{provider}/disable (the `DisableAuthProvider` operationId).
 func (c *Client) DisableAuthProvider(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -12022,7 +12169,17 @@ func (c *Client) GetAuthSettings(ctx context.Context, reqEditors ...RequestEdito
 // one. Refused `invalid_auth_settings` naming each field that breaks a
 // rule: every duration a whole number of seconds from 60 to 315360000
 // (ten years), the idle timeout at most the absolute one, the password
-// minimum length from 12 to 128.
+// minimum length from 12 to 128, and each enforced domain named once,
+// to an enabled auth provider that lists it among its domains.
+// `sso_enforced_domains` is the whole list: a domain left out is
+// lifted. Disabling local login, or changing the enforced domains while
+// it is disabled, is refused `identity_required` unless the caller
+// holds an identity that signs them in under the new settings: at an
+// enabled auth provider and, when their own email domain is enforced,
+// at the provider it is enforced to. Whoever closes the door keeps a
+// way through it; `flagnetic admin unlock`
+// enables it again from the server's side. Audited
+// `auth_settings.updated`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -12048,7 +12205,17 @@ func (c *Client) UpdateAuthSettingsWithBody(ctx context.Context, contentType str
 // one. Refused `invalid_auth_settings` naming each field that breaks a
 // rule: every duration a whole number of seconds from 60 to 315360000
 // (ten years), the idle timeout at most the absolute one, the password
-// minimum length from 12 to 128.
+// minimum length from 12 to 128, and each enforced domain named once,
+// to an enabled auth provider that lists it among its domains.
+// `sso_enforced_domains` is the whole list: a domain left out is
+// lifted. Disabling local login, or changing the enforced domains while
+// it is disabled, is refused `identity_required` unless the caller
+// holds an identity that signs them in under the new settings: at an
+// enabled auth provider and, when their own email domain is enforced,
+// at the provider it is enforced to. Whoever closes the door keeps a
+// way through it; `flagnetic admin unlock`
+// enables it again from the server's side. Audited
+// `auth_settings.updated`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -12360,9 +12527,11 @@ func (c *Client) ListMyIdentities(ctx context.Context, reqEditors ...RequestEdit
 //
 // Unlinks an identity of the caller. Refused 409 `last_auth_method`
 // when it is the caller's last usable way in: the other ways are a
-// password and identities at enabled auth providers. Unlinking an
-// identity at a disabled auth provider is always allowed, since it was
-// no way in. An identity of another member, or an identifier that names
+// password local login accepts for the caller's email and identities
+// at enabled auth providers that SSO enforcement allows. Unlinking an
+// identity that is no way in, such as one at a disabled auth provider,
+// is always allowed. The identity at the auth provider the caller's
+// email domain is enforced to is refused 409 `provider_enforced`. An identity of another member, or an identifier that names
 // none, is not found. Recorded as `identity.unlinked`. Only a session
 // may do this.
 //
@@ -12869,8 +13038,9 @@ func (c *Client) ListMemberIdentities(ctx context.Context, member MemberID, reqE
 // Unlinks an identity of the member, under the rules of a member
 // unlinking their own: refused 409 `last_auth_method` when it is the
 // member's last usable way in, except for a deactivated member, who
-// signs in nowhere. An identity that does not belong to the member is
-// not found. Recorded as `identity.unlinked` with the instance admin as
+// signs in nowhere, and 409 `provider_enforced` for the identity at the
+// auth provider the member's email domain is enforced to. An identity
+// that does not belong to the member is not found. Recorded as `identity.unlinked` with the instance admin as
 // its actor.
 //
 // Corresponds with DELETE /members/{member}/identities/{identity} (the `UnlinkMemberIdentity` operationId).
@@ -18232,7 +18402,7 @@ func NewAcceptInvitationRequestWithBody(server string, secret string, contentTyp
 }
 
 // NewGetAuthMethodsRequest constructs an http.Request for the GetAuthMethods method
-func NewGetAuthMethodsRequest(server string) (*http.Request, error) {
+func NewGetAuthMethodsRequest(server string, params *GetAuthMethodsParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -18248,6 +18418,33 @@ func NewGetAuthMethodsRequest(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Email != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "email", *params.Email, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -28308,6 +28505,9 @@ type ClientWithResponsesInterface interface {
 	// invitation it is. An invitation that cannot be accepted, whether it
 	// was never issued, has been used or replaced, or has expired, is
 	// `invitation_gone`, alike. The secret never reaches a log line.
+	// `password_allowed` says whether the invitation can be accepted with
+	// a password; when the invited email's domain is enforced to an auth
+	// provider, `enforced_provider` names it, the only way to accept.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -28318,7 +28518,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Sets the invited member's first password under the password policy
 	// (`weak_password` otherwise), makes them active, uses up the link and
-	// opens a session, setting its cookie. The body must be sent as
+	// opens a session, setting its cookie. A password is refused, and the
+	// invitation stays open, when the invited email's domain is enforced
+	// to an auth provider (`sso_required`, naming the `provider`) or local
+	// login is disabled (`local_login_disabled`). The body must be sent as
 	// `application/json`; anything else is refused
 	// `unsupported_media_type`.
 	//
@@ -28336,7 +28539,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Sets the invited member's first password under the password policy
 	// (`weak_password` otherwise), makes them active, uses up the link and
-	// opens a session, setting its cookie. The body must be sent as
+	// opens a session, setting its cookie. A password is refused, and the
+	// invitation stays open, when the invited email's domain is enforced
+	// to an auth provider (`sso_required`, naming the `provider`) or local
+	// login is disabled (`local_login_disabled`). The body must be sent as
 	// `application/json`; anything else is refused
 	// `unsupported_media_type`.
 	//
@@ -28353,11 +28559,15 @@ type ClientWithResponsesInterface interface {
 	// GetAuthMethodsWithResponse How members sign in
 	//
 	// The ways the sign-in page offers, read before anyone is signed in.
+	// Given an `email`, it also says where that email signs in: the
+	// `enforced_provider` its domain is enforced to. The answer is judged
+	// from the email's domain alone, so it never tells whether a member
+	// holds the email.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /auth/methods (the `GetAuthMethods` operationId).
-	GetAuthMethodsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthMethodsResponse, error)
+	GetAuthMethodsWithResponse(ctx context.Context, params *GetAuthMethodsParams, reqEditors ...RequestEditorFn) (*GetAuthMethodsResponse, error)
 
 	// RequestPasswordResetWithBodyWithResponse Ask for a password reset by mail
 	//
@@ -28368,8 +28578,9 @@ type ClientWithResponsesInterface interface {
 	//
 	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
-	// reset is on in the auth settings, the email belongs to an active
-	// member who holds a password, and no self-service reset was issued
+	// reset is on in the auth settings, local login is enabled and the
+	// email's domain is not enforced to an auth provider, the email
+	// belongs to an active member who holds a password, and no self-service reset was issued
 	// for them in the last 5 minutes (a reset counts when it was issued,
 	// even if its mail could not be sent). The link opens
 	// `/password-reset/{secret}` in the console, works once and expires
@@ -28393,8 +28604,9 @@ type ClientWithResponsesInterface interface {
 	//
 	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
-	// reset is on in the auth settings, the email belongs to an active
-	// member who holds a password, and no self-service reset was issued
+	// reset is on in the auth settings, local login is enabled and the
+	// email's domain is not enforced to an auth provider, the email
+	// belongs to an active member who holds a password, and no self-service reset was issued
 	// for them in the last 5 minutes (a reset counts when it was issued,
 	// even if its mail could not be sent). The link opens
 	// `/password-reset/{secret}` in the console, works once and expires
@@ -28427,7 +28639,11 @@ type ClientWithResponsesInterface interface {
 	// Sets the member's new password under the password policy
 	// (`weak_password` otherwise), clears the lockout on their email, signs
 	// them out of every device, ends every other open password reset and
-	// invitation of theirs, and opens a session, setting its cookie. The
+	// invitation of theirs, and opens a session, setting its cookie. A
+	// password is refused, and the reset stays open, when the member's
+	// email domain is enforced to an auth provider (`sso_required`, naming
+	// the `provider`) or local login is disabled
+	// (`local_login_disabled`). The
 	// body must be sent as `application/json`; anything else is refused
 	// `unsupported_media_type`.
 	//
@@ -28446,7 +28662,11 @@ type ClientWithResponsesInterface interface {
 	// Sets the member's new password under the password policy
 	// (`weak_password` otherwise), clears the lockout on their email, signs
 	// them out of every device, ends every other open password reset and
-	// invitation of theirs, and opens a session, setting its cookie. The
+	// invitation of theirs, and opens a session, setting its cookie. A
+	// password is refused, and the reset stays open, when the member's
+	// email domain is enforced to an auth provider (`sso_required`, naming
+	// the `provider`) or local login is disabled
+	// (`local_login_disabled`). The
 	// body must be sent as `application/json`; anything else is refused
 	// `unsupported_media_type`.
 	//
@@ -28480,6 +28700,12 @@ type ClientWithResponsesInterface interface {
 	// same five, so a stranger locking the email does not keep the member
 	// out where they usually sign in.
 	//
+	// A password is no way in for an email whose domain is enforced to an
+	// auth provider (`sso_required`, naming the `provider` to sign in
+	// through) nor, while local login is disabled, for anybody
+	// (`local_login_disabled`). Both are judged from the email alone,
+	// before anything is looked up or counted, whoever holds it.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /auth/sign-in (the `SignIn` operationId).
@@ -28504,6 +28730,12 @@ type ClientWithResponsesInterface interface {
 	// failures on the email are counted apart and lock it alone, after the
 	// same five, so a stranger locking the email does not keep the member
 	// out where they usually sign in.
+	//
+	// A password is no way in for an email whose domain is enforced to an
+	// auth provider (`sso_required`, naming the `provider` to sign in
+	// through) nor, while local login is disabled, for anybody
+	// (`local_login_disabled`). Both are judged from the email alone,
+	// before anything is looked up or counted, whoever holds it.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -28577,7 +28809,9 @@ type ClientWithResponsesInterface interface {
 	//
 	// Refused 409 `provider_in_use` while something depends on the provider;
 	// `used_by` names what (`identities`, `grants` while its group mappings
-	// made a grant or an instance admin, among others). Disable it instead:
+	// made a grant or an instance admin, `enforced domains` while a domain
+	// is enforced to it, `only way in` while it is the only enabled
+	// provider and local login is disabled, among others). Disable it instead:
 	// that stops its sign-ins and leaves its members, identities and grants
 	// as they are. Audited
 	// `auth_provider.deleted`.
@@ -28599,7 +28833,9 @@ type ClientWithResponsesInterface interface {
 	// Changes any property but `slug` and `kind`; each absent one is left as
 	// it is, a sent `client_secret` replaces the stored one, and a `claims`
 	// member names only the claims to rename. Whether the provider is enabled
-	// is changed with `enable` and `disable`. Refused as a creation is.
+	// is changed with `enable` and `disable`. Refused as a creation is, and
+	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
+	// drops a domain enforced to the provider: lift the enforcement first.
 	// Audited `auth_provider.updated`; an edit that changes nothing is not.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -28612,7 +28848,9 @@ type ClientWithResponsesInterface interface {
 	// Changes any property but `slug` and `kind`; each absent one is left as
 	// it is, a sent `client_secret` replaces the stored one, and a `claims`
 	// member names only the claims to rename. Whether the provider is enabled
-	// is changed with `enable` and `disable`. Refused as a creation is.
+	// is changed with `enable` and `disable`. Refused as a creation is, and
+	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
+	// drops a domain enforced to the provider: lift the enforcement first.
 	// Audited `auth_provider.updated`; an edit that changes nothing is not.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
@@ -28624,7 +28862,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Stops the provider's sign-ins and leaves its
 	// members, identities and grants as they are. A disabled provider is
-	// answered as it is. Audited `auth_provider.disabled`.
+	// answered as it is. Refused 409 `provider_in_use` while people are sent
+	// to it: `used_by` names `enforced domains` while a domain is enforced
+	// to it, and `only way in` while it is the only enabled provider and
+	// local login is disabled. Audited `auth_provider.disabled`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -28757,7 +28998,17 @@ type ClientWithResponsesInterface interface {
 	// one. Refused `invalid_auth_settings` naming each field that breaks a
 	// rule: every duration a whole number of seconds from 60 to 315360000
 	// (ten years), the idle timeout at most the absolute one, the password
-	// minimum length from 12 to 128.
+	// minimum length from 12 to 128, and each enforced domain named once,
+	// to an enabled auth provider that lists it among its domains.
+	// `sso_enforced_domains` is the whole list: a domain left out is
+	// lifted. Disabling local login, or changing the enforced domains while
+	// it is disabled, is refused `identity_required` unless the caller
+	// holds an identity that signs them in under the new settings: at an
+	// enabled auth provider and, when their own email domain is enforced,
+	// at the provider it is enforced to. Whoever closes the door keeps a
+	// way through it; `flagnetic admin unlock`
+	// enables it again from the server's side. Audited
+	// `auth_settings.updated`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -28773,7 +29024,17 @@ type ClientWithResponsesInterface interface {
 	// one. Refused `invalid_auth_settings` naming each field that breaks a
 	// rule: every duration a whole number of seconds from 60 to 315360000
 	// (ten years), the idle timeout at most the absolute one, the password
-	// minimum length from 12 to 128.
+	// minimum length from 12 to 128, and each enforced domain named once,
+	// to an enabled auth provider that lists it among its domains.
+	// `sso_enforced_domains` is the whole list: a domain left out is
+	// lifted. Disabling local login, or changing the enforced domains while
+	// it is disabled, is refused `identity_required` unless the caller
+	// holds an identity that signs them in under the new settings: at an
+	// enabled auth provider and, when their own email domain is enforced,
+	// at the provider it is enforced to. Whoever closes the door keeps a
+	// way through it; `flagnetic admin unlock`
+	// enables it again from the server's side. Audited
+	// `auth_settings.updated`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -28959,9 +29220,11 @@ type ClientWithResponsesInterface interface {
 	//
 	// Unlinks an identity of the caller. Refused 409 `last_auth_method`
 	// when it is the caller's last usable way in: the other ways are a
-	// password and identities at enabled auth providers. Unlinking an
-	// identity at a disabled auth provider is always allowed, since it was
-	// no way in. An identity of another member, or an identifier that names
+	// password local login accepts for the caller's email and identities
+	// at enabled auth providers that SSO enforcement allows. Unlinking an
+	// identity that is no way in, such as one at a disabled auth provider,
+	// is always allowed. The identity at the auth provider the caller's
+	// email domain is enforced to is refused 409 `provider_enforced`. An identity of another member, or an identifier that names
 	// none, is not found. Recorded as `identity.unlinked`. Only a session
 	// may do this.
 	//
@@ -29280,8 +29543,9 @@ type ClientWithResponsesInterface interface {
 	// Unlinks an identity of the member, under the rules of a member
 	// unlinking their own: refused 409 `last_auth_method` when it is the
 	// member's last usable way in, except for a deactivated member, who
-	// signs in nowhere. An identity that does not belong to the member is
-	// not found. Recorded as `identity.unlinked` with the instance admin as
+	// signs in nowhere, and 409 `provider_enforced` for the identity at the
+	// auth provider the member's email domain is enforced to. An identity
+	// that does not belong to the member is not found. Recorded as `identity.unlinked` with the instance admin as
 	// its actor.
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -32632,6 +32896,8 @@ type AcceptInvitationResponse struct {
 	ApplicationproblemJSON400 *BadRequest
 	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
 	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *PasswordRefused
 	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
 	ApplicationproblemJSON410 *InvitationGone
 	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
@@ -32667,6 +32933,11 @@ func (r AcceptInvitationResponse) GetApplicationproblemJSON400() *BadRequest {
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
 func (r AcceptInvitationResponse) GetApplicationproblemJSON401() *Unauthenticated {
 	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r AcceptInvitationResponse) GetApplicationproblemJSON403() *PasswordRefused {
+	return r.ApplicationproblemJSON403
 }
 
 // GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
@@ -32943,6 +33214,8 @@ type CompletePasswordResetResponse struct {
 	ApplicationproblemJSON400 *BadRequest
 	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
 	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *PasswordRefused
 	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
 	ApplicationproblemJSON410 *PasswordResetGone
 	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
@@ -32978,6 +33251,11 @@ func (r CompletePasswordResetResponse) GetApplicationproblemJSON400() *BadReques
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
 func (r CompletePasswordResetResponse) GetApplicationproblemJSON401() *Unauthenticated {
 	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CompletePasswordResetResponse) GetApplicationproblemJSON403() *PasswordRefused {
+	return r.ApplicationproblemJSON403
 }
 
 // GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
@@ -33068,6 +33346,8 @@ type SignInResponse struct {
 	ApplicationproblemJSON400 *BadRequest
 	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
 	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *PasswordRefused
 	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
 	ApplicationproblemJSON413 *RequestTooLarge
 	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
@@ -33099,6 +33379,11 @@ func (r SignInResponse) GetApplicationproblemJSON400() *BadRequest {
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
 func (r SignInResponse) GetApplicationproblemJSON401() *Unauthenticated {
 	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SignInResponse) GetApplicationproblemJSON403() *PasswordRefused {
+	return r.ApplicationproblemJSON403
 }
 
 // GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
@@ -33532,6 +33817,8 @@ type UpdateAuthProviderResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
 	ApplicationproblemJSON412 *VersionMismatch
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
@@ -33567,6 +33854,11 @@ func (r UpdateAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r UpdateAuthProviderResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r UpdateAuthProviderResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
@@ -33634,6 +33926,8 @@ type DisableAuthProviderResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *DisableAuthProviderResponse200Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
@@ -33658,6 +33952,11 @@ func (r DisableAuthProviderResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r DisableAuthProviderResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r DisableAuthProviderResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetBody returns the raw response body bytes
@@ -48616,6 +48915,9 @@ func (c *ClientWithResponses) ExportAuditEntriesWithResponse(ctx context.Context
 // invitation it is. An invitation that cannot be accepted, whether it
 // was never issued, has been used or replaced, or has expired, is
 // `invitation_gone`, alike. The secret never reaches a log line.
+// `password_allowed` says whether the invitation can be accepted with
+// a password; when the invited email's domain is enforced to an auth
+// provider, `enforced_provider` names it, the only way to accept.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -48632,7 +48934,10 @@ func (c *ClientWithResponses) GetInvitationWithResponse(ctx context.Context, sec
 //
 // Sets the invited member's first password under the password policy
 // (`weak_password` otherwise), makes them active, uses up the link and
-// opens a session, setting its cookie. The body must be sent as
+// opens a session, setting its cookie. A password is refused, and the
+// invitation stays open, when the invited email's domain is enforced
+// to an auth provider (`sso_required`, naming the `provider`) or local
+// login is disabled (`local_login_disabled`). The body must be sent as
 // `application/json`; anything else is refused
 // `unsupported_media_type`.
 //
@@ -48656,7 +48961,10 @@ func (c *ClientWithResponses) AcceptInvitationWithBodyWithResponse(ctx context.C
 //
 // Sets the invited member's first password under the password policy
 // (`weak_password` otherwise), makes them active, uses up the link and
-// opens a session, setting its cookie. The body must be sent as
+// opens a session, setting its cookie. A password is refused, and the
+// invitation stays open, when the invited email's domain is enforced
+// to an auth provider (`sso_required`, naming the `provider`) or local
+// login is disabled (`local_login_disabled`). The body must be sent as
 // `application/json`; anything else is refused
 // `unsupported_media_type`.
 //
@@ -48679,12 +48987,16 @@ func (c *ClientWithResponses) AcceptInvitationWithResponse(ctx context.Context, 
 // GetAuthMethodsWithResponse How members sign in
 //
 // The ways the sign-in page offers, read before anyone is signed in.
+// Given an `email`, it also says where that email signs in: the
+// `enforced_provider` its domain is enforced to. The answer is judged
+// from the email's domain alone, so it never tells whether a member
+// holds the email.
 //
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /auth/methods (the `GetAuthMethods` operationId).
-func (c *ClientWithResponses) GetAuthMethodsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthMethodsResponse, error) {
-	rsp, err := c.GetAuthMethods(ctx, reqEditors...)
+func (c *ClientWithResponses) GetAuthMethodsWithResponse(ctx context.Context, params *GetAuthMethodsParams, reqEditors ...RequestEditorFn) (*GetAuthMethodsResponse, error) {
+	rsp, err := c.GetAuthMethods(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -48700,8 +49012,9 @@ func (c *ClientWithResponses) GetAuthMethodsWithResponse(ctx context.Context, re
 //
 // A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
-// reset is on in the auth settings, the email belongs to an active
-// member who holds a password, and no self-service reset was issued
+// reset is on in the auth settings, local login is enabled and the
+// email's domain is not enforced to an auth provider, the email
+// belongs to an active member who holds a password, and no self-service reset was issued
 // for them in the last 5 minutes (a reset counts when it was issued,
 // even if its mail could not be sent). The link opens
 // `/password-reset/{secret}` in the console, works once and expires
@@ -48731,8 +49044,9 @@ func (c *ClientWithResponses) RequestPasswordResetWithBodyWithResponse(ctx conte
 //
 // A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
-// reset is on in the auth settings, the email belongs to an active
-// member who holds a password, and no self-service reset was issued
+// reset is on in the auth settings, local login is enabled and the
+// email's domain is not enforced to an auth provider, the email
+// belongs to an active member who holds a password, and no self-service reset was issued
 // for them in the last 5 minutes (a reset counts when it was issued,
 // even if its mail could not be sent). The link opens
 // `/password-reset/{secret}` in the console, works once and expires
@@ -48777,7 +49091,11 @@ func (c *ClientWithResponses) GetPasswordResetWithResponse(ctx context.Context, 
 // Sets the member's new password under the password policy
 // (`weak_password` otherwise), clears the lockout on their email, signs
 // them out of every device, ends every other open password reset and
-// invitation of theirs, and opens a session, setting its cookie. The
+// invitation of theirs, and opens a session, setting its cookie. A
+// password is refused, and the reset stays open, when the member's
+// email domain is enforced to an auth provider (`sso_required`, naming
+// the `provider`) or local login is disabled
+// (`local_login_disabled`). The
 // body must be sent as `application/json`; anything else is refused
 // `unsupported_media_type`.
 //
@@ -48802,7 +49120,11 @@ func (c *ClientWithResponses) CompletePasswordResetWithBodyWithResponse(ctx cont
 // Sets the member's new password under the password policy
 // (`weak_password` otherwise), clears the lockout on their email, signs
 // them out of every device, ends every other open password reset and
-// invitation of theirs, and opens a session, setting its cookie. The
+// invitation of theirs, and opens a session, setting its cookie. A
+// password is refused, and the reset stays open, when the member's
+// email domain is enforced to an auth provider (`sso_required`, naming
+// the `provider`) or local login is disabled
+// (`local_login_disabled`). The
 // body must be sent as `application/json`; anything else is refused
 // `unsupported_media_type`.
 //
@@ -48842,6 +49164,12 @@ func (c *ClientWithResponses) CompletePasswordResetWithResponse(ctx context.Cont
 // same five, so a stranger locking the email does not keep the member
 // out where they usually sign in.
 //
+// A password is no way in for an email whose domain is enforced to an
+// auth provider (`sso_required`, naming the `provider` to sign in
+// through) nor, while local login is disabled, for anybody
+// (`local_login_disabled`). Both are judged from the email alone,
+// before anything is looked up or counted, whoever holds it.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /auth/sign-in (the `SignIn` operationId).
@@ -48872,6 +49200,12 @@ func (c *ClientWithResponses) SignInWithBodyWithResponse(ctx context.Context, co
 // failures on the email are counted apart and lock it alone, after the
 // same five, so a stranger locking the email does not keep the member
 // out where they usually sign in.
+//
+// A password is no way in for an email whose domain is enforced to an
+// auth provider (`sso_required`, naming the `provider` to sign in
+// through) nor, while local login is disabled, for anybody
+// (`local_login_disabled`). Both are judged from the email alone,
+// before anything is looked up or counted, whoever holds it.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -48975,7 +49309,9 @@ func (c *ClientWithResponses) CreateAuthProviderWithResponse(ctx context.Context
 //
 // Refused 409 `provider_in_use` while something depends on the provider;
 // `used_by` names what (`identities`, `grants` while its group mappings
-// made a grant or an instance admin, among others). Disable it instead:
+// made a grant or an instance admin, `enforced domains` while a domain
+// is enforced to it, `only way in` while it is the only enabled
+// provider and local login is disabled, among others). Disable it instead:
 // that stops its sign-ins and leaves its members, identities and grants
 // as they are. Audited
 // `auth_provider.deleted`.
@@ -49009,7 +49345,9 @@ func (c *ClientWithResponses) GetAuthProviderWithResponse(ctx context.Context, p
 // Changes any property but `slug` and `kind`; each absent one is left as
 // it is, a sent `client_secret` replaces the stored one, and a `claims`
 // member names only the claims to rename. Whether the provider is enabled
-// is changed with `enable` and `disable`. Refused as a creation is.
+// is changed with `enable` and `disable`. Refused as a creation is, and
+// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
+// drops a domain enforced to the provider: lift the enforcement first.
 // Audited `auth_provider.updated`; an edit that changes nothing is not.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -49028,7 +49366,9 @@ func (c *ClientWithResponses) UpdateAuthProviderWithBodyWithResponse(ctx context
 // Changes any property but `slug` and `kind`; each absent one is left as
 // it is, a sent `client_secret` replaces the stored one, and a `claims`
 // member names only the claims to rename. Whether the provider is enabled
-// is changed with `enable` and `disable`. Refused as a creation is.
+// is changed with `enable` and `disable`. Refused as a creation is, and
+// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
+// drops a domain enforced to the provider: lift the enforcement first.
 // Audited `auth_provider.updated`; an edit that changes nothing is not.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
@@ -49046,7 +49386,10 @@ func (c *ClientWithResponses) UpdateAuthProviderWithResponse(ctx context.Context
 //
 // Stops the provider's sign-ins and leaves its
 // members, identities and grants as they are. A disabled provider is
-// answered as it is. Audited `auth_provider.disabled`.
+// answered as it is. Refused 409 `provider_in_use` while people are sent
+// to it: `used_by` names `enforced domains` while a domain is enforced
+// to it, and `only way in` while it is the only enabled provider and
+// local login is disabled. Audited `auth_provider.disabled`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -49233,7 +49576,17 @@ func (c *ClientWithResponses) GetAuthSettingsWithResponse(ctx context.Context, r
 // one. Refused `invalid_auth_settings` naming each field that breaks a
 // rule: every duration a whole number of seconds from 60 to 315360000
 // (ten years), the idle timeout at most the absolute one, the password
-// minimum length from 12 to 128.
+// minimum length from 12 to 128, and each enforced domain named once,
+// to an enabled auth provider that lists it among its domains.
+// `sso_enforced_domains` is the whole list: a domain left out is
+// lifted. Disabling local login, or changing the enforced domains while
+// it is disabled, is refused `identity_required` unless the caller
+// holds an identity that signs them in under the new settings: at an
+// enabled auth provider and, when their own email domain is enforced,
+// at the provider it is enforced to. Whoever closes the door keeps a
+// way through it; `flagnetic admin unlock`
+// enables it again from the server's side. Audited
+// `auth_settings.updated`.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -49255,7 +49608,17 @@ func (c *ClientWithResponses) UpdateAuthSettingsWithBodyWithResponse(ctx context
 // one. Refused `invalid_auth_settings` naming each field that breaks a
 // rule: every duration a whole number of seconds from 60 to 315360000
 // (ten years), the idle timeout at most the absolute one, the password
-// minimum length from 12 to 128.
+// minimum length from 12 to 128, and each enforced domain named once,
+// to an enabled auth provider that lists it among its domains.
+// `sso_enforced_domains` is the whole list: a domain left out is
+// lifted. Disabling local login, or changing the enforced domains while
+// it is disabled, is refused `identity_required` unless the caller
+// holds an identity that signs them in under the new settings: at an
+// enabled auth provider and, when their own email domain is enforced,
+// at the provider it is enforced to. Whoever closes the door keeps a
+// way through it; `flagnetic admin unlock`
+// enables it again from the server's side. Audited
+// `auth_settings.updated`.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -49525,9 +49888,11 @@ func (c *ClientWithResponses) ListMyIdentitiesWithResponse(ctx context.Context, 
 //
 // Unlinks an identity of the caller. Refused 409 `last_auth_method`
 // when it is the caller's last usable way in: the other ways are a
-// password and identities at enabled auth providers. Unlinking an
-// identity at a disabled auth provider is always allowed, since it was
-// no way in. An identity of another member, or an identifier that names
+// password local login accepts for the caller's email and identities
+// at enabled auth providers that SSO enforcement allows. Unlinking an
+// identity that is no way in, such as one at a disabled auth provider,
+// is always allowed. The identity at the auth provider the caller's
+// email domain is enforced to is refused 409 `provider_enforced`. An identity of another member, or an identifier that names
 // none, is not found. Recorded as `identity.unlinked`. Only a session
 // may do this.
 //
@@ -49972,8 +50337,9 @@ func (c *ClientWithResponses) ListMemberIdentitiesWithResponse(ctx context.Conte
 // Unlinks an identity of the member, under the rules of a member
 // unlinking their own: refused 409 `last_auth_method` when it is the
 // member's last usable way in, except for a deactivated member, who
-// signs in nowhere. An identity that does not belong to the member is
-// not found. Recorded as `identity.unlinked` with the instance admin as
+// signs in nowhere, and 409 `provider_enforced` for the identity at the
+// auth provider the member's email domain is enforced to. An identity
+// that does not belong to the member is not found. Recorded as `identity.unlinked` with the instance admin as
 // its actor.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -54493,6 +54859,13 @@ func ParseAcceptInvitationResponse(rsp *http.Response) (*AcceptInvitationRespons
 		}
 		response.ApplicationproblemJSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest PasswordRefused
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 410:
 		var dest InvitationGone
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -54780,6 +55153,13 @@ func ParseCompletePasswordResetResponse(rsp *http.Response) (*CompletePasswordRe
 		}
 		response.ApplicationproblemJSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest PasswordRefused
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 410:
 		var dest PasswordResetGone
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -54904,6 +55284,13 @@ func ParseSignInResponse(rsp *http.Response) (*SignInResponse, error) {
 			return nil, err
 		}
 		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest PasswordRefused
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
 		var dest RequestTooLarge
@@ -55359,6 +55746,13 @@ func ParseUpdateAuthProviderResponse(rsp *http.Response) (*UpdateAuthProviderRes
 		}
 		response.ApplicationproblemJSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
 		var dest VersionMismatch
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -55449,6 +55843,13 @@ func ParseDisableAuthProviderResponse(rsp *http.Response) (*DisableAuthProviderR
 			return nil, err
 		}
 		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
 
 	}
 
@@ -69053,7 +69454,7 @@ type ServerInterface interface {
 	AcceptInvitation(w http.ResponseWriter, r *http.Request, secret string)
 	// GetAuthMethods How members sign in
 	// (GET /auth/methods)
-	GetAuthMethods(w http.ResponseWriter, r *http.Request)
+	GetAuthMethods(w http.ResponseWriter, r *http.Request, params GetAuthMethodsParams)
 	// RequestPasswordReset Ask for a password reset by mail
 	// (POST /auth/password-reset)
 	RequestPasswordReset(w http.ResponseWriter, r *http.Request)
@@ -70093,8 +70494,27 @@ func (siw *ServerInterfaceWrapper) AcceptInvitation(w http.ResponseWriter, r *ht
 // GetAuthMethods operation middleware
 func (siw *ServerInterfaceWrapper) GetAuthMethods(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAuthMethodsParams
+
+	// ------------- Optional query parameter "email" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "email", r.URL.Query(), &params.Email, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "email"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "email", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAuthMethods(w, r)
+		siw.Handler.GetAuthMethods(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -78339,6 +78759,8 @@ type InvitationGoneApplicationProblemPlusJSONResponse Problem
 
 type NotFoundApplicationProblemPlusJSONResponse Problem
 
+type PasswordRefusedApplicationProblemPlusJSONResponse Problem
+
 type PasswordResetGoneApplicationProblemPlusJSONResponse Problem
 
 type PreconditionRequiredApplicationProblemPlusJSONResponse Problem
@@ -78747,6 +79169,22 @@ func (response AcceptInvitation401ApplicationProblemPlusJSONResponse) VisitAccep
 	return err
 }
 
+type AcceptInvitation403ApplicationProblemPlusJSONResponse struct {
+	PasswordRefusedApplicationProblemPlusJSONResponse
+}
+
+func (response AcceptInvitation403ApplicationProblemPlusJSONResponse) VisitAcceptInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type AcceptInvitation410ApplicationProblemPlusJSONResponse struct {
 	InvitationGoneApplicationProblemPlusJSONResponse
 }
@@ -78850,6 +79288,7 @@ func (response AcceptInvitation503ApplicationProblemPlusJSONResponse) VisitAccep
 }
 
 type GetAuthMethodsRequestObject struct {
+	Params GetAuthMethodsParams
 }
 
 type GetAuthMethodsResponseObject interface {
@@ -79097,6 +79536,22 @@ func (response CompletePasswordReset401ApplicationProblemPlusJSONResponse) Visit
 	return err
 }
 
+type CompletePasswordReset403ApplicationProblemPlusJSONResponse struct {
+	PasswordRefusedApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasswordReset403ApplicationProblemPlusJSONResponse) VisitCompletePasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type CompletePasswordReset410ApplicationProblemPlusJSONResponse struct {
 	PasswordResetGoneApplicationProblemPlusJSONResponse
 }
@@ -79262,6 +79717,22 @@ func (response SignIn401ApplicationProblemPlusJSONResponse) VisitSignInResponse(
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignIn403ApplicationProblemPlusJSONResponse struct {
+	PasswordRefusedApplicationProblemPlusJSONResponse
+}
+
+func (response SignIn403ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -79832,6 +80303,22 @@ func (response UpdateAuthProvider404ApplicationProblemPlusJSONResponse) VisitUpd
 	return err
 }
 
+type UpdateAuthProvider409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthProvider409ApplicationProblemPlusJSONResponse) VisitUpdateAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type UpdateAuthProvider412ApplicationProblemPlusJSONResponse struct {
 	VersionMismatchApplicationProblemPlusJSONResponse
 }
@@ -79959,6 +80446,22 @@ func (response DisableAuthProvider404ApplicationProblemPlusJSONResponse) VisitDi
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableAuthProvider409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DisableAuthProvider409ApplicationProblemPlusJSONResponse) VisitDisableAuthProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -99266,8 +99769,10 @@ func (sh *strictHandler) AcceptInvitation(w http.ResponseWriter, r *http.Request
 }
 
 // GetAuthMethods operation middleware
-func (sh *strictHandler) GetAuthMethods(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) GetAuthMethods(w http.ResponseWriter, r *http.Request, params GetAuthMethodsParams) {
 	var request GetAuthMethodsRequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.GetAuthMethods(ctx, request.(GetAuthMethodsRequestObject))

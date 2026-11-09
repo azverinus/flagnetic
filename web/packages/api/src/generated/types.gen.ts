@@ -37,7 +37,11 @@ export type Problem = {
    */
   references?: Array<Reference>;
   /**
-   * What refers to an auth provider that cannot be deleted, such as `identities`, for `provider_in_use`.
+   * The slug of the auth provider to sign in through instead, for `sso_required`.
+   */
+  provider?: string;
+  /**
+   * What keeps an auth provider from being deleted, disabled or edited, for `provider_in_use`, such as `identities`, `enforced domains` or `only way in` (the only enabled provider while local login is disabled).
    */
   used_by?: Array<string>;
   /**
@@ -407,15 +411,19 @@ export type AuthMethods = {
    */
   local_login_enabled: boolean;
   /**
-   * Whether a member can ask for a password reset by mail (`POST /auth/password-reset`): the instance has an SMTP server and self-service password reset is on. The sign-in page offers the forgotten-password link only then.
+   * Whether a member can ask for a password reset by mail (`POST /auth/password-reset`): the instance has an SMTP server, self-service password reset is on, local login is enabled and, given an `email`, its domain is not enforced. The sign-in page offers the forgotten-password link only then.
    */
   password_reset_available: boolean;
   /**
    * The enabled auth providers a member signs in through, ordered by display name.
    */
   providers: Array<AuthMethodProvider>;
+  enforced_provider?: AuthMethodProvider;
 };
 
+/**
+ * An auth provider as the sign-in page offers it. As `enforced_provider`, the provider the given email's domain is enforced to, the only way it signs in; absent when the domain is not enforced or no email was given.
+ */
 export type AuthMethodProvider = {
   slug: string;
   display_name: string;
@@ -587,6 +595,11 @@ export type Invitation = {
    * The display name of the member who issued the invitation; absent when none did.
    */
   invited_by?: string;
+  /**
+   * Whether the invitation can be accepted with a password; false while local login is disabled or when the invited email's domain is enforced to an auth provider.
+   */
+  password_allowed: boolean;
+  enforced_provider?: AuthMethodProvider;
 };
 
 /**
@@ -859,6 +872,28 @@ export type AuthSettings = {
    * Whether a member can ask for a password reset by mail (`POST /auth/password-reset`). It also takes an SMTP server. True on a fresh instance. An instance admin can still issue a password reset whatever this says.
    */
   self_service_password_reset: boolean;
+  /**
+   * Whether members may sign in with a password at all. Off, every sign-in, invitation acceptance and password reset by password is refused `local_login_disabled`, and members sign in through auth providers. True on a fresh instance.
+   */
+  local_login_enabled: boolean;
+  /**
+   * The email domains whose people sign in only through one auth provider, in the order given. A password is no way in for them (`sso_required`, naming the provider), nor is any other provider. Empty on a fresh instance.
+   */
+  sso_enforced_domains: Array<SsoEnforcedDomain>;
+};
+
+/**
+ * An email domain sent to one auth provider.
+ */
+export type SsoEnforcedDomain = {
+  /**
+   * The domain, such as `example.com`, stored lowercase; its subdomains are not included. It must be one of the provider's domains.
+   */
+  domain: string;
+  /**
+   * The slug of the enabled auth provider its people sign in through.
+   */
+  provider: string;
 };
 
 /**
@@ -4489,6 +4524,13 @@ export type SignInErrors = {
    */
   401: Problem;
   /**
+   * A password is no way in for this email: its domain is enforced to an
+   * auth provider (`sso_required`, with the `provider` to sign in
+   * through), or local login is disabled (`local_login_disabled`).
+   *
+   */
+  403: Problem;
+  /**
    * `request_too_large`: the body is larger than the operation accepts; one that checks a password accepts 8 KiB.
    */
   413: Problem;
@@ -4571,7 +4613,12 @@ export type SignOutResponse = SignOutResponses[keyof SignOutResponses];
 export type GetAuthMethodsData = {
   body?: never;
   path?: never;
-  query?: never;
+  query?: {
+    /**
+     * The email the person typed, to learn where it signs in.
+     */
+    email?: string;
+  };
   url: "/auth/methods";
 };
 
@@ -4666,6 +4713,13 @@ export type AcceptInvitationErrors = {
    *
    */
   401: Problem;
+  /**
+   * A password is no way in for this email: its domain is enforced to an
+   * auth provider (`sso_required`, with the `provider` to sign in
+   * through), or local login is disabled (`local_login_disabled`).
+   *
+   */
+  403: Problem;
   /**
    * `invitation_gone`: the link opens no invitation that can be accepted: it was never issued, has been used or replaced, or has expired.
    */
@@ -4821,6 +4875,13 @@ export type CompletePasswordResetErrors = {
    *
    */
   401: Problem;
+  /**
+   * A password is no way in for this email: its domain is enforced to an
+   * auth provider (`sso_required`, with the `provider` to sign in
+   * through), or local login is disabled (`local_login_disabled`).
+   *
+   */
+  403: Problem;
   /**
    * `reset_gone`: the link opens no password reset that can be completed: it was never issued, has been used or ended by another, has expired, or its member is not active.
    */
@@ -13816,6 +13877,10 @@ export type UpdateAuthProviderErrors = {
    */
   404: Problem;
   /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
    * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
    */
   412: Problem;
@@ -13935,6 +14000,10 @@ export type DisableAuthProviderErrors = {
    * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
    */
   404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
 };
 
 export type DisableAuthProviderError = DisableAuthProviderErrors[keyof DisableAuthProviderErrors];

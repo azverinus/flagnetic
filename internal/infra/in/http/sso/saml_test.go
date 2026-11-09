@@ -577,7 +577,7 @@ func TestSAMLProvidersAreOfferedOnTheSignInPage(t *testing.T) {
 	e := start(t)
 	p := e.createSAML(t, idp, nil)
 
-	res, err := testkit.NewBrowser(t, e.srv.URL).GetAuthMethodsWithResponse(t.Context())
+	res, err := testkit.NewBrowser(t, e.srv.URL).GetAuthMethodsWithResponse(t.Context(), nil)
 	if err != nil || res.JSON200 == nil {
 		t.Fatalf("GET /auth/methods = %v, %v", res.StatusCode(), err)
 	}

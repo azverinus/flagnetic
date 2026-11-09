@@ -229,8 +229,10 @@ type CompletePasswordResetCommand struct {
 // hammering completion is throttled with its sign-ins; a throttled source is
 // refused rate_limited before anything else. A secret that opens no password
 // reset keeps its failure and is answered reset_gone; one that does takes it
-// back, whatever happens next. The password policy applies (weak_password),
-// before any hash.
+// back, whatever happens next. A password the auth settings refuse the
+// member's email is refused, local_login_disabled or sso_required naming the
+// provider, and the reset stays open. The password policy applies
+// (weak_password), before any hash.
 func (h *CompletePasswordReset) Handle(ctx context.Context, cmd CompletePasswordResetCommand) (SignInResult, error) {
 	now := h.d.Clock.Now()
 	reserved, err := h.d.Store.ReserveSourceAttempt(ctx, access.NewAttempt("", cmd.ClientIP, now))
@@ -267,6 +269,9 @@ func (h *CompletePasswordReset) complete(ctx context.Context, cmd CompletePasswo
 ) (SignInResult, error) {
 	settings, err := h.d.Settings.AuthSettings(ctx)
 	if err != nil {
+		return SignInResult{}, err
+	}
+	if err = settings.PasswordRefusal(member.Email); err != nil {
 		return SignInResult{}, err
 	}
 	if err = access.CheckPassword(cmd.Password.Reveal(), member.Email, settings.PasswordMinLength); err != nil {

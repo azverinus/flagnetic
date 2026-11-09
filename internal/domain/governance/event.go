@@ -398,6 +398,7 @@ var entryOnlyActions = []string{
 	"auth_provider.metadata_refresh_refused",
 	"auth_provider.metadata_refreshed",
 	"auth_provider.updated",
+	"auth_settings.unlocked",
 	"auth_settings.updated",
 	"change_request.copied",
 	"change_request.drafted",

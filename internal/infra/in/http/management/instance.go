@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 )
 
@@ -20,14 +21,21 @@ func (a *api) GetAuthSettings(ctx context.Context, _ GetAuthSettingsRequestObjec
 // UpdateAuthSettings replaces the instance's auth settings.
 func (a *api) UpdateAuthSettings(ctx context.Context, req UpdateAuthSettingsRequestObject) (UpdateAuthSettingsResponseObject, error) {
 	b := req.Body
-	s, err := a.h.UpdateAuthSettings.Handle(ctx, access.AuthSettings{
-		SessionIdleTimeout:       seconds(b.SessionIdleTimeoutSeconds),
-		SessionAbsoluteTimeout:   seconds(b.SessionAbsoluteTimeoutSeconds),
-		TokenMaxLifetime:         seconds(b.TokenMaxLifetimeSeconds),
-		TokenExpiryRequired:      b.TokenExpiryRequired,
-		PasswordMinLength:        b.PasswordMinLength,
-		SelfServicePasswordReset: b.SelfServicePasswordReset,
-	}, requestOf(ctx))
+	s, err := a.h.UpdateAuthSettings.Handle(ctx, appaccess.UpdateAuthSettingsCommand{
+		Settings: access.AuthSettings{
+			SessionIdleTimeout:       seconds(b.SessionIdleTimeoutSeconds),
+			SessionAbsoluteTimeout:   seconds(b.SessionAbsoluteTimeoutSeconds),
+			TokenMaxLifetime:         seconds(b.TokenMaxLifetimeSeconds),
+			TokenExpiryRequired:      b.TokenExpiryRequired,
+			PasswordMinLength:        b.PasswordMinLength,
+			SelfServicePasswordReset: b.SelfServicePasswordReset,
+			LocalLoginEnabled:        b.LocalLoginEnabled,
+			SSOEnforcedDomains: each(b.SsoEnforcedDomains, func(d SsoEnforcedDomain) access.EnforcedDomain {
+				return access.EnforcedDomain{Domain: d.Domain, Provider: d.Provider}
+			}),
+		},
+		Caller: callerOf(ctx), Request: requestOf(ctx),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -56,5 +64,9 @@ func authSettingsOf(s access.AuthSettings) AuthSettings {
 		TokenExpiryRequired:           s.TokenExpiryRequired,
 		PasswordMinLength:             s.PasswordMinLength,
 		SelfServicePasswordReset:      s.SelfServicePasswordReset,
+		LocalLoginEnabled:             s.LocalLoginEnabled,
+		SsoEnforcedDomains: each(s.SSOEnforcedDomains, func(d access.EnforcedDomain) SsoEnforcedDomain {
+			return SsoEnforcedDomain{Domain: d.Domain, Provider: d.Provider}
+		}),
 	}
 }

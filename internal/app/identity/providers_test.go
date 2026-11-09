@@ -14,6 +14,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/identity"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
+	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pgidentity "github.com/azverinus/flagnetic/internal/infra/out/postgres/identity"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -29,6 +30,15 @@ type references map[identity.ProviderID][]string
 
 func (r references) ProviderUses(_ context.Context, p identity.ProviderID) ([]string, error) {
 	return r[p], nil
+}
+
+// accessSettings reads the auth settings the access context keeps, as the
+// composition root lets the identity context.
+type accessSettings struct{ store *pgaccess.Store }
+
+func (a accessSettings) LockProviderSettings(ctx context.Context, slug string) (appidentity.SettingsOfProvider, error) {
+	s, err := a.store.LockAuthSettings(ctx)
+	return appidentity.SettingsOfProvider{LocalLoginEnabled: s.LocalLoginEnabled, EnforcedDomains: s.EnforcedDomainsOf(slug)}, err
 }
 
 func codeOf(err error) string {
@@ -48,6 +58,7 @@ func deps(t *testing.T, refs ...appidentity.ProviderReference) appidentity.Provi
 		Tx: postgres.NewTransactor(pool), Store: pgidentity.NewStore(pool), Audit: testkit.Record(pool), Clock: c,
 		IDs: id.NewSource(c), Sealer: secret.NewKeyring(secret.New(testkit.SecretKey)),
 		BaseURL: &url.URL{Scheme: "https", Host: "flags.example.com"}, References: refs,
+		Settings: accessSettings{store: pgaccess.NewStore(pool)},
 	}
 }
 

@@ -18,6 +18,7 @@ Any number of replicas can run against one database; every replica serves every 
 | `flagnetic serve` | Runs a replica. |
 | `flagnetic migrate` | Applies pending migrations and exits. Safe to run again, and safe to run from several places at once. |
 | `flagnetic admin bootstrap` | Creates the first instance admin and their API token; see [The first instance admin](#the-first-instance-admin). |
+| `flagnetic admin unlock` | Turns local login back on, lifts every SSO-enforced domain and clears every lockout; see [Break-glass](#break-glass-flagnetic-admin-unlock). |
 | `flagnetic hash-check` | Runs the [uniformity check](experiments.md#the-uniformity-check) offline on a list of unit IDs; needs neither a database nor a configuration. |
 | `flagnetic healthcheck` | Asks the replica on the configured listen address whether it is ready; exits 0 when it is, 1 otherwise. |
 | `flagnetic version` | Prints the version. |
@@ -64,6 +65,21 @@ Two more commands work the same way, for a second instance admin or one who lost
 
 Both are recorded in the audit log with the CLI as their actor.
 
+### Break-glass: `flagnetic admin unlock`
+
+When nobody can sign in, because the auth provider an email domain is [enforced](sso.md#sso-enforcement-and-local-login) to is broken, or local login is off and no provider works, or a lockout holds the email that matters, an operator with the database's credentials restores password sign-in:
+
+```sh
+flagnetic admin unlock
+```
+
+- In one transaction it turns local login on, lifts every enforced domain, and clears every lockout and failure count: those of emails, of known sources and of addresses. Auth providers, identities, passwords and sessions are left as they are.
+- Every replica applies it within a second, as any change to the auth settings.
+- It is recorded in the instance audit log as `auth_settings.unlocked` with the CLI as its actor, the settings before and after, and how many lockouts it cleared.
+- It prints what it did on standard error, and takes no arguments (exit code 2 otherwise). Running it again does no harm.
+
+Instance admins are not exempt from enforcement, so this command, not an exemption, is the way back in. Fix or replace the provider, then enforce the domains again in the auth settings.
+
 ## Signing in to the console
 
 Members sign in with their email and password. A sign-in opens a session held by the server and referred to by the cookie `flagnetic_session` (`HttpOnly; SameSite=Lax`), signed under the secret key. A session ends at sign-out, after 24 hours without a request, or 30 days after it opened (the defaults; see below); a request with its cookie is then answered `401 session_expired` and the cookie is cleared.
@@ -78,6 +94,8 @@ An instance admin changes the instance's auth settings at runtime (`/instance/au
 | `token_expiry_required` | false | Whether an API token must be created with an expiry. |
 | `password_min_length` | 12 | The fewest characters a password chosen from now on has; never below 12. |
 | `self_service_password_reset` | true | Whether a member can ask for a password reset by mail ([Access](access.md#asking-for-a-password-reset-by-mail)); it also takes an SMTP server. An instance admin can issue a password reset whatever this says. |
+| `local_login_enabled` | true | Whether a password signs anybody in; see [SSO enforcement](sso.md#sso-enforcement-and-local-login). |
+| `sso_enforced_domains` | none | Email domains whose members sign in only through their auth provider; see [SSO enforcement](sso.md#sso-enforcement-and-local-login). |
 
 Durations are whole seconds from a minute to ten years, and the idle timeout is at most the absolute one. Every replica applies a change within a second: each keeps a copy of the settings and drops it when PostgreSQL notifies it of a change, and reads the settings from PostgreSQL on every use while its listener is down (`flagnetic_listener_up{channel="auth_settings"}` at 0). Live sessions are judged by the timeouts in force, so lowering one signs out every session already past it; raising the absolute timeout never lengthens a session opened under a lower one. Each change is recorded in the instance audit log as `auth_settings.updated`, with the settings before and after.
 

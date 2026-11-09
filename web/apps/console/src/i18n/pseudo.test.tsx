@@ -96,6 +96,8 @@ const screens: { name: string; routes?: Record<string, FakeAnswer>; ui: () => Re
           token_expiry_required: false,
           password_min_length: 12,
           self_service_password_reset: true,
+          local_login_enabled: true,
+          sso_enforced_domains: [],
         }}
       />
     ),

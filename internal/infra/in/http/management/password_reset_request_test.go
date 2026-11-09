@@ -217,7 +217,7 @@ func TestNothingIsMailedWhileSelfServiceResetIsOff(t *testing.T) {
 	if res := do(in.admin.UpdateAuthSettingsWithResponse(t.Context(), off)); res.JSON200 == nil || res.JSON200.SelfServicePasswordReset {
 		t.Fatalf("turning it off = %d: %s", res.StatusCode(), res.Body)
 	}
-	if got := do(in.anon.GetAuthMethodsWithResponse(t.Context())).JSON200; got == nil || got.PasswordResetAvailable {
+	if got := do(in.anon.GetAuthMethodsWithResponse(t.Context(), nil)).JSON200; got == nil || got.PasswordResetAvailable {
 		t.Errorf("auth methods = %+v, want no reset available with it off", got)
 	}
 
@@ -230,7 +230,7 @@ func TestNothingIsMailedWhileSelfServiceResetIsOff(t *testing.T) {
 	if res := do(in.admin.UpdateAuthSettingsWithResponse(t.Context(), on)); res.JSON200 == nil || !res.JSON200.SelfServicePasswordReset {
 		t.Fatalf("turning it on = %d: %s", res.StatusCode(), res.Body)
 	}
-	if got := do(in.anon.GetAuthMethodsWithResponse(t.Context())).JSON200; got == nil || !got.PasswordResetAvailable {
+	if got := do(in.anon.GetAuthMethodsWithResponse(t.Context(), nil)).JSON200; got == nil || !got.PasswordResetAvailable {
 		t.Errorf("auth methods = %+v, want a reset available again", got)
 	}
 	other := testkit.NewMember(t, in.pool)
@@ -250,7 +250,7 @@ func TestNothingIsMailedWhileTheInstanceHasNoSMTPServer(t *testing.T) {
 	anon := testkit.NewBrowser(t, in.srv.URL)
 	m := testkit.NewMember(t, in.pool)
 
-	if got := do(anon.GetAuthMethodsWithResponse(t.Context())).JSON200; got == nil || got.PasswordResetAvailable {
+	if got := do(anon.GetAuthMethodsWithResponse(t.Context(), nil)).JSON200; got == nil || got.PasswordResetAvailable {
 		t.Errorf("auth methods without SMTP = %+v, want no reset available", got)
 	}
 	res := do(anon.RequestPasswordResetWithResponse(t.Context(), management.PasswordResetRequest{Email: m.Email}))
@@ -261,7 +261,7 @@ func TestNothingIsMailedWhileTheInstanceHasNoSMTPServer(t *testing.T) {
 	// Once SMTP is configured the request that went unanswered is no reason
 	// to wait: the member is mailed at once.
 	putSMTP(t, in.admin, settingsFor(mp))
-	if got := do(anon.GetAuthMethodsWithResponse(t.Context())).JSON200; got == nil || !got.PasswordResetAvailable {
+	if got := do(anon.GetAuthMethodsWithResponse(t.Context(), nil)).JSON200; got == nil || !got.PasswordResetAvailable {
 		t.Errorf("auth methods with SMTP = %+v, want a reset available", got)
 	}
 	other := testkit.NewMember(t, in.pool)
@@ -473,5 +473,36 @@ func TestTheAuthSettingsCarrySelfServicePasswordResetAndAuditIt(t *testing.T) {
 	if !strings.Contains(string(before), `"self_service_password_reset":true`) ||
 		!strings.Contains(string(after), `"self_service_password_reset":false`) {
 		t.Errorf("auth_settings.updated before %s, after %s; want the setting on, then off", before, after)
+	}
+}
+
+func TestNothingIsMailedToAnEmailInAnEnforcedDomain(t *testing.T) {
+	t.Parallel()
+	in := startResetInstance(t, testkit.MailpitOpen)
+	body := corporate(providerSlug())
+	body.Domains = []string{"corp.example"}
+	corp := createProvider(t, in.admin, body).Slug
+	settings := do(in.admin.GetAuthSettingsWithResponse(t.Context())).JSON200
+	if settings == nil {
+		t.Fatal("GET /instance/auth-settings answered nothing")
+	}
+	enforced := *settings
+	enforced.SsoEnforcedDomains = []management.SsoEnforcedDomain{{Domain: "corp.example", Provider: corp}}
+	if res := do(in.admin.UpdateAuthSettingsWithResponse(t.Context(), enforced)); res.JSON200 == nil {
+		t.Fatalf("enforcing corp.example = %d: %s", res.StatusCode(), res.Body)
+	}
+	m := testkit.NewMember(t, in.pool, testkit.WithEmail("ann@corp.example"))
+
+	got := do(in.anon.GetAuthMethodsWithResponse(t.Context(), &management.GetAuthMethodsParams{Email: &m.Email})).JSON200
+	if got == nil || got.PasswordResetAvailable || got.EnforcedProvider == nil || got.EnforcedProvider.Slug != corp {
+		t.Errorf("auth methods for %s = %+v, want no reset available and %s", m.Email, got, corp)
+	}
+	in.ask(t, m.Email)
+	in.settle(t)
+	if mails := in.mp.MailsTo(t, m.Email); len(mails) != 0 {
+		t.Errorf("%d mails to an email in an enforced domain, want none", len(mails))
+	}
+	if n := len(in.auditOf(t, "password.reset_requested", m.ID.String())); n != 0 {
+		t.Errorf("password.reset_requested entries = %d, want none", n)
 	}
 }

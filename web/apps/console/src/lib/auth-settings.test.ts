@@ -17,6 +17,8 @@ const fresh = {
   token_expiry_required: false,
   password_min_length: 12,
   self_service_password_reset: true,
+  local_login_enabled: true,
+  sso_enforced_domains: [],
 };
 
 function issues(values: ReturnType<typeof formOf>) {

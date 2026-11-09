@@ -1365,6 +1365,7 @@ export type {
   SmtpSettingsUpdate,
   SmtpSettingsUpdateWritable,
   SpCertificate,
+  SsoEnforcedDomain,
   StaleExperiment,
   StaleFlag,
   StaleFlagDigest,

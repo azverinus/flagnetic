@@ -166,22 +166,47 @@ func (a *api) SignOut(ctx context.Context, _ SignOutRequestObject) (SignOutRespo
 }
 
 // GetAuthMethods answers how members sign in: with their email and password,
-// and through each enabled auth provider.
-func (a *api) GetAuthMethods(ctx context.Context, _ GetAuthMethodsRequestObject) (GetAuthMethodsResponseObject, error) {
+// and through each enabled auth provider, and, for an email, the provider its
+// domain is enforced to.
+func (a *api) GetAuthMethods(ctx context.Context, req GetAuthMethodsRequestObject) (GetAuthMethodsResponseObject, error) {
 	list, err := a.h.ListEnabledAuthProviders.Handle(ctx)
 	if err != nil {
 		return nil, err
 	}
-	resetAvailable, err := a.h.ResetAvailable.Handle(ctx)
+	email := ""
+	if req.Params.Email != nil {
+		email = *req.Params.Email
+	}
+	rules, err := a.h.SignInRules.Handle(ctx, email)
 	if err != nil {
 		return nil, err
 	}
 	return GetAuthMethods200JSONResponse{
-		LocalLoginEnabled: true, PasswordResetAvailable: resetAvailable,
-		Providers: each(list, func(p identity.Provider) AuthMethodProvider {
-			return AuthMethodProvider{Slug: p.Slug, DisplayName: p.DisplayName, Kind: AuthProviderKind(p.Kind)}
-		}),
+		LocalLoginEnabled: rules.LocalLoginEnabled, PasswordResetAvailable: rules.PasswordResetAvailable,
+		Providers:        each(list, authMethodProvider),
+		EnforcedProvider: enforcedProvider(list, rules.EnforcedProvider),
 	}, nil
+}
+
+func authMethodProvider(p identity.Provider) AuthMethodProvider {
+	return AuthMethodProvider{Slug: p.Slug, DisplayName: p.DisplayName, Kind: AuthProviderKind(p.Kind)}
+}
+
+// enforcedProvider returns the provider with the slug among the enabled ones,
+// nil for "". A domain is enforced only to an enabled provider, which cannot
+// be disabled while it is; a provider missing from the list is nil all the
+// same.
+func enforcedProvider(enabled []identity.Provider, slug string) *AuthMethodProvider {
+	if slug == "" {
+		return nil
+	}
+	for _, p := range enabled {
+		if p.Slug == slug {
+			out := authMethodProvider(p)
+			return &out
+		}
+	}
+	return nil
 }
 
 // GetInvitation answers what an invitation's link opens.
@@ -190,7 +215,14 @@ func (a *api) GetInvitation(ctx context.Context, req GetInvitationRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	out := GetInvitation200JSONResponse{Email: v.MaskedEmail, DisplayName: v.DisplayName, ExpiresAt: v.ExpiresAt}
+	out := GetInvitation200JSONResponse{Email: v.MaskedEmail, DisplayName: v.DisplayName, ExpiresAt: v.ExpiresAt, PasswordAllowed: v.PasswordAllowed}
+	if v.EnforcedProvider != "" {
+		enabled, listErr := a.h.ListEnabledAuthProviders.Handle(ctx)
+		if listErr != nil {
+			return nil, listErr
+		}
+		out.EnforcedProvider = enforcedProvider(enabled, v.EnforcedProvider)
+	}
 	if v.InvitedBy != "" {
 		out.InvitedBy = &v.InvitedBy
 	}

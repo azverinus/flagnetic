@@ -377,6 +377,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	authProviders := appidentity.ProviderDeps{
 		Tx: tx, Store: identityStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Sealer: o.Keyring, BaseURL: o.BaseURL, SAML: samlClient, SPKeys: samlClient,
 		References: []appidentity.ProviderReference{identityStore, providerGrants{providers: identityStore, access: accessStore}, providerProvisioned{providers: identityStore, svc: provisioning}},
+		Settings:   providerSettings{store: accessStore},
 	}
 	scimTokens := appidentity.SCIMTokenDeps{
 		Tx: tx, Providers: identityStore, Store: identityStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, Sealer: o.Keyring,
@@ -396,7 +397,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	ssoAccess := appaccess.NewSSO(accessStore, settings, audit, d.Clock, d.IDs, rand.Reader, sessionKey)
 	oidcClient := oidc.NewClient()
 	identities := identityDirectory{store: identityStore}
-	waysIn := appaccess.NewWaysIn(accessStore, identities)
+	waysIn := appaccess.NewWaysIn(accessStore, identities, settings)
 	authenticateSession := appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey)
 	signIn := appidentity.SignInDeps{
 		Tx: tx, Providers: identityStore, Attempts: identityStore, Identities: identityStore, Members: ssoMembers{sso: ssoAccess, ways: waysIn},
@@ -451,12 +452,15 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 			Random: rand.Reader, Key: sessionKey,
 		}),
-		SignOut:            appaccess.NewSignOut(tx, accessStore, audit, d.Clock, d.IDs),
-		ListSessions:       appaccess.NewListSessions(accessStore, settings, d.Clock),
-		RevokeSessions:     appaccess.NewRevokeSessions(tx, accessStore, settings, audit, d.Clock, d.IDs),
-		GetAuthSettings:    appaccess.NewGetAuthSettings(settings),
-		UpdateAuthSettings: appaccess.NewUpdateAuthSettings(tx, accessStore, settings, audit, d.Clock, d.IDs),
-		GetSMTP:            appaccess.NewGetSMTP(smtpSettings),
+		SignOut:         appaccess.NewSignOut(tx, accessStore, audit, d.Clock, d.IDs),
+		ListSessions:    appaccess.NewListSessions(accessStore, settings, d.Clock),
+		RevokeSessions:  appaccess.NewRevokeSessions(tx, accessStore, settings, audit, d.Clock, d.IDs),
+		GetAuthSettings: appaccess.NewGetAuthSettings(settings),
+		UpdateAuthSettings: appaccess.NewUpdateAuthSettings(appaccess.UpdateAuthSettingsDeps{
+			Tx: tx, Store: accessStore, Cache: settings, Providers: enforcementProviders{store: identityStore}, Identities: identities,
+			Audit: audit, Clock: d.Clock, IDs: d.IDs,
+		}),
+		GetSMTP: appaccess.NewGetSMTP(smtpSettings),
 		ConfigureSMTP: appaccess.NewConfigureSMTP(appaccess.ConfigureSMTPDeps{
 			Tx: tx, Store: accessStore, Cache: smtpSettings, Sealer: o.Keyring, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 			BaseURLSet: o.BaseURL != nil,
@@ -479,7 +483,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		InviteMember:          appaccess.NewInviteMember(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader, invitationMail),
 		InviteToProject:       appaccess.NewInviteToProject(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader, invitationMail),
 		ReissueInvitation:     appaccess.NewReissueInvitation(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader, invitationMail),
-		GetInvitation:         appaccess.NewGetInvitation(accessStore, d.Clock),
+		GetInvitation:         appaccess.NewGetInvitation(accessStore, settings, d.Clock),
 		AcceptInvitation: appaccess.NewAcceptInvitation(appaccess.AcceptInvitationDeps{
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 			Random: rand.Reader, Key: sessionKey,
@@ -488,9 +492,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Tx: tx, Store: accessStore, Settings: settings, SMTP: smtpSettings, Postman: postman, Background: background,
 			Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, Logger: edge.Logger(), ConsoleURL: publicURL,
 		}),
-		ResetAvailable: appaccess.NewPasswordResetAvailable(settings, smtpSettings),
-		IssueReset:     appaccess.NewIssuePasswordReset(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
-		GetReset:       appaccess.NewGetPasswordReset(accessStore, d.Clock),
+		SignInRules: appaccess.NewGetSignInRules(settings, smtpSettings),
+		IssueReset:  appaccess.NewIssuePasswordReset(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
+		GetReset:    appaccess.NewGetPasswordReset(accessStore, d.Clock),
 		CompleteReset: appaccess.NewCompletePasswordReset(appaccess.CompletePasswordResetDeps{
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 			Random: rand.Reader, Key: sessionKey,
@@ -835,6 +839,12 @@ func CreateInstanceAdmin(d Deps) *appaccess.CreateInstanceAdmin {
 func PromoteMember(d Deps) *appaccess.PromoteMember {
 	return appaccess.NewPromoteMember(postgres.NewTransactor(d.Pool), pgaccess.NewStore(d.Pool),
 		record(d), d.Clock, d.IDs)
+}
+
+// Unlock returns the use case opening the instance again to passwords from
+// the command line.
+func Unlock(d Deps) *appaccess.Unlock {
+	return appaccess.NewUnlock(postgres.NewTransactor(d.Pool), pgaccess.NewStore(d.Pool), record(d), d.Clock, d.IDs)
 }
 
 // InstanceAdminExists returns the query telling whether the instance has an

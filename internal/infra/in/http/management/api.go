@@ -64,7 +64,7 @@ type Handlers struct {
 	GetInvitation       *appaccess.GetInvitation
 	AcceptInvitation    *appaccess.AcceptInvitation
 	RequestReset        *appaccess.RequestPasswordReset
-	ResetAvailable      *appaccess.PasswordResetAvailable
+	SignInRules         *appaccess.GetSignInRules
 	IssueReset          *appaccess.IssuePasswordReset
 	GetReset            *appaccess.GetPasswordReset
 	CompleteReset       *appaccess.CompletePasswordReset
