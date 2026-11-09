@@ -178,10 +178,7 @@ export function AuthSettingsForm({ settings }: { settings: AuthSettings }) {
                   <Trans>
                     A member who forgot their password asks for a reset link by mail from the
                     sign-in page. It works only while an SMTP server is configured under{" "}
-                    <Link
-                      to="/admin/mail"
-                      className="text-primary underline-offset-4 hover:underline"
-                    >
+                    <Link to="/admin/mail" className="font-medium underline">
                       Mail
                     </Link>
                     . An instance admin can issue a reset link from a member's page either way.
