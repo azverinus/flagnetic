@@ -410,6 +410,22 @@ export const zPermission = z.string();
 
 export const zRoleName = z.enum(["owner", "maintainer", "developer", "viewer"]);
 
+/**
+ * A member invited with a role in a project, which accepting their invitation grants them.
+ */
+export const zProjectInvitation = z.object({
+  member: z.uuid(),
+  email: z.string(),
+  display_name: z.string(),
+  role: zRoleName,
+  invited_by: z.uuid().nullable(),
+  expires_at: z.iso.datetime(),
+});
+
+export const zProjectInvitationList = z.object({
+  items: z.array(zProjectInvitation),
+});
+
 export const zCredential = z.object({
   method: z.enum(["token", "session"]),
   token_id: z.uuid().optional(),
@@ -4510,6 +4526,15 @@ export const zDeleteGrantPath = z.object({
  * Removed.
  */
 export const zDeleteGrantResponse = z.void();
+
+export const zListProjectInvitationsPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The invited members and the role each invitation grants.
+ */
+export const zListProjectInvitationsResponse = zProjectInvitationList;
 
 export const zInviteProjectMemberBody = zProjectInvitationCreate;
 

@@ -107,6 +107,37 @@ func (s *Store) PendingInvitation(ctx context.Context, member access.MemberID) (
 	return invitation(), nil
 }
 
+// ProjectInvitations returns the invited members whose pending invitation,
+// expired or not, grants a role in project, ordered by email, each with that
+// invitation. A member's pending invitation is their latest not consumed
+// yet, so an earlier one is passed over even when it grants a role here.
+func (s *Store) ProjectInvitations(ctx context.Context, project workspace.ProjectID) ([]appaccess.ProjectInvitation, error) {
+	rows, err := s.db(ctx).Query(ctx, `
+		SELECT `+invitationColumns+`, `+memberColumns+`
+		FROM invitations i JOIN members m ON m.id = i.member_id
+		WHERE i.project_id = $1 AND i.role IS NOT NULL AND i.consumed_at IS NULL AND m.status = 'invited'
+			AND NOT EXISTS (
+				SELECT 1 FROM invitations later
+				WHERE later.member_id = i.member_id AND later.consumed_at IS NULL
+					AND (later.created_at, later.id) > (i.created_at, i.id))
+		ORDER BY lower(m.email) COLLATE "C", m.id`, project.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("listing a project's invitations: %w", err)
+	}
+	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (appaccess.ProjectInvitation, error) {
+		invDest, invitation := scanInvitation()
+		dest, member := scanMember()
+		if scanErr := row.Scan(append(invDest, dest...)...); scanErr != nil {
+			return appaccess.ProjectInvitation{}, scanErr
+		}
+		return appaccess.ProjectInvitation{Invitation: invitation(), Member: member()}, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("listing a project's invitations: %w", err)
+	}
+	return out, nil
+}
+
 // GrantingInvitations returns the invitations issued by inviter, not
 // consumed yet, that would grant a role in project, or in any project when
 // project is zero, each with its member, locked until the transaction ends.

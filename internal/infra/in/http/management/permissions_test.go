@@ -165,6 +165,10 @@ func matrix(t *testing.T) []matrixRow {
 			}))
 			return res.StatusCode(), res.Body
 		}},
+		{"grant.manage", "listProjectInvitations", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
+			res := do(c.ListProjectInvitationsWithResponse(t.Context(), p.Key))
+			return res.StatusCode(), res.Body
+		}},
 		{"project_token.manage", "listProjectTokens", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
 			res := do(c.ListProjectTokensWithResponse(t.Context(), p.Key))
 			return res.StatusCode(), res.Body

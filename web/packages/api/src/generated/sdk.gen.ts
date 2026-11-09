@@ -361,6 +361,9 @@ import type {
   ListProjectAuditEntriesData,
   ListProjectAuditEntriesErrors,
   ListProjectAuditEntriesResponses,
+  ListProjectInvitationsData,
+  ListProjectInvitationsErrors,
+  ListProjectInvitationsResponses,
   ListProjectMembersData,
   ListProjectMembersErrors,
   ListProjectMembersResponses,
@@ -4184,6 +4187,37 @@ export const deleteGrant = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/grants/{grant}",
+    ...options,
+  });
+
+/**
+ * The people invited to a project
+ *
+ * Every member still invited whose latest invitation grants a role in
+ * the project once accepted, expired or not, ordered by email. An
+ * invitation whose grant was dropped, or that grants a role elsewhere,
+ * is not listed; an accepted one is a grant of the project. A member
+ * listed here is invited again, with the same or another role, by
+ * inviting their email to the project once more.
+ *
+ */
+export const listProjectInvitations = <ThrowOnError extends boolean = false>(
+  options: Options<ListProjectInvitationsData, ThrowOnError>,
+): RequestResult<ListProjectInvitationsResponses, ListProjectInvitationsErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListProjectInvitationsResponses,
+    ListProjectInvitationsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/invitations",
     ...options,
   });
 

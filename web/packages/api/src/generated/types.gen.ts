@@ -557,6 +557,28 @@ export type ProjectInvitationCreate = {
 };
 
 /**
+ * A member invited with a role in a project, which accepting their invitation grants them.
+ */
+export type ProjectInvitation = {
+  member: string;
+  email: string;
+  display_name: string;
+  role: RoleName;
+  /**
+   * The member who issued the invitation; null when none did.
+   */
+  invited_by: string | null;
+  /**
+   * When the invitation's link stops working; a member whose link expired is invited again for a fresh one.
+   */
+  expires_at: string;
+};
+
+export type ProjectInvitationList = {
+  items: Array<ProjectInvitation>;
+};
+
+/**
  * An invitation just issued. With SMTP configured and `FLAGNETIC_BASE_URL` set it is mailed to the invited person and its link is never shown; otherwise its link is shown this once, for the issuer to pass on.
  */
 export type IssuedInvitation = {
@@ -12211,6 +12233,59 @@ export type DeleteGrantResponses = {
 };
 
 export type DeleteGrantResponse = DeleteGrantResponses[keyof DeleteGrantResponses];
+
+export type ListProjectInvitationsData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/invitations";
+};
+
+export type ListProjectInvitationsErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListProjectInvitationsError =
+  ListProjectInvitationsErrors[keyof ListProjectInvitationsErrors];
+
+export type ListProjectInvitationsResponses = {
+  /**
+   * The invited members and the role each invitation grants.
+   */
+  200: ProjectInvitationList;
+};
+
+export type ListProjectInvitationsResponse =
+  ListProjectInvitationsResponses[keyof ListProjectInvitationsResponses];
 
 export type InviteProjectMemberData = {
   body: ProjectInvitationCreate;

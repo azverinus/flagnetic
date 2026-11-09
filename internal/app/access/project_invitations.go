@@ -7,6 +7,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -142,4 +143,35 @@ func (h *InviteToProject) memberToInvite(ctx context.Context, invited access.Mem
 		return access.Member{}, "", errEmailHeld
 	}
 	return existing, "member.invitation_reissued", nil
+}
+
+// ProjectInvitation is a member invited with a role in a project, with the
+// invitation that grants it once accepted.
+type ProjectInvitation struct {
+	Member     access.Member
+	Invitation access.Invitation
+}
+
+// ProjectInvitationDirectory reads who is invited to projects.
+type ProjectInvitationDirectory interface {
+	// ProjectInvitations returns the invited members whose pending
+	// invitation, expired or not, grants a role in project, ordered by
+	// email, each with that invitation, read in one query.
+	ProjectInvitations(ctx context.Context, project workspace.ProjectID) ([]ProjectInvitation, error)
+}
+
+// ListProjectInvitations answers who is invited to a project.
+type ListProjectInvitations struct{ store ProjectInvitationDirectory }
+
+// NewListProjectInvitations returns the query.
+func NewListProjectInvitations(store ProjectInvitationDirectory) *ListProjectInvitations {
+	return &ListProjectInvitations{store: store}
+}
+
+// Handle returns the members invited to project with the role their pending
+// invitation grants there. A member is listed by their pending invitation
+// alone, as only it can still be accepted: an earlier one granting a role
+// here was replaced, and one whose grant was dropped grants nothing.
+func (h *ListProjectInvitations) Handle(ctx context.Context, project workspace.ProjectID) ([]ProjectInvitation, error) {
+	return h.store.ProjectInvitations(ctx, project)
 }

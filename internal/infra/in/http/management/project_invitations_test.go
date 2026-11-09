@@ -654,3 +654,73 @@ func TestDemotingAnInstanceAdminDropsTheGrantsOfInvitationsToProjectsTheyDoNotMa
 		t.Errorf("grants = %+v, want the viewer grant of the project they still own", g)
 	}
 }
+
+// invitedIn returns the members invited to project, as c lists them.
+func invitedIn(t *testing.T, c *management.ClientWithResponses, project string) []management.ProjectInvitation {
+	t.Helper()
+	res := do(c.ListProjectInvitationsWithResponse(t.Context(), project))
+	if res.JSON200 == nil {
+		t.Fatalf("GET /projects/%s/invitations = %d: %s", project, res.StatusCode(), res.Body)
+	}
+	return res.JSON200.Items
+}
+
+func TestAProjectListsTheMembersInvitedToItWithTheRoleTheirInvitationGrants(t *testing.T) {
+	c := testkit.Clock()
+	srv := testkit.StartServer(t, testkit.WithClock(c))
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	elsewhere := createProject(t, admin, projectKey())
+	owner := memberIn(t, srv, p, access.RoleOwner)
+	departing := memberIn(t, srv, p, access.RoleOwner)
+
+	viewer, viewerEmail := inviteTo(t, owner.ClientWithResponses, p.Key, "viewer")
+	_, maintainerEmail := inviteTo(t, owner.ClientWithResponses, p.Key, "developer")
+	// Invited again with another role, the member is listed once, with it.
+	maintainer := mustInviteTo(t, owner.ClientWithResponses, p.Key, maintainerEmail, "maintainer")
+
+	// Neither an accepted invitation, nor one to another project or to the
+	// instance alone, nor one whose grant was dropped, is listed.
+	accepted, _ := inviteTo(t, admin, p.Key, "viewer")
+	acceptedBy(t, srv, *accepted.Invitation.Url)
+	inviteTo(t, admin, elsewhere.Key, "viewer")
+	invite(t, admin, "Instance Only")
+	_, droppedEmail := inviteTo(t, departing.ClientWithResponses, p.Key, "developer")
+	if res := do(admin.DeactivateMemberWithResponse(t.Context(), departing.ID.String())); res.JSON200 == nil {
+		t.Fatalf("deactivating the inviter = %d: %s", res.StatusCode(), res.Body)
+	}
+	wantGrantRevoked(t, admin, p.Key, droppedEmail, "developer", "inviter_deactivated")
+
+	type listed struct {
+		member  openapi_types.UUID
+		email   string
+		role    management.RoleName
+		expires time.Time
+	}
+	want := []listed{
+		{viewer.Member.Id, viewerEmail, management.RoleNameViewer, viewer.Invitation.ExpiresAt},
+		{maintainer.Member.Id, maintainerEmail, management.RoleNameMaintainer, maintainer.Invitation.ExpiresAt},
+	}
+	if want[1].email < want[0].email {
+		want[0], want[1] = want[1], want[0]
+	}
+	check := func(when string) {
+		t.Helper()
+		got := invitedIn(t, owner.ClientWithResponses, p.Key)
+		if len(got) != len(want) {
+			t.Fatalf("%s, the invited members = %+v, want %d", when, got, len(want))
+		}
+		for i, w := range want {
+			g := got[i]
+			if g.Member != w.member || g.Email != w.email || g.DisplayName != "Invitee" || g.Role != w.role ||
+				g.InvitedBy == nil || *g.InvitedBy != owner.ID.Bytes() || !g.ExpiresAt.Equal(w.expires) {
+				t.Errorf("%s, invited member %d = %+v, want %s as %s, invited by the owner, until %v", when, i, g, w.email, w.role, w.expires)
+			}
+		}
+	}
+	check("while the links work")
+
+	// An expired link leaves the member invited, to be invited again.
+	c.Advance(7*24*time.Hour + time.Minute)
+	check("once the links expired")
+}
