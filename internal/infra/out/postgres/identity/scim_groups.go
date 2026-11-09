@@ -159,8 +159,8 @@ func (s *Store) scimGroups(ctx context.Context, where string, args []any, startI
 			external *string
 			members  [][16]byte
 		)
-		if err := row.Scan(&gid, &pid, &g.DisplayName, &external, &g.CreatedAt, &g.UpdatedAt, &members); err != nil {
-			return g, err
+		if scanErr := row.Scan(&gid, &pid, &g.DisplayName, &external, &g.CreatedAt, &g.UpdatedAt, &members); scanErr != nil {
+			return g, scanErr
 		}
 		g.ID, g.Provider, g.ExternalID = id.FromBytes[identity.SCIMGroup](gid), id.FromBytes[identity.Provider](pid), deref(external)
 		g.CreatedAt, g.UpdatedAt = g.CreatedAt.UTC(), g.UpdatedAt.UTC()
@@ -189,9 +189,9 @@ func (s *Store) GroupsOfMembers(ctx context.Context, provider identity.ProviderI
 			m        membership
 			mid, gid [16]byte
 		)
-		err := row.Scan(&mid, &gid, &m.group.DisplayName)
+		scanErr := row.Scan(&mid, &gid, &m.group.DisplayName)
 		m.member, m.group.ID = id.FromBytes[identity.Member](mid), id.FromBytes[identity.SCIMGroup](gid)
-		return m, err
+		return m, scanErr
 	})
 	if err != nil {
 		return nil, err
