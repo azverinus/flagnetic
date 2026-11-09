@@ -89,18 +89,23 @@ func (s *Store) SaveAuthSettings(ctx context.Context, settings access.AuthSettin
 }
 
 // ClearAllSignInFailures forgets every failed sign-in counted, per email, per
-// email and source, and per source, and returns how many emails, alone or
-// from a source, were locked out.
-func (s *Store) ClearAllSignInFailures(ctx context.Context) (int, error) {
+// email and source, and per source, and returns how many emails were locked
+// out at the moment at, alone or from some source: an email locked both ways
+// counts once, and a lockout already over counts not at all.
+func (s *Store) ClearAllSignInFailures(ctx context.Context, at time.Time) (int, error) {
 	var locked int
 	err := s.db(ctx).QueryRow(ctx, `
-		WITH emails AS (DELETE FROM sign_in_email_failures RETURNING locked_until),
-		known AS (DELETE FROM sign_in_known_source_failures RETURNING locked_until),
+		WITH emails AS (DELETE FROM sign_in_email_failures RETURNING email, locked_until),
+		known AS (DELETE FROM sign_in_known_source_failures RETURNING email, locked_until),
 		-- A data-modifying statement in WITH runs to completion whether or
 		-- not the query reads it.
 		sources AS (DELETE FROM sign_in_source_failures)
-		SELECT (SELECT count(*) FROM emails WHERE locked_until IS NOT NULL)
-			+ (SELECT count(*) FROM known WHERE locked_until IS NOT NULL)`).Scan(&locked)
+		SELECT count(DISTINCT email) FROM (
+			SELECT email, locked_until FROM emails
+			UNION ALL
+			SELECT email, locked_until FROM known
+		) locked
+		WHERE locked_until > $1`, at).Scan(&locked)
 	if err != nil {
 		return 0, fmt.Errorf("clearing the failed sign-ins: %w", err)
 	}

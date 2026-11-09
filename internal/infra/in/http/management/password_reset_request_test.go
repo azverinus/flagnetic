@@ -475,3 +475,34 @@ func TestTheAuthSettingsCarrySelfServicePasswordResetAndAuditIt(t *testing.T) {
 		t.Errorf("auth_settings.updated before %s, after %s; want the setting on, then off", before, after)
 	}
 }
+
+func TestNothingIsMailedToAnEmailInAnEnforcedDomain(t *testing.T) {
+	t.Parallel()
+	in := startResetInstance(t, testkit.MailpitOpen)
+	body := corporate(providerSlug())
+	body.Domains = []string{"corp.example"}
+	corp := createProvider(t, in.admin, body).Slug
+	settings := do(in.admin.GetAuthSettingsWithResponse(t.Context())).JSON200
+	if settings == nil {
+		t.Fatal("GET /instance/auth-settings answered nothing")
+	}
+	enforced := *settings
+	enforced.SsoEnforcedDomains = []management.SsoEnforcedDomain{{Domain: "corp.example", Provider: corp}}
+	if res := do(in.admin.UpdateAuthSettingsWithResponse(t.Context(), enforced)); res.JSON200 == nil {
+		t.Fatalf("enforcing corp.example = %d: %s", res.StatusCode(), res.Body)
+	}
+	m := testkit.NewMember(t, in.pool, testkit.WithEmail("ann@corp.example"))
+
+	got := do(in.anon.GetAuthMethodsWithResponse(t.Context(), &management.GetAuthMethodsParams{Email: &m.Email})).JSON200
+	if got == nil || got.PasswordResetAvailable || got.EnforcedProvider == nil || got.EnforcedProvider.Slug != corp {
+		t.Errorf("auth methods for %s = %+v, want no reset available and %s", m.Email, got, corp)
+	}
+	in.ask(t, m.Email)
+	in.settle(t)
+	if mails := in.mp.MailsTo(t, m.Email); len(mails) != 0 {
+		t.Errorf("%d mails to an email in an enforced domain, want none", len(mails))
+	}
+	if n := len(in.auditOf(t, "password.reset_requested", m.ID.String())); n != 0 {
+		t.Errorf("password.reset_requested entries = %d, want none", n)
+	}
+}
