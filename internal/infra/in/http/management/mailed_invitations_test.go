@@ -200,6 +200,57 @@ func TestAnInvitationIsMailedInTheInvitersLanguageUnlessTheInstanceKnowsTheInvit
 	}
 }
 
+// A member the instance knows the language of, deactivated before they ever
+// set a password, is mailed the invitation their reactivation issues in their
+// own language, over the instance admin's and the instance's.
+func TestAnInvitationIsMailedInTheInviteesLanguageWhenTheInstanceKnowsIt(t *testing.T) {
+	t.Parallel()
+	in := startMailingInstance(t, testkit.MailpitOpen,
+		[]testkit.ServerOption{testkit.WithDefaultLocale("en")}, testkit.WithLocale("en"))
+	email := newEmail()
+	invitee := testkit.NewPasswordlessMember(t, in.pool, testkit.WithEmail(email), testkit.WithLocale("ru"),
+		testkit.WithStatus(access.MemberDeactivated))
+
+	res := do(in.admin.ReactivateMemberWithResponse(t.Context(), invitee.ID.String()))
+	if res.JSON200 == nil {
+		t.Fatalf("reactivating = %d: %s", res.StatusCode(), res.Body)
+	}
+	wantMailed(t, "the reactivation's invitation", res.JSON200)
+	got := in.mp.AwaitMails(t, email, 1)[0]
+	if want := "Приглашение во Flagnetic"; got.Subject != want {
+		t.Errorf("subject = %q, want %q", got.Subject, want)
+	}
+	invitationLinkIn(t, got)
+}
+
+// An instance admin's invitation carrying a role in a project is mailed as
+// one to the project, naming it, the role and the instance admin.
+func TestWithSMTPAnInstanceInvitationWithAGrantIsMailedNamingTheProject(t *testing.T) {
+	t.Parallel()
+	in := startMailingInstance(t, testkit.MailpitOpen, nil)
+	p := createProject(t, in.admin, projectKey())
+	email := newEmail()
+
+	res := do(in.admin.InviteMemberWithResponse(t.Context(), management.MemberInvite{
+		Email: email, DisplayName: "Ada Lovelace", Grant: &management.InvitationGrantCreate{Project: p.Key, Role: "maintainer"},
+	}))
+	if res.JSON201 == nil {
+		t.Fatalf("POST /members = %d: %s", res.StatusCode(), res.Body)
+	}
+	wantMailed(t, "the invitation", res.JSON201)
+	got := in.mp.AwaitMails(t, email, 1)[0]
+	if want := "Grace Hopper invited you to " + p.Name + " on Flagnetic"; got.Subject != want {
+		t.Errorf("subject = %q, want %q", got.Subject, want)
+	}
+	if !strings.Contains(got.Text, "Maintainer") || !strings.Contains(got.HTML, "Maintainer") {
+		t.Errorf("the mail does not name the role:\n%s", got.Text)
+	}
+	acceptedBy(t, in.srv, invitationLinkIn(t, got))
+	if grants := grantsOf(t, in.admin, p.Key, email); len(grants) != 1 || grants[0].Role != "maintainer" {
+		t.Errorf("grants after accepting the mailed link = %+v, want the maintainer role", grants)
+	}
+}
+
 // A member deactivated before they accepted is invited again when brought
 // back, by nobody in particular, and that invitation is mailed too.
 func TestAReactivatedMemberIsMailedTheirFreshInvitation(t *testing.T) {

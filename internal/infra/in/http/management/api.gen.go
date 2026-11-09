@@ -3231,11 +3231,11 @@ type InvitationProject struct {
 	Name string `json:"name"`
 }
 
-// IssuedInvitation An invitation just issued. With SMTP configured it is mailed to the invited person and its link is never shown; without, its link is shown this once, for the issuer to pass on.
+// IssuedInvitation An invitation just issued. With SMTP configured and `FLAGNETIC_BASE_URL` set it is mailed to the invited person and its link is never shown; otherwise its link is shown this once, for the issuer to pass on.
 type IssuedInvitation struct {
 	ExpiresAt time.Time `json:"expires_at"`
 
-	// Mailed Whether the link is being mailed to the invited person, which it is whenever the instance has an SMTP server. A mail that does not arrive is replaced by reissuing the invitation.
+	// Mailed Whether the link is being mailed to the invited person, which it is whenever the instance has an SMTP server and `FLAGNETIC_BASE_URL` is set. A mail that does not arrive is replaced by reissuing the invitation.
 	Mailed bool `json:"mailed"`
 
 	// Url The one-time link to pass on to the invited person; absent when the link is mailed.
@@ -3382,7 +3382,7 @@ type MemberAuthMethods struct {
 
 // MemberInvitation defines model for MemberInvitation.
 type MemberInvitation struct {
-	// Invitation An invitation just issued. With SMTP configured it is mailed to the invited person and its link is never shown; without, its link is shown this once, for the issuer to pass on.
+	// Invitation An invitation just issued. With SMTP configured and `FLAGNETIC_BASE_URL` set it is mailed to the invited person and its link is never shown; otherwise its link is shown this once, for the issuer to pass on.
 	Invitation *IssuedInvitation `json:"invitation,omitempty"`
 
 	// Member A member as an instance admin sees them.

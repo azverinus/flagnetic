@@ -41,7 +41,7 @@ A person who uses the management UI or API, working in each project through the 
 _Avoid_: user (reserved for the unit type), account, admin
 
 **Invitation**:
-The one-time link that lets an invited member set their first password. Its secret is mailed to the person invited when the instance has an SMTP server, else shown once to whoever issued it, and stored only as a hash; it expires, is used once, and is replaced by re-issuing. An invitation to a project also carries a role there, made when it is accepted, in the name of the member who invited; if that member loses the permission to grant it, or is deactivated, first, the role is dropped and the invitation still activates the member.
+The one-time link that lets an invited member set their first password. Its secret is mailed to the person invited when the instance has an SMTP server and knows the address its console is served at, else shown once to whoever issued it, and stored only as a hash; it expires, is used once, and is replaced by re-issuing. An invitation to a project also carries a role there, made when it is accepted, in the name of the member who invited; if that member loses the permission to grant it, or is deactivated, first, the role is dropped and the invitation still activates the member.
 _Avoid_: invite code, activation link, signup link
 
 **Password reset**:

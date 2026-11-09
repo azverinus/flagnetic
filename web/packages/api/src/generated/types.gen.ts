@@ -549,11 +549,11 @@ export type ProjectInvitationCreate = {
 };
 
 /**
- * An invitation just issued. With SMTP configured it is mailed to the invited person and its link is never shown; without, its link is shown this once, for the issuer to pass on.
+ * An invitation just issued. With SMTP configured and `FLAGNETIC_BASE_URL` set it is mailed to the invited person and its link is never shown; otherwise its link is shown this once, for the issuer to pass on.
  */
 export type IssuedInvitation = {
   /**
-   * Whether the link is being mailed to the invited person, which it is whenever the instance has an SMTP server. A mail that does not arrive is replaced by reissuing the invitation.
+   * Whether the link is being mailed to the invited person, which it is whenever the instance has an SMTP server and `FLAGNETIC_BASE_URL` is set. A mail that does not arrive is replaced by reissuing the invitation.
    */
   mailed: boolean;
   /**
