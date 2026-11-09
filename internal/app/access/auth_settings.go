@@ -102,8 +102,9 @@ type UpdateAuthSettingsCommand struct {
 // change nothing and record nothing. Each enforced domain must name an
 // enabled auth provider that vouches for it (invalid_auth_settings
 // otherwise). Disabling local login is refused identity_required unless the
-// caller holds an identity at an enabled provider, so the instance admin who
-// closes the door keeps a way through it. Every replica applies a change
+// caller holds an identity at an enabled provider that the new settings'
+// enforcement still lets sign them in, so the instance admin who closes the
+// door keeps a way through it. Every replica applies a change
 // once the notification reaches it; this one at once.
 func (h *UpdateAuthSettings) Handle(ctx context.Context, cmd UpdateAuthSettingsCommand) (access.AuthSettings, error) {
 	s := cmd.Settings.Normalized()
@@ -123,7 +124,7 @@ func (h *UpdateAuthSettings) Handle(ctx context.Context, cmd UpdateAuthSettingsC
 			return err
 		}
 		if before.LocalLoginEnabled && !s.LocalLoginEnabled {
-			if err = h.requireIdentity(ctx, cmd.Caller); err != nil {
+			if err = h.requireIdentity(ctx, cmd.Caller, s); err != nil {
 				return err
 			}
 		}
@@ -180,8 +181,11 @@ func (h *UpdateAuthSettings) checkProviders(ctx context.Context, domains []acces
 }
 
 // requireIdentity refuses identity_required a caller who holds no identity
-// at an enabled auth provider.
-func (h *UpdateAuthSettings) requireIdentity(ctx context.Context, caller access.Caller) error {
+// that signs them in under the settings s: one at an enabled auth provider
+// and, when s enforces the caller's email domain, at the provider it is
+// enforced to. An identity at another provider would be refused them the
+// moment s is in force.
+func (h *UpdateAuthSettings) requireIdentity(ctx context.Context, caller access.Caller, s access.AuthSettings) error {
 	if caller.Member == nil {
 		return access.ErrIdentityRequired
 	}
@@ -189,7 +193,7 @@ func (h *UpdateAuthSettings) requireIdentity(ctx context.Context, caller access.
 	if err != nil {
 		return err
 	}
-	if !slices.ContainsFunc(held, func(i access.IdentityMethod) bool { return i.ProviderEnabled }) {
+	if !(access.AuthMethods{Identities: held}).UnderSettings(s, caller.Member.Email).HoldsUsableWayIn() {
 		return access.ErrIdentityRequired
 	}
 	return nil

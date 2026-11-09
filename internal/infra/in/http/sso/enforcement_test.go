@@ -456,3 +456,51 @@ func TestDisablingLocalLoginNeedsAnIdentityAndRefusesEveryPassword(t *testing.T)
 		}
 	})
 }
+
+func TestAnEnforcedDomainSignsInThroughASAMLProvider(t *testing.T) {
+	idp := testkit.StartForgingSAMLIDP(t)
+	e := startIsolated(t)
+	corp := e.createSAML(t, idp, func(c *management.AuthProviderCreate) {
+		c.Domains, c.AutoProvision, c.LinkByEmail = []string{"corp.example"}, ptr(false), ptr(true)
+	}).Slug
+	bob := testkit.NewMember(t, e.pool, testkit.WithEmail("bob@corp.example"))
+	enforce(t, e.admin, "corp.example", corp)
+
+	wantSSORequired(t, "a password", passwordSignIn(t, e.env, bob.Email, bob.Password), corp)
+	b, v := e.samlSignIn(t, idp, corp, "/", samlPerson(bob.Email))
+	if v.URL.Path != "/" {
+		t.Fatalf("the SAML sign-in ended at %s", v.URL)
+	}
+	if me := signedIn(t, b); me == nil || me.Member == nil || me.Member.Email != bob.Email {
+		t.Errorf("signed in as %+v, want %s", me, bob.Email)
+	}
+}
+
+func TestDisablingLocalLoginNeedsAnIdentityTheSameChangeStillLetsIn(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := startIsolated(t)
+	corp := e.forged(t, idp, noFallback("corp.example"))
+	other := e.forged(t, idp, noFallback("corp.example"))
+	keeper := testkit.NewMember(t, e.pool, testkit.AsInstanceAdmin(), testkit.WithEmail("keeper@corp.example"))
+	keeperAt := testkit.NewBrowser(t, e.srv.URL)
+	keeperAt.SignIn(t, keeper.Email, keeper.Password)
+	e.link(t, idp, keeperAt, other, "sub-keeper-other", nil)
+	closeAndEnforce := func(s *management.AuthSettings) {
+		s.LocalLoginEnabled = false
+		s.SsoEnforcedDomains = []management.SsoEnforcedDomain{{Domain: "corp.example", Provider: corp}}
+	}
+
+	// The identity at other would be refused the keeper the moment their
+	// own domain is enforced to corp: it keeps no way through.
+	res := putSettings(t, keeperAt.ClientWithResponses, closeAndEnforce)
+	wantRefused(t, "holding another provider's identity", res.StatusCode(), res.Body, res.ApplicationproblemJSON422,
+		http.StatusUnprocessableEntity, "identity_required", "")
+	if got := settingsWith(t, e.admin, func(*management.AuthSettings) {}); !got.LocalLoginEnabled || len(got.SsoEnforcedDomains) != 0 {
+		t.Errorf("settings after the refusal = %+v, want them unchanged", got)
+	}
+
+	e.link(t, idp, keeperAt, corp, "sub-keeper-corp", nil)
+	if res = putSettings(t, keeperAt.ClientWithResponses, closeAndEnforce); res.JSON200 == nil || res.JSON200.LocalLoginEnabled {
+		t.Errorf("holding the enforced provider's identity = %d: %s", res.StatusCode(), res.Body)
+	}
+}
