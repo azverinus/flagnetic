@@ -141,6 +141,17 @@ func (s *SSO) OpenSession(ctx context.Context, in SSOSignIn) (secret.String, err
 		"auth.signed_in", in.Member, in.Method, in.Provider, nil))
 }
 
+// EnforcedProvider returns the slug of the auth provider email's domain is
+// enforced to; "" when it is not.
+func (s *SSO) EnforcedProvider(ctx context.Context, email string) (string, error) {
+	settings, err := s.settings.AuthSettings(ctx)
+	if err != nil {
+		return "", err
+	}
+	d, _ := settings.EnforcedFor(email)
+	return d.Provider, nil
+}
+
 // RecordFailedSignIn records auth.sign_in_failed for a member known to the
 // instance who could not sign in through provider, with reason.
 func (s *SSO) RecordFailedSignIn(ctx context.Context, member access.Member, method access.SignInMethod, provider, reason, requestID string) error {

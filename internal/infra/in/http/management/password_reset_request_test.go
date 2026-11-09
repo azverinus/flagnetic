@@ -217,7 +217,7 @@ func TestNothingIsMailedWhileSelfServiceResetIsOff(t *testing.T) {
 	if res := do(in.admin.UpdateAuthSettingsWithResponse(t.Context(), off)); res.JSON200 == nil || res.JSON200.SelfServicePasswordReset {
 		t.Fatalf("turning it off = %d: %s", res.StatusCode(), res.Body)
 	}
-	if got := do(in.anon.GetAuthMethodsWithResponse(t.Context())).JSON200; got == nil || got.PasswordResetAvailable {
+	if got := do(in.anon.GetAuthMethodsWithResponse(t.Context(), nil)).JSON200; got == nil || got.PasswordResetAvailable {
 		t.Errorf("auth methods = %+v, want no reset available with it off", got)
 	}
 
@@ -230,7 +230,7 @@ func TestNothingIsMailedWhileSelfServiceResetIsOff(t *testing.T) {
 	if res := do(in.admin.UpdateAuthSettingsWithResponse(t.Context(), on)); res.JSON200 == nil || !res.JSON200.SelfServicePasswordReset {
 		t.Fatalf("turning it on = %d: %s", res.StatusCode(), res.Body)
 	}
-	if got := do(in.anon.GetAuthMethodsWithResponse(t.Context())).JSON200; got == nil || !got.PasswordResetAvailable {
+	if got := do(in.anon.GetAuthMethodsWithResponse(t.Context(), nil)).JSON200; got == nil || !got.PasswordResetAvailable {
 		t.Errorf("auth methods = %+v, want a reset available again", got)
 	}
 	other := testkit.NewMember(t, in.pool)
@@ -250,7 +250,7 @@ func TestNothingIsMailedWhileTheInstanceHasNoSMTPServer(t *testing.T) {
 	anon := testkit.NewBrowser(t, in.srv.URL)
 	m := testkit.NewMember(t, in.pool)
 
-	if got := do(anon.GetAuthMethodsWithResponse(t.Context())).JSON200; got == nil || got.PasswordResetAvailable {
+	if got := do(anon.GetAuthMethodsWithResponse(t.Context(), nil)).JSON200; got == nil || got.PasswordResetAvailable {
 		t.Errorf("auth methods without SMTP = %+v, want no reset available", got)
 	}
 	res := do(anon.RequestPasswordResetWithResponse(t.Context(), management.PasswordResetRequest{Email: m.Email}))
@@ -261,7 +261,7 @@ func TestNothingIsMailedWhileTheInstanceHasNoSMTPServer(t *testing.T) {
 	// Once SMTP is configured the request that went unanswered is no reason
 	// to wait: the member is mailed at once.
 	putSMTP(t, in.admin, settingsFor(mp))
-	if got := do(anon.GetAuthMethodsWithResponse(t.Context())).JSON200; got == nil || !got.PasswordResetAvailable {
+	if got := do(anon.GetAuthMethodsWithResponse(t.Context(), nil)).JSON200; got == nil || !got.PasswordResetAvailable {
 		t.Errorf("auth methods with SMTP = %+v, want a reset available", got)
 	}
 	other := testkit.NewMember(t, in.pool)

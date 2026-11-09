@@ -14,26 +14,54 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
-// PasswordResetAvailable answers whether a member can ask for a password reset
-// by mail: the instance has an SMTP server and lets them.
-type PasswordResetAvailable struct {
+// SignInRules are what the sign-in page shows of the auth settings, for an
+// email or for anybody.
+type SignInRules struct {
+	// LocalLoginEnabled is whether members sign in with a password at all.
+	LocalLoginEnabled bool
+	// PasswordResetAvailable is whether a reset can be asked for by mail.
+	PasswordResetAvailable bool
+	// EnforcedProvider is the slug of the auth provider the email's domain
+	// is enforced to, "" when it is not.
+	EnforcedProvider string
+}
+
+// GetSignInRules answers how the sign-in page offers to sign in.
+type GetSignInRules struct {
 	settings AuthSettingsReader
 	smtp     SMTPReader
 }
 
-// NewPasswordResetAvailable returns the query.
-func NewPasswordResetAvailable(settings AuthSettingsReader, smtp SMTPReader) *PasswordResetAvailable {
-	return &PasswordResetAvailable{settings: settings, smtp: smtp}
+// NewGetSignInRules returns the query.
+func NewGetSignInRules(settings AuthSettingsReader, smtp SMTPReader) *GetSignInRules {
+	return &GetSignInRules{settings: settings, smtp: smtp}
 }
 
-// Handle reports whether a reset can be asked for by mail.
-func (q *PasswordResetAvailable) Handle(ctx context.Context) (bool, error) {
-	return resetByMailAvailable(ctx, q.settings, q.smtp)
+// Handle returns the rules for email, "" for anybody. They are judged from
+// the email's domain alone, so they never tell whether a member holds it. A
+// reset by mail is available when the instance has an SMTP server, lets
+// members ask, and accepts a password from the email: local login is on and
+// its domain is not enforced. A reset that could not be completed is never
+// offered.
+func (q *GetSignInRules) Handle(ctx context.Context, email string) (SignInRules, error) {
+	s, err := q.settings.AuthSettings(ctx)
+	if err != nil {
+		return SignInRules{}, err
+	}
+	out := SignInRules{LocalLoginEnabled: s.LocalLoginEnabled}
+	if d, ok := s.EnforcedFor(email); ok {
+		out.EnforcedProvider = d.Provider
+	}
+	out.PasswordResetAvailable, err = resetByMailAvailable(ctx, q.settings, q.smtp, email)
+	return out, err
 }
 
-func resetByMailAvailable(ctx context.Context, settings AuthSettingsReader, smtp SMTPReader) (bool, error) {
+// resetByMailAvailable reports whether a reset by mail can be asked for
+// email: the instance has an SMTP server, lets members ask, and the settings
+// accept a password from the email.
+func resetByMailAvailable(ctx context.Context, settings AuthSettingsReader, smtp SMTPReader, email string) (bool, error) {
 	s, err := settings.AuthSettings(ctx)
-	if err != nil || !s.SelfServicePasswordReset {
+	if err != nil || !s.SelfServicePasswordReset || s.PasswordRefusal(email) != nil {
 		return false, err
 	}
 	if _, err = smtp.SMTPSettings(ctx); errors.Is(err, ErrSMTPNotConfigured) {
@@ -116,7 +144,9 @@ const requestBound = 30 * time.Second
 // SMTP server and lets members ask, the email belongs to an active member
 // who holds a password, and the member has not been issued a reset they asked
 // for in the last PasswordResetInterval, whether or not its mail was sent.
-// Whatever stops it does so silently; a failure is logged.
+// An email the auth settings refuse a password, while local login is
+// disabled or in an enforced domain, is issued none. Whatever stops it does
+// so silently; a failure is logged.
 func (h *RequestPasswordReset) Handle(ctx context.Context, cmd RequestPasswordResetCommand) {
 	h.d.Background.Go(ctx, "password reset request", requestBound, func(ctx context.Context) {
 		if err := h.issue(ctx, cmd); err != nil {
@@ -131,7 +161,7 @@ func (h *RequestPasswordReset) issue(ctx context.Context, cmd RequestPasswordRes
 	if email == "" || h.d.ConsoleURL == "" {
 		return nil
 	}
-	if on, err := resetByMailAvailable(ctx, h.d.Settings, h.d.SMTP); err != nil || !on {
+	if on, err := resetByMailAvailable(ctx, h.d.Settings, h.d.SMTP, email); err != nil || !on {
 		return err
 	}
 	found, hash, err := h.d.Store.MemberByEmail(ctx, email)

@@ -35,11 +35,13 @@ type WaysInStore interface {
 type WaysIn struct {
 	store      WaysInStore
 	identities IdentityDirectory
+	settings   AuthSettingsReader
 }
 
-// NewWaysIn returns the service.
-func NewWaysIn(store WaysInStore, identities IdentityDirectory) *WaysIn {
-	return &WaysIn{store: store, identities: identities}
+// NewWaysIn returns the service; settings tell which ways in local login and
+// enforcement leave usable.
+func NewWaysIn(store WaysInStore, identities IdentityDirectory, settings AuthSettingsReader) *WaysIn {
+	return &WaysIn{store: store, identities: identities, settings: settings}
 }
 
 // Lock locks the member until the unit of work ends and returns them;
@@ -55,7 +57,8 @@ func (w *WaysIn) PasswordSetAt(ctx context.Context, member access.MemberID) (*ti
 	return w.store.PasswordSetAt(ctx, member)
 }
 
-// Methods returns the ways m holds to sign in.
+// Methods returns the ways m holds to sign in, judged under the auth
+// settings in force for their email.
 func (w *WaysIn) Methods(ctx context.Context, m access.Member) (access.AuthMethods, error) {
 	setAt, err := w.store.PasswordSetAt(ctx, m.ID)
 	if err != nil {
@@ -65,7 +68,11 @@ func (w *WaysIn) Methods(ctx context.Context, m access.Member) (access.AuthMetho
 	if err != nil {
 		return access.AuthMethods{}, err
 	}
-	return access.AuthMethods{Status: m.Status, PasswordSetAt: setAt, Identities: identities}, nil
+	settings, err := w.settings.AuthSettings(ctx)
+	if err != nil {
+		return access.AuthMethods{}, err
+	}
+	return access.AuthMethods{Status: m.Status, PasswordSetAt: setAt, Identities: identities}.UnderSettings(settings, m.Email), nil
 }
 
 // EnsureWayIn refuses, with ErrLastAuthMethod, removing the password
@@ -114,8 +121,9 @@ type RemoveMyPasswordCommand struct {
 // Handle removes the caller's password, ends their open invitations and
 // password resets so no old link sets one again, and records
 // password.removed, in one unit of work. It is refused ErrLastAuthMethod when
-// no identity at an enabled auth provider remains; a member who holds no
-// password changes nothing. Only a session removes a password, so a leaked
+// the password is a usable way in and no identity at an enabled auth provider
+// that enforcement allows remains; a member who holds no password changes
+// nothing. Only a session removes a password, so a leaked
 // token cannot lock its owner out of signing in with it.
 func (h *RemoveMyPassword) Handle(ctx context.Context, cmd RemoveMyPasswordCommand) error {
 	if cmd.Caller.Member == nil || cmd.Caller.Session == nil {

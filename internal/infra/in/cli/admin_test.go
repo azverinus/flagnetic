@@ -14,8 +14,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/identity"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
+	pgidentity "github.com/azverinus/flagnetic/internal/infra/out/postgres/identity"
+	"github.com/azverinus/flagnetic/internal/shared/id"
+	"github.com/azverinus/flagnetic/internal/shared/secret"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -403,5 +407,128 @@ func TestAdminBootstrapRefusesAWeakPasswordBeforeCreatingAnything(t *testing.T) 
 	}
 	if r := bootstrap(map[string]string{"DATABASE_URL": url, "FLAGNETIC_ADMIN_PASSWORD": adminPassword}, "--email", "first@example.com"); r.code != 0 {
 		t.Errorf("a bootstrap after the refusal: exit code = %d, want 0 since nothing was created; stderr:\n%s", r.code, r.stderr)
+	}
+}
+
+// lockEveryoneOut makes the instance refuse every password: an auth provider
+// that cannot sign anybody in, corp.example enforced to it, and local login
+// disabled. It writes through the repositories, as an
+// instance admin would have through the API before the provider broke.
+func lockEveryoneOut(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	in, err := identity.CheckProviderInput(identity.ProviderInput{
+		Slug: "broken", Kind: identity.KindOIDC, DisplayName: "Broken", Enabled: true, Domains: []string{"corp.example"},
+		OIDC: identity.OIDCInput{Issuer: "https://idp.invalid", ClientID: "flagnetic", ClientSecret: secret.New("unused")},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw [16]byte
+	copy(raw[:], "broken-provider!")
+	if err = pgidentity.NewStore(pool).CreateProvider(t.Context(), identity.New(id.FromBytes[identity.Provider](raw), in, "sealed", testkit.Start)); err != nil {
+		t.Fatal(err)
+	}
+	s := access.DefaultAuthSettings
+	s.LocalLoginEnabled = false
+	s.SSOEnforcedDomains = []access.EnforcedDomain{{Domain: "corp.example", Provider: "broken"}}
+	if err = pgaccess.NewStore(pool).SaveAuthSettings(t.Context(), s); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// signInStatus is the status of a password sign-in as email with password.
+func signInStatus(t *testing.T, baseURL, email, password string) int {
+	t.Helper()
+	res, err := testkit.NewBrowser(t, baseURL).SignInWithResponse(t.Context(), management.SignInRequest{Email: email, Password: password})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res.StatusCode()
+}
+
+func TestAdminUnlockReopensLocalLoginAndLiftsLockouts(t *testing.T) {
+	url := testkit.EmptyDatabase(t)
+	if r := migrate(url); r.code != 0 {
+		t.Fatalf("migrate: %s", r.stderr)
+	}
+	pool, err := pgxpool.New(t.Context(), url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	admin := testkit.NewMember(t, pool, testkit.AsInstanceAdmin(), testkit.WithEmail("first@corp.example"))
+	locked := testkit.NewMember(t, pool, testkit.WithEmail("locked@example.com"))
+	srv := serve(t, map[string]string{"DATABASE_URL": url})
+	for range 5 {
+		if got := signInStatus(t, srv.baseURL, locked.Email, "not the password at all"); got != http.StatusUnauthorized {
+			t.Fatalf("a wrong password = %d, want 401", got)
+		}
+	}
+	if got := signInStatus(t, srv.baseURL, locked.Email, locked.Password); got == http.StatusOK {
+		t.Fatal("the right password signed in although five wrong ones locked the email")
+	}
+	lockEveryoneOut(t, pool)
+	if !waitFor(func() bool { return signInStatus(t, srv.baseURL, admin.Email, admin.Password) == http.StatusForbidden }) {
+		t.Fatal("the running server never refused the instance admin's password")
+	}
+
+	r := run(map[string]string{"DATABASE_URL": url}, nil, "admin", "unlock")
+	if r.code != 0 || r.stdout != "" {
+		t.Fatalf("unlock: exit code = %d, stdout = %q; stderr:\n%s", r.code, r.stdout, r.stderr)
+	}
+	for _, want := range []string{"local login enabled", "1 SSO-enforced domain(s) lifted", "1 lockout(s) cleared"} {
+		if !strings.Contains(r.stderr, want) {
+			t.Errorf("stderr does not say %q:\n%s", want, r.stderr)
+		}
+	}
+	if !waitFor(func() bool { return signInStatus(t, srv.baseURL, admin.Email, admin.Password) == http.StatusOK }) {
+		t.Fatal("the instance admin cannot sign in with their password after the unlock")
+	}
+	if got := signInStatus(t, srv.baseURL, locked.Email, locked.Password); got != http.StatusOK {
+		t.Errorf("the member locked out signs in = %d, want 200", got)
+	}
+	b := signIn(t, srv.baseURL, admin.Email, admin.Password)
+	settings, err := b.GetAuthSettingsWithResponse(t.Context())
+	if err != nil || settings.JSON200 == nil {
+		t.Fatalf("GET /instance/auth-settings: %v", err)
+	}
+	if !settings.JSON200.LocalLoginEnabled || len(settings.JSON200.SsoEnforcedDomains) != 0 {
+		t.Errorf("settings after the unlock = %+v, want local login on and no enforced domain", settings.JSON200)
+	}
+
+	again := run(map[string]string{"DATABASE_URL": url}, nil, "admin", "unlock")
+	if again.code != 0 || !strings.Contains(again.stderr, "local login was enabled already; 0 SSO-enforced domain(s) lifted; 0 lockout(s) cleared") {
+		t.Errorf("a second unlock: exit code = %d; stderr:\n%s", again.code, again.stderr)
+	}
+	if bad := run(map[string]string{"DATABASE_URL": url}, nil, "admin", "unlock", "--force"); bad.code != 2 {
+		t.Errorf("unlock with an argument: exit code = %d, want 2", bad.code)
+	}
+	want := []string{"flagnetic admin unlock auth_settings.unlocked instance", "flagnetic admin unlock auth_settings.unlocked instance"}
+	if audit := cliAudit(t, b); !slices.Equal(audit, want) {
+		t.Errorf("command line audit = %q, want %q: every unlock is recorded", audit, want)
+	}
+	assertUnlockEntry(t, b)
+}
+
+// assertUnlockEntry checks the first unlock's audit entry: the settings
+// before and after, and the lockout cleared.
+func assertUnlockEntry(t *testing.T, b *testkit.Browser) {
+	t.Helper()
+	action := "auth_settings.unlocked"
+	res, err := b.ListAuditEntriesWithResponse(t.Context(), &management.ListAuditEntriesParams{Action: &action})
+	if err != nil || res.JSON200 == nil || len(res.JSON200.Items) != 2 {
+		t.Fatalf("GET /audit: %v", err)
+	}
+	first := res.JSON200.Items[len(res.JSON200.Items)-1]
+	before, _ := first.Before.(map[string]any)
+	after, _ := first.After.(map[string]any)
+	if before["local_login_enabled"] != false || after["local_login_enabled"] != true || after["lockouts_cleared"] != float64(1) {
+		t.Errorf("entry before %v, after %v; want local login off then on, one lockout cleared", before, after)
+	}
+	if domains, _ := before["sso_enforced_domains"].([]any); len(domains) != 1 {
+		t.Errorf("enforced domains before = %v, want one", before["sso_enforced_domains"])
+	}
+	if domains, _ := after["sso_enforced_domains"].([]any); len(domains) != 0 {
+		t.Errorf("enforced domains after = %v, want none", after["sso_enforced_domains"])
 	}
 }

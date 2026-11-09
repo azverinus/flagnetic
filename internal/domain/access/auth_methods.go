@@ -15,6 +15,8 @@ var ErrLastAuthMethod = apperrors.Conflict("last_auth_method",
 type IdentityMethod struct {
 	// ID identifies the identity, in the form its context gives it.
 	ID string
+	// Provider is the slug of the auth provider the identity is at.
+	Provider string
 	// ProviderEnabled is whether the auth provider the identity is at is
 	// enabled: an identity at a disabled provider signs nobody in.
 	ProviderEnabled bool
@@ -29,25 +31,51 @@ type AuthMethods struct {
 	// Identities are every identity the member holds, whether or not its
 	// provider is enabled.
 	Identities []IdentityMethod
+	// PasswordRefused is whether the auth settings refuse the member's email
+	// a password: local login is disabled, or their domain is enforced.
+	PasswordRefused bool
+	// EnforcedProvider is the slug of the auth provider the member's email
+	// domain is enforced to, "" when it is not: an identity at another
+	// provider signs them in nowhere.
+	EnforcedProvider string
+}
+
+// UnderSettings returns m with what the settings s say of the member's email
+// applied: whether a password is refused, and the provider it is enforced to.
+func (m AuthMethods) UnderSettings(s AuthSettings, email string) AuthMethods {
+	m.PasswordRefused = s.PasswordRefusal(email) != nil
+	m.EnforcedProvider = ""
+	if d, ok := s.EnforcedFor(email); ok {
+		m.EnforcedProvider = d.Provider
+	}
+	return m
 }
 
 // PasswordSet reports whether the member holds a password.
 func (m AuthMethods) PasswordSet() bool { return m.PasswordSetAt != nil }
 
-// passwordUsable reports whether the password is a way in. Local login
-// accepts every email today, so it is when the member holds one.
-func (m AuthMethods) passwordUsable() bool { return m.PasswordSet() }
+// passwordUsable reports whether the password is a way in: the member holds
+// one and local login accepts it for their email.
+func (m AuthMethods) passwordUsable() bool { return m.PasswordSet() && !m.PasswordRefused }
+
+// identityUsable reports whether i is a way in: its provider is enabled, and
+// it is the provider the member's domain is enforced to, if any.
+func (m AuthMethods) identityUsable(i IdentityMethod) bool {
+	return i.ProviderEnabled && (m.EnforcedProvider == "" || i.Provider == m.EnforcedProvider)
+}
 
 // KeepsWayIn reports whether the member keeps a usable way in when the
 // password is removed (withoutPassword) and the identity named by
 // withoutIdentity ("" for none) is unlinked. A usable way in is a password
-// local login accepts, or an identity at an enabled provider. A deactivated
-// member signs in nowhere, so they need none.
+// local login accepts for the member's email, or an identity at an enabled
+// provider that enforcement does not refuse them. Removing only what is no
+// way in takes nothing away, so it keeps whatever the member had. A
+// deactivated member signs in nowhere, so they need none.
 func (m AuthMethods) KeepsWayIn(withoutPassword bool, withoutIdentity string) bool {
 	if m.Status == MemberDeactivated {
 		return true
 	}
-	return m.usable(withoutPassword, withoutIdentity)
+	return m.usable(withoutPassword, withoutIdentity) || !m.usable(false, "")
 }
 
 // HoldsUsableWayIn reports whether the member holds a usable way in,
@@ -62,7 +90,7 @@ func (m AuthMethods) usable(withoutPassword bool, withoutIdentity string) bool {
 		return true
 	}
 	for _, i := range m.Identities {
-		if i.ID != withoutIdentity && i.ProviderEnabled {
+		if i.ID != withoutIdentity && m.identityUsable(i) {
 			return true
 		}
 	}

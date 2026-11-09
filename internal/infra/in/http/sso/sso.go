@@ -229,7 +229,7 @@ func (e *edge) refuse(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.As(err, &failure):
 		e.o.Metrics.count(string(failure.Kind), string(failure.Code))
 		e.Logger().WarnContext(r.Context(), "single sign-on failed", "code", failure.Code, "error", err)
-		redirectWithError(w, r, failure.Intent, failure.Code)
+		redirectWithError(w, r, failure.Intent, failure.Code, failure.Provider)
 	case apperrors.IsKind(err, apperrors.KindNotFound):
 		e.WriteError(w, r, err)
 	default:
@@ -240,16 +240,21 @@ func (e *edge) refuse(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 func redirectToSignIn(w http.ResponseWriter, r *http.Request, code appidentity.FailureCode) {
-	redirectWithError(w, r, "", code)
+	redirectWithError(w, r, "", code, "")
 }
 
 // redirectWithError sends the browser back to the page it started from, with
 // the code: the settings for a link, whose member is signed in already, the
-// sign-in page otherwise.
-func redirectWithError(w http.ResponseWriter, r *http.Request, intent identity.Intent, code appidentity.FailureCode) {
+// sign-in page otherwise. A provider to sign in through instead, for
+// sso_required, goes along as provider.
+func redirectWithError(w http.ResponseWriter, r *http.Request, intent identity.Intent, code appidentity.FailureCode, provider string) {
 	page := "/sign-in"
 	if intent == identity.IntentLink {
 		page = identity.DefaultLinkReturnTo
 	}
-	http.Redirect(w, r, page+"?error="+url.QueryEscape(string(code)), http.StatusSeeOther)
+	q := url.Values{"error": {string(code)}}
+	if provider != "" {
+		q.Set("provider", provider)
+	}
+	http.Redirect(w, r, page+"?"+q.Encode(), http.StatusSeeOther)
 }

@@ -39,6 +39,9 @@ const (
 	// CodeIdentityLinked: linking an identity found its subject linked to
 	// another member.
 	CodeIdentityLinked FailureCode = "identity_linked"
+	// CodeSSORequired: the person's email domain is enforced to another
+	// provider, which the failure names.
+	CodeSSORequired FailureCode = "sso_required"
 )
 
 // SignInFailure ends a sign-in with a code for the sign-in page.
@@ -52,6 +55,9 @@ type SignInFailure struct {
 	// attempt was known. The browser of a link lands on the page the member
 	// started it from; one that signs in lands on the sign-in page.
 	Intent identity.Intent
+	// Provider is the slug of the provider to sign in through instead, for
+	// CodeSSORequired.
+	Provider string
 }
 
 func (f *SignInFailure) Error() string {
@@ -64,6 +70,23 @@ func (f *SignInFailure) Error() string {
 func (f *SignInFailure) Unwrap() error { return f.Cause }
 
 func fail(code FailureCode, cause error) error { return &SignInFailure{Code: code, Cause: cause} }
+
+// requireSSO refuses a sign-in or link of an email whose domain is enforced
+// to another provider, naming that one.
+func requireSSO(provider string) error {
+	return &SignInFailure{Code: CodeSSORequired, Provider: provider,
+		Cause: errors.New("the email's domain is enforced to the auth provider " + provider)}
+}
+
+// refuseEnforced returns requireSSO when email's domain is enforced to a
+// provider other than p; nil otherwise.
+func refuseEnforced(ctx context.Context, members Members, p identity.Provider, email string) error {
+	enforced, err := members.EnforcedProvider(ctx, email)
+	if err != nil || enforced == "" || enforced == p.Slug {
+		return err
+	}
+	return requireSSO(enforced)
+}
 
 // inKind names kind as the protocol of the sign-in err ends, if err is a
 // failure that does not say yet.
@@ -157,6 +180,9 @@ type Members interface {
 	// PasswordSetAt returns when the member set the password they hold, nil
 	// when they hold none.
 	PasswordSetAt(ctx context.Context, member identity.MemberID) (*time.Time, error)
+	// EnforcedProvider returns the slug of the auth provider email's domain
+	// is enforced to; "" when it is not.
+	EnforcedProvider(ctx context.Context, email string) (string, error)
 	// EnsureWayIn refuses, with the conflict last_auth_method, unlinking the
 	// identity without ("" for none) when no other usable way in would remain
 	// to member, whom the caller holds locked.
@@ -467,7 +493,9 @@ func (u *unresolved) Unwrap() error { return u.err }
 // time: another browser changes nothing. Then, in one transaction, it
 // resolves the verified person to a member, provisions or links as the
 // provider allows, and opens the session. A person who matches no member who
-// may sign in is SignInFailure member_not_found or member_deactivated.
+// may sign in is SignInFailure member_not_found or member_deactivated; one
+// whose email's domain is enforced to another provider is sso_required,
+// naming it.
 func (h *CompleteSignIn) Handle(ctx context.Context, cmd CompleteCommand) (signed SignedIn, err error) {
 	now := h.d.now()
 	attempt, err := h.d.Attempts.TakeCompletion(ctx, identity.HashSecret(cmd.Token))
@@ -501,10 +529,15 @@ func (h *CompleteSignIn) Handle(ctx context.Context, cmd CompleteCommand) (signe
 		out.Cookie, txErr = h.signIn(ctx, p, *attempt.Claims, cmd)
 		return txErr
 	})
-	var refused *unresolved
+	var (
+		refused *unresolved
+		failure *SignInFailure
+	)
 	switch {
 	case errors.As(err, &refused):
 		return SignedIn{}, h.refuse(ctx, p, refused, cmd.RequestID)
+	case errors.As(err, &failure):
+		return SignedIn{}, err
 	case err != nil:
 		return SignedIn{}, fail(CodeSSOFailed, err)
 	}
@@ -589,6 +622,16 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 		if ok {
 			member, in.ByEmail = m, &m.KnownMember
 		}
+	}
+	// An email of an enforced domain signs in through its provider only:
+	// the email of the member the person resolves to, or the one they claim
+	// when they resolve to none.
+	email := claims.Email
+	if in.Linked != nil || in.Provisioned != nil || in.ByEmail != nil {
+		email = member.Email
+	}
+	if err = refuseEnforced(ctx, h.d.Members, p, email); err != nil {
+		return secret.String{}, err
 	}
 	res, err := identity.Resolve(in)
 	if err != nil {

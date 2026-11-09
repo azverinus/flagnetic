@@ -41,6 +41,14 @@ Commands:
   promote --email <email>
       Make the member with this email an instance admin.
 
+  unlock
+      Let everybody sign in with a password again, for an instance whose
+      members are locked out, for example by a broken auth provider: enable
+      local login, lift every SSO-enforced email domain and clear every
+      lockout of an email and every throttled address. Works on the
+      database alone; running servers apply it within a second. Recorded in
+      the audit log as auth_settings.unlocked by the command line.
+
 A password given in FLAGNETIC_ADMIN_PASSWORD must pass the password policy:
 12 to 128 characters, not containing the part of the email before the @,
 and not a common password. A refused one exits 2 naming the rule.
@@ -57,7 +65,7 @@ type commandLine struct {
 // any configuration is read: help on request, the usage and exit 2 otherwise.
 func adminHelp(args []string, stdout, stderr io.Writer) (code int, done bool) {
 	switch {
-	case len(args) > 0 && (args[0] == "bootstrap" || args[0] == "create" || args[0] == "promote"):
+	case len(args) > 0 && (args[0] == "bootstrap" || args[0] == "create" || args[0] == "promote" || args[0] == "unlock"):
 		return 0, false
 	case len(args) > 0 && (args[0] == "help" || args[0] == "-h" || args[0] == "--help"):
 		fmt.Fprint(stdout, adminUsage)
@@ -75,6 +83,8 @@ func admin(ctx context.Context, cl commandLine, cfg config.Config, log *slog.Log
 		return adminCreate(ctx, cl, cfg, log, o)
 	case "promote":
 		return adminPromote(ctx, cl, cfg, log, o)
+	case "unlock":
+		return adminUnlock(ctx, cl, cfg, log, o)
 	}
 	return adminBootstrap(ctx, cl, cfg, log, o)
 }
@@ -172,6 +182,31 @@ func adminPromote(ctx context.Context, cl commandLine, cfg config.Config, log *s
 		return exitOK
 	}
 	fmt.Fprintf(cl.stderr, "%s is now an instance admin.\n", *email)
+	return exitOK
+}
+
+func adminUnlock(ctx context.Context, cl commandLine, cfg config.Config, log *slog.Logger, o options) int {
+	if len(cl.args) > 0 {
+		fmt.Fprint(cl.stderr, "admin unlock: takes no arguments\n\n"+adminUsage)
+		return exitUsage
+	}
+	pool, code := adminDatabase(ctx, "unlock", cfg, log, o)
+	if pool == nil {
+		return code
+	}
+	defer pool.Close()
+
+	res, err := compose.Unlock(compose.NewDeps(pool, clock.System{})).Handle(ctx,
+		governance.Request{Actor: governance.CLIActor("admin unlock")})
+	if err != nil {
+		return fail(log, "admin unlock failed", err)
+	}
+	localLogin := "local login enabled"
+	if !res.LocalLoginWasDisabled {
+		localLogin = "local login was enabled already"
+	}
+	fmt.Fprintf(cl.stderr, "Unlocked: %s; %d SSO-enforced domain(s) lifted; %d lockout(s) cleared.\n",
+		localLogin, res.DomainsLifted, res.LockoutsCleared)
 	return exitOK
 }
 

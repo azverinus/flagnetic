@@ -88,7 +88,8 @@ type SignIn struct {
 type SignInDeps struct {
 	Tx    Transactor
 	Store SignInStore
-	// Settings give the timeouts a session opens with.
+	// Settings give the timeouts a session opens with, and whether a
+	// password is a way in.
 	Settings AuthSettingsReader
 	Hasher   PasswordVerifier
 	Audit    AuditLog
@@ -140,8 +141,20 @@ const reasonWrongPassword = "wrong_password"
 // password matches, so it takes as long as a wrong password; a member who
 // is not active is refused like a wrong password even when the password is
 // right. Failures of a known member are audited, attempts on unknown emails
-// are not: the log records people, not an attacker's input.
+// are not: the log records people, not an attacker's input. While local login
+// is disabled every attempt is refused local_login_disabled, and an email in
+// an enforced domain sso_required naming its provider, whoever holds it.
 func (h *SignIn) Handle(ctx context.Context, cmd SignInCommand) (SignInResult, error) {
+	// The settings refuse a password from the email's domain alone, before
+	// anything is looked up or counted: whether a member holds the email,
+	// and whether the password was right, stay unknown.
+	settings, err := h.d.Settings.AuthSettings(ctx)
+	if err != nil {
+		return SignInResult{}, err
+	}
+	if err = settings.PasswordRefusal(cmd.Email); err != nil {
+		return SignInResult{}, err
+	}
 	a, err := attemptPassword(ctx, h.d.Tx, h.d.Store, h.d.Hasher, access.NewAttempt(cmd.Email, cmd.ClientIP, h.d.Clock.Now()), cmd.Password)
 	if err != nil {
 		return SignInResult{}, err

@@ -649,6 +649,12 @@ export type Options<
  * same five, so a stranger locking the email does not keep the member
  * out where they usually sign in.
  *
+ * A password is no way in for an email whose domain is enforced to an
+ * auth provider (`sso_required`, naming the `provider` to sign in
+ * through) nor, while local login is disabled, for anybody
+ * (`local_login_disabled`). Both are judged from the email alone,
+ * before anything is looked up or counted, whoever holds it.
+ *
  */
 export const signIn = <ThrowOnError extends boolean = false>(
   options: Options<SignInData, ThrowOnError>,
@@ -687,6 +693,11 @@ export const signOut = <ThrowOnError extends boolean = false>(
  * How members sign in
  *
  * The ways the sign-in page offers, read before anyone is signed in.
+ * Given an `email`, it also says where that email signs in: the
+ * `enforced_provider` its domain is enforced to. The answer is judged
+ * from the email's domain alone, so it never tells whether a member
+ * holds the email.
+ *
  */
 export const getAuthMethods = <ThrowOnError extends boolean = false>(
   options?: Options<GetAuthMethodsData, ThrowOnError>,
@@ -703,6 +714,9 @@ export const getAuthMethods = <ThrowOnError extends boolean = false>(
  * invitation it is. An invitation that cannot be accepted, whether it
  * was never issued, has been used or replaced, or has expired, is
  * `invitation_gone`, alike. The secret never reaches a log line.
+ * `password_allowed` says whether the invitation can be accepted with
+ * a password; when the invited email's domain is enforced to an auth
+ * provider, `enforced_provider` names it, the only way to accept.
  *
  */
 export const getInvitation = <ThrowOnError extends boolean = false>(
@@ -718,7 +732,10 @@ export const getInvitation = <ThrowOnError extends boolean = false>(
  *
  * Sets the invited member's first password under the password policy
  * (`weak_password` otherwise), makes them active, uses up the link and
- * opens a session, setting its cookie. The body must be sent as
+ * opens a session, setting its cookie. A password is refused, and the
+ * invitation stays open, when the invited email's domain is enforced
+ * to an auth provider (`sso_required`, naming the `provider`) or local
+ * login is disabled (`local_login_disabled`). The body must be sent as
  * `application/json`; anything else is refused
  * `unsupported_media_type`.
  *
@@ -750,8 +767,9 @@ export const acceptInvitation = <ThrowOnError extends boolean = false>(
  *
  * A password reset is mailed, to the member in their language,
  * only when the instance has an SMTP server and self-service password
- * reset is on in the auth settings, the email belongs to an active
- * member who holds a password, and no self-service reset was issued
+ * reset is on in the auth settings, local login is enabled and the
+ * email's domain is not enforced to an auth provider, the email
+ * belongs to an active member who holds a password, and no self-service reset was issued
  * for them in the last 5 minutes (a reset counts when it was issued,
  * even if its mail could not be sent). The link opens
  * `/password-reset/{secret}` in the console, works once and expires
@@ -802,7 +820,11 @@ export const getPasswordReset = <ThrowOnError extends boolean = false>(
  * Sets the member's new password under the password policy
  * (`weak_password` otherwise), clears the lockout on their email, signs
  * them out of every device, ends every other open password reset and
- * invitation of theirs, and opens a session, setting its cookie. The
+ * invitation of theirs, and opens a session, setting its cookie. A
+ * password is refused, and the reset stays open, when the member's
+ * email domain is enforced to an auth provider (`sso_required`, naming
+ * the `provider`) or local login is disabled
+ * (`local_login_disabled`). The
  * body must be sent as `application/json`; anything else is refused
  * `unsupported_media_type`.
  *
@@ -1019,9 +1041,11 @@ export const linkMyIdentity = <ThrowOnError extends boolean = false>(
  *
  * Unlinks an identity of the caller. Refused 409 `last_auth_method`
  * when it is the caller's last usable way in: the other ways are a
- * password and identities at enabled auth providers. Unlinking an
- * identity at a disabled auth provider is always allowed, since it was
- * no way in. An identity of another member, or an identifier that names
+ * password local login accepts for the caller's email and identities
+ * at enabled auth providers that SSO enforcement allows. Unlinking an
+ * identity that is no way in, such as one at a disabled auth provider,
+ * is always allowed. The identity at the auth provider the caller's
+ * email domain is enforced to is refused 409 `provider_enforced`. An identity of another member, or an identifier that names
  * none, is not found. Recorded as `identity.unlinked`. Only a session
  * may do this.
  *
@@ -4711,8 +4735,9 @@ export const listMemberIdentities = <ThrowOnError extends boolean = false>(
  * Unlinks an identity of the member, under the rules of a member
  * unlinking their own: refused 409 `last_auth_method` when it is the
  * member's last usable way in, except for a deactivated member, who
- * signs in nowhere. An identity that does not belong to the member is
- * not found. Recorded as `identity.unlinked` with the instance admin as
+ * signs in nowhere, and 409 `provider_enforced` for the identity at the
+ * auth provider the member's email domain is enforced to. An identity
+ * that does not belong to the member is not found. Recorded as `identity.unlinked` with the instance admin as
  * its actor.
  *
  */
@@ -4861,7 +4886,14 @@ export const getAuthSettings = <ThrowOnError extends boolean = false>(
  * one. Refused `invalid_auth_settings` naming each field that breaks a
  * rule: every duration a whole number of seconds from 60 to 315360000
  * (ten years), the idle timeout at most the absolute one, the password
- * minimum length from 12 to 128.
+ * minimum length from 12 to 128, and each enforced domain named once,
+ * to an enabled auth provider that lists it among its domains.
+ * `sso_enforced_domains` is the whole list: a domain left out is
+ * lifted. Disabling local login is refused `identity_required` unless
+ * the caller holds an identity at an enabled auth provider, so whoever
+ * closes the door keeps a way through it; `flagnetic admin unlock`
+ * enables it again from the server's side. Audited
+ * `auth_settings.updated`.
  *
  */
 export const updateAuthSettings = <ThrowOnError extends boolean = false>(
@@ -4963,7 +4995,9 @@ export const createAuthProvider = <ThrowOnError extends boolean = false>(
  *
  * Refused 409 `provider_in_use` while something depends on the provider;
  * `used_by` names what (`identities`, `grants` while its group mappings
- * made a grant or an instance admin, among others). Disable it instead:
+ * made a grant or an instance admin, `enforced domains` while a domain
+ * is enforced to it, `only way in` while it is the only enabled
+ * provider and local login is disabled, among others). Disable it instead:
  * that stops its sign-ins and leaves its members, identities and grants
  * as they are. Audited
  * `auth_provider.deleted`.
@@ -5014,7 +5048,9 @@ export const getAuthProvider = <ThrowOnError extends boolean = false>(
  * Changes any property but `slug` and `kind`; each absent one is left as
  * it is, a sent `client_secret` replaces the stored one, and a `claims`
  * member names only the claims to rename. Whether the provider is enabled
- * is changed with `enable` and `disable`. Refused as a creation is.
+ * is changed with `enable` and `disable`. Refused as a creation is, and
+ * 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
+ * drops a domain enforced to the provider: lift the enforcement first.
  * Audited `auth_provider.updated`; an edit that changes nothing is not.
  *
  */
@@ -5075,7 +5111,10 @@ export const enableAuthProvider = <ThrowOnError extends boolean = false>(
  *
  * Stops the provider's sign-ins and leaves its
  * members, identities and grants as they are. A disabled provider is
- * answered as it is. Audited `auth_provider.disabled`.
+ * answered as it is. Refused 409 `provider_in_use` while people are sent
+ * to it: `used_by` names `enforced domains` while a domain is enforced
+ * to it, and `only way in` while it is the only enabled provider and
+ * local login is disabled. Audited `auth_provider.disabled`.
  *
  */
 export const disableAuthProvider = <ThrowOnError extends boolean = false>(

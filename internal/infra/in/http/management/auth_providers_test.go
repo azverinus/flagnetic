@@ -60,7 +60,7 @@ func providerSlugs(t *testing.T, c *management.ClientWithResponses) []string {
 
 func offeredSlugs(t *testing.T, c *management.ClientWithResponses) []string {
 	t.Helper()
-	res := do(c.GetAuthMethodsWithResponse(t.Context()))
+	res := do(c.GetAuthMethodsWithResponse(t.Context(), nil))
 	if res.JSON200 == nil {
 		t.Fatalf("GET /auth/methods = %d: %s", res.StatusCode(), res.Body)
 	}
@@ -313,7 +313,7 @@ func TestEnablingAndDisablingAnAuthProviderChangesWhatSignInOffers(t *testing.T)
 	if again := do(admin.EnableAuthProviderWithResponse(t.Context(), slug)); again.JSON200 == nil || again.JSON200.Version != 2 {
 		t.Errorf("enabling an enabled provider = %d: %s", again.StatusCode(), again.Body)
 	}
-	methods := do(anyone.GetAuthMethodsWithResponse(t.Context()))
+	methods := do(anyone.GetAuthMethodsWithResponse(t.Context(), nil))
 	if methods.JSON200 == nil || !methods.JSON200.LocalLoginEnabled {
 		t.Fatalf("GET /auth/methods = %d: %s", methods.StatusCode(), methods.Body)
 	}

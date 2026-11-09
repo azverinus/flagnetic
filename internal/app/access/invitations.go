@@ -264,6 +264,12 @@ type InvitationView struct {
 	// InvitedBy is the display name of the member who issued the invitation;
 	// "" when none did.
 	InvitedBy string
+	// PasswordAllowed is whether the invitation can be accepted with a
+	// password: local login is on and the email's domain is not enforced.
+	PasswordAllowed bool
+	// EnforcedProvider is the slug of the auth provider the invited email's
+	// domain is enforced to, the only way to accept; "" when it is not.
+	EnforcedProvider string
 }
 
 // InvitationGrantView is the role in a project an invitation grants.
@@ -289,13 +295,15 @@ type InvitationDetails struct {
 // GetInvitation answers what an invitation's link opens, before anyone is
 // signed in.
 type GetInvitation struct {
-	store InvitationReader
-	clock clock.Clock
+	store    InvitationReader
+	settings AuthSettingsReader
+	clock    clock.Clock
 }
 
-// NewGetInvitation returns the query.
-func NewGetInvitation(store InvitationReader, c clock.Clock) *GetInvitation {
-	return &GetInvitation{store: store, clock: c}
+// NewGetInvitation returns the query; settings tell whether a password may
+// accept the invitation.
+func NewGetInvitation(store InvitationReader, settings AuthSettingsReader, c clock.Clock) *GetInvitation {
+	return &GetInvitation{store: store, settings: settings, clock: c}
 }
 
 // Handle returns the invitation the secret opens; invitation_gone when it
@@ -317,6 +325,14 @@ func (h *GetInvitation) Handle(ctx context.Context, s secret.String) (Invitation
 	}
 	if g := inv.Grant; g != nil && details.ProjectKey != "" {
 		view.Grant = &InvitationGrantView{ProjectKey: details.ProjectKey, ProjectName: details.ProjectName, Role: g.Role}
+	}
+	settings, err := h.settings.AuthSettings(ctx)
+	if err != nil {
+		return InvitationView{}, err
+	}
+	view.PasswordAllowed = settings.PasswordRefusal(m.Email) == nil
+	if d, ok := settings.EnforcedFor(m.Email); ok {
+		view.EnforcedProvider = d.Provider
 	}
 	return view, nil
 }
@@ -415,8 +431,10 @@ type AcceptInvitationCommand struct {
 // hammering acceptance is throttled with its sign-ins; a throttled source is refused
 // rate_limited before anything else. A secret that opens no invitation
 // keeps its failure and is answered invitation_gone; one that does takes it
-// back, whatever happens next. The password policy applies (weak_password),
-// before any hash.
+// back, whatever happens next. A password the auth settings refuse the
+// member's email is refused, local_login_disabled or sso_required naming the
+// provider, and the invitation stays open for that provider. The password
+// policy applies (weak_password), before any hash.
 func (h *AcceptInvitation) Handle(ctx context.Context, cmd AcceptInvitationCommand) (SignInResult, error) {
 	now := h.d.Clock.Now()
 	reserved, err := h.d.Store.ReserveSourceAttempt(ctx, access.NewAttempt("", cmd.ClientIP, now))
@@ -453,6 +471,9 @@ func (h *AcceptInvitation) accept(ctx context.Context, cmd AcceptInvitationComma
 ) (SignInResult, error) {
 	settings, err := h.d.Settings.AuthSettings(ctx)
 	if err != nil {
+		return SignInResult{}, err
+	}
+	if err = settings.PasswordRefusal(invited.Email); err != nil {
 		return SignInResult{}, err
 	}
 	if err = access.CheckPassword(cmd.Password.Reveal(), invited.Email, settings.PasswordMinLength); err != nil {

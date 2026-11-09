@@ -13,9 +13,9 @@ func TestAFreshInstanceHasTheDefaultAuthSettings(t *testing.T) {
 	want := access.AuthSettings{
 		SessionIdleTimeout: 24 * time.Hour, SessionAbsoluteTimeout: 30 * 24 * time.Hour,
 		TokenMaxLifetime: 365 * 24 * time.Hour, TokenExpiryRequired: false, PasswordMinLength: 12,
-		SelfServicePasswordReset: true,
+		SelfServicePasswordReset: true, LocalLoginEnabled: true,
 	}
-	if access.DefaultAuthSettings != want {
+	if !access.DefaultAuthSettings.Equal(want) {
 		t.Errorf("defaults = %+v, want %+v", access.DefaultAuthSettings, want)
 	}
 	if got := access.DefaultAuthSettings.SessionTimeouts(); got != access.DefaultSessionTimeouts {
@@ -82,5 +82,92 @@ func TestAuthSettingsAreBoundedAndConsistent(t *testing.T) {
 		if err := s.Check(); err != nil {
 			t.Errorf("%s refused: %v", name, err)
 		}
+	}
+}
+
+func TestEnforcedDomainsAreNamedOnceWithAProvider(t *testing.T) {
+	for name, tc := range map[string]struct {
+		domains []access.EnforcedDomain
+		want    []string
+	}{
+		"an empty domain":       {[]access.EnforcedDomain{{Domain: " ", Provider: "corp"}}, []string{"/sso_enforced_domains/0/domain invalid_domain"}},
+		"an email for a domain": {[]access.EnforcedDomain{{Domain: "ann@corp.example", Provider: "corp"}}, []string{"/sso_enforced_domains/0/domain invalid_domain"}},
+		"a domain with a space": {[]access.EnforcedDomain{{Domain: "corp example", Provider: "corp"}}, []string{"/sso_enforced_domains/0/domain invalid_domain"}},
+		"a domain named twice, whatever its case": {
+			[]access.EnforcedDomain{{Domain: "corp.example", Provider: "corp"}, {Domain: "CORP.Example.", Provider: "other"}},
+			[]string{"/sso_enforced_domains/1/domain duplicate_domain"},
+		},
+		"no provider": {[]access.EnforcedDomain{{Domain: "corp.example"}}, []string{"/sso_enforced_domains/0/provider required"}},
+	} {
+		s := access.DefaultAuthSettings
+		s.SSOEnforcedDomains = tc.domains
+		if got := violations(t, s.Normalized().Check()); !slices.Equal(got, tc.want) {
+			t.Errorf("%s: violations %v, want %v", name, got, tc.want)
+		}
+	}
+	s := access.DefaultAuthSettings
+	s.SSOEnforcedDomains = []access.EnforcedDomain{{Domain: " CORP.Example. ", Provider: "corp"}}
+	got := s.Normalized()
+	if err := got.Check(); err != nil {
+		t.Fatalf("a domain refused: %v", err)
+	}
+	if want := []access.EnforcedDomain{{Domain: "corp.example", Provider: "corp"}}; !slices.Equal(got.SSOEnforcedDomains, want) {
+		t.Errorf("normalized %v, want %v", got.SSOEnforcedDomains, want)
+	}
+	if s.SSOEnforcedDomains[0].Domain != " CORP.Example. " {
+		t.Error("Normalized changed the settings it was called on")
+	}
+}
+
+func TestAPasswordIsRefusedInAnEnforcedDomainAndWhileLocalLoginIsOff(t *testing.T) {
+	s := access.DefaultAuthSettings
+	s.SSOEnforcedDomains = []access.EnforcedDomain{{Domain: "corp.example", Provider: "corp"}}
+	for email, want := range map[string]string{
+		"ann@corp.example": "sso_required", "Nobody@CORP.example": "sso_required",
+		"ann@sub.corp.example": "", "ann@example.com": "", "no-at-sign": "",
+	} {
+		assertRefusal(t, s.PasswordRefusal(email), want, "corp")
+	}
+	s.LocalLoginEnabled = false
+	assertRefusal(t, s.PasswordRefusal("ann@example.com"), "local_login_disabled", "")
+	assertRefusal(t, s.PasswordRefusal("ann@corp.example"), "sso_required", "corp")
+
+	assertRefusal(t, s.ProviderRefusal("ann@corp.example", "other"), "sso_required", "corp")
+	assertRefusal(t, s.ProviderRefusal("ann@corp.example", "corp"), "", "")
+	assertRefusal(t, s.ProviderRefusal("ann@example.com", "other"), "", "")
+	if got := s.EnforcedDomainsOf("corp"); !slices.Equal(got, []string{"corp.example"}) {
+		t.Errorf("domains of corp = %v", got)
+	}
+	if got := s.EnforcedDomainsOf("other"); got != nil {
+		t.Errorf("domains of other = %v", got)
+	}
+}
+
+func assertRefusal(t *testing.T, err error, code, provider string) {
+	t.Helper()
+	if code == "" {
+		if err != nil {
+			t.Errorf("refused %v, want none", err)
+		}
+		return
+	}
+	e, ok := apperrors.From(err)
+	if !ok || e.Code != code {
+		t.Fatalf("refusal = %v, want %s", err, code)
+	}
+	if code == "sso_required" && e.Extensions["provider"] != provider {
+		t.Errorf("provider = %v, want %s", e.Extensions["provider"], provider)
+	}
+}
+
+func TestSettingsAreEqualWithTheSameEnforcedDomains(t *testing.T) {
+	a, b := access.DefaultAuthSettings, access.DefaultAuthSettings
+	a.SSOEnforcedDomains = []access.EnforcedDomain{{Domain: "corp.example", Provider: "corp"}}
+	if a.Equal(b) {
+		t.Error("settings with and without an enforced domain are equal")
+	}
+	b.SSOEnforcedDomains = []access.EnforcedDomain{{Domain: "corp.example", Provider: "corp"}}
+	if !a.Equal(b) {
+		t.Error("the same settings are not equal")
 	}
 }

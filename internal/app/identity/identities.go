@@ -17,6 +17,8 @@ var (
 	errMemberNotFound    = apperrors.NotFound("not_found", "the instance has no such member")
 	errMemberProvisioned = apperrors.Conflict("member_provisioned",
 		"the member is provisioned through this auth provider, which signs them in: change it in the directory")
+	errProviderEnforced = apperrors.Conflict("provider_enforced",
+		"the member's email domain is enforced to this identity's auth provider, their only way in: lift the enforcement first")
 	errProviderUnusable = apperrors.BadGateway("provider_unreachable", "the auth provider could not be reached to link an identity")
 )
 
@@ -66,6 +68,9 @@ func (h *CompleteSignIn) link(ctx context.Context, p identity.Provider, attempt 
 			// with their deactivation: nothing is linked.
 			return cmp.Or(lockErr, errors.New("the member who started the link cannot sign in"))
 		}
+		if enforcedErr := refuseEnforced(ctx, h.d.Members, p, m.Email); enforcedErr != nil {
+			return enforcedErr
+		}
 		claims := *attempt.Claims
 		existing, lookupErr := h.d.Identities.IdentityBySubject(ctx, p.ID, claims.Subject)
 		switch {
@@ -86,9 +91,12 @@ func (h *CompleteSignIn) link(ctx context.Context, p identity.Provider, attempt 
 		}
 		return h.recordLinked(ctx, now, p, linked, m, cmd.RequestID)
 	})
+	var failure *SignInFailure
 	switch {
 	case errors.Is(err, ErrIdentityLinked):
 		return SignedIn{}, fail(CodeIdentityLinked, err)
+	case errors.As(err, &failure):
+		return SignedIn{}, err
 	case err != nil:
 		return SignedIn{}, fail(CodeSSOFailed, err)
 	}
@@ -155,7 +163,11 @@ type UnlinkCommand struct {
 // last_auth_method when no other usable way in remains; a deactivated member
 // signs in nowhere and needs none. The identity of a provisioned member at
 // the provider that provisions them is the directory's, and is refused with
-// the conflict member_provisioned.
+// the conflict member_provisioned; the identity at the provider the member's
+// email domain is enforced to is the only way in enforcement leaves them, and
+// is refused with the conflict provider_enforced. Unlinking what is no
+// usable way in, such as an identity at a disabled provider, never leaves a
+// member without one.
 func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 	identityID, err := id.Parse[identity.Identity](cmd.Identity)
 	if err != nil {
@@ -185,10 +197,15 @@ func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 		if m.Provider != "" && m.Provider == unlinking.ProviderSlug {
 			return errMemberProvisioned
 		}
-		if unlinking.ProviderEnabled {
-			if err = h.d.Members.EnsureWayIn(ctx, m, identityID); err != nil {
-				return err
-			}
+		enforced, err := h.d.Members.EnforcedProvider(ctx, m.Email)
+		if err != nil {
+			return err
+		}
+		if enforced == unlinking.ProviderSlug {
+			return errProviderEnforced
+		}
+		if err = h.d.Members.EnsureWayIn(ctx, m, identityID); err != nil {
+			return err
 		}
 		if err = h.d.Identities.DeleteIdentity(ctx, identityID); err != nil {
 			return err

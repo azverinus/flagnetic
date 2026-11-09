@@ -9,6 +9,7 @@ import (
 	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/identity"
+	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pgidentity "github.com/azverinus/flagnetic/internal/infra/out/postgres/identity"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
@@ -81,6 +82,10 @@ func (a ssoMembers) PasswordSetAt(ctx context.Context, member identity.MemberID)
 	return a.ways.PasswordSetAt(ctx, id.FromBytes[access.Member](member.Bytes()))
 }
 
+func (a ssoMembers) EnforcedProvider(ctx context.Context, email string) (string, error) {
+	return a.sso.EnforcedProvider(ctx, email)
+}
+
 func (a ssoMembers) EnsureWayIn(ctx context.Context, member appidentity.MemberRecord, without identity.ID) error {
 	return a.ways.EnsureWayIn(ctx, memberOf(member), false, without.String())
 }
@@ -98,7 +103,7 @@ func (d identityDirectory) MemberIdentities(ctx context.Context, member access.M
 	}
 	out := make([]access.IdentityMethod, 0, len(held))
 	for _, i := range held {
-		out = append(out, access.IdentityMethod{ID: i.ID.String(), ProviderEnabled: i.ProviderEnabled})
+		out = append(out, access.IdentityMethod{ID: i.ID.String(), Provider: i.ProviderSlug, ProviderEnabled: i.ProviderEnabled})
 	}
 	return out, nil
 }
@@ -122,4 +127,35 @@ func (r sessionResolver) SessionOf(ctx context.Context, cookie string) (identity
 		return identity.MemberID{}, identity.SessionID{}, false, err
 	}
 	return id.FromBytes[identity.Member](c.Member.ID.Bytes()), id.FromBytes[identity.Session](c.Session.ID.Bytes()), true, nil
+}
+
+// enforcementProviders lets the access context check the auth providers the
+// enforced domains name, which the identity context keeps.
+type enforcementProviders struct{ store *pgidentity.Store }
+
+var _ appaccess.EnforcementProviders = enforcementProviders{}
+
+func (e enforcementProviders) EnforcementProvider(ctx context.Context, slug string) (appaccess.EnforcementProvider, bool, error) {
+	p, err := e.store.Provider(ctx, slug)
+	if errors.Is(err, appidentity.ErrNotFound) {
+		return appaccess.EnforcementProvider{}, false, nil
+	}
+	if err != nil {
+		return appaccess.EnforcementProvider{}, false, err
+	}
+	return appaccess.EnforcementProvider{Enabled: p.Enabled, Domains: p.Domains}, true, nil
+}
+
+// providerSettings lets the identity context read what the auth settings,
+// which the access context keeps, ask of a provider.
+type providerSettings struct{ store *pgaccess.Store }
+
+var _ appidentity.ProviderSettings = providerSettings{}
+
+func (p providerSettings) LockProviderSettings(ctx context.Context, slug string) (appidentity.SettingsOfProvider, error) {
+	s, err := p.store.LockAuthSettings(ctx)
+	if err != nil {
+		return appidentity.SettingsOfProvider{}, err
+	}
+	return appidentity.SettingsOfProvider{LocalLoginEnabled: s.LocalLoginEnabled, EnforcedDomains: s.EnforcedDomainsOf(slug)}, nil
 }

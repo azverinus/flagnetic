@@ -191,6 +191,9 @@ export const zAuthProviderTest = z.object({
   code_challenge_methods_supported: z.array(z.string()).optional(),
 });
 
+/**
+ * An auth provider as the sign-in page offers it. As `enforced_provider`, the provider the given email's domain is enforced to, the only way it signs in; absent when the domain is not enforced or no email was given.
+ */
 export const zAuthMethodProvider = z.object({
   slug: z.string(),
   display_name: z.string(),
@@ -201,6 +204,7 @@ export const zAuthMethods = z.object({
   local_login_enabled: z.boolean(),
   password_reset_available: z.boolean(),
   providers: z.array(zAuthMethodProvider),
+  enforced_provider: zAuthMethodProvider.optional(),
 });
 
 export const zMemberStatus = z.enum(["invited", "active", "deactivated"]);
@@ -295,6 +299,8 @@ export const zInvitation = z.object({
   project: zInvitationProject.optional(),
   role: z.string().optional(),
   invited_by: z.string().optional(),
+  password_allowed: z.boolean(),
+  enforced_provider: zAuthMethodProvider.optional(),
 });
 
 export const zInvitationAcceptance = z.object({
@@ -466,6 +472,14 @@ export const zSessionRevocation = z.object({
 });
 
 /**
+ * An email domain sent to one auth provider.
+ */
+export const zSsoEnforcedDomain = z.object({
+  domain: z.string(),
+  provider: z.string(),
+});
+
+/**
  * The instance's rules for sessions, API tokens and passwords.
  */
 export const zAuthSettings = z.object({
@@ -496,6 +510,8 @@ export const zAuthSettings = z.object({
   token_expiry_required: z.boolean(),
   password_min_length: z.int(),
   self_service_password_reset: z.boolean(),
+  local_login_enabled: z.boolean(),
+  sso_enforced_domains: z.array(zSsoEnforcedDomain),
 });
 
 /**
@@ -925,6 +941,7 @@ export const zProblem = z.object({
     })
     .optional(),
   references: z.array(zReference).optional(),
+  provider: z.string().optional(),
   used_by: z.array(z.string()).optional(),
   failure: z.string().optional(),
   failure_status: z.int().optional(),
@@ -3120,6 +3137,10 @@ export const zSignInResponse = zMe;
  * Signed out.
  */
 export const zSignOutResponse = z.void();
+
+export const zGetAuthMethodsQuery = z.object({
+  email: z.string().optional(),
+});
 
 /**
  * The sign-in methods.
