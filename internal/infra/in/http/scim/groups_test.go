@@ -248,6 +248,12 @@ func TestGroupsAreCreatedFilteredReadReplacedAndDeleted(t *testing.T) {
 		if r := e.call(t, token, http.MethodPut, "/Groups/"+newUUID(), marshal(t, groupBody(name, nil))); r.status != http.StatusNotFound {
 			t.Errorf("PUT of an unknown group = %d", r.status)
 		}
+		assertScimError(t, "a PUT that is no group", e.call(t, token, http.MethodPut, "/Groups/"+gid, `[`), http.StatusBadRequest, "invalidSyntax")
+		assertScimError(t, "a PUT without a name", e.call(t, token, http.MethodPut, "/Groups/"+gid, marshal(t, groupBody("", nil))), http.StatusBadRequest, "invalidValue")
+		e.mustCreateGroup(t, token, groupBody(name+"-taken", nil))
+		assertScimError(t, "a PUT taking another group's name", e.call(t, token, http.MethodPut, "/Groups/"+gid,
+			marshal(t, groupBody(name+"-taken", nil))), http.StatusConflict, "uniqueness")
+		assertScimError(t, "a PATCH that is no PatchOp", e.call(t, token, http.MethodPatch, "/Groups/"+gid, `{"Operations": 5}`), http.StatusBadRequest, "invalidSyntax")
 	})
 
 	t.Run("discovery serves Group", func(t *testing.T) {
@@ -517,5 +523,42 @@ func TestAGroupNameIsUniquePerProviderAndATokenReachesOnlyItsProvidersGroups(t *
 	e.wantRoles(t, "A's mapping", alpha, other, management.GrantSourceSso, "viewer")
 	if g := e.call(t, tokenB, http.MethodGet, "/Groups/"+groupB, "").json(t); !slices.Equal(membersOf(g), []string{ofB}) {
 		t.Errorf("B's group = %v, want B's member alone", g)
+	}
+}
+
+func TestAMemberDeactivatedThroughSCIMLosesTheirMappedAccessAndRegainsItWhenReactivated(t *testing.T) {
+	e := start(t)
+	slug := e.provider(t)
+	token := e.token(t, slug)
+	alpha := e.project(t)
+	e.mapGroups(t, slug, projectMapping("eng", alpha, "developer"))
+	kim := e.user(t, token)
+	e.grantByHand(t, alpha, kim, "viewer")
+	e.mustCreateGroup(t, token, groupBody("eng", map[string]any{"members": memberRefs(kim)}))
+	e.wantRoles(t, "in eng", alpha, kim, management.GrantSourceSso, "developer")
+
+	active := func(v any) {
+		t.Helper()
+		e.patch(t, token, "/Users/"+kim, map[string]any{"op": "replace", "value": map[string]any{"active": v}})
+	}
+	active(false)
+	e.wantRoles(t, "deactivated", alpha, kim, management.GrantSourceSso)
+	e.wantRoles(t, "deactivated", alpha, kim, management.GrantSourceManual, "viewer")
+	active(true)
+	e.wantRoles(t, "reactivated", alpha, kim, management.GrantSourceSso, "developer")
+
+	if r := e.call(t, token, http.MethodPut, "/Users/"+kim, marshal(t, userBody(e.member(t, kim).Email, map[string]any{"active": false}))); r.status != http.StatusOK {
+		t.Fatalf("PUT active false = %d: %s", r.status, r.body)
+	}
+	e.wantRoles(t, "deactivated by PUT", alpha, kim, management.GrantSourceSso)
+	active("True")
+	e.wantRoles(t, "reactivated by Entra's string", alpha, kim, management.GrantSourceSso, "developer")
+
+	if r := e.call(t, token, http.MethodDelete, "/Users/"+kim, ""); r.status != http.StatusNoContent {
+		t.Fatalf("DELETE = %d: %s", r.status, r.body)
+	}
+	e.wantRoles(t, "deleted", alpha, kim, management.GrantSourceSso)
+	if deleted := e.scimEntries(t, "grant.deleted"); len(deleted) == 0 || deleted[0].Actor.Kind != management.ActorKindScim {
+		t.Errorf("grant.deleted = %v, want the removal recorded for the SCIM token", deleted)
 	}
 }

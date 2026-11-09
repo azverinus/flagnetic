@@ -285,17 +285,24 @@ func (d SCIMGroupDeps) checkJoining(ctx context.Context, req SCIMRequest, before
 // groups each is in at the provider now, recording the access made and
 // removed for the SCIM token.
 func (d SCIMGroupDeps) rerun(ctx context.Context, p identity.Provider, req SCIMRequest, touched []identity.MemberID) error {
-	if len(touched) == 0 {
+	return rerunMappings(ctx, d.Mappings, GroupMappingDeps{Access: d.Access, Logger: d.Logger}, p, req, touched)
+}
+
+// rerunMappings runs the provider's group mappings for each of members, in
+// the order of their identifiers, from the groups each is in at the provider
+// now, recording the access made and removed for the SCIM token of req. The
+// caller holds the provider.
+func rerunMappings(ctx context.Context, store MappingStore, run GroupMappingDeps, p identity.Provider, req SCIMRequest, members []identity.MemberID) error {
+	if len(members) == 0 {
 		return nil
 	}
-	mappings, err := d.Mappings.GroupMappings(ctx, p.ID)
+	mappings, err := store.GroupMappings(ctx, p.ID)
 	if err != nil || len(mappings) == 0 {
 		// Nothing is mapped, so nothing was granted and nothing is.
 		return err
 	}
-	run := GroupMappingDeps{Access: d.Access, Logger: d.Logger}
-	for _, m := range sortedMembers(touched) {
-		groups, groupsErr := d.Mappings.GroupsOf(ctx, p.ID, m)
+	for _, m := range sortedMembers(members) {
+		groups, groupsErr := store.GroupsOf(ctx, p.ID, m)
 		if groupsErr != nil {
 			return groupsErr
 		}

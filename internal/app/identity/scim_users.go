@@ -2,6 +2,7 @@ package identity
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -118,6 +119,32 @@ type SCIMUserDeps struct {
 	Providers ProviderStore
 	Members   SCIMMembers
 	Groups    SCIMGroupStore
+	// Mappings and Access run the provider's group mappings for a member
+	// deactivated or reactivated, so their mapped access follows their
+	// status.
+	Mappings MappingStore
+	Access   ProviderAccess
+	Logger   *slog.Logger
+}
+
+// holdProvider holds the caller's provider until the unit of work ctx carries
+// ends, before anything else is held: running its group mappings for a member
+// whose status changes must not interleave with replacing them or with a
+// group change, which hold it first too.
+func (d SCIMUserDeps) holdProvider(ctx context.Context, req SCIMRequest) (identity.Provider, error) {
+	return lockProvider(ctx, d.Providers, req.Caller.ProviderSlug)
+}
+
+// setActive deactivates or reactivates the member and runs the provider's
+// group mappings for them: a deactivated member keeps none of the provider's
+// grants, and a reactivated one regains what their groups map to. The caller
+// holds the provider p.
+func (d SCIMUserDeps) setActive(ctx context.Context, p identity.Provider, req SCIMRequest, member identity.MemberID, active bool) (ProvisionedMember, error) {
+	out, err := d.Members.SetActive(ctx, SetUserActive{Provider: req.provider(), Member: member, Active: active, Request: req.governance()})
+	if err != nil {
+		return out, err
+	}
+	return out, rerunMappings(ctx, d.Mappings, GroupMappingDeps{Access: d.Access, Logger: d.Logger}, p, req, []identity.MemberID{member})
 }
 
 // withGroups fills in the groups of the caller's provider each member is in.
@@ -303,12 +330,20 @@ func (h *ReplaceSCIMUser) Handle(ctx context.Context, req SCIMRequest, member id
 func applyUserChange(ctx context.Context, d SCIMUserDeps, req SCIMRequest, cmd UpdateUser, active *bool) (ProvisionedMember, error) {
 	var out ProvisionedMember
 	err := d.Tx.Within(ctx, func(ctx context.Context) error {
-		var err error
+		var (
+			p   identity.Provider
+			err error
+		)
+		if active != nil {
+			if p, err = d.holdProvider(ctx, req); err != nil {
+				return err
+			}
+		}
 		if out, err = d.Members.Update(ctx, cmd); err != nil {
 			return err
 		}
 		if active != nil && out.Active != *active {
-			out, err = d.Members.SetActive(ctx, SetUserActive{Provider: cmd.Provider, Member: cmd.Member, Active: *active, Request: req.governance()})
+			out, err = d.setActive(ctx, p, req, cmd.Member, *active)
 		}
 		return err
 	})
@@ -366,9 +401,16 @@ type DeleteSCIMUser struct{ d SCIMUserDeps }
 // NewDeleteSCIMUser returns the handler.
 func NewDeleteSCIMUser(d SCIMUserDeps) *DeleteSCIMUser { return &DeleteSCIMUser{d: d} }
 
-// Handle deactivates the member; none is ever removed. A member the caller's
-// provider does not provision is not found.
+// Handle deactivates the member, who keeps none of the provider's mapped
+// grants; none is ever removed. A member the caller's provider does not
+// provision is not found.
 func (h *DeleteSCIMUser) Handle(ctx context.Context, req SCIMRequest, member identity.MemberID) error {
-	_, err := h.d.Members.SetActive(ctx, SetUserActive{Provider: req.provider(), Member: member, Active: false, Request: req.governance()})
-	return err
+	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
+		p, err := h.d.holdProvider(ctx, req)
+		if err != nil {
+			return err
+		}
+		_, err = h.d.setActive(ctx, p, req, member, false)
+		return err
+	})
 }
