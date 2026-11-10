@@ -182,7 +182,7 @@ func TestAnEntryMovesTheExperimentChangeRequestsOfWhatItChanged(t *testing.T) {
 		{"a clone of it", experimentEntry("experiment.cloned", checkoutV2), nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := idsOf(governance.Supersedes(tc.entry, candidates, governance.Referrers{}))
+			got := idsOf(governance.Supersedes(tc.entry, candidates, governance.Referrers{}, nil))
 			if !slices.Equal(got, tc.want) && (len(got) != 0 || len(tc.want) != 0) {
 				t.Errorf("Supersedes = %v, want %v", got, tc.want)
 			}

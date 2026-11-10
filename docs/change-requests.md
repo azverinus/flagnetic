@@ -98,7 +98,8 @@ An open or approved change request is superseded the moment any other write move
 
 - a write to its configuration: a direct write in an environment that is not protected, an override set or removed, the kill switch, a rollout's salt regenerated, a copy from another environment, a revert, a stop of an experiment rewriting its rules, or another change request's application;
 - archiving or deleting its flag;
-- deleting its environment.
+- deleting its environment;
+- a write to a segment a rule of `proposed` names, or deleting it: the rule was reviewed with the segment as it was. A segment no saved configuration of a protected environment names is written without review, so its edit would otherwise change what an approval covers after it was given.
 
 A definition was reviewed with the configurations it changes what they serve, so it is superseded by:
 
@@ -106,7 +107,7 @@ A definition was reviewed with the configurations it changes what they serve, so
 - for a flag's definition, a write to the flag's configuration in any environment;
 - for a segment's definition, a write to the configuration, in any environment, of a flag that named the segment when the change request was based on it or names it now, so a write that starts or stops naming it counts.
 
-Applying a definition supersedes no configuration's change request, since no configuration moved.
+Applying a flag's definition supersedes no configuration's change request, since no configuration moved. Applying a segment's definition is a write to the segment, so it supersedes the configurations' change requests proposed to name it.
 
 An experiment's transition was reviewed as changing the environments holding its rule, so it is superseded by:
 

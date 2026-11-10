@@ -11092,7 +11092,7 @@ components:
           description: >-
             The audit entry of the write that superseded the change request by changing what it was based on: a direct
             write, an override, the kill switch, a copy, a revert, another change request's application, archiving or
-            deleting its flag, deleting its environment; for a definition, any write to its flag or segment, and a write
+            deleting its flag, deleting its environment, a write to a segment a rule of `proposed` names; for a definition, any write to its flag or segment, and a write
             to the configuration of its flag or of a flag naming its segment, in any environment; for an experiment, any
             write to the experiment, its deletion included, and a write to its flag's configuration in an environment that
             held its rule when the change request was based on it. Null unless a write superseded it; a change request

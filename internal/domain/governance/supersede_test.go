@@ -124,7 +124,7 @@ func TestAnEntryMovesTheWaitingChangeRequestsOnWhatItChanged(t *testing.T) {
 		}}, []governance.ChangeRequestID{}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := idsOf(governance.Supersedes(tc.entry, candidates, nil)); !slices.Equal(got, tc.want) {
+			if got := idsOf(governance.Supersedes(tc.entry, candidates, nil, nil)); !slices.Equal(got, tc.want) {
 				t.Errorf("Supersedes = %v, want %v", got, tc.want)
 			}
 		})
@@ -136,7 +136,7 @@ func TestOnlyOpenAndApprovedChangeRequestsAreSuperseded(t *testing.T) {
 	for i, s := range governance.ChangeRequestStates() {
 		candidates = append(candidates, configurationRequest(t, byte(i+1), checkout, production, s))
 	}
-	got := governance.Supersedes(flagEntry("flag.killed", checkout, production), candidates, nil)
+	got := governance.Supersedes(flagEntry("flag.killed", checkout, production), candidates, nil, nil)
 	var states []governance.ChangeRequestState
 	for _, s := range got {
 		states = append(states, s.Before.State)
@@ -151,7 +151,7 @@ func TestTheChangeRequestBeingAppliedIsNotSupersededByItsOwnWrite(t *testing.T) 
 	other := configurationRequest(t, 2, checkout, production, governance.StateApproved)
 	e := flagEntry("flag.switched_on", checkout, production)
 	e.ChangeRequest = applying.ID
-	if got := idsOf(governance.Supersedes(e, []governance.ChangeRequest{applying, other}, nil)); !slices.Equal(got, []governance.ChangeRequestID{other.ID}) {
+	if got := idsOf(governance.Supersedes(e, []governance.ChangeRequest{applying, other}, nil, nil)); !slices.Equal(got, []governance.ChangeRequestID{other.ID}) {
 		t.Errorf("Supersedes = %v, want only %v", got, other.ID)
 	}
 }
@@ -252,7 +252,7 @@ func TestAnEntryMovesTheDefinitionsOfWhatItChanged(t *testing.T) {
 		}}, []governance.ChangeRequestID{onCheckoutProduction.ID}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := idsOf(governance.Supersedes(tc.entry, candidates, referrers)); !slices.Equal(got, tc.want) {
+			if got := idsOf(governance.Supersedes(tc.entry, candidates, referrers, nil)); !slices.Equal(got, tc.want) {
 				t.Errorf("Supersedes = %v, want %v", got, tc.want)
 			}
 		})
@@ -261,8 +261,47 @@ func TestAnEntryMovesTheDefinitionsOfWhatItChanged(t *testing.T) {
 	// A flag that named the segment when the change request was based on
 	// it still moves it once it stops naming it.
 	got := idsOf(governance.Supersedes(flagEntry("flag.configuration_updated", checkout, staging),
-		[]governance.ChangeRequest{namedByCheckout}, governance.Referrers{}))
+		[]governance.ChangeRequest{namedByCheckout}, governance.Referrers{}, nil))
 	if !slices.Equal(got, []governance.ChangeRequestID{namedByCheckout.ID}) {
 		t.Errorf("Supersedes once checkout stopped naming the segment = %v, want %v", got, namedByCheckout.ID)
+	}
+}
+
+// A configuration is reviewed with the segments its rules name as they were
+// then: a rule serving a segment of five people is not the rule it becomes
+// once the segment holds everyone. A segment no saved configuration of a
+// protected environment names yet is written directly, so without this its
+// edit would change what an approval covers after the approval was given.
+func TestASegmentsWriteMovesTheConfigurationsProposedToNameIt(t *testing.T) {
+	naming := configurationRequest(t, 1, checkout, production, governance.StateApproved)
+	open := configurationRequest(t, 2, banner, production, governance.StateOpen)
+	other := configurationRequest(t, 3, checkout, staging, governance.StateApproved)
+	definition := segmentDefinitionRequest(t, 4, employees)
+	candidates := []governance.ChangeRequest{naming, open, other, definition}
+	named := governance.Naming{naming.ID: true, open.ID: true}
+
+	for _, action := range []string{"segment.updated", "segment.deleted"} {
+		got := idsOf(governance.Supersedes(segmentEntry(action, employees), candidates, nil, named))
+		if want := []governance.ChangeRequestID{naming.ID, open.ID, definition.ID}; !slices.Equal(got, want) {
+			t.Errorf("%s supersedes %v, want %v: those proposed to name the segment, and its own definition's", action, got, want)
+		}
+	}
+	// What a configuration is proposed to name is asked of a segment's
+	// write alone.
+	for _, cr := range candidates {
+		segment, _ := governance.MovedBy(segmentEntry("segment.updated", employees))
+		flag, _ := governance.MovedBy(flagEntry("flag.configuration_updated", checkout, production))
+		if got, want := segment.NeedsNaming(cr), cr.Kind == governance.KindFlagConfiguration; got != want {
+			t.Errorf("a segment's write needs the naming of %s = %t, want %t", cr.ID, got, want)
+		}
+		if flag.NeedsNaming(cr) {
+			t.Errorf("a configuration's write needs the naming of %s", cr.ID)
+		}
+	}
+	// A flag's own write moves its configurations as before, whatever they
+	// name.
+	got := idsOf(governance.Supersedes(flagEntry("flag.archived", checkout, workspace.EnvironmentID{}), candidates, nil, nil))
+	if want := []governance.ChangeRequestID{naming.ID, other.ID}; !slices.Equal(got, want) {
+		t.Errorf("archiving the flag supersedes %v, want %v", got, want)
 	}
 }

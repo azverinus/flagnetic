@@ -101,6 +101,17 @@ func (m Moved) NeedsReferrers(cr ChangeRequest) bool {
 	return m.Configurations && cr.Kind == KindDefinition && cr.Segment != nil
 }
 
+// Naming are the change requests to a configuration whose proposed
+// configuration names, in a rule's condition, the segment a write changed.
+type Naming map[ChangeRequestID]bool
+
+// NeedsNaming reports whether which change requests m moves depends on
+// whether cr's proposed configuration names m's segment: a write to a
+// segment moves the configurations proposed to name it.
+func (m Moved) NeedsNaming(cr ChangeRequest) bool {
+	return m.Definition && !m.Segment.IsZero() && cr.Kind == KindFlagConfiguration
+}
+
 // Superseded is a change request before and after a write superseded it.
 type Superseded struct {
 	Before, After ChangeRequest
@@ -111,15 +122,17 @@ type Superseded struct {
 // approved), and not the change request whose application wrote e, which
 // is applied by that write rather than overtaken by it. referrers are the
 // flags naming the segments of the candidates now, which a write to a
-// configuration is judged against.
-func Supersedes(e Entry, candidates []ChangeRequest, referrers Referrers) []Superseded {
+// configuration is judged against; naming are the candidates proposing a
+// configuration that names the segment e changed, which a write to a
+// segment is judged against.
+func Supersedes(e Entry, candidates []ChangeRequest, referrers Referrers, naming Naming) []Superseded {
 	moved, ok := MovedBy(e)
 	if !ok {
 		return nil
 	}
 	var out []Superseded
 	for _, cr := range candidates {
-		if !moved.moves(cr, referrers) || cr.ID == e.ChangeRequest {
+		if !moved.moves(cr, referrers, naming) || cr.ID == e.ChangeRequest {
 			continue
 		}
 		if after, err := cr.Supersede(e.ID, e.OccurredAt); err == nil {
@@ -130,8 +143,13 @@ func Supersedes(e Entry, candidates []ChangeRequest, referrers Referrers) []Supe
 }
 
 // moves reports whether m moves what cr was based on:
-//   - a configuration's change request, by a write to that configuration
-//     or the deletion of its environment;
+//   - a configuration's change request, by a write to that configuration,
+//     the deletion of its environment, or a write to a segment its
+//     proposed configuration names: the proposal was reviewed with the
+//     segment as it was, and a segment no saved configuration of a
+//     protected environment names yet is written without review, so its
+//     edit would otherwise change what an approval covers after it was
+//     given;
 //   - a flag's definition, by any write to the flag, its configurations
 //     included, since the definition was reviewed with them;
 //   - a segment's definition, by a write to the segment, or to the
@@ -142,11 +160,14 @@ func Supersedes(e Entry, candidates []ChangeRequest, referrers Referrers) []Supe
 //     flag's configuration in an environment that held its rule when the
 //     change request was based on it, whose ruleset the transition was
 //     reviewed as changing.
-func (m Moved) moves(cr ChangeRequest, referrers Referrers) bool {
+func (m Moved) moves(cr ChangeRequest, referrers Referrers, naming Naming) bool {
 	switch {
 	case cr.Kind == KindFlagConfiguration && cr.Flag != nil && cr.Environment != nil:
 		if m.EnvironmentDeleted {
 			return cr.Environment.ID == m.Environment
+		}
+		if m.NeedsNaming(cr) {
+			return naming[cr.ID]
 		}
 		return m.Configurations && cr.Flag.ID == m.Flag && (m.Environment.IsZero() || cr.Environment.ID == m.Environment)
 	case cr.Kind == KindDefinition && cr.Flag != nil:
