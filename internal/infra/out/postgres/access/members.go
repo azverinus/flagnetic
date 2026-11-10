@@ -343,8 +343,8 @@ func (s *Store) ActiveInstanceAdmins(ctx context.Context) ([]access.Member, erro
 	}
 	members, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (access.Member, error) {
 		dest, member := scanMember()
-		if err := row.Scan(dest...); err != nil {
-			return access.Member{}, err
+		if scanErr := row.Scan(dest...); scanErr != nil {
+			return access.Member{}, scanErr
 		}
 		return member(), nil
 	})

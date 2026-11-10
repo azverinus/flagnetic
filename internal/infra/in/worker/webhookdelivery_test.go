@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -45,9 +44,18 @@ func TestAnAttemptRecordedIsCountedWhenWhatFollowedItFailed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := testutil.GatherAndCount(reg, "flagnetic_webhook_deliveries_total")
-	if err != nil || got != 1 {
-		t.Errorf("flagnetic_webhook_deliveries_total series = %d (%v), want the failed delivery counted", got, err)
+	families, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := 0
+	for _, f := range families {
+		if f.GetName() == "flagnetic_webhook_deliveries_total" {
+			got = len(f.GetMetric())
+		}
+	}
+	if got != 1 {
+		t.Errorf("flagnetic_webhook_deliveries_total series = %d, want the failed delivery counted", got)
 	}
 	if len(logs.Find("webhook delivery attempt failed")) != 1 {
 		t.Error("the failure after the attempt was not logged")
