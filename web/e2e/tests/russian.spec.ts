@@ -126,6 +126,7 @@ test.describe("the console in Russian", () => {
 
     // The server refuses by code and points at the field; the console
     // writes the message in Russian on that field.
+    await page.goto("/settings/sign-in-methods");
     const current = page.getByLabel("Текущий пароль");
     await current.fill("not-the-password-at-all");
     await page.getByLabel("Новый пароль", { exact: true }).fill(`${password}-new`);
@@ -133,7 +134,7 @@ test.describe("the console in Russian", () => {
     await page.getByRole("button", { name: "Сменить пароль" }).click();
     await expect(page.getByText("Это не ваш текущий пароль.")).toBeVisible();
     await expect(current).toHaveAttribute("aria-invalid", "true");
-    await expectNoSeriousViolations(page, "the profile with a refusal in Russian");
+    await expectNoSeriousViolations(page, "the sign-in methods with a refusal in Russian");
   });
 
   test("reads a flag's page in Russian, with its rule, its history and why a viewer cannot edit it", async ({

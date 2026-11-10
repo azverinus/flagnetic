@@ -215,6 +215,18 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
             msg`The provider is still in use. Disable it instead: that stops its sign-ins and keeps its members, identities and grants.`,
           );
     }
+    case "last_auth_method":
+      return i18n._(
+        msg`That is the only usable way to sign in left, so it stays. Add another way in first: link a provider, or keep the password.`,
+      );
+    case "provider_enforced":
+      return i18n._(
+        msg`The email address's domain signs in through this provider only, so its identity there cannot be unlinked.`,
+      );
+    case "member_provisioned":
+      return i18n._(
+        msg`The provider manages this member, so their identity at it stays for as long as they are provisioned. Deactivate or remove them at the provider.`,
+      );
     case "reset_gone":
       return i18n._(
         msg`This password reset link no longer works: it was used, ended by a password change, or it expired.`,

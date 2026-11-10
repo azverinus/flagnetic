@@ -4,7 +4,7 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -15,6 +15,7 @@ import { FormRefusal } from "@/components/ui/form-page";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateTime } from "@/i18n/format";
+import { signInStartPath } from "@/lib/auth-providers";
 import { roleName } from "@/lib/access-names";
 import { ApiError, unwrap } from "@/lib/errors";
 import { formRefusal } from "@/lib/problem-messages";
@@ -33,8 +34,10 @@ function isGone(error: unknown): boolean {
 }
 
 /**
- * What an invitation's link opens: whose invitation it is, and the
- * member's first password, which signs them in. A link that opens nothing
+ * What an invitation's link opens: whose invitation it is, and the ways to
+ * join it: the member's first password, which signs them in, where the
+ * instance allows one, and signing in through an identity provider that
+ * vouches for their email. A link that opens nothing
  * any more says why, whether it was used, replaced or expired, alike.
  */
 export function InvitationAcceptance({ secret, onAccepted }: InvitationAcceptanceProps) {
@@ -66,6 +69,96 @@ function AcceptForm({
   invitation: Invitation;
 } & Pick<InvitationAcceptanceProps, "onAccepted">) {
   const { i18n } = useLingui();
+  // Accepting found the link no longer works: the page says so in place of the form.
+  const [gone, setGone] = useState(false);
+  const { display_name: name, email, password_allowed: passwordAllowed, providers } = invitation;
+  const until = formatDateTime(i18n, invitation.expires_at);
+  if (gone) return <InvitationGone />;
+  const choices = passwordAllowed
+    ? providers.length > 0
+      ? "both"
+      : "password"
+    : providers.length > 0
+      ? "providers"
+      : "none";
+
+  return (
+    <div className="flex flex-col gap-4">
+      <h1 className="text-xl font-semibold">
+        <Trans>Accept your invitation</Trans>
+      </h1>
+      <InvitedBy invitation={invitation} />
+      <p className="text-sm text-muted-foreground">
+        {choices === "password" ? (
+          <Trans>
+            You are invited to this Flagnetic instance as {name} ({email}). Choose a password to
+            join; the link works until {until}.
+          </Trans>
+        ) : choices === "providers" ? (
+          <Trans>
+            You are invited to this Flagnetic instance as {name} ({email}). Sign in through your
+            identity provider to join; the link works until {until}.
+          </Trans>
+        ) : choices === "both" ? (
+          <Trans>
+            You are invited to this Flagnetic instance as {name} ({email}). Choose a password, or
+            sign in through an identity provider, to join; the link works until {until}.
+          </Trans>
+        ) : (
+          <Trans>
+            You are invited to this Flagnetic instance as {name} ({email}), but no way to join it is
+            available now: this instance accepts no password and none of its identity providers
+            vouches for your email address. Ask an instance admin.
+          </Trans>
+        )}
+      </p>
+      {passwordAllowed ? (
+        <PasswordForm secret={secret} onAccepted={onAccepted} onGone={() => setGone(true)} />
+      ) : null}
+      {passwordAllowed && providers.length > 0 ? (
+        <p
+          aria-hidden
+          className="flex items-center gap-3 text-xs text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border"
+        >
+          <Trans>or</Trans>
+        </p>
+      ) : null}
+      {providers.length > 0 ? <ProviderButtons providers={providers} /> : null}
+    </div>
+  );
+}
+
+/**
+ * Joining through an identity provider: signing in at one whose domains
+ * hold the invited email activates the member and makes the grant the
+ * invitation carries, with no password ever set.
+ */
+function ProviderButtons({ providers }: { providers: Invitation["providers"] }) {
+  const { t } = useLingui();
+  return (
+    <ul aria-label={t`Accept with a provider`} className="flex flex-col gap-2">
+      {providers.map((provider) => {
+        const name = provider.display_name;
+        return (
+          <li key={provider.slug}>
+            <Button variant="outline" className="w-full" asChild>
+              <a href={signInStartPath(provider.slug)}>
+                <Trans>Sign in with {name}</Trans>
+              </a>
+            </Button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function PasswordForm({
+  secret,
+  onAccepted,
+  onGone,
+}: { secret: string; onGone: () => void } & Pick<InvitationAcceptanceProps, "onAccepted">) {
+  const { i18n } = useLingui();
   const schema = z
     .object({
       password: z.string().min(1, i18n._(msg`Choose a password.`)),
@@ -87,63 +180,47 @@ function AcceptForm({
     ...forgetsSecret,
     meta: { toast: false, readsAuditAgain: false },
     onSuccess: (me) => onAccepted(me),
+    onError: (error) => {
+      if (isGone(error)) onGone();
+    },
   });
-  if (isGone(accept.error)) return <InvitationGone />;
 
   const { errors } = form.formState;
   const refusal = formRefusal(accept.error, fieldPointers);
-  const { display_name: name, email } = invitation;
-  const until = formatDateTime(i18n, invitation.expires_at);
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">
-        <Trans>Accept your invitation</Trans>
-      </h1>
-      <InvitedBy invitation={invitation} />
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          You are invited to this Flagnetic instance as {name} ({email}). Choose a password to join;
-          the link works until {until}.
-        </Trans>
-      </p>
-      <form
-        noValidate
-        className="flex flex-col gap-4"
-        onSubmit={form.handleSubmit((values) => accept.mutate(values))}
+    <form
+      noValidate
+      className="flex flex-col gap-4"
+      onSubmit={form.handleSubmit((values) => accept.mutate(values))}
+    >
+      <Field
+        label={<Trans>Password</Trans>}
+        hint={
+          <Trans>
+            At least 12 characters, or as many as this instance asks for. Length is what makes a
+            password hard to guess.
+          </Trans>
+        }
+        error={errors.password?.message}
+        refusal={accept.error}
+        pointer="/password"
       >
-        <Field
-          label={<Trans>Password</Trans>}
-          hint={
-            <Trans>
-              At least 12 characters, or as many as this instance asks for. Length is what makes a
-              password hard to guess.
-            </Trans>
-          }
-          error={errors.password?.message}
-          refusal={accept.error}
-          pointer="/password"
-        >
-          <Input
-            type="password"
-            autoComplete="new-password"
-            autoFocus
-            {...form.register("password")}
-          />
-        </Field>
-        <Field label={<Trans>Confirm the password</Trans>} error={errors.confirm_password?.message}>
-          <Input
-            type="password"
-            autoComplete="new-password"
-            {...form.register("confirm_password")}
-          />
-        </Field>
-        <FormRefusal refusal={refusal} />
-        <Button type="submit" disabled={accept.isPending}>
-          {accept.isPending ? <Trans>Joining…</Trans> : <Trans>Accept invitation</Trans>}
-        </Button>
-      </form>
-    </div>
+        <Input
+          type="password"
+          autoComplete="new-password"
+          autoFocus
+          {...form.register("password")}
+        />
+      </Field>
+      <Field label={<Trans>Confirm the password</Trans>} error={errors.confirm_password?.message}>
+        <Input type="password" autoComplete="new-password" {...form.register("confirm_password")} />
+      </Field>
+      <FormRefusal refusal={refusal} />
+      <Button type="submit" disabled={accept.isPending}>
+        {accept.isPending ? <Trans>Joining…</Trans> : <Trans>Accept invitation</Trans>}
+      </Button>
+    </form>
   );
 }
 

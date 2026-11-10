@@ -5,6 +5,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { MemberActions } from "@/components/member-actions";
+import { MemberIdentities } from "@/components/member-identities";
 import { MemberSessions, MemberTokens } from "@/components/member-credentials";
 import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,8 @@ export const Route = createFileRoute("/_signed-in/admin/members/$member")({
 /**
  * One member, for an instance admin: who they are and what they may do,
  * the changes an instance admin makes to them, and the sessions and API
- * tokens they hold, to revoke in an incident.
+ * tokens they hold, to revoke in an incident, and the identities they
+ * linked at auth providers, to unlink when one is wrong.
  */
 function MemberPage() {
   const { i18n, t } = useLingui();
@@ -99,6 +101,11 @@ function MemberPage() {
             value: "tokens",
             label: <Trans>API tokens</Trans>,
             content: <MemberTokens member={shown} />,
+          },
+          {
+            value: "identities",
+            label: <Trans>Sign-in methods</Trans>,
+            content: <MemberIdentities member={shown} />,
           },
         ]}
       />

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { activateForTests } from "@/test/render";
 
-import { ssoErrorMessage } from "./sso-errors";
+import { linkErrorMessage, ssoErrorMessage } from "./sso-errors";
 
 beforeEach(() => activateForTests("en"));
 
@@ -30,6 +30,34 @@ describe("the sentence for an error the sign-in page was sent with", () => {
   it("says that signing in did not work for a code it does not know, showing the code", () => {
     expect(ssoErrorMessage(i18n, "something_new")).toBe(
       "Signing in did not work (something_new). Try again, or ask your instance admin.",
+    );
+  });
+});
+
+describe("the sentence for an error the personal settings were sent with after linking", () => {
+  it.each([
+    [
+      "identity_linked",
+      "That account at the identity provider is already linked to another member",
+    ],
+    ["attempt_mismatch", "That linking was started in another browser"],
+    ["sso_failed", "Linking through the identity provider failed"],
+    ["idp_error", "The identity provider refused the request"],
+  ])("explains %s, and says nothing was linked", (code, start) => {
+    const sentence = linkErrorMessage(i18n, code);
+    expect(sentence).toMatch(new RegExp(`^${start}`));
+    expect(sentence).toContain("nothing was linked");
+  });
+
+  it("explains that an enforced email links no other provider", () => {
+    expect(linkErrorMessage(i18n, "sso_required")).toBe(
+      "Your email address signs in only through the auth provider its domain is enforced to, so nothing was linked.",
+    );
+  });
+
+  it("shows the code of an error it does not know", () => {
+    expect(linkErrorMessage(i18n, "something_new")).toBe(
+      "Linking did not work (something_new). Try again, or ask your instance admin.",
     );
   });
 });
