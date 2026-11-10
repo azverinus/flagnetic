@@ -11,7 +11,12 @@ import { scimRequest as scim } from "../support/scim";
 const heading = (page: Page, name: string) => page.getByRole("heading", { level: 1, name });
 
 /** The sign-in page as it reads in Russian. */
-const russian: SignInWords = { email: "Электронная почта", password: "Пароль", submit: "Войти" };
+const russian: SignInWords = {
+  email: "Электронная почта",
+  password: "Пароль",
+  submit: "Войти",
+  next: "Продолжить",
+};
 
 const stamp = randomUUID().replaceAll("-", "").slice(0, 10);
 const slug = `scim-${stamp}`;
