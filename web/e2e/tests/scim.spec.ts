@@ -4,6 +4,7 @@ import { expect, type Page, test } from "@playwright/test";
 import { expectNoSeriousViolations } from "../support/axe";
 import { managementClient, must, signIn, type SignInWords } from "../support/console";
 import { admin, readState } from "../support/instance";
+import { scimRequest as scim } from "../support/scim";
 
 const heading = (page: Page, name: string) => page.getByRole("heading", { level: 1, name });
 
@@ -16,17 +17,6 @@ const providerName = `Directory ${stamp}`;
 const userEmail = `lena-${stamp}@scim.test`;
 const userName = `Elena Directory ${stamp}`;
 const groupName = `platform-${stamp}`;
-
-/** What the directory's connector sends: one request to `/scim/v2` with the token. */
-async function scim(token: string, method: string, path: string, body?: unknown) {
-  const response = await fetch(`${readState().baseURL}/scim/v2${path}`, {
-    method,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/scim+json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const text = await response.text();
-  return { status: response.status, body: text === "" ? undefined : JSON.parse(text) };
-}
 
 test.describe("SCIM tokens and provisioned members", () => {
   // The provider and its token are the instance's: the specs share them in
@@ -101,7 +91,7 @@ test.describe("SCIM tokens and provisioned members", () => {
       active: true,
     });
     expect(created.status).toBe(201);
-    memberId = created.body.id;
+    memberId = created.body?.id ?? "";
     const group = await scim(token, "POST", "/Groups", {
       schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
       displayName: groupName,
