@@ -23,7 +23,7 @@ const me = {
 
 async function signIn(email: string, password: string) {
   const user = userEvent.setup();
-  await user.type(screen.getByLabelText("Email"), email);
+  await user.type(await screen.findByLabelText("Email"), email);
   await user.type(screen.getByLabelText("Password"), password);
   await user.click(screen.getByRole("button", { name: "Sign in" }));
 }
@@ -53,7 +53,7 @@ describe("the sign-in form", () => {
     const server = fakeServer({ "GET /auth/methods": methods });
     renderWithProviders(<SignInForm onSignedIn={vi.fn()} />);
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Sign in" }));
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Sign in" }));
 
     expect(await screen.findByText("Enter your email.")).toBeInTheDocument();
     expect(screen.getByText("Enter your password.")).toBeInTheDocument();
@@ -109,7 +109,13 @@ describe("the sign-in form", () => {
     ];
     const withProviders = {
       status: 200,
-      body: { local_login_enabled: true, providers },
+      body: { local_login_enabled: true, password_reset_available: true, providers },
+    };
+    const lookup = (answer: Record<string, unknown>) => (request: Request) => {
+      const email = new URL(request.url).searchParams.get("email");
+      return email === null
+        ? withProviders
+        : { status: 200, body: { ...withProviders.body, ...answer } };
     };
 
     it("offers a way in per enabled provider, keeping where the member was going", async () => {
@@ -125,17 +131,128 @@ describe("the sign-in form", () => {
         "href",
         expect.stringMatching(/^\/sso\/globex\/start/),
       );
-      // The password form stays, since local login is on.
-      expect(screen.getByLabelText("Password")).toBeInTheDocument();
     });
 
-    it("starts at the provider without a return path when there is none", async () => {
-      fakeServer({ "GET /auth/methods": withProviders });
+    it("asks for the email first, and for the password only once it is known to need one", async () => {
+      const server = fakeServer({
+        "GET /auth/methods": lookup({}),
+        "POST /auth/sign-in": { status: 200, body: me },
+      });
+      const onSignedIn = vi.fn();
+      await renderWithRouter(() => <SignInForm onSignedIn={onSignedIn} />);
+
+      expect(await screen.findByLabelText("Email")).toBeVisible();
+      expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+      const user = userEvent.setup();
+      await user.type(screen.getByLabelText("Email"), "ada@example.com");
+      await user.click(screen.getByRole("button", { name: "Continue" }));
+
+      expect(await screen.findByLabelText("Password")).toBeVisible();
+      expect(screen.getByLabelText("Email")).toHaveAttribute("readonly");
+      const asked = server.requests.find((r) => new URL(r.url).searchParams.has("email"))!;
+      expect(new URL(asked.url).searchParams.get("email")).toBe("ada@example.com");
+
+      await user.type(screen.getByLabelText("Password"), "correct horse battery");
+      await user.click(screen.getByRole("button", { name: "Sign in" }));
+      await waitFor(() => expect(onSignedIn).toHaveBeenCalled());
+    });
+
+    it("asks for the email before sending anything", async () => {
+      const server = fakeServer({ "GET /auth/methods": withProviders });
       renderWithProviders(<SignInForm onSignedIn={vi.fn()} />);
 
-      expect(await screen.findByRole("link", { name: "Sign in with Acme SSO" })).toHaveAttribute(
+      await userEvent.setup().click(await screen.findByRole("button", { name: "Continue" }));
+
+      expect(await screen.findByText("Enter your email.")).toBeVisible();
+      expect(server.requests.some((r) => new URL(r.url).searchParams.has("email"))).toBe(false);
+    });
+
+    it("sends an email in an enforced domain to its provider, keeping where the member was going", async () => {
+      fakeServer({
+        "GET /auth/methods": lookup({
+          enforced_provider: providers[1],
+          password_reset_available: false,
+        }),
+      });
+      const redirect = vi.fn();
+      renderWithProviders(
+        <SignInForm returnTo="/projects/checkout" onRedirect={redirect} onSignedIn={vi.fn()} />,
+      );
+
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText("Email"), "ada@globex.example");
+      await user.click(screen.getByRole("button", { name: "Continue" }));
+
+      await waitFor(() =>
+        expect(redirect).toHaveBeenCalledWith("/sso/globex/start?return_to=%2Fprojects%2Fcheckout"),
+      );
+      expect(await screen.findByRole("status")).toHaveTextContent("Taking you to Globex");
+      expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+    });
+
+    it("goes back to the email to try another", async () => {
+      fakeServer({ "GET /auth/methods": lookup({}) });
+      await renderWithRouter(() => <SignInForm onSignedIn={vi.fn()} />);
+
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText("Email"), "ada@example.com");
+      await user.click(screen.getByRole("button", { name: "Continue" }));
+      await user.type(await screen.findByLabelText("Password"), "half typed");
+      await user.click(screen.getByRole("button", { name: "Use another email" }));
+
+      expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+      expect(screen.getByLabelText("Email")).not.toHaveAttribute("readonly");
+      expect(screen.getByLabelText("Email")).toHaveFocus();
+    });
+
+    it("offers the forgotten-password page by what the email's domain allows", async () => {
+      fakeServer({
+        "GET /auth/methods": lookup({ password_reset_available: false }),
+      });
+      await renderWithRouter(() => <SignInForm onSignedIn={vi.fn()} />);
+
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText("Email"), "ada@example.com");
+      await user.click(screen.getByRole("button", { name: "Continue" }));
+
+      expect(await screen.findByLabelText("Password")).toBeVisible();
+      expect(screen.queryByRole("link", { name: "Forgot your password?" })).not.toBeInTheDocument();
+    });
+
+    it("says so when the instance could not say where the email signs in", async () => {
+      fakeServer({
+        "GET /auth/methods": (request) =>
+          new URL(request.url).searchParams.has("email") ? problem(503, "busy") : withProviders,
+      });
+      renderWithProviders(<SignInForm onSignedIn={vi.fn()} />);
+
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText("Email"), "ada@example.com");
+      await user.click(screen.getByRole("button", { name: "Continue" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("busy");
+      expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+    });
+
+    it("names the provider when the server refuses the password of an enforced email", async () => {
+      fakeServer({
+        "GET /auth/methods": lookup({}),
+        "POST /auth/sign-in": problem(403, "sso_required", { provider: "globex" }),
+      });
+      await renderWithRouter(() => <SignInForm returnTo="/x" onSignedIn={vi.fn()} />);
+
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText("Email"), "ada@globex.example");
+      await user.click(screen.getByRole("button", { name: "Continue" }));
+      await user.type(await screen.findByLabelText("Password"), "a password");
+      await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Your email address signs in through Globex only",
+      );
+      expect(screen.getAllByRole("link", { name: "Sign in with Globex" })[0]).toHaveAttribute(
         "href",
-        "/sso/acme/start",
+        "/sso/globex/start?return_to=%2Fx",
       );
     });
 
@@ -147,6 +264,7 @@ describe("the sign-in form", () => {
 
       expect(await screen.findByRole("link", { name: "Sign in with Acme SSO" })).toBeVisible();
       expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
       expect(screen.queryByText(/No way to sign in/)).not.toBeInTheDocument();
     });
 
@@ -171,6 +289,20 @@ describe("the sign-in form", () => {
         "Your email address signs in through Acme SSO only. Use its button.",
       );
     });
+  });
+
+  it("explains a password refused because local login was switched off meanwhile", async () => {
+    fakeServer({
+      "GET /auth/methods": methods,
+      "POST /auth/sign-in": problem(403, "local_login_disabled"),
+    });
+    renderWithProviders(<SignInForm onSignedIn={vi.fn()} />);
+
+    await signIn("ada@example.com", "a password");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This instance signs nobody in with a password. Sign in through your identity provider instead.",
+    );
   });
 
   describe("a forgotten password", () => {

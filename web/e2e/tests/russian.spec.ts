@@ -38,7 +38,12 @@ test.use({ locale: "ru-RU" });
 const password = "harness-birch-samovar-4417";
 
 /** The sign-in page as it reads in Russian. */
-const russian: SignInWords = { email: "Электронная почта", password: "Пароль", submit: "Войти" };
+const russian: SignInWords = {
+  email: "Электронная почта",
+  password: "Пароль",
+  submit: "Войти",
+  next: "Продолжить",
+};
 
 test.describe("the console in Russian", () => {
   test.describe.configure({ mode: "serial" });

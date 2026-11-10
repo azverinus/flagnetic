@@ -223,6 +223,10 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(
         msg`The member has not joined yet, so they have no password to reset. Issue a new invitation link instead.`,
       );
+    case "identity_required":
+      return i18n._(
+        msg`Local login stays on until you hold an identity of your own at an enabled auth provider, so that you cannot lock yourself out. Sign in through a provider or link one to your account, then try again.`,
+      );
     case "local_login_disabled":
       return i18n._(
         msg`This instance signs nobody in with a password. Sign in through your identity provider instead.`,
@@ -415,6 +419,16 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
       const max = numberParam(i18n, violation, "max");
       return max ? i18n._(msg`At most ${max} domains.`) : i18n._(msg`Too many domains.`);
     }
+    case "unknown_provider":
+      return i18n._(msg`Choose one of the offered providers.`);
+    case "provider_disabled":
+      return i18n._(msg`This provider is disabled: enable it first, or choose another.`);
+    case "not_provider_domain":
+      return i18n._(
+        msg`This provider does not list the domain: add it to the provider's domains first.`,
+      );
+    case "duplicate_domain":
+      return i18n._(msg`This domain is already enforced.`);
     case "invalid_domain":
       return i18n._(msg`Enter host names such as example.com, without an at sign or a scheme.`);
     case "invalid_issuer":

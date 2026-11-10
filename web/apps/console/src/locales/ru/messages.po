@@ -783,6 +783,10 @@ msgstr "Добавить условие по атрибуту"
 msgid "Add condition"
 msgstr "Добавить условие"
 
+#: src/components/enforced-domains-field.tsx
+msgid "Add enforced domain"
+msgstr "Добавить домен с обязательным входом"
+
 #: src/components/auth-provider-list.tsx
 msgid "Add one to let members sign in through your company's identity provider. Members keep signing in with their password until you do."
 msgstr "Добавьте провайдера, чтобы участники входили через провайдера идентификации вашей компании. Пока вы этого не сделали, участники входят по паролю."
@@ -1473,6 +1477,14 @@ msgstr "Проверено <0/>."
 msgid "Checked top to bottom; the first whose conditions all hold serves. Reorder by dragging, with the arrows, or with Alt+Arrow Up and Down."
 msgstr "Проверяются сверху вниз; срабатывает первое правило, все условия которого выполнены. Порядок меняется перетаскиванием, стрелками или клавишами Alt+стрелка вверх и вниз."
 
+#: src/components/enforced-domains-field.tsx
+msgid "Choose a domain"
+msgstr "Выберите домен"
+
+#: src/lib/auth-settings.ts
+msgid "Choose a domain."
+msgstr "Выберите домен."
+
 #: src/components/condition-row.tsx
 #: src/components/experiment-fields.tsx
 #: src/components/prerequisites-section.tsx
@@ -1521,6 +1533,14 @@ msgstr "Придумайте пароль."
 #: src/components/invite-form.tsx
 msgid "Choose a project first."
 msgstr "Сначала выберите проект."
+
+#: src/components/enforced-domains-field.tsx
+msgid "Choose a provider"
+msgstr "Выберите провайдера"
+
+#: src/lib/auth-settings.ts
+msgid "Choose a provider."
+msgstr "Выберите провайдера."
 
 #: src/components/role-field.tsx
 msgid "Choose a role"
@@ -1623,6 +1643,10 @@ msgstr "Выберите один из предложенных форматов
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered projects."
 msgstr "Выберите один из предложенных проектов."
+
+#: src/lib/problem-messages.ts
+msgid "Choose one of the offered providers."
+msgstr "Выберите одного из предложенных провайдеров."
 
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered roles."
@@ -1836,6 +1860,10 @@ msgstr "содержит любое из"
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Contexts are served by the overrides, rules and fallthrough below."
 msgstr "Контексты получают значения по переопределениям, правилам и варианту без совпадений ниже."
+
+#: src/components/sign-in-form.tsx
+msgid "Continue"
+msgstr "Продолжить"
 
 #: src/components/copyable-value.tsx
 #: src/components/experiment-assignment.tsx
@@ -2226,6 +2254,10 @@ msgstr "не содержит"
 msgid "does not equal"
 msgstr "не равно"
 
+#: src/components/enforced-domains-field.tsx
+msgid "Domain {number}"
+msgstr "Домен {number}"
+
 #: src/components/auth-provider-form.tsx
 #: src/components/auth-provider-list.tsx
 #: src/components/saml-provider-form.tsx
@@ -2391,6 +2423,10 @@ msgstr "Завершится не позднее"
 #: src/lib/conditions.ts
 msgid "ends with"
 msgstr "заканчивается на"
+
+#: src/components/enforced-domains-field.tsx
+msgid "Enforced domains"
+msgstr "Домены с обязательным входом"
 
 #: src/lib/problem-messages.ts
 msgid "Enter a claim name of 1 to 256 characters."
@@ -2842,6 +2878,10 @@ msgstr "Все в окружении {name} получат вариант при
 msgid "Everyone who can sign in to this instance. What they may do in a project comes from their grants there."
 msgstr "Все, кто может входить в этот экземпляр. Что участник может делать в проекте, определяют выданные ему там роли."
 
+#: src/components/enforced-domains-field.tsx
+msgid "Everyone with an email address in an enforced domain signs in through its provider only: no password, no other provider, and the sign-in page sends the address to the provider. A domain is offered once an enabled auth provider lists it among its domains. Instance admins are not exempt."
+msgstr "Все, у кого адрес электронной почты в таком домене, входят только через его провайдера: без пароля и без других провайдеров, а страница входа отправляет адрес к провайдеру. Домен предлагается, когда включённый провайдер входа указывает его среди своих доменов. Администраторы экземпляра не исключение."
+
 #: src/components/delete-project.tsx
 msgid "Everything in the project is deleted at once, its SDK keys stop working, and this cannot be undone."
 msgstr "Всё в проекте удаляется разом, его SDK-ключи перестают работать, и отменить это нельзя."
@@ -3290,8 +3330,8 @@ msgid "How code names the flag, such as checkout.newFlow: letters, digits, ., - 
 msgstr "Имя флага в коде, например checkout.newFlow: буквы, цифры, ., - и _. Не меняется."
 
 #: src/routes/_signed-in/admin/auth-settings.tsx
-msgid "How long sessions last, how long API tokens may live, how long passwords must be, and whether members reset a forgotten password by mail. Every replica of the instance applies a change within a second."
-msgstr "Сколько длятся сеансы, сколько могут жить API-токены, какой длины должны быть пароли и могут ли участники сбросить забытый пароль по почте. Каждая реплика экземпляра применяет изменение в течение секунды."
+msgid "How long sessions last, how long API tokens may live, how long passwords must be, whether members reset a forgotten password by mail, whether they sign in with a password at all, and which email domains sign in through one auth provider only. Every replica of the instance applies a change within a second."
+msgstr "Как долго длятся сессии, как долго живут API-токены, какой длины должны быть пароли, сбрасывают ли участники забытый пароль по почте, входят ли они вообще по паролю и какие почтовые домены входят только через одного провайдера входа. Каждая реплика экземпляра применяет изменение в течение секунды."
 
 #: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
 msgid "How rules name the segment. It never changes."
@@ -3791,6 +3831,14 @@ msgstr "Загрузить их версию"
 msgid "Loading…"
 msgstr "Загрузка…"
 
+#: src/components/auth-settings-form.tsx
+msgid "Local login"
+msgstr "Локальный вход"
+
+#: src/lib/problem-messages.ts
+msgid "Local login stays on until you hold an identity of your own at an enabled auth provider, so that you cannot lock yourself out. Sign in through a provider or link one to your account, then try again."
+msgstr "Локальный вход остаётся включённым, пока у вас нет собственной учётной записи у включённого провайдера входа: так вы не заблокируете себя. Войдите через провайдера или привяжите его к своей учётной записи и повторите."
+
 #: src/lib/audit.ts
 msgid "Locked out after failed sign-ins"
 msgstr "Вход заблокирован после неудачных попыток"
@@ -3957,6 +4005,10 @@ msgstr "Участники, приглашённые в проект"
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Members of the project"
 msgstr "Участники проекта"
+
+#: src/components/auth-settings-form.tsx
+msgid "Members sign in with their email and password. Switching it off leaves auth providers as the only way in, so it is refused unless you hold an identity at an enabled provider yourself. If a provider breaks and nobody can sign in, run \"flagnetic admin unlock\" on the server: it switches local login back on and lifts every enforced domain."
+msgstr "Участники входят по электронной почте и паролю. Если выключить, единственным способом входа останутся провайдеры входа, поэтому выключить можно, только имея собственную учётную запись у включённого провайдера. Если провайдер сломался и никто не может войти, выполните на сервере \"flagnetic admin unlock\": он снова включит локальный вход и снимет обязательный вход для всех доменов."
 
 #: src/components/change-request-actions.tsx
 msgid "Members who may approve change requests can then approve or reject it. Its proposal can still be edited while it is open."
@@ -4205,6 +4257,10 @@ msgstr "Без условий: подходит любой контекст."
 #: src/components/webhook-deliveries.tsx
 msgid "No delivery matches the filters."
 msgstr "Ни одна доставка не подходит под фильтры."
+
+#: src/components/enforced-domains-field.tsx
+msgid "No domain is enforced."
+msgstr "Ни для одного домена вход через провайдера не обязателен."
 
 #: src/components/audit-log.tsx
 msgid "No entry matches these filters."
@@ -5018,6 +5074,10 @@ msgstr "Защита"
 msgid "Protocol"
 msgstr "Протокол"
 
+#: src/components/enforced-domains-field.tsx
+msgid "Provider {number}"
+msgstr "Провайдер {number}"
+
 #: src/lib/problem-messages.ts
 msgid "provisioned members"
 msgstr "созданные участники"
@@ -5205,6 +5265,10 @@ msgstr "Удалить атрибут {n}"
 #: src/components/condition-row.tsx
 msgid "Remove condition {position}"
 msgstr "Удалить условие {position}"
+
+#: src/components/enforced-domains-field.tsx
+msgid "Remove enforced domain {number}"
+msgstr "Убрать домен с обязательным входом {number}"
 
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Remove grant"
@@ -6214,6 +6278,10 @@ msgstr "Удалён тег <0>{tag}</0>."
 msgid "Tags"
 msgstr "Теги"
 
+#: src/components/sign-in-form.tsx
+msgid "Taking you to {leaving} to sign in…"
+msgstr "Переходим к {leaving} для входа…"
+
 #: src/components/change-request-diff.tsx
 msgid "Targeting"
 msgstr "Таргетинг"
@@ -7130,6 +7198,10 @@ msgstr "Это здесь изменить нельзя."
 msgid "This device"
 msgstr "Это устройство"
 
+#: src/lib/problem-messages.ts
+msgid "This domain is already enforced."
+msgstr "Для этого домена вход через провайдера уже обязателен."
+
 #: src/components/sdk-keys.tsx
 msgid "This environment has no SDK key yet."
 msgstr "В этом окружении пока нет SDK-ключей."
@@ -7288,6 +7360,14 @@ msgstr "У этого проекта пока нет токенов."
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "This project has no unit type yet."
 msgstr "В этом проекте пока нет типов единиц."
+
+#: src/lib/problem-messages.ts
+msgid "This provider does not list the domain: add it to the provider's domains first."
+msgstr "Этот провайдер не указывает домен: сначала добавьте его в домены провайдера."
+
+#: src/lib/problem-messages.ts
+msgid "This provider is disabled: enable it first, or choose another."
+msgstr "Этот провайдер выключен: сначала включите его или выберите другого."
 
 #: src/components/auth-provider-detail.tsx
 msgid "This provider is disabled: it is not offered on the sign-in page, and its sign-ins are refused. Its members, identities and grants are kept."
@@ -7572,6 +7652,10 @@ msgstr "Используйте от {min} до {max} символов."
 #: src/lib/problem-messages.ts
 msgid "Use an https URL. Plain http is accepted only on a loopback address such as localhost."
 msgstr "Используйте https-адрес. Простой http допустим только для адреса обратной петли, например localhost."
+
+#: src/components/sign-in-form.tsx
+msgid "Use another email"
+msgstr "Другой адрес"
 
 #: src/components/tester-panel.tsx
 msgid "Use unsaved draft"
