@@ -20,13 +20,27 @@ import { PasswordResetLinkDialog } from "@/components/password-reset-link-dialog
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
+import { Tooltip } from "@/components/ui/tooltip";
 import { unwrap } from "@/lib/errors";
-import { type MemberAction, memberActions, memberName } from "@/lib/members";
+import { directoryOwns, type MemberAction, memberActions, memberName } from "@/lib/members";
 import { meQuery } from "@/lib/queries";
 import { forgetsSecret } from "@/lib/mutations";
 
 /** A change of a member confirmed in a dialog, by the action that asks for it. */
 type Confirmed = Exclude<MemberAction, "edit">;
+
+/**
+ * Why a provisioned member's email, name and status cannot be changed by
+ * hand: their identity provider's directory decides them.
+ */
+export function ProvisionedReason({ provider }: { provider: string }) {
+  return (
+    <Trans>
+      Provisioned by {provider}: its directory decides their email, name and whether they are
+      active.
+    </Trans>
+  );
+}
 
 export type MemberActionsProps = {
   member: Member;
@@ -170,15 +184,27 @@ export function MemberActions({ member, self }: MemberActionsProps) {
 
   return (
     <>
-      {memberActions(member).map((action) => (
-        <Button
-          key={action}
-          variant="outline"
-          onClick={() => (action === "edit" ? setEditing(true) : setConfirming(action))}
-        >
-          {actionLabel[action]}
-        </Button>
-      ))}
+      {memberActions(member).map((action) => {
+        const button = (
+          <Button
+            key={action}
+            variant="outline"
+            disabled={member.provider !== null && directoryOwns(action)}
+            onClick={() => (action === "edit" ? setEditing(true) : setConfirming(action))}
+          >
+            {actionLabel[action]}
+          </Button>
+        );
+        // A disabled button takes no focus or hover of its own, so the
+        // reason is its description and shown beside it.
+        return member.provider !== null && directoryOwns(action) ? (
+          <Tooltip key={action} content={<ProvisionedReason provider={member.provider} />}>
+            {button}
+          </Tooltip>
+        ) : (
+          button
+        );
+      })}
 
       <Dialog
         open={editing}

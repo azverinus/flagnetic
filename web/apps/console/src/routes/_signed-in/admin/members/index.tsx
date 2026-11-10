@@ -148,25 +148,33 @@ function MembersTable({
       {
         id: "member",
         header: t`Member`,
-        cell: ({ row }) => (
-          <span className="flex flex-col">
-            <span className="flex flex-wrap items-center gap-2">
-              <Link
-                to="/admin/members/$member"
-                params={{ member: row.original.id }}
-                className="font-medium hover:underline"
-              >
-                {memberName(row.original)}
-              </Link>
-              {row.original.instance_admin ? (
-                <Badge>
-                  <Trans>Instance admin</Trans>
-                </Badge>
-              ) : null}
+        cell: ({ row }) => {
+          const { provider } = row.original;
+          return (
+            <span className="flex flex-col">
+              <span className="flex flex-wrap items-center gap-2">
+                <Link
+                  to="/admin/members/$member"
+                  params={{ member: row.original.id }}
+                  className="font-medium hover:underline"
+                >
+                  {memberName(row.original)}
+                </Link>
+                {row.original.instance_admin ? (
+                  <Badge>
+                    <Trans>Instance admin</Trans>
+                  </Badge>
+                ) : null}
+                {provider === null ? null : (
+                  <Badge variant="muted">
+                    <Trans>Provisioned by {provider}</Trans>
+                  </Badge>
+                )}
+              </span>
+              <span className="text-xs text-muted-foreground">{row.original.email}</span>
             </span>
-            <span className="text-xs text-muted-foreground">{row.original.email}</span>
-          </span>
-        ),
+          );
+        },
       },
       {
         id: "status",

@@ -221,4 +221,40 @@ describe("what an instance admin does to a member", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(server.requests).toHaveLength(0);
   });
+
+  describe("a member the directory provisions", () => {
+    it("disables the actions the directory owns and gives the reason", async () => {
+      renderWithProviders(<MemberActions member={member({ provider: "acme" })} self={false} />);
+      const user = userEvent.setup();
+
+      for (const name of ["Edit", "Deactivate"]) {
+        const button = screen.getByRole("button", { name });
+        expect(button).toBeDisabled();
+        expect(button).toHaveAccessibleDescription(
+          /provisioned by acme.*decides their email, name and whether they are active/i,
+        );
+      }
+      await user.hover(screen.getByRole("button", { name: "Deactivate" }));
+      expect(await screen.findAllByRole("tooltip", { hidden: false })).not.toHaveLength(0);
+      // What the directory does not own stays available.
+      expect(screen.getByRole("button", { name: "Make instance admin" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Issue a password reset link" })).toBeEnabled();
+    });
+
+    it("disables reactivating a deactivated one", () => {
+      renderWithProviders(
+        <MemberActions member={member({ provider: "acme", status: "deactivated" })} self={false} />,
+      );
+
+      expect(screen.getByRole("button", { name: "Reactivate" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Edit" })).toBeDisabled();
+    });
+
+    it("leaves every action of a member nobody provisioned enabled", () => {
+      renderWithProviders(<MemberActions member={member()} self={false} />);
+
+      expect(screen.getByRole("button", { name: "Edit" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Deactivate" })).toBeEnabled();
+    });
+  });
 });
