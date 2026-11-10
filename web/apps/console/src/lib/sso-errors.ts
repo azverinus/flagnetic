@@ -42,7 +42,9 @@ export function ssoErrorMessage(i18n: I18n, code: string, providerName?: string)
 /**
  * The sentence for the error a failed linking sends the member back to
  * their personal settings with (`/settings?error=`): the codes are those of
- * a sign-in, and `identity_linked` is the one only linking has.
+ * a sign-in, and `identity_linked` is the one only linking has. A member
+ * whose email domain is enforced to one provider is refused linking any
+ * other with `sso_required`.
  */
 export function linkErrorMessage(i18n: I18n, code: string): string {
   switch (code) {
@@ -61,6 +63,10 @@ export function linkErrorMessage(i18n: I18n, code: string): string {
     case "idp_error":
       return i18n._(
         msg`The identity provider refused the request, so nothing was linked. Ask whoever runs it, or your instance admin.`,
+      );
+    case "sso_required":
+      return i18n._(
+        msg`Your email address signs in only through the auth provider its domain is enforced to, so nothing was linked.`,
       );
     default:
       return i18n._(msg`Linking did not work (${code}). Try again, or ask your instance admin.`);

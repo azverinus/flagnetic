@@ -71,9 +71,13 @@ export function SignInMethods({
       <SettingsSection
         title={<Trans>Password</Trans>}
         description={
-          <Trans>
-            Changing it signs out every other device you are signed in on; this one stays signed in.
-          </Trans>
+          // A member without a password has nothing to change.
+          password?.set ? (
+            <Trans>
+              Changing it signs out every other device you are signed in on; this one stays signed
+              in.
+            </Trans>
+          ) : undefined
         }
       >
         {password === undefined ? (

@@ -81,6 +81,7 @@ describe("the sign-in methods", () => {
     expect(await screen.findByText(/You have no password/)).toBeInTheDocument();
     expect(screen.queryByLabelText("Current password")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove password" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Changing it signs out/)).not.toBeInTheDocument();
   });
 
   it("removes the password after saying what it ends, then shows there is none", async () => {
@@ -109,6 +110,33 @@ describe("the sign-in methods", () => {
 
     expect(await screen.findByText(/You have no password/)).toBeInTheDocument();
     expect(server.requests.some((request) => request.method === "DELETE")).toBe(true);
+  });
+
+  it("shows the new date once the password is changed", async () => {
+    let setAt = "2026-10-01T09:00:00Z";
+    fakeServer({
+      "GET /me/identities": () => ({
+        status: 200,
+        body: { password: { set: true, set_at: setAt }, identities: [] },
+      }),
+      "GET /auth/methods": authMethods,
+      "POST /me/password": () => {
+        setAt = "2027-03-15T09:00:00Z";
+        return { status: 204 };
+      },
+    });
+    renderWithProviders(<SignInMethods />);
+    const user = userEvent.setup();
+
+    expect(await screen.findByText(/Your password was set on/)).toHaveTextContent("2026");
+    await user.type(screen.getByLabelText("Current password"), "old password here");
+    await user.type(screen.getByLabelText("New password"), "a new long password");
+    await user.type(screen.getByLabelText("Confirm the new password"), "a new long password");
+    await user.click(screen.getByRole("button", { name: "Change password" }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Your password was set on/)).toHaveTextContent("2027"),
+    );
   });
 
   it("explains that the last way in cannot be removed, keeping the password", async () => {

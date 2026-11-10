@@ -8150,6 +8150,10 @@ msgid "Your changes on this page will be lost."
 msgstr "Изменения на этой странице будут потеряны."
 
 #: src/lib/sso-errors.ts
+msgid "Your email address signs in only through the auth provider its domain is enforced to, so nothing was linked."
+msgstr "С вашим адресом почты можно войти только через провайдер входа, закреплённый за его доменом, поэтому ничего не привязано."
+
+#: src/lib/sso-errors.ts
 msgid "Your email address signs in through {providerName} only. Use its button."
 msgstr "Ваша почта входит только через {providerName}. Нажмите его кнопку."
 

@@ -49,6 +49,12 @@ describe("the sentence for an error the personal settings were sent with after l
     expect(sentence).toContain("nothing was linked");
   });
 
+  it("explains that an enforced email links no other provider", () => {
+    expect(linkErrorMessage(i18n, "sso_required")).toBe(
+      "Your email address signs in only through the auth provider its domain is enforced to, so nothing was linked.",
+    );
+  });
+
   it("shows the code of an error it does not know", () => {
     expect(linkErrorMessage(i18n, "something_new")).toBe(
       "Linking did not work (something_new). Try again, or ask your instance admin.",
