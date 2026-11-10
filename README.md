@@ -8,12 +8,13 @@ Self-hosted, open-source feature flags and experiments. One Go binary with an em
 
 The open-source flag products keep a paid tier, and the features a real team needs sit behind it: roles, SSO, audit log, approvals, environments, streaming, experiment analysis. Flagnetic ships all of it under Apache-2.0, with no cloud edition, no enterprise license and no feature gates. Ever.
 
-## What 0.2 contains
+## What it contains
 
 - **Flags** of four types (boolean, string, number, JSON) in every environment, with targeting rules, segments (private ones included), percentage rollouts, prerequisites, overrides and a kill switch; revert, copy and compare between environments, history, and a tester that shows what a context is served, and why. Stale flags are listed with their reasons and sent as a weekly digest.
 - **Experiments**: a lifecycle of draft, running, stopped and archived, with a hypothesis, an owner, weights, a traffic allocation that only grows and a decision when it stops. A rule serves an experiment, SDKs record exposures explicitly, and an alias links an anonymous visitor to the user they sign up as. Exposures are rolled up into first exposures, daily counts and conflicts; the sample-ratio check raises alerts members acknowledge, silent failures and overdue experiments are flagged, and an assignment lookup and a hash uniformity check let you verify assignment in your own warehouse.
 - **Governance**: protected environments, where a change reaches SDKs only through a reviewed change request (flag configurations and definitions, segments, experiment transitions), with approval, rejection, scheduled application and revert; webhooks with signed deliveries, retries, test pings, redelivery and a delivery log; a stream of a project's changes that keeps the console current; and an audit log you can download as JSON Lines or CSV.
 - **Access**: roles and permissions per project, personal access tokens and project tokens with scopes, an audit log of every change, local sign-in with lockout and throttling, members and invitations; a project can be deleted with everything in it.
+- **Identity**: an SMTP server for mailed invitations, password resets and notices of a disabled webhook subscription, in English and Russian; invitations into a project with a grant; OIDC and SAML auth providers, each vouching for its own email domains, with identity linking, group mappings that turn directory groups into roles, and SSO enforcement per email domain; SCIM provisioning and deprovisioning of members and groups from Entra ID, Okta or any SCIM 2.0 client; and a command-line break-glass that restores password sign-in.
 - **Delivery to SDKs**: server and client SDK keys per environment, with rotation and an overlap, revocation and allowed origins; the ruleset with conditional requests; the ruleset stream, which brings a change, a kill switch included, to a server SDK within 2 seconds; remote evaluation for client keys, which learn served values only; the events SDKs post, kept and rolled up under a retention you set, with the event volume and any gap retention left; the attributes SDKs send that the project has not declared; and the SDKs seen using each environment.
 - **SDKs** for Go, JavaScript and TypeScript, Dart and Flutter, Ruby and Python, with OpenFeature providers for Go, JavaScript, Ruby and Python, listed below. Evaluation happens in a server SDK, so a flag check costs no network call and the SDK keeps serving its last good ruleset if the server goes away.
 - **Operations**: any number of identical replicas on one PostgreSQL, with no sticky sessions; Prometheus metrics; a console in English and Russian covering all of the above; a Docker image for `linux/amd64` and `linux/arm64` with provenance and an SBOM.
@@ -23,7 +24,6 @@ The open-source flag products keep a paid tier, and the features a real team nee
 Each arrives in a later release:
 
 - **Analysis** of an experiment's results: Flagnetic assigns units, records exposures and checks the sample ratio, and for now the metrics are read in your own warehouse.
-- **Identity**: OIDC, SAML and SCIM.
 - **Export** of exposures and evaluation summaries to ClickHouse, object storage or a webhook.
 - A Helm chart.
 

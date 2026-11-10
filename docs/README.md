@@ -8,8 +8,8 @@
 - [The sample-ratio check](sample-ratio-check.md): the statistic, when it is skipped, its two thresholds, a worked example and the warehouse SQL reproducing it.
 - [Governance](governance.md): protected environments, which writes they refuse, and the kill switch exception.
 - [Change requests](change-requests.md): proposing a flag's configuration for review, its diff and its states.
-- [Mail](mail.md): the SMTP server, its TLS modes, the test mail, the languages mail is written in, and what a failed send does.
-- [Single sign-on](sso.md): OIDC and SAML auth providers, their domains, how a sign-in matches a member, and what each sign-in error means.
+- [Mail](mail.md): the SMTP server and setting up common relays, its TLS modes, the test mail, what is mailed and in which language, and troubleshooting by failure class.
+- [Single sign-on](sso.md): OIDC and SAML auth providers and setting them up with Keycloak, Entra ID, Okta and Google, their domains, group mappings, SSO enforcement, how a sign-in matches a member, and what each sign-in error means.
 - [Provisioning members with SCIM](scim.md): SCIM tokens, setting up Entra ID and Okta, how Users are created, adopted, updated and deprovisioned, and what a provisioned member's directory decides.
 - [Webhooks](webhooks.md): subscribing a receiver to a project's events, its secret, the targets the platform calls, and the event catalogue.
 - [Segments](segments.md) and [Targeting](targeting.md): reusable sets of conditions, and the operators and limits of every condition.

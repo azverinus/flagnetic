@@ -45,6 +45,43 @@ Both secure modes require TLS 1.2 or later and verify the server's certificate a
 
 The answer never carries the password.
 
+## Setting up common relays
+
+Every relay asks for the same five things: a host, a port, a [TLS mode](#tls-modes), credentials and a sender the relay accepts. Check the values below against your provider's own documentation, which changes more often than this page. After saving, send the [test mail](#the-test-mail).
+
+| Relay | `host` | `port` and `security` | `username`, `password` | `from` |
+|---|---|---|---|---|
+| A relay on the same machine or network (Postfix, Exim, a company relay that trusts your address) | its name or address | 25 with `none`, or 587 with `starttls` | none, when it trusts you by address | any address the relay lets you send as |
+| Amazon SES | `email-smtp.<region>.amazonaws.com` | 587 with `starttls`, or 465 with `tls` | the SMTP credentials created in the SES console, which are not an IAM access key | an address or domain verified in SES; a new SES account may send only to verified recipients until its sandbox is lifted |
+| SendGrid | `smtp.sendgrid.net` | 587 with `starttls` | the username `apikey` and an API key allowed to send mail | a verified sender or domain |
+| Mailgun | `smtp.mailgun.org` | 587 with `starttls` | the SMTP credentials of the sending domain, `postmaster@<domain>` by default | an address of that domain |
+| Postmark | `smtp.postmarkapp.com` | 587 with `starttls` | the server's token as both username and password | a confirmed sender signature or domain |
+| Google Workspace or Gmail | `smtp.gmail.com` | 587 with `starttls`, or 465 with `tls` | the mailbox and an app password (the account needs two-step verification) | the mailbox's own address, or an alias it may send as |
+| Microsoft 365 | `smtp.office365.com` | 587 with `starttls` | the mailbox and its password, with authenticated SMTP allowed for the mailbox | the mailbox's own address |
+| Mailpit, for a trial | its name or address | 1025 with `none` | none | any address |
+
+A relay that offers only a password over plain text on a network you do not control is not a relay to use: choose `starttls` or `tls`. The instance refuses credentials over `none` to any host that is not this machine.
+
+Sending as an address on your own domain works best when the domain publishes SPF and DKIM records that name the relay: a mail the relay accepts can still land in a recipient's spam folder without them, which no setting here can show.
+
+## Troubleshooting
+
+Start from what the test mail says. A `502 smtp_failed` carries a `failure`; the same classes label `flagnetic_mail_sent_total` and the server's log record for a mail that failed later.
+
+| Symptom | Cause and what to do |
+|---|---|
+| `422 invalid_smtp_settings` | A field breaks a rule; the violations name each one. The common one is a username over `security: none` to a host that is not this machine: switch to `starttls` or `tls`. |
+| `422 base_url_required` | `FLAGNETIC_BASE_URL` is not set. Set it to the address members open the console at and restart. |
+| `409 smtp_not_configured` | There is no SMTP server yet, or it was removed. |
+| `failure: connection` | The host or port is wrong, a firewall or the cloud provider blocks outbound SMTP (many block port 25, and some every port until you ask), the relay is down, or it did not accept the connection within 10 seconds or finish the exchange within 30. Try another port the relay offers, such as 587 or 2525. Test from the instance's own network: `nc -vz <host> <port>`. |
+| `failure: tls` | The mode does not match the port (`tls` on 587, `starttls` on 465), the relay does not offer STARTTLS, its certificate is for another name than `host`, has expired or comes from an authority the instance's system does not trust, or the relay only speaks TLS 1.0 or 1.1. Give the host name the certificate names, not an address. |
+| `failure: authentication` | The username or password is wrong, the relay needs an app password or an API key rather than the account password, authenticated SMTP is off for the account, or the relay offers only a mechanism the connection may not use (PLAIN and LOGIN need TLS). The password is sealed and never shown; type it again. |
+| `failure: rejected` | The relay refused the sender, the recipient or the mail itself. Usually `from` is not an address the account may send as, the domain is not verified at the relay, or the relay is in a sandbox that allows only some recipients. The answer does not carry the relay's own message; the server's log record of the failure does, under `error`, as does the relay's log. |
+| The test mail was accepted and never arrived | Look in the recipient's spam folder and at the relay's own delivery log. The instance reports only what the relay answered at the time. |
+| An invitation shows a link instead of being mailed | No SMTP server is configured, or `FLAGNETIC_BASE_URL` is unset. The link is yours to hand over. |
+| A password reset mail never comes | The instance mails it only while it has an SMTP server, only to an active member who holds a password, at most once in 5 minutes, and only while local login is on, self-service reset is allowed and the member's domain is not [enforced](sso.md#sso-enforcement-and-local-login); the answer is `202` either way so nobody learns which emails exist. |
+| `flagnetic_mail_sent_total{result="error"}` rises | A mail failed before the relay was reached, such as a stored password that the current `FLAGNETIC_SECRET_KEY` cannot open. Type the password again, or restore the key. |
+
 ## What is mailed
 
 | Kind | Sent to | When |
