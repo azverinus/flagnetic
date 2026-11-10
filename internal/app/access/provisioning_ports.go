@@ -54,6 +54,8 @@ type ProvisionedMemberStore interface {
 	// every condition, ordered by email, from the 1-based startIndex, count
 	// at most (none when 0), and how many satisfy them in all.
 	ProvisionedMembers(ctx context.Context, provider string, conds []ProvisionedCondition, startIndex, count int) ([]access.Member, int, error)
+	// ClearPasswordHash removes the password of member.
+	ClearPasswordHash(ctx context.Context, member access.MemberID, at time.Time) error
 	// ProviderProvisionedMembers reports whether the provider holds a member.
 	ProviderProvisionedMembers(ctx context.Context, provider string) (bool, error)
 }

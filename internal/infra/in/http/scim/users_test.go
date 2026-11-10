@@ -402,6 +402,60 @@ func TestPatchingAUserAddsReplacesAndRemoves(t *testing.T) {
 	assertScimError(t, "no operations", e.call(t, token, http.MethodPatch, "/Users/"+member, `{"Operations":[]}`), http.StatusBadRequest, "invalidValue")
 }
 
+// A password proves whoever holds it once held the old address. Were it kept
+// when the directory moves the member to another address, a SCIM token
+// alone could adopt a member, move them to an address of its holder's and
+// have a password reset mailed there: an account taken over without ever
+// signing in at the identity provider.
+func TestADirectoryChangingAMembersEmailEndsTheirPasswordAndResets(t *testing.T) {
+	e := start(t)
+	slug := e.provider(t, "example.com")
+	token := e.createToken(t, management.ScimTokenCreate{Provider: slug}).Value
+	existing := testkit.NewMember(t, testkit.Pool(t), testkit.WithEmail(email("example.com")))
+	member := e.mustCreate(t, token, userBody(existing.Email, nil))
+	if member != existing.ID.String() {
+		t.Fatalf("POST /Users = %s, want the member %s adopted", member, existing.ID)
+	}
+	reset := do(e.admin.IssuePasswordResetWithResponse(t.Context(), member))
+	if reset.JSON201 == nil {
+		t.Fatalf("issuing a reset = %d: %s", reset.StatusCode(), reset.Body)
+	}
+
+	// A change of case alone is the same address: nothing ends.
+	r := e.call(t, token, http.MethodPatch, "/Users/"+member, marshal(t, patch(op("replace", "userName", strings.ToUpper(existing.Email)))))
+	if r.status != http.StatusOK {
+		t.Fatalf("PATCH userName to another case = %d: %s", r.status, r.body)
+	}
+	b := testkit.NewBrowser(t, e.srv.URL)
+	if res, err := b.SignInWithResponse(t.Context(), management.SignInRequest{Email: existing.Email, Password: existing.Password}); err != nil || res.JSON200 == nil {
+		t.Fatalf("signing in after a change of case = %v, %d, want the password kept", err, res.StatusCode())
+	}
+
+	moved := email("elsewhere.example")
+	r = e.call(t, token, http.MethodPatch, "/Users/"+member, marshal(t, patch(op("replace", "userName", moved))))
+	if r.status != http.StatusOK || r.json(t)["userName"] != moved {
+		t.Fatalf("PATCH userName = %d: %s", r.status, r.body)
+	}
+	for _, address := range []string{existing.Email, moved} {
+		res, err := testkit.NewBrowser(t, e.srv.URL).SignInWithResponse(t.Context(), management.SignInRequest{Email: address, Password: existing.Password})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.JSON200 != nil {
+			t.Errorf("signing in as %s with the old password = %d, want it refused", address, res.StatusCode())
+		}
+	}
+	got := do(e.admin.GetPasswordResetWithResponse(t.Context(), secretOfLink(reset.JSON201.Url)))
+	assertProblem(t, "the reset link issued before the move", got.StatusCode(), got.Body, http.StatusGone, "reset_gone")
+	updated := e.audited(t, "member.updated", member)
+	if len(updated) == 0 {
+		t.Fatal("no member.updated entry")
+	}
+	if is, _ := updated[0].After.(map[string]any); is["email"] != moved || is["password_removed"] != true {
+		t.Errorf("member.updated after = %v, want the new email and the password removed", updated[0].After)
+	}
+}
+
 func TestDeactivatingAUserEndsItsTokensAndResetsAndReactivatingRestoresIt(t *testing.T) {
 	e := start(t)
 	token := e.token(t, e.provider(t))

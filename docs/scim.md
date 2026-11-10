@@ -65,7 +65,7 @@ Okta deactivates a user with a patch that has no path (`{"op": "replace", "value
 - **`PATCH /Users/{id}`** applies `add`, `replace` and `remove` operations, in order, as one change. An operation names its attribute in `path` (`active`, `userName`, `emails`, `emails[type eq "work"].value`, `displayName`, `externalId`) or, with no path, in an object value. `name` and its parts are accepted and change nothing: the member has one name, `displayName`. `remove` empties `displayName` (the member is named after their email again) and `externalId`; `userName`, `emails` and `active` cannot be removed. `groups`, `id` and `meta` are read only (`400 mutability`), any other attribute is `400 noTarget`. A patch that fails changes nothing.
 - **`DELETE /Users/{id}`** deactivates the member and answers `204`. No member is ever deleted.
 
-A change that alters the member is audited `member.updated`, with what changed, and one that alters nothing is not. Every write names the SCIM token as its actor (`scim`, the token's id, its hint).
+A change that alters the member is audited `member.updated`, with what changed, and one that alters nothing is not. A change of the member's email to another address, not of its case alone, removes their password, if they hold one, and ends their open password resets (`password_removed: true` in the entry): a password proves its holder once held the old address, and a reset is mailed to whatever address the member has, so neither follows the member to an address the directory names. The provider is how its members sign in, so nobody is locked out. Every write names the SCIM token as its actor (`scim`, the token's id, its hint).
 
 ### Adoption
 
@@ -76,7 +76,7 @@ An instance that already has members can switch SCIM on without duplicating them
 - the member is **no instance admin**;
 - no provider provisions the member already.
 
-An adopted member keeps their identifier, their grants, their password (if they have one) and their sessions; from then on they belong to the provider, and its directory decides their email, name and status. Audited `member.adopted`.
+An adopted member keeps their identifier, their grants, their password (if they have one) and their sessions; from then on they belong to the provider, and its directory decides their email, name and status. The password stays only as long as the email does: the directory changing it removes it, as above. Audited `member.adopted`.
 
 ### Deprovisioning
 
