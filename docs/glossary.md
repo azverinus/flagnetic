@@ -69,7 +69,7 @@ One configured identity provider a member can sign in through, an OIDC or SAML i
 _Avoid_: SSO connection, identity source
 
 **Provider domain**:
-An email domain an auth provider vouches for, the part of an address after the `@`, compared without case; a subdomain is not its parent. Only an email in a provider domain is linked to an existing member by email or provisioned on a first sign-in, and an email domain can be enforced only to a provider that names it. A person whose identity is already linked, or whose subject is a provisioned member's external ID, signs in whatever their email says.
+An email domain an auth provider vouches for, the part of an address after the `@`, compared without case; a subdomain is not its parent. Only an email in a provider domain accepts an invitation through the provider, is linked to an existing member by email, is provisioned on a first sign-in or has its member adopted by the provider's SCIM token, and an email domain can be enforced only to a provider that names it. A person whose identity is already linked, or whose subject is a provisioned member's external ID, signs in whatever their email says.
 _Avoid_: allowed domain, tenant domain, email whitelist
 
 **SSO enforcement**:
