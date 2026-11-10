@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { AuthProviderKind, AuthProviderStateBadge } from "@/components/auth-provider-badges";
 import { AuthProviderForm } from "@/components/auth-provider-form";
 import { CopyableValue } from "@/components/copyable-value";
+import { GroupMappingsSection } from "@/components/group-mappings";
 import { QueryError } from "@/components/query-error";
 import {
   IdPCertificates,
@@ -231,6 +232,7 @@ function AuthProviderPage({
           />
         )}
       </section>
+      <GroupMappingsSection provider={provider.slug} />
       <ConfirmDialog
         open={deleting}
         onOpenChange={(open) => {
@@ -248,8 +250,9 @@ function AuthProviderPage({
       >
         <p>
           <Trans>
-            Members can no longer sign in through it. A provider that members have signed in through
-            cannot be deleted; disable it instead. This cannot be undone.
+            Members can no longer sign in through it. A provider that members have signed in
+            through, or that granted access through its group mappings, cannot be deleted; disable
+            it instead. This cannot be undone.
           </Trans>
         </p>
       </ConfirmDialog>

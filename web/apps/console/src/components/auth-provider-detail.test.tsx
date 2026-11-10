@@ -37,6 +37,13 @@ const discovery = {
   code_challenge_methods_supported: ["S256", "plain"],
 };
 
+/** The reads the group mappings below the settings make, answered with nothing mapped. */
+const mappingReads = {
+  "GET /instance/auth-providers/acme/group-mappings": { status: 200, body: { items: [] } },
+  "GET /projects": { status: 200, body: { items: [] } },
+  "GET /roles": { status: 200, body: { items: [] } },
+};
+
 /** The fake API, which also answers the provider's SCIM groups unless the test says otherwise. */
 function serve(routes: Parameters<typeof fakeServer>[0]) {
   return fakeServer({
@@ -50,6 +57,17 @@ function renderScreen() {
 }
 
 describe("an auth provider's page", () => {
+  it("has the provider's group mappings below its settings", async () => {
+    serve({
+      ...mappingReads,
+      "GET /instance/auth-providers/acme": { status: 200, body: acme },
+    });
+    await renderScreen();
+
+    expect(await screen.findByRole("heading", { name: "Group mappings" })).toBeVisible();
+    expect(await screen.findByText("This provider's groups grant nothing yet.")).toBeVisible();
+  });
+
   it("shows the redirect URI to register, copyable", async () => {
     serve({ "GET /instance/auth-providers/acme": { status: 200, body: acme } });
     await renderScreen();
@@ -102,6 +120,7 @@ describe("an auth provider's page", () => {
 
   it("explains an identity provider that could not be reached", async () => {
     serve({
+      ...mappingReads,
       "GET /instance/auth-providers/acme": { status: 200, body: acme },
       "POST /instance/auth-providers/acme/test": problem(502, "provider_unreachable", {
         failure: "dial tcp: connection refused",

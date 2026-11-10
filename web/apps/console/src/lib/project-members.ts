@@ -129,6 +129,20 @@ export function grantOrigin(i18n: I18n, names: ReadonlyMap<string, string>, gran
   );
 }
 
+/** The short label of where a grant comes from, as its badge shows it. */
+export function grantSourceLabel(i18n: I18n, grant: Pick<Grant, "source" | "provider">): string {
+  if (grant.source === "manual") return i18n._(msg`Manual`);
+  const provider = grant.provider ?? "";
+  return i18n._(msg`SSO: ${provider}`);
+}
+
+/** Why a grant an auth provider's group mapping made has no remove action that works. */
+export function ssoGrantRemovalReason(i18n: I18n, provider: string): string {
+  return i18n._(
+    msg`The group mappings of ${provider} made this grant, so only they remove it. An instance admin changes them on the provider's page.`,
+  );
+}
+
 /** What a role lets its holder do in a project, as one sentence in the member's language. */
 export function roleSummary(i18n: I18n, role: Role): string {
   if (role.permissions.length === 0) return i18n._(msg`Lets the holder do nothing yet.`);

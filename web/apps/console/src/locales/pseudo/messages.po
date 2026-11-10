@@ -17,6 +17,11 @@ msgstr ""
 msgid "{0, plural, one {# conflicting exposure} other {# conflicting exposures}} {1, plural, one {from # unit} other {from # units}} reached the threshold, {threshold}; units first exposed: {units}."
 msgstr ""
 
+#. placeholder {0}: run.kept_instance_admin
+#: src/lib/group-mappings.ts
+msgid "{0, plural, one {# member stays instance admin, being the last active one.} other {# members stay instance admins, being the last active ones.}}"
+msgstr ""
+
 #. placeholder {0}: disabled.length
 #: src/components/webhook-disabled-banner.tsx
 msgid "{0, plural, one {The platform disabled # webhook after its receiver kept failing. It is sent nothing until it is enabled again.} other {The platform disabled # webhooks after their receivers kept failing. They are sent nothing until they are enabled again.}}"
@@ -603,6 +608,10 @@ msgstr ""
 msgid "A revoked device is signed out at its next request."
 msgstr ""
 
+#: src/components/group-mappings.tsx
+msgid "A role in a project"
+msgstr ""
+
 #: src/components/saml-provider-detail.tsx
 msgid "A rotation is pending. Import the SP metadata at the identity provider again, so that it knows the next certificate, then complete the rotation. Until then nothing changes for the identity provider."
 msgstr ""
@@ -805,6 +814,14 @@ msgstr ""
 msgid "Actor kind"
 msgstr ""
 
+#: src/components/group-mappings.tsx
+msgid "Add a mapping"
+msgstr ""
+
+#: src/components/group-mappings.tsx
+msgid "Add a mapping to give the members of a directory group a role in a project, or make them instance admins."
+msgstr ""
+
 #: src/components/overrides-section.tsx
 msgid "Add an override"
 msgstr ""
@@ -922,6 +939,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "An attribute's type is fixed once it is declared."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "An auth provider's group mapping made this, so only the provider takes it away. An instance admin changes its group mappings on the provider's page."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -1582,8 +1603,16 @@ msgstr ""
 msgid "Choose a password."
 msgstr ""
 
+#: src/components/group-mappings.tsx
+msgid "Choose a project"
+msgstr ""
+
 #: src/components/invite-form.tsx
 msgid "Choose a project first."
+msgstr ""
+
+#: src/lib/group-mappings.ts
+msgid "Choose a project."
 msgstr ""
 
 #: src/components/enforced-domains-field.tsx
@@ -1602,6 +1631,7 @@ msgstr ""
 #: src/components/grant-form.tsx
 #: src/components/invite-form.tsx
 #: src/components/token-create-form.tsx
+#: src/lib/group-mappings.ts
 msgid "Choose a role."
 msgstr ""
 
@@ -2254,6 +2284,10 @@ msgstr ""
 msgid "Differs between"
 msgstr ""
 
+#: src/components/group-mappings.tsx
+msgid "Directory group"
+msgstr ""
+
 #: src/components/auth-provider-detail.tsx
 msgid "Disable"
 msgstr ""
@@ -2654,6 +2688,11 @@ msgstr ""
 
 #: src/lib/auth-providers.ts
 msgid "Enter the client secret."
+msgstr ""
+
+#: src/lib/group-mappings.ts
+#: src/lib/problem-messages.ts
+msgid "Enter the directory group."
 msgstr ""
 
 #: src/components/password-reset-request.tsx
@@ -3350,13 +3389,25 @@ msgstr ""
 msgid "Grant role"
 msgstr ""
 
+#: src/lib/group-mappings.ts
+msgid "Granted {granted}, removed {revoked}."
+msgstr ""
+
 #: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Grants"
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "grants made by its group mappings"
+msgstr ""
+
 #: src/components/scim-groups.tsx
 msgid "Group"
+msgstr ""
+
+#: src/components/group-mappings.tsx
+msgid "Group mappings"
 msgstr ""
 
 #: src/components/saml-provider-form.tsx
@@ -3496,9 +3547,14 @@ msgstr ""
 msgid "Instance"
 msgstr ""
 
+#: src/components/group-mappings.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Instance admin"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Instance admin stands alone: choose it or a role in a project, not both."
 msgstr ""
 
 #: src/routes/_signed-in/admin/route.tsx
@@ -4013,6 +4069,10 @@ msgstr ""
 msgid "manage who has access"
 msgstr ""
 
+#: src/lib/project-members.ts
+msgid "Manual"
+msgstr ""
+
 #. A grant made by hand.
 #: src/lib/project-members.ts
 msgid "Manual, granted by {by} on {when}"
@@ -4026,6 +4086,18 @@ msgstr ""
 #. A grant made by hand.
 #: src/lib/project-members.ts
 msgid "Manual, granted on {when} by a member without a grant here"
+msgstr ""
+
+#: src/components/group-mappings.tsx
+msgid "Mapping {number}"
+msgstr ""
+
+#: src/components/group-mappings.tsx
+msgid "Maps to"
+msgstr ""
+
+#: src/components/group-mappings.tsx
+msgid "Matched exactly as the provider claims it, case included."
 msgstr ""
 
 #: src/components/rule-editor.tsx
@@ -4098,13 +4170,20 @@ msgstr ""
 msgid "Members"
 msgstr ""
 
-#: src/components/auth-provider-detail.tsx
 #: src/components/auth-provider-list.tsx
 msgid "Members can no longer sign in through it. A provider that members have signed in through cannot be deleted; disable it instead. This cannot be undone."
 msgstr ""
 
+#: src/components/auth-provider-detail.tsx
+msgid "Members can no longer sign in through it. A provider that members have signed in through, or that granted access through its group mappings, cannot be deleted; disable it instead. This cannot be undone."
+msgstr ""
+
 #: src/components/project-invitations.tsx
 msgid "Members invited to the project"
+msgstr ""
+
+#: src/components/group-mappings.tsx
+msgid "Members of a directory group hold the role in the project, or are instance admins, that the group maps to. A sign-in through the provider grants what the member's groups map to and removes what they no longer map to. A grant made this way can be removed only here."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/members.tsx
@@ -4150,6 +4229,14 @@ msgstr ""
 
 #: src/components/navigation.tsx
 msgid "More than {awaitingCountLimit} change requests await your decision"
+msgstr ""
+
+#: src/components/group-mappings.tsx
+msgid "Move mapping {number} down"
+msgstr ""
+
+#: src/components/group-mappings.tsx
+msgid "Move mapping {number} up"
 msgstr ""
 
 #: src/components/rule-editor.tsx
@@ -5114,6 +5201,7 @@ msgid "Profile"
 msgstr ""
 
 #. A kind of entity in the audit log.
+#: src/components/group-mappings.tsx
 #: src/components/invite-form.tsx
 #: src/components/navigation.tsx
 #: src/lib/audit.ts
@@ -5418,6 +5506,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Remove grant"
+msgstr ""
+
+#: src/components/group-mappings.tsx
+msgid "Remove mapping {number}"
 msgstr ""
 
 #: src/components/sign-in-methods.tsx
@@ -5794,6 +5886,10 @@ msgstr ""
 msgid "Save definition"
 msgstr ""
 
+#: src/components/group-mappings.tsx
+msgid "Save mappings"
+msgstr ""
+
 #: src/components/experiment-transitions.tsx
 msgid "Save note"
 msgstr ""
@@ -5806,6 +5902,11 @@ msgstr ""
 msgid "Save with usages?"
 msgstr ""
 
+#: src/components/group-mappings.tsx
+msgid "Saving runs the mappings at once for every member the provider knows. Removing a mapping takes the access it granted away from them now. The last active instance admin is never demoted this way."
+msgstr ""
+
+#: src/components/group-mappings.tsx
 #: src/components/password-reset-completion.tsx
 msgid "Saving…"
 msgstr ""
@@ -6256,6 +6357,10 @@ msgstr ""
 
 #: src/components/weights-input.tsx
 msgid "Split evenly"
+msgstr ""
+
+#: src/lib/project-members.ts
+msgid "SSO: {provider}"
 msgstr ""
 
 #: src/components/navigation.tsx
@@ -6869,6 +6974,10 @@ msgstr ""
 
 #: src/components/auth-settings-form.tsx
 msgid "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
+msgstr ""
+
+#: src/lib/project-members.ts
+msgid "The group mappings of {provider} made this grant, so only they remove it. An instance admin changes them on the provider's page."
 msgstr ""
 
 #: src/components/scim-groups.tsx
@@ -7611,6 +7720,10 @@ msgstr ""
 
 #: src/components/auth-provider-detail.tsx
 msgid "This provider is disabled: it is not offered on the sign-in page, and its sign-ins are refused. Its members, identities and grants are kept."
+msgstr ""
+
+#: src/components/group-mappings.tsx
+msgid "This provider's groups grant nothing yet."
 msgstr ""
 
 #: src/lib/flag-detail.ts

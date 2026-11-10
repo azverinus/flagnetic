@@ -136,7 +136,7 @@ test.describe("auth providers", () => {
     );
 
     await page.getByLabel("Name", { exact: true }).fill("Dex (mine)");
-    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
 
     await expect(page.getByRole("alert")).toContainText("Someone else changed this");
     await page.getByRole("button", { name: "Load their version" }).click();
@@ -145,7 +145,7 @@ test.describe("auth providers", () => {
 
     // Saving from their version works, and names the provider as it is now.
     await page.getByLabel("Name", { exact: true }).fill("Dex");
-    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(heading(page, "Dex")).toBeVisible();
   });
 

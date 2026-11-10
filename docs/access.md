@@ -93,7 +93,7 @@ A grant is one role held by one member in one project. A project owner grants a 
 - An instance admin holds every permission in every project without a grant, and is every project's backstop: a project's creator receives no grant, and removing the last owner's grant is allowed.
 - A member sees in `GET /projects` the projects where they hold a grant; an instance admin sees every project.
 
-The console's project members screen lists every member holding a grant with each grant's role, source, maker and time, and lets an owner grant a role and remove one grant at a time. Reading every member of the instance is an instance admin's alone, so an instance admin grants a role to anyone, while an owner who is not one grants further roles to the project's own members.
+The console's project members screen lists every member holding a grant with each grant's role, source (a badge: `Manual`, or `SSO` with the provider), maker and time, and lets an owner grant a role and remove one grant at a time; the remove action of a grant a group mapping made is disabled, saying that only the provider's group mappings remove it. Reading every member of the instance is an instance admin's alone, so an instance admin grants a role to anyone, while an owner who is not one grants further roles to the project's own members.
 
 ### Inviting to a project
 

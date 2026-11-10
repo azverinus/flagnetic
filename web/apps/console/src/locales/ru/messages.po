@@ -17,6 +17,11 @@ msgstr "«{bad}» не источник. Укажите схему, хост и,
 msgid "{0, plural, one {# conflicting exposure} other {# conflicting exposures}} {1, plural, one {from # unit} other {from # units}} reached the threshold, {threshold}; units first exposed: {units}."
 msgstr "{0, plural, one {# конфликтная экспозиция} few {# конфликтные экспозиции} many {# конфликтных экспозиций} other {# конфликтной экспозиции}} {1, plural, one {от # единицы} few {от # единиц} many {от # единиц} other {от # единицы}} достигли порога, {threshold}; впервые получили экспозицию: {units}."
 
+#. placeholder {0}: run.kept_instance_admin
+#: src/lib/group-mappings.ts
+msgid "{0, plural, one {# member stays instance admin, being the last active one.} other {# members stay instance admins, being the last active ones.}}"
+msgstr "{0, plural, one {# участник остаётся администратором экземпляра, потому что он последний активный.} few {# участника остаются администраторами экземпляра, потому что они последние активные.} many {# участников остаются администраторами экземпляра, потому что они последние активные.} other {# участника остаются администраторами экземпляра, потому что они последние активные.}}"
+
 #. placeholder {0}: disabled.length
 #: src/components/webhook-disabled-banner.tsx
 msgid "{0, plural, one {The platform disabled # webhook after its receiver kept failing. It is sent nothing until it is enabled again.} other {The platform disabled # webhooks after their receivers kept failing. They are sent nothing until they are enabled again.}}"
@@ -603,6 +608,10 @@ msgstr "Требуемый флаг не отдаёт нужный вариан�
 msgid "A revoked device is signed out at its next request."
 msgstr "Устройство с отозванным сеансом выходит из системы при следующем запросе."
 
+#: src/components/group-mappings.tsx
+msgid "A role in a project"
+msgstr "Роль в проекте"
+
 #: src/components/saml-provider-detail.tsx
 msgid "A rotation is pending. Import the SP metadata at the identity provider again, so that it knows the next certificate, then complete the rotation. Until then nothing changes for the identity provider."
 msgstr "Ротация начата. Снова импортируйте метаданные SP у провайдера идентификации, чтобы он узнал следующий сертификат, затем завершите ротацию. До тех пор для провайдера идентификации ничего не меняется."
@@ -805,6 +814,14 @@ msgstr "Автор"
 msgid "Actor kind"
 msgstr "Вид автора"
 
+#: src/components/group-mappings.tsx
+msgid "Add a mapping"
+msgstr "Добавить соответствие"
+
+#: src/components/group-mappings.tsx
+msgid "Add a mapping to give the members of a directory group a role in a project, or make them instance admins."
+msgstr "Добавьте соответствие, чтобы участники группы каталога получали роль в проекте или становились администраторами экземпляра."
+
 #: src/components/overrides-section.tsx
 msgid "Add an override"
 msgstr "Добавить переопределение"
@@ -923,6 +940,10 @@ msgstr "Разрешённые источники"
 #: src/lib/problem-messages.ts
 msgid "An attribute's type is fixed once it is declared."
 msgstr "Тип атрибута после объявления не меняется."
+
+#: src/lib/problem-messages.ts
+msgid "An auth provider's group mapping made this, so only the provider takes it away. An instance admin changes its group mappings on the provider's page."
+msgstr "Это выдано по соответствию групп провайдера входа, поэтому отобрать это может только провайдер. Администратор экземпляра меняет соответствия групп на странице провайдера."
 
 #: src/lib/problem-messages.ts
 msgid "an enforced domain"
@@ -1582,9 +1603,17 @@ msgstr "Выберите новый пароль для {name} ({email}); ссы
 msgid "Choose a password."
 msgstr "Придумайте пароль."
 
+#: src/components/group-mappings.tsx
+msgid "Choose a project"
+msgstr "Выберите проект"
+
 #: src/components/invite-form.tsx
 msgid "Choose a project first."
 msgstr "Сначала выберите проект."
+
+#: src/lib/group-mappings.ts
+msgid "Choose a project."
+msgstr "Выберите проект."
 
 #: src/components/enforced-domains-field.tsx
 #: src/components/scim-tokens.tsx
@@ -1602,6 +1631,7 @@ msgstr "Выберите роль"
 #: src/components/grant-form.tsx
 #: src/components/invite-form.tsx
 #: src/components/token-create-form.tsx
+#: src/lib/group-mappings.ts
 msgid "Choose a role."
 msgstr "Выберите роль."
 
@@ -2254,6 +2284,10 @@ msgstr "Отличается"
 msgid "Differs between"
 msgstr "Отличается между"
 
+#: src/components/group-mappings.tsx
+msgid "Directory group"
+msgstr "Группа каталога"
+
 #: src/components/auth-provider-detail.tsx
 msgid "Disable"
 msgstr "Отключить"
@@ -2655,6 +2689,11 @@ msgstr "Введите идентификатор клиента."
 #: src/lib/auth-providers.ts
 msgid "Enter the client secret."
 msgstr "Введите секрет клиента."
+
+#: src/lib/group-mappings.ts
+#: src/lib/problem-messages.ts
+msgid "Enter the directory group."
+msgstr "Укажите группу каталога."
 
 #: src/components/password-reset-request.tsx
 msgid "Enter the email you sign in with, and a link to choose a new password is mailed."
@@ -3350,14 +3389,26 @@ msgstr "Роль отозвана"
 msgid "Grant role"
 msgstr "Выдать роль"
 
+#: src/lib/group-mappings.ts
+msgid "Granted {granted}, removed {revoked}."
+msgstr "Выдано: {granted}, отозвано: {revoked}."
+
 #: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Grants"
 msgstr "Роли"
 
+#: src/lib/problem-messages.ts
+msgid "grants made by its group mappings"
+msgstr "ролях, выданных по его соответствиям групп"
+
 #: src/components/scim-groups.tsx
 msgid "Group"
 msgstr "Группа"
+
+#: src/components/group-mappings.tsx
+msgid "Group mappings"
+msgstr "Соответствия групп"
 
 #: src/components/saml-provider-form.tsx
 msgid "Groups attribute"
@@ -3496,10 +3547,15 @@ msgstr "Соль включения"
 msgid "Instance"
 msgstr "Экземпляр"
 
+#: src/components/group-mappings.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Instance admin"
 msgstr "Администратор экземпляра"
+
+#: src/lib/problem-messages.ts
+msgid "Instance admin stands alone: choose it or a role in a project, not both."
+msgstr "Администратор экземпляра выдаётся отдельно: выберите его или роль в проекте, но не то и другое."
 
 #: src/routes/_signed-in/admin/route.tsx
 msgid "Instance administration"
@@ -4013,6 +4069,10 @@ msgstr "управлять подписками на вебхуки"
 msgid "manage who has access"
 msgstr "управлять доступом"
 
+#: src/lib/project-members.ts
+msgid "Manual"
+msgstr "Вручную"
+
 #. A grant made by hand.
 #: src/lib/project-members.ts
 msgid "Manual, granted by {by} on {when}"
@@ -4027,6 +4087,18 @@ msgstr "Выдана вручную {when}"
 #: src/lib/project-members.ts
 msgid "Manual, granted on {when} by a member without a grant here"
 msgstr "Выдана вручную {when} участником без роли в этом проекте"
+
+#: src/components/group-mappings.tsx
+msgid "Mapping {number}"
+msgstr "Соответствие {number}"
+
+#: src/components/group-mappings.tsx
+msgid "Maps to"
+msgstr "Выдаёт"
+
+#: src/components/group-mappings.tsx
+msgid "Matched exactly as the provider claims it, case included."
+msgstr "Сравнивается точно так, как группу передаёт провайдер, с учётом регистра."
 
 #: src/components/rule-editor.tsx
 msgid "Matched in the tester"
@@ -4098,14 +4170,21 @@ msgstr "Участник изменён"
 msgid "Members"
 msgstr "Участники"
 
-#: src/components/auth-provider-detail.tsx
 #: src/components/auth-provider-list.tsx
 msgid "Members can no longer sign in through it. A provider that members have signed in through cannot be deleted; disable it instead. This cannot be undone."
 msgstr "Участники больше не смогут входить через него. Провайдера, через которого участники уже входили, удалить нельзя — отключите его. Это действие нельзя отменить."
 
+#: src/components/auth-provider-detail.tsx
+msgid "Members can no longer sign in through it. A provider that members have signed in through, or that granted access through its group mappings, cannot be deleted; disable it instead. This cannot be undone."
+msgstr "Участники больше не смогут входить через него. Провайдера, через которого участники уже входили или который выдавал доступ по соответствиям групп, удалить нельзя — отключите его. Это действие нельзя отменить."
+
 #: src/components/project-invitations.tsx
 msgid "Members invited to the project"
 msgstr "Участники, приглашённые в проект"
+
+#: src/components/group-mappings.tsx
+msgid "Members of a directory group hold the role in the project, or are instance admins, that the group maps to. A sign-in through the provider grants what the member's groups map to and removes what they no longer map to. A grant made this way can be removed only here."
+msgstr "Участники группы каталога получают роль в проекте или становятся администраторами экземпляра — в зависимости от того, чему соответствует группа. Вход через провайдера выдаёт то, чему соответствуют группы участника, и отзывает то, чему они больше не соответствуют. Выданное так отозвать можно только здесь."
 
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Members of the project"
@@ -4151,6 +4230,14 @@ msgstr "Чего не хватает для запуска"
 #: src/components/navigation.tsx
 msgid "More than {awaitingCountLimit} change requests await your decision"
 msgstr "Вашего решения ждут больше {awaitingCountLimit} запросов на изменение"
+
+#: src/components/group-mappings.tsx
+msgid "Move mapping {number} down"
+msgstr "Сдвинуть соответствие {number} вниз"
+
+#: src/components/group-mappings.tsx
+msgid "Move mapping {number} up"
+msgstr "Сдвинуть соответствие {number} вверх"
 
 #: src/components/rule-editor.tsx
 msgid "Move rule {position} down"
@@ -5114,6 +5201,7 @@ msgid "Profile"
 msgstr "Профиль"
 
 #. A kind of entity in the audit log.
+#: src/components/group-mappings.tsx
 #: src/components/invite-form.tsx
 #: src/components/navigation.tsx
 #: src/lib/audit.ts
@@ -5419,6 +5507,10 @@ msgstr "Убрать домен с обязательным входом {number
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Remove grant"
 msgstr "Отозвать роль"
+
+#: src/components/group-mappings.tsx
+msgid "Remove mapping {number}"
+msgstr "Удалить соответствие {number}"
 
 #: src/components/sign-in-methods.tsx
 msgid "Remove password"
@@ -5794,6 +5886,10 @@ msgstr "Всё равно сохранить"
 msgid "Save definition"
 msgstr "Сохранить определение"
 
+#: src/components/group-mappings.tsx
+msgid "Save mappings"
+msgstr "Сохранить соответствия"
+
 #: src/components/experiment-transitions.tsx
 msgid "Save note"
 msgstr "Сохранить заметку"
@@ -5806,6 +5902,11 @@ msgstr "Сохраните или отмените правки, прежде ч
 msgid "Save with usages?"
 msgstr "Сохранить сегмент, который используется?"
 
+#: src/components/group-mappings.tsx
+msgid "Saving runs the mappings at once for every member the provider knows. Removing a mapping takes the access it granted away from them now. The last active instance admin is never demoted this way."
+msgstr "При сохранении соответствия сразу применяются ко всем участникам, которых знает провайдер. Удалённое соответствие тут же отбирает выданный им доступ. Последнего активного администратора экземпляра так не лишить роли."
+
+#: src/components/group-mappings.tsx
 #: src/components/password-reset-completion.tsx
 msgid "Saving…"
 msgstr "Сохраняем…"
@@ -6257,6 +6358,10 @@ msgstr "URL метаданных SP"
 #: src/components/weights-input.tsx
 msgid "Split evenly"
 msgstr "Поровну"
+
+#: src/lib/project-members.ts
+msgid "SSO: {provider}"
+msgstr "SSO: {provider}"
 
 #: src/components/navigation.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -6870,6 +6975,10 @@ msgstr "Формат, который экземпляр запрашивает �
 #: src/components/auth-settings-form.tsx
 msgid "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
 msgstr "На какой наибольший срок можно создать новый API-токен. У созданных раньше токенов срок не изменится."
+
+#: src/lib/project-members.ts
+msgid "The group mappings of {provider} made this grant, so only they remove it. An instance admin changes them on the provider's page."
+msgstr "Эта роль выдана по соответствиям групп провайдера {provider}, поэтому отозвать её могут только они. Администратор экземпляра меняет их на странице провайдера."
 
 #: src/components/scim-groups.tsx
 msgid "The groups the identity provider pushed through SCIM, which its group mappings can name. The directory owns them and who is in them, so they are read only here. Pushing groups needs a <0>SCIM token</0> of this provider."
@@ -7612,6 +7721,10 @@ msgstr "Этот провайдер выключен: сначала включ�
 #: src/components/auth-provider-detail.tsx
 msgid "This provider is disabled: it is not offered on the sign-in page, and its sign-ins are refused. Its members, identities and grants are kept."
 msgstr "Провайдер отключён: он не предлагается на странице входа, а входы через него отклоняются. Участники, учётные записи и выданные роли сохраняются."
+
+#: src/components/group-mappings.tsx
+msgid "This provider's groups grant nothing yet."
+msgstr "Группы этого провайдера пока ничего не выдают."
 
 #: src/lib/flag-detail.ts
 msgid "This rule is no longer in the configuration."

@@ -215,6 +215,10 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
             msg`The provider is still in use. Disable it instead: that stops its sign-ins and keeps its members, identities and grants.`,
           );
     }
+    case "sso_sourced":
+      return i18n._(
+        msg`An auth provider's group mapping made this, so only the provider takes it away. An instance admin changes its group mappings on the provider's page.`,
+      );
     case "last_auth_method":
       return i18n._(
         msg`That is the only usable way to sign in left, so it stays. Add another way in first: link a provider, or keep the password.`,
@@ -296,6 +300,8 @@ function providerUses(i18n: I18n, error: ApiError): string | undefined {
         return i18n._(msg`SCIM tokens`);
       case "provisioned members":
         return i18n._(msg`provisioned members`);
+      case "grants":
+        return i18n._(msg`grants made by its group mappings`);
       case "an enforced domain":
         return i18n._(msg`an enforced domain`);
       default:
@@ -504,6 +510,10 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
       return i18n._(
         msg`A username and password are sent only over STARTTLS or TLS, unless the SMTP server is this machine.`,
       );
+    case "blank":
+      return i18n._(msg`Enter the directory group.`);
+    case "exclusive":
+      return i18n._(msg`Instance admin stands alone: choose it or a role in a project, not both.`);
     case "too_soon":
       return i18n._(msg`Choose a later time: the server needs some lead to apply it.`);
     case "too_late":
