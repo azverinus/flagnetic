@@ -409,13 +409,27 @@ func TestInvitingSomebodyToTheSameProjectAgainReplacesTheInvitation(t *testing.T
 		t.Errorf("the replaced link granted %+v", g)
 	}
 
-	acceptedBy(t, srv, *second.Invitation.Url)
+	// Issuing it again hands its link to whoever asks while the instance
+	// cannot mail, so only the member who invited, or an instance admin,
+	// does: another owner would otherwise take the link and accept it as
+	// the person invited.
+	another := memberIn(t, srv, p, access.RoleOwner)
+	taken := do(another.InviteProjectMemberWithResponse(t.Context(), p.Key,
+		management.ProjectInvitationCreate{Email: email, DisplayName: "Invitee", Role: "viewer"}))
+	assertProblem(t, "another owner inviting them again", taken.StatusCode(), taken.Body, http.StatusConflict, "already_exists")
+	if got := opened(t, srv, *second.Invitation.Url); got.JSON200 == nil {
+		t.Fatalf("the link after another owner's attempt = %d: %s, want it to stand", got.StatusCode(), got.Body)
+	}
+	third := mustInviteTo(t, admin, p.Key, email, "maintainer")
+	wantGone(t, srv, *second.Invitation.Url, "the second link, once an instance admin issued it again")
+
+	acceptedBy(t, srv, *third.Invitation.Url)
 	if g := grantsOf(t, admin, p.Key, email); len(g) != 1 || g[0].Role != "maintainer" {
-		t.Errorf("grants = %+v, want the maintainer role of the second invitation alone", g)
+		t.Errorf("grants = %+v, want the maintainer role of the last invitation alone", g)
 	}
 	reissued := entriesAbout(t, admin, p.Key, "member.invitation_reissued", email)
-	if len(reissued) != 1 || reissued[0].Actor.MemberId == nil || *reissued[0].Actor.MemberId != owner.ID.Bytes() {
-		t.Errorf("member.invitation_reissued = %+v, want one, by the owner", reissued)
+	if len(reissued) != 2 || reissued[1].Actor.MemberId == nil || *reissued[1].Actor.MemberId != owner.ID.Bytes() {
+		t.Errorf("member.invitation_reissued = %+v, want two, the first by the owner", reissued)
 	}
 }
 
@@ -471,9 +485,11 @@ func TestAnInvitationGrantsBesideWhatTheMemberWasGivenMeanwhile(t *testing.T) {
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
 
+	// A member invited again after a deactivation holds what they held
+	// before it; nothing is granted by hand to one who has not joined.
 	t.Run("another role", func(t *testing.T) {
 		mi, email := inviteTo(t, admin, p.Key, "owner")
-		grant(t, admin, p.Key, memberRef(mi.Member.Id), "viewer")
+		grantHeld(t, projectIDOf(p), memberRef(mi.Member.Id), access.RoleViewer)
 		acceptedBy(t, srv, *mi.Invitation.Url)
 		if g := rolesOf(grantsOf(t, admin, p.Key, email)); len(g) != 2 {
 			t.Errorf("roles = %v, want the viewer given by hand and the owner invited with", g)
@@ -481,13 +497,13 @@ func TestAnInvitationGrantsBesideWhatTheMemberWasGivenMeanwhile(t *testing.T) {
 	})
 	t.Run("the same role", func(t *testing.T) {
 		mi, email := inviteTo(t, admin, p.Key, "viewer")
-		grant(t, admin, p.Key, memberRef(mi.Member.Id), "viewer")
+		grantHeld(t, projectIDOf(p), memberRef(mi.Member.Id), access.RoleViewer)
 		acceptedBy(t, srv, *mi.Invitation.Url)
 		if g := rolesOf(grantsOf(t, admin, p.Key, email)); len(g) != 1 || g[0] != "viewer" {
 			t.Errorf("roles = %v, want the one viewer grant", g)
 		}
-		if n := len(entriesAbout(t, admin, p.Key, "grant.created", email)); n != 1 {
-			t.Errorf("%d grant.created entries, want the one of the grant made by hand", n)
+		if n := len(entriesAbout(t, admin, p.Key, "grant.created", email)); n != 0 {
+			t.Errorf("%d grant.created entries, want none: accepting made no grant", n)
 		}
 	})
 }

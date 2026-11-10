@@ -7098,6 +7098,10 @@ msgid "The member already holds this role in the project."
 msgstr "У участника уже есть эта роль в проекте."
 
 #: src/lib/problem-messages.ts
+msgid "The member has not accepted their invitation yet. Give them this once they have joined."
+msgstr "Участник ещё не принял приглашение. Выдайте это, когда он присоединится."
+
+#: src/lib/problem-messages.ts
 msgid "The member has not joined yet, so they have no password to reset. Issue a new invitation link instead."
 msgstr "Участник ещё не присоединился, поэтому сбрасывать ему нечего. Вместо этого выпустите новую ссылку-приглашение."
 

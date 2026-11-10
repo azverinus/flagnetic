@@ -151,6 +151,10 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(msg`Only an invited member has an invitation to replace.`);
     case "member_deactivated":
       return i18n._(msg`The member is deactivated. Reactivate them first.`);
+    case "member_invited":
+      return i18n._(
+        msg`The member has not accepted their invitation yet. Give them this once they have joined.`,
+      );
     case "already_granted":
       return i18n._(msg`The member already holds this role in the project.`);
     case "role_not_allowed": {

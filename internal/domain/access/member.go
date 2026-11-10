@@ -228,7 +228,8 @@ type MemberChange struct {
 
 // Edited returns m with change applied, the email and display name trimmed
 // and held to the bounds of a new member's. Whether another member holds the
-// email is the store's to judge.
+// email is the store's to judge. A member still invited is not made an
+// instance admin (ErrMemberInvited).
 func (m Member) Edited(change MemberChange) (Member, error) {
 	if m.Provisioned() && (differs(change.Email, m.Email) || differs(change.DisplayName, m.DisplayName)) {
 		return Member{}, ErrMemberProvisioned
@@ -250,6 +251,9 @@ func (m Member) Edited(change MemberChange) (Member, error) {
 	if change.InstanceAdmin != nil {
 		if !*change.InstanceAdmin && m.InstanceAdminProvider != "" {
 			return Member{}, ErrSSOSourced
+		}
+		if *change.InstanceAdmin && !m.InstanceAdmin && m.Status == MemberInvited {
+			return Member{}, ErrMemberInvited
 		}
 		m.InstanceAdmin = *change.InstanceAdmin
 	}

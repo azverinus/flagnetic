@@ -33,6 +33,13 @@ type InviteToProjectStore interface {
 var errEmailHeld = apperrors.Conflict("already_exists",
 	"a member with this email already exists; grant them a role in the project instead")
 
+// errInvitedByAnother refuses inviting again someone another member
+// invited. Until an invitation is mailed, issuing it again hands its link
+// to whoever asks: any member who may invite to the project could otherwise
+// take the link of a person somebody else invited and accept it as them.
+var errInvitedByAnother = apperrors.Conflict("already_exists",
+	"a member with this email is invited already; the member who invited them, or an instance admin, issues their invitation again")
+
 // InviteToProject invites a person to the instance with a role in a project.
 type InviteToProject struct {
 	tx     Transactor
@@ -70,7 +77,8 @@ type InviteToProjectCommand struct {
 // the caller, when the instance can. A role holding a permission the caller lacks in the project
 // is refused role_not_allowed. A person the instance holds is refused
 // already_exists, except a member invited who has a pending invitation to this
-// project, who is invited again with the new role: a fresh invitation then
+// project that the caller issued, or any such when the caller is an instance
+// admin, who is invited again with the new role: a fresh invitation then
 // replaces theirs, recorded as member.invitation_reissued.
 func (h *InviteToProject) Handle(ctx context.Context, cmd InviteToProjectCommand) (InvitedMember, error) {
 	grant, err := access.NewInvitationGrant(cmd.Project.ID, cmd.Role, "/role")
@@ -89,7 +97,7 @@ func (h *InviteToProject) Handle(ctx context.Context, cmd InviteToProjectCommand
 	origin := invitationOrigin{InvitedBy: creatorOf(cmd.Caller), Grant: &grant}
 	var res InvitedMember
 	err = h.tx.Within(ctx, func(ctx context.Context) error {
-		member, action, memberErr := h.memberToInvite(ctx, invited, cmd.Project)
+		member, action, memberErr := h.memberToInvite(ctx, invited, cmd.Project, cmd.Caller)
 		if memberErr != nil {
 			return memberErr
 		}
@@ -121,8 +129,10 @@ func (h *InviteToProject) Handle(ctx context.Context, cmd InviteToProjectCommand
 
 // memberToInvite returns the member to issue an invitation to, locked, and
 // the audit action issuing it records: a new invited member, created, or the
-// invited one whose pending invitation is to project.
-func (h *InviteToProject) memberToInvite(ctx context.Context, invited access.Member, project ProjectRef) (access.Member, string, error) {
+// invited one whose pending invitation is to project and may be issued again
+// by caller: the member who issued it, or an instance admin.
+func (h *InviteToProject) memberToInvite(ctx context.Context, invited access.Member, project ProjectRef, caller access.Caller,
+) (access.Member, string, error) {
 	existing, err := h.store.LockMemberByEmail(ctx, invited.Email)
 	if errors.Is(err, ErrNotFound) {
 		return invited, "member.invited", h.store.CreateMember(ctx, invited, "")
@@ -142,6 +152,9 @@ func (h *InviteToProject) memberToInvite(ctx context.Context, invited access.Mem
 	}
 	if g := pending.Grant; g == nil || g.Project != project.ID {
 		return access.Member{}, "", errEmailHeld
+	}
+	if by := caller.Member; by == nil || (by.ID != pending.InvitedBy && !by.InstanceAdmin) {
+		return access.Member{}, "", errInvitedByAnother
 	}
 	return existing, "member.invitation_reissued", nil
 }

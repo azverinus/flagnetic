@@ -59,14 +59,27 @@ type NewGrantInput struct {
 // can use nothing it gives until they are reactivated.
 var ErrMemberDeactivated = apperrors.Conflict("member_deactivated", "the member is deactivated")
 
+// ErrMemberInvited refuses giving a member who has not accepted their
+// invitation more than the invitation carries. Until an invitation is
+// mailed its link is held by whoever issued it, who can accept it as the
+// person invited: a role granted, or the instance admin switch set, before
+// the person joins would be given to whoever holds their link.
+var ErrMemberInvited = apperrors.Conflict("member_invited",
+	"the member has not accepted their invitation yet; they are given this once they have joined")
+
 // NewGrant returns a grant made by hand of a built-in role to a member who
-// is not deactivated; an invited member may hold grants before they join.
+// has joined and is not deactivated: an invited member is refused
+// ErrMemberInvited, and holds only what their invitation grants once they
+// accept it.
 func NewGrant(grantID GrantID, in NewGrantInput) (Grant, error) {
 	if _, ok := RoleNamed(in.Role); !ok {
 		return Grant{}, UnknownRoleError("/role")
 	}
-	if in.Member.Status == MemberDeactivated {
+	switch in.Member.Status {
+	case MemberDeactivated:
 		return Grant{}, ErrMemberDeactivated
+	case MemberInvited:
+		return Grant{}, ErrMemberInvited
 	}
 	return Grant{
 		ID: grantID, Project: in.Project, Member: in.Member.ID, Role: in.Role, Source: GrantManual,

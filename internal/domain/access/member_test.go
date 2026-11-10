@@ -77,6 +77,28 @@ func TestAMemberIsEditedWithinTheBoundsOfANewOne(t *testing.T) {
 	}
 }
 
+// Until an invitation is mailed, its link is held by whoever issued it, who
+// can accept it as the person invited. What an invited member is given
+// before they join is therefore given to whoever holds their link.
+func TestAnInvitedMemberIsMadeInstanceAdminOnlyOnceTheyJoined(t *testing.T) {
+	invited := access.Member{Email: "ada@example.com", DisplayName: "Ada", Status: access.MemberInvited}
+	_, err := invited.Edited(access.MemberChange{InstanceAdmin: new(true)})
+	if e, ok := apperrors.From(err); !ok || e.Kind != apperrors.KindConflict || e.Code != "member_invited" {
+		t.Errorf("promoting an invited member = %v, want the conflict member_invited", err)
+	}
+	if got, err := invited.Edited(access.MemberChange{DisplayName: new("Ada L"), InstanceAdmin: new(false)}); err != nil || got.DisplayName != "Ada L" {
+		t.Errorf("renaming an invited member = %+v, %v", got, err)
+	}
+	// One invited again after a deactivation keeps what they held.
+	was := access.Member{Email: "ada@example.com", DisplayName: "Ada", Status: access.MemberInvited, InstanceAdmin: true}
+	if got, err := was.Edited(access.MemberChange{InstanceAdmin: new(true)}); err != nil || !got.InstanceAdmin {
+		t.Errorf("leaving an invited instance admin as they are = %+v, %v", got, err)
+	}
+	if got, err := was.Edited(access.MemberChange{InstanceAdmin: new(false)}); err != nil || got.InstanceAdmin {
+		t.Errorf("demoting an invited instance admin = %+v, %v", got, err)
+	}
+}
+
 func TestTheLastActiveInstanceAdminIsNeverLost(t *testing.T) {
 	admin := access.Member{Status: access.MemberActive, InstanceAdmin: true}
 	demoted, deactivated := admin, admin.Deactivated()
