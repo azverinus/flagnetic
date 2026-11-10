@@ -99,6 +99,7 @@ type Handlers struct {
 	TestAuthProvider                        *appidentity.TestProvider
 	GetGroupMappings                        *appidentity.GetGroupMappings
 	ReplaceGroupMappings                    *appidentity.ReplaceGroupMappings
+	ListProviderSCIMGroups                  *appidentity.ListProviderSCIMGroups
 	ListSCIMTokens                          *appidentity.ListSCIMTokens
 	CreateSCIMToken                         *appidentity.CreateSCIMToken
 	RevokeSCIMToken                         *appidentity.RevokeSCIMToken

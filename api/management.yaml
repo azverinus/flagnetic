@@ -5848,6 +5848,32 @@ paths:
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/Invalid"
+  /instance/auth-providers/{provider}/scim-groups:
+    parameters:
+      - $ref: "#/components/parameters/AuthProviderSlug"
+    get:
+      operationId: listAuthProviderScimGroups
+      summary: An auth provider's SCIM groups
+      description: |
+        The groups the provider's directory has pushed through SCIM, by name,
+        each with how many of the provider's provisioned members it holds. The
+        directory owns them: they are read only here, and group mappings match
+        them by `display_name`.
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "200":
+          description: The SCIM groups, ordered by name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScimGroupList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /instance/auth-providers/{provider}/test:
     parameters:
       - $ref: "#/components/parameters/AuthProviderSlug"
@@ -9071,6 +9097,32 @@ components:
           type: string
           format: date-time
           nullable: true
+    ScimGroupList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScimGroup"
+    ScimGroup:
+      type: object
+      description: A group an auth provider's directory pushed through SCIM.
+      required: [id, display_name, external_id, member_count]
+      properties:
+        id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+          description: The group's name, which the provider's group mappings match exactly.
+        external_id:
+          type: string
+          nullable: true
+          description: The directory's own identifier of the group; null when it sent none.
+        member_count:
+          type: integer
+          description: How many of the provider's provisioned members the group holds.
     ScimTokenList:
       type: object
       required: [items]

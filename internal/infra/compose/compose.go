@@ -443,6 +443,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		TestAuthProvider:                        appidentity.NewTestProvider(identityStore, oidc.NewDiscoverer(), samlClient),
 		GetGroupMappings:                        appidentity.NewGetGroupMappings(identityStore, identityStore),
 		ReplaceGroupMappings:                    appidentity.NewReplaceGroupMappings(groupMappings),
+		ListProviderSCIMGroups:                  appidentity.NewListProviderSCIMGroups(identityStore, identityStore),
 		ListSCIMTokens:                          appidentity.NewListSCIMTokens(identityStore),
 		CreateSCIMToken:                         appidentity.NewCreateSCIMToken(scimTokens),
 		RevokeSCIMToken:                         appidentity.NewRevokeSCIMToken(scimTokens),
