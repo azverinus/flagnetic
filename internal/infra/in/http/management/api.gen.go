@@ -9884,8 +9884,11 @@ type ClientInterface interface {
 	// never change (`immutable`). Variations are replaced as a list and
 	// matched by key: removing one that a configuration still serves is
 	// `in_use`, listing what serves it, as is removing one that any
-	// experiment of the flag lists. A change to the values the flag
-	// already has changes nothing and records nothing.
+	// experiment of the flag lists. An archived flag keeps the keys and
+	// values of its variations (`409 archived`), so that restoring it
+	// serves what was archived; the rest of it is changed as any flag's. A
+	// change to the values the flag already has changes nothing and
+	// records nothing.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9899,8 +9902,11 @@ type ClientInterface interface {
 	// never change (`immutable`). Variations are replaced as a list and
 	// matched by key: removing one that a configuration still serves is
 	// `in_use`, listing what serves it, as is removing one that any
-	// experiment of the flag lists. A change to the values the flag
-	// already has changes nothing and records nothing.
+	// experiment of the flag lists. An archived flag keeps the keys and
+	// values of its variations (`409 archived`), so that restoring it
+	// serves what was archived; the rest of it is changed as any flag's. A
+	// change to the values the flag already has changes nothing and
+	// records nothing.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -15448,8 +15454,11 @@ func (c *Client) GetFlag(ctx context.Context, project ProjectKey, flag FlagKey, 
 // never change (`immutable`). Variations are replaced as a list and
 // matched by key: removing one that a configuration still serves is
 // `in_use`, listing what serves it, as is removing one that any
-// experiment of the flag lists. A change to the values the flag
-// already has changes nothing and records nothing.
+// experiment of the flag lists. An archived flag keeps the keys and
+// values of its variations (`409 archived`), so that restoring it
+// serves what was archived; the rest of it is changed as any flag's. A
+// change to the values the flag already has changes nothing and
+// records nothing.
 //
 // Takes any type of body and a specified content type.
 //
@@ -15473,8 +15482,11 @@ func (c *Client) UpdateFlagWithBody(ctx context.Context, project ProjectKey, fla
 // never change (`immutable`). Variations are replaced as a list and
 // matched by key: removing one that a configuration still serves is
 // `in_use`, listing what serves it, as is removing one that any
-// experiment of the flag lists. A change to the values the flag
-// already has changes nothing and records nothing.
+// experiment of the flag lists. An archived flag keeps the keys and
+// values of its variations (`409 archived`), so that restoring it
+// serves what was archived; the rest of it is changed as any flag's. A
+// change to the values the flag already has changes nothing and
+// records nothing.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -31209,8 +31221,11 @@ type ClientWithResponsesInterface interface {
 	// never change (`immutable`). Variations are replaced as a list and
 	// matched by key: removing one that a configuration still serves is
 	// `in_use`, listing what serves it, as is removing one that any
-	// experiment of the flag lists. A change to the values the flag
-	// already has changes nothing and records nothing.
+	// experiment of the flag lists. An archived flag keeps the keys and
+	// values of its variations (`409 archived`), so that restoring it
+	// serves what was archived; the rest of it is changed as any flag's. A
+	// change to the values the flag already has changes nothing and
+	// records nothing.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -31224,8 +31239,11 @@ type ClientWithResponsesInterface interface {
 	// never change (`immutable`). Variations are replaced as a list and
 	// matched by key: removing one that a configuration still serves is
 	// `in_use`, listing what serves it, as is removing one that any
-	// experiment of the flag lists. A change to the values the flag
-	// already has changes nothing and records nothing.
+	// experiment of the flag lists. An archived flag keeps the keys and
+	// values of its variations (`409 archived`), so that restoring it
+	// serves what was archived; the rest of it is changed as any flag's. A
+	// change to the values the flag already has changes nothing and
+	// records nothing.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -52757,8 +52775,11 @@ func (c *ClientWithResponses) GetFlagWithResponse(ctx context.Context, project P
 // never change (`immutable`). Variations are replaced as a list and
 // matched by key: removing one that a configuration still serves is
 // `in_use`, listing what serves it, as is removing one that any
-// experiment of the flag lists. A change to the values the flag
-// already has changes nothing and records nothing.
+// experiment of the flag lists. An archived flag keeps the keys and
+// values of its variations (`409 archived`), so that restoring it
+// serves what was archived; the rest of it is changed as any flag's. A
+// change to the values the flag already has changes nothing and
+// records nothing.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -52778,8 +52799,11 @@ func (c *ClientWithResponses) UpdateFlagWithBodyWithResponse(ctx context.Context
 // never change (`immutable`). Variations are replaced as a list and
 // matched by key: removing one that a configuration still serves is
 // `in_use`, listing what serves it, as is removing one that any
-// experiment of the flag lists. A change to the values the flag
-// already has changes nothing and records nothing.
+// experiment of the flag lists. An archived flag keeps the keys and
+// values of its variations (`409 archived`), so that restoring it
+// serves what was archived; the rest of it is changed as any flag's. A
+// change to the values the flag already has changes nothing and
+// records nothing.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

@@ -33,7 +33,7 @@ A flag is created switched off in every environment of its project. A boolean fl
 
 `POST /flags/{flag}/archive` hides a flag from SDKs in every environment and keeps its definition and configurations; `POST /flags/{flag}/restore` brings it back as it was archived. Archiving an archived flag, or restoring one that is not, changes nothing. A flag another flag still requires as a prerequisite is not archived (`409 in_use`, naming the flags that require it).
 
-An archived flag's definition can still be edited, but none of its configurations can be written (`409 archived`), and no condition or prerequisite may start naming it (`archived_flag`).
+An archived flag's definition can still be edited, except the keys and values of its variations (`409 archived`): an archived flag is in no ruleset, so nothing would judge the change against a [protected environment](governance.md#protected-environments), and restoring the flag serves exactly what was archived. A variation's name and description are edited as before. None of its configurations can be written (`409 archived`), and no condition or prerequisite may start naming it (`archived_flag`).
 
 `DELETE /flags/{flag}` deletes a flag with its configuration in every environment, and only an archived one (`409 not_archived`), so deleting is a deliberate second step after archiving.
 

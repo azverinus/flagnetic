@@ -347,6 +347,38 @@ func TestAReferenceNamingEveryEnvironmentCarriesEnvironmentNull(t *testing.T) {
 	}
 }
 
+// An archived flag is in no ruleset, so nothing judges a change to it
+// against a protected environment. Were its variations changed meanwhile,
+// restoring it would hand every environment values nobody reviewed.
+func TestAnArchivedFlagKeepsTheVariationsItServes(t *testing.T) {
+	f, err := flags.NewFlag(input("f", flags.TypeString, variation("a", `"A"`), variation("b", `"B"`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	archived, _ := f.Archive(now)
+	for name, served := range map[string][]flags.VariationInput{
+		"another value":     {variation("a", `"changed"`), variation("b", `"B"`)},
+		"a variation fewer": {variation("a", `"A"`)},
+		"a variation more":  {variation("a", `"A"`), variation("b", `"B"`), variation("c", `"C"`)},
+		"another order":     {variation("b", `"B"`), variation("a", `"A"`)},
+	} {
+		_, _, err = archived.Change(flags.FlagChange{Variations: &served}, now)
+		if e, ok := apperrors.From(err); !ok || e.Kind != apperrors.KindConflict || e.Code != "archived" {
+			t.Errorf("%s of an archived flag = %v, want the conflict archived", name, err)
+		}
+		if _, _, err = f.Change(flags.FlagChange{Variations: &served}, now); err != nil {
+			t.Errorf("%s of an active flag: %v", name, err)
+		}
+	}
+	// What no SDK is served stays editable: the flag's own name and
+	// description, and those of its variations.
+	renamed := []flags.VariationInput{{Key: "a", Value: json.RawMessage(`"A"`), Name: ptr("First")}, variation("b", `"B"`)}
+	out, changed, err := archived.Change(flags.FlagChange{Name: ptr("Renamed"), Variations: &renamed}, now)
+	if err != nil || !changed.Any || out.Name != "Renamed" || out.Variations[0].Name != "First" {
+		t.Errorf("renaming an archived flag and its variation = %+v, %+v, %v", out, changed, err)
+	}
+}
+
 func TestArchivingHidesAFlagUntilItIsRestoredAndOnlyAnArchivedFlagIsDeleted(t *testing.T) {
 	f, _ := flags.NewFlag(input("f", flags.TypeBoolean))
 	if e, ok := apperrors.From(f.CanDelete()); !ok || e.Kind != apperrors.KindConflict || e.Code != "not_archived" {

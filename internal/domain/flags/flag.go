@@ -400,6 +400,14 @@ type Changed struct {
 	Switched bool
 }
 
+// errArchivedVariations refuses a change to what an archived flag's
+// variations serve. An archived flag is in no ruleset, so nothing judges a
+// change to it against a protected environment: were its variations changed
+// meanwhile, restoring it would hand every environment, protected ones
+// included, values nobody reviewed. Restored, it serves what was archived.
+var errArchivedVariations = apperrors.Conflict("archived",
+	"the flag is archived; restore it before changing the keys or values of its variations")
+
 // Change returns the flag with ch applied at now, its version incremented
 // when anything changed, and what changed. The owner is judged only when
 // the change names a new one: ownership is never checked afterwards, so a
@@ -444,6 +452,9 @@ func (f Flag) Change(ch FlagChange, now time.Time) (Flag, Changed, error) {
 	}
 	if err := c.err(); err != nil {
 		return f, Changed{}, err
+	}
+	if f.ArchivedAt != nil && !sameServed(f.Variations, out.Variations) {
+		return f, Changed{}, errArchivedVariations
 	}
 	if out.sameDefinition(f) {
 		return f, Changed{}, nil

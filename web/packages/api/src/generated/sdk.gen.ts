@@ -2421,8 +2421,11 @@ export const getFlag = <ThrowOnError extends boolean = false>(
  * never change (`immutable`). Variations are replaced as a list and
  * matched by key: removing one that a configuration still serves is
  * `in_use`, listing what serves it, as is removing one that any
- * experiment of the flag lists. A change to the values the flag
- * already has changes nothing and records nothing.
+ * experiment of the flag lists. An archived flag keeps the keys and
+ * values of its variations (`409 archived`), so that restoring it
+ * serves what was archived; the rest of it is changed as any flag's. A
+ * change to the values the flag already has changes nothing and
+ * records nothing.
  *
  */
 export const updateFlag = <ThrowOnError extends boolean = false>(
