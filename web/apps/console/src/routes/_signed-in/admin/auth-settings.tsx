@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_signed-in/admin/auth-settings")({
   component: AuthSettingsPage,
 });
 
-/** The instance's rules for sessions, API tokens, passwords and their reset. */
+/** The instance's rules for sessions, API tokens, passwords, local login and SSO enforcement. */
 function AuthSettingsPage() {
   const { t } = useLingui();
   const settings = useQuery(authSettingsQuery);
@@ -24,9 +24,10 @@ function AuthSettingsPage() {
         title={t`Auth settings`}
         description={
           <Trans>
-            How long sessions last, how long API tokens may live, how long passwords must be, and
-            whether members reset a forgotten password by mail. Every replica of the instance
-            applies a change within a second.
+            How long sessions last, how long API tokens may live, how long passwords must be,
+            whether members reset a forgotten password by mail, whether they sign in with a password
+            at all, and which email domains sign in through one auth provider only. Every replica of
+            the instance applies a change within a second.
           </Trans>
         }
       />

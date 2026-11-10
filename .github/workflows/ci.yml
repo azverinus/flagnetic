@@ -420,7 +420,9 @@ jobs:
       - name: Test with the race detector
         env:
           FLAGNETIC_SCENARIO_REPORT: ${{ runner.temp }}/scenarios.json
-        run: go test -race -coverprofile=coverage.out ./...
+        # -count=1: the behaviour matrix below reads the report the tests
+        # write, which a cached result would not write again.
+        run: go test -race -count=1 -coverprofile=coverage.out ./...
       - name: Behaviour matrix
         # The Go column of docs/sdks/behaviour-matrix.md is what the
         # protocol runners report as passed in the run above.
