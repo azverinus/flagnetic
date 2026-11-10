@@ -9212,7 +9212,9 @@ type ClientInterface interface {
 	// validate it (`invalid_configuration`, its pointers under
 	// `/draft/configuration`), with no `If-Match`, and is never stored:
 	// nothing changes and nothing is recorded. A context whose unit ID is
-	// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+	// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+	// is `invalid_context`. A flag named twice is evaluated once.
+	// Evaluating records no exposure.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9234,7 +9236,9 @@ type ClientInterface interface {
 	// validate it (`invalid_configuration`, its pointers under
 	// `/draft/configuration`), with no `If-Match`, and is never stored:
 	// nothing changes and nothing is recorded. A context whose unit ID is
-	// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+	// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+	// is `invalid_context`. A flag named twice is evaluated once.
+	// Evaluating records no exposure.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -14342,7 +14346,9 @@ func (c *Client) UpdateEnvironment(ctx context.Context, project ProjectKey, envi
 // validate it (`invalid_configuration`, its pointers under
 // `/draft/configuration`), with no `If-Match`, and is never stored:
 // nothing changes and nothing is recorded. A context whose unit ID is
-// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+// is `invalid_context`. A flag named twice is evaluated once.
+// Evaluating records no exposure.
 //
 // Takes any type of body and a specified content type.
 //
@@ -14374,7 +14380,9 @@ func (c *Client) EvaluateWithBody(ctx context.Context, project ProjectKey, envir
 // validate it (`invalid_configuration`, its pointers under
 // `/draft/configuration`), with no `If-Match`, and is never stored:
 // nothing changes and nothing is recorded. A context whose unit ID is
-// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+// is `invalid_context`. A flag named twice is evaluated once.
+// Evaluating records no exposure.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -30485,7 +30493,9 @@ type ClientWithResponsesInterface interface {
 	// validate it (`invalid_configuration`, its pointers under
 	// `/draft/configuration`), with no `If-Match`, and is never stored:
 	// nothing changes and nothing is recorded. A context whose unit ID is
-	// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+	// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+	// is `invalid_context`. A flag named twice is evaluated once.
+	// Evaluating records no exposure.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -30507,7 +30517,9 @@ type ClientWithResponsesInterface interface {
 	// validate it (`invalid_configuration`, its pointers under
 	// `/draft/configuration`), with no `If-Match`, and is never stored:
 	// nothing changes and nothing is recorded. A context whose unit ID is
-	// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+	// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+	// is `invalid_context`. A flag named twice is evaluated once.
+	// Evaluating records no exposure.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -51771,7 +51783,9 @@ func (c *ClientWithResponses) UpdateEnvironmentWithResponse(ctx context.Context,
 // validate it (`invalid_configuration`, its pointers under
 // `/draft/configuration`), with no `If-Match`, and is never stored:
 // nothing changes and nothing is recorded. A context whose unit ID is
-// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+// is `invalid_context`. A flag named twice is evaluated once.
+// Evaluating records no exposure.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -51799,7 +51813,9 @@ func (c *ClientWithResponses) EvaluateWithBodyWithResponse(ctx context.Context, 
 // validate it (`invalid_configuration`, its pointers under
 // `/draft/configuration`), with no `If-Match`, and is never stored:
 // nothing changes and nothing is recorded. A context whose unit ID is
-// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+// is `invalid_context`. A flag named twice is evaluated once.
+// Evaluating records no exposure.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

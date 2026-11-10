@@ -194,7 +194,7 @@ In the console, **Stale flags** in the project navigation, also linked from the 
 }
 ```
 
-A unit ID over 256 bytes is refused `422 invalid_context`.
+A unit ID over 256 bytes, or an attribute holding a string over 1,024 bytes, is refused `422 invalid_context`.
 
 In the console, **Tester** on a flag's page (or the `t` key) opens a panel beside the environment's tab that evaluates the flag there for a context of units and typed attributes: against the saved configuration, or with **Use unsaved draft** against the draft being edited, which is never saved. It shows the value, the variation, the reason, the rule that served (marked in the editor), for a rollout the unit's bucket and the salt, and whether an override decided. The last 10 contexts evaluated in a project are kept in this browser to pick again. The tester needs only read access, so a viewer can answer why a user sees what they see.
 

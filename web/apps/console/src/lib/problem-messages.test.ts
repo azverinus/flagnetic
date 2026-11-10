@@ -160,6 +160,17 @@ describe("a field violation", () => {
     ).toBe("Nest arrays and objects at most 32 deep.");
   });
 
+  it("says a pattern repeats too much", () => {
+    expect(
+      violationMessage(i18n, {
+        pointer: "/rules/0/conditions/0/value",
+        code: "too_complex",
+        detail: "the pattern repeats too much",
+        params: { max: 1000 },
+      }),
+    ).toBe("The pattern repeats too much. Shorten its repetitions or split it into conditions.");
+  });
+
   it("names the bound of a token's expiry the instance allows", () => {
     expect(
       violationMessage(i18n, {

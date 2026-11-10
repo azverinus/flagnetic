@@ -77,6 +77,7 @@ In the console, **Unit types** and **Attributes** show each declaration's count 
 | Rules in a configuration | 50 |
 | Conditions in a rule or a segment | 20 |
 | Entries in a list value | 10,000 |
+| `matches` pattern | 500 characters (`too_long`), and no more repetition than a program of 1,000 steps holds (`too_complex`): `a{1,400}` fits, `(?:[a-z0-9]{1,100}-){1,10}` does not |
 | Overrides in a configuration | 200 |
 | Prerequisite chain in an environment | 5 flags deep, acyclic |
 | Unit ID | 256 bytes |

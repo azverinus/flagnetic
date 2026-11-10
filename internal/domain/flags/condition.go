@@ -1,9 +1,11 @@
 package flags
 
 import (
+	"regexp/syntax"
 	"slices"
 	"strconv"
 	"time"
+	"unicode/utf8"
 
 	"github.com/azverinus/flagnetic/eval"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -35,6 +37,36 @@ type Condition struct {
 // maxListEntries bounds a list value, so a condition stays quick for an SDK
 // to evaluate and a ruleset quick to download.
 const maxListEntries = 10_000
+
+// A matches pattern is bounded twice, since its length alone does not bound
+// what it costs: a{1000} is seven characters and a thousand steps. The
+// evaluator compiles every pattern of a ruleset when the ruleset is loaded
+// and keeps the programs, and matching takes time in proportion to the
+// program's size times the value's length, which a pattern left unbounded
+// turned into gigabytes of memory on every replica and SDK holding the
+// ruleset and hours of processor time for one evaluation.
+const (
+	// maxPatternLength is how many characters a matches pattern has at most.
+	maxPatternLength = 500
+	// maxPatternSize is how many instructions the program a matches pattern
+	// compiles to has at most. A literal of the longest pattern fits, and so
+	// does a{1,400}; no pattern written by hand comes near.
+	maxPatternSize = 1000
+)
+
+// patternSize returns how many instructions the program of pattern, a
+// regular expression the evaluator accepts, has.
+func patternSize(pattern string) int {
+	re, err := syntax.Parse(pattern, syntax.Perl)
+	if err != nil {
+		return 0
+	}
+	prog, err := syntax.Compile(re.Simplify())
+	if err != nil {
+		return 0
+	}
+	return len(prog.Inst)
+}
 
 // valuelessOperators test whether the attribute is there or empty, and take
 // no value.
@@ -96,11 +128,25 @@ func (c *check) attributeCondition(pointer string, cond Condition, d Declaration
 	case valueless:
 		// Nothing to parse: whether the attribute is there holds for every
 		// type alike.
+	case cond.Op == "matches" && overlong(cond.Value):
+		// Judged before the pattern is compiled, which is what a long one
+		// makes costly.
+		c.add(pointer+"/value", "too_long", "a pattern has at most 500 characters", map[string]any{"max": maxPatternLength})
 	case eval.CheckOperator(typ, cond.Op, cond.Value) != nil:
 		c.add(pointer+"/value", "invalid_value", "the value does not fit the operator and the attribute's type", nil)
+	case cond.Op == "matches" && patternSize(cond.Value.(string)) > maxPatternSize:
+		c.add(pointer+"/value", "too_complex", "the pattern repeats too much: shorten its repetitions or split it into conditions",
+			map[string]any{"max": maxPatternSize})
 	default:
 		c.listAndEntries(pointer+"/value", typ, cond.Value)
 	}
+}
+
+// overlong reports whether value is a pattern of more than maxPatternLength
+// characters.
+func overlong(value any) bool {
+	pattern, ok := value.(string)
+	return ok && utf8.RuneCountInString(pattern) > maxPatternLength
 }
 
 // operatorDefined reports whether the evaluator defines op for typ: whether

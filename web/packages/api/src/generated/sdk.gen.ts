@@ -1765,7 +1765,9 @@ export const setEnvironmentProtection = <ThrowOnError extends boolean = false>(
  * validate it (`invalid_configuration`, its pointers under
  * `/draft/configuration`), with no `If-Match`, and is never stored:
  * nothing changes and nothing is recorded. A context whose unit ID is
- * over 256 bytes is `invalid_context`. Evaluating records no exposure.
+ * over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+ * is `invalid_context`. A flag named twice is evaluated once.
+ * Evaluating records no exposure.
  *
  */
 export const evaluate = <ThrowOnError extends boolean = false>(

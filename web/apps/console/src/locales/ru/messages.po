@@ -7186,6 +7186,10 @@ msgstr "Пароли не совпадают."
 msgid "The pasted metadata is stored and not shown again. Leave this empty to keep it, or paste a new document to replace it."
 msgstr "Вставленные метаданные сохранены и больше не показываются. Оставьте поле пустым, чтобы сохранить их, или вставьте новый документ, чтобы заменить."
 
+#: src/lib/problem-messages.ts
+msgid "The pattern repeats too much. Shorten its repetitions or split it into conditions."
+msgstr "В шаблоне слишком много повторений. Сократите их или разбейте шаблон на несколько условий."
+
 #: src/components/webhook-detail.tsx
 msgid "The platform disabled this webhook after its receiver kept failing, and dropped the deliveries that were waiting. Enable it once the receiver is back; a dropped delivery can then be redelivered from the log."
 msgstr "Платформа отключила этот вебхук, потому что его получатель продолжал отвечать ошибками, и отбросила ожидавшие доставки. Включите его, когда получатель снова заработает; после этого отброшенную доставку можно отправить снова из журнала."

@@ -210,12 +210,20 @@ func TestEvaluateUsesADraftWithoutSavingIt(t *testing.T) {
 	refused("an undeclared attribute", management.FlagConfigurationPut{OffVariation: "a", Fallthrough: "a",
 		Rules: &[]management.RuleInput{{Conditions: conditions(attr("shoe_size", "eq", `"9"`)), Serve: serves("a")}}},
 		"/draft/configuration/rules/0/conditions/0/attribute unknown_attribute")
+	refused("a pattern that repeats too much", management.FlagConfigurationPut{OffVariation: "a", Fallthrough: "a",
+		Rules: &[]management.RuleInput{{Conditions: conditions(attr("os", "matches", `"^(?:[a-z0-9]{1,100}-){1,10}$"`)), Serve: serves("a")}}},
+		"/draft/configuration/rules/0/conditions/0/value too_complex")
 	refused("an experiment", management.FlagConfigurationPut{OffVariation: "a", Fallthrough: "a",
 		Rules: &[]management.RuleInput{{Serve: management.Serve{Kind: "experiment", Experiment: ptr("nothing")}}}},
 		"/draft/configuration/rules/0/serve/experiment unknown_experiment")
 	refused("a cycle", management.FlagConfigurationPut{OffVariation: "a", Fallthrough: "a",
 		Prerequisites: &[]management.Prerequisite{{Flag: "dependent", Variation: "a"}}},
 		"/draft/configuration/prerequisites/0/flag prerequisite_cycle")
+	long := evaluate(t, admin, p.Key, "staging", management.EvaluationRequest{
+		Context: contextOf(user("u1"), `{"os":"`+strings.Repeat("x", 1025)+`"}`)})
+	if got := violationsOf(t, "an overlong attribute", long.StatusCode(), long.Body, "invalid_context"); !slices.Equal(got, []string{"/context/attributes/os too_long"}) {
+		t.Errorf("an overlong attribute: violations = %v", got)
+	}
 	unknown := evaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: ctx,
 		Draft: &management.EvaluationDraft{Flag: "nope", Configuration: draft}})
 	assertProblem(t, "a draft of an unknown flag", unknown.StatusCode(), unknown.Body, http.StatusNotFound, "not_found")

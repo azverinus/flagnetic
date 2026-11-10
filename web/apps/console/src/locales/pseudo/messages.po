@@ -7186,6 +7186,10 @@ msgstr ""
 msgid "The pasted metadata is stored and not shown again. Leave this empty to keep it, or paste a new document to replace it."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "The pattern repeats too much. Shorten its repetitions or split it into conditions."
+msgstr ""
+
 #: src/components/webhook-detail.tsx
 msgid "The platform disabled this webhook after its receiver kept failing, and dropped the deliveries that were waiting. Enable it once the receiver is back; a dropped delivery can then be redelivered from the log."
 msgstr ""

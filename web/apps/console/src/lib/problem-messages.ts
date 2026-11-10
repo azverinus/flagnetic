@@ -343,6 +343,10 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
         ? i18n._(msg`Nest arrays and objects at most ${max} deep.`)
         : i18n._(msg`Nested too deep.`);
     }
+    case "too_complex":
+      return i18n._(
+        msg`The pattern repeats too much. Shorten its repetitions or split it into conditions.`,
+      );
     case "reserved_key":
       return i18n._(msg`This key is reserved.`);
     case "invalid_type":
