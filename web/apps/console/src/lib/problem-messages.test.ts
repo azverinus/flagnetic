@@ -88,6 +88,18 @@ describe("a refusal in the member's language", () => {
     );
   });
 
+  it("explains why a way to sign in cannot be removed", () => {
+    expect(problemMessage(i18n, refusal(409, { code: "last_auth_method" }))).toMatch(
+      /^That is the only usable way to sign in left/,
+    );
+    expect(problemMessage(i18n, refusal(409, { code: "provider_enforced" }))).toMatch(
+      /signs in through this provider only/,
+    );
+    expect(problemMessage(i18n, refusal(409, { code: "member_provisioned" }))).toMatch(
+      /provider manages this member/,
+    );
+  });
+
   it("names the missing permission by its display name", () => {
     expect(
       problemMessage(i18n, refusal(403, { code: "forbidden", permission: "environment.manage" })),

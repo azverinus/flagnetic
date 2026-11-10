@@ -221,9 +221,25 @@ msgstr "{name} can sign in again. What deactivation revoked stays revoked: their
 msgid "{name} gets a fresh invitation as {role}, and their earlier link stops working."
 msgstr "{name} gets a fresh invitation as {role}, and their earlier link stops working."
 
+#: src/components/member-identities.tsx
+msgid "{name} has linked no identity."
+msgstr "{name} has linked no identity."
+
 #: src/components/member-credentials.tsx
 msgid "{name} has no API token."
 msgstr "{name} has no API token."
+
+#: src/components/member-identities.tsx
+msgid "{name} holds a password, set on <0>{setAt}</0>."
+msgstr "{name} holds a password, set on <0>{setAt}</0>."
+
+#: src/components/member-identities.tsx
+msgid "{name} holds a password."
+msgstr "{name} holds a password."
+
+#: src/components/member-identities.tsx
+msgid "{name} holds no password."
+msgstr "{name} holds no password."
 
 #: src/components/member-actions.tsx
 msgid "{name} is an instance admin."
@@ -300,6 +316,10 @@ msgstr "{name} never set a password, so they join again through the mailed link.
 msgid "{name} never set a password, so they join again through this link."
 msgstr "{name} never set a password, so they join again through this link."
 
+#: src/components/member-identities.tsx
+msgid "{name} will no longer be able to sign in through {provider} with this account. The member and everything they hold stays, and they can link it again."
+msgstr "{name} will no longer be able to sign in through {provider} with this account. The member and everything they hold stays, and they can link it again."
+
 #: src/components/session-list.tsx
 msgid "{others, plural, one {Revoke # session} other {Revoke # sessions}}"
 msgstr "{others, plural, one {Revoke # session} other {Revoke # sessions}}"
@@ -329,6 +349,10 @@ msgstr "{total, plural, one {# unit first exposed} other {# units first exposed}
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "{unacknowledged, plural, one {# alert} other {# alerts}}"
 msgstr "{unacknowledged, plural, one {# alert} other {# alerts}}"
+
+#: src/components/identity-list.tsx
+msgid "{unlinkedName} is unlinked."
+msgstr "{unlinkedName} is unlinked."
 
 #: src/components/experiment-alerts.tsx
 msgid "{variation} {seen}, expected {asked}"
@@ -718,8 +742,16 @@ msgid "Accept invitation"
 msgstr "Accept invitation"
 
 #: src/components/invitation-acceptance.tsx
+msgid "Accept with a provider"
+msgstr "Accept with a provider"
+
+#: src/components/invitation-acceptance.tsx
 msgid "Accept your invitation"
 msgstr "Accept your invitation"
+
+#: src/components/identity-list.tsx
+msgid "Account"
+msgstr "Account"
 
 #: src/components/experiment-alerts.tsx
 msgid "Acknowledge"
@@ -901,6 +933,10 @@ msgstr "An experiment on it is still running past its expected end."
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "An experiment starts as a draft and changes nothing until it is started."
 msgstr "An experiment starts as a draft and changes nothing until it is started."
+
+#: src/components/sign-in-methods.tsx
+msgid "An identity is the account an identity provider knows you by. Signing in through a provider you linked opens your account here; an identity at a disabled provider is no way in until the provider is enabled again."
+msgstr "An identity is the account an identity provider knows you by. Signing in through a provider you linked opens your account here; an identity at a disabled provider is no way in until the provider is enabled again."
 
 #: src/components/member-actions.tsx
 msgid "An instance admin administers every project, every member and the instance's settings."
@@ -1461,7 +1497,7 @@ msgstr "Changes to the experiment"
 msgid "Changes to the segment"
 msgstr "Changes to the segment"
 
-#: src/routes/_signed-in/settings/profile.tsx
+#: src/components/sign-in-methods.tsx
 msgid "Changing it signs out every other device you are signed in on; this one stays signed in."
 msgstr "Changing it signs out every other device you are signed in on; this one stays signed in."
 
@@ -3676,6 +3712,7 @@ msgstr "Last ruleset version"
 msgid "Last seen"
 msgstr "Last seen"
 
+#: src/components/identity-list.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Last sign-in"
@@ -3764,14 +3801,38 @@ msgstr "Light"
 msgid "Link"
 msgstr "Link"
 
+#: src/components/sign-in-methods.tsx
+msgid "Link {name}"
+msgstr "Link {name}"
+
+#: src/components/sign-in-methods.tsx
+msgid "Link a provider"
+msgstr "Link a provider"
+
 #: src/components/auth-provider-form.tsx
 #: src/components/saml-provider-form.tsx
 msgid "Link members by email"
 msgstr "Link members by email"
 
+#: src/components/identity-list.tsx
+msgid "Linked"
+msgstr "Linked"
+
 #: src/lib/problem-messages.ts
 msgid "linked identities"
 msgstr "linked identities"
+
+#: src/components/sign-in-methods.tsx
+msgid "Linked identities"
+msgstr "Linked identities"
+
+#: src/lib/sso-errors.ts
+msgid "Linking did not work ({code}). Try again, or ask your instance admin."
+msgstr "Linking did not work ({code}). Try again, or ask your instance admin."
+
+#: src/lib/sso-errors.ts
+msgid "Linking through the identity provider failed, so nothing was linked. Try again; if it keeps failing, ask your instance admin to check the provider."
+msgstr "Linking through the identity provider failed, so nothing was linked. Try again; if it keeps failing, ask your instance admin to check the provider."
 
 #. An attribute type.
 #: src/lib/attribute-types.ts
@@ -4071,6 +4132,7 @@ msgstr "Needs the permission to {name}, held by {list}."
 msgid "Needs the permission to {name}."
 msgstr "Needs the permission to {name}."
 
+#: src/components/identity-list.tsx
 #: src/components/moment.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
@@ -4307,6 +4369,10 @@ msgstr "No project matches that."
 #: src/routes/_signed-in/index.tsx
 msgid "No projects yet"
 msgstr "No projects yet"
+
+#: src/components/sign-in-methods.tsx
+msgid "No provider is enabled on this instance."
+msgstr "No provider is enabled on this instance."
 
 #: src/components/webhook-delivery-sheet.tsx
 #: src/lib/webhooks.ts
@@ -4658,6 +4724,7 @@ msgstr "Optional; the author and the audit log see it."
 msgid "Optional. Accepting the invitation grants the role you choose in this project."
 msgstr "Optional. Accepting the invitation grants the role you choose in this project."
 
+#: src/components/invitation-acceptance.tsx
 #: src/components/sign-in-form.tsx
 msgid "or"
 msgstr "or"
@@ -4780,7 +4847,7 @@ msgstr "Part"
 #: src/components/mail-settings.tsx
 #: src/components/session-list.tsx
 #: src/components/sign-in-form.tsx
-#: src/routes/_signed-in/settings/profile.tsx
+#: src/components/sign-in-methods.tsx
 msgid "Password"
 msgstr "Password"
 
@@ -5018,6 +5085,18 @@ msgstr "Protection"
 msgid "Protocol"
 msgstr "Protocol"
 
+#: src/components/identity-list.tsx
+msgid "Provider"
+msgstr "Provider"
+
+#: src/components/identity-list.tsx
+msgid "Provider disabled"
+msgstr "Provider disabled"
+
+#: src/components/sign-in-methods.tsx
+msgid "Providers you can link"
+msgstr "Providers you can link"
+
 #: src/lib/problem-messages.ts
 msgid "provisioned members"
 msgstr "provisioned members"
@@ -5210,6 +5289,10 @@ msgstr "Remove condition {position}"
 msgid "Remove grant"
 msgstr "Remove grant"
 
+#: src/components/sign-in-methods.tsx
+msgid "Remove password"
+msgstr "Remove password"
+
 #: src/components/prerequisites-section.tsx
 msgid "Remove prerequisite {position}"
 msgstr "Remove prerequisite {position}"
@@ -5242,6 +5325,10 @@ msgstr "Remove unit {n}"
 #: src/components/weights-input.tsx
 msgid "Remove variation {n}"
 msgstr "Remove variation {n}"
+
+#: src/components/sign-in-methods.tsx
+msgid "Remove your password"
+msgstr "Remove your password"
 
 #: src/components/experiment-transitions.tsx
 msgid "Remove: its rules are deleted, the flag's other rules decide"
@@ -5867,6 +5954,11 @@ msgstr "Sign authentication requests"
 msgid "Sign in"
 msgstr "Sign in"
 
+#: src/components/sign-in-methods.tsx
+msgid "Sign in at the provider once to link the account you choose there, whatever its email. You come back to this page."
+msgstr "Sign in at the provider once to link the account you choose there, whatever its email. You come back to this page."
+
+#: src/components/invitation-acceptance.tsx
 #: src/components/sign-in-form.tsx
 msgid "Sign in with {name}"
 msgstr "Sign in with {name}"
@@ -5890,6 +5982,12 @@ msgstr "Sign yourself out everywhere"
 #: src/lib/audit.ts
 msgid "Sign-in failed"
 msgstr "Sign-in failed"
+
+#: src/routes/_signed-in/admin/members/$member.tsx
+#: src/routes/_signed-in/settings/route.tsx
+#: src/routes/_signed-in/settings/sign-in-methods.tsx
+msgid "Sign-in methods"
+msgstr "Sign-in methods"
 
 #: src/components/auth-provider-detail.tsx
 #: src/components/saml-provider-detail.tsx
@@ -6245,6 +6343,10 @@ msgstr "Tester"
 msgid "Testing…"
 msgstr "Testing…"
 
+#: src/lib/sso-errors.ts
+msgid "That account at the identity provider is already linked to another member, so nothing was linked. Sign in to the provider as the account you want to link."
+msgstr "That account at the identity provider is already linked to another member, so nothing was linked. Sign in to the provider as the account you want to link."
+
 #: src/components/session-list.tsx
 msgid "That device is signed out at its next request and must sign in again."
 msgstr "That device is signed out at its next request and must sign in again."
@@ -6252,6 +6354,14 @@ msgstr "That device is signed out at its next request and must sign in again."
 #: src/lib/problem-messages.ts
 msgid "That is not your current password."
 msgstr "That is not your current password."
+
+#: src/lib/problem-messages.ts
+msgid "That is the only usable way to sign in left, so it stays. Add another way in first: link a provider, or keep the password."
+msgstr "That is the only usable way to sign in left, so it stays. Add another way in first: link a provider, or keep the password."
+
+#: src/lib/sso-errors.ts
+msgid "That linking was started in another browser, window or session, so nothing was linked. Start it again from here."
+msgstr "That linking was started in another browser, window or session, so nothing was linked. Start it again from here."
 
 #: src/lib/sso-errors.ts
 msgid "That sign-in was started in another browser or window, so it was not completed. Start it again from here."
@@ -6410,6 +6520,10 @@ msgstr "The draft is deleted. This cannot be taken back; its audit entries stay.
 #: src/components/experiment-transitions.tsx
 msgid "The draft never starts and nothing about it changes any more; no ruleset changes. Archived experiments are listed only on request; it can still be cloned."
 msgstr "The draft never starts and nothing about it changes any more; no ruleset changes. Archived experiments are listed only on request; it can still be cloned."
+
+#: src/lib/problem-messages.ts
+msgid "The email address's domain signs in through this provider only, so its identity there cannot be unlinked."
+msgstr "The email address's domain signs in through this provider only, so its identity there cannot be unlinked."
 
 #: src/components/saml-provider-form.tsx
 msgid "The email domains this provider vouches for, one per line or separated by spaces. A subdomain is not included. An email counts as verified, and linking and creating members apply, only inside these domains."
@@ -6596,6 +6710,14 @@ msgstr "The format the instance asks the identity provider for. The name identif
 msgid "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
 msgstr "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
 
+#: src/components/member-identities.tsx
+msgid "The identities {name} linked"
+msgstr "The identities {name} linked"
+
+#: src/components/sign-in-methods.tsx
+msgid "The identities you linked"
+msgstr "The identities you linked"
+
 #: src/components/auth-provider-detail.tsx
 msgid "The identity provider answered"
 msgstr "The identity provider answered"
@@ -6611,6 +6733,10 @@ msgstr "The identity provider could not be reached or did not answer as expected
 #: src/lib/problem-messages.ts
 msgid "The identity provider offers no single sign-on service with the HTTP-Redirect binding, which the instance signs in through."
 msgstr "The identity provider offers no single sign-on service with the HTTP-Redirect binding, which the instance signs in through."
+
+#: src/lib/sso-errors.ts
+msgid "The identity provider refused the request, so nothing was linked. Ask whoever runs it, or your instance admin."
+msgstr "The identity provider refused the request, so nothing was linked. Ask whoever runs it, or your instance admin."
 
 #: src/lib/sso-errors.ts
 msgid "The identity provider refused the sign-in. Ask whoever runs it, or your instance admin."
@@ -6867,6 +6993,10 @@ msgstr "The provider is still in use. Disable it instead: that stops its sign-in
 #: src/lib/problem-messages.ts
 msgid "The provider is still used by {uses}. Disable it instead: that stops its sign-ins and keeps its members, identities and grants."
 msgstr "The provider is still used by {uses}. Disable it instead: that stops its sign-ins and keeps its members, identities and grants."
+
+#: src/lib/problem-messages.ts
+msgid "The provider manages this member, so their identity at it stays for as long as they are provisioned. Deactivate or remove them at the provider."
+msgstr "The provider manages this member, so their identity at it stays for as long as they are provisioned. Deactivate or remove them at the provider."
 
 #: src/components/auth-provider-detail.tsx
 msgid "The redirect URI is built from the instance's public address (FLAGNETIC_BASE_URL), which is not set. Set it, and the address shows here."
@@ -7547,6 +7677,14 @@ msgstr "Unknown"
 msgid "Unknown device"
 msgstr "Unknown device"
 
+#: src/components/identity-list.tsx
+msgid "Unlink"
+msgstr "Unlink"
+
+#: src/components/identity-list.tsx
+msgid "Unlink {name}"
+msgstr "Unlink {name}"
+
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Unsaved changes"
 msgstr "Unsaved changes"
@@ -7903,8 +8041,20 @@ msgid "You are invited to the project {projectName} as {role}. Accepting grants 
 msgstr "You are invited to the project {projectName} as {role}. Accepting grants you that role there."
 
 #: src/components/invitation-acceptance.tsx
+msgid "You are invited to this Flagnetic instance as {name} ({email}), but no way to join it is available now: this instance accepts no password and none of its identity providers vouches for your email address. Ask an instance admin."
+msgstr "You are invited to this Flagnetic instance as {name} ({email}), but no way to join it is available now: this instance accepts no password and none of its identity providers vouches for your email address. Ask an instance admin."
+
+#: src/components/invitation-acceptance.tsx
 msgid "You are invited to this Flagnetic instance as {name} ({email}). Choose a password to join; the link works until {until}."
 msgstr "You are invited to this Flagnetic instance as {name} ({email}). Choose a password to join; the link works until {until}."
+
+#: src/components/invitation-acceptance.tsx
+msgid "You are invited to this Flagnetic instance as {name} ({email}). Choose a password, or sign in through an identity provider, to join; the link works until {until}."
+msgstr "You are invited to this Flagnetic instance as {name} ({email}). Choose a password, or sign in through an identity provider, to join; the link works until {until}."
+
+#: src/components/invitation-acceptance.tsx
+msgid "You are invited to this Flagnetic instance as {name} ({email}). Sign in through your identity provider to join; the link works until {until}."
+msgstr "You are invited to this Flagnetic instance as {name} ({email}). Sign in through your identity provider to join; the link works until {until}."
 
 #: src/lib/problem-messages.ts
 msgid "You are not signed in."
@@ -7935,9 +8085,25 @@ msgstr "You cannot open this screen"
 msgid "You do not hold this scope yourself."
 msgstr "You do not hold this scope yourself."
 
+#: src/components/sign-in-methods.tsx
+msgid "You have a password."
+msgstr "You have a password."
+
+#: src/components/sign-in-methods.tsx
+msgid "You have linked every enabled provider."
+msgstr "You have linked every enabled provider."
+
+#: src/components/sign-in-methods.tsx
+msgid "You have linked no identity."
+msgstr "You have linked no identity."
+
 #: src/components/token-list.tsx
 msgid "You have no API token yet."
 msgstr "You have no API token yet."
+
+#: src/components/sign-in-methods.tsx
+msgid "You have no password, so you sign in through a provider below. To set one, use “Forgot your password?” on the sign-in page, or ask an instance admin for a reset link."
+msgstr "You have no password, so you sign in through a provider below. To set one, use “Forgot your password?” on the sign-in page, or ask an instance admin for a reset link."
 
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "You have proposed no change request here."
@@ -7962,6 +8128,14 @@ msgstr "You may not do this."
 #: src/lib/problem-messages.ts
 msgid "You need the permission to {name}."
 msgstr "You need the permission to {name}."
+
+#: src/components/sign-in-methods.tsx
+msgid "You will no longer be able to sign in through {name} with this account. Your own account here, and everything in it, stays. You can link it again later."
+msgstr "You will no longer be able to sign in through {name} with this account. Your own account here, and everything in it, stays. You can link it again later."
+
+#: src/components/sign-in-methods.tsx
+msgid "You will sign in only through the providers you linked. Any invitation link or password reset link still open for you stops working. This device and your other sessions stay signed in. It is refused while no linked provider is left that lets you in."
+msgstr "You will sign in only through the providers you linked. Any invitation link or password reset link still open for you stops working. This device and your other sessions stay signed in. It is refused while no linked provider is left that lets you in."
 
 #: src/lib/sso-errors.ts
 msgid "Your account here is deactivated. Ask an instance admin to reactivate it."
@@ -7998,6 +8172,14 @@ msgstr "Your new password is set. Every other session of yours is signed out."
 #: src/components/password-form.tsx
 msgid "Your password is changed. Every other device is signed out."
 msgstr "Your password is changed. Every other device is signed out."
+
+#: src/components/sign-in-methods.tsx
+msgid "Your password is removed."
+msgstr "Your password is removed."
+
+#: src/components/sign-in-methods.tsx
+msgid "Your password was set on <0>{setOn}</0>."
+msgstr "Your password was set on <0>{setOn}</0>."
 
 #: src/components/profile-form.tsx
 msgid "Your profile is saved."

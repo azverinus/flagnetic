@@ -38,3 +38,31 @@ export function ssoErrorMessage(i18n: I18n, code: string, providerName?: string)
       return i18n._(msg`Signing in did not work (${code}). Try again, or ask your instance admin.`);
   }
 }
+
+/**
+ * The sentence for the error a failed linking sends the member back to
+ * their personal settings with (`/settings?error=`): the codes are those of
+ * a sign-in, and `identity_linked` is the one only linking has.
+ */
+export function linkErrorMessage(i18n: I18n, code: string): string {
+  switch (code) {
+    case "identity_linked":
+      return i18n._(
+        msg`That account at the identity provider is already linked to another member, so nothing was linked. Sign in to the provider as the account you want to link.`,
+      );
+    case "attempt_mismatch":
+      return i18n._(
+        msg`That linking was started in another browser, window or session, so nothing was linked. Start it again from here.`,
+      );
+    case "sso_failed":
+      return i18n._(
+        msg`Linking through the identity provider failed, so nothing was linked. Try again; if it keeps failing, ask your instance admin to check the provider.`,
+      );
+    case "idp_error":
+      return i18n._(
+        msg`The identity provider refused the request, so nothing was linked. Ask whoever runs it, or your instance admin.`,
+      );
+    default:
+      return i18n._(msg`Linking did not work (${code}). Try again, or ask your instance admin.`);
+  }
+}
