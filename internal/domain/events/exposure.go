@@ -13,19 +13,28 @@ import (
 // it weighs. An experiment of any status has them, since a mobile app may
 // flush its exposures days after the experiment stopped.
 type ExperimentFacts struct {
-	ID         experiments.ExperimentID
-	FlagKey    string
-	UnitType   string
+	ID       experiments.ExperimentID
+	FlagKey  string
+	UnitType string
+	// Variations are the variations the experiment weighs.
 	Variations []string
+	// FlagVariations are all the variations of the experiment's flag, which
+	// an override may serve whatever the experiment weighs.
+	FlagVariations []string
 }
 
 // CheckExposure judges x against the experiment it names, nil when none
 // exists, and returns why it is refused, or nil when it agrees. The checks
 // run in a fixed order, so every SDK is told the same of the same exposure:
 // the experiment exists, the unit type is its own, the variation is one it
-// weighs (an override exposure is not checked against the weights, since an
-// override decides the variation whatever the weights), then the flag and the
-// evaluation reason.
+// weighs (an override exposure is checked against the flag's variations
+// instead, since an override decides the variation whatever the weights),
+// then the flag and the evaluation reason.
+//
+// Every exposure names a variation that exists: the variation is part of
+// what is counted and kept for good, and a client key ships inside apps, so
+// a variation taken as sent would let anyone holding one grow the counts
+// with names of their own making.
 //
 // A client key ships inside apps and browsers, so what it learns of an
 // experiment is its existence by the key it already holds and nothing more:
@@ -48,6 +57,9 @@ func CheckExposure(x Exposure, experiment *ExperimentFacts, detailed bool) *Reje
 	case !x.Override && !slices.Contains(experiment.Variations, x.VariationKey):
 		return reject(RejectUnknownVariation, "the variation is not one of the experiment's",
 			fmt.Sprintf("experiment %q has no variation %q", x.ExperimentKey, x.VariationKey))
+	case x.Override && !slices.Contains(experiment.FlagVariations, x.VariationKey):
+		return reject(RejectUnknownVariation, "the variation is not one of the experiment's flag",
+			fmt.Sprintf("the flag of experiment %q has no variation %q", x.ExperimentKey, x.VariationKey))
 	case x.FlagKey != experiment.FlagKey:
 		return reject(RejectEventInvalid, "the flag is not the experiment's",
 			fmt.Sprintf("flag_key is %q, but experiment %q is on flag %q", x.FlagKey, x.ExperimentKey, experiment.FlagKey))

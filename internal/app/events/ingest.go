@@ -34,9 +34,10 @@ type EventStore interface {
 	// DeclaredUnitTypes returns which of keys project declares as unit
 	// types.
 	DeclaredUnitTypes(ctx context.Context, project workspace.ProjectID, keys []string) (map[string]bool, error)
-	// KnownFlags returns which of keys name a flag of project, archived
-	// ones included.
-	KnownFlags(ctx context.Context, project workspace.ProjectID, keys []string) (map[string]bool, error)
+	// FlagVariations returns the variation keys of each flag of project
+	// that keys name, archived ones included, by flag key; a key naming no
+	// flag is absent.
+	FlagVariations(ctx context.Context, project workspace.ProjectID, keys []string) (map[string][]string, error)
 	// Experiments returns the experiments of project keyed by keys, of any
 	// status, by key; a key naming none is absent. It holds each experiment
 	// against deletion until the unit of work ends, so that the count of a
@@ -172,7 +173,7 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 	if err != nil {
 		return BatchResult{}, err
 	}
-	known, err := h.store.KnownFlags(ctx, key.Project, unique(flags))
+	variations, err := h.store.FlagVariations(ctx, key.Project, unique(flags))
 	if err != nil {
 		return BatchResult{}, err
 	}
@@ -273,7 +274,11 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 		}
 		if s := e.Summary; s != nil {
 			for _, r := range s.Rows {
-				if !known[r.Flag] {
+				// A row of a flag the project lacks, or of a variation
+				// the flag lacks, is no evaluation the project can have
+				// had: it is dropped rather than kept under a name of
+				// the sender's making.
+				if of, known := variations[r.Flag]; !known || !events.NamesVariationOf(r, of) {
 					res.DroppedRows++
 					continue
 				}

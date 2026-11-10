@@ -45,7 +45,7 @@ Otherwise each event is judged on its own and a refused one is listed in `reject
 | `undeclared_unit_type` | An alias names a unit type the project does not declare. |
 | `unknown_experiment` | An exposure names no experiment of the project. An experiment of any status exists, a draft or a stopped one too, since a mobile app may flush its queue days after the exposure. |
 | `unit_type_mismatch` | An exposure's `unit_type` is not the unit type its experiment assigns. |
-| `unknown_variation` | An exposure names a variation its experiment does not weigh. An exposure with `override` true is not checked against the weights, since an override decides the variation whatever they are. |
+| `unknown_variation` | An exposure names a variation its experiment does not weigh. An exposure with `override` true may name any variation of the experiment's flag instead, since an override decides the variation whatever the weights are. |
 
 An exposure carries what the evaluation that assigned the unit answered, so the server can check it against the experiment:
 
@@ -62,7 +62,7 @@ An exposure is judged against its experiment in this order, and refused with the
 
 An accepted alias links its pair of unit IDs in the environment of the key, once: the pair sent again under another `event_id`, as an app signing the same user in again does, is stored as an event but adds no link, and the link keeps the alias that occurred earliest. Links are kept for as long as the environment exists, after retention drops the raw aliases, so an anonymous ID can always be joined to the ID known after sign-up.
 
-A summary row's `reason` is a true reason (`rule`, `rollout`, `fallthrough`, `prerequisite_failed`, `off`, `override`, `experiment`, `error`), the SDK's own `fallback` or `local_override`, or `targeting_match`, which a client SDK counts from the answers it receives. A row naming a flag the project does not have (an archived flag is still one) is dropped and counted in `dropped_rows`; the rest of its summary is stored.
+A summary row's `reason` is a true reason (`rule`, `rollout`, `fallthrough`, `prerequisite_failed`, `off`, `override`, `experiment`, `error`), the SDK's own `fallback` or `local_override`, or `targeting_match`, which a client SDK counts from the answers it receives. A row naming a flag the project does not have (an archived flag is still one), or a variation its flag does not have, is dropped and counted in `dropped_rows`; the rest of its summary is stored. A row's `variation` may be null, when no variation was served.
 
 An event's time more than 24 hours ahead of the server clock is taken as the time the event was received.
 

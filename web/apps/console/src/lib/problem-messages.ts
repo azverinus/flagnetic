@@ -151,6 +151,10 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(msg`Only an invited member has an invitation to replace.`);
     case "member_deactivated":
       return i18n._(msg`The member is deactivated. Reactivate them first.`);
+    case "member_invited":
+      return i18n._(
+        msg`The member has not accepted their invitation yet. Give them this once they have joined.`,
+      );
     case "already_granted":
       return i18n._(msg`The member already holds this role in the project.`);
     case "role_not_allowed": {
@@ -337,6 +341,16 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
       const max = numberParam(i18n, violation, "max");
       return max ? i18n._(msg`At most ${max} characters.`) : i18n._(msg`Too long.`);
     }
+    case "too_deep": {
+      const max = numberParam(i18n, violation, "max");
+      return max
+        ? i18n._(msg`Nest arrays and objects at most ${max} deep.`)
+        : i18n._(msg`Nested too deep.`);
+    }
+    case "too_complex":
+      return i18n._(
+        msg`The pattern repeats too much. Shorten its repetitions or split it into conditions.`,
+      );
     case "reserved_key":
       return i18n._(msg`This key is reserved.`);
     case "invalid_type":

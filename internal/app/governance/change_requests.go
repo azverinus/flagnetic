@@ -434,6 +434,24 @@ func configurationDocument(c flags.Configuration) (governance.Document, error) {
 	return out, json.Unmarshal(b, &out)
 }
 
+// namesSegment reports whether proposed, the document of a configuration a
+// change request proposes, names the segment keyed segment in a condition
+// of a rule.
+func namesSegment(proposed governance.Document, segment string) (bool, error) {
+	var d configurationDoc
+	if err := fromDocument(proposed, &d); err != nil {
+		return false, err
+	}
+	for _, r := range d.Rules {
+		for _, c := range r.Conditions {
+			if (c.Kind == flags.ConditionInSegment || c.Kind == flags.ConditionNotInSegment) && c.Segment == segment {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 // ruleDocOf returns r as the documents of a change request hold it.
 func ruleDocOf(r flags.Rule) ruleDoc {
 	rd := ruleDoc{

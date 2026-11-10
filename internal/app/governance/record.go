@@ -18,8 +18,9 @@ type AuditAppender interface {
 // entry may move.
 type WaitingChangeRequests interface {
 	// Waiting returns project's open and approved change requests moved
-	// may move: those naming its flag, its environment or its segment, and
-	// when it moved configurations, those to a segment's definition.
+	// may move: those naming its flag, its environment or its segment,
+	// when it moved configurations, those to a segment's definition, and
+	// when it moved a segment, those to a configuration.
 	Waiting(ctx context.Context, project workspace.ProjectID, moved governance.Moved) ([]governance.ChangeRequest, error)
 	// UpdateChangeRequest stores cr in place of the change request with
 	// its identifier.
@@ -151,7 +152,18 @@ func (r *Record) supersede(ctx context.Context, e governance.Entry) error {
 			return err
 		}
 	}
-	for _, s := range governance.Supersedes(e, candidates, referrers) {
+	// A segment's write moves the configurations proposed to name it: the
+	// entry carries the segment's key, which is what a condition names.
+	naming := governance.Naming{}
+	for _, cr := range candidates {
+		if !moved.NeedsNaming(cr) {
+			continue
+		}
+		if naming[cr.ID], err = namesSegment(cr.Proposed, e.Entity.Key); err != nil {
+			return err
+		}
+	}
+	for _, s := range governance.Supersedes(e, candidates, referrers, naming) {
 		if err = r.changeRequests.UpdateChangeRequest(ctx, s.After); err != nil {
 			return err
 		}

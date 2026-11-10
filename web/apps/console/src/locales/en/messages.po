@@ -4315,6 +4315,14 @@ msgstr "Needs the permission to {name}, held by {list}."
 msgid "Needs the permission to {name}."
 msgstr "Needs the permission to {name}."
 
+#: src/lib/problem-messages.ts
+msgid "Nest arrays and objects at most {max} deep."
+msgstr "Nest arrays and objects at most {max} deep."
+
+#: src/lib/problem-messages.ts
+msgid "Nested too deep."
+msgstr "Nested too deep."
+
 #: src/components/identity-list.tsx
 #: src/components/moment.tsx
 #: src/components/scim-tokens.tsx
@@ -7090,6 +7098,10 @@ msgid "The member already holds this role in the project."
 msgstr "The member already holds this role in the project."
 
 #: src/lib/problem-messages.ts
+msgid "The member has not accepted their invitation yet. Give them this once they have joined."
+msgstr "The member has not accepted their invitation yet. Give them this once they have joined."
+
+#: src/lib/problem-messages.ts
 msgid "The member has not joined yet, so they have no password to reset. Issue a new invitation link instead."
 msgstr "The member has not joined yet, so they have no password to reset. Issue a new invitation link instead."
 
@@ -7177,6 +7189,10 @@ msgstr "The passwords do not match."
 #: src/components/saml-provider-form.tsx
 msgid "The pasted metadata is stored and not shown again. Leave this empty to keep it, or paste a new document to replace it."
 msgstr "The pasted metadata is stored and not shown again. Leave this empty to keep it, or paste a new document to replace it."
+
+#: src/lib/problem-messages.ts
+msgid "The pattern repeats too much. Shorten its repetitions or split it into conditions."
+msgstr "The pattern repeats too much. Shorten its repetitions or split it into conditions."
 
 #: src/components/webhook-detail.tsx
 msgid "The platform disabled this webhook after its receiver kept failing, and dropped the deliveries that were waiting. Enable it once the receiver is back; a dropped delivery can then be redelivered from the log."

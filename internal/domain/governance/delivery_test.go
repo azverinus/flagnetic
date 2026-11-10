@@ -3,6 +3,7 @@ package governance_test
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"math"
 	"strings"
 	"testing"
@@ -174,6 +175,27 @@ func TestAResponseSnippetIsTheFirstKibibyteAsValidText(t *testing.T) {
 	if got := governance.ResponseSnippet([]byte{0xff, 'o', 'k'}); got == nil || !utf8.ValidString(*got) {
 		t.Errorf("a binary body is snippet %v", got)
 	}
+}
+
+// PostgreSQL refuses a NUL in jsonb, where attempts are kept: an attempt
+// holding one could never be recorded, and its delivery would be sent again
+// for ever as its first attempt.
+func TestWhatAnAttemptKeepsOfAReceiverHoldsNoNUL(t *testing.T) {
+	got := governance.ResponseSnippet([]byte("GIF89a\x01\x00\x01\x00"))
+	if got == nil || strings.ContainsRune(*got, 0) || !strings.HasPrefix(*got, "GIF89a") {
+		t.Errorf("a body with NUL bytes is snippet %q, want its text without them", deref(got))
+	}
+	reason := governance.AttemptError(errors.New("malformed HTTP response \"\x00\xff\""))
+	if reason == nil || strings.ContainsRune(*reason, 0) || !utf8.ValidString(*reason) {
+		t.Errorf("an error with a NUL byte is kept as %q, want text PostgreSQL stores", deref(reason))
+	}
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return "<nil>"
+	}
+	return *s
 }
 
 // A redelivery is the same event, byte for byte, under a new delivery with

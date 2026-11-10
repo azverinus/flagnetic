@@ -157,6 +157,51 @@ func TestEveryWriteToAConfigurationSupersedesTheChangeRequestsWaitingOnIt(t *tes
 	}
 }
 
+// A segment no saved configuration of a protected environment names is
+// written directly. A configuration proposed to name it was reviewed with
+// the segment as it was, so the segment's write ends the review: otherwise
+// an approval given for a rule serving a handful of people would apply the
+// rule to whomever the segment was widened to afterwards.
+func TestAWriteToASegmentSupersedesTheConfigurationsProposedToNameIt(t *testing.T) {
+	f := startChangeRequests(t)
+	key := f.project.Key
+	setProtected(t, f.admin, key, "production", true)
+	maintainer, _ := grantedSession(t, f.srv, f.project, access.RoleMaintainer)
+	dev := f.dev.ClientWithResponses
+	insiders := createSegment(t, f.admin, key, management.SegmentCreate{Key: "insiders", Name: "Insiders",
+		Conditions: conditions(attr("user", "in", `["u1","u2"]`))})
+	toInsiders := management.FlagConfigurationPut{On: true, OffVariation: "a", Fallthrough: "a",
+		Rules: &[]management.RuleInput{{Conditions: conditions(inSegment("insiders")), Serve: serves("b")}}}
+
+	approved := mustApprove(t, maintainer.ClientWithResponses, key, openedOn(t, dev, key, "checkout_title", "production", toInsiders))
+	open := openedOn(t, dev, key, "checkout_title", "staging", toInsiders)
+	naming := openedOn(t, dev, key, "checkout_title", "development", proposedOn())
+
+	// Nothing saved names the segment yet, so a developer widens it with no
+	// review, protected production or not.
+	widened := updateSegment(t, dev, key, "insiders", insiders.Version, management.SegmentPatch{
+		Conditions: conditions(attr("user", "exists", ""))})
+	if widened.JSON200 == nil {
+		t.Fatalf("PATCH segment = %d: %s", widened.StatusCode(), widened.Body)
+	}
+	written := lastEntryOf(t, f.srv, insiders.Id)
+	if written.Action != "segment.updated" {
+		t.Fatalf("the segment's last entry = %s", written.Action)
+	}
+	assertSupersededBy(t, f, approved, written)
+	assertSupersededBy(t, f, open, written)
+	if got := getChangeRequest(t, dev, key, naming); got.State != management.ChangeRequestStateOpen {
+		t.Errorf("a change request naming no segment: %s, want open", got.State)
+	}
+	superseded := getChangeRequest(t, dev, key, approved)
+	if res := applyChangeRequest(t, maintainer.ClientWithResponses, key, superseded); res.JSON200 != nil {
+		t.Errorf("applying the superseded change request = %d: %s, want it refused", res.StatusCode(), res.Body)
+	}
+	if c := getConfiguration(t, f.admin, key, "checkout_title", "production"); c.On || len(c.Rules) != 0 {
+		t.Errorf("production = %+v, want it as it was", c)
+	}
+}
+
 func TestApplyingAChangeRequestSupersedesTheOthersOnItsConfiguration(t *testing.T) {
 	f := startChangeRequests(t)
 	key := f.project.Key

@@ -1765,7 +1765,9 @@ export const setEnvironmentProtection = <ThrowOnError extends boolean = false>(
  * validate it (`invalid_configuration`, its pointers under
  * `/draft/configuration`), with no `If-Match`, and is never stored:
  * nothing changes and nothing is recorded. A context whose unit ID is
- * over 256 bytes is `invalid_context`. Evaluating records no exposure.
+ * over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+ * is `invalid_context`. A flag named twice is evaluated once.
+ * Evaluating records no exposure.
  *
  */
 export const evaluate = <ThrowOnError extends boolean = false>(
@@ -2419,8 +2421,11 @@ export const getFlag = <ThrowOnError extends boolean = false>(
  * never change (`immutable`). Variations are replaced as a list and
  * matched by key: removing one that a configuration still serves is
  * `in_use`, listing what serves it, as is removing one that any
- * experiment of the flag lists. A change to the values the flag
- * already has changes nothing and records nothing.
+ * experiment of the flag lists. An archived flag keeps the keys and
+ * values of its variations (`409 archived`), so that restoring it
+ * serves what was archived; the rest of it is changed as any flag's. A
+ * change to the values the flag already has changes nothing and
+ * records nothing.
  *
  */
 export const updateFlag = <ThrowOnError extends boolean = false>(
@@ -4141,8 +4146,11 @@ export const listGrants = <ThrowOnError extends boolean = false>(
  *
  * Grants the member one of the built-in roles in the project, beside
  * any grants they hold already; they act with the union of their
- * grants' permissions. An invited member may be granted roles before
- * they join. A role holding a permission the caller lacks in the
+ * grants' permissions. A member still invited is refused
+ * `member_invited` until they accept their invitation, which carries
+ * the one role it was issued with: until an invitation is mailed its
+ * link is held by whoever issued it, so what an invited member is given
+ * is given to whoever holds their link. A role holding a permission the caller lacks in the
  * project is refused `role_not_allowed`, naming it in `permission`;
  * the same member and role twice `already_granted`; a deactivated
  * member `member_deactivated`; an unknown member or role
@@ -4205,7 +4213,8 @@ export const deleteGrant = <ThrowOnError extends boolean = false>(
  * invitation whose grant was dropped, or that grants a role elsewhere,
  * is not listed; an accepted one is a grant of the project. A member
  * listed here is invited again, with the same or another role, by
- * inviting their email to the project once more.
+ * inviting their email to the project once more, which the member who
+ * invited them or an instance admin does.
  *
  */
 export const listProjectInvitations = <ThrowOnError extends boolean = false>(
@@ -4242,8 +4251,11 @@ export const listProjectInvitations = <ThrowOnError extends boolean = false>(
  * An email the instance holds, whatever its case, is refused
  * `already_exists`: grant that member a role instead. The exception is
  * a member still invited whose latest invitation is to this project,
- * who is invited again: the fresh link replaces the old one and
- * carries the new role.
+ * who is invited again when the caller is the member who issued that
+ * invitation or an instance admin: the fresh link replaces the old one
+ * and carries the new role. Anyone else is refused `already_exists`
+ * too, since issuing an invitation again hands its link to whoever
+ * asks while the instance cannot mail it.
  *
  * The grant is dropped, and the invitation still activates the person,
  * when the caller loses `grant.manage` in the project or is
@@ -4600,7 +4612,9 @@ export const getMember = <ThrowOnError extends boolean = false>(
  * another member holds, whatever its case, is refused `already_exists`.
  * Demoting the instance's last active instance admin is refused
  * `last_instance_admin`, and demoting one an auth provider's group
- * mapping made `sso_sourced`: only the provider takes it away.
+ * mapping made `sso_sourced`: only the provider takes it away. Making a
+ * member still invited an instance admin is refused `member_invited`:
+ * they are made one once they have accepted their invitation.
  *
  */
 export const updateMember = <ThrowOnError extends boolean = false>(

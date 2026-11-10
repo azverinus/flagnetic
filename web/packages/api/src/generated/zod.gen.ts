@@ -1064,7 +1064,10 @@ export const zLifetime = z.enum(["permanent", "temporary"]);
 export const zVariationKey = z.string().regex(/^[a-zA-Z0-9_.-]{1,64}$/);
 
 /**
- * A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+ * A JSON value of the flag's type, never null, of at most 64 KiB once
+ * compact (`too_long`), nesting arrays and objects at most 32 deep
+ * (`too_deep`).
+ *
  */
 export const zVariationValue = z.unknown();
 

@@ -117,14 +117,16 @@ func TestVariationsAreTypedByTheFlagType(t *testing.T) {
 		typ   flags.Type
 		value string
 	}{
-		"an empty string":     {flags.TypeString, `""`},
-		"a number":            {flags.TypeNumber, `3`},
-		"a negative fraction": {flags.TypeNumber, `-0.25`},
-		"an exponent":         {flags.TypeNumber, `1e3`},
-		"an object":           {flags.TypeJSON, `{"b":[1,2],"a":null}`},
-		"an array":            {flags.TypeJSON, `[]`},
-		"a JSON string":       {flags.TypeJSON, `"s"`},
-		"64 KiB":              {flags.TypeJSON, big},
+		"an empty string":      {flags.TypeString, `""`},
+		"a number":             {flags.TypeNumber, `3`},
+		"a negative fraction":  {flags.TypeNumber, `-0.25`},
+		"an exponent":          {flags.TypeNumber, `1e3`},
+		"an object":            {flags.TypeJSON, `{"b":[1,2],"a":null}`},
+		"an array":             {flags.TypeJSON, `[]`},
+		"a JSON string":        {flags.TypeJSON, `"s"`},
+		"64 KiB":               {flags.TypeJSON, big},
+		"32 levels deep":       {flags.TypeJSON, strings.Repeat(`[`, 32) + strings.Repeat(`]`, 32)},
+		"brackets in a string": {flags.TypeJSON, `["` + strings.Repeat(`[{`, 100) + `\"[", {"a": "\\"}]`},
 	} {
 		if _, err := flags.NewFlag(input("f", tc.typ, variation("v", tc.value))); err != nil {
 			t.Errorf("%s: %v", name, err)
@@ -143,6 +145,8 @@ func TestVariationsAreTypedByTheFlagType(t *testing.T) {
 		"JSON given null":          {flags.TypeJSON, `null`, "/variations/0/value invalid_value"},
 		"malformed JSON":           {flags.TypeJSON, `{`, "/variations/0/value invalid_value"},
 		"over 64 KiB":              {flags.TypeJSON, `"` + strings.Repeat("x", 64*1024-1) + `"`, "/variations/0/value too_long"},
+		"33 levels deep": {flags.TypeJSON, strings.Repeat(`{"a":[`, 16) + `[1]` + strings.Repeat(`]}`, 16),
+			"/variations/0/value too_deep"},
 	} {
 		_, err := flags.NewFlag(input("f", tc.typ, variation("v", tc.value)))
 		if got := violations(t, err); !slices.Equal(got, []string{tc.want}) {
@@ -340,6 +344,38 @@ func TestAReferenceNamingEveryEnvironmentCarriesEnvironmentNull(t *testing.T) {
 	want := `[{"environment":"staging","key":"copy","kind":"flag"},{"environment":null,"key":"beta_testers","kind":"segment"}]`
 	if err != nil || string(got) != want {
 		t.Errorf("references = %s, %v, want %s", got, err, want)
+	}
+}
+
+// An archived flag is in no ruleset, so nothing judges a change to it
+// against a protected environment. Were its variations changed meanwhile,
+// restoring it would hand every environment values nobody reviewed.
+func TestAnArchivedFlagKeepsTheVariationsItServes(t *testing.T) {
+	f, err := flags.NewFlag(input("f", flags.TypeString, variation("a", `"A"`), variation("b", `"B"`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	archived, _ := f.Archive(now)
+	for name, served := range map[string][]flags.VariationInput{
+		"another value":     {variation("a", `"changed"`), variation("b", `"B"`)},
+		"a variation fewer": {variation("a", `"A"`)},
+		"a variation more":  {variation("a", `"A"`), variation("b", `"B"`), variation("c", `"C"`)},
+		"another order":     {variation("b", `"B"`), variation("a", `"A"`)},
+	} {
+		_, _, err = archived.Change(flags.FlagChange{Variations: &served}, now)
+		if e, ok := apperrors.From(err); !ok || e.Kind != apperrors.KindConflict || e.Code != "archived" {
+			t.Errorf("%s of an archived flag = %v, want the conflict archived", name, err)
+		}
+		if _, _, err = f.Change(flags.FlagChange{Variations: &served}, now); err != nil {
+			t.Errorf("%s of an active flag: %v", name, err)
+		}
+	}
+	// What no SDK is served stays editable: the flag's own name and
+	// description, and those of its variations.
+	renamed := []flags.VariationInput{{Key: "a", Value: json.RawMessage(`"A"`), Name: ptr("First")}, variation("b", `"B"`)}
+	out, changed, err := archived.Change(flags.FlagChange{Name: ptr("Renamed"), Variations: &renamed}, now)
+	if err != nil || !changed.Any || out.Name != "Renamed" || out.Variations[0].Name != "First" {
+		t.Errorf("renaming an archived flag and its variation = %+v, %+v, %v", out, changed, err)
 	}
 }
 

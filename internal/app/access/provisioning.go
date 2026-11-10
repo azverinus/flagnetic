@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
@@ -50,13 +51,14 @@ func (p *Provisioning) Get(ctx context.Context, provider string, member access.M
 	return m, err
 }
 
-// lock is Get, locking the member until the unit of work ends.
-func (p *Provisioning) lock(ctx context.Context, provider string, member access.MemberID) (access.Member, error) {
-	m, err := p.lockMember(ctx, member)
+// lock is Get, locking the member until the unit of work ends, and tells
+// whether they hold a password.
+func (p *Provisioning) lock(ctx context.Context, provider string, member access.MemberID) (access.Member, bool, error) {
+	m, holdsPassword, err := p.lockMember(ctx, member)
 	if errors.Is(err, ErrNotFound) || (err == nil && m.Provider != provider) {
-		return access.Member{}, ErrProvisionedMemberNotFound
+		return access.Member{}, false, ErrProvisionedMemberNotFound
 	}
-	return m, err
+	return m, holdsPassword, err
 }
 
 // lockMember locks the instance's admins and then the member, in the order
@@ -64,12 +66,11 @@ func (p *Provisioning) lock(ctx context.Context, provider string, member access.
 // and then deactivates them in one unit of work would otherwise hold the
 // member while waiting for the admins that an instance admin's change of the
 // same member holds while waiting for the member, and deadlock.
-func (p *Provisioning) lockMember(ctx context.Context, member access.MemberID) (access.Member, error) {
+func (p *Provisioning) lockMember(ctx context.Context, member access.MemberID) (access.Member, bool, error) {
 	if err := p.store.LockInstanceAdmins(ctx); err != nil {
-		return access.Member{}, err
+		return access.Member{}, false, err
 	}
-	m, _, err := p.store.LockMember(ctx, member)
-	return m, err
+	return p.store.LockMember(ctx, member)
 }
 
 // List returns the page of provider's members that satisfy every condition,
@@ -119,7 +120,7 @@ type AdoptCommand struct {
 // ID the directory's from now on, and records member.adopted.
 func (p *Provisioning) Adopt(ctx context.Context, cmd AdoptCommand) (access.Member, error) {
 	now := p.clock.Now()
-	before, err := p.lockMember(ctx, cmd.Member)
+	before, _, err := p.lockMember(ctx, cmd.Member)
 	if errors.Is(err, ErrNotFound) {
 		return access.Member{}, ErrProvisionedMemberNotFound
 	}
@@ -157,9 +158,18 @@ type UpdateProvisionedCommand struct {
 // Update changes the member's email, name and external ID and records
 // member.updated with what changed; a request that changes nothing records
 // nothing.
+//
+// A member moved to another address keeps neither their password nor an
+// open password reset. A password proves its holder once held the old
+// address, and a reset is mailed to whatever address the member has: kept
+// across the move, they would let whoever holds a SCIM token adopt a member,
+// move them to an address of their own and have a reset mailed there,
+// taking the account over without ever signing in at the identity
+// provider. The provider is how its members sign in, so nobody is locked
+// out. A change of case alone is no move.
 func (p *Provisioning) Update(ctx context.Context, cmd UpdateProvisionedCommand) (access.Member, error) {
 	now := p.clock.Now()
-	before, err := p.lock(ctx, cmd.Provider.Slug, cmd.Member)
+	before, holdsPassword, err := p.lock(ctx, cmd.Provider.Slug, cmd.Member)
 	if err != nil {
 		return access.Member{}, err
 	}
@@ -180,6 +190,17 @@ func (p *Provisioning) Update(ctx context.Context, cmd UpdateProvisionedCommand)
 		return access.Member{}, err
 	}
 	was, is := map[string]any{}, map[string]any{}
+	if !strings.EqualFold(before.Email, after.Email) {
+		if _, err = p.store.ConsumePasswordResets(ctx, after.ID, now); err != nil {
+			return access.Member{}, err
+		}
+		if holdsPassword {
+			if err = p.store.ClearPasswordHash(ctx, after.ID, now); err != nil {
+				return access.Member{}, err
+			}
+			is["password_removed"] = true
+		}
+	}
 	for name, change := range map[string][2]string{
 		"email": {before.Email, after.Email}, "display_name": {before.DisplayName, after.DisplayName},
 		"external_id": {before.ExternalID, after.ExternalID},

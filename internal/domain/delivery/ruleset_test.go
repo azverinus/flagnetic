@@ -3,6 +3,7 @@ package delivery_test
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -197,7 +198,7 @@ func TestEvaluateExplainsARolloutWithItsSalt(t *testing.T) {
 		got.Bucket == nil || *got.Bucket != eval.Bucket("salt0123456789ab", "u-1") {
 		t.Errorf("results = %+v", all)
 	}
-	named := delivery.Evaluate(rs, eval.Context{}, []string{"banner", "missing"})
+	named := delivery.Evaluate(rs, eval.Context{}, []string{"banner", "missing", "banner", "missing"})
 	if named["banner"].Reason != eval.ReasonFallthrough || named["banner"].Salt != "" ||
 		named["missing"].ErrorCode != eval.ErrorFlagNotFound || len(named) != 2 {
 		t.Errorf("named results = %+v", named)
@@ -212,6 +213,20 @@ func TestAContextWithAnOverlongUnitIDIsInvalid(t *testing.T) {
 	}
 	err := delivery.CheckContext(eval.Context{Units: map[string]string{"user": long, "a/b": long, "ok": "u-1"}})
 	if got := violationsOf(t, err, "invalid_context"); len(got) != 2 || got[0] != "/units/a~1b too_long" || got[1] != "/units/user too_long" {
+		t.Errorf("violations = %v", got)
+	}
+}
+
+// Matching a pattern takes time in proportion to the value's length, and a
+// context comes from whoever asks for the evaluation.
+func TestAContextWithAnOverlongAttributeStringIsInvalid(t *testing.T) {
+	long := strings.Repeat("x", delivery.MaxAttributeStringBytes+1)
+	fits := strings.Repeat("x", delivery.MaxAttributeStringBytes)
+	if err := delivery.CheckContext(eval.Context{Attributes: map[string]any{"bio": fits, "tags": []any{fits, 1.0, true}}}); err != nil {
+		t.Errorf("strings of the longest length: %v", err)
+	}
+	err := delivery.CheckContext(eval.Context{Attributes: map[string]any{"bio": long, "tags": []any{"a", long}, "ok": "x", "n": 5.0}})
+	if got := violationsOf(t, err, "invalid_context"); len(got) != 2 || got[0] != "/attributes/bio too_long" || got[1] != "/attributes/tags too_long" {
 		t.Errorf("violations = %v", got)
 	}
 }

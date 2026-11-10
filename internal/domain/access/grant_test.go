@@ -38,7 +38,7 @@ func TestEveryBuiltInRoleIsWithinAnOwnersReach(t *testing.T) {
 	}
 }
 
-func TestAGrantIsOfABuiltInRoleToAMemberWhoIsNotDeactivated(t *testing.T) {
+func TestAGrantIsOfABuiltInRoleToAMemberWhoHasJoinedAndIsNotDeactivated(t *testing.T) {
 	ids := newIDs()
 	project := id.New[workspace.Project](ids)
 	creator := id.New[access.Member](ids)
@@ -49,7 +49,7 @@ func TestAGrantIsOfABuiltInRoleToAMemberWhoIsNotDeactivated(t *testing.T) {
 		code   string
 	}{
 		"an active member":       {access.MemberActive, access.RoleDeveloper, 0, ""},
-		"an invited member":      {access.MemberInvited, access.RoleViewer, 0, ""},
+		"an invited member":      {access.MemberInvited, access.RoleViewer, apperrors.KindConflict, "member_invited"},
 		"a deactivated member":   {access.MemberDeactivated, access.RoleViewer, apperrors.KindConflict, "member_deactivated"},
 		"a role that is no role": {access.MemberActive, "admin", apperrors.KindInvalid, "invalid_grant"},
 	} {

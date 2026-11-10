@@ -644,6 +644,30 @@ func TestArchivingRestoringAndDeletingFlags(t *testing.T) {
 	}
 }
 
+func TestAnArchivedFlagKeepsTheVariationsItServesUntilRestored(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	stringFlag(t, admin, p.Key, "banner")
+	if res := archive(t, admin, p.Key, "banner", 1); res.JSON200 == nil {
+		t.Fatalf("archive = %d %s", res.StatusCode(), res.Body)
+	}
+
+	served := updateFlag(t, admin, p.Key, "banner", 2, management.FlagPatch{Variations: variations("a", `"changed"`, "b", `"B"`, "c", `"C"`)})
+	assertProblem(t, "another value while archived", served.StatusCode(), served.Body, http.StatusConflict, "archived")
+	renamed := updateFlag(t, admin, p.Key, "banner", 2, management.FlagPatch{Name: ptr("Banner text")})
+	if renamed.JSON200 == nil || renamed.JSON200.Name != "Banner text" || renamed.JSON200.Version != 3 {
+		t.Fatalf("renaming while archived = %d %s", renamed.StatusCode(), renamed.Body)
+	}
+	if res := restore(t, admin, p.Key, "banner", 3); res.JSON200 == nil || raw(res.JSON200.Variations[0].Value) != `"A"` {
+		t.Fatalf("restore = %d %s, want the variations as archived", res.StatusCode(), res.Body)
+	}
+	if res := updateFlag(t, admin, p.Key, "banner", 4, management.FlagPatch{
+		Variations: variations("a", `"changed"`, "b", `"B"`, "c", `"C"`)}); res.JSON200 == nil {
+		t.Errorf("another value once restored = %d %s", res.StatusCode(), res.Body)
+	}
+}
+
 func TestArchivingRestoringAndDeletingNeedTheCurrentVersionInIfMatch(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))

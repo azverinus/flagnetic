@@ -1627,7 +1627,10 @@ export type Lifetime = "permanent" | "temporary";
 export type VariationKey = string;
 
 /**
- * A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+ * A JSON value of the flag's type, never null, of at most 64 KiB once
+ * compact (`too_long`), nesting arrays and objects at most 32 deep
+ * (`too_deep`).
+ *
  */
 export type VariationValue = unknown;
 
@@ -2610,7 +2613,7 @@ export type ChangeRequest = {
    */
   applied_by: ChangeRequestApplier | null;
   /**
-   * The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, deleting its environment; for a definition, any write to its flag or segment, and a write to the configuration of its flag or of a flag naming its segment, in any environment; for an experiment, any write to the experiment, its deletion included, and a write to its flag's configuration in an environment that held its rule when the change request was based on it. Null unless a write superseded it; a change request found superseded only when it was opened, approved or applied names none, as when another environment has started holding the experiment's rule since.
+   * The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, deleting its environment, a write to a segment a rule of `proposed` names; for a definition, any write to its flag or segment, and a write to the configuration of its flag or of a flag naming its segment, in any environment; for an experiment, any write to the experiment, its deletion included, and a write to its flag's configuration in an environment that held its rule when the change request was based on it. Null unless a write superseded it; a change request found superseded only when it was opened, approved or applied names none, as when another environment has started holding the experiment's rule since.
    */
   superseded_by: string | null;
   /**

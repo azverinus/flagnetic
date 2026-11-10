@@ -21,7 +21,7 @@ A key, type or other field that does not fit is refused `422 invalid_flag`, each
 
 ### Variations
 
-A **variation** is one of the values a flag can serve. Each has a `key` (letters, digits, `_`, `.` and `-`, 1 to 64 characters, unique in the flag), a `value` of the flag's type of at most 64 KiB as compact JSON, a `name` that defaults to the key, and a `description`. A boolean flag always has exactly the variations `true` and `false`, and is created without listing them; every other flag lists at least one.
+A **variation** is one of the values a flag can serve. Each has a `key` (letters, digits, `_`, `.` and `-`, 1 to 64 characters, unique in the flag), a `value` of the flag's type of at most 64 KiB as compact JSON, nesting arrays and objects at most 32 deep, a `name` that defaults to the key, and a `description`. A boolean flag always has exactly the variations `true` and `false`, and is created without listing them; every other flag lists at least one.
 
 A `PATCH` replaces the variations as a list, matched by key. Removing a variation that is still served is refused `409 in_use`, with `references` naming each flag and environment that names it: as the off or fallthrough variation, in a rule or rollout, in an override, or as the variation another flag requires as a prerequisite. An experiment of the flag that lists the variation, whatever its status, is a reference too (`kind` `experiment`, no environment).
 
@@ -33,7 +33,7 @@ A flag is created switched off in every environment of its project. A boolean fl
 
 `POST /flags/{flag}/archive` hides a flag from SDKs in every environment and keeps its definition and configurations; `POST /flags/{flag}/restore` brings it back as it was archived. Archiving an archived flag, or restoring one that is not, changes nothing. A flag another flag still requires as a prerequisite is not archived (`409 in_use`, naming the flags that require it).
 
-An archived flag's definition can still be edited, but none of its configurations can be written (`409 archived`), and no condition or prerequisite may start naming it (`archived_flag`).
+An archived flag's definition can still be edited, except the keys and values of its variations (`409 archived`): an archived flag is in no ruleset, so nothing would judge the change against a [protected environment](governance.md#protected-environments), and restoring the flag serves exactly what was archived. A variation's name and description are edited as before. None of its configurations can be written (`409 archived`), and no condition or prerequisite may start naming it (`archived_flag`).
 
 `DELETE /flags/{flag}` deletes a flag with its configuration in every environment, and only an archived one (`409 not_archived`), so deleting is a deliberate second step after archiving.
 
@@ -194,7 +194,7 @@ In the console, **Stale flags** in the project navigation, also linked from the 
 }
 ```
 
-A unit ID over 256 bytes is refused `422 invalid_context`.
+A unit ID over 256 bytes, or an attribute holding a string over 1,024 bytes, is refused `422 invalid_context`.
 
 In the console, **Tester** on a flag's page (or the `t` key) opens a panel beside the environment's tab that evaluates the flag there for a context of units and typed attributes: against the saved configuration, or with **Use unsaved draft** against the draft being edited, which is never saved. It shows the value, the variation, the reason, the rule that served (marked in the editor), for a rollout the unit's bucket and the salt, and whether an override decided. The last 10 contexts evaluated in a project are kept in this browser to pick again. The tester needs only read access, so a viewer can answer why a user sees what they see.
 

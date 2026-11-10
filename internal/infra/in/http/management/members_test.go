@@ -8,7 +8,9 @@ import (
 	"testing"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
+	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -93,7 +95,7 @@ func TestAnInstanceAdminEditsAMember(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
-	m := testkit.NewMember(t, pool, testkit.WithStatus(access.MemberInvited))
+	m := testkit.NewMember(t, pool)
 	other := testkit.NewMember(t, pool)
 	renamed := "renamed-" + strings.ToLower(rand.Text()[:10]) + "@example.com"
 
@@ -104,8 +106,8 @@ func TestAnInstanceAdminEditsAMember(t *testing.T) {
 		return
 	}
 	if got := *res.JSON200; got.DisplayName != "After" || got.Email != renamed || !got.InstanceAdmin ||
-		got.Status != management.MemberStatusInvited {
-		t.Errorf("edited = %+v, want renamed, an instance admin, still invited", got)
+		got.Status != management.MemberStatusActive {
+		t.Errorf("edited = %+v, want renamed, an instance admin, still active", got)
 	}
 	res = do(admin.UpdateMemberWithResponse(t.Context(), m.ID.String(), management.MemberPatch{InstanceAdmin: ptr(false)}))
 	if status(t, "demote", res.StatusCode(), res.Body, http.StatusOK) {
@@ -349,13 +351,51 @@ func TestAProjectCountsItsMembers(t *testing.T) {
 	}
 }
 
+// What an invited member is given before they join is given to whoever
+// holds their link, which is its issuer until an invitation is mailed.
+func TestAnInvitedMemberIsGivenNothingByHandUntilTheyJoin(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	invited := invite(t, admin, "Invited")
+	m := id.FromBytes[access.Member](invited.Member.Id)
+
+	granted := do(admin.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: m.Bytes(), Role: "viewer"}))
+	assertProblem(t, "a grant to an invited member", granted.StatusCode(), granted.Body, http.StatusConflict, "member_invited")
+	promoted := do(admin.UpdateMemberWithResponse(t.Context(), m.String(), management.MemberPatch{InstanceAdmin: ptr(true)}))
+	assertProblem(t, "promoting an invited member", promoted.StatusCode(), promoted.Body, http.StatusConflict, "member_invited")
+	if renamed := do(admin.UpdateMemberWithResponse(t.Context(), m.String(), management.MemberPatch{DisplayName: ptr("Renamed")})); renamed.JSON200 == nil {
+		t.Errorf("renaming an invited member = %d: %s", renamed.StatusCode(), renamed.Body)
+	}
+
+	acceptedBy(t, srv, *invited.Invitation.Url)
+	grant(t, admin, p.Key, m, "viewer")
+	if res := do(admin.UpdateMemberWithResponse(t.Context(), m.String(), management.MemberPatch{InstanceAdmin: ptr(true)})); res.JSON200 == nil || !res.JSON200.InstanceAdmin {
+		t.Errorf("promoting a member who joined = %d: %s", res.StatusCode(), res.Body)
+	}
+}
+
+// grantHeld stores a grant of role in project that member holds already
+// while invited, as one deactivated and brought back without a way to sign
+// in does: no request makes such a grant.
+func grantHeld(t *testing.T, project workspace.ProjectID, member access.MemberID, role access.RoleName) {
+	t.Helper()
+	g := access.Grant{
+		ID: id.New[access.Grant](id.NewSource(testkit.Clock())), Project: project, Member: member, Role: role,
+		Source: access.GrantManual, CreatedAt: testkit.Clock().Now(),
+	}
+	if err := pgaccess.NewStore(testkit.Pool(t)).CreateGrant(t.Context(), g); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestAnInvitedMemberCountsNothing(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
 	invited := invite(t, admin, "Invited")
 	m := id.FromBytes[access.Member](invited.Member.Id)
-	grant(t, admin, p.Key, m, "developer")
+	grantHeld(t, projectIDOf(p), m, access.RoleDeveloper)
 
 	if got := memberOf(t, admin, m); got.ProjectCount != 0 {
 		t.Errorf("an invited member with a grant counts %d projects, want 0", got.ProjectCount)

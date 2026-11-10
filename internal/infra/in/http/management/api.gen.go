@@ -1700,7 +1700,7 @@ type ChangeRequest struct {
 	// it was based on moved). The last four are final.
 	State ChangeRequestState `json:"state"`
 
-	// SupersededBy The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, deleting its environment; for a definition, any write to its flag or segment, and a write to the configuration of its flag or of a flag naming its segment, in any environment; for an experiment, any write to the experiment, its deletion included, and a write to its flag's configuration in an environment that held its rule when the change request was based on it. Null unless a write superseded it; a change request found superseded only when it was opened, approved or applied names none, as when another environment has started holding the experiment's rule since.
+	// SupersededBy The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, deleting its environment, a write to a segment a rule of `proposed` names; for a definition, any write to its flag or segment, and a write to the configuration of its flag or of a flag naming its segment, in any environment; for an experiment, any write to the experiment, its deletion included, and a write to its flag's configuration in an environment that held its rule when the change request was based on it. Null unless a write superseded it; a change request found superseded only when it was opened, approved or applied names none, as when another environment has started holding the experiment's rule since.
 	SupersededBy *openapi_types.UUID `json:"superseded_by"`
 	Title        string              `json:"title"`
 	UpdatedAt    time.Time           `json:"updated_at"`
@@ -2311,7 +2311,9 @@ type EvaluationResult struct {
 	Salt *string   `json:"salt,omitempty"`
 	Type *FlagType `json:"type,omitempty"`
 
-	// Value A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+	// Value A JSON value of the flag's type, never null, of at most 64 KiB once
+	// compact (`too_long`), nesting arrays and objects at most 32 deep
+	// (`too_deep`).
 	Value *VariationValue `json:"value,omitempty"`
 
 	// Variation The served variation's key; absent for an error.
@@ -4964,7 +4966,9 @@ type Variation struct {
 	Key         VariationKey `json:"key"`
 	Name        string       `json:"name"`
 
-	// Value A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+	// Value A JSON value of the flag's type, never null, of at most 64 KiB once
+	// compact (`too_long`), nesting arrays and objects at most 32 deep
+	// (`too_deep`).
 	Value VariationValue `json:"value"`
 }
 
@@ -4995,14 +4999,18 @@ type VariationInput struct {
 	// Name Defaults to the key.
 	Name *string `json:"name,omitempty"`
 
-	// Value A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+	// Value A JSON value of the flag's type, never null, of at most 64 KiB once
+	// compact (`too_long`), nesting arrays and objects at most 32 deep
+	// (`too_deep`).
 	Value VariationValue `json:"value"`
 }
 
 // VariationKey defines model for VariationKey.
 type VariationKey = string
 
-// VariationValue A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+// VariationValue A JSON value of the flag's type, never null, of at most 64 KiB once
+// compact (`too_long`), nesting arrays and objects at most 32 deep
+// (`too_deep`).
 type VariationValue = json.RawMessage
 
 // Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
@@ -8481,7 +8489,9 @@ type ClientInterface interface {
 	// another member holds, whatever its case, is refused `already_exists`.
 	// Demoting the instance's last active instance admin is refused
 	// `last_instance_admin`, and demoting one an auth provider's group
-	// mapping made `sso_sourced`: only the provider takes it away.
+	// mapping made `sso_sourced`: only the provider takes it away. Making a
+	// member still invited an instance admin is refused `member_invited`:
+	// they are made one once they have accepted their invitation.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -8494,7 +8504,9 @@ type ClientInterface interface {
 	// another member holds, whatever its case, is refused `already_exists`.
 	// Demoting the instance's last active instance admin is refused
 	// `last_instance_admin`, and demoting one an auth provider's group
-	// mapping made `sso_sourced`: only the provider takes it away.
+	// mapping made `sso_sourced`: only the provider takes it away. Making a
+	// member still invited an instance admin is refused `member_invited`:
+	// they are made one once they have accepted their invitation.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9204,7 +9216,9 @@ type ClientInterface interface {
 	// validate it (`invalid_configuration`, its pointers under
 	// `/draft/configuration`), with no `If-Match`, and is never stored:
 	// nothing changes and nothing is recorded. A context whose unit ID is
-	// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+	// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+	// is `invalid_context`. A flag named twice is evaluated once.
+	// Evaluating records no exposure.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9226,7 +9240,9 @@ type ClientInterface interface {
 	// validate it (`invalid_configuration`, its pointers under
 	// `/draft/configuration`), with no `If-Match`, and is never stored:
 	// nothing changes and nothing is recorded. A context whose unit ID is
-	// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+	// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+	// is `invalid_context`. A flag named twice is evaluated once.
+	// Evaluating records no exposure.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9872,8 +9888,11 @@ type ClientInterface interface {
 	// never change (`immutable`). Variations are replaced as a list and
 	// matched by key: removing one that a configuration still serves is
 	// `in_use`, listing what serves it, as is removing one that any
-	// experiment of the flag lists. A change to the values the flag
-	// already has changes nothing and records nothing.
+	// experiment of the flag lists. An archived flag keeps the keys and
+	// values of its variations (`409 archived`), so that restoring it
+	// serves what was archived; the rest of it is changed as any flag's. A
+	// change to the values the flag already has changes nothing and
+	// records nothing.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9887,8 +9906,11 @@ type ClientInterface interface {
 	// never change (`immutable`). Variations are replaced as a list and
 	// matched by key: removing one that a configuration still serves is
 	// `in_use`, listing what serves it, as is removing one that any
-	// experiment of the flag lists. A change to the values the flag
-	// already has changes nothing and records nothing.
+	// experiment of the flag lists. An archived flag keeps the keys and
+	// values of its variations (`409 archived`), so that restoring it
+	// serves what was archived; the rest of it is changed as any flag's. A
+	// change to the values the flag already has changes nothing and
+	// records nothing.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10172,8 +10194,11 @@ type ClientInterface interface {
 	//
 	// Grants the member one of the built-in roles in the project, beside
 	// any grants they hold already; they act with the union of their
-	// grants' permissions. An invited member may be granted roles before
-	// they join. A role holding a permission the caller lacks in the
+	// grants' permissions. A member still invited is refused
+	// `member_invited` until they accept their invitation, which carries
+	// the one role it was issued with: until an invitation is mailed its
+	// link is held by whoever issued it, so what an invited member is given
+	// is given to whoever holds their link. A role holding a permission the caller lacks in the
 	// project is refused `role_not_allowed`, naming it in `permission`;
 	// the same member and role twice `already_granted`; a deactivated
 	// member `member_deactivated`; an unknown member or role
@@ -10189,8 +10214,11 @@ type ClientInterface interface {
 	//
 	// Grants the member one of the built-in roles in the project, beside
 	// any grants they hold already; they act with the union of their
-	// grants' permissions. An invited member may be granted roles before
-	// they join. A role holding a permission the caller lacks in the
+	// grants' permissions. A member still invited is refused
+	// `member_invited` until they accept their invitation, which carries
+	// the one role it was issued with: until an invitation is mailed its
+	// link is held by whoever issued it, so what an invited member is given
+	// is given to whoever holds their link. A role holding a permission the caller lacks in the
 	// project is refused `role_not_allowed`, naming it in `permission`;
 	// the same member and role twice `already_granted`; a deactivated
 	// member `member_deactivated`; an unknown member or role
@@ -10425,7 +10453,8 @@ type ClientInterface interface {
 	// invitation whose grant was dropped, or that grants a role elsewhere,
 	// is not listed; an accepted one is a grant of the project. A member
 	// listed here is invited again, with the same or another role, by
-	// inviting their email to the project once more.
+	// inviting their email to the project once more, which the member who
+	// invited them or an instance admin does.
 	//
 	// Corresponds with GET /projects/{project}/invitations (the `ListProjectInvitations` operationId).
 	ListProjectInvitations(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -10443,8 +10472,11 @@ type ClientInterface interface {
 	// An email the instance holds, whatever its case, is refused
 	// `already_exists`: grant that member a role instead. The exception is
 	// a member still invited whose latest invitation is to this project,
-	// who is invited again: the fresh link replaces the old one and
-	// carries the new role.
+	// who is invited again when the caller is the member who issued that
+	// invitation or an instance admin: the fresh link replaces the old one
+	// and carries the new role. Anyone else is refused `already_exists`
+	// too, since issuing an invitation again hands its link to whoever
+	// asks while the instance cannot mail it.
 	//
 	// The grant is dropped, and the invitation still activates the person,
 	// when the caller loses `grant.manage` in the project or is
@@ -10471,8 +10503,11 @@ type ClientInterface interface {
 	// An email the instance holds, whatever its case, is refused
 	// `already_exists`: grant that member a role instead. The exception is
 	// a member still invited whose latest invitation is to this project,
-	// who is invited again: the fresh link replaces the old one and
-	// carries the new role.
+	// who is invited again when the caller is the member who issued that
+	// invitation or an instance admin: the fresh link replaces the old one
+	// and carries the new role. Anyone else is refused `already_exists`
+	// too, since issuing an invitation again hands its link to whoever
+	// asks while the instance cannot mail it.
 	//
 	// The grant is dropped, and the invitation still activates the person,
 	// when the caller loses `grant.manage` in the project or is
@@ -13041,7 +13076,9 @@ func (c *Client) GetMember(ctx context.Context, member MemberID, reqEditors ...R
 // another member holds, whatever its case, is refused `already_exists`.
 // Demoting the instance's last active instance admin is refused
 // `last_instance_admin`, and demoting one an auth provider's group
-// mapping made `sso_sourced`: only the provider takes it away.
+// mapping made `sso_sourced`: only the provider takes it away. Making a
+// member still invited an instance admin is refused `member_invited`:
+// they are made one once they have accepted their invitation.
 //
 // Takes any type of body and a specified content type.
 //
@@ -13064,7 +13101,9 @@ func (c *Client) UpdateMemberWithBody(ctx context.Context, member MemberID, cont
 // another member holds, whatever its case, is refused `already_exists`.
 // Demoting the instance's last active instance admin is refused
 // `last_instance_admin`, and demoting one an auth provider's group
-// mapping made `sso_sourced`: only the provider takes it away.
+// mapping made `sso_sourced`: only the provider takes it away. Making a
+// member still invited an instance admin is refused `member_invited`:
+// they are made one once they have accepted their invitation.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -14334,7 +14373,9 @@ func (c *Client) UpdateEnvironment(ctx context.Context, project ProjectKey, envi
 // validate it (`invalid_configuration`, its pointers under
 // `/draft/configuration`), with no `If-Match`, and is never stored:
 // nothing changes and nothing is recorded. A context whose unit ID is
-// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+// is `invalid_context`. A flag named twice is evaluated once.
+// Evaluating records no exposure.
 //
 // Takes any type of body and a specified content type.
 //
@@ -14366,7 +14407,9 @@ func (c *Client) EvaluateWithBody(ctx context.Context, project ProjectKey, envir
 // validate it (`invalid_configuration`, its pointers under
 // `/draft/configuration`), with no `If-Match`, and is never stored:
 // nothing changes and nothing is recorded. A context whose unit ID is
-// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+// is `invalid_context`. A flag named twice is evaluated once.
+// Evaluating records no exposure.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15432,8 +15475,11 @@ func (c *Client) GetFlag(ctx context.Context, project ProjectKey, flag FlagKey, 
 // never change (`immutable`). Variations are replaced as a list and
 // matched by key: removing one that a configuration still serves is
 // `in_use`, listing what serves it, as is removing one that any
-// experiment of the flag lists. A change to the values the flag
-// already has changes nothing and records nothing.
+// experiment of the flag lists. An archived flag keeps the keys and
+// values of its variations (`409 archived`), so that restoring it
+// serves what was archived; the rest of it is changed as any flag's. A
+// change to the values the flag already has changes nothing and
+// records nothing.
 //
 // Takes any type of body and a specified content type.
 //
@@ -15457,8 +15503,11 @@ func (c *Client) UpdateFlagWithBody(ctx context.Context, project ProjectKey, fla
 // never change (`immutable`). Variations are replaced as a list and
 // matched by key: removing one that a configuration still serves is
 // `in_use`, listing what serves it, as is removing one that any
-// experiment of the flag lists. A change to the values the flag
-// already has changes nothing and records nothing.
+// experiment of the flag lists. An archived flag keeps the keys and
+// values of its variations (`409 archived`), so that restoring it
+// serves what was archived; the rest of it is changed as any flag's. A
+// change to the values the flag already has changes nothing and
+// records nothing.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15922,8 +15971,11 @@ func (c *Client) ListGrants(ctx context.Context, project ProjectKey, reqEditors 
 //
 // Grants the member one of the built-in roles in the project, beside
 // any grants they hold already; they act with the union of their
-// grants' permissions. An invited member may be granted roles before
-// they join. A role holding a permission the caller lacks in the
+// grants' permissions. A member still invited is refused
+// `member_invited` until they accept their invitation, which carries
+// the one role it was issued with: until an invitation is mailed its
+// link is held by whoever issued it, so what an invited member is given
+// is given to whoever holds their link. A role holding a permission the caller lacks in the
 // project is refused `role_not_allowed`, naming it in `permission`;
 // the same member and role twice `already_granted`; a deactivated
 // member `member_deactivated`; an unknown member or role
@@ -15949,8 +16001,11 @@ func (c *Client) CreateGrantWithBody(ctx context.Context, project ProjectKey, co
 //
 // Grants the member one of the built-in roles in the project, beside
 // any grants they hold already; they act with the union of their
-// grants' permissions. An invited member may be granted roles before
-// they join. A role holding a permission the caller lacks in the
+// grants' permissions. A member still invited is refused
+// `member_invited` until they accept their invitation, which carries
+// the one role it was issued with: until an invitation is mailed its
+// link is held by whoever issued it, so what an invited member is given
+// is given to whoever holds their link. A role holding a permission the caller lacks in the
 // project is refused `role_not_allowed`, naming it in `permission`;
 // the same member and role twice `already_granted`; a deactivated
 // member `member_deactivated`; an unknown member or role
@@ -16245,7 +16300,8 @@ func (c *Client) ImportProject(ctx context.Context, project ProjectKey, params *
 // invitation whose grant was dropped, or that grants a role elsewhere,
 // is not listed; an accepted one is a grant of the project. A member
 // listed here is invited again, with the same or another role, by
-// inviting their email to the project once more.
+// inviting their email to the project once more, which the member who
+// invited them or an instance admin does.
 //
 // Corresponds with GET /projects/{project}/invitations (the `ListProjectInvitations` operationId).
 func (c *Client) ListProjectInvitations(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -16273,8 +16329,11 @@ func (c *Client) ListProjectInvitations(ctx context.Context, project ProjectKey,
 // An email the instance holds, whatever its case, is refused
 // `already_exists`: grant that member a role instead. The exception is
 // a member still invited whose latest invitation is to this project,
-// who is invited again: the fresh link replaces the old one and
-// carries the new role.
+// who is invited again when the caller is the member who issued that
+// invitation or an instance admin: the fresh link replaces the old one
+// and carries the new role. Anyone else is refused `already_exists`
+// too, since issuing an invitation again hands its link to whoever
+// asks while the instance cannot mail it.
 //
 // The grant is dropped, and the invitation still activates the person,
 // when the caller loses `grant.manage` in the project or is
@@ -16311,8 +16370,11 @@ func (c *Client) InviteProjectMemberWithBody(ctx context.Context, project Projec
 // An email the instance holds, whatever its case, is refused
 // `already_exists`: grant that member a role instead. The exception is
 // a member still invited whose latest invitation is to this project,
-// who is invited again: the fresh link replaces the old one and
-// carries the new role.
+// who is invited again when the caller is the member who issued that
+// invitation or an instance admin: the fresh link replaces the old one
+// and carries the new role. Anyone else is refused `already_exists`
+// too, since issuing an invitation again hands its link to whoever
+// asks while the instance cannot mail it.
 //
 // The grant is dropped, and the invitation still activates the person,
 // when the caller loses `grant.manage` in the project or is
@@ -29688,7 +29750,9 @@ type ClientWithResponsesInterface interface {
 	// another member holds, whatever its case, is refused `already_exists`.
 	// Demoting the instance's last active instance admin is refused
 	// `last_instance_admin`, and demoting one an auth provider's group
-	// mapping made `sso_sourced`: only the provider takes it away.
+	// mapping made `sso_sourced`: only the provider takes it away. Making a
+	// member still invited an instance admin is refused `member_invited`:
+	// they are made one once they have accepted their invitation.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -29701,7 +29765,9 @@ type ClientWithResponsesInterface interface {
 	// another member holds, whatever its case, is refused `already_exists`.
 	// Demoting the instance's last active instance admin is refused
 	// `last_instance_admin`, and demoting one an auth provider's group
-	// mapping made `sso_sourced`: only the provider takes it away.
+	// mapping made `sso_sourced`: only the provider takes it away. Making a
+	// member still invited an instance admin is refused `member_invited`:
+	// they are made one once they have accepted their invitation.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -30477,7 +30543,9 @@ type ClientWithResponsesInterface interface {
 	// validate it (`invalid_configuration`, its pointers under
 	// `/draft/configuration`), with no `If-Match`, and is never stored:
 	// nothing changes and nothing is recorded. A context whose unit ID is
-	// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+	// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+	// is `invalid_context`. A flag named twice is evaluated once.
+	// Evaluating records no exposure.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -30499,7 +30567,9 @@ type ClientWithResponsesInterface interface {
 	// validate it (`invalid_configuration`, its pointers under
 	// `/draft/configuration`), with no `If-Match`, and is never stored:
 	// nothing changes and nothing is recorded. A context whose unit ID is
-	// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+	// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+	// is `invalid_context`. A flag named twice is evaluated once.
+	// Evaluating records no exposure.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -31189,8 +31259,11 @@ type ClientWithResponsesInterface interface {
 	// never change (`immutable`). Variations are replaced as a list and
 	// matched by key: removing one that a configuration still serves is
 	// `in_use`, listing what serves it, as is removing one that any
-	// experiment of the flag lists. A change to the values the flag
-	// already has changes nothing and records nothing.
+	// experiment of the flag lists. An archived flag keeps the keys and
+	// values of its variations (`409 archived`), so that restoring it
+	// serves what was archived; the rest of it is changed as any flag's. A
+	// change to the values the flag already has changes nothing and
+	// records nothing.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -31204,8 +31277,11 @@ type ClientWithResponsesInterface interface {
 	// never change (`immutable`). Variations are replaced as a list and
 	// matched by key: removing one that a configuration still serves is
 	// `in_use`, listing what serves it, as is removing one that any
-	// experiment of the flag lists. A change to the values the flag
-	// already has changes nothing and records nothing.
+	// experiment of the flag lists. An archived flag keeps the keys and
+	// values of its variations (`409 archived`), so that restoring it
+	// serves what was archived; the rest of it is changed as any flag's. A
+	// change to the values the flag already has changes nothing and
+	// records nothing.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -31503,8 +31579,11 @@ type ClientWithResponsesInterface interface {
 	//
 	// Grants the member one of the built-in roles in the project, beside
 	// any grants they hold already; they act with the union of their
-	// grants' permissions. An invited member may be granted roles before
-	// they join. A role holding a permission the caller lacks in the
+	// grants' permissions. A member still invited is refused
+	// `member_invited` until they accept their invitation, which carries
+	// the one role it was issued with: until an invitation is mailed its
+	// link is held by whoever issued it, so what an invited member is given
+	// is given to whoever holds their link. A role holding a permission the caller lacks in the
 	// project is refused `role_not_allowed`, naming it in `permission`;
 	// the same member and role twice `already_granted`; a deactivated
 	// member `member_deactivated`; an unknown member or role
@@ -31520,8 +31599,11 @@ type ClientWithResponsesInterface interface {
 	//
 	// Grants the member one of the built-in roles in the project, beside
 	// any grants they hold already; they act with the union of their
-	// grants' permissions. An invited member may be granted roles before
-	// they join. A role holding a permission the caller lacks in the
+	// grants' permissions. A member still invited is refused
+	// `member_invited` until they accept their invitation, which carries
+	// the one role it was issued with: until an invitation is mailed its
+	// link is held by whoever issued it, so what an invited member is given
+	// is given to whoever holds their link. A role holding a permission the caller lacks in the
 	// project is refused `role_not_allowed`, naming it in `permission`;
 	// the same member and role twice `already_granted`; a deactivated
 	// member `member_deactivated`; an unknown member or role
@@ -31758,7 +31840,8 @@ type ClientWithResponsesInterface interface {
 	// invitation whose grant was dropped, or that grants a role elsewhere,
 	// is not listed; an accepted one is a grant of the project. A member
 	// listed here is invited again, with the same or another role, by
-	// inviting their email to the project once more.
+	// inviting their email to the project once more, which the member who
+	// invited them or an instance admin does.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -31778,8 +31861,11 @@ type ClientWithResponsesInterface interface {
 	// An email the instance holds, whatever its case, is refused
 	// `already_exists`: grant that member a role instead. The exception is
 	// a member still invited whose latest invitation is to this project,
-	// who is invited again: the fresh link replaces the old one and
-	// carries the new role.
+	// who is invited again when the caller is the member who issued that
+	// invitation or an instance admin: the fresh link replaces the old one
+	// and carries the new role. Anyone else is refused `already_exists`
+	// too, since issuing an invitation again hands its link to whoever
+	// asks while the instance cannot mail it.
 	//
 	// The grant is dropped, and the invitation still activates the person,
 	// when the caller loses `grant.manage` in the project or is
@@ -31806,8 +31892,11 @@ type ClientWithResponsesInterface interface {
 	// An email the instance holds, whatever its case, is refused
 	// `already_exists`: grant that member a role instead. The exception is
 	// a member still invited whose latest invitation is to this project,
-	// who is invited again: the fresh link replaces the old one and
-	// carries the new role.
+	// who is invited again when the caller is the member who issued that
+	// invitation or an instance admin: the fresh link replaces the old one
+	// and carries the new role. Anyone else is refused `already_exists`
+	// too, since issuing an invitation again hands its link to whoever
+	// asks while the instance cannot mail it.
 	//
 	// The grant is dropped, and the invitation still activates the person,
 	// when the caller loses `grant.manage` in the project or is
@@ -50632,7 +50721,9 @@ func (c *ClientWithResponses) GetMemberWithResponse(ctx context.Context, member 
 // another member holds, whatever its case, is refused `already_exists`.
 // Demoting the instance's last active instance admin is refused
 // `last_instance_admin`, and demoting one an auth provider's group
-// mapping made `sso_sourced`: only the provider takes it away.
+// mapping made `sso_sourced`: only the provider takes it away. Making a
+// member still invited an instance admin is refused `member_invited`:
+// they are made one once they have accepted their invitation.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -50651,7 +50742,9 @@ func (c *ClientWithResponses) UpdateMemberWithBodyWithResponse(ctx context.Conte
 // another member holds, whatever its case, is refused `already_exists`.
 // Demoting the instance's last active instance admin is refused
 // `last_instance_admin`, and demoting one an auth provider's group
-// mapping made `sso_sourced`: only the provider takes it away.
+// mapping made `sso_sourced`: only the provider takes it away. Making a
+// member still invited an instance admin is refused `member_invited`:
+// they are made one once they have accepted their invitation.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -51763,7 +51856,9 @@ func (c *ClientWithResponses) UpdateEnvironmentWithResponse(ctx context.Context,
 // validate it (`invalid_configuration`, its pointers under
 // `/draft/configuration`), with no `If-Match`, and is never stored:
 // nothing changes and nothing is recorded. A context whose unit ID is
-// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+// is `invalid_context`. A flag named twice is evaluated once.
+// Evaluating records no exposure.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -51791,7 +51886,9 @@ func (c *ClientWithResponses) EvaluateWithBodyWithResponse(ctx context.Context, 
 // validate it (`invalid_configuration`, its pointers under
 // `/draft/configuration`), with no `If-Match`, and is never stored:
 // nothing changes and nothing is recorded. A context whose unit ID is
-// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+// over 256 bytes, or whose attribute holds a string over 1,024 bytes,
+// is `invalid_context`. A flag named twice is evaluated once.
+// Evaluating records no exposure.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -52733,8 +52830,11 @@ func (c *ClientWithResponses) GetFlagWithResponse(ctx context.Context, project P
 // never change (`immutable`). Variations are replaced as a list and
 // matched by key: removing one that a configuration still serves is
 // `in_use`, listing what serves it, as is removing one that any
-// experiment of the flag lists. A change to the values the flag
-// already has changes nothing and records nothing.
+// experiment of the flag lists. An archived flag keeps the keys and
+// values of its variations (`409 archived`), so that restoring it
+// serves what was archived; the rest of it is changed as any flag's. A
+// change to the values the flag already has changes nothing and
+// records nothing.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -52754,8 +52854,11 @@ func (c *ClientWithResponses) UpdateFlagWithBodyWithResponse(ctx context.Context
 // never change (`immutable`). Variations are replaced as a list and
 // matched by key: removing one that a configuration still serves is
 // `in_use`, listing what serves it, as is removing one that any
-// experiment of the flag lists. A change to the values the flag
-// already has changes nothing and records nothing.
+// experiment of the flag lists. An archived flag keeps the keys and
+// values of its variations (`409 archived`), so that restoring it
+// serves what was archived; the rest of it is changed as any flag's. A
+// change to the values the flag already has changes nothing and
+// records nothing.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -53161,8 +53264,11 @@ func (c *ClientWithResponses) ListGrantsWithResponse(ctx context.Context, projec
 //
 // Grants the member one of the built-in roles in the project, beside
 // any grants they hold already; they act with the union of their
-// grants' permissions. An invited member may be granted roles before
-// they join. A role holding a permission the caller lacks in the
+// grants' permissions. A member still invited is refused
+// `member_invited` until they accept their invitation, which carries
+// the one role it was issued with: until an invitation is mailed its
+// link is held by whoever issued it, so what an invited member is given
+// is given to whoever holds their link. A role holding a permission the caller lacks in the
 // project is refused `role_not_allowed`, naming it in `permission`;
 // the same member and role twice `already_granted`; a deactivated
 // member `member_deactivated`; an unknown member or role
@@ -53184,8 +53290,11 @@ func (c *ClientWithResponses) CreateGrantWithBodyWithResponse(ctx context.Contex
 //
 // Grants the member one of the built-in roles in the project, beside
 // any grants they hold already; they act with the union of their
-// grants' permissions. An invited member may be granted roles before
-// they join. A role holding a permission the caller lacks in the
+// grants' permissions. A member still invited is refused
+// `member_invited` until they accept their invitation, which carries
+// the one role it was issued with: until an invitation is mailed its
+// link is held by whoever issued it, so what an invited member is given
+// is given to whoever holds their link. A role holding a permission the caller lacks in the
 // project is refused `role_not_allowed`, naming it in `permission`;
 // the same member and role twice `already_granted`; a deactivated
 // member `member_deactivated`; an unknown member or role
@@ -53458,7 +53567,8 @@ func (c *ClientWithResponses) ImportProjectWithResponse(ctx context.Context, pro
 // invitation whose grant was dropped, or that grants a role elsewhere,
 // is not listed; an accepted one is a grant of the project. A member
 // listed here is invited again, with the same or another role, by
-// inviting their email to the project once more.
+// inviting their email to the project once more, which the member who
+// invited them or an instance admin does.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -53484,8 +53594,11 @@ func (c *ClientWithResponses) ListProjectInvitationsWithResponse(ctx context.Con
 // An email the instance holds, whatever its case, is refused
 // `already_exists`: grant that member a role instead. The exception is
 // a member still invited whose latest invitation is to this project,
-// who is invited again: the fresh link replaces the old one and
-// carries the new role.
+// who is invited again when the caller is the member who issued that
+// invitation or an instance admin: the fresh link replaces the old one
+// and carries the new role. Anyone else is refused `already_exists`
+// too, since issuing an invitation again hands its link to whoever
+// asks while the instance cannot mail it.
 //
 // The grant is dropped, and the invitation still activates the person,
 // when the caller loses `grant.manage` in the project or is
@@ -53518,8 +53631,11 @@ func (c *ClientWithResponses) InviteProjectMemberWithBodyWithResponse(ctx contex
 // An email the instance holds, whatever its case, is refused
 // `already_exists`: grant that member a role instead. The exception is
 // a member still invited whose latest invitation is to this project,
-// who is invited again: the fresh link replaces the old one and
-// carries the new role.
+// who is invited again when the caller is the member who issued that
+// invitation or an instance admin: the fresh link replaces the old one
+// and carries the new role. Anyone else is refused `already_exists`
+// too, since issuing an invitation again hands its link to whoever
+// asks while the instance cannot mail it.
 //
 // The grant is dropped, and the invitation still activates the person,
 // when the caller loses `grant.manage` in the project or is

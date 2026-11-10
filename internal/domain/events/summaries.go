@@ -3,6 +3,7 @@ package events
 import (
 	"fmt"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
@@ -73,6 +74,16 @@ func SaturatingAdd(a, b int64) int64 {
 		return math.MaxInt64
 	}
 	return a + b
+}
+
+// NamesVariationOf reports whether r, a summary row an SDK sent of a flag
+// whose variations are variations, counts a variation the flag has, or
+// none. Any other row is dropped: the variation is part of what the daily
+// counts are kept by, for good, and a client key ships inside apps, so a
+// variation taken as sent would let anyone holding one grow the counts
+// without bound with names of their own making.
+func NamesVariationOf(r delivery.SummaryRow, variations []string) bool {
+	return r.Variation == "" || slices.Contains(variations, r.Variation)
 }
 
 // RollUpSummaries adds a batch of summary rows up per flag, variation,

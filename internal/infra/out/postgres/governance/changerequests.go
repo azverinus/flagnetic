@@ -466,9 +466,11 @@ func (s *ChangeRequests) ChangeRequests(ctx context.Context, f appgovernance.Cha
 // Waiting returns project's open and approved change requests moved may
 // move: those naming its flag, its deleted environment, its segment or its
 // experiment and, when it moved configurations, those to a segment's
-// definition, which the flag may name. An experiment's change request names
-// the experiment's flag, so a write to the flag's configuration finds it. It reads under the project's row lock the writing transaction
-// holds, so none is approved or applied meanwhile.
+// definition, which the flag may name, and when it moved a segment, those to
+// a configuration, which may be proposed to name the segment. An
+// experiment's change request names the experiment's flag, so a write to
+// the flag's configuration finds it. It reads under the project's row lock
+// the writing transaction holds, so none is approved or applied meanwhile.
 func (s *ChangeRequests) Waiting(ctx context.Context, project workspace.ProjectID, moved governance.Moved,
 ) ([]governance.ChangeRequest, error) {
 	var flag, environment, segment, experiment any
@@ -489,9 +491,10 @@ func (s *ChangeRequests) Waiting(ctx context.Context, project workspace.ProjectI
 	rows, err := s.db(ctx).Query(ctx, `SELECT `+changeRequestColumns+changeRequestFrom+`
 		WHERE cr.project_id = $1 AND cr.state IN ('open', 'approved')
 		  AND (cr.flag_id = $2 OR cr.environment_id = $3 OR cr.segment_id = $4 OR ($5 AND cr.segment_id IS NOT NULL)
-		       OR cr.experiment_id = $6)
+		       OR cr.experiment_id = $6 OR ($7 AND cr.kind = $8))
 		ORDER BY cr.id`,
-		project.Bytes(), flag, environment, segment, moved.Configurations, experiment)
+		project.Bytes(), flag, environment, segment, moved.Configurations, experiment,
+		segment != nil, string(governance.KindFlagConfiguration))
 	if err != nil {
 		return nil, fmt.Errorf("reading the waiting change requests: %w", err)
 	}
