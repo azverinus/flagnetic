@@ -12,7 +12,7 @@ import { FormPage } from "@/components/ui/form-page";
 import { Input } from "@/components/ui/input";
 import { unwrap } from "@/lib/errors";
 import { formRefusal } from "@/lib/problem-messages";
-import { mySessionsQuery } from "@/lib/queries";
+import { myIdentitiesQuery, mySessionsQuery } from "@/lib/queries";
 import { forgetsSecret } from "@/lib/mutations";
 
 /** The fields whose refusals are shown under them. */
@@ -49,6 +49,8 @@ export function PasswordForm() {
       // Nothing typed lingers on the page once it is used.
       form.reset(empty);
       void queryClient.invalidateQueries({ queryKey: mySessionsQuery.queryKey });
+      // The sign-in methods page says when the password was set.
+      void queryClient.invalidateQueries({ queryKey: myIdentitiesQuery.queryKey });
       toast.success(t`Your password is changed. Every other device is signed out.`);
     },
   });

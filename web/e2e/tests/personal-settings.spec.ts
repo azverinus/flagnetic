@@ -171,7 +171,7 @@ test.describe("personal settings", () => {
     const other = await otherContext.newPage();
     await signIn(other, grace);
     await signIn(page, grace);
-    await page.goto("/settings/profile");
+    await page.goto("/settings/sign-in-methods");
 
     const current = page.getByLabel("Current password");
     const next = page.getByLabel("New password", { exact: true });
@@ -201,7 +201,7 @@ test.describe("personal settings", () => {
 
     // This device stays; the other is signed out.
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Profile", level: 2 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Password", level: 2 })).toBeVisible();
     await other.reload();
     await expect(other).toHaveURL(/\/sign-in\?/);
     await otherContext.close();
@@ -219,14 +219,17 @@ test.describe("personal settings", () => {
   });
 
   for (const theme of ["light", "dark"] as const) {
-    test(`has no serious accessibility violations on the profile and the sessions (${theme})`, async ({
+    test(`has no serious accessibility violations on the profile, the sign-in methods and the sessions (${theme})`, async ({
       page,
     }) => {
       await useTheme(page, theme);
       await signIn(page, grace);
       await page.goto("/settings/profile");
-      await expect(page.getByRole("heading", { name: "Password", level: 2 })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Appearance", level: 2 })).toBeVisible();
       await expectNoSeriousViolations(page, `the profile (${theme})`);
+      await page.goto("/settings/sign-in-methods");
+      await expect(page.getByRole("heading", { name: "Password", level: 2 })).toBeVisible();
+      await expectNoSeriousViolations(page, `the sign-in methods (${theme})`);
       await openSessions(page);
       await expect(sessionRows(page).first()).toContainText("This device");
       await expectNoSeriousViolations(page, `the sessions (${theme})`);
