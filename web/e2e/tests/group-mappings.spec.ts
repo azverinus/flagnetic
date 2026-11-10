@@ -171,6 +171,7 @@ test.describe("group mappings and where grants come from", () => {
       email: "Электронная почта",
       password: "Пароль",
       submit: "Войти",
+      next: "Продолжить",
     };
 
     test("reads the mappings and the source of a grant", async ({ page }) => {
