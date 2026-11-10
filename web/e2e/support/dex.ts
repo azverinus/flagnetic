@@ -83,7 +83,18 @@ export const dexUsers = {
     password: "dex-ochre-meadow-6639",
     hash: "$2a$10$tv5Qzml8FyJgrU5gU/3I.e4Li.rKkSKuce7ybbgmzwgkIDUGAECJa",
   },
+  // Ellis has an address in `enforcedDomain`, which only the enforcement spec
+  // makes one the instance vouches for through Dex.
+  ellis: {
+    email: "ellis@corp.flagnetic.test",
+    name: "Ellis Enforced",
+    password: "dex-juniper-forge-4417",
+    hash: "$2a$10$Mht6HVIoR4Jvx2IhQvL5Wug2GuQSLOwwNUrX0gWP.jkwT4w9ZS9pu",
+  },
 } as const satisfies Record<string, DexUser>;
+
+/** The email domain of Ellis, whom the enforcement spec sends to Dex. */
+export const enforcedDomain = "corp.flagnetic.test";
 
 /** The slug the specs give the provider they create; Dex lists its redirect URIs exactly. */
 export const dexSlug = "dex";

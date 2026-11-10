@@ -178,8 +178,9 @@ test.describe("auth providers", () => {
     await expect(page.getByRole("alert")).toHaveText(
       "No member of this instance matches that account. Ask an instance admin to invite you.",
     );
-    // Still signed out, and the password form is still there.
-    await expect(page.getByLabel("Password")).toBeVisible();
+    // Still signed out, asked for the email first.
+    await expect(page.getByLabel("Email")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
     await expectNoSeriousViolations(page, "the sign-in page with an error");
   });
 

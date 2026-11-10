@@ -1,11 +1,16 @@
 import { i18n } from "@lingui/core";
 import { describe, expect, it } from "vitest";
 
+import type { AuthProvider } from "@flagnetic/api";
+
 import {
   authSettingsSchema,
   authSettingsViolation,
   durationOf,
+  enforceableDomains,
+  enforcedRowOf,
   formOf,
+  providersVouchingFor,
   secondsOf,
   settingsOf,
 } from "./auth-settings";
@@ -114,5 +119,48 @@ describe("the auth settings form", () => {
         params: { min: 60, max: 120 },
       }),
     ).toBe("Enter a value from 60 to 120.");
+  });
+});
+
+describe("the domains that can be enforced", () => {
+  const provider = (slug: string, enabled: boolean, domains: string[]) =>
+    ({ slug, enabled, domains }) as AuthProvider;
+  const providers = [
+    provider("acme", true, ["Acme.example", "acme.test"]),
+    provider("globex", true, ["acme.test", "globex.example"]),
+    provider("dormant", false, ["dormant.example"]),
+  ];
+
+  it("lists the domains of the enabled providers once each, in order", () => {
+    expect(enforceableDomains(providers, [])).toEqual([
+      "acme.example",
+      "acme.test",
+      "globex.example",
+    ]);
+  });
+
+  it("keeps a domain already enforced, so its row can be read and removed", () => {
+    expect(
+      enforceableDomains(providers, [{ domain: "dormant.example", provider: "dormant" }]),
+    ).toContain("dormant.example");
+  });
+
+  it("names the enabled providers that vouch for a domain, in any case", () => {
+    expect(providersVouchingFor(providers, "ACME.test").map((p) => p.slug)).toEqual([
+      "acme",
+      "globex",
+    ]);
+    expect(providersVouchingFor(providers, "dormant.example")).toEqual([]);
+    expect(providersVouchingFor(providers, "")).toEqual([]);
+  });
+
+  it("reads which row and part a violation points at", () => {
+    expect(enforcedRowOf("/sso_enforced_domains/2/provider")).toEqual({
+      index: 2,
+      part: "provider",
+    });
+    expect(enforcedRowOf("/sso_enforced_domains/0/domain")).toEqual({ index: 0, part: "domain" });
+    expect(enforcedRowOf("/sso_enforced_domains")).toBeUndefined();
+    expect(enforcedRowOf("/password_min_length")).toBeUndefined();
   });
 });

@@ -87,6 +87,7 @@ const screens: { name: string; routes?: Record<string, FakeAnswer>; ui: () => Re
   },
   {
     name: "the auth settings form",
+    routes: { "GET /instance/auth-providers": none },
     ui: () => (
       <AuthSettingsForm
         settings={{
