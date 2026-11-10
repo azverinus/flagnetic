@@ -16,11 +16,14 @@ const (
 	// MailInvitation carries the link that lets a person invited to the
 	// instance, or to a project in it, set their first password.
 	MailInvitation MailKind = "invitation"
+	// MailWebhookDisabled tells those who manage a webhook subscription that
+	// the platform disabled it for failing persistently.
+	MailWebhookDisabled MailKind = "webhook_disabled"
 )
 
 // MailKinds are every kind of mail the instance sends; each has a template
 // in every language of MailLocales.
-var MailKinds = []MailKind{MailTest, MailPasswordReset, MailInvitation}
+var MailKinds = []MailKind{MailTest, MailPasswordReset, MailInvitation, MailWebhookDisabled}
 
 // MailLocales are the languages mail is written in, the console's.
 var MailLocales = []string{"en", "ru"}

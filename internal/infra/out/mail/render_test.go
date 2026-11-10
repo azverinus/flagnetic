@@ -23,6 +23,10 @@ var samples = map[access.MailKind]any{
 		URL: "https://flags.example.com/invitations/c2VjcmV0", ExpiresAt: time.Date(2026, 11, 13, 15, 4, 0, 0, time.UTC),
 		InvitedBy: "Grace Hopper", Project: "Checkout", Role: access.RoleDeveloper,
 	},
+	access.MailWebhookDisabled: appaccess.WebhookDisabledMailData{
+		Name: "Security channel", Project: "Checkout", Reason: "persistent_failure",
+		URL: "https://flags.example.com/projects/checkout/webhooks/0192f6c4",
+	},
 }
 
 func TestEveryKindHasEveryLanguageAndPart(t *testing.T) {

@@ -329,3 +329,27 @@ func (s *Store) RevokePersonalTokens(ctx context.Context, member access.MemberID
 	}
 	return int(tag.RowsAffected()), nil
 }
+
+// ActiveInstanceAdmins returns the active members who are instance admins,
+// ordered by email whatever its case.
+func (s *Store) ActiveInstanceAdmins(ctx context.Context) ([]access.Member, error) {
+	rows, err := s.db(ctx).Query(ctx, `
+		SELECT `+memberColumns+`
+		FROM members m
+		WHERE m.status = 'active' AND m.instance_admin
+		ORDER BY lower(m.email) COLLATE "C", m.id`)
+	if err != nil {
+		return nil, fmt.Errorf("listing the instance admins: %w", err)
+	}
+	members, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (access.Member, error) {
+		dest, member := scanMember()
+		if err := row.Scan(dest...); err != nil {
+			return access.Member{}, err
+		}
+		return member(), nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("listing the instance admins: %w", err)
+	}
+	return members, nil
+}

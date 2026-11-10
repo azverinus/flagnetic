@@ -357,6 +357,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		publicURL = strings.TrimSuffix(o.BaseURL.String(), "/")
 	}
 	invitationMail := appaccess.NewInvitationMailer(postman, smtpSettings, accessStore, publicURL)
+	webhookDisabledMail := disabledWebhookMail{appaccess.NewWebhookDisabledMailer(postman, smtpSettings, accessStore, publicURL)}
 	// One hasher serves every use case of the replica, so its bound is the
 	// replica's.
 	hasher := password.NewBoundedHasher(password.DefaultParams,
@@ -774,6 +775,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			worker.WebhookDelivery(appgovernance.NewDeliver(appgovernance.DeliverDeps{
 				Tx: tx, Store: deliveryLog, Sender: webhook.NewSender(o.WebhookTargets),
 				Opener: o.Keyring, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, Audit: audit, Outbox: outbox,
+				Notifier: webhookDisabledMail,
 			}), o.WebhookTick, edge.Logger(), reg),
 			worker.SinkDelivery(sinkDelivery, o.SinkTick, edge.Logger()),
 			worker.WebhookRetention(appgovernance.NewRunWebhookRetention(tx, deliveryLog, d.Clock), reg),

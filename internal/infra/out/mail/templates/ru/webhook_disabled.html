@@ -1,0 +1,10 @@
+{{define "reason"}}{{if eq . "persistent_failure"}}он постоянно сбоил: доставки не удавались не менее суток, и ни одна не прошла{{else}}{{.}}{{end}}{{end -}}
+<!doctype html>
+<html lang="ru">
+<body>
+<p>Здравствуйте, {{.Recipient.Name}}!</p>
+<p>Flagnetic отключил подписку на вебхук <strong>«{{.Data.Name}}»</strong>{{if .Data.Project}} проекта <strong>{{.Data.Project}}</strong>{{else}} экземпляра{{end}}: {{template "reason" .Data.Reason}}. Пока подписку не включат снова, события в неё не поступают, а ожидавшие доставки отброшены.</p>
+<p>Вы получили это письмо, потому что ваша учётная запись ({{.Recipient.Email}}) управляет вебхуками {{if .Data.Project}}этого проекта{{else}}этого экземпляра{{end}}. Откройте подписку, чтобы узнать причину сбоев и включить её, когда получатель заработает:</p>
+<p><a href="{{.Data.URL}}">{{.Data.URL}}</a></p>
+</body>
+</html>
