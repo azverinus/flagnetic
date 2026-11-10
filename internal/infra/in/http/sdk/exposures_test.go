@@ -155,6 +155,19 @@ func TestAnExposureOfAnExperimentIsStoredOnce(t *testing.T) {
 	}
 }
 
+func TestAnOverrideExposureOfAVariationTheFlagLacksIsRefused(t *testing.T) {
+	f := startExposures(t)
+	got := batchResult(t, f.srv, f.client, batch(exposureEvent(1, map[string]any{
+		"variation_key": "made_up", "override": true, "evaluation_reason": "override",
+	})))
+	if got.Accepted != 0 || len(got.Rejected) != 1 || got.Rejected[0].Code != "unknown_variation" {
+		t.Errorf("answer = %+v, want the exposure refused unknown_variation", got)
+	}
+	if stored := f.stored(t); len(stored) != 0 {
+		t.Errorf("exposures stored = %+v, want none", stored)
+	}
+}
+
 func TestAnExposureIsDeduplicatedPerProject(t *testing.T) {
 	f := startExposures(t)
 	other := newProject(t, f.srv)

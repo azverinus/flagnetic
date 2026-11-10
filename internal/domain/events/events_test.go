@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/azverinus/flagnetic/internal/domain/delivery"
 	"github.com/azverinus/flagnetic/internal/domain/events"
 )
 
@@ -317,7 +318,10 @@ func mustJSON(v any) json.RawMessage {
 }
 
 func onboarding() *events.ExperimentFacts {
-	return &events.ExperimentFacts{FlagKey: "onboarding", UnitType: "user", Variations: []string{"control", "guided"}}
+	return &events.ExperimentFacts{
+		FlagKey: "onboarding", UnitType: "user", Variations: []string{"control", "guided"},
+		FlagVariations: []string{"control", "guided", "classic"},
+	}
 }
 
 func exposed(t *testing.T, changes map[string]any) events.Exposure {
@@ -379,6 +383,29 @@ func TestAnOverrideExposureMayNameAnyVariationOfTheFlag(t *testing.T) {
 	plain := exposed(t, map[string]any{"variation_key": "classic"})
 	if got := events.CheckExposure(plain, onboarding(), true); got == nil || got.Code != events.RejectUnknownVariation {
 		t.Errorf("the same without override = %+v, want unknown_variation", got)
+	}
+}
+
+// An exposure's variation becomes part of what is counted and kept for good,
+// so even an override names a variation that exists: a key that ships
+// inside apps could otherwise grow the counts with names of its own making.
+func TestAnOverrideExposureOfAVariationTheFlagLacksIsRefused(t *testing.T) {
+	x := exposed(t, map[string]any{"variation_key": "made_up", "override": true, "evaluation_reason": "override"})
+	for _, detailed := range []bool{true, false} {
+		got := events.CheckExposure(x, onboarding(), detailed)
+		if got == nil || got.Code != events.RejectUnknownVariation {
+			t.Errorf("detailed %t: override exposure of a variation the flag lacks = %+v, want unknown_variation", detailed, got)
+		}
+	}
+}
+
+func TestASummaryRowCountsOnlyAVariationItsFlagHas(t *testing.T) {
+	variations := []string{"true", "false"}
+	for variation, want := range map[string]bool{"true": true, "false": true, "": true, "made_up": false} {
+		r := delivery.SummaryRow{Flag: "checkout", Variation: variation, Reason: "rule", Count: 1}
+		if got := events.NamesVariationOf(r, variations); got != want {
+			t.Errorf("a row of variation %q counts = %t, want %t", variation, got, want)
+		}
 	}
 }
 

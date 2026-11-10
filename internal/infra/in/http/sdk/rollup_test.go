@@ -220,7 +220,7 @@ func TestConflictsAreTheSameWhicheverBatchesTheExposuresArriveIn(t *testing.T) {
 func TestAnOverrideExposureIsCountedAsOverriddenAndNeverTouchesAFirstExposure(t *testing.T) {
 	f := startRollup(t)
 	now := f.clock.Now()
-	f.post(t, f.exposure("u", "true", now), f.override("u", "false", now.Add(-time.Minute)), f.override("v", "qa", now))
+	f.post(t, f.exposure("u", "true", now), f.override("u", "false", now.Add(-time.Minute)))
 	f.rollUp(t)
 
 	x := f.exposures(t)
@@ -234,10 +234,8 @@ func TestAnOverrideExposureIsCountedAsOverriddenAndNeverTouchesAFirstExposure(t 
 	if x.Conflicts.Total != 0 {
 		t.Errorf("conflicts = %+v, want none", x.Conflicts)
 	}
-	// A variation the experiment does not weigh, named by an override, is
-	// listed after the experiment's own.
-	if len(x.Variations) != 3 || x.Variations[2] != (management.VariationExposures{Variation: "qa", Overridden: 1}) {
-		t.Errorf("variations = %+v, want true, false, then qa overridden once", x.Variations)
+	if len(x.Variations) != 2 {
+		t.Errorf("variations = %+v, want true and false alone", x.Variations)
 	}
 }
 

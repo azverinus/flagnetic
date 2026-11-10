@@ -184,7 +184,7 @@ type EventBatchResult struct {
 	// Accepted The events stored.
 	Accepted int `json:"accepted"`
 
-	// DroppedRows The summary rows naming a flag the environment does not have.
+	// DroppedRows The summary rows naming a flag the project does not have, or a variation its flag does not have.
 	DroppedRows int `json:"dropped_rows"`
 
 	// Duplicates The events already received, by `event_id`.
@@ -705,8 +705,8 @@ type ClientInterface interface {
 	// UUIDv7, for a year, or the retention window and a day when that is
 	// longer: one already received is counted in `duplicates`, never
 	// twice. A summary row naming a flag
-	// the environment does not have is dropped and counted in
-	// `dropped_rows`. A refused event is listed in `rejected` with its
+	// the project does not have, or a variation its flag does not have, is
+	// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
 	// SDK never sends it again.
 	//
@@ -722,8 +722,9 @@ type ClientInterface interface {
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
-	// exposure with `override` true is not checked against the weights, since
-	// an override decides the variation whatever they are)
+	// exposure with `override` true may name any variation of the
+	// experiment's flag instead, since an override decides the variation
+	// whatever the weights are)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -778,8 +779,8 @@ type ClientInterface interface {
 	// UUIDv7, for a year, or the retention window and a day when that is
 	// longer: one already received is counted in `duplicates`, never
 	// twice. A summary row naming a flag
-	// the environment does not have is dropped and counted in
-	// `dropped_rows`. A refused event is listed in `rejected` with its
+	// the project does not have, or a variation its flag does not have, is
+	// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
 	// SDK never sends it again.
 	//
@@ -795,8 +796,9 @@ type ClientInterface interface {
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
-	// exposure with `override` true is not checked against the weights, since
-	// an override decides the variation whatever they are)
+	// exposure with `override` true may name any variation of the
+	// experiment's flag instead, since an override decides the variation
+	// whatever the weights are)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -851,8 +853,8 @@ type ClientInterface interface {
 	// UUIDv7, for a year, or the retention window and a day when that is
 	// longer: one already received is counted in `duplicates`, never
 	// twice. A summary row naming a flag
-	// the environment does not have is dropped and counted in
-	// `dropped_rows`. A refused event is listed in `rejected` with its
+	// the project does not have, or a variation its flag does not have, is
+	// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
 	// SDK never sends it again.
 	//
@@ -868,8 +870,9 @@ type ClientInterface interface {
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
-	// exposure with `override` true is not checked against the weights, since
-	// an override decides the variation whatever they are)
+	// exposure with `override` true may name any variation of the
+	// experiment's flag instead, since an override decides the variation
+	// whatever the weights are)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -1044,8 +1047,8 @@ func (c *Client) Evaluate(ctx context.Context, params *EvaluateParams, body Eval
 // UUIDv7, for a year, or the retention window and a day when that is
 // longer: one already received is counted in `duplicates`, never
 // twice. A summary row naming a flag
-// the environment does not have is dropped and counted in
-// `dropped_rows`. A refused event is listed in `rejected` with its
+// the project does not have, or a variation its flag does not have, is
+// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
 // SDK never sends it again.
 //
@@ -1061,8 +1064,9 @@ func (c *Client) Evaluate(ctx context.Context, params *EvaluateParams, body Eval
 // flushes its queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
-// exposure with `override` true is not checked against the weights, since
-// an override decides the variation whatever they are)
+// exposure with `override` true may name any variation of the
+// experiment's flag instead, since an override decides the variation
+// whatever the weights are)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
@@ -1127,8 +1131,8 @@ func (c *Client) PostEventsWithBody(ctx context.Context, params *PostEventsParam
 // UUIDv7, for a year, or the retention window and a day when that is
 // longer: one already received is counted in `duplicates`, never
 // twice. A summary row naming a flag
-// the environment does not have is dropped and counted in
-// `dropped_rows`. A refused event is listed in `rejected` with its
+// the project does not have, or a variation its flag does not have, is
+// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
 // SDK never sends it again.
 //
@@ -1144,8 +1148,9 @@ func (c *Client) PostEventsWithBody(ctx context.Context, params *PostEventsParam
 // flushes its queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
-// exposure with `override` true is not checked against the weights, since
-// an override decides the variation whatever they are)
+// exposure with `override` true may name any variation of the
+// experiment's flag instead, since an override decides the variation
+// whatever the weights are)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
@@ -1210,8 +1215,8 @@ func (c *Client) PostEvents(ctx context.Context, params *PostEventsParams, body 
 // UUIDv7, for a year, or the retention window and a day when that is
 // longer: one already received is counted in `duplicates`, never
 // twice. A summary row naming a flag
-// the environment does not have is dropped and counted in
-// `dropped_rows`. A refused event is listed in `rejected` with its
+// the project does not have, or a variation its flag does not have, is
+// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
 // SDK never sends it again.
 //
@@ -1227,8 +1232,9 @@ func (c *Client) PostEvents(ctx context.Context, params *PostEventsParams, body 
 // flushes its queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
-// exposure with `override` true is not checked against the weights, since
-// an override decides the variation whatever they are)
+// exposure with `override` true may name any variation of the
+// experiment's flag instead, since an override decides the variation
+// whatever the weights are)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
@@ -1748,8 +1754,8 @@ type ClientWithResponsesInterface interface {
 	// UUIDv7, for a year, or the retention window and a day when that is
 	// longer: one already received is counted in `duplicates`, never
 	// twice. A summary row naming a flag
-	// the environment does not have is dropped and counted in
-	// `dropped_rows`. A refused event is listed in `rejected` with its
+	// the project does not have, or a variation its flag does not have, is
+	// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
 	// SDK never sends it again.
 	//
@@ -1765,8 +1771,9 @@ type ClientWithResponsesInterface interface {
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
-	// exposure with `override` true is not checked against the weights, since
-	// an override decides the variation whatever they are)
+	// exposure with `override` true may name any variation of the
+	// experiment's flag instead, since an override decides the variation
+	// whatever the weights are)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -1821,8 +1828,8 @@ type ClientWithResponsesInterface interface {
 	// UUIDv7, for a year, or the retention window and a day when that is
 	// longer: one already received is counted in `duplicates`, never
 	// twice. A summary row naming a flag
-	// the environment does not have is dropped and counted in
-	// `dropped_rows`. A refused event is listed in `rejected` with its
+	// the project does not have, or a variation its flag does not have, is
+	// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
 	// SDK never sends it again.
 	//
@@ -1838,8 +1845,9 @@ type ClientWithResponsesInterface interface {
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
-	// exposure with `override` true is not checked against the weights, since
-	// an override decides the variation whatever they are)
+	// exposure with `override` true may name any variation of the
+	// experiment's flag instead, since an override decides the variation
+	// whatever the weights are)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -1894,8 +1902,8 @@ type ClientWithResponsesInterface interface {
 	// UUIDv7, for a year, or the retention window and a day when that is
 	// longer: one already received is counted in `duplicates`, never
 	// twice. A summary row naming a flag
-	// the environment does not have is dropped and counted in
-	// `dropped_rows`. A refused event is listed in `rejected` with its
+	// the project does not have, or a variation its flag does not have, is
+	// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
 	// SDK never sends it again.
 	//
@@ -1911,8 +1919,9 @@ type ClientWithResponsesInterface interface {
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
-	// exposure with `override` true is not checked against the weights, since
-	// an override decides the variation whatever they are)
+	// exposure with `override` true may name any variation of the
+	// experiment's flag instead, since an override decides the variation
+	// whatever the weights are)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -2567,8 +2576,8 @@ func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, params *
 // UUIDv7, for a year, or the retention window and a day when that is
 // longer: one already received is counted in `duplicates`, never
 // twice. A summary row naming a flag
-// the environment does not have is dropped and counted in
-// `dropped_rows`. A refused event is listed in `rejected` with its
+// the project does not have, or a variation its flag does not have, is
+// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
 // SDK never sends it again.
 //
@@ -2584,8 +2593,9 @@ func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, params *
 // flushes its queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
-// exposure with `override` true is not checked against the weights, since
-// an override decides the variation whatever they are)
+// exposure with `override` true may name any variation of the
+// experiment's flag instead, since an override decides the variation
+// whatever the weights are)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
@@ -2646,8 +2656,8 @@ func (c *ClientWithResponses) PostEventsWithBodyWithResponse(ctx context.Context
 // UUIDv7, for a year, or the retention window and a day when that is
 // longer: one already received is counted in `duplicates`, never
 // twice. A summary row naming a flag
-// the environment does not have is dropped and counted in
-// `dropped_rows`. A refused event is listed in `rejected` with its
+// the project does not have, or a variation its flag does not have, is
+// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
 // SDK never sends it again.
 //
@@ -2663,8 +2673,9 @@ func (c *ClientWithResponses) PostEventsWithBodyWithResponse(ctx context.Context
 // flushes its queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
-// exposure with `override` true is not checked against the weights, since
-// an override decides the variation whatever they are)
+// exposure with `override` true may name any variation of the
+// experiment's flag instead, since an override decides the variation
+// whatever the weights are)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
@@ -2725,8 +2736,8 @@ func (c *ClientWithResponses) PostEventsWithResponse(ctx context.Context, params
 // UUIDv7, for a year, or the retention window and a day when that is
 // longer: one already received is counted in `duplicates`, never
 // twice. A summary row naming a flag
-// the environment does not have is dropped and counted in
-// `dropped_rows`. A refused event is listed in `rejected` with its
+// the project does not have, or a variation its flag does not have, is
+// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
 // SDK never sends it again.
 //
@@ -2742,8 +2753,9 @@ func (c *ClientWithResponses) PostEventsWithResponse(ctx context.Context, params
 // flushes its queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
-// exposure with `override` true is not checked against the weights, since
-// an override decides the variation whatever they are)
+// exposure with `override` true may name any variation of the
+// experiment's flag instead, since an override decides the variation
+// whatever the weights are)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused

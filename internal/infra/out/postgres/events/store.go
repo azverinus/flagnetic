@@ -49,11 +49,35 @@ func (s *Store) DeclaredUnitTypes(ctx context.Context, project workspace.Project
 	return s.keysIn(ctx, "unit_types", project, keys)
 }
 
-// KnownFlags returns which of keys name a flag of project, archived ones
-// included: an SDK still evaluating an archived flag is what tells its code
-// is not deleted yet.
-func (s *Store) KnownFlags(ctx context.Context, project workspace.ProjectID, keys []string) (map[string]bool, error) {
-	return s.keysIn(ctx, "flags", project, keys)
+// FlagVariations returns the variation keys of each flag of project that
+// keys name, by flag key, archived flags included: an SDK still evaluating
+// an archived flag is what tells its code is not deleted yet.
+func (s *Store) FlagVariations(ctx context.Context, project workspace.ProjectID, keys []string) (map[string][]string, error) {
+	out := map[string][]string{}
+	if len(keys) == 0 {
+		return out, nil
+	}
+	rows, err := s.db(ctx).Query(ctx, `
+		SELECT key, ARRAY(SELECT v->>'key' FROM jsonb_array_elements(variations) AS v)
+		FROM flags WHERE project_id = $1 AND key = ANY($2)`, project.Bytes(), keys)
+	if err != nil {
+		return nil, fmt.Errorf("reading the variations of flags: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			key        string
+			variations []string
+		)
+		if err = rows.Scan(&key, &variations); err != nil {
+			return nil, fmt.Errorf("reading the variations of flags: %w", err)
+		}
+		out[key] = variations
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("reading the variations of flags: %w", err)
+	}
+	return out, nil
 }
 
 // keysIn returns which of keys are the key of a row of project in table.
@@ -365,7 +389,8 @@ func (s *Store) Experiments(ctx context.Context, project workspace.ProjectID, ke
 		return out, nil
 	}
 	rows, err := s.db(ctx).Query(ctx, `
-		SELECT e.id, e.key, f.key, e.unit_type, e.variations
+		SELECT e.id, e.key, f.key, e.unit_type, e.variations,
+		       ARRAY(SELECT v->>'key' FROM jsonb_array_elements(f.variations) AS v)
 		FROM experiments e JOIN flags f ON f.id = e.flag_id
 		WHERE e.project_id = $1 AND e.key = ANY($2)
 		ORDER BY e.id
@@ -381,7 +406,7 @@ func (s *Store) Experiments(ctx context.Context, project workspace.ProjectID, ke
 			key        string
 			variations []byte
 		)
-		if err = rows.Scan(&experiment, &key, &f.FlagKey, &f.UnitType, &variations); err != nil {
+		if err = rows.Scan(&experiment, &key, &f.FlagKey, &f.UnitType, &variations, &f.FlagVariations); err != nil {
 			return nil, fmt.Errorf("reading experiments for exposures: %w", err)
 		}
 		var weights []struct {

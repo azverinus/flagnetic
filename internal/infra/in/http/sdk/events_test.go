@@ -173,6 +173,27 @@ func TestAMixedBatchIsJudgedPerEvent(t *testing.T) {
 	}
 }
 
+// A client key ships inside apps: were a row's variation kept as sent, anyone
+// holding the key could grow the daily counts, kept for good, without bound.
+func TestASummaryRowOfAVariationItsFlagLacksIsDropped(t *testing.T) {
+	srv, p, value := eventsServer(t)
+	got := batchResult(t, srv, value, batch(summaryEvent(eventID(protocolTime, 1),
+		map[string]any{"flag": "checkout", "variation": "true", "reason": "targeting_match", "count": 3},
+		map[string]any{"flag": "checkout", "variation": "made_up_1", "reason": "targeting_match", "count": 1},
+		map[string]any{"flag": "checkout", "variation": "made_up_2", "reason": "fallback", "count": 1},
+	)))
+	if got.Accepted != 1 || got.DroppedRows != 2 || len(got.Rejected) != 0 {
+		t.Errorf("answer = %+v, want the summary accepted and 2 rows dropped", got)
+	}
+	summaries, err := pgevents.NewStore(testkit.Pool(t)).EvaluationSummaries(t.Context(), p.environmentID(t, "production"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summaries) != 1 || summaries[0].Row.Variation != "true" {
+		t.Errorf("summaries stored = %+v, want the row of the flag's own variation alone", summaries)
+	}
+}
+
 func TestAcceptedSummariesAndAliasesAreStoredOnce(t *testing.T) {
 	srv, p, value := eventsServer(t)
 	body := batch(aliasEvent(eventID(protocolTime, 1)), summaryEvent(eventID(protocolTime, 2),
