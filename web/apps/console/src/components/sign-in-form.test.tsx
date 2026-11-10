@@ -190,6 +190,25 @@ describe("the sign-in form", () => {
       expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
     });
 
+    it("asks for the email again when the browser comes back from the provider", async () => {
+      fakeServer({ "GET /auth/methods": lookup({ enforced_provider: providers[1] }) });
+      renderWithProviders(<SignInForm onRedirect={vi.fn()} onSignedIn={vi.fn()} />);
+
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText("Email"), "ada@globex.example");
+      await user.click(screen.getByRole("button", { name: "Continue" }));
+      expect(await screen.findByRole("status")).toHaveTextContent("Taking you to Globex");
+
+      // The page restored from the back-forward cache, as it was left.
+      const restored = new Event("pageshow");
+      Object.defineProperty(restored, "persisted", { value: true });
+      window.dispatchEvent(restored);
+
+      expect(await screen.findByRole("button", { name: "Continue" })).toBeVisible();
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Sign in with Globex" })).toBeVisible();
+    });
+
     it("goes back to the email to try another", async () => {
       fakeServer({ "GET /auth/methods": lookup({}) });
       await renderWithRouter(() => <SignInForm onSignedIn={vi.fn()} />);

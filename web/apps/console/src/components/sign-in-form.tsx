@@ -106,6 +106,19 @@ export function SignInForm({
       setStep("password");
     },
   });
+  // Coming back from the provider with the browser's back button can show
+  // this page as it was left, saying it is taking the member away: the
+  // email is asked again instead, so the page is never a dead end.
+  const resetLookup = lookup.reset;
+  useEffect(() => {
+    const restored = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      setLeaving(undefined);
+      resetLookup();
+    };
+    window.addEventListener("pageshow", restored);
+    return () => window.removeEventListener("pageshow", restored);
+  }, [resetLookup]);
   // The field to type in is focused once the form is there, and again when
   // the step changes.
   const ready = !methods.isPending;
