@@ -28,7 +28,7 @@ import {
   sameMappings,
 } from "@/lib/group-mappings";
 import { formRefusal } from "@/lib/problem-messages";
-import { projectsQuery, rolesQuery } from "@/lib/queries";
+import { meQuery, projectsQuery, rolesQuery } from "@/lib/queries";
 
 /**
  * What a provider's directory groups grant, in the order the provider
@@ -99,6 +99,8 @@ function GroupMappingsForm({
       // Members' grants changed under every project.
       void queryClient.invalidateQueries({ queryKey: projectsQuery.queryKey });
       void queryClient.invalidateQueries({ queryKey: ["members"] });
+      // A mapping to instance admin may have promoted or demoted the caller.
+      void queryClient.invalidateQueries({ queryKey: meQuery.queryKey });
       setSummary(runSummary(i18n, run));
     },
   });

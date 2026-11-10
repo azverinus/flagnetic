@@ -1,8 +1,9 @@
-import type { GroupMappings, Project, Role } from "@flagnetic/api";
+import type { GroupMappings, Me, Project, Role } from "@flagnetic/api";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
+import { meQuery } from "@/lib/queries";
 import { fakeServer, problem } from "@/test/fake-server";
 import { renderWithProviders } from "@/test/render";
 
@@ -106,6 +107,25 @@ describe("a provider's group mappings", () => {
     expect(sent).toEqual({ items: [{ group: "admins", instance_admin: true }] });
     // Saved: there is nothing left to save.
     expect(screen.getByRole("button", { name: "Save mappings" })).toBeDisabled();
+  });
+
+  it("reads the caller again after a save, as a mapping may have made or unmade them instance admin", async () => {
+    routes({
+      "PUT /instance/auth-providers/acme/group-mappings": {
+        status: 200,
+        body: { granted: 0, revoked: 1, kept_instance_admin: 0 },
+      },
+    });
+    const { queryClient } = renderWithProviders(<GroupMappingsSection provider="acme" />);
+    queryClient.setQueryData(meQuery.queryKey, {} as Me);
+    expect(await screen.findByRole("group", { name: "Mapping 2" })).toBeVisible();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Remove mapping 2" }));
+    await user.click(screen.getByRole("button", { name: "Save mappings" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Granted 0, removed 1.");
+    expect(queryClient.getQueryState(meQuery.queryKey)?.isInvalidated).toBe(true);
   });
 
   it("shows the server's refusal of a field under it, keeping the rows", async () => {
