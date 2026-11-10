@@ -337,6 +337,12 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
       const max = numberParam(i18n, violation, "max");
       return max ? i18n._(msg`At most ${max} characters.`) : i18n._(msg`Too long.`);
     }
+    case "too_deep": {
+      const max = numberParam(i18n, violation, "max");
+      return max
+        ? i18n._(msg`Nest arrays and objects at most ${max} deep.`)
+        : i18n._(msg`Nested too deep.`);
+    }
     case "reserved_key":
       return i18n._(msg`This key is reserved.`);
     case "invalid_type":

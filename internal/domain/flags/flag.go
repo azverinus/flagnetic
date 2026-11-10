@@ -62,6 +62,13 @@ const (
 	maxTags        = 50
 	maxTagLength   = 64
 	maxValueLength = 64 * 1024
+	// maxValueDepth is how deep a variation's value may nest arrays and
+	// objects. SDKs decode, copy and compare a value recursively, and a
+	// value nested a thousand deep, which fits in a few kilobytes, overflows
+	// the stack of several of their runtimes: the SDK then refuses the whole
+	// ruleset, kill switches included. No configuration needs anything near
+	// the bound.
+	maxValueDepth = 32
 )
 
 // Variation is one of the values a flag can serve.
@@ -297,8 +304,8 @@ func isBooleanPair(vs []Variation) bool {
 }
 
 // value returns raw compact, refusing a value that is absent, null, not
-// JSON, not of typ or over 64 KiB, which an SDK would otherwise receive as
-// a value its code cannot read.
+// JSON, not of typ, over 64 KiB or nested too deep, which an SDK would
+// otherwise receive as a value its code cannot read.
 func (c *check) value(pointer string, typ Type, raw json.RawMessage) json.RawMessage {
 	var compact bytes.Buffer
 	if len(bytes.TrimSpace(raw)) == 0 || json.Compact(&compact, raw) != nil || compact.String() == "null" {
@@ -307,6 +314,10 @@ func (c *check) value(pointer string, typ Type, raw json.RawMessage) json.RawMes
 	}
 	if compact.Len() > maxValueLength {
 		c.add(pointer, "too_long", "a variation's value has at most 64 KiB of compact JSON", map[string]any{"max": maxValueLength})
+		return nil
+	}
+	if jsonDepth(compact.Bytes()) > maxValueDepth {
+		c.add(pointer, "too_deep", "a variation's value nests arrays and objects at most 32 deep", map[string]any{"max": maxValueDepth})
 		return nil
 	}
 	first := compact.Bytes()[0]
@@ -326,6 +337,34 @@ func (c *check) value(pointer string, typ Type, raw json.RawMessage) json.RawMes
 		return nil
 	}
 	return compact.Bytes()
+}
+
+// jsonDepth returns how deep doc, valid JSON, nests arrays and objects: 0
+// for a scalar, 1 for an array or object of scalars.
+func jsonDepth(doc []byte) int {
+	depth, deepest := 0, 0
+	inString, escaped := false, false
+	for _, b := range doc {
+		switch {
+		case escaped:
+			escaped = false
+		case inString:
+			switch b {
+			case '\\':
+				escaped = true
+			case '"':
+				inString = false
+			}
+		case b == '"':
+			inString = true
+		case b == '[' || b == '{':
+			depth++
+			deepest = max(deepest, depth)
+		case b == ']' || b == '}':
+			depth--
+		}
+	}
+	return deepest
 }
 
 // FlagChange is a change to a flag's definition; a nil field is left as it

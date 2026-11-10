@@ -1627,7 +1627,10 @@ export type Lifetime = "permanent" | "temporary";
 export type VariationKey = string;
 
 /**
- * A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+ * A JSON value of the flag's type, never null, of at most 64 KiB once
+ * compact (`too_long`), nesting arrays and objects at most 32 deep
+ * (`too_deep`).
+ *
  */
 export type VariationValue = unknown;
 

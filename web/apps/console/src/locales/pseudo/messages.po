@@ -4315,6 +4315,14 @@ msgstr ""
 msgid "Needs the permission to {name}."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "Nest arrays and objects at most {max} deep."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Nested too deep."
+msgstr ""
+
 #: src/components/identity-list.tsx
 #: src/components/moment.tsx
 #: src/components/scim-tokens.tsx

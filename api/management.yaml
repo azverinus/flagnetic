@@ -9824,7 +9824,10 @@ components:
       type: string
       pattern: "^[a-zA-Z0-9_.-]{1,64}$"
     VariationValue:
-      description: A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+      description: |
+        A JSON value of the flag's type, never null, of at most 64 KiB once
+        compact (`too_long`), nesting arrays and objects at most 32 deep
+        (`too_deep`).
       # The generated code imports encoding/json already, so the type needs
       # no import of its own.
       x-go-type: json.RawMessage

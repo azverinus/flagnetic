@@ -2311,7 +2311,9 @@ type EvaluationResult struct {
 	Salt *string   `json:"salt,omitempty"`
 	Type *FlagType `json:"type,omitempty"`
 
-	// Value A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+	// Value A JSON value of the flag's type, never null, of at most 64 KiB once
+	// compact (`too_long`), nesting arrays and objects at most 32 deep
+	// (`too_deep`).
 	Value *VariationValue `json:"value,omitempty"`
 
 	// Variation The served variation's key; absent for an error.
@@ -4964,7 +4966,9 @@ type Variation struct {
 	Key         VariationKey `json:"key"`
 	Name        string       `json:"name"`
 
-	// Value A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+	// Value A JSON value of the flag's type, never null, of at most 64 KiB once
+	// compact (`too_long`), nesting arrays and objects at most 32 deep
+	// (`too_deep`).
 	Value VariationValue `json:"value"`
 }
 
@@ -4995,14 +4999,18 @@ type VariationInput struct {
 	// Name Defaults to the key.
 	Name *string `json:"name,omitempty"`
 
-	// Value A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+	// Value A JSON value of the flag's type, never null, of at most 64 KiB once
+	// compact (`too_long`), nesting arrays and objects at most 32 deep
+	// (`too_deep`).
 	Value VariationValue `json:"value"`
 }
 
 // VariationKey defines model for VariationKey.
 type VariationKey = string
 
-// VariationValue A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+// VariationValue A JSON value of the flag's type, never null, of at most 64 KiB once
+// compact (`too_long`), nesting arrays and objects at most 32 deep
+// (`too_deep`).
 type VariationValue = json.RawMessage
 
 // Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.

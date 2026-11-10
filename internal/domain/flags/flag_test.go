@@ -117,14 +117,16 @@ func TestVariationsAreTypedByTheFlagType(t *testing.T) {
 		typ   flags.Type
 		value string
 	}{
-		"an empty string":     {flags.TypeString, `""`},
-		"a number":            {flags.TypeNumber, `3`},
-		"a negative fraction": {flags.TypeNumber, `-0.25`},
-		"an exponent":         {flags.TypeNumber, `1e3`},
-		"an object":           {flags.TypeJSON, `{"b":[1,2],"a":null}`},
-		"an array":            {flags.TypeJSON, `[]`},
-		"a JSON string":       {flags.TypeJSON, `"s"`},
-		"64 KiB":              {flags.TypeJSON, big},
+		"an empty string":      {flags.TypeString, `""`},
+		"a number":             {flags.TypeNumber, `3`},
+		"a negative fraction":  {flags.TypeNumber, `-0.25`},
+		"an exponent":          {flags.TypeNumber, `1e3`},
+		"an object":            {flags.TypeJSON, `{"b":[1,2],"a":null}`},
+		"an array":             {flags.TypeJSON, `[]`},
+		"a JSON string":        {flags.TypeJSON, `"s"`},
+		"64 KiB":               {flags.TypeJSON, big},
+		"32 levels deep":       {flags.TypeJSON, strings.Repeat(`[`, 32) + strings.Repeat(`]`, 32)},
+		"brackets in a string": {flags.TypeJSON, `["` + strings.Repeat(`[{`, 100) + `\"[", {"a": "\\"}]`},
 	} {
 		if _, err := flags.NewFlag(input("f", tc.typ, variation("v", tc.value))); err != nil {
 			t.Errorf("%s: %v", name, err)
@@ -143,6 +145,8 @@ func TestVariationsAreTypedByTheFlagType(t *testing.T) {
 		"JSON given null":          {flags.TypeJSON, `null`, "/variations/0/value invalid_value"},
 		"malformed JSON":           {flags.TypeJSON, `{`, "/variations/0/value invalid_value"},
 		"over 64 KiB":              {flags.TypeJSON, `"` + strings.Repeat("x", 64*1024-1) + `"`, "/variations/0/value too_long"},
+		"33 levels deep": {flags.TypeJSON, strings.Repeat(`{"a":[`, 16) + `[1]` + strings.Repeat(`]}`, 16),
+			"/variations/0/value too_deep"},
 	} {
 		_, err := flags.NewFlag(input("f", tc.typ, variation("v", tc.value)))
 		if got := violations(t, err); !slices.Equal(got, []string{tc.want}) {

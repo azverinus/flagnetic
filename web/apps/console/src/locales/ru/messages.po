@@ -4315,6 +4315,14 @@ msgstr "Нужно право {name}, оно есть у ролей {list}."
 msgid "Needs the permission to {name}."
 msgstr "Нужно право {name}."
 
+#: src/lib/problem-messages.ts
+msgid "Nest arrays and objects at most {max} deep."
+msgstr "Вложенность массивов и объектов — не больше {max} уровней."
+
+#: src/lib/problem-messages.ts
+msgid "Nested too deep."
+msgstr "Слишком глубокая вложенность."
+
 #: src/components/identity-list.tsx
 #: src/components/moment.tsx
 #: src/components/scim-tokens.tsx

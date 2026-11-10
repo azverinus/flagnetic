@@ -21,7 +21,7 @@ A key, type or other field that does not fit is refused `422 invalid_flag`, each
 
 ### Variations
 
-A **variation** is one of the values a flag can serve. Each has a `key` (letters, digits, `_`, `.` and `-`, 1 to 64 characters, unique in the flag), a `value` of the flag's type of at most 64 KiB as compact JSON, a `name` that defaults to the key, and a `description`. A boolean flag always has exactly the variations `true` and `false`, and is created without listing them; every other flag lists at least one.
+A **variation** is one of the values a flag can serve. Each has a `key` (letters, digits, `_`, `.` and `-`, 1 to 64 characters, unique in the flag), a `value` of the flag's type of at most 64 KiB as compact JSON, nesting arrays and objects at most 32 deep, a `name` that defaults to the key, and a `description`. A boolean flag always has exactly the variations `true` and `false`, and is created without listing them; every other flag lists at least one.
 
 A `PATCH` replaces the variations as a list, matched by key. Removing a variation that is still served is refused `409 in_use`, with `references` naming each flag and environment that names it: as the off or fallthrough variation, in a rule or rollout, in an override, or as the variation another flag requires as a prerequisite. An experiment of the flag that lists the variation, whatever its status, is a reference too (`kind` `experiment`, no environment).
 
