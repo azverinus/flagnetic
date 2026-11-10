@@ -226,8 +226,7 @@ func (h *Deliver) Attempt(ctx context.Context, token LeaseToken, delivery govern
 	}
 	a.LatencyMS = sent.Latency.Milliseconds()
 	if sent.Err != nil {
-		reason := sent.Err.Error()
-		a.Error = &reason
+		a.Error = governance.AttemptError(sent.Err)
 	} else {
 		a.StatusCode, a.ResponseSnippet = sent.StatusCode, governance.ResponseSnippet(sent.Body)
 	}

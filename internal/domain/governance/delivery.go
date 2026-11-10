@@ -174,19 +174,35 @@ func SettleAttempt(a DeliveryAttempt, random io.Reader) (DeliveryStatus, *time.T
 }
 
 // ResponseSnippet returns the start of a receiver's answer as an attempt
-// keeps it: at most ResponseSnippetLimit bytes of valid UTF-8, so a binary
-// body cannot break the JSON the delivery log answers; nil for an empty
-// body.
+// keeps it: at most ResponseSnippetLimit bytes of text PostgreSQL stores, so
+// a binary body can break neither the JSON the delivery log answers nor the
+// recording of the attempt; nil for an empty body.
 func ResponseSnippet(body []byte) *string {
 	if len(body) == 0 {
 		return nil
 	}
-	s := strings.ToValidUTF8(string(body), "�")
+	s := storableText(string(body))
 	for len(s) > ResponseSnippetLimit {
 		_, size := utf8.DecodeLastRuneInString(s)
 		s = s[:len(s)-size]
 	}
 	return &s
+}
+
+// AttemptError returns why a call got no answer, as an attempt keeps it.
+// The text may quote bytes the receiver or the network sent, so it is made
+// text PostgreSQL stores like a snippet is.
+func AttemptError(err error) *string {
+	s := storableText(err.Error())
+	return &s
+}
+
+// storableText returns s as valid UTF-8 without NUL. PostgreSQL refuses a
+// NUL in jsonb, where a delivery's attempts are kept: an attempt holding one
+// could never be recorded, and its delivery, never settled, would be sent
+// again for ever as its first attempt.
+func storableText(s string) string {
+	return strings.ToValidUTF8(strings.ReplaceAll(s, "\x00", "\uFFFD"), "\uFFFD")
 }
 
 // The headers every call to a receiver carries.
