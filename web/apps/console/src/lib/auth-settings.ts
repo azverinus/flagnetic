@@ -1,4 +1,4 @@
-import type { AuthSettings, SsoEnforcedDomain, Violation } from "@flagnetic/api";
+import type { AuthProvider, AuthSettings, SsoEnforcedDomain, Violation } from "@flagnetic/api";
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { z } from "zod";
@@ -58,9 +58,7 @@ export type AuthSettingsValues = Record<DurationField, Duration> & {
   token_expiry_required: boolean;
   password_min_length: string;
   self_service_password_reset: boolean;
-  /** Not edited here: the form sends back what it was given, as the server replaces every setting. */
   local_login_enabled: boolean;
-  /** Not edited here, sent back as given. */
   sso_enforced_domains: SsoEnforcedDomain[];
 };
 
@@ -157,6 +155,22 @@ export function authSettingsSchema(i18n: I18n) {
       sso_enforced_domains: z.array(z.object({ domain: z.string(), provider: z.string() })),
     })
     .superRefine((values, context) => {
+      values.sso_enforced_domains.forEach((row, index) => {
+        if (row.domain.trim() === "") {
+          context.addIssue({
+            code: "custom",
+            path: ["sso_enforced_domains", index, "domain"],
+            message: i18n._(msg`Choose a domain.`),
+          });
+        }
+        if (row.provider === "") {
+          context.addIssue({
+            code: "custom",
+            path: ["sso_enforced_domains", index, "provider"],
+            message: i18n._(msg`Choose a provider.`),
+          });
+        }
+      });
       for (const field of durationFields) {
         const seconds = secondsOf(values[field]);
         if (seconds === undefined) {
@@ -201,4 +215,45 @@ export function authSettingsSchema(i18n: I18n) {
         });
       }
     });
+}
+
+/**
+ * The email domains an instance admin may enforce: those of the enabled
+ * providers, each once, in order. A domain already enforced stays offered
+ * though its provider has since lost it, so the row that holds it can be
+ * read and removed.
+ */
+export function enforceableDomains(
+  providers: readonly AuthProvider[],
+  enforced: readonly SsoEnforcedDomain[],
+): string[] {
+  const domains = new Set<string>();
+  for (const provider of providers) {
+    if (provider.enabled) for (const domain of provider.domains) domains.add(domain.toLowerCase());
+  }
+  for (const { domain } of enforced) if (domain !== "") domains.add(domain.toLowerCase());
+  return [...domains].sort();
+}
+
+/**
+ * The enabled providers an email domain can be enforced to: those that
+ * vouch for it. The server refuses any other.
+ */
+export function providersVouchingFor(
+  providers: readonly AuthProvider[],
+  domain: string,
+): AuthProvider[] {
+  const wanted = domain.toLowerCase();
+  return providers.filter(
+    (provider) => provider.enabled && provider.domains.some((d) => d.toLowerCase() === wanted),
+  );
+}
+
+/** The index a violation of the enforced domains points at, with the part of the row it names. */
+export function enforcedRowOf(
+  pointer: string,
+): { index: number; part: "domain" | "provider" } | undefined {
+  const match = /^\/sso_enforced_domains\/(\d+)\/(domain|provider)$/.exec(pointer);
+  if (!match) return undefined;
+  return { index: Number(match[1]), part: match[2] as "domain" | "provider" };
 }

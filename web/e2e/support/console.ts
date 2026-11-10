@@ -17,11 +17,20 @@ import { admin, readState } from "./instance";
 export type Credentials = { email: string; password: string };
 
 /** The labels of the sign-in page in the language a spec reads it in. */
-export type SignInWords = { email: string; password: string; submit: string };
+export type SignInWords = { email: string; password: string; submit: string; next: string };
 
-const english: SignInWords = { email: "Email", password: "Password", submit: "Sign in" };
+const english: SignInWords = {
+  email: "Email",
+  password: "Password",
+  submit: "Sign in",
+  next: "Continue",
+};
 
-/** Fills in and sends the sign-in page, leaving the page wherever the answer takes it. */
+/**
+ * Fills in and sends the sign-in page, leaving the page wherever the answer
+ * takes it. While the instance has auth providers the page asks for the
+ * email first, so the password comes after "Continue".
+ */
 export async function submitSignIn(
   page: Page,
   who: Credentials,
@@ -29,6 +38,8 @@ export async function submitSignIn(
 ): Promise<void> {
   await page.goto("/sign-in");
   await page.getByLabel(words.email).fill(who.email);
+  const next = page.getByRole("button", { name: words.next, exact: true });
+  if (await next.isVisible()) await next.click();
   await page.getByLabel(words.password).fill(who.password);
   await page.getByRole("button", { name: words.submit }).click();
 }
