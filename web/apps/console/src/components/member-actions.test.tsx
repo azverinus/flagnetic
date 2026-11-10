@@ -24,6 +24,22 @@ function member(overrides: Partial<Member> = {}): Member {
 }
 
 describe("what an instance admin does to a member", () => {
+  it("explains that only the auth provider takes away an instance admin its group mapping made", async () => {
+    fakeServer({ "PATCH /members/m1": problem(409, "sso_sourced") });
+    renderWithProviders(<MemberActions member={member({ instance_admin: true })} self={false} />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Revoke instance admin" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Revoke instance admin from Grace Hopper",
+    });
+    await user.click(within(dialog).getByRole("button", { name: "Revoke instance admin" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "An auth provider's group mapping made this, so only the provider takes it away.",
+    );
+  });
+
   it("explains the last instance admin's refusal in the dialog that asked for it", async () => {
     fakeServer({ "PATCH /members/m1": problem(409, "last_instance_admin") });
     renderWithProviders(<MemberActions member={member({ instance_admin: true })} self />);

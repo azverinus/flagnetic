@@ -147,7 +147,7 @@ A provider's group mappings turn the directory groups of the people who sign in 
 
 **Reading the groups.** A member's groups at a provider are those their last sign-in through it claimed together with the provider's [SCIM groups](scim.md#groups) they are in. For the claim, the identity provider has to send them. For an OIDC provider that is the claim `claims.groups` names (default `groups`) in the ID token, and the provider usually needs a scope or a setting to include it: Dex and Keycloak ask for the `groups` scope, Okta for a groups claim on the authorization server, Entra ID for the groups claim of the app registration. For a SAML provider it is the multi-valued attribute `claims.groups` names. A claim counts only when it is a list of strings; a list may be empty, which says the person is in no group.
 
-**Mapping groups.** `PUT /instance/auth-providers/{slug}/group-mappings` replaces the provider's whole list, and `GET` reads it. An instance admin's call, with a body of `items`, in order:
+**Mapping groups.** In the console, the provider's page has a **Group mappings** section: one row per mapping, in order, each naming a directory group and either a role in a project or instance admin, with buttons to add, move and remove rows. **Save mappings** replaces the whole list and says how many grants it granted and removed, and how many members stayed instance admin as the last active one. Through the API, `PUT /instance/auth-providers/{slug}/group-mappings` replaces the provider's whole list, and `GET` reads it. An instance admin's call, with a body of `items`, in order:
 
 ```json
 {

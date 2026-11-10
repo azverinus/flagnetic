@@ -20,11 +20,22 @@ const statePath = resolve(workDir, "dex.json");
  * verified. The hashes are bcrypt of the passwords, as Dex asks for; they
  * are test credentials that exist only in this harness.
  */
-export type DexUser = { email: string; name: string; password: string; hash: string };
+export type DexUser = {
+  email: string;
+  name: string;
+  password: string;
+  hash: string;
+  /** The directory groups Dex puts in the groups claim, when it is asked for them. */
+  groups?: readonly string[];
+};
+
+/** The directory group Vera belongs to, which the group mapping specs map to a role. */
+export const dexGroup = "engineering";
 
 /**
  * Vera is the member the harness seeds as a viewer: signing in as her
  * through a provider that links by email lands in an account that exists.
+ * She belongs to the directory group `dexGroup`.
  * The stranger has an address in the same domain and no member, so a
  * provider that does not create members refuses her.
  */
@@ -34,6 +45,7 @@ export const dexUsers = {
     name: "Vera Viewer",
     password: "dex-cobalt-lantern-2031",
     hash: "$2a$10$HMXzCOvuyYjaz0Eyvkzhjuzg.vWI.8LDXKafAECdoD9POI4SPiP0e",
+    groups: [dexGroup],
   },
   stranger: {
     email: "sam.stranger@flagnetic.test",
@@ -45,6 +57,8 @@ export const dexUsers = {
 
 /** The slug the specs give the provider they create; Dex lists its redirect URIs exactly. */
 export const dexSlug = "dex";
+/** The slug of the provider the group mapping specs create, which asks Dex for groups. */
+export const dexGroupsSlug = "dex-groups";
 /** The client Dex is configured with. */
 const clientId = "flagnetic";
 const clientSecret = "dex-client-secret";
@@ -64,13 +78,16 @@ export function readDex(): DexState {
 /**
  * The configuration of a Dex that keeps everything in memory, asks for a
  * password only (no connector to choose, no approval screen), and has one
- * client whose redirect URI is the instance's callback for `dexSlug`.
+ * client whose redirect URIs are the instance's callbacks for `dexSlug` and `dexGroupsSlug`.
  */
 function configuration(issuer: string, baseURL: string): string {
-  const users = Object.values(dexUsers)
+  const users = (Object.values(dexUsers) as DexUser[])
     .map(
       (user, index) =>
-        `  - email: "${user.email}"\n    hash: "${user.hash}"\n    username: "${user.name}"\n    userID: "user-${index + 1}"\n`,
+        `  - email: "${user.email}"\n    hash: "${user.hash}"\n    username: "${user.name}"\n    userID: "user-${index + 1}"\n` +
+        (user.groups?.length
+          ? `    groups: [${user.groups.map((group) => JSON.stringify(group)).join(", ")}]\n`
+          : ""),
     )
     .join("");
   return [
@@ -90,6 +107,7 @@ function configuration(issuer: string, baseURL: string): string {
     "    name: Flagnetic",
     "    redirectURIs:",
     `      - ${baseURL}/sso/${dexSlug}/callback`,
+    `      - ${baseURL}/sso/${dexGroupsSlug}/callback`,
     "staticPasswords:",
     users,
   ].join("\n");
