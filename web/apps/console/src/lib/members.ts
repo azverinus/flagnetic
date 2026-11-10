@@ -39,6 +39,15 @@ export type MemberAction =
   "edit" | "promote" | "demote" | "reissue" | "reset" | "deactivate" | "reactivate";
 
 /**
+ * Whether the directory of a provisioned member owns the action: their
+ * email, their name and whether they are active follow the identity
+ * provider, so the management API refuses to change them by hand.
+ */
+export function directoryOwns(action: MemberAction): boolean {
+  return action === "edit" || action === "deactivate" || action === "reactivate";
+}
+
+/**
  * What can be done to a member as they are: an invited member's link can
  * be replaced, and an active member given a password reset link (an
  * invited one joins through their invitation instead); a deactivated

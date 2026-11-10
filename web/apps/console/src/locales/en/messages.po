@@ -205,6 +205,10 @@ msgstr "{live, plural, one {Revoke # session} other {Revoke # sessions}}"
 msgid "{name} ({email})"
 msgstr "{name} ({email})"
 
+#: src/components/scim-tokens.tsx
+msgid "{name} (disabled)"
+msgstr "{name} (disabled)"
+
 #: src/lib/environments.ts
 msgid "{name} (protected)"
 msgstr "{name} (protected)"
@@ -627,6 +631,10 @@ msgstr "A running experiment is stopped with a decision before it is archived."
 msgid "A running experiment's traffic allocation can only grow."
 msgstr "A running experiment's traffic allocation can only grow."
 
+#: src/components/scim-tokens.tsx
+msgid "A SCIM token belongs to an auth provider, and there is none yet. Add the provider of your identity provider first."
+msgstr "A SCIM token belongs to an auth provider, and there is none yet. Add the provider of your identity provider first."
+
 #: src/lib/problem-messages.ts
 msgid "A scope is a word without spaces."
 msgstr "A scope is a word without spaces."
@@ -729,6 +737,7 @@ msgstr "A variation pinned for one unit, checked before any rule. An override is
 msgid "A webhook posts the events you choose to a URL, signed with its secret, retried when the receiver fails, and logged."
 msgstr "A webhook posts the events you choose to a URL, signed with its secret, retried when the receiver fails, and logged."
 
+#: src/components/scim-tokens.tsx
 #: src/components/token-create-form.tsx
 msgid "A year"
 msgstr "A year"
@@ -776,6 +785,7 @@ msgid "Actions"
 msgstr "Actions"
 
 #: src/components/experiment-alerts.tsx
+#: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
 #: src/lib/members.ts
 #: src/lib/sdk-keys.ts
@@ -880,6 +890,10 @@ msgstr "Administer the instance: projects, members and its settings."
 #: src/components/audit-entry-sheet.tsx
 msgid "After"
 msgstr "After"
+
+#: src/components/scim-tokens.tsx
+msgid "After this the identity provider is refused until it gets a new token."
+msgstr "After this the identity provider is refused until it gets a new token."
 
 #: src/components/experiment-alerts.tsx
 msgid "Alert"
@@ -1289,6 +1303,7 @@ msgid "Audit log"
 msgstr "Audit log"
 
 #. A kind of actor in the audit log.
+#: src/components/scim-tokens.tsx
 #: src/lib/audit.ts
 #: src/routes/_signed-in/admin/auth-providers/$provider.tsx
 msgid "Auth provider"
@@ -1386,6 +1401,7 @@ msgstr "Bucket"
 
 #: src/components/experiment-transitions.tsx
 #: src/components/kill-switch-dialog.tsx
+#: src/components/scim-tokens.tsx
 #: src/components/ui/confirm-dialog.tsx
 #: src/components/ui/form-page.tsx
 msgid "Cancel"
@@ -1571,6 +1587,7 @@ msgid "Choose a project first."
 msgstr "Choose a project first."
 
 #: src/components/enforced-domains-field.tsx
+#: src/components/scim-tokens.tsx
 msgid "Choose a provider"
 msgstr "Choose a provider"
 
@@ -1651,6 +1668,10 @@ msgstr "Choose an attribute"
 #: src/lib/conditions.ts
 msgid "Choose an attribute."
 msgstr "Choose an attribute."
+
+#: src/components/scim-tokens.tsx
+msgid "Choose an auth provider."
+msgstr "Choose an auth provider."
 
 #: src/components/rule-editor.tsx
 msgid "Choose an experiment"
@@ -1982,6 +2003,7 @@ msgstr "Create segment"
 msgid "Create the first project to start declaring what it serves."
 msgstr "Create the first project to start declaring what it serves."
 
+#: src/components/scim-tokens.tsx
 #: src/components/token-create-form.tsx
 msgid "Create token"
 msgstr "Create token"
@@ -1995,6 +2017,7 @@ msgid "Create webhook"
 msgstr "Create webhook"
 
 #: src/components/experiment-transitions.tsx
+#: src/components/scim-tokens.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/token-list.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
@@ -2609,6 +2632,10 @@ msgstr "Enter every weight to see the total."
 msgid "Enter host names such as example.com, without an at sign or a scheme."
 msgstr "Enter host names such as example.com, without an at sign or a scheme."
 
+#: src/components/scim-tokens.tsx
+msgid "Enter it in the identity provider as the secret token or bearer token of the connection. Keep it where only the identity provider can read it."
+msgstr "Enter it in the identity provider as the secret token or bearer token of the connection. Keep it where only the identity provider can read it."
+
 #: src/lib/variations.ts
 msgid "Enter JSON other than null."
 msgstr "Enter JSON other than null."
@@ -2668,6 +2695,10 @@ msgstr "Enter the URL of the identity provider's metadata."
 #: src/components/webhook-editor.tsx
 msgid "Enter the URL the events are posted to."
 msgstr "Enter the URL the events are posted to."
+
+#: src/components/scim-tokens.tsx
+msgid "Enter this as the tenant or connector base URL, with a token as the secret or bearer token."
+msgstr "Enter this as the tenant or connector base URL, with a token as the secret or bearer token."
 
 #: src/components/password-form.tsx
 msgid "Enter your current password."
@@ -3008,6 +3039,7 @@ msgstr "Experiment updated"
 msgid "Experiments"
 msgstr "Experiments"
 
+#: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
 #: src/lib/sdk-keys.ts
 msgid "Expired"
@@ -3017,6 +3049,7 @@ msgstr "Expired"
 msgid "Expired on {until}"
 msgstr "Expired on {until}"
 
+#: src/components/scim-tokens.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
@@ -3031,6 +3064,10 @@ msgstr "Exposure conflicts"
 #: src/lib/event-volume.ts
 msgid "Exposures"
 msgstr "Exposures"
+
+#: src/components/scim-groups.tsx
+msgid "External ID"
+msgstr "External ID"
 
 #: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
@@ -3252,6 +3289,7 @@ msgid "Give the metadata as a URL or pasted, not both."
 msgstr "Give the metadata as a URL or pasted, not both."
 
 #: src/components/auth-provider-detail.tsx
+#: src/components/scim-tokens.tsx
 msgid "Go to the auth providers"
 msgstr "Go to the auth providers"
 
@@ -3316,6 +3354,10 @@ msgstr "Grant role"
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Grants"
 msgstr "Grants"
+
+#: src/components/scim-groups.tsx
+msgid "Group"
+msgstr "Group"
 
 #: src/components/saml-provider-form.tsx
 msgid "Groups attribute"
@@ -3767,6 +3809,7 @@ msgstr "Last success"
 msgid "Last updated"
 msgstr "Last updated"
 
+#: src/components/scim-tokens.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/token-list.tsx
 msgid "Last used"
@@ -4048,6 +4091,7 @@ msgstr "Member updated"
 
 #: src/components/navigation.tsx
 #: src/components/projects-table.tsx
+#: src/components/scim-groups.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
 #: src/routes/_signed-in/admin/members/route.tsx
 #: src/routes/_signed-in/projects/$project/members.tsx
@@ -4186,6 +4230,7 @@ msgstr "Needs the permission to {name}."
 
 #: src/components/identity-list.tsx
 #: src/components/moment.tsx
+#: src/components/scim-tokens.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
@@ -4240,6 +4285,10 @@ msgstr "New project token"
 #: src/components/auth-provider-list.tsx
 msgid "New provider"
 msgstr "New provider"
+
+#: src/components/scim-tokens.tsx
+msgid "New SCIM token"
+msgstr "New SCIM token"
 
 #: src/components/sdk-keys.tsx
 msgid "New SDK key"
@@ -4460,6 +4509,10 @@ msgstr "No rule serves it: no ruleset changes."
 msgid "No rules: every context receives the fallthrough variation."
 msgstr "No rules: every context receives the fallthrough variation."
 
+#: src/components/scim-tokens.tsx
+msgid "No SCIM token yet."
+msgstr "No SCIM token yet."
+
 #: src/lib/stale-flags.ts
 msgid "No SDK evaluated it or recorded an exposure of it in any environment for 30 days, while SDKs reported evaluations of the project. Only flags created more than 30 days ago are judged; remote evaluations do not count."
 msgstr "No SDK evaluated it or recorded an exposure of it in any environment for 30 days, while SDKs reported evaluations of the project. Only flags created more than 30 days ago are judged; remote evaluations do not count."
@@ -4523,6 +4576,7 @@ msgid "none"
 msgstr "none"
 
 #: src/components/compare-environments.tsx
+#: src/components/scim-groups.tsx
 #: src/components/webhook-detail.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "None"
@@ -5142,6 +5196,7 @@ msgid "Protocol"
 msgstr "Protocol"
 
 #: src/components/identity-list.tsx
+#: src/components/scim-tokens.tsx
 msgid "Provider"
 msgstr "Provider"
 
@@ -5156,6 +5211,18 @@ msgstr "Provider disabled"
 #: src/components/sign-in-methods.tsx
 msgid "Providers you can link"
 msgstr "Providers you can link"
+
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "Provisioned by"
+msgstr "Provisioned by"
+
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Provisioned by {provider}"
+msgstr "Provisioned by {provider}"
+
+#: src/components/member-actions.tsx
+msgid "Provisioned by {provider}: its directory decides their email, name and whether they are active."
+msgstr "Provisioned by {provider}: its directory decides their email, name and whether they are active."
 
 #: src/lib/problem-messages.ts
 msgid "provisioned members"
@@ -5495,6 +5562,10 @@ msgstr "Revert to version {version}"
 msgid "Reverts the configuration to version {revertTo}."
 msgstr "Reverts the configuration to version {revertTo}."
 
+#: src/components/scim-tokens.tsx
+msgid "Revoke {hint}"
+msgstr "Revoke {hint}"
+
 #: src/components/token-list.tsx
 msgid "Revoke {name}"
 msgstr "Revoke {name}"
@@ -5502,6 +5573,10 @@ msgstr "Revoke {name}"
 #: src/components/sdk-keys.tsx
 msgid "Revoke {name} ({keyId})"
 msgstr "Revoke {name} ({keyId})"
+
+#: src/components/scim-tokens.tsx
+msgid "Revoke {revokingHint}"
+msgstr "Revoke {revokingHint}"
 
 #: src/components/token-list.tsx
 msgid "Revoke {revokingName}"
@@ -5543,10 +5618,12 @@ msgstr "Revoke the session on {device}"
 msgid "Revoke the session on {revokingDevice}"
 msgstr "Revoke the session on {revokingDevice}"
 
+#: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
 msgid "Revoke token"
 msgstr "Revoke token"
 
+#: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
 #: src/lib/sdk-keys.ts
 msgid "Revoked"
@@ -5745,12 +5822,23 @@ msgstr "Schedule"
 msgid "Scheduled"
 msgstr "Scheduled"
 
+#: src/components/scim-tokens.tsx
+msgid "SCIM base URL"
+msgstr "SCIM base URL"
+
+#: src/components/scim-groups.tsx
+msgid "SCIM groups"
+msgstr "SCIM groups"
+
 #. A kind of actor in the audit log.
 #: src/lib/audit.ts
 msgid "SCIM token"
 msgstr "SCIM token"
 
+#: src/components/navigation.tsx
+#: src/components/scim-tokens.tsx
 #: src/lib/problem-messages.ts
+#: src/routes/_signed-in/admin/scim-tokens.tsx
 msgid "SCIM tokens"
 msgstr "SCIM tokens"
 
@@ -6238,6 +6326,7 @@ msgstr "STARTTLS and TLS need TLS 1.2 or later and verify the server's certifica
 msgid "STARTTLS, usually port 587"
 msgstr "STARTTLS, usually port 587"
 
+#: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -6383,6 +6472,10 @@ msgstr "Taking you to {leaving} to sign in…"
 #: src/components/change-request-diff.tsx
 msgid "Targeting"
 msgstr "Targeting"
+
+#: src/components/scim-tokens.tsx
+msgid "Tell the identity provider"
+msgstr "Tell the identity provider"
 
 #: src/components/structural-diff-view.tsx
 msgid "temporary"
@@ -6778,6 +6871,10 @@ msgstr "The format the instance asks the identity provider for. The name identif
 msgid "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
 msgstr "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
 
+#: src/components/scim-groups.tsx
+msgid "The groups the identity provider pushed through SCIM, which its group mappings can name. The directory owns them and who is in them, so they are read only here. Pushing groups needs a <0>SCIM token</0> of this provider."
+msgstr "The groups the identity provider pushed through SCIM, which its group mappings can name. The directory owns them and who is in them, so they are read only here. Pushing groups needs a <0>SCIM token</0> of this provider."
+
 #: src/components/member-identities.tsx
 msgid "The identities {name} linked"
 msgstr "The identities {name} linked"
@@ -6797,6 +6894,14 @@ msgstr "The identity provider could not be reached or did not answer as expected
 #: src/lib/problem-messages.ts
 msgid "The identity provider could not be reached or did not answer as expected."
 msgstr "The identity provider could not be reached or did not answer as expected."
+
+#: src/components/scim-groups.tsx
+msgid "The identity provider has pushed no group."
+msgstr "The identity provider has pushed no group."
+
+#: src/components/scim-tokens.tsx
+msgid "The identity provider is refused from now on, and stops provisioning until it is given another token. Members and groups it already provisioned are kept. This cannot be undone."
+msgstr "The identity provider is refused from now on, and stops provisioning until it is given another token. Members and groups it already provisioned are kept. This cannot be undone."
 
 #: src/lib/problem-messages.ts
 msgid "The identity provider offers no single sign-on service with the HTTP-Redirect binding, which the instance signs in through."
@@ -7066,6 +7171,10 @@ msgstr "The provider is still used by {uses}. Disable it instead: that stops its
 msgid "The provider manages this member, so their identity at it stays for as long as they are provisioned. Deactivate or remove them at the provider."
 msgstr "The provider manages this member, so their identity at it stays for as long as they are provisioned. Deactivate or remove them at the provider."
 
+#: src/components/scim-tokens.tsx
+msgid "The provider whose members and groups the token reaches. It cannot be changed later."
+msgstr "The provider whose members and groups the token reaches. It cannot be changed later."
+
 #: src/components/auth-provider-detail.tsx
 msgid "The redirect URI is built from the instance's public address (FLAGNETIC_BASE_URL), which is not set. Set it, and the address shows here."
 msgstr "The redirect URI is built from the instance's public address (FLAGNETIC_BASE_URL), which is not set. Set it, and the address shows here."
@@ -7229,6 +7338,7 @@ msgstr "The test mail goes to {recipient} through the saved settings."
 msgid "The token in use does not carry the scope this needs."
 msgstr "The token in use does not carry the scope this needs."
 
+#: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
 msgid "The token is revoked."
 msgstr "The token is revoked."
@@ -7557,6 +7667,10 @@ msgstr "To"
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "to be removed by {by}"
 msgstr "to be removed by {by}"
+
+#: src/components/scim-tokens.tsx
+msgid "Token"
+msgstr "Token"
 
 #: src/components/auth-provider-detail.tsx
 msgid "Token endpoint"
@@ -7986,6 +8100,10 @@ msgstr "Welcome, {name}. Choose a project to work in."
 msgid "What {name} holds"
 msgstr "What {name} holds"
 
+#: src/components/scim-tokens.tsx
+msgid "What an identity provider presents to create, update and deprovision members through SCIM. A token belongs to one auth provider for life and reaches only that provider's members and groups."
+msgstr "What an identity provider presents to create, update and deprovision members through SCIM. A token belongs to one auth provider for life and reaches only that provider's members and groups."
+
 #: src/components/webhook-editor.tsx
 msgid "What receives the events, to tell the subscriptions apart."
 msgstr "What receives the events, to tell the subscriptions apart."
@@ -8256,6 +8374,10 @@ msgstr "Your new API token"
 #: src/routes/password-reset.$secret.tsx
 msgid "Your new password is set. Every other session of yours is signed out."
 msgstr "Your new password is set. Every other session of yours is signed out."
+
+#: src/components/scim-tokens.tsx
+msgid "Your new SCIM token"
+msgstr "Your new SCIM token"
 
 #: src/components/password-form.tsx
 msgid "Your password is changed. Every other device is signed out."

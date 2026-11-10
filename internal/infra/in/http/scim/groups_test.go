@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
+	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
 const groupSchema = "urn:ietf:params:scim:schemas:core:2.0:Group"
@@ -561,4 +562,64 @@ func TestAMemberDeactivatedThroughSCIMLosesTheirMappedAccessAndRegainsItWhenReac
 	if deleted := e.scimEntries(t, "grant.deleted"); len(deleted) == 0 || deleted[0].Actor.Kind != management.ActorKindScim {
 		t.Errorf("grant.deleted = %v, want the removal recorded for the SCIM token", deleted)
 	}
+}
+
+func TestAnInstanceAdminReadsAProvidersSCIMGroupsWithTheirMemberCounts(t *testing.T) {
+	e := start(t)
+	a, b := e.provider(t), e.provider(t)
+	tokenA, tokenB := e.token(t, a), e.token(t, b)
+	one, two := e.user(t, tokenA), e.user(t, tokenA)
+
+	e.mustCreateGroup(t, tokenA, groupBody("platform", map[string]any{"externalId": "dir-7", "members": memberRefs(one, two)}))
+	e.mustCreateGroup(t, tokenA, groupBody("admins", nil))
+	e.mustCreateGroup(t, tokenB, groupBody("elsewhere", map[string]any{"members": memberRefs(e.user(t, tokenB))}))
+
+	res, err := e.admin.ListAuthProviderScimGroupsWithResponse(t.Context(), a)
+	if err != nil || res.JSON200 == nil {
+		t.Fatalf("listing the SCIM groups of %s: %v, %d: %s", a, err, res.StatusCode(), res.Body)
+	}
+	type row struct {
+		name     string
+		external string
+		members  int
+	}
+	var got []row
+	for _, g := range res.JSON200.Items {
+		got = append(got, row{g.DisplayName, deref(g.ExternalId), g.MemberCount})
+	}
+	want := []row{{"admins", "", 0}, {"platform", "dir-7", 2}}
+	if !slices.Equal(got, want) {
+		t.Errorf("groups = %v, want %v: the provider's own, by name, with their members counted", got, want)
+	}
+
+	// A member leaving a group is no longer counted.
+	groupID := e.call(t, tokenA, http.MethodGet, `/Groups?filter=displayName%20eq%20%22platform%22`, "").json(t)["Resources"].([]any)[0].(map[string]any)["id"].(string)
+	e.patch(t, tokenA, "/Groups/"+groupID, map[string]any{"op": "remove", "path": "members[value eq \"" + one + "\"]"})
+	res, _ = e.admin.ListAuthProviderScimGroupsWithResponse(t.Context(), a)
+	if res.JSON200 == nil || res.JSON200.Items[1].MemberCount != 1 {
+		t.Errorf("after a removal = %d %s, want platform with 1 member", res.StatusCode(), res.Body)
+	}
+
+	empty, _ := e.admin.ListAuthProviderScimGroupsWithResponse(t.Context(), e.provider(t))
+	if empty.JSON200 == nil || len(empty.JSON200.Items) != 0 {
+		t.Errorf("a provider without groups = %d %s, want an empty list", empty.StatusCode(), empty.Body)
+	}
+	missing, _ := e.admin.ListAuthProviderScimGroupsWithResponse(t.Context(), "nowhere")
+	if missing.StatusCode() != http.StatusNotFound {
+		t.Errorf("an unknown provider = %d, want 404", missing.StatusCode())
+	}
+
+	member := testkit.NewMember(t, testkit.Pool(t))
+	b2 := testkit.NewBrowser(t, e.srv.URL)
+	b2.SignIn(t, member.Email, member.Password)
+	if denied, _ := b2.ListAuthProviderScimGroupsWithResponse(t.Context(), a); denied.StatusCode() != http.StatusForbidden {
+		t.Errorf("a member listing = %d, want 403", denied.StatusCode())
+	}
+}
+
+func deref[T any](p *T) (v T) {
+	if p != nil {
+		v = *p
+	}
+	return v
 }

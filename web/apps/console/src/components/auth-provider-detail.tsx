@@ -25,6 +25,7 @@ import {
   SamlRegistration,
 } from "@/components/saml-provider-detail";
 import { SamlProviderForm } from "@/components/saml-provider-form";
+import { ScimGroups } from "@/components/scim-groups";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/ui/page-header";
@@ -206,6 +207,7 @@ function AuthProviderPage({
           <SamlCertificates provider={provider} onChanged={remember} onReload={onReload} />
         </>
       ) : null}
+      <ScimGroups provider={provider.slug} />
       <section aria-labelledby="settings" className="flex flex-col gap-4">
         <h2 id="settings" className="text-base font-semibold">
           <Trans>Settings</Trans>

@@ -3994,6 +3994,24 @@ type ScheduleFailure struct {
 	Stopped bool `json:"stopped"`
 }
 
+// ScimGroup A group an auth provider's directory pushed through SCIM.
+type ScimGroup struct {
+	// DisplayName The group's name, which the provider's group mappings match exactly.
+	DisplayName string `json:"display_name"`
+
+	// ExternalId The directory's own identifier of the group; null when it sent none.
+	ExternalId *string            `json:"external_id"`
+	Id         openapi_types.UUID `json:"id"`
+
+	// MemberCount How many of the provider's provisioned members the group holds.
+	MemberCount int `json:"member_count"`
+}
+
+// ScimGroupList defines model for ScimGroupList.
+type ScimGroupList struct {
+	Items []ScimGroup `json:"items"`
+}
+
 // ScimToken A SCIM token, by its hint; its value is shown only when it is created.
 type ScimToken struct {
 	CreatedAt time.Time `json:"created_at"`
@@ -7964,6 +7982,16 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /instance/auth-providers/{provider}/rotate-certificate/complete (the `CompleteAuthProviderCertificateRotation` operationId).
 	CompleteAuthProviderCertificateRotation(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAuthProviderScimGroups An auth provider's SCIM groups
+	//
+	// The groups the provider's directory has pushed through SCIM, by name,
+	// each with how many of the provider's provisioned members it holds. The
+	// directory owns them: they are read only here, and group mappings match
+	// them by `display_name`.
+	//
+	// Corresponds with GET /instance/auth-providers/{provider}/scim-groups (the `ListAuthProviderScimGroups` operationId).
+	ListAuthProviderScimGroups(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// TestAuthProvider Test that an auth provider can be reached
 	//
@@ -12155,6 +12183,26 @@ func (c *Client) RotateAuthProviderCertificate(ctx context.Context, provider Aut
 // Corresponds with POST /instance/auth-providers/{provider}/rotate-certificate/complete (the `CompleteAuthProviderCertificateRotation` operationId).
 func (c *Client) CompleteAuthProviderCertificateRotation(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCompleteAuthProviderCertificateRotationRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAuthProviderScimGroups An auth provider's SCIM groups
+//
+// The groups the provider's directory has pushed through SCIM, by name,
+// each with how many of the provider's provisioned members it holds. The
+// directory owns them: they are read only here, and group mappings match
+// them by `display_name`.
+//
+// Corresponds with GET /instance/auth-providers/{provider}/scim-groups (the `ListAuthProviderScimGroups` operationId).
+func (c *Client) ListAuthProviderScimGroups(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAuthProviderScimGroupsRequest(c.Server, provider)
 	if err != nil {
 		return nil, err
 	}
@@ -19114,6 +19162,40 @@ func NewCompleteAuthProviderCertificateRotationRequest(server string, provider A
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListAuthProviderScimGroupsRequest constructs an http.Request for the ListAuthProviderScimGroups method
+func NewListAuthProviderScimGroupsRequest(server string, provider AuthProviderSlug) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-providers/%s/scim-groups", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -29070,6 +29152,18 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /instance/auth-providers/{provider}/rotate-certificate/complete (the `CompleteAuthProviderCertificateRotation` operationId).
 	CompleteAuthProviderCertificateRotationWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*CompleteAuthProviderCertificateRotationResponse, error)
 
+	// ListAuthProviderScimGroupsWithResponse An auth provider's SCIM groups
+	//
+	// The groups the provider's directory has pushed through SCIM, by name,
+	// each with how many of the provider's provisioned members it holds. The
+	// directory owns them: they are read only here, and group mappings match
+	// them by `display_name`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /instance/auth-providers/{provider}/scim-groups (the `ListAuthProviderScimGroups` operationId).
+	ListAuthProviderScimGroupsWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*ListAuthProviderScimGroupsResponse, error)
+
 	// TestAuthProviderWithResponse Test that an auth provider can be reached
 	//
 	// Fetches the provider's discovery document now (OIDC), or fetches its
@@ -34513,6 +34607,75 @@ func (r CompleteAuthProviderCertificateRotationResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CompleteAuthProviderCertificateRotationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListAuthProviderScimGroupsResponse401Headers the declared response headers of an HTTP 401 response for ListAuthProviderScimGroups
+type ListAuthProviderScimGroupsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListAuthProviderScimGroupsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ScimGroupList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListAuthProviderScimGroupsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAuthProviderScimGroupsResponse) GetJSON200() *ScimGroupList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListAuthProviderScimGroupsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListAuthProviderScimGroupsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListAuthProviderScimGroupsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAuthProviderScimGroupsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAuthProviderScimGroupsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAuthProviderScimGroupsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAuthProviderScimGroupsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -49723,6 +49886,24 @@ func (c *ClientWithResponses) CompleteAuthProviderCertificateRotationWithRespons
 	return ParseCompleteAuthProviderCertificateRotationResponse(rsp)
 }
 
+// ListAuthProviderScimGroupsWithResponse An auth provider's SCIM groups
+//
+// The groups the provider's directory has pushed through SCIM, by name,
+// each with how many of the provider's provisioned members it holds. The
+// directory owns them: they are read only here, and group mappings match
+// them by `display_name`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/auth-providers/{provider}/scim-groups (the `ListAuthProviderScimGroups` operationId).
+func (c *ClientWithResponses) ListAuthProviderScimGroupsWithResponse(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*ListAuthProviderScimGroupsResponse, error) {
+	rsp, err := c.ListAuthProviderScimGroups(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAuthProviderScimGroupsResponse(rsp)
+}
+
 // TestAuthProviderWithResponse Test that an auth provider can be reached
 //
 // Fetches the provider's discovery document now (OIDC), or fetches its
@@ -56454,6 +56635,66 @@ func ParseCompleteAuthProviderCertificateRotationResponse(rsp *http.Response) (*
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers CompleteAuthProviderCertificateRotationResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListAuthProviderScimGroupsResponse parses an HTTP response from a ListAuthProviderScimGroupsWithResponse call
+func ParseListAuthProviderScimGroupsResponse(rsp *http.Response) (*ListAuthProviderScimGroupsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAuthProviderScimGroupsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ScimGroupList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListAuthProviderScimGroupsResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -69772,6 +70013,9 @@ type ServerInterface interface {
 	// CompleteAuthProviderCertificateRotation Complete the rotation of a SAML provider's SP certificate
 	// (POST /instance/auth-providers/{provider}/rotate-certificate/complete)
 	CompleteAuthProviderCertificateRotation(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	// ListAuthProviderScimGroups An auth provider's SCIM groups
+	// (GET /instance/auth-providers/{provider}/scim-groups)
+	ListAuthProviderScimGroups(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
 	// TestAuthProvider Test that an auth provider can be reached
 	// (POST /instance/auth-providers/{provider}/test)
 	TestAuthProvider(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
@@ -71167,6 +71411,32 @@ func (siw *ServerInterfaceWrapper) CompleteAuthProviderCertificateRotation(w htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CompleteAuthProviderCertificateRotation(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAuthProviderScimGroups operation middleware
+func (siw *ServerInterfaceWrapper) ListAuthProviderScimGroups(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthProviderSlug
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAuthProviderScimGroups(w, r, provider)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -78983,6 +79253,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/rotate-certificate/complete", wrapper.CompleteAuthProviderCertificateRotation)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-providers/{provider}/group-mappings", wrapper.GetAuthProviderGroupMappings)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/auth-providers/{provider}/group-mappings", wrapper.ReplaceAuthProviderGroupMappings)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-providers/{provider}/scim-groups", wrapper.ListAuthProviderScimGroups)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/auth-providers/{provider}/test", wrapper.TestAuthProvider)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/scim-tokens", wrapper.ListScimTokens)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/instance/scim-tokens", wrapper.CreateScimToken)
@@ -81269,6 +81540,79 @@ func (response CompleteAuthProviderCertificateRotation422ApplicationProblemPlusJ
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAuthProviderScimGroupsRequestObject struct {
+	Provider AuthProviderSlug `json:"provider"`
+}
+
+type ListAuthProviderScimGroupsResponseObject interface {
+	VisitListAuthProviderScimGroupsResponse(w http.ResponseWriter) error
+}
+
+type ListAuthProviderScimGroups200JSONResponse ScimGroupList
+
+func (response ListAuthProviderScimGroups200JSONResponse) VisitListAuthProviderScimGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAuthProviderScimGroups401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListAuthProviderScimGroups401ApplicationProblemPlusJSONResponse) VisitListAuthProviderScimGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAuthProviderScimGroups403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListAuthProviderScimGroups403ApplicationProblemPlusJSONResponse) VisitListAuthProviderScimGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAuthProviderScimGroups404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListAuthProviderScimGroups404ApplicationProblemPlusJSONResponse) VisitListAuthProviderScimGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -99454,6 +99798,9 @@ type StrictServerInterface interface {
 	// CompleteAuthProviderCertificateRotation Complete the rotation of a SAML provider's SP certificate
 	// (POST /instance/auth-providers/{provider}/rotate-certificate/complete)
 	CompleteAuthProviderCertificateRotation(ctx context.Context, request CompleteAuthProviderCertificateRotationRequestObject) (CompleteAuthProviderCertificateRotationResponseObject, error)
+	// ListAuthProviderScimGroups An auth provider's SCIM groups
+	// (GET /instance/auth-providers/{provider}/scim-groups)
+	ListAuthProviderScimGroups(ctx context.Context, request ListAuthProviderScimGroupsRequestObject) (ListAuthProviderScimGroupsResponseObject, error)
 	// TestAuthProvider Test that an auth provider can be reached
 	// (POST /instance/auth-providers/{provider}/test)
 	TestAuthProvider(ctx context.Context, request TestAuthProviderRequestObject) (TestAuthProviderResponseObject, error)
@@ -100611,6 +100958,32 @@ func (sh *strictHandler) CompleteAuthProviderCertificateRotation(w http.Response
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CompleteAuthProviderCertificateRotationResponseObject); ok {
 		if err := validResponse.VisitCompleteAuthProviderCertificateRotationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAuthProviderScimGroups operation middleware
+func (sh *strictHandler) ListAuthProviderScimGroups(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+	var request ListAuthProviderScimGroupsRequestObject
+
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAuthProviderScimGroups(ctx, request.(ListAuthProviderScimGroupsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAuthProviderScimGroups")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAuthProviderScimGroupsResponseObject); ok {
+		if err := validResponse.VisitListAuthProviderScimGroupsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

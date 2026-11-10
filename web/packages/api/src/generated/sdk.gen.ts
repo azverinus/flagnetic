@@ -307,6 +307,9 @@ import type {
   ListAuditEntriesData,
   ListAuditEntriesErrors,
   ListAuditEntriesResponses,
+  ListAuthProviderScimGroupsData,
+  ListAuthProviderScimGroupsErrors,
+  ListAuthProviderScimGroupsResponses,
   ListAuthProvidersData,
   ListAuthProvidersErrors,
   ListAuthProvidersResponses,
@@ -5327,6 +5330,39 @@ export const replaceAuthProviderGroupMappings = <ThrowOnError extends boolean = 
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * An auth provider's SCIM groups
+ *
+ * The groups the provider's directory has pushed through SCIM, by name,
+ * each with how many of the provider's provisioned members it holds. The
+ * directory owns them: they are read only here, and group mappings match
+ * them by `display_name`.
+ *
+ */
+export const listAuthProviderScimGroups = <ThrowOnError extends boolean = false>(
+  options: Options<ListAuthProviderScimGroupsData, ThrowOnError>,
+): RequestResult<
+  ListAuthProviderScimGroupsResponses,
+  ListAuthProviderScimGroupsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListAuthProviderScimGroupsResponses,
+    ListAuthProviderScimGroupsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/instance/auth-providers/{provider}/scim-groups",
+    ...options,
   });
 
 /**

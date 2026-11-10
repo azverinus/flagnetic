@@ -172,6 +172,29 @@ func (s *Store) scimGroups(ctx context.Context, where string, args []any, startI
 	return groups, total, err
 }
 
+// SCIMGroupSummaries returns every group of the provider, ordered by name,
+// with how many members each holds.
+func (s *Store) SCIMGroupSummaries(ctx context.Context, provider identity.ProviderID) ([]appidentity.SCIMGroupSummary, error) {
+	rows, err := s.db(ctx).Query(ctx, `
+		SELECT g.id, g.display_name, g.external_id, count(sm.member_id)
+		FROM scim_groups g LEFT JOIN scim_group_members sm ON sm.group_id = g.id
+		WHERE g.provider_id = $1
+		GROUP BY g.id
+		ORDER BY g.display_name, g.id`, provider.Bytes())
+	return collectRows(rows, err, "SCIM group summaries", func(row pgx.CollectableRow) (appidentity.SCIMGroupSummary, error) {
+		var (
+			g        appidentity.SCIMGroupSummary
+			gid      [16]byte
+			external *string
+		)
+		if scanErr := row.Scan(&gid, &g.DisplayName, &external, &g.MemberCount); scanErr != nil {
+			return g, scanErr
+		}
+		g.ID, g.ExternalID = id.FromBytes[identity.SCIMGroup](gid), deref(external)
+		return g, nil
+	})
+}
+
 // GroupsOfMembers returns the provider's groups each of members is in,
 // ordered by name.
 func (s *Store) GroupsOfMembers(ctx context.Context, provider identity.ProviderID, members []identity.MemberID) (map[identity.MemberID][]appidentity.GroupRef, error) {

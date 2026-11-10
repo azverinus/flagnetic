@@ -37,13 +37,21 @@ const discovery = {
   code_challenge_methods_supported: ["S256", "plain"],
 };
 
+/** The fake API, which also answers the provider's SCIM groups unless the test says otherwise. */
+function serve(routes: Parameters<typeof fakeServer>[0]) {
+  return fakeServer({
+    "GET /instance/auth-providers/acme/scim-groups": { status: 200, body: { items: [] } },
+    ...routes,
+  });
+}
+
 function renderScreen() {
   return renderWithRouter(() => <AuthProviderScreen slug="acme" />);
 }
 
 describe("an auth provider's page", () => {
   it("shows the redirect URI to register, copyable", async () => {
-    fakeServer({ "GET /instance/auth-providers/acme": { status: 200, body: acme } });
+    serve({ "GET /instance/auth-providers/acme": { status: 200, body: acme } });
     await renderScreen();
     // The clipboard the user-event session installs.
     const user = userEvent.setup();
@@ -57,14 +65,14 @@ describe("an auth provider's page", () => {
 
   it("says the redirect URI needs the instance's public address when it has none", async () => {
     const { redirect_uri: _, ...withoutAddress } = acme;
-    fakeServer({ "GET /instance/auth-providers/acme": { status: 200, body: withoutAddress } });
+    serve({ "GET /instance/auth-providers/acme": { status: 200, body: withoutAddress } });
     await renderScreen();
 
     expect(await screen.findByText(/FLAGNETIC_BASE_URL/)).toBeVisible();
   });
 
   it("shows what the identity provider answered to a test", async () => {
-    fakeServer({
+    serve({
       "GET /instance/auth-providers/acme": { status: 200, body: acme },
       "POST /instance/auth-providers/acme/test": { status: 200, body: discovery },
     });
@@ -78,7 +86,7 @@ describe("an auth provider's page", () => {
   });
 
   it("flags a provider that does not list S256", async () => {
-    fakeServer({
+    serve({
       "GET /instance/auth-providers/acme": { status: 200, body: acme },
       "POST /instance/auth-providers/acme/test": {
         status: 200,
@@ -93,7 +101,7 @@ describe("an auth provider's page", () => {
   });
 
   it("explains an identity provider that could not be reached", async () => {
-    fakeServer({
+    serve({
       "GET /instance/auth-providers/acme": { status: 200, body: acme },
       "POST /instance/auth-providers/acme/test": problem(502, "provider_unreachable", {
         failure: "dial tcp: connection refused",
@@ -109,7 +117,7 @@ describe("an auth provider's page", () => {
   });
 
   it("says a disabled provider is not offered, and enables it", async () => {
-    const server = fakeServer({
+    const server = serve({
       "GET /instance/auth-providers/acme": { status: 200, body: { ...acme, enabled: false } },
       "POST /instance/auth-providers/acme/enable": { status: 200, body: acme },
     });
@@ -125,7 +133,7 @@ describe("an auth provider's page", () => {
   it("deletes the provider and goes to the list, never saying it was not found", async () => {
     let deleted = false;
     let notFound = 0;
-    fakeServer({
+    serve({
       "GET /instance/auth-providers/acme": () => {
         if (!deleted) return { status: 200, body: acme };
         notFound++;
@@ -149,7 +157,7 @@ describe("an auth provider's page", () => {
   });
 
   it("forgets a test's answer once the settings it was for are saved", async () => {
-    fakeServer({
+    serve({
       "GET /instance/auth-providers/acme": { status: 200, body: acme },
       "POST /instance/auth-providers/acme/test": { status: 200, body: discovery },
       "PATCH /instance/auth-providers/acme": {
@@ -174,9 +182,26 @@ describe("an auth provider's page", () => {
   });
 
   it("says there is no such provider", async () => {
-    fakeServer({ "GET /instance/auth-providers/acme": problem(404, "not_found") });
+    serve({ "GET /instance/auth-providers/acme": problem(404, "not_found") });
     await renderScreen();
 
     expect(await screen.findByRole("heading", { name: "Auth provider not found" })).toBeVisible();
+  });
+
+  it("lists the SCIM groups the directory pushed, read only", async () => {
+    serve({
+      "GET /instance/auth-providers/acme": { status: 200, body: acme },
+      "GET /instance/auth-providers/acme/scim-groups": {
+        status: 200,
+        body: {
+          items: [{ id: "g1", display_name: "platform", external_id: "dir-7", member_count: 3 }],
+        },
+      },
+    });
+    await renderScreen();
+
+    const row = await screen.findByRole("row", { name: /platform/ });
+    expect(row).toHaveTextContent("dir-7");
+    expect(row).toHaveTextContent("3");
   });
 });

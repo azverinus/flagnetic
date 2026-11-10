@@ -4,7 +4,7 @@ import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
-import { MemberActions } from "@/components/member-actions";
+import { MemberActions, ProvisionedReason } from "@/components/member-actions";
 import { MemberIdentities } from "@/components/member-identities";
 import { MemberSessions, MemberTokens } from "@/components/member-credentials";
 import { QueryError } from "@/components/query-error";
@@ -70,8 +70,24 @@ function MemberPage() {
         description={shown.email}
         actions={<MemberActions member={shown} self={self} />}
       />
+      {shown.provider === null ? null : (
+        <p role="note" className="rounded-md border bg-muted p-3 text-sm">
+          <ProvisionedReason provider={shown.provider} />
+        </p>
+      )}
       <dl className="grid grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
         <Detail term={<Trans>Status</Trans>}>{memberStatusName(i18n, shown.status)}</Detail>
+        {shown.provider === null ? null : (
+          <Detail term={<Trans>Provisioned by</Trans>}>
+            <Link
+              to="/admin/auth-providers/$provider"
+              params={{ provider: shown.provider }}
+              className="hover:underline"
+            >
+              {shown.provider}
+            </Link>
+          </Detail>
+        )}
         <Detail term={<Trans>Instance admin</Trans>}>
           {shown.instance_admin ? t`Yes` : t`No`}
         </Detail>
