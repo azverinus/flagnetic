@@ -46,6 +46,8 @@ The PostgreSQL of this file keeps its data in the `postgres` volume, with a fixe
 docker compose exec -T postgres pg_dump -U flagnetic flagnetic > flagnetic.sql
 ```
 
+Such a dump is a copy to read or to keep, not a backup to move a running instance with: restored into another PostgreSQL cluster, it leaves rollups and sinks reading no new event (see [After restoring a logical dump](operations.md#after-restoring-a-logical-dump)). Back an instance up physically: `pg_basebackup`, a snapshot of the volume, or your provider's snapshots and point-in-time recovery.
+
 ## As a binary
 
 ### Get the binary
