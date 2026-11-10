@@ -49,7 +49,7 @@ The one-time link that lets an active member set a new password when they cannot
 _Avoid_: reset link, reset code, recovery link
 
 **Mail**:
-What the instance sends a member through the SMTP server an instance admin configures: an invitation, a password reset they asked for, or a test mail to the admin themselves. Mail goes out after the change that causes it is stored, and a send that fails never undoes that change. Without SMTP nothing is mailed, and the link is shown to the instance admin instead.
+What the instance sends through the SMTP server an instance admin configures: an invitation, a password reset a member asked for, a notice to those who manage a webhook subscription the platform disabled, or a test mail to the admin themselves. Mail goes out after the change that causes it is stored, and a send that fails never undoes that change. Without SMTP nothing is mailed, and the link is shown to the instance admin instead.
 _Avoid_: email (the member's address), notification, message
 
 **API token**:
@@ -65,8 +65,12 @@ A member's sign-in to the UI, held server-side and referred to by an httpOnly co
 _Avoid_: JWT, auth cookie, session token
 
 **Auth provider**:
-One configured identity provider a member can sign in through, such as an OIDC or SAML integration. Its slug names it in a "sign in with" button and in its own redirect URI.
+One configured identity provider a member can sign in through, an OIDC or SAML integration, vouching for the email domains it names. Its slug names it in a "sign in with" button and in its own redirect, ACS and metadata addresses; it owns its identities, its group mappings, its SCIM tokens and the members and grants they make.
 _Avoid_: SSO connection, identity source
+
+**Provider domain**:
+An email domain an auth provider vouches for, the part of an address after the `@`, compared without case; a subdomain is not its parent. Only an email in a provider domain is linked to an existing member by email or provisioned on a first sign-in, and an email domain can be enforced only to a provider that names it. A person whose identity is already linked, or whose subject is a provisioned member's external ID, signs in whatever their email says.
+_Avoid_: allowed domain, tenant domain, email whitelist
 
 **SSO enforcement**:
 An email domain an instance admin sends to one auth provider: a password is no way in for an email in it, whether to sign in, to accept an invitation or to complete a password reset, and the sign-in page points it to that provider. Local login may also be disabled for everybody; `flagnetic admin unlock` lifts both.

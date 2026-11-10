@@ -56,6 +56,29 @@ Add a provider with slug `dex`, issuer `https://dex.example.com`, client ID `fla
 
 Create an OpenID Connect client in the realm, with **Client authentication** on and the standard flow enabled. Set **Valid redirect URIs** to `https://flags.example.com/sso/keycloak/callback`. The issuer is `https://keycloak.example.com/realms/<realm>`; the client secret is on the client's *Credentials* tab. Keycloak sets `email_verified` from the user's *Email verified* switch.
 
+For group mappings, add a *Group Membership* mapper to the client's dedicated scope, claim name `groups`, with *Full group path* off so the names match what you write in the mappings, and add `groups` to the provider's `scopes` if the mapper is attached to a client scope of that name.
+
+### Example: Microsoft Entra ID
+
+1. In *App registrations*, register a web application and add the redirect URI `https://flags.example.com/sso/entra/callback`. Under *Certificates & secrets*, create a client secret and copy its value (not its ID).
+2. The issuer is `https://login.microsoftonline.com/<tenant-id>/v2.0`, the client ID is the application's *Application (client) ID*.
+3. Entra ID leaves `email` out of the ID token of a member until you add it: under *Token configuration*, add the optional claim `email` to the ID token. It does not send `email_verified` for members, so an Entra provider that vouches for your own tenant's domains is created with `require_verified_email: false`; the tenant's administrators control those addresses. Never switch it off for a provider that accepts addresses anyone can claim.
+4. For group mappings, add a groups claim under *Token configuration* (restrict it to the groups assigned to the application). Entra ID sends **group object IDs**, so the `group` of a mapping is the object ID, such as `0b1f6c3e-...`. A user in too many groups (over 200) gets no groups claim at all; the sign-in then changes nothing, as for any missing claim, and the access they hold stays. Assign only the groups you map to the application to stay under the limit, or use [SCIM groups](scim.md#groups), whose names the directory sends as they are.
+5. The ID token's `sub` is different for every application, so a member [provisioned through SCIM](scim.md#setting-up-microsoft-entra-id) is found by email: switch `link_by_email` on.
+
+### Example: Okta
+
+1. In the Okta admin console, create an *OIDC - OpenID Connect* app integration of type *Web Application*, with the sign-in redirect URI `https://flags.example.com/sso/okta/callback` and the assignments you want.
+2. The issuer is your Okta domain, `https://<org>.okta.com`, or `https://<org>.okta.com/oauth2/default` for a custom authorization server; the client ID and secret are on the app's *General* tab. Okta sets `email_verified` from the user's profile.
+3. For group mappings, add `groups` to the provider's `scopes` (`openid email profile groups`), and under the app's *Sign On* tab edit *OpenID Connect ID Token* and give the *Groups claim filter* a name of `groups`, with a filter such as *Matches regex* `.*` (or narrower, to the groups you map). On a custom authorization server define the `groups` claim under its *Claims* tab instead, included in the ID token. Okta refuses more than 100 matching groups, so filter.
+
+### Example: Google
+
+1. In the Google Cloud console, under *APIs & Services*, configure the OAuth consent screen (for a Google Workspace organization, choose *Internal* so only its accounts can sign in) and create an *OAuth client ID* of type *Web application* with the authorized redirect URI `https://flags.example.com/sso/google/callback`.
+2. The issuer is `https://accounts.google.com`; the client ID and secret are those of the OAuth client. Google sends `email_verified` and `email`, and the default `scopes` (`openid email profile`) are enough.
+3. Set `domains` to your Workspace domain only. A personal `@gmail.com` address is a verified address too, so a provider that lists `gmail.com` lets anyone with a Google account in, with `link_by_email` or `auto_provision` on.
+4. Google sends no groups, so group mappings have nothing to read at a Google provider: grant roles by hand, or sign in through a provider that sends groups.
+
 ## Setting up a SAML provider
 
 1. Set `FLAGNETIC_BASE_URL`, as for an OIDC provider.

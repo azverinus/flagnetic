@@ -28,7 +28,7 @@ A token reaches **its provider's members and groups, and nothing else**. A membe
 
 1. In Flagnetic, [add an auth provider](sso.md) for the Entra application and create a SCIM token for it.
 2. In the Entra application, open **Provisioning**, set the mode to **Automatic**, and enter the **Tenant URL** `https://<your instance>/scim/v2` and the token as the **Secret Token**. **Test Connection** reads `GET /Users?filter=userName eq "…"`.
-3. Under **Mappings**, keep `userName` (from the user principal name or mail), `active`, `displayName`, `emails[type eq "work"].value` and `externalId`. `externalId` is what links a sign-in (below), so map it to the attribute the sign-in carries as its `sub` or NameID: for OIDC the object ID, for SAML what the `NameID` holds. Attributes the instance does not map (`title`, phone numbers, the enterprise extension) are refused `400 noTarget` in a patch: remove them from the mappings.
+3. Under **Mappings**, keep `userName` (from the user principal name or mail), `active`, `displayName`, `emails[type eq "work"].value` and `externalId`. `externalId` is what links a sign-in (below) when it equals the subject the sign-in carries, so for a SAML provider map it to the attribute the application sends as the `NameID`. An Entra OIDC `sub` is a value of its own for each application and no attribute a provisioning mapping can send, so a provisioned member signs in through an OIDC provider by email instead: switch `link_by_email` on for the provider, keep the member's email in its domains, and the first sign-in links them. Attributes the instance does not map (`title`, phone numbers, the enterprise extension) are refused `400 noTarget` in a patch: remove them from the mappings.
 4. To push groups, keep the group mappings of **Provisioning** on, with `displayName`, `externalId` and `members`, and assign the groups to the application. The group's `displayName` is what the provider's [group mappings](sso.md#group-mappings) name.
 5. Switch provisioning **On**.
 
@@ -117,6 +117,8 @@ An instance admin reads a provider's groups with `GET /instance/auth-providers/{
 ## Signing in
 
 A provisioned member signs in through their provider, matched by `externalId`: the first sign-in at the provider whose subject (the OIDC `sub`, the SAML `NameID`) equals the member's `externalId` is linked to that member and signs them in, whatever email the sign-in carries, and with `link_by_email` and `auto_provision` both off. The link is made at the member's provider only: another provider's sign-in with the same subject finds no member. A provisioned member who was deactivated is refused `member_deactivated`.
+
+A sign-in whose subject is not any member's `externalId` falls back to the provider's [email rules](sso.md#domains-linking-and-provisioning): with `link_by_email` on, the provisioned member holding the email is linked and signed in; with it off they are not found (`member_not_found`). Use this when the directory's subject cannot be mapped to `externalId`.
 
 ## Deleting a provider
 
