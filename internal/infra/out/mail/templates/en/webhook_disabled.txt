@@ -1,0 +1,8 @@
+{{define "reason"}}{{if eq . "persistent_failure"}}it was failing persistently, its deliveries having failed for at least a day with none succeeding{{else}}{{.}}{{end}}{{end -}}
+Hello {{.Recipient.Name}},
+
+Flagnetic disabled the webhook subscription "{{.Data.Name}}"{{if .Data.Project}} of the project {{.Data.Project}}{{else}} of the instance{{end}}: {{template "reason" .Data.Reason}}. It receives no more events until someone enables it, and its pending deliveries were dropped.
+
+You are told because your account ({{.Recipient.Email}}) manages webhooks{{if .Data.Project}} in this project{{else}} on this instance{{end}}. Open the subscription to see why its deliveries failed and to enable it once the receiver is back:
+
+{{.Data.URL}}

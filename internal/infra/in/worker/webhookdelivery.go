@@ -59,7 +59,12 @@ func WebhookDelivery(d Deliverer, interval time.Duration, log *slog.Logger, reg 
 				"delivery", delivery.String())
 		case err != nil && ctx.Err() == nil:
 			log.ErrorContext(ctx, "webhook delivery attempt failed", "delivery", delivery.String(), "error", err.Error())
-		case err == nil && done.Status != "" && done.Status != governance.DeliveryPending:
+		}
+		// A status is reported only once the attempt is recorded, so the
+		// delivery is counted even when what followed failed, such as
+		// telling those who manage the subscription it made the platform
+		// disable.
+		if done.Status != "" && done.Status != governance.DeliveryPending {
 			settled.WithLabelValues(string(done.Status)).Inc()
 		}
 		if done.Disabled {

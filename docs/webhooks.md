@@ -35,6 +35,8 @@ The platform disables a subscription whose receiver is dead: once 25 attempts in
 {"subscription_id": "0192…", "name": "Security channel", "last_error": "the receiver answered 503"}
 ```
 
+When the instance has an SMTP server and `FLAGNETIC_BASE_URL` (see [Mail](mail.md)), the disabling is also mailed, once it has been stored: to every active member holding `webhook.manage` in the subscription's project (instance admins hold it everywhere), or to every active instance admin for an instance subscription. The mail names the subscription and its project, says it failed persistently, and links to the subscription's page in the console; it never carries the receiver's address, its last error or any secret. It is written in each recipient's language. Nothing is mailed without an SMTP server, and a mail that fails to leave never undoes the disabling: the subscription stays disabled and the failure is logged and counted in `flagnetic_mail_sent_total`.
+
 A `PATCH` setting `enabled: true` on such a subscription is refused `409 webhook_disabled`. `POST …/webhooks/{webhook}/enable` enables it: `disabled_reason` cleared, `consecutive_failures` reset to 0 and the day counted again from now, audited as `webhook.enabled`. Events are queued for it from then on; the deliveries dropped stay dropped, and a delivery in the log can be redelivered. It enables a subscription a member disabled too, answers an enabled one as it is, takes no `If-Match` and needs `webhook.manage`.
 
 A subscription is refused with 422 and one of these codes:

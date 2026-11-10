@@ -251,3 +251,16 @@ func (s *Store) ProjectMemberCounts(ctx context.Context, projects []workspace.Pr
 	}
 	return counts, nil
 }
+
+// ProjectKeyAndName returns the key and the name of project; ErrNotFound when
+// it no longer exists.
+func (s *Store) ProjectKeyAndName(ctx context.Context, project workspace.ProjectID) (key, name string, err error) {
+	err = s.db(ctx).QueryRow(ctx, `SELECT key, name FROM projects WHERE id = $1`, project.Bytes()).Scan(&key, &name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", appaccess.ErrNotFound
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("reading a project's key and name: %w", err)
+	}
+	return key, name, nil
+}
