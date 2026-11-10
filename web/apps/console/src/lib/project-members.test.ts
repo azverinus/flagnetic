@@ -6,9 +6,11 @@ import {
   grantableRoles,
   grantCandidates,
   grantOrigin,
+  grantSourceLabel,
   invitationExpired,
   madeBy,
   memberNames,
+  ssoGrantRemovalReason,
 } from "./project-members";
 
 const projectMember: ProjectMember = {
@@ -81,6 +83,22 @@ describe("where a grant comes from", () => {
     const mapped = { ...grant, source: "sso" as const, provider: "okta", created_by: null };
     expect(grantOrigin(i18n, names, mapped)).toMatch(
       /^From the group mappings of okta, granted on /,
+    );
+  });
+});
+
+describe("the label of a grant's source", () => {
+  it("says a grant was made by hand", () => {
+    expect(grantSourceLabel(i18n, { source: "manual", provider: null })).toBe("Manual");
+  });
+
+  it("names the auth provider whose group mapping made it", () => {
+    expect(grantSourceLabel(i18n, { source: "sso", provider: "okta" })).toBe("SSO: okta");
+  });
+
+  it("says why a grant of a group mapping is not removed by hand", () => {
+    expect(ssoGrantRemovalReason(i18n, "okta")).toBe(
+      "The group mappings of okta made this grant, so only they remove it. An instance admin changes them on the provider's page.",
     );
   });
 });

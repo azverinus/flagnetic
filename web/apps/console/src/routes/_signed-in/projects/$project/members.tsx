@@ -5,7 +5,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { MailIcon, PlusIcon, Trash2Icon, UserPlusIcon, UsersIcon } from "lucide-react";
 import { useContext, useMemo, useState } from "react";
 
-import { Can } from "@/components/can";
+import { Can, DisabledAction } from "@/components/can";
 import { GrantForm } from "@/components/grant-form";
 import { InvitationLinkDialog } from "@/components/invitation-link-dialog";
 import { InvitedMembers, ProjectInviteDialog } from "@/components/project-invitations";
@@ -23,7 +23,7 @@ import { type Permission, roleName } from "@/lib/access-names";
 import { unwrap } from "@/lib/errors";
 import { memberName, memberStatusName } from "@/lib/members";
 import { useListMutation } from "@/lib/mutations";
-import { grantOrigin } from "@/lib/project-members";
+import { grantOrigin, grantSourceLabel, ssoGrantRemovalReason } from "@/lib/project-members";
 import { projectsQuery } from "@/lib/queries";
 import { useKnownMembers } from "@/lib/use-known-members";
 
@@ -94,13 +94,29 @@ function Members() {
               return (
                 <li key={grant.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="min-w-24 font-medium">{role}</span>
+                  <Badge variant={grant.source === "sso" ? "default" : "muted"}>
+                    {grantSourceLabel(i18n, grant)}
+                  </Badge>
                   <span className="text-muted-foreground">{grantOrigin(i18n, names, grant)}</span>
                   {canManage ? (
-                    <RowAction
-                      label={t`Remove ${role} from ${holder}`}
-                      icon={Trash2Icon}
-                      onClick={() => setRemoving({ grant, member: row.original })}
-                    />
+                    grant.source === "sso" ? (
+                      // The directory owns it: the server refuses 409 sso_sourced.
+                      <DisabledAction reason={ssoGrantRemovalReason(i18n, grant.provider ?? "")}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={t`Remove ${role} from ${holder}`}
+                        >
+                          <Trash2Icon aria-hidden />
+                        </Button>
+                      </DisabledAction>
+                    ) : (
+                      <RowAction
+                        label={t`Remove ${role} from ${holder}`}
+                        icon={Trash2Icon}
+                        onClick={() => setRemoving({ grant, member: row.original })}
+                      />
+                    )
                   ) : null}
                 </li>
               );
