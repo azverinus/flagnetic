@@ -186,7 +186,7 @@ Creating, editing, enabling, disabling and deleting are audited as `auth_provide
 
 ## Provisioned members
 
-A member an identity provider created or adopted through [SCIM](scim.md) is a *provisioned member*: the provider's directory decides their email, name and whether they are active. `GET /members` answers the `provider` (its slug) of each, `null` for any other. The management API refuses to change by hand what the directory decides, `409 member_provisioned`: editing the email or the display name (`PATCH /members/{member}`, or `PATCH /me` for the member's own name), deactivating (`POST /members/{member}/deactivate`) and reactivating. A request that asks for what is already so is no change. Grants, the instance admin switch, the member's language and their tokens stay the instance's to manage.
+A member an identity provider created or adopted through [SCIM](scim.md) is a *provisioned member*: the provider's directory decides their email, name and whether they are active. `GET /members` answers the `provider` (its slug) of each, `null` for any other. The management API refuses to change by hand what the directory decides, `409 member_provisioned`: editing the email or the display name (`PATCH /members/{member}`, or `PATCH /me` for the member's own name), deactivating (`POST /members/{member}/deactivate`) and reactivating. A request that asks for what is already so is no change. Grants, the instance admin switch, the member's language and their tokens stay the instance's to manage. The console marks a provisioned member with a badge naming the provider, and shows **Edit**, **Deactivate** and **Reactivate** disabled on their page with that reason.
 
 ## Your own account
 

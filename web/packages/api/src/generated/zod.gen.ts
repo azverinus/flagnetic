@@ -617,6 +617,20 @@ export const zScimToken = z.object({
   revoked_at: z.iso.datetime().nullable(),
 });
 
+/**
+ * A group an auth provider's directory pushed through SCIM.
+ */
+export const zScimGroup = z.object({
+  id: z.uuid(),
+  display_name: z.string(),
+  external_id: z.string().nullable(),
+  member_count: z.int(),
+});
+
+export const zScimGroupList = z.object({
+  items: z.array(zScimGroup),
+});
+
 export const zScimTokenList = z.object({
   items: z.array(zScimToken),
 });
@@ -4891,6 +4905,15 @@ export const zReplaceAuthProviderGroupMappingsPath = z.object({
  * What running the mappings did.
  */
 export const zReplaceAuthProviderGroupMappingsResponse = zGroupMappingsRun;
+
+export const zListAuthProviderScimGroupsPath = z.object({
+  provider: z.string(),
+});
+
+/**
+ * The SCIM groups, ordered by name.
+ */
+export const zListAuthProviderScimGroupsResponse = zScimGroupList;
 
 export const zTestAuthProviderPath = z.object({
   provider: z.string(),

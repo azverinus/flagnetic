@@ -1063,6 +1063,29 @@ export type ScimToken = {
   revoked_at: string | null;
 };
 
+export type ScimGroupList = {
+  items: Array<ScimGroup>;
+};
+
+/**
+ * A group an auth provider's directory pushed through SCIM.
+ */
+export type ScimGroup = {
+  id: string;
+  /**
+   * The group's name, which the provider's group mappings match exactly.
+   */
+  display_name: string;
+  /**
+   * The directory's own identifier of the group; null when it sent none.
+   */
+  external_id: string | null;
+  /**
+   * How many of the provider's provisioned members the group holds.
+   */
+  member_count: number;
+};
+
 export type ScimTokenList = {
   items: Array<ScimToken>;
 };
@@ -14332,6 +14355,59 @@ export type ReplaceAuthProviderGroupMappingsResponses = {
 
 export type ReplaceAuthProviderGroupMappingsResponse =
   ReplaceAuthProviderGroupMappingsResponses[keyof ReplaceAuthProviderGroupMappingsResponses];
+
+export type ListAuthProviderScimGroupsData = {
+  body?: never;
+  path: {
+    /**
+     * The auth provider's slug.
+     */
+    provider: string;
+  };
+  query?: never;
+  url: "/instance/auth-providers/{provider}/scim-groups";
+};
+
+export type ListAuthProviderScimGroupsErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListAuthProviderScimGroupsError =
+  ListAuthProviderScimGroupsErrors[keyof ListAuthProviderScimGroupsErrors];
+
+export type ListAuthProviderScimGroupsResponses = {
+  /**
+   * The SCIM groups, ordered by name.
+   */
+  200: ScimGroupList;
+};
+
+export type ListAuthProviderScimGroupsResponse =
+  ListAuthProviderScimGroupsResponses[keyof ListAuthProviderScimGroupsResponses];
 
 export type TestAuthProviderData = {
   body?: never;

@@ -25,6 +25,22 @@ func (a *api) GetAuthProviderGroupMappings(ctx context.Context, req GetAuthProvi
 	return GetAuthProviderGroupMappings200JSONResponse(out), nil
 }
 
+// ListAuthProviderScimGroups answers the groups an auth provider's directory
+// pushed through SCIM, with their member counts.
+func (a *api) ListAuthProviderScimGroups(ctx context.Context, req ListAuthProviderScimGroupsRequestObject) (ListAuthProviderScimGroupsResponseObject, error) {
+	groups, err := a.h.ListProviderSCIMGroups.Handle(ctx, req.Provider)
+	if err != nil {
+		return nil, err
+	}
+	return ListAuthProviderScimGroups200JSONResponse{Items: each(groups, func(g appidentity.SCIMGroupSummary) ScimGroup {
+		out := ScimGroup{Id: g.ID.Bytes(), DisplayName: g.DisplayName, MemberCount: g.MemberCount}
+		if g.ExternalID != "" {
+			out.ExternalId = &g.ExternalID
+		}
+		return out
+	})}, nil
+}
+
 // ReplaceAuthProviderGroupMappings replaces an auth provider's group mappings
 // and runs them for every member the provider knows.
 func (a *api) ReplaceAuthProviderGroupMappings(ctx context.Context, req ReplaceAuthProviderGroupMappingsRequestObject) (ReplaceAuthProviderGroupMappingsResponseObject, error) {

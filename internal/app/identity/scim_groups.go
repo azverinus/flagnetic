@@ -31,6 +31,15 @@ type GroupRef struct {
 	DisplayName string
 }
 
+// SCIMGroupSummary is a SCIM group as an instance admin sees it: without its
+// members, which are counted.
+type SCIMGroupSummary struct {
+	ID          identity.SCIMGroupID
+	DisplayName string
+	ExternalID  string
+	MemberCount int
+}
+
 // Refusals of a SCIM group write, which the SCIM adapter answers 409
 // `uniqueness`.
 var (
@@ -60,6 +69,9 @@ type SCIMGroupStore interface {
 	SaveSCIMGroup(ctx context.Context, g SCIMGroupRecord) error
 	// DeleteSCIMGroup removes the group and its memberships.
 	DeleteSCIMGroup(ctx context.Context, group identity.SCIMGroupID) error
+	// SCIMGroupSummaries returns every group of the provider, ordered by
+	// name, with how many members each holds.
+	SCIMGroupSummaries(ctx context.Context, provider identity.ProviderID) ([]SCIMGroupSummary, error)
 	// GroupsOfMembers returns the provider's groups each of members is in,
 	// ordered by name; a member in none is absent.
 	GroupsOfMembers(ctx context.Context, provider identity.ProviderID, members []identity.MemberID) (map[identity.MemberID][]GroupRef, error)
@@ -102,6 +114,28 @@ func (h *ListSCIMGroups) Handle(ctx context.Context, caller SCIMCaller, rawFilte
 	}
 	groups, total, err := h.d.Groups.SCIMGroups(ctx, caller.Provider, f, max(startIndex, 1), count)
 	return GroupPage{Groups: groups, Total: total}, err
+}
+
+// ListProviderSCIMGroups lists the groups an auth provider's directory pushed,
+// for an instance admin to read.
+type ListProviderSCIMGroups struct {
+	providers ProviderStore
+	groups    SCIMGroupStore
+}
+
+// NewListProviderSCIMGroups returns the query.
+func NewListProviderSCIMGroups(providers ProviderStore, groups SCIMGroupStore) *ListProviderSCIMGroups {
+	return &ListProviderSCIMGroups{providers: providers, groups: groups}
+}
+
+// Handle returns the groups of the provider with slug, ordered by name; an
+// unknown provider is not found.
+func (h *ListProviderSCIMGroups) Handle(ctx context.Context, slug string) ([]SCIMGroupSummary, error) {
+	p, err := providerOf(ctx, h.providers, slug)
+	if err != nil {
+		return nil, err
+	}
+	return h.groups.SCIMGroupSummaries(ctx, p.ID)
 }
 
 // GetSCIMGroup reads one of a provider's groups.

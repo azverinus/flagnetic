@@ -210,6 +210,10 @@ msgstr "{live, plural, one {Отозвать # сеанс} few {Отозвать
 msgid "{name} ({email})"
 msgstr "{name} ({email})"
 
+#: src/components/scim-tokens.tsx
+msgid "{name} (disabled)"
+msgstr "{name} (отключён)"
+
 #: src/lib/environments.ts
 msgid "{name} (protected)"
 msgstr "{name} (защищено)"
@@ -636,6 +640,10 @@ msgstr "Запущенный эксперимент сначала остана�
 msgid "A running experiment's traffic allocation can only grow."
 msgstr "Охват запущенного эксперимента можно только увеличивать."
 
+#: src/components/scim-tokens.tsx
+msgid "A SCIM token belongs to an auth provider, and there is none yet. Add the provider of your identity provider first."
+msgstr "Токен SCIM принадлежит провайдеру входа, а ни одного пока нет. Сначала добавьте провайдера входа для вашего провайдера идентификации."
+
 #: src/lib/problem-messages.ts
 msgid "A scope is a word without spaces."
 msgstr "Область доступа — слово без пробелов."
@@ -738,6 +746,7 @@ msgstr "Вариант, закреплённый за одной единице�
 msgid "A webhook posts the events you choose to a URL, signed with its secret, retried when the receiver fails, and logged."
 msgstr "Вебхук отправляет выбранные вами события на URL, подписывая их секретом, повторяет отправку при ошибках получателя и ведёт журнал."
 
+#: src/components/scim-tokens.tsx
 #: src/components/token-create-form.tsx
 msgid "A year"
 msgstr "Год"
@@ -785,6 +794,7 @@ msgid "Actions"
 msgstr "Действия"
 
 #: src/components/experiment-alerts.tsx
+#: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
 #: src/lib/members.ts
 #: src/lib/sdk-keys.ts
@@ -897,6 +907,10 @@ msgstr "Администрировать экземпляр: проекты, у�
 #: src/components/audit-entry-sheet.tsx
 msgid "After"
 msgstr "После"
+
+#: src/components/scim-tokens.tsx
+msgid "After this the identity provider is refused until it gets a new token."
+msgstr "После этого провайдеру идентификации будет отказано, пока он не получит новый токен."
 
 #: src/components/experiment-alerts.tsx
 msgid "Alert"
@@ -1310,6 +1324,7 @@ msgid "Audit log"
 msgstr "Журнал аудита"
 
 #. A kind of actor in the audit log.
+#: src/components/scim-tokens.tsx
 #: src/lib/audit.ts
 #: src/routes/_signed-in/admin/auth-providers/$provider.tsx
 msgid "Auth provider"
@@ -1407,6 +1422,7 @@ msgstr "Корзина"
 
 #: src/components/experiment-transitions.tsx
 #: src/components/kill-switch-dialog.tsx
+#: src/components/scim-tokens.tsx
 #: src/components/ui/confirm-dialog.tsx
 #: src/components/ui/form-page.tsx
 msgid "Cancel"
@@ -1600,6 +1616,7 @@ msgid "Choose a project."
 msgstr "Выберите проект."
 
 #: src/components/enforced-domains-field.tsx
+#: src/components/scim-tokens.tsx
 msgid "Choose a provider"
 msgstr "Выберите провайдера"
 
@@ -1681,6 +1698,10 @@ msgstr "Выберите атрибут"
 #: src/lib/conditions.ts
 msgid "Choose an attribute."
 msgstr "Выберите атрибут."
+
+#: src/components/scim-tokens.tsx
+msgid "Choose an auth provider."
+msgstr "Выберите провайдера входа."
 
 #: src/components/rule-editor.tsx
 msgid "Choose an experiment"
@@ -2012,6 +2033,7 @@ msgstr "Создать сегмент"
 msgid "Create the first project to start declaring what it serves."
 msgstr "Создайте первый проект, чтобы начать объявлять, что он отдаёт."
 
+#: src/components/scim-tokens.tsx
 #: src/components/token-create-form.tsx
 msgid "Create token"
 msgstr "Создать токен"
@@ -2025,6 +2047,7 @@ msgid "Create webhook"
 msgstr "Создать вебхук"
 
 #: src/components/experiment-transitions.tsx
+#: src/components/scim-tokens.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/token-list.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
@@ -2643,6 +2666,10 @@ msgstr "Введите все веса, чтобы увидеть сумму."
 msgid "Enter host names such as example.com, without an at sign or a scheme."
 msgstr "Введите имена хостов вроде example.com — без знака @ и без схемы."
 
+#: src/components/scim-tokens.tsx
+msgid "Enter it in the identity provider as the secret token or bearer token of the connection. Keep it where only the identity provider can read it."
+msgstr "Введите его у провайдера идентификации как секретный токен или bearer-токен подключения. Храните его там, где его прочтёт только провайдер идентификации."
+
 #: src/lib/variations.ts
 msgid "Enter JSON other than null."
 msgstr "Введите JSON, отличный от null."
@@ -2707,6 +2734,10 @@ msgstr "Введите URL метаданных провайдера идент�
 #: src/components/webhook-editor.tsx
 msgid "Enter the URL the events are posted to."
 msgstr "Введите URL, на который отправляются события."
+
+#: src/components/scim-tokens.tsx
+msgid "Enter this as the tenant or connector base URL, with a token as the secret or bearer token."
+msgstr "Укажите этот адрес как базовый URL тенанта или коннектора, а токен как секрет или bearer-токен."
 
 #: src/components/password-form.tsx
 msgid "Enter your current password."
@@ -3047,6 +3078,7 @@ msgstr "Эксперимент изменён"
 msgid "Experiments"
 msgstr "Эксперименты"
 
+#: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
 #: src/lib/sdk-keys.ts
 msgid "Expired"
@@ -3056,6 +3088,7 @@ msgstr "Истёк"
 msgid "Expired on {until}"
 msgstr "Истекла {until}"
 
+#: src/components/scim-tokens.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
@@ -3070,6 +3103,10 @@ msgstr "Конфликты экспозиций"
 #: src/lib/event-volume.ts
 msgid "Exposures"
 msgstr "Экспозиции"
+
+#: src/components/scim-groups.tsx
+msgid "External ID"
+msgstr "Внешний ID"
 
 #: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
@@ -3291,6 +3328,7 @@ msgid "Give the metadata as a URL or pasted, not both."
 msgstr "Укажите метаданные либо URL, либо вставкой, но не тем и другим."
 
 #: src/components/auth-provider-detail.tsx
+#: src/components/scim-tokens.tsx
 msgid "Go to the auth providers"
 msgstr "К провайдерам входа"
 
@@ -3363,6 +3401,10 @@ msgstr "Роли"
 #: src/lib/problem-messages.ts
 msgid "grants made by its group mappings"
 msgstr "ролях, выданных по его соответствиям групп"
+
+#: src/components/scim-groups.tsx
+msgid "Group"
+msgstr "Группа"
 
 #: src/components/group-mappings.tsx
 msgid "Group mappings"
@@ -3823,6 +3865,7 @@ msgstr "Последний успех"
 msgid "Last updated"
 msgstr "Последнее изменение"
 
+#: src/components/scim-tokens.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/token-list.tsx
 msgid "Last used"
@@ -4120,6 +4163,7 @@ msgstr "Участник изменён"
 
 #: src/components/navigation.tsx
 #: src/components/projects-table.tsx
+#: src/components/scim-groups.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
 #: src/routes/_signed-in/admin/members/route.tsx
 #: src/routes/_signed-in/projects/$project/members.tsx
@@ -4273,6 +4317,7 @@ msgstr "Нужно право {name}."
 
 #: src/components/identity-list.tsx
 #: src/components/moment.tsx
+#: src/components/scim-tokens.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
@@ -4327,6 +4372,10 @@ msgstr "Новый токен проекта"
 #: src/components/auth-provider-list.tsx
 msgid "New provider"
 msgstr "Новый провайдер"
+
+#: src/components/scim-tokens.tsx
+msgid "New SCIM token"
+msgstr "Новый токен SCIM"
 
 #: src/components/sdk-keys.tsx
 msgid "New SDK key"
@@ -4547,6 +4596,10 @@ msgstr "Ни одно правило его не отдаёт: наборы пр
 msgid "No rules: every context receives the fallthrough variation."
 msgstr "Правил нет: каждый контекст получает вариант без совпадений."
 
+#: src/components/scim-tokens.tsx
+msgid "No SCIM token yet."
+msgstr "Токенов SCIM пока нет."
+
 #: src/lib/stale-flags.ts
 msgid "No SDK evaluated it or recorded an exposure of it in any environment for 30 days, while SDKs reported evaluations of the project. Only flags created more than 30 days ago are judged; remote evaluations do not count."
 msgstr "Ни один SDK не вычислял его и не записывал его экспозиций ни в одном окружении 30 дней, хотя SDK присылали вычисления проекта. Проверяются только флаги, созданные больше 30 дней назад; удалённые вычисления не считаются."
@@ -4610,6 +4663,7 @@ msgid "none"
 msgstr "нет"
 
 #: src/components/compare-environments.tsx
+#: src/components/scim-groups.tsx
 #: src/components/webhook-detail.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "None"
@@ -5230,6 +5284,7 @@ msgid "Protocol"
 msgstr "Протокол"
 
 #: src/components/identity-list.tsx
+#: src/components/scim-tokens.tsx
 msgid "Provider"
 msgstr "Провайдер"
 
@@ -5244,6 +5299,18 @@ msgstr "Провайдер отключён"
 #: src/components/sign-in-methods.tsx
 msgid "Providers you can link"
 msgstr "Провайдеры, которых можно привязать"
+
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "Provisioned by"
+msgstr "Заведён провайдером"
+
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Provisioned by {provider}"
+msgstr "Заведён провайдером {provider}"
+
+#: src/components/member-actions.tsx
+msgid "Provisioned by {provider}: its directory decides their email, name and whether they are active."
+msgstr "Заведён провайдером {provider}: его каталог определяет почту, имя участника и то, активен ли он."
 
 #: src/lib/problem-messages.ts
 msgid "provisioned members"
@@ -5587,6 +5654,10 @@ msgstr "Вернуть версию {version}"
 msgid "Reverts the configuration to version {revertTo}."
 msgstr "Откатывает конфигурацию к версии {revertTo}."
 
+#: src/components/scim-tokens.tsx
+msgid "Revoke {hint}"
+msgstr "Отозвать {hint}"
+
 #: src/components/token-list.tsx
 msgid "Revoke {name}"
 msgstr "Отозвать {name}"
@@ -5594,6 +5665,10 @@ msgstr "Отозвать {name}"
 #: src/components/sdk-keys.tsx
 msgid "Revoke {name} ({keyId})"
 msgstr "Отозвать ключ {name} ({keyId})"
+
+#: src/components/scim-tokens.tsx
+msgid "Revoke {revokingHint}"
+msgstr "Отозвать {revokingHint}"
 
 #: src/components/token-list.tsx
 msgid "Revoke {revokingName}"
@@ -5635,10 +5710,12 @@ msgstr "Отозвать сеанс на устройстве {device}"
 msgid "Revoke the session on {revokingDevice}"
 msgstr "Отозвать сеанс на устройстве {revokingDevice}"
 
+#: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
 msgid "Revoke token"
 msgstr "Отозвать токен"
 
+#: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
 #: src/lib/sdk-keys.ts
 msgid "Revoked"
@@ -5846,12 +5923,23 @@ msgstr "Расписание"
 msgid "Scheduled"
 msgstr "По расписанию"
 
+#: src/components/scim-tokens.tsx
+msgid "SCIM base URL"
+msgstr "Базовый URL SCIM"
+
+#: src/components/scim-groups.tsx
+msgid "SCIM groups"
+msgstr "Группы SCIM"
+
 #. A kind of actor in the audit log.
 #: src/lib/audit.ts
 msgid "SCIM token"
 msgstr "Токен SCIM"
 
+#: src/components/navigation.tsx
+#: src/components/scim-tokens.tsx
 #: src/lib/problem-messages.ts
+#: src/routes/_signed-in/admin/scim-tokens.tsx
 msgid "SCIM tokens"
 msgstr "токены SCIM"
 
@@ -6343,6 +6431,7 @@ msgstr "STARTTLS и TLS требуют TLS 1.2 или новее и провер
 msgid "STARTTLS, usually port 587"
 msgstr "STARTTLS, обычно порт 587"
 
+#: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -6488,6 +6577,10 @@ msgstr "Переходим к {leaving} для входа…"
 #: src/components/change-request-diff.tsx
 msgid "Targeting"
 msgstr "Таргетинг"
+
+#: src/components/scim-tokens.tsx
+msgid "Tell the identity provider"
+msgstr "Что сообщить провайдеру идентификации"
 
 #: src/components/structural-diff-view.tsx
 msgid "temporary"
@@ -6887,6 +6980,10 @@ msgstr "На какой наибольший срок можно создать 
 msgid "The group mappings of {provider} made this grant, so only they remove it. An instance admin changes them on the provider's page."
 msgstr "Эта роль выдана по соответствиям групп провайдера {provider}, поэтому отозвать её могут только они. Администратор экземпляра меняет их на странице провайдера."
 
+#: src/components/scim-groups.tsx
+msgid "The groups the identity provider pushed through SCIM, which its group mappings can name. The directory owns them and who is in them, so they are read only here. Pushing groups needs a <0>SCIM token</0> of this provider."
+msgstr "Группы, которые провайдер идентификации передал через SCIM и которые могут называть сопоставления групп. Группы и их состав определяет каталог, поэтому здесь они только для чтения. Чтобы передавать группы, нужен <0>токен SCIM</0> этого провайдера."
+
 #: src/components/member-identities.tsx
 msgid "The identities {name} linked"
 msgstr "Учётные записи, привязанные участником {name}"
@@ -6906,6 +7003,14 @@ msgstr "Провайдер идентификации недоступен ил�
 #: src/lib/problem-messages.ts
 msgid "The identity provider could not be reached or did not answer as expected."
 msgstr "Провайдер идентификации недоступен или ответил не так, как ожидалось."
+
+#: src/components/scim-groups.tsx
+msgid "The identity provider has pushed no group."
+msgstr "Провайдер идентификации не передал ни одной группы."
+
+#: src/components/scim-tokens.tsx
+msgid "The identity provider is refused from now on, and stops provisioning until it is given another token. Members and groups it already provisioned are kept. This cannot be undone."
+msgstr "С этого момента провайдеру идентификации будет отказано, и он перестанет заводить участников, пока не получит другой токен. Уже заведённые им участники и группы сохраняются. Это нельзя отменить."
 
 #: src/lib/problem-messages.ts
 msgid "The identity provider offers no single sign-on service with the HTTP-Redirect binding, which the instance signs in through."
@@ -7175,6 +7280,10 @@ msgstr "Провайдер всё ещё используется: {uses}. От�
 msgid "The provider manages this member, so their identity at it stays for as long as they are provisioned. Deactivate or remove them at the provider."
 msgstr "Этого участника ведёт провайдер, поэтому его учётная запись у провайдера остаётся, пока он выдан провайдером. Деактивируйте или удалите его у провайдера."
 
+#: src/components/scim-tokens.tsx
+msgid "The provider whose members and groups the token reaches. It cannot be changed later."
+msgstr "Провайдер, чьих участников и группы затрагивает токен. Позже его нельзя изменить."
+
 #: src/components/auth-provider-detail.tsx
 msgid "The redirect URI is built from the instance's public address (FLAGNETIC_BASE_URL), which is not set. Set it, and the address shows here."
 msgstr "URI перенаправления строится из публичного адреса экземпляра (FLAGNETIC_BASE_URL), который не задан. Задайте его — и адрес появится здесь."
@@ -7338,6 +7447,7 @@ msgstr "Тестовое письмо уходит на {recipient} через �
 msgid "The token in use does not carry the scope this needs."
 msgstr "У используемого токена нет нужной для этого области доступа."
 
+#: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
 msgid "The token is revoked."
 msgstr "Токен отозван."
@@ -7670,6 +7780,10 @@ msgstr "По"
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "to be removed by {by}"
 msgstr "удалить до {by}"
+
+#: src/components/scim-tokens.tsx
+msgid "Token"
+msgstr "Токен"
 
 #: src/components/auth-provider-detail.tsx
 msgid "Token endpoint"
@@ -8099,6 +8213,10 @@ msgstr "Здравствуйте, {name}. Выберите проект для �
 msgid "What {name} holds"
 msgstr "Что есть у участника {name}"
 
+#: src/components/scim-tokens.tsx
+msgid "What an identity provider presents to create, update and deprovision members through SCIM. A token belongs to one auth provider for life and reaches only that provider's members and groups."
+msgstr "Что провайдер идентификации предъявляет, чтобы создавать, обновлять и отключать участников через SCIM. Токен навсегда принадлежит одному провайдеру входа и затрагивает только его участников и группы."
+
 #: src/components/webhook-editor.tsx
 msgid "What receives the events, to tell the subscriptions apart."
 msgstr "Что получает события; нужно, чтобы различать подписки."
@@ -8369,6 +8487,10 @@ msgstr "Ваш новый API-токен"
 #: src/routes/password-reset.$secret.tsx
 msgid "Your new password is set. Every other session of yours is signed out."
 msgstr "Новый пароль сохранён. Все остальные ваши сеансы завершены."
+
+#: src/components/scim-tokens.tsx
+msgid "Your new SCIM token"
+msgstr "Ваш новый токен SCIM"
 
 #: src/components/password-form.tsx
 msgid "Your password is changed. Every other device is signed out."
