@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 /** The personal settings' pages, in the order their navigation lists them. */
 const pages = [
   { to: "/settings/profile", label: msg`Profile` },
+  { to: "/settings/sign-in-methods", label: msg`Sign-in methods` },
   { to: "/settings/sessions", label: msg`Sessions` },
   { to: "/settings/tokens", label: msg`API tokens` },
 ] as const satisfies readonly { to: NonNullable<LinkProps["to"]>; label: MessageDescriptor }[];

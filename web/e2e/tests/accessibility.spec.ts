@@ -90,12 +90,17 @@ const signedIn: Route[] = [
   },
   { name: "personal settings: tokens", route: "/settings/tokens", path: () => "/settings/tokens" },
   {
+    name: "personal settings: sign-in methods",
+    route: "/settings/sign-in-methods",
+    path: () => "/settings/sign-in-methods",
+  },
+  {
     name: "personal settings: sessions",
     route: "/settings/sessions",
     path: () => "/settings/sessions",
   },
   { name: "instance members", route: "/admin/members", path: () => "/admin/members" },
-  ...["sessions", "tokens"].map((tab) => ({
+  ...["sessions", "tokens", "identities"].map((tab) => ({
     name: `instance member: ${tab}`,
     route: "/admin/members/$member",
     path: (s: Seeded) => `/admin/members/${s.member}?tab=${tab}`,

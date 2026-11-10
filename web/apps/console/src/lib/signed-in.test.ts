@@ -5,7 +5,13 @@ import { describe, expect, it, vi } from "vitest";
 import { fakeServer, problem } from "@/test/fake-server";
 
 import { meQuery } from "./queries";
-import { onSessionEnded, requireSignedIn, signInSearch, validateSignInSearch } from "./signed-in";
+import {
+  onSessionEnded,
+  requireSignedIn,
+  signInSearch,
+  validateLinkErrorSearch,
+  validateSignInSearch,
+} from "./signed-in";
 
 const me = {
   member: {
@@ -125,5 +131,16 @@ describe("the sign-in page's search", () => {
       ended: true,
     });
     expect(signInSearch({ pathname: "/sign-ins" }, false)).toEqual({ returnTo: "/sign-ins" });
+  });
+});
+
+describe("the search of the page a failed linking returns to", () => {
+  it("keeps the error only as a code", () => {
+    expect(validateLinkErrorSearch({ error: "identity_linked" })).toEqual({
+      error: "identity_linked",
+    });
+    expect(validateLinkErrorSearch({ error: "<script>" })).toEqual({});
+    expect(validateLinkErrorSearch({ error: 3 })).toEqual({});
+    expect(validateLinkErrorSearch({})).toEqual({});
   });
 });

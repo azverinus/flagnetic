@@ -5,6 +5,9 @@ import {
   type ChangeRequestList,
   getAuthMethods,
   listMySessions,
+  listMyIdentities,
+  listMemberIdentities,
+  type MemberAuthMethods,
   listMyTokens,
   type ApiToken,
   type Session,
@@ -106,6 +109,12 @@ export const meQuery = queryOptions<Me>({
 export const mySessionsQuery = queryOptions<Session[]>({
   queryKey: ["me", "sessions"],
   queryFn: async () => (await unwrap(listMySessions())).items,
+});
+
+/** Whether the caller holds a password, and the identities they linked at auth providers. */
+export const myIdentitiesQuery = queryOptions<MemberAuthMethods>({
+  queryKey: ["me", "identities"],
+  queryFn: () => unwrap(listMyIdentities()),
 });
 
 /** The caller's personal access tokens, revoked and expired ones included, the newest first. */
@@ -605,6 +614,14 @@ export function memberSessionsQuery(member: string) {
   return queryOptions<Session[]>({
     queryKey: ["members", member, "sessions"],
     queryFn: async () => (await unwrap(listMemberSessions({ path: { member } }))).items,
+  });
+}
+
+/** The identities a member linked at auth providers, and whether they hold a password, for an instance admin. */
+export function memberIdentitiesQuery(member: string) {
+  return queryOptions<MemberAuthMethods>({
+    queryKey: ["members", member, "identities"],
+    queryFn: () => unwrap(listMemberIdentities({ path: { member } })),
   });
 }
 

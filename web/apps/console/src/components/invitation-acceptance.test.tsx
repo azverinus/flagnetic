@@ -1,5 +1,5 @@
 import type { Me } from "@flagnetic/api";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -14,6 +14,8 @@ const invitation = {
     email: "g***@flagnetic.test",
     display_name: "Grace Hopper",
     expires_at: "2026-10-28T10:00:00Z",
+    password_allowed: true,
+    providers: [],
   },
 };
 
@@ -138,6 +140,67 @@ describe("accepting an invitation", () => {
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
       view.unmount();
     }
+  });
+
+  it("offers the providers that vouch for the email beside the password", async () => {
+    fakeServer({
+      "GET /auth/invitations/s3cret": {
+        status: 200,
+        body: {
+          ...invitation.body,
+          providers: [
+            { slug: "acme", display_name: "Acme SSO", kind: "oidc" },
+            { slug: "globex", display_name: "Globex", kind: "saml" },
+          ],
+        },
+      },
+    });
+    await renderWithRouter(() => <InvitationAcceptance secret="s3cret" onAccepted={() => {}} />);
+
+    expect(await screen.findByLabelText("Password")).toBeVisible();
+    const list = screen.getByRole("list", { name: "Accept with a provider" });
+    expect(within(list).getByRole("link", { name: "Sign in with Acme SSO" })).toHaveAttribute(
+      "href",
+      "/sso/acme/start",
+    );
+    expect(within(list).getByRole("link", { name: "Sign in with Globex" })).toHaveAttribute(
+      "href",
+      "/sso/globex/start",
+    );
+  });
+
+  it("offers the provider alone, with no password form, when a password is not allowed", async () => {
+    fakeServer({
+      "GET /auth/invitations/s3cret": {
+        status: 200,
+        body: {
+          ...invitation.body,
+          password_allowed: false,
+          enforced_provider: { slug: "acme", display_name: "Acme SSO", kind: "oidc" },
+          providers: [{ slug: "acme", display_name: "Acme SSO", kind: "oidc" }],
+        },
+      },
+    });
+    await renderWithRouter(() => <InvitationAcceptance secret="s3cret" onAccepted={() => {}} />);
+
+    expect(await screen.findByRole("link", { name: "Sign in with Acme SSO" })).toBeVisible();
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept invitation" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Sign in through your identity provider to join/)).toBeInTheDocument();
+  });
+
+  it("says no way to join is available when neither a password nor a provider is", async () => {
+    fakeServer({
+      "GET /auth/invitations/s3cret": {
+        status: 200,
+        body: { ...invitation.body, password_allowed: false },
+      },
+    });
+    await renderWithRouter(() => <InvitationAcceptance secret="s3cret" onAccepted={() => {}} />);
+
+    expect(await screen.findByText(/no way to join it is available now/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Sign in with/ })).not.toBeInTheDocument();
   });
 
   it("explains a link that opens nothing, with the way to sign in", async () => {

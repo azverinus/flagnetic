@@ -39,6 +39,19 @@ export function validateSignInSearch(search: Record<string, unknown>): SignInSea
   return out;
 }
 
+/** The search parameters of the sign-in methods, and of the settings a failed linking returns to. */
+export type LinkErrorSearch = {
+  /** The code a failed linking sent the member back with. */
+  error?: string;
+};
+
+/** Reads the code a failed linking returned the member with, dropping anything unsafe. */
+export function validateLinkErrorSearch(search: Record<string, unknown>): LinkErrorSearch {
+  return typeof search.error === "string" && errorCodePattern.test(search.error)
+    ? { error: search.error }
+    : {};
+}
+
 /** The sign-in page's path. */
 const signInPath = "/sign-in";
 

@@ -79,11 +79,11 @@ test.describe("SSO enforcement", () => {
     const client = managementClient();
     before = must("reading the auth settings", await getAuthSettings({ client }));
     await prepareDex();
-    // Ines is a member Dex knows, in the domain this spec enforces. A retry
+    // Ellis is a member Dex knows, in the domain this spec enforces. A retry
     // meets her already invited, which is what the spec needs.
     await inviteMember({
       client,
-      body: { email: dexUsers.ines.email, display_name: dexUsers.ines.name },
+      body: { email: dexUsers.ellis.email, display_name: dexUsers.ellis.name },
     });
   });
 
@@ -147,18 +147,18 @@ test.describe("SSO enforcement", () => {
     await page.getByRole("button", { name: "Use another email" }).click();
     await expect(page.getByLabel("Password")).toHaveCount(0);
 
-    await page.getByLabel("Email").fill(dexUsers.ines.email);
+    await page.getByLabel("Email").fill(dexUsers.ellis.email);
     await page.getByRole("button", { name: "Continue" }).click();
     await page.waitForURL(`${readDex().issuer}/**`);
-    await signInAtDex(page, dexUsers.ines);
+    await signInAtDex(page, dexUsers.ellis);
 
-    await expect(personalMenu(page, dexUsers.ines.name)).toBeVisible();
+    await expect(personalMenu(page, dexUsers.ellis.name)).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`^${readState().baseURL}/$`));
   });
 
   test("refuses a password for the enforced domain, naming the provider", async ({ request }) => {
     const refused = await request.post(`${readState().baseURL}/api/v1/auth/sign-in`, {
-      data: { email: dexUsers.ines.email, password: "any-password-at-all-1234" },
+      data: { email: dexUsers.ellis.email, password: "any-password-at-all-1234" },
     });
     expect(refused.status()).toBe(403);
     expect(await refused.json()).toMatchObject({ code: "sso_required", provider: dexSlug });

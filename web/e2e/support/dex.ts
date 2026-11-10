@@ -5,6 +5,14 @@ import { promisify } from "node:util";
 
 import type { Page } from "@playwright/test";
 
+import {
+  createAuthProvider,
+  disableAuthProvider,
+  enableAuthProvider,
+  getAuthProvider,
+} from "@flagnetic/api";
+
+import { managementClient, must } from "./console";
 import { freePort, workDir } from "./instance";
 
 const run = promisify(execFile);
@@ -26,7 +34,11 @@ export type DexUser = { email: string; name: string; password: string; hash: str
  * Vera is the member the harness seeds as a viewer: signing in as her
  * through a provider that links by email lands in an account that exists.
  * The stranger has an address in the same domain and no member, so a
- * provider that does not create members refuses her.
+ * provider that does not create members refuses her. Lena, Mara and Ines
+ * are accounts for the specs of sign-in methods: Lena is linked to a
+ * member and keeps that identity, Mara is linked and then unlinked by an
+ * instance admin, and Ines is invited by her address and accepts through
+ * the provider.
  */
 export const dexUsers = {
   vera: {
@@ -41,17 +53,35 @@ export const dexUsers = {
     password: "dex-saffron-harbor-1874",
     hash: "$2a$10$iDQrCCaWFiC/6yEoiE1L6uDx5bsjl/DUj4cDOijOWU5pTDYcvM0vG",
   },
-  // Ines has an address in `enforcedDomain`, which only the enforcement spec
-  // makes one the instance vouches for through Dex.
+  lena: {
+    email: "lena.linker@flagnetic.test",
+    name: "Lena Linker",
+    password: "dex-indigo-pelican-4417",
+    hash: "$2a$10$QznKWYuSTuQ305QxvNdKTuz1AnRm9PRxYhonO.tEvmSJJZUKgd3ZC",
+  },
+  mara: {
+    email: "mara.mislinked@flagnetic.test",
+    name: "Mara Mislinked",
+    password: "dex-umber-orchard-5528",
+    hash: "$2a$10$eh9bEuzQOXRLpbA7naKxWOpDXQTYDJ/8rEJjRQU/yzlucUx6681L.",
+  },
   ines: {
-    email: "ines@corp.flagnetic.test",
-    name: "Ines Enforced",
+    email: "ines.invitee@flagnetic.test",
+    name: "Ines Invitee",
+    password: "dex-ochre-meadow-6639",
+    hash: "$2a$10$tv5Qzml8FyJgrU5gU/3I.e4Li.rKkSKuce7ybbgmzwgkIDUGAECJa",
+  },
+  // Ellis has an address in `enforcedDomain`, which only the enforcement spec
+  // makes one the instance vouches for through Dex.
+  ellis: {
+    email: "ellis@corp.flagnetic.test",
+    name: "Ellis Enforced",
     password: "dex-juniper-forge-4417",
     hash: "$2a$10$Mht6HVIoR4Jvx2IhQvL5Wug2GuQSLOwwNUrX0gWP.jkwT4w9ZS9pu",
   },
 } as const satisfies Record<string, DexUser>;
 
-/** The email domain of Ines, whom the enforcement spec sends to Dex. */
+/** The email domain of Ellis, whom the enforcement spec sends to Dex. */
 export const enforcedDomain = "corp.flagnetic.test";
 
 /** The slug the specs give the provider they create; Dex lists its redirect URIs exactly. */
@@ -187,4 +217,46 @@ export async function signInAtDex(page: Page, user: DexUser): Promise<void> {
   await page.locator("#login").fill(user.email);
   await page.locator("#password").fill(user.password);
   await page.locator("#submit-login").click();
+}
+
+/**
+ * Leaves the provider for Dex enabled: added when the run has none yet,
+ * enabled again when an earlier spec disabled it. Specs that sign in
+ * through Dex call it first, so they run alone as well as in order, and
+ * disable the provider when they are done, since the sign-in page of every
+ * spec after them offers what is enabled.
+ */
+export async function enableDexProvider(): Promise<void> {
+  const client = managementClient();
+  const found = await getAuthProvider({ client, path: { provider: dexSlug } });
+  if (found.error === undefined) {
+    if (!found.data.enabled) {
+      must(
+        "enabling the Dex provider",
+        await enableAuthProvider({ client, path: { provider: dexSlug } }),
+      );
+    }
+    return;
+  }
+  const dex = readDex();
+  must(
+    "adding the Dex provider",
+    await createAuthProvider({
+      client,
+      body: {
+        slug: dexSlug,
+        kind: "oidc",
+        display_name: "Dex",
+        domains: ["flagnetic.test"],
+        issuer: dex.issuer,
+        client_id: dex.clientId,
+        client_secret: dex.clientSecret,
+      },
+    }),
+  );
+}
+
+/** Disables the provider for Dex, if the run has one. */
+export async function disableDexProvider(): Promise<void> {
+  await disableAuthProvider({ client: managementClient(), path: { provider: dexSlug } });
 }
