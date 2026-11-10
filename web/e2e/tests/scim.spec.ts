@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { createAuthProvider, disableAuthProvider } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
 
@@ -11,7 +13,7 @@ const heading = (page: Page, name: string) => page.getByRole("heading", { level:
 /** The sign-in page as it reads in Russian. */
 const russian: SignInWords = { email: "Электронная почта", password: "Пароль", submit: "Войти" };
 
-const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+const stamp = randomUUID().replaceAll("-", "").slice(0, 10);
 const slug = `scim-${stamp}`;
 const providerName = `Directory ${stamp}`;
 const userEmail = `lena-${stamp}@scim.test`;
