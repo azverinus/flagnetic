@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Flagnetic
-  VERSION = "0.1.0"
+  VERSION = "0.1.1"
 
   # The schema_version range of the documents this SDK reads and the SDK API
   # path it speaks. A ruleset outside the range is a fallback chain failure,
