@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.3](https://github.com/azverinus/flagnetic/compare/sdks/js/v0.1.2...sdks/js/v0.1.3) (2026-11-11)
+
+
+### Bug Fixes
+
+* **sdk-js:** no internal promise rejects on a malformed events answer ([#241](https://github.com/azverinus/flagnetic/issues/241)) ([98b6309](https://github.com/azverinus/flagnetic/commit/98b6309d967b2b726834a9d12cec84b966e8e82e))
+
+
+### Dependencies
+
+* **sdk-js:** Bump the sdk-js group in /sdks/js with 4 updates ([#235](https://github.com/azverinus/flagnetic/issues/235)) ([edd7b63](https://github.com/azverinus/flagnetic/commit/edd7b6311c900c6d1460dcb553c0d787f6f8077f))
+
 ## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/js/v0.1.1...sdks/js/v0.1.2) (2026-11-03)
 
 
