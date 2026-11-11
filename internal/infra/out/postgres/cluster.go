@@ -36,29 +36,23 @@ func AdoptCluster(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('event_cluster@' || current_schema(), 0))`); err != nil {
 		return false, fmt.Errorf("adopting the cluster: %w", err)
 	}
-	// Everything that holds a transaction ID of the old cluster: the rows, the
-	// cursors of rollups and sinks, and the records of what retention dropped
-	// or a sink set aside. A greater ID anywhere would otherwise lie ahead of
-	// the new rows.
+	// Every replica asks at every start, so the common answer, this cluster's
+	// own database, is found without looking at the events.
+	var same bool
+	if err = tx.QueryRow(ctx, `SELECT c.system_identifier = s.system_identifier
+		FROM event_cluster c, pg_control_system() s`).Scan(&same); err != nil {
+		return false, fmt.Errorf("adopting the cluster: %w", err)
+	}
+	if same {
+		return false, nil
+	}
+	// event_xid_stored() is the greatest ID anything holds of the old
+	// cluster; a greater one anywhere would lie ahead of the new rows.
 	tag, err := tx.Exec(ctx, `
-		WITH ours AS (
-			SELECT c.system_identifier, c.xid_offset, now_cluster.system_identifier AS current, now_cluster.next
-			FROM event_cluster c, (
-				SELECT s.system_identifier, pg_snapshot_xmax(pg_current_snapshot())::text::bigint AS next
-				FROM pg_control_system() s) now_cluster
-			WHERE c.system_identifier <> now_cluster.system_identifier),
-		stored AS (
-			SELECT max(x) AS greatest FROM (
-				SELECT max(xid::text::bigint) AS x FROM exposure_events
-				UNION ALL SELECT max(xid::text::bigint) FROM evaluation_summary_events
-				UNION ALL SELECT max(xid::text::bigint) FROM alias_events
-				UNION ALL SELECT max(xid::text::bigint) FROM rollup_cursors
-				UNION ALL SELECT max(greatest(cursor_xid, inflight_xid, pending_cursor_xid, replay_stop_xid, replay_resume_xid)::text::bigint) FROM sink_streams
-				UNION ALL SELECT max(to_xid::text::bigint) FROM event_gaps
-				UNION ALL SELECT max(to_xid::text::bigint) FROM sink_dead_letters) all_of_them)
-		UPDATE event_cluster SET system_identifier = ours.current,
-			xid_offset = greatest(event_cluster.xid_offset, coalesce(stored.greatest, 0) + 1 - ours.next, 0)
-		FROM ours, stored`)
+		UPDATE event_cluster SET system_identifier = s.system_identifier,
+			xid_offset = greatest(event_cluster.xid_offset,
+				event_xid_stored() + 1 - pg_snapshot_xmax(pg_current_snapshot())::text::bigint, 0)
+		FROM pg_control_system() s`)
 	if err != nil {
 		return false, fmt.Errorf("adopting the cluster: %w", err)
 	}

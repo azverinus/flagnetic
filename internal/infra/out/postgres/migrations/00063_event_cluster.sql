@@ -15,7 +15,32 @@ CREATE TABLE event_cluster (
     xid_offset        bigint  NOT NULL CHECK (xid_offset >= 0)
 );
 
-INSERT INTO event_cluster (system_identifier, xid_offset) SELECT system_identifier, 0 FROM pg_control_system();
+-- +goose StatementBegin
+-- The greatest transaction ID stored anywhere: in the rows, the cursors of
+-- rollups and sinks, and the records of what retention dropped or a sink set
+-- aside; 0 when there is none. The offset must put every new row above it.
+-- Each max() is read from an index on the column where there is one, so it
+-- costs a few pages however many events are stored.
+CREATE FUNCTION event_xid_stored() RETURNS bigint LANGUAGE sql STABLE AS $$
+    SELECT coalesce(max(x)::text::bigint, 0) FROM (
+        SELECT max(xid) AS x FROM exposure_events
+        UNION ALL SELECT max(xid) FROM evaluation_summary_events
+        UNION ALL SELECT max(xid) FROM alias_events
+        UNION ALL SELECT max(xid) FROM rollup_cursors
+        UNION ALL SELECT max(greatest(cursor_xid, inflight_xid, pending_cursor_xid, replay_stop_xid, replay_resume_xid))
+            FROM sink_streams
+        UNION ALL SELECT max(to_xid) FROM event_gaps
+        UNION ALL SELECT max(to_xid) FROM sink_dead_letters) stored
+$$;
+-- +goose StatementEnd
+
+-- Within one cluster every stored ID is below the next transaction's, and the
+-- offset starts at 0. A database restored from a logical dump made before
+-- this table existed holds IDs of another cluster, and starts with an offset
+-- above them.
+INSERT INTO event_cluster (system_identifier, xid_offset)
+SELECT system_identifier, greatest(event_xid_stored() + 1 - pg_snapshot_xmax(pg_current_snapshot())::text::bigint, 0)
+FROM pg_control_system();
 
 -- +goose StatementBegin
 -- The ID the current transaction gives a raw event: its own, moved by the

@@ -3,10 +3,13 @@ package postgres_test
 import (
 	"bytes"
 	"context"
+	"io/fs"
 	"testing"
+	"testing/fstest"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/pressly/goose/v3"
 
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
 	"github.com/azverinus/flagnetic/internal/domain/events"
@@ -126,5 +129,70 @@ func TestStreamsGoOnAfterALogicalRestoreIntoAnotherCluster(t *testing.T) {
 	}
 	if next.XID <= cursor.XID {
 		t.Errorf("the cursor moved to transaction %d, want it past %d", next.XID, cursor.XID)
+	}
+}
+
+// upTo returns the migrations up to and including version.
+func upTo(t *testing.T, version int64) fs.FS {
+	t.Helper()
+	files, err := fs.Glob(postgres.Migrations(), "*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := fstest.MapFS{}
+	for _, f := range files {
+		if v, err := goose.NumericComponent(f); err != nil || v > version {
+			continue
+		}
+		b, err := fs.ReadFile(postgres.Migrations(), f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out[f] = &fstest.MapFile{Data: b}
+	}
+	return out
+}
+
+// A dump made before the database recorded its cluster, restored into a
+// cluster whose counter is far behind the dump's, holds cursors no new row
+// would pass: the migration that starts recording the cluster puts new rows
+// after them, although the cluster it records is the one it runs on.
+func TestStreamsGoOnAfterARestoreOfADumpFromBeforeTheClusterWasRecorded(t *testing.T) {
+	ctx := context.WithoutCancel(t.Context())
+	clock := testkit.Clock()
+	pool, err := pgxpool.New(ctx, testkit.EmptyDatabase(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	if _, err := postgres.Migrate(ctx, pool, upTo(t, 62)); err != nil {
+		t.Fatal(err)
+	}
+	store := pgevents.NewStore(pool)
+	restored := events.Cursor{XID: 1 << 40, Seq: 7}
+	if err := store.MoveCursor(ctx, events.StreamAliases, restored, clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := postgres.Migrate(ctx, pool, postgres.Migrations()); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CreateEventPartitions(ctx, clock.Now(), 0); err != nil {
+		t.Fatal(err)
+	}
+	var event [16]byte
+	event[0] = 1
+	if err := store.SaveAliases(ctx, []events.AliasRecord{{
+		EventID:    id.FromBytes[delivery.Event](event),
+		Alias:      events.Alias{FromUnitType: "visitor", FromUnitID: "a", ToUnitType: "user", ToUnitID: "b", OccurredAt: clock.Now()},
+		ReceivedAt: clock.Now(),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := store.OldestUnread(ctx, events.StreamAliases); err != nil || !ok {
+		t.Fatalf("a row received after the restore lies after the restored cursor = %v, %v; want true", ok, err)
+	}
+	if adopted, err := postgres.AdoptCluster(ctx, pool); err != nil || adopted {
+		t.Fatalf("adopting the cluster = %v, %v; want nothing to do", adopted, err)
 	}
 }
