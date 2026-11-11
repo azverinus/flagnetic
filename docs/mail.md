@@ -4,7 +4,7 @@ An instance admin configures one SMTP server, and the instance sends its mail th
 
 ## Configuring the SMTP server
 
-In the console, an instance admin does it under **Mail**: the form sets the server, **Send a test mail** sends the [test mail](#the-test-mail) to their own address and explains a failure, and **Remove** removes the server. The password field is always empty; a stored password is kept until a new one is typed, and clearing the username removes both.
+In the console, an instance admin does it under **Mail**: the form sets the server, **Send a test mail** sends the [test mail](#the-test-mail) to their own address and explains a failure, and **Remove** removes the server. The password field is always empty; a stored password is kept until a new one is typed, though changing the host, port, security or username asks for it again, and clearing the username removes both.
 
 Through the API, `PUT /instance/smtp` sets the server; `GET /instance/smtp` reads it and `DELETE /instance/smtp` removes it (both answer `404 not_found` while none is configured). All four operations, with `POST /instance/smtp/test`, are an instance admin's.
 
@@ -20,7 +20,7 @@ A setting that breaks a rule is refused `422 invalid_smtp_settings` with a viola
 
 `FLAGNETIC_BASE_URL` must be set before the SMTP server is: every mailed link is built from it, and a mail carrying a link to nowhere helps nobody. Without it `PUT` is refused `422 base_url_required`.
 
-The password is sealed under the instance's secret key (see [The secret key](operations.md#the-secret-key)) and is write only: `GET` answers `password_set` and never the password. Leave `password` out of a `PUT` to keep the stored one. Leave the `username` out (or empty) to remove the credentials, the stored password with them. A `PUT` that leaves the settings as they are changes and records nothing.
+The password is sealed under the instance's secret key (see [The secret key](operations.md#the-secret-key)) and is write only: `GET` answers `password_set` and never the password. Leave `password` out of a `PUT` to keep the stored one, as long as the `host`, `port`, `security` and `username` are unchanged: a `PUT` that moves any of them without a `password` is refused `422 invalid_smtp_settings` with `credentials_together` at `/password`, so the stored password is never sent to a server it was not given for. Leave the `username` out (or empty) to remove the credentials, the stored password with them. A `PUT` that leaves the settings as they are changes and records nothing.
 
 The change is recorded as `smtp.updated` with the settings before and after, and removal as `smtp.deleted`; the password appears only as `password_set`. Every replica applies a change within a second, through the `smtp_settings` notification channel; while that listener is down a replica reads the settings from PostgreSQL on every use.
 

@@ -294,37 +294,59 @@ export function providerFields(i18n: I18n, { creating }: { creating: boolean }) 
 /**
  * The form's checks before it asks the server, in the words the server's
  * violations are shown in. A provider that exists has its slug and keeps
- * its secret, so neither is asked for again.
+ * its secret, so neither is asked for again, unless the issuer or the client
+ * ID changes: the secret does not follow them.
  */
-export function oidcFormSchema(i18n: I18n, { creating }: { creating: boolean }) {
-  return z.object({
-    ...providerFields(i18n, { creating }),
-    issuer: httpURLField(i18n, i18n._(msg`Enter the issuer's URL.`)),
-    client_id: z
-      .string()
-      .trim()
-      .min(1, i18n._(msg`Enter the client ID.`)),
-    client_secret: creating
-      ? z
-          .string()
-          .trim()
-          .min(1, i18n._(msg`Enter the client secret.`))
-      : z.string(),
-    scopes: z.string(),
-    claim_email: z
-      .string()
-      .trim()
-      .min(1, i18n._(msg`Enter a claim name.`)),
-    claim_name: z
-      .string()
-      .trim()
-      .min(1, i18n._(msg`Enter a claim name.`)),
-    claim_groups: z
-      .string()
-      .trim()
-      .min(1, i18n._(msg`Enter a claim name.`)),
-    require_verified_email: z.boolean(),
-  });
+export function oidcFormSchema(
+  i18n: I18n,
+  { creating, stored }: { creating: boolean; stored?: AuthProvider },
+) {
+  return z
+    .object({
+      ...providerFields(i18n, { creating }),
+      issuer: httpURLField(i18n, i18n._(msg`Enter the issuer's URL.`)),
+      client_id: z
+        .string()
+        .trim()
+        .min(1, i18n._(msg`Enter the client ID.`)),
+      client_secret: creating
+        ? z
+            .string()
+            .trim()
+            .min(1, i18n._(msg`Enter the client secret.`))
+        : z.string(),
+      scopes: z.string(),
+      claim_email: z
+        .string()
+        .trim()
+        .min(1, i18n._(msg`Enter a claim name.`)),
+      claim_name: z
+        .string()
+        .trim()
+        .min(1, i18n._(msg`Enter a claim name.`)),
+      claim_groups: z
+        .string()
+        .trim()
+        .min(1, i18n._(msg`Enter a claim name.`)),
+      require_verified_email: z.boolean(),
+    })
+    .superRefine((values, context) => {
+      // The stored secret was given for one issuer and client: it is not
+      // sent to another, so the form asks for it again.
+      if (
+        stored !== undefined &&
+        values.client_secret === "" &&
+        (values.issuer.trim() !== stored.issuer || values.client_id.trim() !== stored.client_id)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["client_secret"],
+          message: i18n._(
+            msg`Enter the client secret again: it is stored for the current issuer and client ID only.`,
+          ),
+        });
+      }
+    });
 }
 
 /** The address that starts a sign-in through a provider, keeping where the member was going. */

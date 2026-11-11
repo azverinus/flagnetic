@@ -5593,7 +5593,10 @@ paths:
       description: |
         Changes any property but `slug` and `kind`; each absent one is left as
         it is, a sent `client_secret` replaces the stored one, and a `claims`
-        member names only the claims to rename. Whether the provider is enabled
+        member names only the claims to rename. The stored client secret stays
+        only for the `issuer` and `client_id` it was given for: an edit that
+        changes either without sending `client_secret` is refused
+        `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
         is changed with `enable` and `disable`. Refused as a creation is, and
         409 `provider_in_use` (`used_by` naming `enforced domains`) when it
         drops a domain enforced to the provider: lift the enforcement first.
@@ -6768,7 +6771,11 @@ paths:
         sub-object of the sink's kind replaces its configuration whole, so
         nothing of the earlier one lingers; the one exception is its secret:
         `***`, as every read answers it, or no secret at all keeps the stored
-        one, and any other value replaces it. A sub-object of another kind,
+        one, and any other value replaces it. The stored secret stays only for
+        the target it was given for: an edit that changes a ClickHouse `url`,
+        `username` or `tls_skip_verify`, or an object storage `endpoint` or
+        `access_key_id`, must send the secret again, or is refused
+        `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
         or a `kind` other than the sink's own, is refused `kind_immutable`.
         `enabled` takes `false` only, which lets the attempt in progress
         finish and keeps the sink's place; a sink is enabled with its own
@@ -8997,7 +9004,7 @@ components:
         password:
           type: string
           writeOnly: true
-          description: The password for the username. Left out, the stored one is kept; with a username it must not be empty.
+          description: The password for the username. Left out, the stored one is kept while `host`, `port`, `security` and `username` stay as stored; a write that changes any of them must send the password again (`credentials_together` at `/password`). With a username it must not be empty.
         from:
           type: string
           description: One address, optionally with a display name.
@@ -12339,7 +12346,7 @@ components:
           type: string
         password:
           type: string
-          description: Sealed on arrival. `***` or absent keeps the stored password when editing.
+          description: Sealed on arrival. `***` or absent keeps the stored password when editing, unless `url`, `username` or `tls_skip_verify` changes, and then it must be sent again.
         tls_skip_verify:
           type: boolean
         create_tables:
@@ -12368,7 +12375,7 @@ components:
           type: string
         secret_access_key:
           type: string
-          description: Sealed on arrival. `***` or absent keeps the stored key when editing.
+          description: Sealed on arrival. `***` or absent keeps the stored key when editing, unless `endpoint` or `access_key_id` changes, and then it must be sent again.
         path_style:
           type: boolean
         format:
