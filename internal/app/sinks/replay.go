@@ -119,7 +119,7 @@ func (h *Replay) plan(ctx context.Context, s sinks.Sink, k sinks.EventKind, scop
 	if err != nil {
 		return sinks.ReplayPlan{}, false, err
 	}
-	ask := sinks.ReplayAsk{Live: stream.Live(), Bounded: cmd.To != nil}
+	ask := sinks.ReplayAsk{Live: stream.Live(), Bounded: cmd.To != nil, From: cmd.From, Floor: stream.Floor}
 	if ask.Start, ask.StartFound, err = h.d.Rows.Before(ctx, k, scope, cmd.From); err != nil {
 		return sinks.ReplayPlan{}, false, err
 	}

@@ -31,7 +31,7 @@ func cursorOf(text string, seq int64) (events.Cursor, error) {
 const streamColumns = `ss.sink_id, ss.event_kind, ss.cursor_xid::text, ss.cursor_seq, ss.last_delivered_at,
 	ss.consecutive_failures, ss.last_failure_class, ss.last_failure_status, ss.last_failure_code, ss.last_failure_at,
 	ss.inflight_xid::text, ss.inflight_seq, ss.inflight_environments, ss.inflight_rejections,
-	ss.replay_stop_xid::text, ss.replay_stop_seq, ss.replay_resume_xid::text, ss.replay_resume_seq`
+	ss.replay_stop_xid::text, ss.replay_stop_seq, ss.replay_resume_xid::text, ss.replay_resume_seq, ss.received_floor`
 
 type streamRow struct {
 	sink       sinks.ID
@@ -55,13 +55,16 @@ func scanStream(row pgx.Row) (streamRow, error) {
 		inflightRejections       int
 		stopXID, resumeXID       *string
 		stopSeq, resumeSeq       *int64
+		floor                    *time.Time
 	)
 	if err := row.Scan(&sk, &kind, &cursorXID, &cursorSeq, &delivered, &failures, &class, &failStatus, &code, &failedAt,
-		&inflightXID, &inflightSeq, &environments, &inflightRejections, &stopXID, &stopSeq, &resumeXID, &resumeSeq); err != nil {
+		&inflightXID, &inflightSeq, &environments, &inflightRejections, &stopXID, &stopSeq, &resumeXID, &resumeSeq,
+		&floor); err != nil {
 		return r, err
 	}
 	r.sink = id.FromBytes[sinks.Sink](sk)
-	r.stream = sinks.Stream{EventKind: sinks.EventKind(kind), LastDeliveredAt: utc(delivered), ConsecutiveFailures: failures}
+	r.stream = sinks.Stream{EventKind: sinks.EventKind(kind), LastDeliveredAt: utc(delivered), ConsecutiveFailures: failures,
+		Floor: utc(floor)}
 	var err error
 	if r.stream.Cursor, err = cursorOf(cursorXID, cursorSeq); err != nil {
 		return r, err
@@ -162,7 +165,7 @@ func (s *Store) LockStream(ctx context.Context, sink sinks.ID, kind sinks.EventK
 // on from is stored as pending and applied by the worker as it leases the
 // stream; the batch in flight and the lease are dropped now, so that a send
 // under way records nothing over the replay. The plan carries the position to
-// return to, which the caller read from the stream under lock.
+// return to and the floor, which the caller read from the stream under lock.
 func (s *Store) Replay(ctx context.Context, sink sinks.ID, kind sinks.EventKind, plan sinks.ReplayPlan, now time.Time) error {
 	var stopXID, resumeXID *string
 	var stopSeq, resumeSeq *int64
@@ -176,20 +179,21 @@ func (s *Store) Replay(ctx context.Context, sink sinks.ID, kind sinks.EventKind,
 		    replay_stop_xid = $5::text::xid8, replay_stop_seq = $6,
 		    replay_resume_xid = $7::text::xid8, replay_resume_seq = $8,
 		    inflight_xid = NULL, inflight_seq = NULL, inflight_environments = NULL, inflight_rejections = 0,
-		    lease_token = NULL, lease_until = NULL, next_attempt_at = $9
+		    lease_token = NULL, lease_until = NULL, next_attempt_at = $9, received_floor = $10
 		WHERE sink_id = $1 AND event_kind = $2`,
-		sink.Bytes(), string(kind), xid(plan.Cursor), plan.Cursor.Seq, stopXID, stopSeq, resumeXID, resumeSeq, now)
+		sink.Bytes(), string(kind), xid(plan.Cursor), plan.Cursor.Seq, stopXID, stopSeq, resumeXID, resumeSeq, now, plan.Floor)
 	if err != nil {
 		return fmt.Errorf("replaying a stream: %w", err)
 	}
 	return nil
 }
 
-// CreateStream starts the stream of kind of sink at the position at, due now.
-func (s *Store) CreateStream(ctx context.Context, sink sinks.ID, kind sinks.EventKind, at events.Cursor, now time.Time) error {
+// CreateStream starts the stream of kind of sink at the position at, with the
+// floor floor, nil for none, due now.
+func (s *Store) CreateStream(ctx context.Context, sink sinks.ID, kind sinks.EventKind, at events.Cursor, floor *time.Time, now time.Time) error {
 	_, err := s.db(ctx).Exec(ctx, `
-		INSERT INTO sink_streams (sink_id, event_kind, cursor_xid, cursor_seq, next_attempt_at, created_at)
-		VALUES ($1, $2, $3::text::xid8, $4, $5, $5)`, sink.Bytes(), string(kind), xid(at), at.Seq, now)
+		INSERT INTO sink_streams (sink_id, event_kind, cursor_xid, cursor_seq, received_floor, next_attempt_at, created_at)
+		VALUES ($1, $2, $3::text::xid8, $4, $5, $6, $6)`, sink.Bytes(), string(kind), xid(at), at.Seq, floor, now)
 	if err != nil {
 		return fmt.Errorf("creating a stream: %w", err)
 	}

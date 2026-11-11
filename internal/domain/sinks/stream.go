@@ -8,14 +8,17 @@ import (
 )
 
 // Scope narrows a stream to the rows of one project and, when Environments is
-// not empty, of those environments. It is part of the bound a batch is chosen
-// by and of the lag, never only of the read, so that a stream's cursor moves
-// past the rows it will never send. A sink naming environments whose every
-// one is gone has no scope, since an empty list would read the whole project:
-// it reads nothing until it is edited.
+// not empty, of those environments, and, when Floor is set, to the rows
+// received at or after it. It is part of the bound a batch is chosen by and of
+// the lag, never only of the read, so that a stream's cursor moves past the
+// rows it will never send. A sink naming environments whose every one is gone
+// has no scope, since an empty list would read the whole project: it reads
+// nothing until it is edited.
 type Scope struct {
 	Project      workspace.ProjectID
 	Environments []workspace.EnvironmentID
+	// Floor leaves out the rows received before it; nil leaves out none.
+	Floor *time.Time
 }
 
 // Batch is the rows of one stream past one cursor up to and including another,
@@ -62,6 +65,34 @@ type Stream struct {
 	// Stop and Resume are set while a bounded replay runs: the last row it
 	// sends, and the position the stream returns to after it.
 	Stop, Resume *events.Cursor
+	// Floor is the time a stream started from a time reads from: no row
+	// received before it is sent, nil for a stream that sends every row past
+	// its cursor. The cursor alone cannot say it. A stream starting from a
+	// time starts no later than the snapshot horizon, so that a transaction
+	// still open then is read once it commits; but the horizon is held back
+	// by any transaction open anywhere in the database, so the rows between
+	// it and the first one received since the start are read too, and must
+	// not be sent.
+	Floor *time.Time
+}
+
+// ReadScope is scope as the stream chooses and reads its next batch: with the
+// stream's floor, except while a bounded replay runs, which sends the rows of
+// the window it was asked for whenever they were received relative to the
+// floor. The live stream the replay returns to keeps the floor.
+func (s Stream) ReadScope(scope Scope) Scope {
+	scope.Floor = s.Floor
+	if s.Stop != nil {
+		scope.Floor = nil
+	}
+	return scope
+}
+
+// LiveScope is scope as the stream's live position reads it, which its lag is
+// measured by: with the stream's floor, a bounded replay running or not.
+func (s Stream) LiveScope(scope Scope) Scope {
+	scope.Floor = s.Floor
+	return scope
 }
 
 // Failing reports whether the stream's last call failed.
