@@ -17,7 +17,7 @@ final class FlagListenable<T> extends ChangeNotifier
     implements ValueListenable<T> {
   /// Follows [flagKey] on [client], falling back to [defaultValue].
   FlagListenable(this.client, this.flagKey, this.defaultValue)
-    : _detail = client.getDetail(flagKey, defaultValue) {
+    : _detail = _serve(client, flagKey, defaultValue) {
     _removeChange = client.onChange((keys) {
       if (keys.contains(flagKey)) _read();
     });
@@ -46,13 +46,33 @@ final class FlagListenable<T> extends ChangeNotifier
     return value as T;
   }
 
+  /// Reads [key] and makes sure the value is a [T]. A decoded JSON document
+  /// is `List<Object?>` or `Map<String, Object?>`, so a `List<String>` or a
+  /// `Map<String, int>` builder, or a `null` served to a non-nullable one,
+  /// cannot hold what an operator served: the built-in default is served
+  /// with `type_mismatch` instead of a cast that would throw inside `build`.
+  static Detail _serve<T>(FlagneticClient client, String key, T defaultValue) {
+    final detail = client.getDetail(key, defaultValue);
+    final value = detail.value;
+    if (value is T || (defaultValue is double && value is num)) return detail;
+    return Detail(
+      value: defaultValue,
+      reason: Reasons.fallback,
+      errorCode: FallbackCodes.typeMismatch,
+      rulesetVersion: detail.rulesetVersion,
+      receivedAt: detail.receivedAt,
+      stage: detail.stage,
+    );
+  }
+
   /// Why the current value was served: reason, variation, ruleset version
   /// and the stage of the fallback chain.
   Detail get detail => _detail;
 
   void _read() {
-    final next = client.getDetail(flagKey, defaultValue);
+    final next = _serve(client, flagKey, defaultValue);
     if (next.reason == _detail.reason &&
+        next.errorCode == _detail.errorCode &&
         next.stage == _detail.stage &&
         next.variation == _detail.variation &&
         _jsonEquals(next.value, _detail.value)) {
