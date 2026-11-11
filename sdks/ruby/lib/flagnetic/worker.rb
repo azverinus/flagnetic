@@ -82,8 +82,6 @@ module Flagnetic
         started = now
         begin
           run
-        rescue SystemExit
-          return # exit called inside a listener: nothing to restart for
         rescue Exception => e # rubocop:disable Lint/RescueException
           @client.__send__(:log, :error, :worker_died, cause: "#{e.class}: #{e.message}")
           deaths.reset if now - started >= @timing.stream_stable
