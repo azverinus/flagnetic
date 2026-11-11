@@ -46,7 +46,7 @@ func copyTable(t *testing.T, from, to *pgxpool.Pool, table string) {
 		t.Fatal(err)
 	}
 	defer src.Release()
-	if _, err := src.Conn().PgConn().CopyTo(t.Context(), &dump, "COPY (SELECT * FROM "+pgx.Identifier{table}.Sanitize()+") TO STDOUT"); err != nil {
+	if _, err = src.Conn().PgConn().CopyTo(t.Context(), &dump, "COPY (SELECT * FROM "+pgx.Identifier{table}.Sanitize()+") TO STDOUT"); err != nil {
 		t.Fatal(err)
 	}
 	dst, err := to.Acquire(t.Context())
@@ -54,7 +54,7 @@ func copyTable(t *testing.T, from, to *pgxpool.Pool, table string) {
 		t.Fatal(err)
 	}
 	defer dst.Release()
-	if _, err := dst.Conn().PgConn().CopyFrom(t.Context(), &dump, "COPY "+pgx.Identifier{table}.Sanitize()+" FROM STDIN"); err != nil {
+	if _, err = dst.Conn().PgConn().CopyFrom(t.Context(), &dump, "COPY "+pgx.Identifier{table}.Sanitize()+" FROM STDIN"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -89,13 +89,13 @@ func TestStreamsGoOnAfterALogicalRestoreIntoAnotherCluster(t *testing.T) {
 	if err != nil || len(rows) != 2 {
 		t.Fatalf("the old cluster's rollup read %d aliases, %v; want 2", len(rows), err)
 	}
-	if err := oldStore.MoveCursor(ctx, events.StreamAliases, cursor, clock.Now()); err != nil {
+	if err = oldStore.MoveCursor(ctx, events.StreamAliases, cursor, clock.Now()); err != nil {
 		t.Fatal(err)
 	}
 
 	fresh := migrated(t, testkit.OtherCluster(t))
 	freshStore := pgevents.NewStore(fresh)
-	if err := freshStore.CreateEventPartitions(ctx, clock.Now(), 0); err != nil {
+	if err = freshStore.CreateEventPartitions(ctx, clock.Now(), 0); err != nil {
 		t.Fatal(err)
 	}
 	for _, table := range []string{"event_cluster", "rollup_cursors", "alias_events"} {
@@ -106,11 +106,11 @@ func TestStreamsGoOnAfterALogicalRestoreIntoAnotherCluster(t *testing.T) {
 	if err != nil || !adopted {
 		t.Fatalf("adopting the cluster = %v, %v; want it adopted", adopted, err)
 	}
-	if again, err := postgres.AdoptCluster(ctx, fresh); err != nil || again {
-		t.Fatalf("adopting it a second time = %v, %v; want nothing to do", again, err)
+	if again, againErr := postgres.AdoptCluster(ctx, fresh); againErr != nil || again {
+		t.Fatalf("adopting it a second time = %v, %v; want nothing to do", again, againErr)
 	}
 
-	if err := freshStore.SaveAliases(ctx, []events.AliasRecord{alias(3)}); err != nil {
+	if err = freshStore.SaveAliases(ctx, []events.AliasRecord{alias(3)}); err != nil {
 		t.Fatal(err)
 	}
 	at, err := freshStore.Cursor(ctx, events.StreamAliases)
@@ -195,4 +195,36 @@ func TestStreamsGoOnAfterARestoreOfADumpFromBeforeTheClusterWasRecorded(t *testi
 	if adopted, err := postgres.AdoptCluster(ctx, pool); err != nil || adopted {
 		t.Fatalf("adopting the cluster = %v, %v; want nothing to do", adopted, err)
 	}
+}
+
+// A replica that cannot tell which cluster the database was last used on
+// does not start: serving events under a wrong offset would lose them.
+func TestAdoptingTheClusterFailsWhereItCannotTellOrChange(t *testing.T) {
+	t.Run("the database is unreachable", func(t *testing.T) {
+		pool := migrated(t, testkit.EmptyDatabase(t))
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		if _, err := postgres.AdoptCluster(ctx, pool); err == nil {
+			t.Error("adopting with a cancelled context succeeded")
+		}
+	})
+	t.Run("the cluster was never recorded", func(t *testing.T) {
+		pool := migrated(t, testkit.EmptyDatabase(t))
+		if _, err := pool.Exec(t.Context(), `DROP TABLE event_cluster CASCADE`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := postgres.AdoptCluster(t.Context(), pool); err == nil {
+			t.Error("adopting a database without the record of its cluster succeeded")
+		}
+	})
+	t.Run("the greatest stored ID cannot be read", func(t *testing.T) {
+		pool := migrated(t, testkit.EmptyDatabase(t))
+		if _, err := pool.Exec(t.Context(), `UPDATE event_cluster SET system_identifier = system_identifier + 1;
+			DROP FUNCTION event_xid_stored()`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := postgres.AdoptCluster(t.Context(), pool); err == nil {
+			t.Error("adopting another cluster's database without the means to read its IDs succeeded")
+		}
+	})
 }
