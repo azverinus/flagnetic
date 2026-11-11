@@ -329,6 +329,7 @@ class Delivery:
                 self._reporter.release()
             with contextlib.suppress(OSError):
                 self._wake_read.close()
+                self._wake_write.close()
 
     def _supervise(self) -> None:
         """Runs the loop again, after a backoff, each time an exception nobody expected ends it.
