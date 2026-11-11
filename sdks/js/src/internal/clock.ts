@@ -45,12 +45,22 @@ export class Repeater {
     this.handle = undefined;
   }
 
+  private async run(): Promise<void> {
+    try {
+      await this.job();
+    } catch {
+      // The job reports its own failures; nothing here can act on one.
+    }
+  }
+
   private arm(): void {
     this.clock.clearTimeout(this.handle);
     if (this.stopped) return;
     this.handle = this.clock.setTimeout(() => {
       this.handle = undefined;
-      void this.job().finally(() => {
+      // A job that fails ends this round only: an unhandled rejection ends a
+      // Node process, and the next round must still be armed.
+      void this.run().finally(() => {
         this.arm();
       });
     }, this.interval);

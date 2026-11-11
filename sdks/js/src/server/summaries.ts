@@ -6,6 +6,7 @@
 import { Backoff } from "../internal/backoff.js";
 import { Repeater, type Clock } from "../internal/clock.js";
 import { countKey, orderRows, summaryEvents, SummaryCounter, type QueuedEvent, type SummaryRow } from "../internal/events.js";
+import { causeOf } from "../internal/logger.js";
 import type { Ingest, SendResult } from "./ingest.js";
 import type { DetailReason, LogEvent, LogLevel } from "./types.js";
 
@@ -79,7 +80,11 @@ export class Summaries {
 
   /** Closes the current window and reports it. Nothing evaluated, nothing sent. */
   flush(): Promise<void> {
-    this.running = this.running.then(() => this.report());
+    // A report that throws is logged and ends there: the chain stays
+    // resolved, so the next report runs and no caller sees a rejection.
+    this.running = this.running.then(() => this.report()).catch((e: unknown) => {
+      this.log("warn", "events_failed", { kind: "evaluation_summary", cause: causeOf(e) });
+    });
     return this.running;
   }
 
