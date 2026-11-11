@@ -74,16 +74,16 @@ class WorkerSurvivalTest < Minitest::Test
     stuck&.kill
   end
 
-  def test_changes_survives_deeply_nested_variation_values
-    deep = 9000.times.reduce("x") { |acc, _| [acc] }
-    mk = lambda do |value|
-      flag = { "key" => "k", "type" => "json", "on" => true, "off_variation" => "v", "fallthrough" => "v",
-               "variations" => [{ "key" => "v", "value" => value }] }
-      doc = document(1).merge("flags" => [flag])
-      Flagnetic::Eval::Ruleset.decode(JSON.generate(doc, max_nesting: false))
+  # Overflowing the stack depends on the platform's stack size, so the
+  # item whose comparison overflows is built rather than nested.
+  def test_changes_reports_an_item_whose_comparison_overflows_the_stack_as_changed
+    overflowing = Struct.new(:key) do
+      def ==(_other) = raise(SystemStackError, "stack level too deep")
     end
-    a = mk.call(deep)
-    b = mk.call(deep)
-    assert_equal ["k"], Flagnetic.const_get(:Changes).flags(a, b)
+    before = [overflowing.new("k"), Struct.new(:key).new("same")]
+    after = [overflowing.new("k"), before.last]
+
+    changed = Flagnetic.const_get(:Changes).changed(before, after, &:key)
+    assert_equal ["k"], changed.keys
   end
 end
