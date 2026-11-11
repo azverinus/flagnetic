@@ -64,10 +64,10 @@ class WorkerSurvivalTest < Minitest::Test
   def test_changes_survives_deeply_nested_variation_values
     deep = 9000.times.reduce("x") { |acc, _| [acc] }
     mk = lambda do |value|
-      Flagnetic::Eval::Ruleset.decode(JSON.generate(document(1, { "k" => 1 }).merge(
-                                                      "flags" => [{ "key" => "k", "type" => "json", "on" => true, "off_variation" => "v", "fallthrough" => "v",
-                                                                    "variations" => [{ "key" => "v", "value" => value }] }]
-                                                    ), max_nesting: false))
+      flag = { "key" => "k", "type" => "json", "on" => true, "off_variation" => "v", "fallthrough" => "v",
+               "variations" => [{ "key" => "v", "value" => value }] }
+      doc = document(1).merge("flags" => [flag])
+      Flagnetic::Eval::Ruleset.decode(JSON.generate(doc, max_nesting: false))
     end
     a = mk.call(deep)
     b = mk.call(deep)
