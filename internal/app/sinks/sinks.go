@@ -58,8 +58,9 @@ type Store interface {
 	// RotateSecret stores s's secrets and version, read under the project's
 	// lock.
 	RotateSecret(ctx context.Context, s sinks.Sink) error
-	// CreateStream starts the stream of kind of sink at the position at.
-	CreateStream(ctx context.Context, sink sinks.ID, kind sinks.EventKind, at events.Cursor, now time.Time) error
+	// CreateStream starts the stream of kind of sink at the position at,
+	// sending no row received before floor when it is not nil.
+	CreateStream(ctx context.Context, sink sinks.ID, kind sinks.EventKind, at events.Cursor, floor *time.Time, now time.Time) error
 	// DeleteStream drops the stream of kind of sink with its position.
 	DeleteStream(ctx context.Context, sink sinks.ID, kind sinks.EventKind) error
 	// LockStream reads the stream of kind of sink for the unit of work, which

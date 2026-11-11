@@ -31,15 +31,15 @@ func (s *Store) SetAside(ctx context.Context, stream appsinks.StreamRef, token a
 	err := db.QueryRow(ctx, `
 		INSERT INTO sink_dead_letters (id, sink_id, event_kind, from_xid, from_seq, to_xid, to_seq, environments, rows,
 		    first_received_at, last_received_at, attempts, last_failure_class, last_failure_status, last_failure_code,
-		    last_failure_at, status, created_at)
+		    last_failure_at, status, created_at, received_floor)
 		SELECT $4, ss.sink_id, ss.event_kind, ss.cursor_xid, ss.cursor_seq, ss.inflight_xid, ss.inflight_seq,
-		    ss.inflight_environments, $5, $6, $7, ss.inflight_rejections + 1, $8, $9, $10, $11, 'pending', $11
+		    ss.inflight_environments, $5, $6, $7, ss.inflight_rejections + 1, $8, $9, $10, $11, 'pending', $11, $12
 		FROM sink_streams ss
 		WHERE ss.sink_id = $1 AND ss.event_kind = $2 AND ss.lease_token = $3 AND ss.inflight_xid IS NOT NULL
 		FOR UPDATE OF ss
 		RETURNING attempts`,
 		stream.Sink.Bytes(), string(stream.Kind), token.String(), dl.ID.Bytes(), dl.Rows, dl.First, dl.Last,
-		string(dl.Failure.Class), status, code, now).Scan(&res.Attempts)
+		string(dl.Failure.Class), status, code, now, dl.Floor).Scan(&res.Attempts)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return appsinks.SetAsideResult{}, nil
 	}
@@ -73,7 +73,7 @@ func (s *Store) SetAside(ctx context.Context, stream appsinks.StreamRef, token a
 
 const deadLetterColumns = `d.id, d.sink_id, d.event_kind, d.from_xid::text, d.from_seq, d.to_xid::text, d.to_seq, d.environments,
 	d.rows, d.first_received_at, d.last_received_at, d.attempts, d.last_failure_class, d.last_failure_status,
-	d.last_failure_code, d.last_failure_at, d.status, d.created_at, d.redelivered_at`
+	d.last_failure_code, d.last_failure_at, d.status, d.created_at, d.redelivered_at, d.received_floor`
 
 func scanDeadLetter(row pgx.Row) (sinks.DeadLetter, error) {
 	var (
@@ -87,10 +87,10 @@ func scanDeadLetter(row pgx.Row) (sinks.DeadLetter, error) {
 		failCode            *string
 		first, last, failAt time.Time
 		created             time.Time
-		redelivered         *time.Time
+		redelivered, floor  *time.Time
 	)
 	if err := row.Scan(&dk, &sk, &kind, &fromX, &fromSeq, &toX, &toSeq, &environments, &dl.Rows, &first, &last,
-		&dl.Attempts, &class, &failStatus, &failCode, &failAt, &status, &created, &redelivered); err != nil {
+		&dl.Attempts, &class, &failStatus, &failCode, &failAt, &status, &created, &redelivered, &floor); err != nil {
 		return dl, err
 	}
 	dl.ID, dl.Sink, dl.EventKind = id.FromBytes[sinks.DeadLetter](dk), id.FromBytes[sinks.Sink](sk), sinks.EventKind(kind)
@@ -113,6 +113,7 @@ func scanDeadLetter(row pgx.Row) (sinks.DeadLetter, error) {
 		dl.LastFailure.Code = *failCode
 	}
 	dl.Status, dl.CreatedAt, dl.RedeliveredAt = sinks.DeadLetterStatus(status), created.UTC(), utc(redelivered)
+	dl.Floor = utc(floor)
 	return dl, nil
 }
 

@@ -735,6 +735,44 @@ func TestASinkStartsAtTheTimeItWasAskedToAndOnlyItsNewStreamsDo(t *testing.T) {
 	}
 }
 
+func TestASinkStartedFromATimeBehindAnOpenTransactionSendsNothingReceivedBeforeTheStart(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t)
+	created, secret := f.create(t, webhook(r, "exposure"))
+
+	// A transaction open since before the start holds the horizon back, so
+	// the stream begins behind an older row committed after it: neither that
+	// row nor the open transaction's was received at or after the start, and
+	// neither is sent.
+	written, release := f.srv.HoldNextIngest(t)
+	held := f.exposure("u-1", "true", f.clock.Now())
+	first := make(chan answer, 1)
+	go func() { first <- postEvents(t, f.srv, f.server, f.envelope(t, held)) }()
+	<-written
+	old := f.exposure("u-2", "true", f.clock.Now())
+	f.post(t, old)
+	f.clock.Advance(2 * time.Hour)
+	recent := f.exposure("u-3", "true", f.clock.Now())
+	f.post(t, recent)
+	f.enable(t, created, management.SinkEnable{StartFrom: ptr(f.clock.Now().Add(-time.Hour))})
+
+	release()
+	if a := <-first; a.status != http.StatusAccepted {
+		t.Fatalf("the held batch = %d: %s", a.status, a.body)
+	}
+	tick(t, f.srv)
+	calls := batchCalls(r)
+	if len(calls) != 1 {
+		t.Fatalf("the receiver got %d calls, want 1", len(calls))
+	}
+	if got, want := idsOf(decodeBatch(t, calls[0], secret).Events), []string{eventIDOf(recent)}; !slices.Equal(got, want) {
+		t.Errorf("events %v, want %v: only the event received after the start", got, want)
+	}
+	if lag := f.sink(t, created).LagSeconds; lag == nil || *lag != 0 {
+		t.Errorf("lag_seconds = %v once the event received after the start is delivered, want 0", lag)
+	}
+}
+
 func TestASinkStartedFromATimeReadsATransactionStillOpenWhenItWasEnabled(t *testing.T) {
 	f := startDelivering(t)
 	r := testkit.StartReceiver(t)

@@ -132,6 +132,9 @@ type NewDeadLetter struct {
 	// and the last of the rows sent were received.
 	Rows        int
 	First, Last time.Time
+	// Floor is the floor the batch was read with, which a redelivery reads
+	// its rows with again; nil when there was none.
+	Floor *time.Time
 }
 
 // SetAsideResult is what setting a batch aside found and did.
@@ -355,19 +358,24 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 		// it finishes even once they are gone: its rows are then passed.
 		batch.To = in.To
 		scope.Environments = in.Environments
-	} else {
+	}
+	// A batch in flight is read with the floor it was chosen with: only a
+	// replay changes the stream's floor or whether it reads with it, and a
+	// replay drops the batch in flight.
+	read, live := due.Stream.ReadScope(scope), due.Stream.LiveScope(scope)
+	if in == nil {
 		if !named {
 			// Every environment the sink names is gone: it exports nothing,
 			// and must not read the project's other environments instead.
 			return h.idle(ctx, ref, token, c.Sink)
 		}
-		if batch, err = h.d.Rows.NextBatch(ctx, ref.Kind, scope, due.Stream.Cursor, c.Sink.BatchSize, due.Stream.Stop); err != nil {
+		if batch, err = h.d.Rows.NextBatch(ctx, ref.Kind, read, due.Stream.Cursor, c.Sink.BatchSize, due.Stream.Stop); err != nil {
 			return Failed, fmt.Errorf("choosing a batch: %w", err)
 		}
 		if batch.To == due.Stream.Cursor && due.Stream.Stop != nil {
 			// No row is left up to the end of a bounded replay, perhaps
 			// because retention dropped the last ones: it is over.
-			return h.ack(ctx, ref, token, c, due, sinks.Batch{From: batch.From, To: *due.Stream.Stop}, 0, 0, scope)
+			return h.ack(ctx, ref, token, c, due, sinks.Batch{From: batch.From, To: *due.Stream.Stop}, 0, 0, live)
 		}
 		if batch.To == due.Stream.Cursor {
 			// Nothing to send, perhaps because a transaction still open holds
@@ -375,14 +383,15 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 			// that is when it grows.
 			res, idleErr := h.idle(ctx, ref, token, c.Sink)
 			if res == Idled {
-				h.observeLag(ctx, ref, scope, due.Stream.Live())
+				h.observeLag(ctx, ref, live, due.Stream.Live())
 			}
 			return res, idleErr
 		}
 		if batch.Rows == 0 {
 			// The rows past the cursor are other projects' or other
-			// environments': the stream passes them.
-			return h.ack(ctx, ref, token, c, due, batch, 0, 0, scope)
+			// environments', or were received before the floor: the stream
+			// passes them.
+			return h.ack(ctx, ref, token, c, due, batch, 0, 0, live)
 		}
 		in = &Inflight{To: batch.To, Environments: scope.Environments}
 		held, beginErr := h.d.Store.Begin(ctx, ref, token, *in)
@@ -395,7 +404,7 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 			return LeaseLost, nil
 		}
 	}
-	page, err := h.d.Rows.ReadBatch(ctx, ref.Kind, scope, batch)
+	page, err := h.d.Rows.ReadBatch(ctx, ref.Kind, read, batch)
 	if err != nil {
 		return Failed, fmt.Errorf("reading the batch: %w", err)
 	}
@@ -403,7 +412,7 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 	// which it is by the rows its range holds, but are never sent.
 	batch.Rows = len(page.Rows) + page.Skipped
 	if len(page.Rows) == 0 {
-		return h.ack(ctx, ref, token, c, due, batch, 0, page.Skipped, scope)
+		return h.ack(ctx, ref, token, c, due, batch, 0, page.Skipped, live)
 	}
 	secrets, err := h.secrets(c.Sink, h.now())
 	if err != nil {
@@ -436,7 +445,7 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 	})
 	if failure == nil {
 		h.d.Observer.Batch(ref.Sink, ref.Kind, ResultAck)
-		return h.ack(ctx, ref, token, c, due, batch, len(page.Rows), page.Skipped, scope)
+		return h.ack(ctx, ref, token, c, due, batch, len(page.Rows), page.Skipped, live)
 	}
 	rejected := failure.Class == sinks.ClassRejected
 	if rejected {
@@ -445,9 +454,9 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 		h.d.Observer.Batch(ref.Sink, ref.Kind, ResultTransient)
 	}
 	if rejected && sinks.SetsAside(rejections, h.d.RejectionAttempts) {
-		return h.setAside(ctx, ref, token, c, batch, page, *failure, scope)
+		return h.setAside(ctx, ref, token, c, batch, page, *failure, read.Floor, live)
 	}
-	return h.fail(ctx, ref, token, c, due, *failure, rejected, scope)
+	return h.fail(ctx, ref, token, c, due, *failure, rejected, live)
 }
 
 // secrets opens the secrets signing a call of s at now: its own, then the one

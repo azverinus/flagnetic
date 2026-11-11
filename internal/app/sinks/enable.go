@@ -162,7 +162,7 @@ func (d Deps) syncStreams(ctx context.Context, s sinks.Sink, kinds []sinks.Event
 		if err != nil {
 			return err
 		}
-		if err = d.Store.CreateStream(ctx, s.ID, k, at, now); err != nil {
+		if err = d.Store.CreateStream(ctx, s.ID, k, at, floorOf(named, from), now); err != nil {
 			return err
 		}
 	}
@@ -186,6 +186,16 @@ func (d Deps) dropStreams(ctx context.Context, s sinks.Sink, kinds []sinks.Event
 	return nil
 }
 
+// floorOf is the floor of a new stream starting at from: from itself, when
+// the stream starts from a time and reads a scope, none otherwise.
+func floorOf(named bool, from *time.Time) *time.Time {
+	if from == nil || !named {
+		return nil
+	}
+	f := *from
+	return &f
+}
+
 // start returns where a new stream of kind begins reading: just before the
 // first row received at or after from, or at the horizon when it is nil or
 // nothing was received since.
@@ -195,6 +205,9 @@ func (d Deps) dropStreams(ctx context.Context, s sinks.Sink, kinds []sinks.Event
 // and never be read. The start is therefore never past the horizon, which is
 // read first: every transaction still open when the first row is looked for
 // has an ID at or above that horizon, so a stream starting no later reads it.
+// The horizon is held back by any transaction open anywhere in the database,
+// whose ID may be below rows received before from, so starting there reads
+// those rows too: the stream's floor, from, keeps them from being sent.
 func (d Deps) start(ctx context.Context, kind sinks.EventKind, scope sinks.Scope, named bool, from *time.Time) (events.Cursor, error) {
 	tail, err := d.Rows.Tail(ctx, kind)
 	if err != nil || from == nil || !named {

@@ -439,3 +439,59 @@ func TestABoundedReplayBatchSetAsideAsADeadLetterStillReturnsTheStreamToTheLiveP
 		t.Errorf("after the replay the receiver got %v, want the replay's two batches (the second five times) then the new event alone: %v", got, want)
 	}
 }
+
+// startedFrom is a sink of the receiver enabled from the time the third of
+// three events an hour apart was received, with the events and their times.
+func (f delivering) startedFrom(t *testing.T, r *testkit.Receiver) (sink management.Sink, secret sinkSecret, events []any, at []time.Time) {
+	t.Helper()
+	created, secret := f.create(t, webhook(r, "exposure"))
+	events, at = f.timeline(t, "u-1", "u-2", "u-3")
+	sink = f.enable(t, created, management.SinkEnable{StartFrom: ptr(at[2])})
+	tick(t, f.srv)
+	if got, _ := delivered(t, r, secret, 0); !slices.Equal(got, ids(events[2])) {
+		t.Fatalf("delivered %v, want the event received at the start alone", got)
+	}
+	return sink, secret, events, at
+}
+
+func TestAReplayRunningOnFromBeforeASinksStartSendsWhatWasReceivedSince(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t)
+	sink, secret, events, at := f.startedFrom(t, r)
+	first := len(batchCalls(r))
+
+	f.replay(t, sink, management.SinkReplay{From: at[0]})
+	tick(t, f.srv)
+	if got, _ := delivered(t, r, secret, first); !slices.Equal(got, ids(events...)) {
+		t.Fatalf("replayed %v, want every row since its start, those received before the sink's start too", got)
+	}
+
+	next := f.exposure("u-4", "true", f.clock.Now())
+	f.post(t, next)
+	f.clock.Advance(time.Minute)
+	tick(t, f.srv)
+	if got, _ := delivered(t, r, secret, first+1); !slices.Equal(got, ids(next)) {
+		t.Errorf("after the replay the receiver got %v, want only the new event once", got)
+	}
+}
+
+func TestABoundedReplayOfWhatWasReceivedBeforeASinksStartSendsItAndTheLiveStreamResumes(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t)
+	sink, secret, events, at := f.startedFrom(t, r)
+	first := len(batchCalls(r))
+
+	f.replay(t, sink, management.SinkReplay{From: at[0], To: ptr(at[1])})
+	tick(t, f.srv)
+	if got, _ := delivered(t, r, secret, first); !slices.Equal(got, ids(events[0], events[1])) {
+		t.Fatalf("replayed %v, want the two events of its range, both received before the sink's start", got)
+	}
+
+	next := f.exposure("u-4", "true", f.clock.Now())
+	f.post(t, next)
+	f.clock.Advance(time.Minute)
+	tick(t, f.srv)
+	if got, _ := delivered(t, r, secret, first+1); !slices.Equal(got, ids(next)) {
+		t.Errorf("after the replay the receiver got %v, want the live stream from where it was", got)
+	}
+}

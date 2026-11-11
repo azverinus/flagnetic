@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -35,36 +36,48 @@ func (b Batch) Where(alias string) (string, []any) {
 func xidText(c events.Cursor) string { return strconv.FormatUint(c.XID, 10) }
 
 // Scope narrows a stream to the rows of one project and, when Environments
-// is not empty, of those environments. A rollup reads the whole table, so
-// its cursor passes every project's rows; a sink's stream reads one
-// project's, and its cursor moves past the rows it will never send, so the
-// scope is part of the bound and of the lag, never only of the read. The zero
-// Scope is the whole table.
+// is not empty, of those environments, and, when Floor is set, to the rows
+// received at or after it. A rollup reads the whole table, so its cursor
+// passes every project's rows; a sink's stream reads one project's, and its
+// cursor moves past the rows it will never send, so the scope is part of the
+// bound and of the lag, never only of the read. The zero Scope is the whole
+// table.
 type Scope struct {
 	Project      workspace.ProjectID
 	Environments []workspace.EnvironmentID
+	// Floor leaves out the rows received before it; nil leaves out none.
+	Floor *time.Time
 }
 
 // Where is the condition selecting the rows of the table aliased alias, empty
 // for it itself, that are in the scope, its arguments numbered from first;
 // it is empty for the whole table.
 func (sc Scope) Where(alias string, first int) (string, []any) {
-	if sc.Project.IsZero() {
-		return "", nil
-	}
 	if alias != "" {
 		alias += "."
 	}
-	cond, args := alias+"project_id = $"+strconv.Itoa(first), []any{sc.Project.Bytes()}
-	if len(sc.Environments) > 0 {
-		ids := make([][16]byte, len(sc.Environments))
-		for i, e := range sc.Environments {
-			ids[i] = e.Bytes()
-		}
-		cond += " AND " + alias + "environment_id = ANY($" + strconv.Itoa(first+1) + "::uuid[])"
-		args = append(args, ids)
+	var (
+		conds []string
+		args  []any
+	)
+	arg := func(v any) string {
+		args = append(args, v)
+		return "$" + strconv.Itoa(first+len(args)-1)
 	}
-	return cond, args
+	if !sc.Project.IsZero() {
+		conds = append(conds, alias+"project_id = "+arg(sc.Project.Bytes()))
+		if len(sc.Environments) > 0 {
+			ids := make([][16]byte, len(sc.Environments))
+			for i, e := range sc.Environments {
+				ids[i] = e.Bytes()
+			}
+			conds = append(conds, alias+"environment_id = ANY("+arg(ids)+"::uuid[])")
+		}
+	}
+	if sc.Floor != nil {
+		conds = append(conds, alias+"received_at >= "+arg(*sc.Floor))
+	}
+	return strings.Join(conds, " AND "), args
 }
 
 // Bound returns the next batch of at most limit rows of table in scope past
