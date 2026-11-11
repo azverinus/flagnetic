@@ -601,12 +601,20 @@ def test_an_unexpected_exception_is_logged_once_per_kind_and_the_thread_goes_on(
 def test_flush_without_a_timeout_returns_when_the_thread_is_gone(
     clients: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    threads: list[threading.Thread] = []
+
     def gone(self: Any) -> None:
+        # The thread can already be finished when the test looks for it, so it
+        # records itself instead of being found through threading.enumerate().
+        threads.append(threading.current_thread())
         raise SystemExit
 
     monkeypatch.setattr(_delivery.Delivery, "_loop", gone)
     client = clients(serving(RULESET), flush_interval=3600, summary_interval=3600)
-    thread = next(t for t in threading.enumerate() if t.name == "flagnetic")
+    deadline = time.monotonic() + 5
+    while not threads and time.monotonic() < deadline:
+        time.sleep(0.01)
+    thread = threads[0]
     thread.join(5)
     assert not thread.is_alive()
     client.get_bool(CONTEXT, "checkout", False)
