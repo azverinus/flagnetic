@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -85,9 +86,22 @@ func TestStreamsGoOnAfterALogicalRestoreIntoAnotherCluster(t *testing.T) {
 	if err := oldStore.SaveAliases(ctx, []events.AliasRecord{alias(1), alias(2)}); err != nil {
 		t.Fatal(err)
 	}
-	rows, cursor, err := oldStore.AliasesAfter(ctx, events.Cursor{}, 10)
-	if err != nil || len(rows) != 2 {
-		t.Fatalf("the old cluster's rollup read %d aliases, %v; want 2", len(rows), err)
+	// A transaction open anywhere on the server, in another package's tests,
+	// holds the horizon back until it ends.
+	var (
+		rows   []events.AliasRow
+		cursor events.Cursor
+		err    error
+	)
+	deadline := time.Now().Add(time.Minute)
+	for len(rows) != 2 && time.Now().Before(deadline) {
+		if rows, cursor, err = oldStore.AliasesAfter(ctx, events.Cursor{}, 10); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("the old cluster's rollup read %d aliases, want 2", len(rows))
 	}
 	if err = oldStore.MoveCursor(ctx, events.StreamAliases, cursor, clock.Now()); err != nil {
 		t.Fatal(err)
