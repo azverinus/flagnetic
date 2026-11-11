@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/ruby/v0.1.0...sdks/ruby/v0.1.1) (2026-11-11)
+
+
+### Bug Fixes
+
+* **sdk-ruby:** keep the worker thread alive through any exception ([#242](https://github.com/azverinus/flagnetic/issues/242)) ([6036682](https://github.com/azverinus/flagnetic/commit/6036682ca28d74335707bc13cb5f9ae0a0e6842c))
+
 ## 0.1.0 (2026-10-28)
 
 
