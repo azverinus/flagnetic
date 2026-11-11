@@ -421,6 +421,36 @@ void main() {
       expect(logs.fieldsOf(LogEvents.sseDropped).single['cause'], 'closed');
     });
 
+    test('a stream line past the bound drops the connection and '
+        'reconnects', () async {
+      final server = await MockServer.start();
+      final logs = LogRecorder();
+      final client = Flagnetic.client(
+        clientKey,
+        baseUrl: server.url,
+        context: anonymous,
+        options: scaledOptions(
+          sse: true,
+          logger: logs.call,
+          pollInterval: const Duration(hours: 1),
+          streamSilenceTimeout: const Duration(seconds: 30),
+        ),
+      );
+      addTearDown(() async {
+        await client.close();
+        await server.close();
+      });
+      final stream = await (await server.next()).respondStream();
+      await (await server.next()).respondJson(evaluation);
+      await eventually(() => client.stage == Stage.fresh);
+      await stream.send('data: ${'a' * (70 << 10)}');
+
+      expect(await stream.closedBySdk(const Duration(seconds: 5)), isTrue);
+      final again = await server.next();
+      expect(again.path, '/sdk/v1/stream');
+      expect(logs.fieldsOf(LogEvents.sseDropped).single['cause'], 'parse');
+    });
+
     test('the background suspends the stream and the foreground opens it '
         'again', () async {
       final server = await MockServer.start();
