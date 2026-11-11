@@ -39,6 +39,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sso"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
+	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	"github.com/azverinus/flagnetic/internal/infra/out/mail"
 	"github.com/azverinus/flagnetic/internal/infra/out/oidc"
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
@@ -346,7 +347,14 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	if err != nil {
 		panic(fmt.Sprintf("compose: the mail templates: %v", err)) // the templates are embedded, so only a broken build fails
 	}
-	background := appaccess.NewBackground(edge.Logger())
+	backgroundDropped := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: metrics.Namespace, Subsystem: "background", Name: "dropped_total",
+		Help: "Background jobs (mails, password reset requests) dropped because the replica was already running its limit, by job.",
+	}, []string{"job"})
+	reg.MustRegister(backgroundDropped)
+	background := appaccess.NewBackground(edge.Logger(), appaccess.WithDroppedCounter(func(name string) {
+		backgroundDropped.WithLabelValues(name).Inc()
+	}))
 	postman := appaccess.NewPostman(appaccess.PostmanDeps{
 		Settings: smtpSettings, Opener: o.Keyring, Mailer: mail.NewSender(renderer, o.MailRootCAs),
 		Counter: mail.NewMetrics(reg), After: postgres.AfterCommit{}, Clock: d.Clock, Logger: edge.Logger(),
@@ -492,7 +500,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		}),
 		RequestReset: appaccess.NewRequestPasswordReset(appaccess.RequestPasswordResetDeps{
 			Tx: tx, Store: accessStore, Settings: settings, SMTP: smtpSettings, Postman: postman, Background: background,
-			Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, Logger: edge.Logger(), ConsoleURL: publicURL,
+			Throttle: appaccess.NewSourceThrottle(tx, accessStore), Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, Logger: edge.Logger(), ConsoleURL: publicURL,
 		}),
 		SignInRules: appaccess.NewGetSignInRules(settings, smtpSettings),
 		IssueReset:  appaccess.NewIssuePasswordReset(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),

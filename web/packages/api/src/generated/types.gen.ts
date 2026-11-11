@@ -4848,6 +4848,16 @@ export type RequestPasswordResetErrors = {
    * `unsupported_media_type`: the body is not sent as `application/json`, which the operations opening a session require so a form on another site cannot call them.
    */
   415: Problem;
+  /**
+   * Refused before the password is checked: `locked` while the email is
+   * locked by consecutive failures (from an address its member signed in
+   * from within thirty days, by that address's own consecutive failures
+   * on it), `rate_limited` while the address is
+   * throttled. `retry_after` and the `Retry-After` header give the
+   * seconds until the attempt can be made again.
+   *
+   */
+  429: Problem;
 };
 
 export type RequestPasswordResetError =

@@ -49,3 +49,36 @@ func TestWaitingWithNothingRunningReturnsAtOnce(t *testing.T) {
 		t.Error("Wait blocked with nothing running")
 	}
 }
+
+// Jobs past the limit are dropped and counted rather than queued, so a flood of
+// requests cannot pile up goroutines; once a running job ends there is room again.
+func TestJobsPastTheLimitAreDroppedAndCounted(t *testing.T) {
+	var dropped []string
+	b := appaccess.NewBackground(slog.New(slog.DiscardHandler), appaccess.WithBackgroundLimit(2),
+		appaccess.WithDroppedCounter(func(name string) { dropped = append(dropped, name) }))
+	release := make(chan struct{})
+	var ran atomic.Int32
+	hold := func(context.Context) { <-release; ran.Add(1) }
+	for range 2 {
+		if !b.Go(t.Context(), "held", time.Minute, hold) {
+			t.Fatal("a job within the limit was dropped")
+		}
+	}
+	if b.Go(t.Context(), "extra", time.Minute, hold) {
+		t.Error("a job past the limit was started")
+	}
+	if len(dropped) != 1 || dropped[0] != "extra" {
+		t.Errorf("dropped = %v, want [extra]", dropped)
+	}
+	close(release)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	b.Wait(ctx)
+	if got := ran.Load(); got != 2 {
+		t.Errorf("jobs run = %d, want 2", got)
+	}
+	if !b.Go(t.Context(), "after", time.Minute, func(context.Context) {}) {
+		t.Error("a job was dropped with nothing running")
+	}
+	b.Wait(ctx)
+}

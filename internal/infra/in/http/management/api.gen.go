@@ -7619,6 +7619,12 @@ type ClientInterface interface {
 	// it, so the answer reveals nothing about which addresses exist. The
 	// lookup, the issuing and the mail happen after the answer.
 	//
+	// Every request counts as a failure against the address's throttle,
+	// which sign-in, invitation acceptance and password reset completion
+	// share: past a hundred from one address in fifteen minutes it is
+	// refused `429 rate_limited` with `Retry-After`, whether or not the
+	// email exists.
+	//
 	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
 	// reset is on in the auth settings, local login is enabled and the
@@ -7644,6 +7650,12 @@ type ClientInterface interface {
 	// once whoever the email belongs to, whether or not anything comes of
 	// it, so the answer reveals nothing about which addresses exist. The
 	// lookup, the issuing and the mail happen after the answer.
+	//
+	// Every request counts as a failure against the address's throttle,
+	// which sign-in, invitation acceptance and password reset completion
+	// share: past a hundred from one address in fifteen minutes it is
+	// refused `429 rate_limited` with `Retry-After`, whether or not the
+	// email exists.
 	//
 	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
@@ -11636,6 +11648,12 @@ func (c *Client) GetAuthMethods(ctx context.Context, params *GetAuthMethodsParam
 // it, so the answer reveals nothing about which addresses exist. The
 // lookup, the issuing and the mail happen after the answer.
 //
+// Every request counts as a failure against the address's throttle,
+// which sign-in, invitation acceptance and password reset completion
+// share: past a hundred from one address in fifteen minutes it is
+// refused `429 rate_limited` with `Retry-After`, whether or not the
+// email exists.
+//
 // A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
 // reset is on in the auth settings, local login is enabled and the
@@ -11671,6 +11689,12 @@ func (c *Client) RequestPasswordResetWithBody(ctx context.Context, contentType s
 // once whoever the email belongs to, whether or not anything comes of
 // it, so the answer reveals nothing about which addresses exist. The
 // lookup, the issuing and the mail happen after the answer.
+//
+// Every request counts as a failure against the address's throttle,
+// which sign-in, invitation acceptance and password reset completion
+// share: past a hundred from one address in fifteen minutes it is
+// refused `429 rate_limited` with `Retry-After`, whether or not the
+// email exists.
 //
 // A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
@@ -28822,6 +28846,12 @@ type ClientWithResponsesInterface interface {
 	// it, so the answer reveals nothing about which addresses exist. The
 	// lookup, the issuing and the mail happen after the answer.
 	//
+	// Every request counts as a failure against the address's throttle,
+	// which sign-in, invitation acceptance and password reset completion
+	// share: past a hundred from one address in fifteen minutes it is
+	// refused `429 rate_limited` with `Retry-After`, whether or not the
+	// email exists.
+	//
 	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
 	// reset is on in the auth settings, local login is enabled and the
@@ -28847,6 +28877,12 @@ type ClientWithResponsesInterface interface {
 	// once whoever the email belongs to, whether or not anything comes of
 	// it, so the answer reveals nothing about which addresses exist. The
 	// lookup, the issuing and the mail happen after the answer.
+	//
+	// Every request counts as a failure against the address's throttle,
+	// which sign-in, invitation acceptance and password reset completion
+	// share: past a hundred from one address in fifteen minutes it is
+	// refused `429 rate_limited` with `Retry-After`, whether or not the
+	// email exists.
 	//
 	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
@@ -33358,6 +33394,11 @@ type RequestPasswordResetResponse401Headers struct {
 	WWWAuthenticate *string
 }
 
+// RequestPasswordResetResponse429Headers the declared response headers of an HTTP 429 response for RequestPasswordReset
+type RequestPasswordResetResponse429Headers struct {
+	RetryAfter *int
+}
+
 type RequestPasswordResetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -33369,8 +33410,12 @@ type RequestPasswordResetResponse struct {
 	ApplicationproblemJSON413 *RequestTooLarge
 	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
 	ApplicationproblemJSON415 *UnsupportedMediaType
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyAttempts
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *RequestPasswordResetResponse401Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *RequestPasswordResetResponse429Headers
 }
 
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
@@ -33391,6 +33436,11 @@ func (r RequestPasswordResetResponse) GetApplicationproblemJSON413() *RequestToo
 // GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
 func (r RequestPasswordResetResponse) GetApplicationproblemJSON415() *UnsupportedMediaType {
 	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r RequestPasswordResetResponse) GetApplicationproblemJSON429() *TooManyAttempts {
+	return r.ApplicationproblemJSON429
 }
 
 // GetBody returns the raw response body bytes
@@ -49451,6 +49501,12 @@ func (c *ClientWithResponses) GetAuthMethodsWithResponse(ctx context.Context, pa
 // it, so the answer reveals nothing about which addresses exist. The
 // lookup, the issuing and the mail happen after the answer.
 //
+// Every request counts as a failure against the address's throttle,
+// which sign-in, invitation acceptance and password reset completion
+// share: past a hundred from one address in fifteen minutes it is
+// refused `429 rate_limited` with `Retry-After`, whether or not the
+// email exists.
+//
 // A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
 // reset is on in the auth settings, local login is enabled and the
@@ -49482,6 +49538,12 @@ func (c *ClientWithResponses) RequestPasswordResetWithBodyWithResponse(ctx conte
 // once whoever the email belongs to, whether or not anything comes of
 // it, so the answer reveals nothing about which addresses exist. The
 // lookup, the issuing and the mail happen after the answer.
+//
+// Every request counts as a failure against the address's throttle,
+// which sign-in, invitation acceptance and password reset completion
+// share: past a hundred from one address in fifteen minutes it is
+// refused `429 rate_limited` with `Retry-After`, whether or not the
+// email exists.
 //
 // A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
@@ -55553,6 +55615,13 @@ func ParseRequestPasswordResetResponse(rsp *http.Response) (*RequestPasswordRese
 		}
 		response.ApplicationproblemJSON415 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyAttempts
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
 	}
 
 	switch {
@@ -55566,6 +55635,16 @@ func ParseRequestPasswordResetResponse(rsp *http.Response) (*RequestPasswordRese
 			headers.WWWAuthenticate = &value
 		}
 		response.Headers401 = &headers
+	case rsp.StatusCode == 429:
+		var headers RequestPasswordResetResponse429Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
 	}
 
 	return response, nil
@@ -80093,6 +80172,25 @@ func (response RequestPasswordReset415ApplicationProblemPlusJSONResponse) VisitR
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestPasswordReset429ApplicationProblemPlusJSONResponse struct {
+	TooManyAttemptsApplicationProblemPlusJSONResponse
+}
+
+func (response RequestPasswordReset429ApplicationProblemPlusJSONResponse) VisitRequestPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
 	_, err := buf.WriteTo(w)
 	return err
 }

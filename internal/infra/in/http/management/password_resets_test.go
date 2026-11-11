@@ -518,3 +518,28 @@ func TestTheRetentionWorkerPurgesPasswordResetsThirtyDaysAfterUseOrExpiry(t *tes
 		t.Errorf("purged password resets = %d, want 2", n)
 	}
 }
+
+// Asking for a password reset counts against the address's throttle before it
+// is answered, whether or not the email exists, so the 429 tells nothing about
+// which addresses are members.
+func TestAskingForAPasswordResetIsThrottledPerAddress(t *testing.T) {
+	srv := testkit.StartServer(t, trustLoopback())
+	b := fromAddress(t, srv, someAddress())
+	body := func(email string) (int, []byte) {
+		res := do(b.RequestPasswordResetWithResponse(t.Context(), management.PasswordResetRequest{Email: email}))
+		return res.StatusCode(), res.Body
+	}
+	for i := range access.SourceFailureLimit {
+		if code, out := body("nobody-" + rand.Text() + "@example.com"); code != http.StatusAccepted {
+			t.Fatalf("request %d = %d %s, want 202", i+1, code, out)
+		}
+	}
+	member := testkit.NewMember(t, testkit.Pool(t))
+	for name, email := range map[string]string{"an unknown email": "nobody@example.com", "a member's email": member.Email} {
+		code, out := body(email)
+		assertProblem(t, name+" past the throttle", code, out, http.StatusTooManyRequests, "rate_limited")
+	}
+	if code, problem, _ := signInAs(t, b, "nobody@example.com", wrongPassword); code != http.StatusTooManyRequests || problem != "rate_limited" {
+		t.Errorf("sign-in from the same address = %d %s, want 429 rate_limited: the throttle is shared", code, problem)
+	}
+}

@@ -775,6 +775,12 @@ export const acceptInvitation = <ThrowOnError extends boolean = false>(
  * it, so the answer reveals nothing about which addresses exist. The
  * lookup, the issuing and the mail happen after the answer.
  *
+ * Every request counts as a failure against the address's throttle,
+ * which sign-in, invitation acceptance and password reset completion
+ * share: past a hundred from one address in fifteen minutes it is
+ * refused `429 rate_limited` with `Retry-After`, whether or not the
+ * email exists.
+ *
  * A password reset is mailed, to the member in their language,
  * only when the instance has an SMTP server and self-service password
  * reset is on in the auth settings, local login is enabled and the
