@@ -2,7 +2,7 @@ module github.com/azverinus/flagnetic
 
 go 1.27.0
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 require (
 	github.com/azverinus/flagnetic/eval v0.0.0
