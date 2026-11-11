@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import resource
 import stat
 import threading
 import time
@@ -16,6 +17,7 @@ from typing import Any
 import pytest
 
 import flagnetic
+from flagnetic import _delivery
 from mock_server import MockServer, Request, Response
 from protocol import SDK_KEY, Logs, eventually, read, read_json
 
@@ -542,3 +544,73 @@ def test_an_event_too_long_to_be_a_version_drops_the_stream(clients: Any) -> Non
         server.stream_send(b"data: " + b"x" * 1024 + b"\n")
     assert eventually(lambda: [] if len(streams) == 2 else ["no reconnect"]) == []
     assert [f["cause"] for f in logs.named("sse_dropped")] == ["malformed"]
+
+
+def test_a_descriptor_beyond_the_select_limit_does_not_stop_the_thread(clients: Any) -> None:
+    # select.select raises ValueError for a descriptor of 1024 or more, which a busy server reaches.
+    limit = resource.getrlimit(resource.RLIMIT_NOFILE)[0]
+    if limit != resource.RLIM_INFINITY and limit < 1400:
+        pytest.skip("the descriptor limit is too low to hold 1,100 descriptors")
+    held = [os.open(os.devnull, os.O_RDONLY) for _ in range(1100)]
+    try:
+        logs = Logs()
+        streams: list[Request] = []
+
+        def handler(request: Request) -> Response:
+            if request.path.endswith("/stream"):
+                streams.append(request)
+                return Response(200, {"Content-Type": "text/event-stream"}, stream=True)
+            return Response(200, JSON, RULESET)
+
+        server = MockServer(handler)
+        client = clients(server, stream=True, logger=logs)
+        assert client.ready(5) is flagnetic.Stage.FRESH
+        assert eventually(lambda: [] if streams else ["no stream"]) == []
+        server.stream_send(b": heartbeat\n\n")
+        time.sleep(0.2)
+        assert logs.count("evaluation_failed") == 0
+        assert [t for t in threading.enumerate() if t.name == "flagnetic" and t.is_alive()]
+    finally:
+        for fd in held:
+            os.close(fd)
+
+
+def test_an_unexpected_exception_is_logged_once_per_kind_and_the_thread_goes_on(
+    clients: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = _delivery.Delivery._fetch_once
+    raised = {"count": 0}
+
+    def sometimes_failing(self: Any) -> None:
+        if raised["count"] < 3:
+            raised["count"] += 1
+            raise RuntimeError(f"unexpected {raised['count']}")
+        original(self)
+
+    monkeypatch.setattr(_delivery.Delivery, "_fetch_once", sometimes_failing)
+    logs = Logs()
+    client = clients(serving(RULESET), logger=logs, _time_divisor=1000)
+    assert client.ready(5) is flagnetic.Stage.FRESH
+    assert raised["count"] == 3
+    assert client.get_bool(CONTEXT, "checkout", False) is True
+    failures = logs.named("evaluation_failed")
+    assert len(failures) == 1
+    assert "RuntimeError" in failures[0]["cause"]
+
+
+def test_flush_without_a_timeout_returns_when_the_thread_is_gone(
+    clients: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def gone(self: Any) -> None:
+        raise SystemExit
+
+    monkeypatch.setattr(_delivery.Delivery, "_loop", gone)
+    client = clients(serving(RULESET), flush_interval=3600, summary_interval=3600)
+    thread = next(t for t in threading.enumerate() if t.name == "flagnetic")
+    thread.join(5)
+    assert not thread.is_alive()
+    client.get_bool(CONTEXT, "checkout", False)
+    done = threading.Thread(target=client.flush, kwargs={"timeout": None}, daemon=True)
+    done.start()
+    done.join(5)
+    assert not done.is_alive()

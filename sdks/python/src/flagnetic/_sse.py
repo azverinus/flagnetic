@@ -12,6 +12,14 @@ MAX_LINE_BYTES = 64 << 10
 
 _LINE_END = re.compile(rb"\r\n|\r|\n")
 
+# A chunk size is plain hex digits: ``int(..., 16)`` alone would take a sign, a prefix or
+# underscores, and a negative size never finishes a chunk. Sixteen digits reach any real chunk.
+_CHUNK_SIZE = re.compile(rb"[0-9A-Fa-f]{1,16}")
+
+# The digits of a ``retry:`` value in milliseconds. Twelve reach 30 years; more is a hostile server,
+# and a value of hundreds of digits overflows the float it is turned into.
+MAX_RETRY_DIGITS = 12
+
 
 class StreamError(Exception):
     """The bytes of the ruleset stream are not what the stream claims to be."""
@@ -44,10 +52,9 @@ class ChunkedDecoder:
                     break
                 line = bytes(self._buffer[:end]).split(b";", 1)[0].strip()
                 del self._buffer[: end + 2]
-                try:
-                    self._left = int(line, 16)
-                except ValueError as err:
-                    raise StreamError(f"bad chunk size {line!r}") from err
+                if _CHUNK_SIZE.fullmatch(line) is None:
+                    raise StreamError(f"bad chunk size {line[:32]!r}")
+                self._left = int(line, 16)
                 if self._left == 0:
                     self.finished = True
                     break
@@ -99,7 +106,7 @@ class EventStreamParser:
         self.retry: float | None = None
 
     def feed(self, data: bytes) -> list[Frame]:
-        """Returns the frames ``data`` completes; raises StreamError on a line beyond MAX_LINE_BYTES."""
+        """Returns the frames ``data`` completes; raises StreamError on a line or a retry that is too long."""
         buffer = self._pending + data
         frames: list[Frame] = []
         start = 0
@@ -144,4 +151,6 @@ class EventStreamParser:
                 if "\0" not in value:
                     self._id = value
             elif field == "retry" and value.isascii() and value.isdigit():
+                if len(value) > MAX_RETRY_DIGITS:
+                    raise StreamError("event stream retry too long")
                 self.retry = int(value) / 1000
