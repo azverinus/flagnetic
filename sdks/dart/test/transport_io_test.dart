@@ -76,11 +76,11 @@ void main() {
     server.listen((request) async {
       final chunk = List<int>.filled(1 << 20, 0x20);
       var gone = false;
-      unawaited(
-        request.response.done
-            .then<void>((_) {}, onError: (Object _) {})
-            .whenComplete(() => gone = true),
+      final ended = request.response.done.then<void>(
+        (_) {},
+        onError: (Object _) {},
       );
+      ended.whenComplete(() => gone = true).ignore();
       try {
         while (!gone) {
           request.response.add(chunk);
@@ -92,11 +92,9 @@ void main() {
         // The client went away.
       }
     });
-    final e = await failure(
-      transport.postJson(Uri.parse('http://127.0.0.1:${server.port}/x'), {}, [
-        123,
-      ], const Duration(seconds: 30)),
-    );
+    final url = Uri.parse('http://127.0.0.1:${server.port}/x');
+    const timeout = Duration(seconds: 30);
+    final e = await failure(transport.postJson(url, {}, [123], timeout));
     expect(e.kind, TransportFailure.network);
     expect(e.detail, contains('larger than'));
   });
