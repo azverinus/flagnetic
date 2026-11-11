@@ -82,3 +82,24 @@ func TestJobsPastTheLimitAreDroppedAndCounted(t *testing.T) {
 	}
 	b.Wait(ctx)
 }
+
+// A job started by a running job is never dropped: the follow-up of work
+// already accepted, such as the mail of a reset just issued, must not be lost.
+func TestAJobStartedByARunningJobIgnoresTheLimit(t *testing.T) {
+	b := appaccess.NewBackground(slog.New(slog.DiscardHandler), appaccess.WithBackgroundLimit(1))
+	var inner atomic.Bool
+	started := b.Go(t.Context(), "outer", time.Minute, func(ctx context.Context) {
+		if !b.Go(ctx, "inner", time.Minute, func(context.Context) { inner.Store(true) }) {
+			t.Error("the follow-up of a running job was dropped")
+		}
+	})
+	if !started {
+		t.Fatal("outer dropped")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	b.Wait(ctx)
+	if !inner.Load() {
+		t.Error("the follow-up did not run")
+	}
+}

@@ -69,7 +69,7 @@ func NewBackground(logger *slog.Logger, opts ...BackgroundOption) *Background {
 // counted, and Go reports false: shedding the work is what keeps a flood
 // from exhausting the database connections the jobs hold.
 func (b *Background) Go(ctx context.Context, name string, bound time.Duration, fn func(ctx context.Context)) bool {
-	done, ok := b.track()
+	done, ok := b.track(inJob(ctx))
 	if !ok {
 		b.logger.WarnContext(ctx, "background job dropped: too many running", "job", name, "limit", b.limit)
 		if b.dropped != nil {
@@ -77,7 +77,7 @@ func (b *Background) Go(ctx context.Context, name string, bound time.Duration, f
 		}
 		return false
 	}
-	bg, cancel := context.WithTimeout(context.WithoutCancel(ctx), bound)
+	bg, cancel := context.WithTimeout(context.WithValue(context.WithoutCancel(ctx), jobKey{}, true), bound)
 	safego.Go(bg, name, b.logger, func(ctx context.Context) {
 		defer done()
 		defer cancel()
@@ -86,12 +86,21 @@ func (b *Background) Go(ctx context.Context, name string, bound time.Duration, f
 	return true
 }
 
+// jobKey marks the context of a running job.
+type jobKey struct{}
+
+// inJob reports whether ctx belongs to a running job.
+func inJob(ctx context.Context) bool { ok, _ := ctx.Value(jobKey{}).(bool); return ok }
+
 // track counts a job Wait awaits and returns what ends it, or false when the
-// limit of jobs is already running.
-func (b *Background) track() (done func(), ok bool) {
+// limit of jobs is already running. A job started by a running job (a password
+// reset request queues its mail after committing the reset) is exempt: the
+// limit sheds incoming work, and dropping the follow-up of work already
+// accepted would leave a reset issued whose mail never leaves.
+func (b *Background) track(nested bool) (done func(), ok bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.running >= b.limit {
+	if !nested && b.running >= b.limit {
 		return nil, false
 	}
 	if b.running == 0 {
