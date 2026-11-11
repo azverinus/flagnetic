@@ -168,12 +168,22 @@ export class Ingest {
         accepted: numberOf(parsed.accepted),
         duplicates: numberOf(parsed.duplicates),
         dropped_rows: numberOf(parsed.dropped_rows),
-        rejected: Array.isArray(parsed.rejected) ? parsed.rejected : [],
+        rejected: rejectionsOf(parsed.rejected),
       };
     } catch {
       return empty;
     }
   }
+}
+
+// Only what has the shape of a rejection is kept: the answer comes off the
+// network, and a null or a bare number in the list must not reach the code
+// that logs the codes.
+function rejectionsOf(v: unknown): Rejection[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter(
+    (x): x is Rejection => typeof x === "object" && x !== null && typeof (x as { code?: unknown }).code === "string",
+  );
 }
 
 function numberOf(v: unknown): number {

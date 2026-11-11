@@ -204,3 +204,28 @@ func serverURL(ctx context.Context) (string, error) {
 	pkg.cleanups = append(pkg.cleanups, func() { _ = testcontainers.TerminateContainer(c) })
 	return c.ConnectionString(ctx, "sslmode=disable")
 }
+
+// OtherCluster starts a second PostgreSQL server, a cluster of its own with
+// its own system identifier and a transaction counter that starts from the
+// beginning, and returns the connection string of its empty database. It is
+// stopped when the test ends. Tests of what a logical dump or logical
+// replication moves between clusters use it; it always needs Docker, since
+// DATABASE_URL names the one server of the package.
+func OtherCluster(t testing.TB) string {
+	t.Helper()
+	c, err := tcpostgres.Run(t.Context(), Image,
+		tcpostgres.WithDatabase("flagnetic"),
+		tcpostgres.WithUsername("flagnetic"),
+		tcpostgres.WithPassword("flagnetic"),
+		tcpostgres.BasicWaitStrategies(),
+	)
+	if err != nil {
+		t.Fatalf("start a second PostgreSQL (is Docker running?): %v", err)
+	}
+	t.Cleanup(func() { _ = testcontainers.TerminateContainer(c) })
+	u, err := c.ConnectionString(t.Context(), "sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u
+}

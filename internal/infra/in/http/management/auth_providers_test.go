@@ -278,8 +278,20 @@ func TestEditingAnAuthProviderNeedsItsVersionAndRecordsWhatChanged(t *testing.T)
 
 	stale := patchProvider(t, admin, slug, 1, management.AuthProviderPatch{DisplayName: ptr("Stale")})
 	assertProblem(t, "a stale version", stale.StatusCode(), stale.Body, http.StatusPreconditionFailed, "version_mismatch")
-	insecure := patchProvider(t, admin, slug, 2, management.AuthProviderPatch{Issuer: ptr("http://idp.example.com")})
+	insecure := patchProvider(t, admin, slug, 2, management.AuthProviderPatch{
+		Issuer: ptr("http://idp.example.com"), ClientSecret: ptr("client-secret-again"),
+	})
 	assertProblem(t, "an http issuer", insecure.StatusCode(), insecure.Body, http.StatusUnprocessableEntity, "insecure_url")
+	// The stored client secret does not follow a new issuer or client.
+	for what, patch := range map[string]management.AuthProviderPatch{
+		"an issuer": {Issuer: ptr("https://other-idp.example.net")}, "a client id": {ClientId: ptr("another-client")},
+	} {
+		moved := patchProvider(t, admin, slug, 2, patch)
+		p := assertProblem(t, what+" without the client secret", moved.StatusCode(), moved.Body, http.StatusUnprocessableEntity, "invalid_auth_provider")
+		if p.Errors == nil || len(*p.Errors) != 1 || (*p.Errors)[0].Pointer != "/client_secret" {
+			t.Errorf("%s: violations %+v, want one at /client_secret", what, p.Errors)
+		}
+	}
 	empty := patchProvider(t, admin, slug, 2, management.AuthProviderPatch{Domains: &[]string{}})
 	assertProblem(t, "no domain", empty.StatusCode(), empty.Body, http.StatusUnprocessableEntity, "invalid_auth_provider")
 

@@ -47,11 +47,12 @@ type DeadLetterStore interface {
 // the same round. It records sink.dead_lettered and, when this was the dead
 // letter that stopped the sink, sink.stopped, in the unit of work of the
 // move.
-func (h *Deliver) setAside(ctx context.Context, ref StreamRef, token LeaseToken, c ClaimedSink, b sinks.Batch, page sinks.Page, f sinks.Failure, scope sinks.Scope) (Result, error) {
+func (h *Deliver) setAside(ctx context.Context, ref StreamRef, token LeaseToken, c ClaimedSink, b sinks.Batch, page sinks.Page, f sinks.Failure, floor *time.Time, scope sinks.Scope) (Result, error) {
 	now := h.now()
 	dl := NewDeadLetter{
 		ID: id.New[sinks.DeadLetter](h.d.IDs), Failure: sinks.FailureAt{Failure: f, At: now},
 		Rows: len(page.Rows) + page.Skipped, First: page.Rows[0].Received(), Last: page.Rows[len(page.Rows)-1].Received(),
+		Floor: floor,
 	}
 	var res SetAsideResult
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
@@ -183,7 +184,7 @@ func (h *RedeliverDeadLetter) Handle(ctx context.Context, cmd DeadLetterCommand)
 	if dl.Status == sinks.DeadLetterExpired {
 		return dl, errRowsExpired
 	}
-	page, err := h.d.Rows.ReadBatch(ctx, dl.EventKind, sinks.Scope{Project: s.Project, Environments: dl.Environments},
+	page, err := h.d.Rows.ReadBatch(ctx, dl.EventKind, sinks.Scope{Project: s.Project, Environments: dl.Environments, Floor: dl.Floor},
 		sinks.Batch{From: dl.From, To: dl.To, Rows: dl.Rows})
 	if err != nil {
 		return dl, fmt.Errorf("reading the dead letter's rows: %w", err)

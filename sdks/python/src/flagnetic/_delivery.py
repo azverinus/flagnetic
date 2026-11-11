@@ -2,7 +2,7 @@
 
 One daemon thread does it all, so a client costs one thread however many
 flags it serves. The ruleset stream is read from its socket by the thread
-itself, between fetches and event reports, with ``select`` waiting for
+itself, between fetches and event reports, with a selector waiting for
 whichever comes first: bytes on the stream, the next fetch, reconnect or
 report due, the heartbeat deadline, or a wake-up from a flush or ``close``.
 """
@@ -14,7 +14,7 @@ import http.client
 import json
 import logging
 import random
-import select
+import selectors
 import socket
 import ssl
 import threading
@@ -233,6 +233,8 @@ class Delivery:
         self._closing = threading.Event()
         self._wake_read, self._wake_write = socket.socketpair()
         self._wake_read.setblocking(False)
+        # The kinds of exception that ended the loop, each logged once.
+        self._crash_kinds: set[str] = set()
         self._thread = threading.Thread(target=self._run, name="flagnetic", daemon=True)
 
         # Fetching.
@@ -315,11 +317,10 @@ class Delivery:
 
     def _run(self) -> None:
         try:
-            self._loop()
-        except Exception as err:  # the thread must never die silently with a client waiting on it
-            self._host.log(
-                logging.ERROR, _events.EVALUATION_FAILED, flag="", cause=f"delivery thread: {err!r}"
-            )
+            self._supervise()
+        except BaseException as err:
+            # Whatever ends the thread is said once, and the finally below lets every waiter go.
+            self._log_crash(err)
         finally:
             self._drop_stream_connection()
             self._host.mark_ready()
@@ -329,6 +330,51 @@ class Delivery:
             with contextlib.suppress(OSError):
                 self._wake_read.close()
                 self._wake_write.close()
+
+    def _supervise(self) -> None:
+        """Runs the loop again, after a backoff, each time an exception nobody expected ends it.
+
+        The thread is the only thing that fetches, streams and reports, so one bug or one
+        hostile peer that ended it would freeze the ruleset and the events for good.
+        """
+        crashes = 0
+        while not self._closing.is_set():
+            began = time.monotonic()
+            try:
+                self._loop()
+                return
+            except Exception as err:
+                if self._closing.is_set():
+                    return
+                crashes = 1 if time.monotonic() - began >= self._waits.stable_for else crashes + 1
+                self._log_crash(err)
+                self._recover()
+                wait = full_jitter(backoff_ceiling(crashes, self._waits.retry_base, self._waits.retry_cap))
+                self._closing.wait(wait)
+
+    def _log_crash(self, err: BaseException) -> None:
+        """Logs a kind of exception the first time it ends the loop, so that a repeating one fills no log."""
+        kind = type(err).__qualname__
+        if kind in self._crash_kinds:
+            return
+        self._crash_kinds.add(kind)
+        with contextlib.suppress(Exception):
+            self._host.log(
+                logging.ERROR, _events.EVALUATION_FAILED, flag="", cause=f"delivery thread: {err!r}"
+            )
+
+    def _recover(self) -> None:
+        """Puts the loop's state where it can start again: no half-read stream, a fetch due at once."""
+        with contextlib.suppress(Exception):
+            self._drop_stream_connection()
+        for conn in (self._fetch_conn, self._opening_conn):
+            if conn is not None:
+                with contextlib.suppress(Exception):
+                    conn.close()
+        self._fetch_conn = self._opening_conn = None
+        self._first_attempt_done = True
+        self._next_fetch = None
+        self._wake_fetch = False
 
     def _loop(self) -> None:
         while not self._closing.is_set():
@@ -377,7 +423,11 @@ class Delivery:
             if pending is not None and pending() > 0:
                 timeout = 0.0
             readable.append(sock)
-        ready, _, _ = select.select(readable, [], [], timeout)
+        # select.select raises ValueError from a descriptor of 1024 up, which a busy server reaches.
+        with selectors.DefaultSelector() as selector:
+            for waited in readable:
+                selector.register(waited, selectors.EVENT_READ)
+            ready = [key.fileobj for key, _ in selector.select(timeout)]
         if self._wake_read in ready:
             with contextlib.suppress(OSError):
                 self._wake_read.recv(4096)

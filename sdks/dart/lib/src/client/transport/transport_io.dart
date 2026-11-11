@@ -36,6 +36,11 @@ final class _IoTransport implements Transport {
 
   /// Opens a request with [open], sends [headers] and [body], and reads the
   /// whole answer within [timeout].
+  ///
+  /// On a timeout the request is abandoned wherever it stands: still
+  /// connecting, it is aborted the moment it opens, before anything is sent;
+  /// answered, the body subscription is cancelled, which destroys the socket.
+  /// `HttpClientRequest.abort` does nothing once the headers are in.
   Future<TransportResponse> _send(
     Future<HttpClientRequest> Function() open,
     Map<String, String> headers,
@@ -43,17 +48,46 @@ final class _IoTransport implements Transport {
     Duration timeout,
   ) async {
     HttpClientRequest? request;
+    StreamSubscription<List<int>>? reading;
+    var abandoned = false;
     try {
       return await () async {
+        _http.connectionTimeout = timeout;
         request = await open();
         final req = request!;
+        if (abandoned) {
+          req.abort();
+          throw TimeoutException(null);
+        }
         _inFlight.add(req);
         headers.forEach(req.headers.set);
         req.headers.set(HttpHeaders.acceptEncodingHeader, 'gzip');
         if (body != null) req.add(body);
         final response = await req.close();
         final bytes = <int>[];
-        await response.forEach(bytes.addAll);
+        final done = Completer<void>();
+        reading = response.listen(
+          (chunk) {
+            bytes.addAll(chunk);
+            if (bytes.length > maxResponseBytes && !done.isCompleted) {
+              unawaited(reading?.cancel());
+              done.completeError(
+                TransportException(
+                  TransportFailure.network,
+                  'answer larger than $maxResponseBytes bytes',
+                ),
+              );
+            }
+          },
+          onError: (Object e) {
+            if (!done.isCompleted) done.completeError(e);
+          },
+          onDone: () {
+            if (!done.isCompleted) done.complete();
+          },
+          cancelOnError: true,
+        );
+        await done.future;
         final received = <String, String>{};
         response.headers.forEach((name, values) {
           received[name.toLowerCase()] = values.join(', ');
@@ -61,7 +95,9 @@ final class _IoTransport implements Transport {
         return (status: response.statusCode, headers: received, body: bytes);
       }().timeout(timeout);
     } on TimeoutException {
+      abandoned = true;
       request?.abort();
+      unawaited(reading?.cancel());
       throw TransportException(
         TransportFailure.timeout,
         'no answer within $timeout',
@@ -82,10 +118,17 @@ final class _IoTransport implements Transport {
     Duration timeout,
   ) async {
     HttpClientRequest? request;
+    HttpClientResponse? answered;
+    var abandoned = false;
     try {
       final response = await () async {
+        _http.connectionTimeout = timeout;
         request = await _http.getUrl(url);
         final req = request!;
+        if (abandoned) {
+          req.abort();
+          throw TimeoutException(null);
+        }
         _inFlight.add(req);
         headers.forEach(req.headers.set);
         req.headers
@@ -94,7 +137,13 @@ final class _IoTransport implements Transport {
           // buffer them on the way.
           ..set(HttpHeaders.acceptEncodingHeader, 'identity')
           ..set(HttpHeaders.cacheControlHeader, 'no-cache');
-        return req.close();
+        final head = await req.close();
+        answered = head;
+        if (abandoned) {
+          unawaited(head.listen(null).cancel());
+          throw TimeoutException(null);
+        }
+        return head;
       }().timeout(timeout);
       final answer = <String, String>{};
       response.headers.forEach((name, values) {
@@ -106,7 +155,12 @@ final class _IoTransport implements Transport {
         body: _untilDone(response, request!),
       );
     } on TimeoutException {
+      abandoned = true;
       request?.abort();
+      // A head that arrived in the same instant is cancelled too, so no
+      // answer is left open that nobody reads.
+      final head = answered;
+      if (head != null) unawaited(head.listen(null).cancel());
       _inFlight.remove(request);
       throw TransportException(
         TransportFailure.timeout,

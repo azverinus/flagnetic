@@ -195,9 +195,9 @@ func TestAMaskedOrAbsentSecretKeepsTheStoredOneAndANewOneReplacesIt(t *testing.T
 
 	// "***", as every read answers it, keeps the password.
 	masked := updateSink(t, admin, p.Key, created, management.SinkPatch{Clickhouse: &management.SinkClickHouseInput{
-		Url: ptr("http://clickhouse.internal:8124"), Database: ptr("analytics"), Username: ptr("writer"), Password: ptr("***"),
+		Url: ptr("http://clickhouse.internal:8123"), Database: ptr("events"), Username: ptr("writer"), Password: ptr("***"),
 	}})
-	if masked.JSON200 == nil || masked.JSON200.Clickhouse.Url != "http://clickhouse.internal:8124" || masked.JSON200.Clickhouse.Password != "***" ||
+	if masked.JSON200 == nil || masked.JSON200.Clickhouse.Database != "events" || masked.JSON200.Clickhouse.Password != "***" ||
 		masked.JSON200.Version != 2 || masked.HTTPResponse.Header.Get("ETag") != `"2"` {
 		t.Fatalf("a masked password = %d: %s", masked.StatusCode(), masked.Body)
 	}
@@ -207,7 +207,7 @@ func TestAMaskedOrAbsentSecretKeepsTheStoredOneAndANewOneReplacesIt(t *testing.T
 
 	// So does leaving it out.
 	omitted := updateSink(t, admin, p.Key, *masked.JSON200, management.SinkPatch{Clickhouse: &management.SinkClickHouseInput{
-		Url: ptr("http://clickhouse.internal:8125"), Database: ptr("analytics"), Username: ptr("writer"),
+		Url: ptr("http://clickhouse.internal:8123"), Database: ptr("analytics"), Username: ptr("writer"),
 	}})
 	if omitted.JSON200 == nil {
 		t.Fatalf("an absent password = %d: %s", omitted.StatusCode(), omitted.Body)
@@ -218,7 +218,7 @@ func TestAMaskedOrAbsentSecretKeepsTheStoredOneAndANewOneReplacesIt(t *testing.T
 
 	// A new value replaces it.
 	replaced := updateSink(t, admin, p.Key, *omitted.JSON200, management.SinkPatch{Clickhouse: &management.SinkClickHouseInput{
-		Url: ptr("http://clickhouse.internal:8125"), Database: ptr("analytics"), Username: ptr("writer"), Password: ptr("ch-password-2"),
+		Url: ptr("http://clickhouse.internal:8126"), Database: ptr("analytics"), Username: ptr("writer"), Password: ptr("ch-password-2"),
 	}})
 	if replaced.JSON200 == nil || replaced.JSON200.Clickhouse.Password != "***" {
 		t.Fatalf("a new password = %d: %s", replaced.StatusCode(), replaced.Body)
@@ -233,6 +233,57 @@ func TestAMaskedOrAbsentSecretKeepsTheStoredOneAndANewOneReplacesIt(t *testing.T
 		if strings.Contains(string(raw), "ch-password") {
 			t.Errorf("an audit entry holds a password: %s", raw)
 		}
+	}
+}
+
+func TestAStoredSecretIsNotSentToATargetItWasNotGivenFor(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	testkit.RecordSecret("ch-password-1")
+	testkit.RecordSecret("s3-secret-key-1")
+	ch := sinkOf(createSink(t, admin, p.Key, clickHouseSink()))
+	lake := sinkOf(createSink(t, admin, p.Key, objectStorageSink()))
+
+	chAt := func(mutate func(*management.SinkClickHouseInput)) *management.SinkClickHouseInput {
+		in := &management.SinkClickHouseInput{
+			Url: ptr("http://clickhouse.internal:8123"), Database: ptr("analytics"), Username: ptr("writer"),
+		}
+		mutate(in)
+		return in
+	}
+	assertSecretAsked := func(what, pointer string, code int, body []byte) {
+		t.Helper()
+		pr := assertProblem(t, what, code, body, http.StatusUnprocessableEntity, "invalid_sink")
+		if got := problemViolations(pr); got[pointer] != "required" {
+			t.Errorf("%s: violations %v, want required at %s", what, got, pointer)
+		}
+	}
+	for what, in := range map[string]*management.SinkClickHouseInput{
+		"another url":    chAt(func(c *management.SinkClickHouseInput) { c.Url = ptr("http://elsewhere.internal:8123") }),
+		"another scheme": chAt(func(c *management.SinkClickHouseInput) { c.Url = ptr("https://clickhouse.internal:8123") }),
+		"another user":   chAt(func(c *management.SinkClickHouseInput) { c.Username = ptr("other") }),
+		"tls skipped":    chAt(func(c *management.SinkClickHouseInput) { c.TlsSkipVerify = ptr(true) }),
+	} {
+		for _, masked := range []*string{nil, ptr("***")} {
+			in.Password = masked
+			res := updateSink(t, admin, p.Key, ch, management.SinkPatch{Clickhouse: in})
+			assertSecretAsked("an edit with "+what, "/clickhouse/password", res.StatusCode(), res.Body)
+			probe := do(admin.TestSinkWithResponse(t.Context(), p.Key, ch.Id, management.SinkTest{Clickhouse: in}))
+			assertSecretAsked("a test with "+what, "/clickhouse/password", probe.StatusCode(), probe.Body)
+		}
+	}
+	moved := updateSink(t, admin, p.Key, lake, management.SinkPatch{ObjectStorage: &management.SinkObjectStorageInput{
+		Endpoint: ptr("http://elsewhere.internal:9000"), Bucket: ptr("exports"), AccessKeyId: ptr("AKIAEXAMPLE"),
+	}})
+	assertSecretAsked("an edit with another endpoint", "/object_storage/secret_access_key", moved.StatusCode(), moved.Body)
+
+	// Given again, the secret goes with the new target.
+	again := updateSink(t, admin, p.Key, ch, management.SinkPatch{Clickhouse: chAt(func(c *management.SinkClickHouseInput) {
+		c.Url, c.Password = ptr("http://elsewhere.internal:8123"), ptr("ch-password-1")
+	})})
+	if again.JSON200 == nil {
+		t.Fatalf("an edit giving the password again = %d: %s", again.StatusCode(), again.Body)
 	}
 }
 
@@ -640,7 +691,7 @@ func TestATargetASinkMayNotReachIsRefusedByKind(t *testing.T) {
 	linkLocal := "http://169.254.169.254:8123"
 	ch := sinkOf(createSink(t, admin, p.Key, clickHouseSink()))
 	res = updateSink(t, admin, p.Key, ch, management.SinkPatch{Clickhouse: &management.SinkClickHouseInput{
-		Url: &linkLocal, Database: ptr("analytics"), Username: ptr("writer"),
+		Url: &linkLocal, Database: ptr("analytics"), Username: ptr("writer"), Password: ptr("ch-password-1"),
 	}})
 	assertProblem(t, "an edit to a link-local target", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "link_local_target")
 }

@@ -137,6 +137,21 @@ describe("the checks of the form before it asks the server", () => {
     return result.success ? [] : result.error.issues.map((issue) => issue.message);
   };
 
+  it("asks for the client secret again when the issuer or the client ID changes", () => {
+    const edit = (values: Partial<OidcProviderForm>) =>
+      oidcFormSchema(i18n, { creating: false, stored: provider }).safeParse({
+        ...formOf(provider),
+        ...values,
+      });
+    expect(edit({}).success).toBe(true);
+    for (const moved of [{ issuer: "https://login.other.example" }, { client_id: "other" }]) {
+      const result = edit(moved);
+      expect(result.success).toBe(false);
+      expect(result.error?.issues.map((issue) => issue.path.join("."))).toEqual(["client_secret"]);
+      expect(edit({ ...moved, client_secret: "again" }).success).toBe(true);
+    }
+  });
+
   it("accepts a complete provider", () => {
     expect(check({ slug: "acme-2" }).success).toBe(true);
   });

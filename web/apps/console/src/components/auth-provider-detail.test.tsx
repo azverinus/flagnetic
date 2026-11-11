@@ -193,6 +193,7 @@ describe("an auth provider's page", () => {
     const issuer = screen.getByLabelText("Issuer");
     await user.clear(issuer);
     await user.type(issuer, "https://login2.acme.example");
+    await user.type(screen.getByLabelText("Client secret"), "client-secret-again");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>

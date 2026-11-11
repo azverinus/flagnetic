@@ -3,6 +3,12 @@ import 'transport_stub.dart'
     if (dart.library.js_interop) 'transport_web.dart'
     as platform;
 
+/// The most a response body may hold once decompressed: an evaluate answer
+/// carries every flag's served value, a few megabytes at the largest, so
+/// this leaves generous headroom while an endless body or a gzip bomb ends
+/// in a [TransportException] instead of the app running out of memory.
+const maxResponseBytes = 32 << 20;
+
 /// An HTTP answer: the status, the headers an SDK acts on (lower-case
 /// names) and the decompressed body.
 typedef TransportResponse = ({

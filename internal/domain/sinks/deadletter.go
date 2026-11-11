@@ -43,6 +43,9 @@ type DeadLetter struct {
 	// Environments are the ones the batch was filtered to; none means every
 	// one.
 	Environments []workspace.EnvironmentID
+	// Floor is the floor the batch was read with: the rows of its range
+	// received before it were never part of it. Nil when there was none.
+	Floor *time.Time
 	// Rows is how many rows the batch held when it was set aside, and
 	// FirstReceivedAt and LastReceivedAt when the first and the last of them
 	// were received.

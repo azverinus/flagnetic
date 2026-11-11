@@ -102,8 +102,11 @@ const portBounds = { min: 1, max: 65_535 } as const;
  * violations are shown in. Whether the sender is one address, and whether
  * credentials may travel without encryption to the host, are left to the
  * server, which parses addresses and knows which hosts are this machine.
+ * A stored password is kept only for the host, port, security and username it
+ * was given for: moving any of them asks for the password again.
  */
-export function mailFormSchema(i18n: I18n, { passwordSet }: { passwordSet: boolean }) {
+export function mailFormSchema(i18n: I18n, { stored }: { stored: SmtpSettings | null }) {
+  const passwordSet = stored?.password_set ?? false;
   const violation = (field: keyof MailForm, code: string, params?: Record<string, unknown>) =>
     violationMessage(i18n, { pointer: pointerOf[field], code, detail: "", params });
   return z
@@ -132,7 +135,13 @@ export function mailFormSchema(i18n: I18n, { passwordSet }: { passwordSet: boole
         issue("from", i18n._(msg`Enter the sender's address.`));
       }
       const username = values.username.trim();
-      if (username !== "" && values.password === "" && !passwordSet) {
+      const moved =
+        stored !== null &&
+        (host.toLowerCase() !== stored.host.toLowerCase() ||
+          Number(port) !== stored.port ||
+          values.security !== stored.security ||
+          username !== stored.username);
+      if (username !== "" && values.password === "" && (!passwordSet || moved)) {
         issue("password", violation("password", "credentials_together"));
       } else if (username === "" && values.password !== "") {
         issue("username", violation("username", "credentials_together"));

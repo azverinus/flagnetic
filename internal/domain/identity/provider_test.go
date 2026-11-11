@@ -167,6 +167,37 @@ func TestAChangeLeavesWhatItDoesNotNameAndNormalizesWhatItDoes(t *testing.T) {
 	}
 }
 
+func TestTheStoredClientSecretIsKeptOnlyForTheIssuerAndClientItWasGivenFor(t *testing.T) {
+	p := newProvider(t)
+	issuer, sameIssuer, client, sameClient := "https://other.example.net", p.OIDC.Issuer, "another", p.OIDC.ClientID
+	fresh := secret.New("given-again")
+	for name, tc := range map[string]struct {
+		change identity.ProviderChange
+		want   bool
+	}{
+		"nothing about the target":  {identity.ProviderChange{}, false},
+		"the same issuer":           {identity.ProviderChange{Issuer: &sameIssuer}, false},
+		"the same client id":        {identity.ProviderChange{ClientID: &sameClient}, false},
+		"another issuer":            {identity.ProviderChange{Issuer: &issuer}, true},
+		"another client id":         {identity.ProviderChange{ClientID: &client}, true},
+		"another issuer, secret":    {identity.ProviderChange{Issuer: &issuer, ClientSecret: &fresh}, false},
+		"another client id, secret": {identity.ProviderChange{ClientID: &client, ClientSecret: &fresh}, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := p.CheckChange(tc.change)
+			if !tc.want {
+				if err != nil {
+					t.Fatalf("CheckChange = %v, want it accepted", err)
+				}
+				return
+			}
+			if code, pointers := problemOf(t, err); code != "invalid_auth_provider" || !slices.Equal(pointers, []string{"/client_secret"}) {
+				t.Errorf("refusal = %s %v, want invalid_auth_provider at /client_secret", code, pointers)
+			}
+		})
+	}
+}
+
 func TestAChangeThatBreaksARuleIsRefusedLikeACreation(t *testing.T) {
 	p := newProvider(t)
 	empty, insecure := []string{}, "http://idp.example.com"
@@ -174,7 +205,8 @@ func TestAChangeThatBreaksARuleIsRefusedLikeACreation(t *testing.T) {
 		!slices.Equal(pointers, []string{"/domains"}) {
 		t.Errorf("no domains: %s %v", code, pointers)
 	}
-	if code, _ := problemOf(t, errOf(p.CheckChange(identity.ProviderChange{Issuer: &insecure}))); code != "insecure_url" {
+	fresh := secret.New("another-secret")
+	if code, _ := problemOf(t, errOf(p.CheckChange(identity.ProviderChange{Issuer: &insecure, ClientSecret: &fresh}))); code != "insecure_url" {
 		t.Errorf("an http issuer: %s", code)
 	}
 	blank := secret.New(" ")

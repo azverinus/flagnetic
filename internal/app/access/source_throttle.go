@@ -20,7 +20,11 @@ type SourceThrottleStore interface {
 // SourceThrottle lets a credential other than a password, such as a SCIM
 // token, count its failed attempts against the throttle of the address they
 // come from, which local sign-in, invitation acceptance and password reset
-// share: guessing at one cannot be traded for guessing at another.
+// share: guessing at one cannot be traded for guessing at another. A request
+// that presents no credential but makes the instance work for anyone who
+// sends it, such as asking for a password reset by mail, counts against it
+// too and is never taken back, so one address cannot make the instance mail
+// and audit at wire speed.
 type SourceThrottle struct {
 	tx    Transactor
 	store SourceThrottleStore

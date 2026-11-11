@@ -5,6 +5,7 @@
 import { Backoff } from "../internal/backoff.js";
 import { Repeater, type Clock } from "../internal/clock.js";
 import type { QueuedEvent } from "../internal/events.js";
+import { causeOf } from "../internal/logger.js";
 import type { Ingest, SendResult } from "./ingest.js";
 import type { LogEvent, LogLevel } from "./types.js";
 
@@ -107,8 +108,20 @@ export class EventQueue {
     this.retryTimer = undefined;
   }
 
+  // send never rejects: a failure here is logged and the batch stays queued
+  // for the next flush, since an unhandled rejection ends a Node process.
+  // Whatever threw, the queue is left free to send again.
   private async send(): Promise<void> {
     this.sending = true;
+    try {
+      await this.sendBatch();
+    } catch (e) {
+      this.sending = false;
+      this.log("warn", "events_failed", { cause: causeOf(e) });
+    }
+  }
+
+  private async sendBatch(): Promise<void> {
     // At most `batchSize` events, and only as many of them as the
     // endpoint's 1 MiB body holds.
     const batch = this.ingest.pack(this.queue.slice(0, this.config.batchSize))[0] ?? [];

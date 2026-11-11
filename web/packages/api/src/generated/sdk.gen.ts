@@ -775,6 +775,12 @@ export const acceptInvitation = <ThrowOnError extends boolean = false>(
  * it, so the answer reveals nothing about which addresses exist. The
  * lookup, the issuing and the mail happen after the answer.
  *
+ * Every request counts as a failure against the address's throttle,
+ * which sign-in, invitation acceptance and password reset completion
+ * share: past a hundred from one address in fifteen minutes it is
+ * refused `429 rate_limited` with `Retry-After`, whether or not the
+ * email exists.
+ *
  * A password reset is mailed, to the member in their language,
  * only when the instance has an SMTP server and self-service password
  * reset is on in the auth settings, local login is enabled and the
@@ -5105,7 +5111,10 @@ export const getAuthProvider = <ThrowOnError extends boolean = false>(
  *
  * Changes any property but `slug` and `kind`; each absent one is left as
  * it is, a sent `client_secret` replaces the stored one, and a `claims`
- * member names only the claims to rename. Whether the provider is enabled
+ * member names only the claims to rename. The stored client secret stays
+ * only for the `issuer` and `client_id` it was given for: an edit that
+ * changes either without sending `client_secret` is refused
+ * `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
  * is changed with `enable` and `disable`. Refused as a creation is, and
  * 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
  * drops a domain enforced to the provider: lift the enforcement first.
@@ -6165,7 +6174,11 @@ export const getSink = <ThrowOnError extends boolean = false>(
  * sub-object of the sink's kind replaces its configuration whole, so
  * nothing of the earlier one lingers; the one exception is its secret:
  * `***`, as every read answers it, or no secret at all keeps the stored
- * one, and any other value replaces it. A sub-object of another kind,
+ * one, and any other value replaces it. The stored secret stays only for
+ * the target it was given for: an edit that changes a ClickHouse `url`,
+ * `username` or `tls_skip_verify`, or an object storage `endpoint` or
+ * `access_key_id`, must send the secret again, or is refused
+ * `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
  * or a `kind` other than the sink's own, is refused `kind_immutable`.
  * `enabled` takes `false` only, which lets the attempt in progress
  * finish and keeps the sink's place; a sink is enabled with its own

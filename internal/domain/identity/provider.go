@@ -266,6 +266,11 @@ func (p Provider) CheckChange(change ProviderChange) (Provider, error) {
 		o.ClientID = checkClientID(&v, o.ClientID)
 		if change.ClientSecret != nil {
 			checkClientSecret(&v, *change.ClientSecret)
+		} else if o.Issuer != p.OIDC.Issuer || o.ClientID != p.OIDC.ClientID {
+			// The stored secret is presented to the issuer's endpoints
+			// as the client: pointed at another issuer or client it
+			// would leave for a host its owner never chose.
+			v.add("/client_secret", "required", "a change of issuer or client id needs the client secret again", nil)
 		}
 		if change.Scopes != nil {
 			o.Scopes = *change.Scopes

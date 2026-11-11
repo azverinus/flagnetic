@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -102,6 +103,9 @@ type RequestPasswordResetDeps struct {
 	Settings AuthSettingsReader
 	SMTP     SMTPReader
 	Postman  *Postman
+	// Throttle is the source throttle sign-in, acceptance and completion
+	// share; every request counts against it.
+	Throttle *SourceThrottle
 	// Background runs the request after its answer.
 	Background *Background
 	Audit      AuditLog
@@ -126,7 +130,9 @@ func NewRequestPasswordReset(d RequestPasswordResetDeps) *RequestPasswordReset {
 
 // RequestPasswordResetCommand is one request for a password reset.
 type RequestPasswordResetCommand struct {
-	Email     string
+	Email string
+	// ClientIP is the address the request comes from.
+	ClientIP  netip.Addr
 	RequestID string
 }
 
@@ -137,22 +143,31 @@ const passwordResetLinkPath = "/password-reset/"
 // requestBound bounds the lookup and the issuing behind a request.
 const requestBound = 30 * time.Second
 
-// Handle starts the request and returns at once, whatever the email is: it
-// is answered before anything is looked up, so neither what comes of the
-// request nor how long it takes tells who holds an account. Behind the
-// answer, a password reset is issued and mailed only when the instance has an
-// SMTP server and lets members ask, the email belongs to an active member
-// who holds a password, and the member has not been issued a reset they asked
-// for in the last PasswordResetInterval, whether or not its mail was sent.
-// An email the auth settings refuse a password, while local login is
-// disabled or in an enforced domain, is issued none. Whatever stops it does
-// so silently; a failure is logged.
-func (h *RequestPasswordReset) Handle(ctx context.Context, cmd RequestPasswordResetCommand) {
+// Handle counts the request against the throttle of its source and starts
+// it, returning before anything is looked up, whatever the email is: neither
+// what comes of the request nor how long it takes tells who holds an
+// account. A source past the throttle is refused rate_limited, whatever the
+// email; every request counts, so a source cannot make the instance mail or
+// audit at wire speed, and the count is kept, as the answer is the same
+// whether or not the email exists. Behind the answer, a password reset is
+// issued and mailed only when the instance has an SMTP server and lets
+// members ask, the email belongs to an active member who holds a password,
+// and the member has not been issued a reset they asked for in the last
+// PasswordResetInterval, whether or not its mail was sent. An email the auth
+// settings refuse a password, while local login is disabled or in an
+// enforced domain, is issued none. Whatever stops it does so silently; a
+// failure is logged, and so is a request dropped because the replica is
+// running too many background jobs.
+func (h *RequestPasswordReset) Handle(ctx context.Context, cmd RequestPasswordResetCommand) error {
+	if _, err := h.d.Throttle.Reserve(ctx, cmd.ClientIP, h.d.Clock.Now()); err != nil {
+		return err
+	}
 	h.d.Background.Go(ctx, "password reset request", requestBound, func(ctx context.Context) {
 		if err := h.issue(ctx, cmd); err != nil {
 			h.d.Logger.WarnContext(ctx, "password reset request failed", "request_id", cmd.RequestID, "error", err.Error())
 		}
 	})
+	return nil
 }
 
 // issue issues and queues the password reset the request leads to, if any.

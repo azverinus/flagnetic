@@ -4419,7 +4419,7 @@ type SinkClickHouseInput struct {
 	CreateTables *bool   `json:"create_tables,omitempty"`
 	Database     *string `json:"database,omitempty"`
 
-	// Password Sealed on arrival. `***` or absent keeps the stored password when editing.
+	// Password Sealed on arrival. `***` or absent keeps the stored password when editing, unless `url`, `username` or `tls_skip_verify` changes, and then it must be sent again.
 	Password *string            `json:"password,omitempty"`
 	Settings *map[string]string `json:"settings,omitempty"`
 
@@ -4591,7 +4591,7 @@ type SinkObjectStorageInput struct {
 	Prefix    *string `json:"prefix,omitempty"`
 	Region    *string `json:"region,omitempty"`
 
-	// SecretAccessKey Sealed on arrival. `***` or absent keeps the stored key when editing.
+	// SecretAccessKey Sealed on arrival. `***` or absent keeps the stored key when editing, unless `endpoint` or `access_key_id` changes, and then it must be sent again.
 	SecretAccessKey *string `json:"secret_access_key,omitempty"`
 }
 
@@ -4832,7 +4832,7 @@ type SmtpSettingsUpdate struct {
 	// Host A host name or address, 1 to 253 characters without spaces.
 	Host string `json:"host"`
 
-	// Password The password for the username. Left out, the stored one is kept; with a username it must not be empty.
+	// Password The password for the username. Left out, the stored one is kept while `host`, `port`, `security` and `username` stay as stored; a write that changes any of them must send the password again (`credentials_together` at `/password`). With a username it must not be empty.
 	Password *string `json:"password,omitempty"`
 
 	// Port From 1 to 65535.
@@ -7619,6 +7619,12 @@ type ClientInterface interface {
 	// it, so the answer reveals nothing about which addresses exist. The
 	// lookup, the issuing and the mail happen after the answer.
 	//
+	// Every request counts as a failure against the address's throttle,
+	// which sign-in, invitation acceptance and password reset completion
+	// share: past a hundred from one address in fifteen minutes it is
+	// refused `429 rate_limited` with `Retry-After`, whether or not the
+	// email exists.
+	//
 	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
 	// reset is on in the auth settings, local login is enabled and the
@@ -7644,6 +7650,12 @@ type ClientInterface interface {
 	// once whoever the email belongs to, whether or not anything comes of
 	// it, so the answer reveals nothing about which addresses exist. The
 	// lookup, the issuing and the mail happen after the answer.
+	//
+	// Every request counts as a failure against the address's throttle,
+	// which sign-in, invitation acceptance and password reset completion
+	// share: past a hundred from one address in fifteen minutes it is
+	// refused `429 rate_limited` with `Retry-After`, whether or not the
+	// email exists.
 	//
 	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
@@ -7865,7 +7877,10 @@ type ClientInterface interface {
 	//
 	// Changes any property but `slug` and `kind`; each absent one is left as
 	// it is, a sent `client_secret` replaces the stored one, and a `claims`
-	// member names only the claims to rename. Whether the provider is enabled
+	// member names only the claims to rename. The stored client secret stays
+	// only for the `issuer` and `client_id` it was given for: an edit that
+	// changes either without sending `client_secret` is refused
+	// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 	// is changed with `enable` and `disable`. Refused as a creation is, and
 	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 	// drops a domain enforced to the provider: lift the enforcement first.
@@ -7880,7 +7895,10 @@ type ClientInterface interface {
 	//
 	// Changes any property but `slug` and `kind`; each absent one is left as
 	// it is, a sent `client_secret` replaces the stored one, and a `claims`
-	// member names only the claims to rename. Whether the provider is enabled
+	// member names only the claims to rename. The stored client secret stays
+	// only for the `issuer` and `client_id` it was given for: an edit that
+	// changes either without sending `client_secret` is refused
+	// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 	// is changed with `enable` and `disable`. Refused as a creation is, and
 	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 	// drops a domain enforced to the provider: lift the enforcement first.
@@ -10745,7 +10763,11 @@ type ClientInterface interface {
 	// sub-object of the sink's kind replaces its configuration whole, so
 	// nothing of the earlier one lingers; the one exception is its secret:
 	// `***`, as every read answers it, or no secret at all keeps the stored
-	// one, and any other value replaces it. A sub-object of another kind,
+	// one, and any other value replaces it. The stored secret stays only for
+	// the target it was given for: an edit that changes a ClickHouse `url`,
+	// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+	// `access_key_id`, must send the secret again, or is refused
+	// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 	// or a `kind` other than the sink's own, is refused `kind_immutable`.
 	// `enabled` takes `false` only, which lets the attempt in progress
 	// finish and keeps the sink's place; a sink is enabled with its own
@@ -10764,7 +10786,11 @@ type ClientInterface interface {
 	// sub-object of the sink's kind replaces its configuration whole, so
 	// nothing of the earlier one lingers; the one exception is its secret:
 	// `***`, as every read answers it, or no secret at all keeps the stored
-	// one, and any other value replaces it. A sub-object of another kind,
+	// one, and any other value replaces it. The stored secret stays only for
+	// the target it was given for: an edit that changes a ClickHouse `url`,
+	// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+	// `access_key_id`, must send the secret again, or is refused
+	// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 	// or a `kind` other than the sink's own, is refused `kind_immutable`.
 	// `enabled` takes `false` only, which lets the attempt in progress
 	// finish and keeps the sink's place; a sink is enabled with its own
@@ -11636,6 +11662,12 @@ func (c *Client) GetAuthMethods(ctx context.Context, params *GetAuthMethodsParam
 // it, so the answer reveals nothing about which addresses exist. The
 // lookup, the issuing and the mail happen after the answer.
 //
+// Every request counts as a failure against the address's throttle,
+// which sign-in, invitation acceptance and password reset completion
+// share: past a hundred from one address in fifteen minutes it is
+// refused `429 rate_limited` with `Retry-After`, whether or not the
+// email exists.
+//
 // A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
 // reset is on in the auth settings, local login is enabled and the
@@ -11671,6 +11703,12 @@ func (c *Client) RequestPasswordResetWithBody(ctx context.Context, contentType s
 // once whoever the email belongs to, whether or not anything comes of
 // it, so the answer reveals nothing about which addresses exist. The
 // lookup, the issuing and the mail happen after the answer.
+//
+// Every request counts as a failure against the address's throttle,
+// which sign-in, invitation acceptance and password reset completion
+// share: past a hundred from one address in fifteen minutes it is
+// refused `429 rate_limited` with `Retry-After`, whether or not the
+// email exists.
 //
 // A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
@@ -12012,7 +12050,10 @@ func (c *Client) GetAuthProvider(ctx context.Context, provider AuthProviderSlug,
 //
 // Changes any property but `slug` and `kind`; each absent one is left as
 // it is, a sent `client_secret` replaces the stored one, and a `claims`
-// member names only the claims to rename. Whether the provider is enabled
+// member names only the claims to rename. The stored client secret stays
+// only for the `issuer` and `client_id` it was given for: an edit that
+// changes either without sending `client_secret` is refused
+// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 // is changed with `enable` and `disable`. Refused as a creation is, and
 // 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 // drops a domain enforced to the provider: lift the enforcement first.
@@ -12037,7 +12078,10 @@ func (c *Client) UpdateAuthProviderWithBody(ctx context.Context, provider AuthPr
 //
 // Changes any property but `slug` and `kind`; each absent one is left as
 // it is, a sent `client_secret` replaces the stored one, and a `claims`
-// member names only the claims to rename. Whether the provider is enabled
+// member names only the claims to rename. The stored client secret stays
+// only for the `issuer` and `client_id` it was given for: an edit that
+// changes either without sending `client_secret` is refused
+// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 // is changed with `enable` and `disable`. Refused as a creation is, and
 // 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 // drops a domain enforced to the provider: lift the enforcement first.
@@ -16792,7 +16836,11 @@ func (c *Client) GetSink(ctx context.Context, project ProjectKey, sink SinkID, r
 // sub-object of the sink's kind replaces its configuration whole, so
 // nothing of the earlier one lingers; the one exception is its secret:
 // `***`, as every read answers it, or no secret at all keeps the stored
-// one, and any other value replaces it. A sub-object of another kind,
+// one, and any other value replaces it. The stored secret stays only for
+// the target it was given for: an edit that changes a ClickHouse `url`,
+// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+// `access_key_id`, must send the secret again, or is refused
+// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 // or a `kind` other than the sink's own, is refused `kind_immutable`.
 // `enabled` takes `false` only, which lets the attempt in progress
 // finish and keeps the sink's place; a sink is enabled with its own
@@ -16821,7 +16869,11 @@ func (c *Client) UpdateSinkWithBody(ctx context.Context, project ProjectKey, sin
 // sub-object of the sink's kind replaces its configuration whole, so
 // nothing of the earlier one lingers; the one exception is its secret:
 // `***`, as every read answers it, or no secret at all keeps the stored
-// one, and any other value replaces it. A sub-object of another kind,
+// one, and any other value replaces it. The stored secret stays only for
+// the target it was given for: an edit that changes a ClickHouse `url`,
+// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+// `access_key_id`, must send the secret again, or is refused
+// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 // or a `kind` other than the sink's own, is refused `kind_immutable`.
 // `enabled` takes `false` only, which lets the attempt in progress
 // finish and keeps the sink's place; a sink is enabled with its own
@@ -28822,6 +28874,12 @@ type ClientWithResponsesInterface interface {
 	// it, so the answer reveals nothing about which addresses exist. The
 	// lookup, the issuing and the mail happen after the answer.
 	//
+	// Every request counts as a failure against the address's throttle,
+	// which sign-in, invitation acceptance and password reset completion
+	// share: past a hundred from one address in fifteen minutes it is
+	// refused `429 rate_limited` with `Retry-After`, whether or not the
+	// email exists.
+	//
 	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
 	// reset is on in the auth settings, local login is enabled and the
@@ -28847,6 +28905,12 @@ type ClientWithResponsesInterface interface {
 	// once whoever the email belongs to, whether or not anything comes of
 	// it, so the answer reveals nothing about which addresses exist. The
 	// lookup, the issuing and the mail happen after the answer.
+	//
+	// Every request counts as a failure against the address's throttle,
+	// which sign-in, invitation acceptance and password reset completion
+	// share: past a hundred from one address in fifteen minutes it is
+	// refused `429 rate_limited` with `Retry-After`, whether or not the
+	// email exists.
 	//
 	// A password reset is mailed, to the member in their language,
 	// only when the instance has an SMTP server and self-service password
@@ -29078,7 +29142,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Changes any property but `slug` and `kind`; each absent one is left as
 	// it is, a sent `client_secret` replaces the stored one, and a `claims`
-	// member names only the claims to rename. Whether the provider is enabled
+	// member names only the claims to rename. The stored client secret stays
+	// only for the `issuer` and `client_id` it was given for: an edit that
+	// changes either without sending `client_secret` is refused
+	// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 	// is changed with `enable` and `disable`. Refused as a creation is, and
 	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 	// drops a domain enforced to the provider: lift the enforcement first.
@@ -29093,7 +29160,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Changes any property but `slug` and `kind`; each absent one is left as
 	// it is, a sent `client_secret` replaces the stored one, and a `claims`
-	// member names only the claims to rename. Whether the provider is enabled
+	// member names only the claims to rename. The stored client secret stays
+	// only for the `issuer` and `client_id` it was given for: an edit that
+	// changes either without sending `client_secret` is refused
+	// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 	// is changed with `enable` and `disable`. Refused as a creation is, and
 	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 	// drops a domain enforced to the provider: lift the enforcement first.
@@ -32152,7 +32222,11 @@ type ClientWithResponsesInterface interface {
 	// sub-object of the sink's kind replaces its configuration whole, so
 	// nothing of the earlier one lingers; the one exception is its secret:
 	// `***`, as every read answers it, or no secret at all keeps the stored
-	// one, and any other value replaces it. A sub-object of another kind,
+	// one, and any other value replaces it. The stored secret stays only for
+	// the target it was given for: an edit that changes a ClickHouse `url`,
+	// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+	// `access_key_id`, must send the secret again, or is refused
+	// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 	// or a `kind` other than the sink's own, is refused `kind_immutable`.
 	// `enabled` takes `false` only, which lets the attempt in progress
 	// finish and keeps the sink's place; a sink is enabled with its own
@@ -32171,7 +32245,11 @@ type ClientWithResponsesInterface interface {
 	// sub-object of the sink's kind replaces its configuration whole, so
 	// nothing of the earlier one lingers; the one exception is its secret:
 	// `***`, as every read answers it, or no secret at all keeps the stored
-	// one, and any other value replaces it. A sub-object of another kind,
+	// one, and any other value replaces it. The stored secret stays only for
+	// the target it was given for: an edit that changes a ClickHouse `url`,
+	// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+	// `access_key_id`, must send the secret again, or is refused
+	// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 	// or a `kind` other than the sink's own, is refused `kind_immutable`.
 	// `enabled` takes `false` only, which lets the attempt in progress
 	// finish and keeps the sink's place; a sink is enabled with its own
@@ -33358,6 +33436,11 @@ type RequestPasswordResetResponse401Headers struct {
 	WWWAuthenticate *string
 }
 
+// RequestPasswordResetResponse429Headers the declared response headers of an HTTP 429 response for RequestPasswordReset
+type RequestPasswordResetResponse429Headers struct {
+	RetryAfter *int
+}
+
 type RequestPasswordResetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -33369,8 +33452,12 @@ type RequestPasswordResetResponse struct {
 	ApplicationproblemJSON413 *RequestTooLarge
 	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
 	ApplicationproblemJSON415 *UnsupportedMediaType
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyAttempts
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *RequestPasswordResetResponse401Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *RequestPasswordResetResponse429Headers
 }
 
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
@@ -33391,6 +33478,11 @@ func (r RequestPasswordResetResponse) GetApplicationproblemJSON413() *RequestToo
 // GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
 func (r RequestPasswordResetResponse) GetApplicationproblemJSON415() *UnsupportedMediaType {
 	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r RequestPasswordResetResponse) GetApplicationproblemJSON429() *TooManyAttempts {
+	return r.ApplicationproblemJSON429
 }
 
 // GetBody returns the raw response body bytes
@@ -49451,6 +49543,12 @@ func (c *ClientWithResponses) GetAuthMethodsWithResponse(ctx context.Context, pa
 // it, so the answer reveals nothing about which addresses exist. The
 // lookup, the issuing and the mail happen after the answer.
 //
+// Every request counts as a failure against the address's throttle,
+// which sign-in, invitation acceptance and password reset completion
+// share: past a hundred from one address in fifteen minutes it is
+// refused `429 rate_limited` with `Retry-After`, whether or not the
+// email exists.
+//
 // A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
 // reset is on in the auth settings, local login is enabled and the
@@ -49482,6 +49580,12 @@ func (c *ClientWithResponses) RequestPasswordResetWithBodyWithResponse(ctx conte
 // once whoever the email belongs to, whether or not anything comes of
 // it, so the answer reveals nothing about which addresses exist. The
 // lookup, the issuing and the mail happen after the answer.
+//
+// Every request counts as a failure against the address's throttle,
+// which sign-in, invitation acceptance and password reset completion
+// share: past a hundred from one address in fifteen minutes it is
+// refused `429 rate_limited` with `Retry-After`, whether or not the
+// email exists.
 //
 // A password reset is mailed, to the member in their language,
 // only when the instance has an SMTP server and self-service password
@@ -49785,7 +49889,10 @@ func (c *ClientWithResponses) GetAuthProviderWithResponse(ctx context.Context, p
 //
 // Changes any property but `slug` and `kind`; each absent one is left as
 // it is, a sent `client_secret` replaces the stored one, and a `claims`
-// member names only the claims to rename. Whether the provider is enabled
+// member names only the claims to rename. The stored client secret stays
+// only for the `issuer` and `client_id` it was given for: an edit that
+// changes either without sending `client_secret` is refused
+// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 // is changed with `enable` and `disable`. Refused as a creation is, and
 // 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 // drops a domain enforced to the provider: lift the enforcement first.
@@ -49806,7 +49913,10 @@ func (c *ClientWithResponses) UpdateAuthProviderWithBodyWithResponse(ctx context
 //
 // Changes any property but `slug` and `kind`; each absent one is left as
 // it is, a sent `client_secret` replaces the stored one, and a `claims`
-// member names only the claims to rename. Whether the provider is enabled
+// member names only the claims to rename. The stored client secret stays
+// only for the `issuer` and `client_id` it was given for: an edit that
+// changes either without sending `client_secret` is refused
+// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 // is changed with `enable` and `disable`. Refused as a creation is, and
 // 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 // drops a domain enforced to the provider: lift the enforcement first.
@@ -53999,7 +54109,11 @@ func (c *ClientWithResponses) GetSinkWithResponse(ctx context.Context, project P
 // sub-object of the sink's kind replaces its configuration whole, so
 // nothing of the earlier one lingers; the one exception is its secret:
 // `***`, as every read answers it, or no secret at all keeps the stored
-// one, and any other value replaces it. A sub-object of another kind,
+// one, and any other value replaces it. The stored secret stays only for
+// the target it was given for: an edit that changes a ClickHouse `url`,
+// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+// `access_key_id`, must send the secret again, or is refused
+// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 // or a `kind` other than the sink's own, is refused `kind_immutable`.
 // `enabled` takes `false` only, which lets the attempt in progress
 // finish and keeps the sink's place; a sink is enabled with its own
@@ -54024,7 +54138,11 @@ func (c *ClientWithResponses) UpdateSinkWithBodyWithResponse(ctx context.Context
 // sub-object of the sink's kind replaces its configuration whole, so
 // nothing of the earlier one lingers; the one exception is its secret:
 // `***`, as every read answers it, or no secret at all keeps the stored
-// one, and any other value replaces it. A sub-object of another kind,
+// one, and any other value replaces it. The stored secret stays only for
+// the target it was given for: an edit that changes a ClickHouse `url`,
+// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+// `access_key_id`, must send the secret again, or is refused
+// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 // or a `kind` other than the sink's own, is refused `kind_immutable`.
 // `enabled` takes `false` only, which lets the attempt in progress
 // finish and keeps the sink's place; a sink is enabled with its own
@@ -55553,6 +55671,13 @@ func ParseRequestPasswordResetResponse(rsp *http.Response) (*RequestPasswordRese
 		}
 		response.ApplicationproblemJSON415 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyAttempts
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
 	}
 
 	switch {
@@ -55566,6 +55691,16 @@ func ParseRequestPasswordResetResponse(rsp *http.Response) (*RequestPasswordRese
 			headers.WWWAuthenticate = &value
 		}
 		response.Headers401 = &headers
+	case rsp.StatusCode == 429:
+		var headers RequestPasswordResetResponse429Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
 	}
 
 	return response, nil
@@ -80093,6 +80228,25 @@ func (response RequestPasswordReset415ApplicationProblemPlusJSONResponse) VisitR
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestPasswordReset429ApplicationProblemPlusJSONResponse struct {
+	TooManyAttemptsApplicationProblemPlusJSONResponse
+}
+
+func (response RequestPasswordReset429ApplicationProblemPlusJSONResponse) VisitRequestPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
 	_, err := buf.WriteTo(w)
 	return err
 }
