@@ -153,7 +153,7 @@ func (h *Update) draft(ctx context.Context, cmd UpdateCommand, s sinks.Sink) (si
 		return sinks.Draft{}, err
 	}
 	return h.d.check(ctx, cmd.Project, sinks.Draft{
-		Input: in, Secret: cmd.Secret, KeepsSecret: sinks.KeepsSecret(cmd.Secret),
+		Input: in, Secret: cmd.Secret, KeepsSecret: sinks.KeepsSecret(cmd.Secret), Stored: &s.Config,
 	}, keptEnvironments(s, cmd.Change)...)
 }
 

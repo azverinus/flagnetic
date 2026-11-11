@@ -144,6 +144,8 @@ func checkConfig(d Draft, add func(pointer, code, detail string, params map[stri
 	if pointer := d.Kind.secretPointer(); pointer != "" {
 		if !d.KeepsSecret && KeepsSecret(d.Secret) {
 			add(pointer, "required", "a secret is required", nil)
+		} else if d.KeepsSecret && d.Stored != nil && d.Config.secretMoved(*d.Stored) {
+			add(pointer, "required", "a change of the target needs the secret again", nil)
 		}
 	} else if d.Secret != "" && d.Secret != Masked {
 		add("/webhook/secret", "not_allowed", "the server draws a webhook sink's secret", nil)

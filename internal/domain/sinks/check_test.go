@@ -314,6 +314,52 @@ func TestAMaskedOrAbsentSecretKeepsTheStoredOneAndAnythingElseReplacesIt(t *test
 	}
 }
 
+func TestAKeptSecretStaysOnlyWhileTheTargetItWasGivenForDoes(t *testing.T) {
+	storedCH := clickHouse().Config
+	storedOS := objectStorage().Config
+	storedOS.ObjectStorage.Endpoint = "https://s3.internal:9000"
+	for name, tc := range map[string]struct {
+		base   func() sinks.Draft
+		stored sinks.Config
+		move   func(*sinks.Config)
+		want   string // pointer refused, empty when accepted
+	}{
+		"clickhouse unchanged":         {clickHouse, storedCH, func(*sinks.Config) {}, ""},
+		"clickhouse database":          {clickHouse, storedCH, func(c *sinks.Config) { c.ClickHouse.Database = "other" }, ""},
+		"clickhouse url":               {clickHouse, storedCH, func(c *sinks.Config) { c.ClickHouse.URL = "http://elsewhere:8123" }, "/clickhouse/password"},
+		"clickhouse scheme":            {clickHouse, storedCH, func(c *sinks.Config) { c.ClickHouse.URL = "https://clickhouse.internal:8123" }, "/clickhouse/password"},
+		"clickhouse username":          {clickHouse, storedCH, func(c *sinks.Config) { c.ClickHouse.Username = "other" }, "/clickhouse/password"},
+		"clickhouse tls skip":          {clickHouse, storedCH, func(c *sinks.Config) { c.ClickHouse.TLSSkipVerify = true }, "/clickhouse/password"},
+		"object storage unchanged":     {objectStorage, storedOS, func(*sinks.Config) {}, ""},
+		"object storage bucket":        {objectStorage, storedOS, func(c *sinks.Config) { c.ObjectStorage.Bucket = "other" }, ""},
+		"object storage endpoint":      {objectStorage, storedOS, func(c *sinks.Config) { c.ObjectStorage.Endpoint = "https://elsewhere:9000" }, "/object_storage/secret_access_key"},
+		"object storage access key id": {objectStorage, storedOS, func(c *sinks.Config) { c.ObjectStorage.AccessKeyID = "AKIAOTHER" }, "/object_storage/secret_access_key"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			stored := tc.stored.Clone()
+			d := tc.base()
+			d.Config = tc.stored.Clone()
+			tc.move(&d.Config)
+			d.Secret, d.KeepsSecret, d.Stored = "", true, &stored
+			_, err := sinks.Check(d, environments, governance.TargetPolicy{})
+			if tc.want == "" {
+				if err != nil {
+					t.Fatalf("Check = %v, want it accepted", err)
+				}
+				return
+			}
+			if got := violations(t, err)[tc.want]; got != "required" {
+				t.Errorf("%s = %q, want required", tc.want, got)
+			}
+			// Given again, the secret goes where the edit says.
+			d.Secret, d.KeepsSecret = "again", false
+			if _, err := sinks.Check(d, environments, governance.TargetPolicy{}); err != nil {
+				t.Errorf("with the secret given again = %v", err)
+			}
+		})
+	}
+}
+
 func TestEditingASinkReplacesAConfigurationWholeAndCannotChangeItsKind(t *testing.T) {
 	in := sinks.Input{Name: "Warehouse", Kind: sinks.KindClickHouse, Config: clickHouse().Config, EventKinds: []sinks.EventKind{sinks.EventAlias}}
 	other := clickHouse().Config

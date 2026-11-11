@@ -68,11 +68,14 @@ const (
 // invalid_smtp_settings naming each field that breaks a rule: a host of 1 to
 // 253 characters without spaces, a port from 1 to 65535, a known security, a
 // sender that is one address, a username on one line, a username and a
-// password together (a password the change leaves out is the stored one,
-// passwordStored saying whether there is one), and credentials over no
+// password together (a password the change leaves out is the one stored in
+// stored, zero when nothing is), a stored password kept only while the host,
+// port, security and username it was given for stay as they are (otherwise
+// the write would send it somewhere its owner never chose, so the change
+// must give the password again), and credentials over no
 // security only to this machine, since the client refuses to send them in
 // the clear and nothing could ever be sent.
-func (c SMTPChange) Check(passwordStored bool) (SMTPChange, error) {
+func (c SMTPChange) Check(stored SMTPSettings) (SMTPChange, error) {
 	c.Host, c.Username, c.From = strings.TrimSpace(c.Host), strings.TrimSpace(c.Username), strings.TrimSpace(c.From)
 	var vs []apperrors.Violation
 	if c.Host == "" || len(c.Host) > maxSMTPHostLength || strings.ContainsFunc(c.Host, unicode.IsSpace) {
@@ -103,11 +106,16 @@ func (c SMTPChange) Check(passwordStored bool) (SMTPChange, error) {
 			Pointer: "/username", Code: "invalid_username", Detail: "must be at most 256 characters on one line",
 		})
 	}
-	hasPassword := passwordStored
+	hasPassword := stored.PasswordSet()
 	if c.Password != nil {
 		hasPassword = *c.Password != ""
 	}
 	switch {
+	case c.Username != "" && c.Password == nil && stored.PasswordSet() && c.targetMoved(stored):
+		vs = append(vs, apperrors.Violation{
+			Pointer: "/password", Code: "credentials_together",
+			Detail: "a change of host, port, security or username needs the password again",
+		})
 	case c.Username != "" && !hasPassword:
 		vs = append(vs, apperrors.Violation{
 			Pointer: "/password", Code: "credentials_together", Detail: "a username needs a password",
@@ -126,6 +134,13 @@ func (c SMTPChange) Check(passwordStored bool) (SMTPChange, error) {
 		return SMTPChange{}, apperrors.Invalid("invalid_smtp_settings", "the SMTP settings are not valid", vs...)
 	}
 	return c, nil
+}
+
+// targetMoved reports whether c reaches, or authenticates as, someone other
+// than stored does.
+func (c SMTPChange) targetMoved(stored SMTPSettings) bool {
+	return !strings.EqualFold(c.Host, stored.Host) || c.Port != stored.Port ||
+		c.Security != stored.Security || c.Username != stored.Username
 }
 
 // isThisMachine reports whether host names this machine, the one place a

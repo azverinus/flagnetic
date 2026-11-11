@@ -38,7 +38,31 @@ func TestSMTPSettingsAreCheckedBeforeAnythingIsStored(t *testing.T) {
 			c.Username, c.Password = "relay", ptr("secret")
 		}},
 		"password kept": {stored: true, change: func(c *access.SMTPChange) { c.Username = "relay" }},
-		"blank host":    {change: func(c *access.SMTPChange) { c.Host = "  " }, want: []string{"/host invalid_host"}},
+		"password kept, host spelled otherwise": {stored: true, change: func(c *access.SMTPChange) {
+			c.Username, c.Host = "relay", " SMTP.Example.com "
+		}},
+		"password kept, nothing about the target changed but the sender": {stored: true, change: func(c *access.SMTPChange) {
+			c.Username, c.From = "relay", "other@example.com"
+		}},
+		"password kept for another host": {stored: true, change: func(c *access.SMTPChange) {
+			c.Username, c.Host = "relay", "evil.example.net"
+		}, want: []string{"/password credentials_together"}},
+		"password kept for another port": {stored: true, change: func(c *access.SMTPChange) {
+			c.Username, c.Port = "relay", 25
+		}, want: []string{"/password credentials_together"}},
+		"password kept for another security": {stored: true, change: func(c *access.SMTPChange) {
+			c.Username, c.Security = "relay", access.SMTPTLS
+		}, want: []string{"/password credentials_together"}},
+		"password kept for another username": {stored: true, change: func(c *access.SMTPChange) {
+			c.Username = "other"
+		}, want: []string{"/password credentials_together"}},
+		"password given for another host": {stored: true, change: func(c *access.SMTPChange) {
+			c.Username, c.Host, c.Password = "relay", "other.example.net", ptr("again")
+		}},
+		"another host without credentials": {stored: true, change: func(c *access.SMTPChange) {
+			c.Host = "other.example.net"
+		}},
+		"blank host": {change: func(c *access.SMTPChange) { c.Host = "  " }, want: []string{"/host invalid_host"}},
 		"host with space": {change: func(c *access.SMTPChange) { c.Host = "smtp example.com" },
 			want: []string{"/host invalid_host"}},
 		"host too long":  {change: func(c *access.SMTPChange) { c.Host = strings.Repeat("a", 254) }, want: []string{"/host invalid_host"}},
@@ -78,7 +102,13 @@ func TestSMTPSettingsAreCheckedBeforeAnythingIsStored(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c := valid
 			tc.change(&c)
-			_, err := c.Check(tc.stored)
+			var stored access.SMTPSettings
+			if tc.stored {
+				stored = access.SMTPSettings{
+					Host: "smtp.example.com", Port: 587, Security: access.SMTPStartTLS, Username: "relay", PasswordSealed: "v1:abc",
+				}
+			}
+			_, err := c.Check(stored)
 			if tc.want == nil {
 				if err != nil {
 					t.Fatalf("Check = %v, want it accepted", err)
@@ -99,7 +129,7 @@ func TestSMTPSettingsAreCheckedBeforeAnythingIsStored(t *testing.T) {
 func TestCheckingSMTPSettingsTrimsWhatIsTyped(t *testing.T) {
 	got, err := access.SMTPChange{
 		Host: " smtp.example.com ", Port: 25, Security: access.SMTPNone, From: " flags@example.com ",
-	}.Check(false)
+	}.Check(access.SMTPSettings{})
 	if err != nil {
 		t.Fatal(err)
 	}

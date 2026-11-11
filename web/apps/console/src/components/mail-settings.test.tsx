@@ -70,19 +70,34 @@ describe("the mail settings", () => {
   it("never shows the stored password and keeps it when left empty", async () => {
     const server = fakeServer({
       "GET /instance/smtp": { status: 200, body: stored },
-      "PUT /instance/smtp": { status: 200, body: { ...stored, port: 2525 } },
+      "PUT /instance/smtp": {
+        status: 200,
+        body: { ...stored, from: "Flags <noreply@example.com>" },
+      },
     });
     await render();
 
     expect(await screen.findByLabelText("Password")).toHaveValue("");
     expect(screen.getByText(/A password is stored and never shown again/)).toBeVisible();
-    const user = await retype("Port", "2525");
+    const user = await retype("Sender", "Flags <noreply@example.com>");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(server.requests.some((r) => r.method === "PUT")).toBe(true));
     const body = await server.requests.find((r) => r.method === "PUT")!.json();
     expect(body).not.toHaveProperty("password");
-    expect(body).toMatchObject({ port: 2525, username: "relay" });
+    expect(body).toMatchObject({ from: "Flags <noreply@example.com>", username: "relay" });
+  });
+
+  it("asks for the stored password again when the port moves, and sends nothing before", async () => {
+    const server = fakeServer({ "GET /instance/smtp": { status: 200, body: stored } });
+    await render();
+    await screen.findByLabelText("Password");
+
+    const user = await retype("Port", "2525");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("A username needs a password.")).toBeVisible();
+    expect(server.requests.some((r) => r.method === "PUT")).toBe(false);
   });
 
   it("starts the form over from the answer of a save that changed nothing", async () => {

@@ -88,8 +88,9 @@ func NewConfigureSMTP(d ConfigureSMTPDeps) *ConfigureSMTP { return &ConfigureSMT
 
 // Handle checks the change, seals a new password, replaces the settings and
 // records smtp.updated with the settings before and after, the password
-// only as password_set. An omitted password stays as stored, unless the
-// change drops the username, which drops the password with it. A change
+// only as password_set. An omitted password stays as stored while the host,
+// port, security and username stay as they are, and is refused otherwise;
+// a change dropping the username drops the password with it. A change
 // leaving the settings as they are stores and records nothing. It refuses
 // base_url_required before anything else while the instance has no public
 // address.
@@ -105,7 +106,7 @@ func (h *ConfigureSMTP) Handle(ctx context.Context, change access.SMTPChange, re
 		if err != nil && !errors.Is(err, ErrSMTPNotConfigured) {
 			return err
 		}
-		checked, err := change.Check(configured && before.PasswordSet())
+		checked, err := change.Check(before)
 		if err != nil {
 			return err
 		}

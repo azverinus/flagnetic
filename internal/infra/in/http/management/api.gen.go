@@ -4419,7 +4419,7 @@ type SinkClickHouseInput struct {
 	CreateTables *bool   `json:"create_tables,omitempty"`
 	Database     *string `json:"database,omitempty"`
 
-	// Password Sealed on arrival. `***` or absent keeps the stored password when editing.
+	// Password Sealed on arrival. `***` or absent keeps the stored password when editing, unless `url`, `username` or `tls_skip_verify` changes, and then it must be sent again.
 	Password *string            `json:"password,omitempty"`
 	Settings *map[string]string `json:"settings,omitempty"`
 
@@ -4591,7 +4591,7 @@ type SinkObjectStorageInput struct {
 	Prefix    *string `json:"prefix,omitempty"`
 	Region    *string `json:"region,omitempty"`
 
-	// SecretAccessKey Sealed on arrival. `***` or absent keeps the stored key when editing.
+	// SecretAccessKey Sealed on arrival. `***` or absent keeps the stored key when editing, unless `endpoint` or `access_key_id` changes, and then it must be sent again.
 	SecretAccessKey *string `json:"secret_access_key,omitempty"`
 }
 
@@ -4832,7 +4832,7 @@ type SmtpSettingsUpdate struct {
 	// Host A host name or address, 1 to 253 characters without spaces.
 	Host string `json:"host"`
 
-	// Password The password for the username. Left out, the stored one is kept; with a username it must not be empty.
+	// Password The password for the username. Left out, the stored one is kept while `host`, `port`, `security` and `username` stay as stored; a write that changes any of them must send the password again (`credentials_together` at `/password`). With a username it must not be empty.
 	Password *string `json:"password,omitempty"`
 
 	// Port From 1 to 65535.
@@ -7865,7 +7865,10 @@ type ClientInterface interface {
 	//
 	// Changes any property but `slug` and `kind`; each absent one is left as
 	// it is, a sent `client_secret` replaces the stored one, and a `claims`
-	// member names only the claims to rename. Whether the provider is enabled
+	// member names only the claims to rename. The stored client secret stays
+	// only for the `issuer` and `client_id` it was given for: an edit that
+	// changes either without sending `client_secret` is refused
+	// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 	// is changed with `enable` and `disable`. Refused as a creation is, and
 	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 	// drops a domain enforced to the provider: lift the enforcement first.
@@ -7880,7 +7883,10 @@ type ClientInterface interface {
 	//
 	// Changes any property but `slug` and `kind`; each absent one is left as
 	// it is, a sent `client_secret` replaces the stored one, and a `claims`
-	// member names only the claims to rename. Whether the provider is enabled
+	// member names only the claims to rename. The stored client secret stays
+	// only for the `issuer` and `client_id` it was given for: an edit that
+	// changes either without sending `client_secret` is refused
+	// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 	// is changed with `enable` and `disable`. Refused as a creation is, and
 	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 	// drops a domain enforced to the provider: lift the enforcement first.
@@ -10745,7 +10751,11 @@ type ClientInterface interface {
 	// sub-object of the sink's kind replaces its configuration whole, so
 	// nothing of the earlier one lingers; the one exception is its secret:
 	// `***`, as every read answers it, or no secret at all keeps the stored
-	// one, and any other value replaces it. A sub-object of another kind,
+	// one, and any other value replaces it. The stored secret stays only for
+	// the target it was given for: an edit that changes a ClickHouse `url`,
+	// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+	// `access_key_id`, must send the secret again, or is refused
+	// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 	// or a `kind` other than the sink's own, is refused `kind_immutable`.
 	// `enabled` takes `false` only, which lets the attempt in progress
 	// finish and keeps the sink's place; a sink is enabled with its own
@@ -10764,7 +10774,11 @@ type ClientInterface interface {
 	// sub-object of the sink's kind replaces its configuration whole, so
 	// nothing of the earlier one lingers; the one exception is its secret:
 	// `***`, as every read answers it, or no secret at all keeps the stored
-	// one, and any other value replaces it. A sub-object of another kind,
+	// one, and any other value replaces it. The stored secret stays only for
+	// the target it was given for: an edit that changes a ClickHouse `url`,
+	// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+	// `access_key_id`, must send the secret again, or is refused
+	// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 	// or a `kind` other than the sink's own, is refused `kind_immutable`.
 	// `enabled` takes `false` only, which lets the attempt in progress
 	// finish and keeps the sink's place; a sink is enabled with its own
@@ -12012,7 +12026,10 @@ func (c *Client) GetAuthProvider(ctx context.Context, provider AuthProviderSlug,
 //
 // Changes any property but `slug` and `kind`; each absent one is left as
 // it is, a sent `client_secret` replaces the stored one, and a `claims`
-// member names only the claims to rename. Whether the provider is enabled
+// member names only the claims to rename. The stored client secret stays
+// only for the `issuer` and `client_id` it was given for: an edit that
+// changes either without sending `client_secret` is refused
+// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 // is changed with `enable` and `disable`. Refused as a creation is, and
 // 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 // drops a domain enforced to the provider: lift the enforcement first.
@@ -12037,7 +12054,10 @@ func (c *Client) UpdateAuthProviderWithBody(ctx context.Context, provider AuthPr
 //
 // Changes any property but `slug` and `kind`; each absent one is left as
 // it is, a sent `client_secret` replaces the stored one, and a `claims`
-// member names only the claims to rename. Whether the provider is enabled
+// member names only the claims to rename. The stored client secret stays
+// only for the `issuer` and `client_id` it was given for: an edit that
+// changes either without sending `client_secret` is refused
+// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 // is changed with `enable` and `disable`. Refused as a creation is, and
 // 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 // drops a domain enforced to the provider: lift the enforcement first.
@@ -16792,7 +16812,11 @@ func (c *Client) GetSink(ctx context.Context, project ProjectKey, sink SinkID, r
 // sub-object of the sink's kind replaces its configuration whole, so
 // nothing of the earlier one lingers; the one exception is its secret:
 // `***`, as every read answers it, or no secret at all keeps the stored
-// one, and any other value replaces it. A sub-object of another kind,
+// one, and any other value replaces it. The stored secret stays only for
+// the target it was given for: an edit that changes a ClickHouse `url`,
+// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+// `access_key_id`, must send the secret again, or is refused
+// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 // or a `kind` other than the sink's own, is refused `kind_immutable`.
 // `enabled` takes `false` only, which lets the attempt in progress
 // finish and keeps the sink's place; a sink is enabled with its own
@@ -16821,7 +16845,11 @@ func (c *Client) UpdateSinkWithBody(ctx context.Context, project ProjectKey, sin
 // sub-object of the sink's kind replaces its configuration whole, so
 // nothing of the earlier one lingers; the one exception is its secret:
 // `***`, as every read answers it, or no secret at all keeps the stored
-// one, and any other value replaces it. A sub-object of another kind,
+// one, and any other value replaces it. The stored secret stays only for
+// the target it was given for: an edit that changes a ClickHouse `url`,
+// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+// `access_key_id`, must send the secret again, or is refused
+// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 // or a `kind` other than the sink's own, is refused `kind_immutable`.
 // `enabled` takes `false` only, which lets the attempt in progress
 // finish and keeps the sink's place; a sink is enabled with its own
@@ -29078,7 +29106,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Changes any property but `slug` and `kind`; each absent one is left as
 	// it is, a sent `client_secret` replaces the stored one, and a `claims`
-	// member names only the claims to rename. Whether the provider is enabled
+	// member names only the claims to rename. The stored client secret stays
+	// only for the `issuer` and `client_id` it was given for: an edit that
+	// changes either without sending `client_secret` is refused
+	// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 	// is changed with `enable` and `disable`. Refused as a creation is, and
 	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 	// drops a domain enforced to the provider: lift the enforcement first.
@@ -29093,7 +29124,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Changes any property but `slug` and `kind`; each absent one is left as
 	// it is, a sent `client_secret` replaces the stored one, and a `claims`
-	// member names only the claims to rename. Whether the provider is enabled
+	// member names only the claims to rename. The stored client secret stays
+	// only for the `issuer` and `client_id` it was given for: an edit that
+	// changes either without sending `client_secret` is refused
+	// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 	// is changed with `enable` and `disable`. Refused as a creation is, and
 	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 	// drops a domain enforced to the provider: lift the enforcement first.
@@ -32152,7 +32186,11 @@ type ClientWithResponsesInterface interface {
 	// sub-object of the sink's kind replaces its configuration whole, so
 	// nothing of the earlier one lingers; the one exception is its secret:
 	// `***`, as every read answers it, or no secret at all keeps the stored
-	// one, and any other value replaces it. A sub-object of another kind,
+	// one, and any other value replaces it. The stored secret stays only for
+	// the target it was given for: an edit that changes a ClickHouse `url`,
+	// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+	// `access_key_id`, must send the secret again, or is refused
+	// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 	// or a `kind` other than the sink's own, is refused `kind_immutable`.
 	// `enabled` takes `false` only, which lets the attempt in progress
 	// finish and keeps the sink's place; a sink is enabled with its own
@@ -32171,7 +32209,11 @@ type ClientWithResponsesInterface interface {
 	// sub-object of the sink's kind replaces its configuration whole, so
 	// nothing of the earlier one lingers; the one exception is its secret:
 	// `***`, as every read answers it, or no secret at all keeps the stored
-	// one, and any other value replaces it. A sub-object of another kind,
+	// one, and any other value replaces it. The stored secret stays only for
+	// the target it was given for: an edit that changes a ClickHouse `url`,
+	// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+	// `access_key_id`, must send the secret again, or is refused
+	// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 	// or a `kind` other than the sink's own, is refused `kind_immutable`.
 	// `enabled` takes `false` only, which lets the attempt in progress
 	// finish and keeps the sink's place; a sink is enabled with its own
@@ -49785,7 +49827,10 @@ func (c *ClientWithResponses) GetAuthProviderWithResponse(ctx context.Context, p
 //
 // Changes any property but `slug` and `kind`; each absent one is left as
 // it is, a sent `client_secret` replaces the stored one, and a `claims`
-// member names only the claims to rename. Whether the provider is enabled
+// member names only the claims to rename. The stored client secret stays
+// only for the `issuer` and `client_id` it was given for: an edit that
+// changes either without sending `client_secret` is refused
+// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 // is changed with `enable` and `disable`. Refused as a creation is, and
 // 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 // drops a domain enforced to the provider: lift the enforcement first.
@@ -49806,7 +49851,10 @@ func (c *ClientWithResponses) UpdateAuthProviderWithBodyWithResponse(ctx context
 //
 // Changes any property but `slug` and `kind`; each absent one is left as
 // it is, a sent `client_secret` replaces the stored one, and a `claims`
-// member names only the claims to rename. Whether the provider is enabled
+// member names only the claims to rename. The stored client secret stays
+// only for the `issuer` and `client_id` it was given for: an edit that
+// changes either without sending `client_secret` is refused
+// `invalid_auth_provider` with a violation at `/client_secret`. Whether the provider is enabled
 // is changed with `enable` and `disable`. Refused as a creation is, and
 // 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 // drops a domain enforced to the provider: lift the enforcement first.
@@ -53999,7 +54047,11 @@ func (c *ClientWithResponses) GetSinkWithResponse(ctx context.Context, project P
 // sub-object of the sink's kind replaces its configuration whole, so
 // nothing of the earlier one lingers; the one exception is its secret:
 // `***`, as every read answers it, or no secret at all keeps the stored
-// one, and any other value replaces it. A sub-object of another kind,
+// one, and any other value replaces it. The stored secret stays only for
+// the target it was given for: an edit that changes a ClickHouse `url`,
+// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+// `access_key_id`, must send the secret again, or is refused
+// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 // or a `kind` other than the sink's own, is refused `kind_immutable`.
 // `enabled` takes `false` only, which lets the attempt in progress
 // finish and keeps the sink's place; a sink is enabled with its own
@@ -54024,7 +54076,11 @@ func (c *ClientWithResponses) UpdateSinkWithBodyWithResponse(ctx context.Context
 // sub-object of the sink's kind replaces its configuration whole, so
 // nothing of the earlier one lingers; the one exception is its secret:
 // `***`, as every read answers it, or no secret at all keeps the stored
-// one, and any other value replaces it. A sub-object of another kind,
+// one, and any other value replaces it. The stored secret stays only for
+// the target it was given for: an edit that changes a ClickHouse `url`,
+// `username` or `tls_skip_verify`, or an object storage `endpoint` or
+// `access_key_id`, must send the secret again, or is refused
+// `invalid_sink` with a violation `required` at the secret. A sub-object of another kind,
 // or a `kind` other than the sink's own, is refused `kind_immutable`.
 // `enabled` takes `false` only, which lets the attempt in progress
 // finish and keeps the sink's place; a sink is enabled with its own

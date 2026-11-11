@@ -168,6 +168,12 @@ type Draft struct {
 	// KeepsSecret is set for an edit that sent none or the mask, so that
 	// the stored secret stands and Secret is not looked at.
 	KeepsSecret bool
+	// Stored is the configuration the stored secret was given for, nil for
+	// a sink being created. A kept secret goes with the target it was given
+	// for only: an edit that moves it (the URL or endpoint, the user or
+	// access key, TLS verification) must send the secret again, or whoever
+	// may edit a sink could point the stored secret at a host of their own.
+	Stored *Config
 }
 
 // Config is the configuration of a sink: exactly the one of its kind is set.
@@ -259,6 +265,20 @@ func (c Config) TargetURL() string {
 		return c.Webhook.URL
 	}
 	return ""
+}
+
+// secretMoved reports whether c reaches, or authenticates as, someone other
+// than stored does, so that a secret stored for stored may not be sent to c.
+func (c Config) secretMoved(stored Config) bool {
+	switch {
+	case c.ClickHouse != nil && stored.ClickHouse != nil:
+		a, b := c.ClickHouse, stored.ClickHouse
+		return a.URL != b.URL || a.Username != b.Username || a.TLSSkipVerify != b.TLSSkipVerify
+	case c.ObjectStorage != nil && stored.ObjectStorage != nil:
+		a, b := c.ObjectStorage, stored.ObjectStorage
+		return a.Endpoint != b.Endpoint || a.AccessKeyID != b.AccessKeyID
+	}
+	return false
 }
 
 // Equal reports whether a and b are the same configuration.
