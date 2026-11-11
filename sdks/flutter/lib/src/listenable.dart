@@ -72,6 +72,7 @@ final class FlagListenable<T> extends ChangeNotifier
   void _read() {
     final next = _serve(client, flagKey, defaultValue);
     if (next.reason == _detail.reason &&
+        next.errorCode == _detail.errorCode &&
         next.stage == _detail.stage &&
         next.variation == _detail.variation &&
         _jsonEquals(next.value, _detail.value)) {
