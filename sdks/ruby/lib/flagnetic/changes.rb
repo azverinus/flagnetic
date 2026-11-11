@@ -45,9 +45,19 @@ module Flagnetic
       a = before.to_h { |i| [key.call(i), i] }
       b = after.to_h { |i| [key.call(i), i] }
       out = {}
-      a.each { |k, v| out[k] = true unless b.key?(k) && b[k] == v }
+      a.each { |k, v| out[k] = true unless b.key?(k) && same?(b[k], v) }
       b.each_key { |k| out[k] = true unless a.key?(k) }
       out
+    end
+
+    # same? compares two decoded items by value. A variation value nested
+    # deeper than the stack allows makes the comparison raise
+    # SystemStackError; such an item is reported as changed, which only
+    # costs a listener call for that one flag and never fails the ruleset.
+    def same?(left, right)
+      left == right
+    rescue SystemStackError
+      false
     end
 
     # reaches maps every flag of either ruleset to what its evaluation

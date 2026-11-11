@@ -10,7 +10,10 @@ module Flagnetic
   # their intervals. The stream
   # itself is read by a Stream thread that posts what happens to the
   # worker's inbox, which the worker waits on together with its next
-  # deadline. It never raises: a failure is a log event and a later attempt.
+  # deadline. It never raises: a failure is a log event and a later attempt,
+  # whatever the failure is, and a thread that dies anyway is logged and
+  # started again after a backoff, because it is the only thing keeping the
+  # process's ruleset current.
   class Worker
     def initialize(client, transport, timing, stream:)
       @client = client
@@ -20,7 +23,7 @@ module Flagnetic
       @inbox = Queue.new
       @stop = false
       @stream_ids = 0
-      @thread = Thread.new { run }
+      @thread = Thread.new { supervise }
       @thread.name = "flagnetic"
       @thread.report_on_exception = false
     end
@@ -37,6 +40,10 @@ module Flagnetic
       # A killed thread still runs its ensure, which closes the stream; it
       # is not waited for, so close returns within timeout.
       @thread.kill unless @thread.join([timeout, 0].max)
+      nil
+    rescue Exception # rubocop:disable Lint/RescueException
+      # join re-raises what the thread died of; that was logged when it
+      # happened and is not the host's to handle.
       nil
     end
 
@@ -59,6 +66,27 @@ module Flagnetic
 
     def now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
+    # supervise runs the loop and starts it again, after a backoff, when it
+    # ends by an exception: step already absorbs failures of one turn, so
+    # this is for what escapes it (a failure in the loop's own setup, or an
+    # exception step re-raised). A backoff that is not reset by a long
+    # enough run keeps a crash loop from spinning.
+    def supervise
+      deaths = Backoff.new(base: @timing.fetch_base, cap: @timing.fetch_cap)
+      until @stop
+        started = now
+        begin
+          run
+        rescue SystemExit
+          return # exit called inside a listener: nothing to restart for
+        rescue Exception => e # rubocop:disable Lint/RescueException
+          @client.__send__(:log, :error, :worker_died, cause: "#{e.class}: #{e.message}")
+          deaths.reset if now - started >= @timing.stream_stable
+          sleep deaths.next_delay unless @stop
+        end
+      end
+    end
+
     def run
       @fetch_backoff = Backoff.new(base: @timing.fetch_base, cap: @timing.fetch_cap)
       @stream_backoff = Backoff.new(base: @timing.stream_base, cap: @timing.stream_cap)
@@ -71,6 +99,7 @@ module Flagnetic
       step until @stop
     ensure
       @stream&.close
+      @stream = nil
     end
 
     # step opens the stream when due, fetches when due, flushes the
@@ -83,7 +112,12 @@ module Flagnetic
       drive(@client.__send__(:exposures), @timing.exposure_flush) unless @stop
       drive(@client.__send__(:summaries), @timing.summary_flush) unless @stop
       wait unless @stop
-    rescue StandardError => e
+    rescue SystemExit, NoMemoryError
+      raise
+    rescue Exception => e # rubocop:disable Lint/RescueException
+      # Not only StandardError: a SystemStackError from a deeply nested
+      # document or a failure raised by a listener must not end the only
+      # thread that follows the ruleset.
       @client.__send__(:log, :error, :worker_failed, cause: "#{e.class}: #{e.message}")
       sleep 1 unless @stop
     end
@@ -99,7 +133,9 @@ module Flagnetic
       return unless queue&.due?(now)
 
       queue.flush_once([interval, @timing.request_timeout].min)
-    rescue StandardError => e
+    rescue SystemExit, NoMemoryError
+      raise
+    rescue Exception => e # rubocop:disable Lint/RescueException
       @client.__send__(:log, :error, :worker_failed, cause: "#{e.class}: #{e.message}")
     end
 
