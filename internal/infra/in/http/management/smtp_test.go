@@ -152,9 +152,9 @@ func TestSMTPSettingsAreWrittenReadAndRemoved(t *testing.T) {
 	} {
 		moved := body
 		move(&moved)
-		res, err := in.admin.UpdateMailSettingsWithResponse(t.Context(), moved)
-		if err != nil {
-			t.Fatal(err)
+		res, putErr := in.admin.UpdateMailSettingsWithResponse(t.Context(), moved)
+		if putErr != nil {
+			t.Fatal(putErr)
 		}
 		p := assertProblem(t, "a new "+name+" without a password", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid_smtp_settings")
 		if p.Errors == nil || len(*p.Errors) != 1 || (*p.Errors)[0].Pointer != "/password" || (*p.Errors)[0].Code != "credentials_together" {
