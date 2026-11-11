@@ -153,7 +153,7 @@ func (s *Store) FirstStoredAfter(ctx context.Context, typ events.EventType, days
 // Horizon returns the ID of the oldest transaction still running.
 func (s *Store) Horizon(ctx context.Context) (uint64, error) {
 	var x uint64
-	if err := s.db(ctx).QueryRow(ctx, `SELECT pg_snapshot_xmin(pg_current_snapshot())::text::bigint`).Scan(&x); err != nil {
+	if err := s.db(ctx).QueryRow(ctx, `SELECT event_horizon()::text::bigint`).Scan(&x); err != nil {
 		return 0, fmt.Errorf("reading the snapshot horizon: %w", err)
 	}
 	return x, nil

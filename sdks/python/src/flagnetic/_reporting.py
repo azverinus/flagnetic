@@ -612,6 +612,8 @@ class Reporter:
         self._lock = threading.Lock()
         # Set once the flush that was asked for has run.
         self._flushes: list[threading.Event] = []
+        # Set once the thread that runs the flushes has ended, so that a later flush finds nobody to wait for.
+        self._released = False
 
     def deadline(self) -> float | None:
         """When the reporter next has something to do, by the monotonic clock; 0 when a flush waits."""
@@ -624,7 +626,10 @@ class Reporter:
     def request_flush(self) -> threading.Event:
         done = threading.Event()
         with self._lock:
-            self._flushes.append(done)
+            if self._released:
+                done.set()
+            else:
+                self._flushes.append(done)
         return done
 
     def run(self, now: float, *, final: bool = False) -> None:
@@ -643,6 +648,7 @@ class Reporter:
     def release(self) -> None:
         """Lets every flush still waiting go: the thread that would run it has ended."""
         with self._lock:
+            self._released = True
             flushes, self._flushes = self._flushes, []
         for done in flushes:
             done.set()

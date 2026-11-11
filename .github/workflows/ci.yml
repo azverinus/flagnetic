@@ -19,6 +19,12 @@ concurrency:
 jobs:
   lint:
     name: golangci-lint
+    needs: changes
+    if: >-
+      always() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.server == 'true'
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -32,6 +38,12 @@ jobs:
 
   test:
     name: go test (postgres ${{ matrix.postgres }})
+    needs: changes
+    if: >-
+      always() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.server == 'true'
+      )
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -75,6 +87,12 @@ jobs:
 
   vuln:
     name: govulncheck
+    needs: changes
+    if: >-
+      always() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.server == 'true'
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -112,6 +130,12 @@ jobs:
 
   tidy:
     name: go mod tidy and generate
+    needs: changes
+    if: >-
+      always() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.server == 'true'
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -130,6 +154,12 @@ jobs:
   # the catalogs are what extraction gives, and it builds.
   console:
     name: console
+    needs: changes
+    if: >-
+      always() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.server == 'true'
+      )
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -179,6 +209,7 @@ jobs:
       ruby: ${{ steps.diff.outputs.ruby }}
       sdk-js: ${{ steps.sdk-js.outputs.run }}
       python: ${{ steps.sdk-python.outputs.run }}
+      server: ${{ steps.server.outputs.run }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -199,6 +230,24 @@ jobs:
             echo "ruby=true" >> "$GITHUB_OUTPUT"
           else
             echo "ruby=false" >> "$GITHUB_OUTPUT"
+          fi
+      # The server, the console and the Go modules: on every pull request
+      # except one whose every file belongs to an SDK that has a job of its
+      # own (or is the release manifest beside it). Such a change cannot
+      # alter what go test, the linters, the image or the console build, and
+      # running them there only gave their slow PostgreSQL suites another
+      # chance to fail on code nobody touched. An empty diff runs everything.
+      - id: server
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          files=$(git diff --name-only "$BASE...HEAD")
+          if [ -z "$files" ] ||
+            printf '%s\n' "$files" |
+            grep -qvE '^(sdks/(js|python|ruby|ruby-openfeature|dart|flutter)/|\.release-please-manifest\.json$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
           fi
       - id: sdk-js
         env:
@@ -332,6 +381,12 @@ jobs:
 
   docker:
     name: docker build
+    needs: changes
+    if: >-
+      always() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.server == 'true'
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

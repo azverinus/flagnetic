@@ -547,8 +547,8 @@ msgid "A new secret signs from now on. The one it replaces keeps signing beside 
 msgstr "Подписывать начнёт новый секрет. Прежний подписывает ещё сутки рядом с ним, поэтому получатель может перейти на новый секрет, не отклонив ни одного события."
 
 #: src/components/mail-settings.tsx
-msgid "A password is stored and never shown again. Leave this empty to keep it, or type a new one to replace it. Clearing the username removes both."
-msgstr "Пароль сохранён и больше не показывается. Оставьте поле пустым, чтобы сохранить его, или введите новый, чтобы заменить. Если очистить имя пользователя, будут удалены оба."
+msgid "A password is stored and never shown again. Leave this empty to keep it, or type a new one to replace it. Changing the host, port, security or username needs it again. Clearing the username removes both."
+msgstr "Пароль сохранён и больше не показывается. Оставьте поле пустым, чтобы сохранить его, или введите новый, чтобы заменить. Если изменить хост, порт, защиту или имя пользователя, пароль нужно ввести снова. Если очистить имя пользователя, будут удалены оба."
 
 #: src/lib/problem-messages.ts
 msgid "A password needs a username."
@@ -649,8 +649,8 @@ msgid "A scope is a word without spaces."
 msgstr "Область доступа — слово без пробелов."
 
 #: src/components/auth-provider-form.tsx
-msgid "A secret is stored and never shown again. Leave this empty to keep it, or type a new one to replace it."
-msgstr "Секрет сохранён и больше не показывается. Оставьте поле пустым, чтобы сохранить его, или введите новый, чтобы заменить."
+msgid "A secret is stored and never shown again. Leave this empty to keep it, or type a new one to replace it. Changing the issuer or the client ID needs it again."
+msgstr "Секрет сохранён и больше не показывается. Оставьте поле пустым, чтобы сохранить его, или введите новый, чтобы заменить. Если изменить издателя или ID клиента, секрет нужно ввести снова."
 
 #: src/components/segment-fields.tsx
 msgid "A segment compares declared attributes only; one without conditions holds every context."
@@ -2685,6 +2685,10 @@ msgstr "Введите один адрес, при необходимости с
 #: src/lib/auth-providers.ts
 msgid "Enter the client ID."
 msgstr "Введите идентификатор клиента."
+
+#: src/lib/auth-providers.ts
+msgid "Enter the client secret again: it is stored for the current issuer and client ID only."
+msgstr "Введите секрет клиента снова: он сохранён только для текущего издателя и ID клиента."
 
 #: src/lib/auth-providers.ts
 msgid "Enter the client secret."

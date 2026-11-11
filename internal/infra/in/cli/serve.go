@@ -80,14 +80,14 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		if err = checkCanary(ctx, pool, secret.NewKeyring(cfg.SecretKey), now); err != nil {
 			return failStart(ctx, log, err)
 		}
+		if err = adoptCluster(ctx, pool, log); err != nil {
+			return failStart(ctx, log, err)
+		}
 	}
 
 	// The registry every part of the replica registers its metrics on.
 	reg := metrics.NewRegistry()
 	reg.MustRegister(postgres.NewPoolCollector(pool))
-	if o.canary {
-		reportStrandedCursors(ctx, pool, log, postgres.NewStrandedCursorsGauge(reg))
-	}
 
 	runner := worker.NewRunner(log, reg)
 	for _, w := range o.workers {
@@ -286,28 +286,19 @@ func checkCanary(ctx context.Context, pool *pgxpool.Pool, keyring *secret.Keyrin
 	return keyring.CheckCanary(stored)
 }
 
-// reportStrandedCursors says, in the log and on gauge, which event streams
-// hold a cursor ahead of every transaction of this cluster. It happens to a
-// database restored from a logical dump, and nothing else would show it:
-// rollups and sinks simply read no new event, and their lag, measured with
-// the same cursors, stays at zero. The replica starts all the same, since
-// flags are served as ever; what stops is the counting and the export of
-// events. A check that fails is logged and says nothing of the cursors.
-func reportStrandedCursors(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger, gauge interface{ Set(float64) }) {
-	stranded, err := postgres.StrandedCursors(ctx, pool)
+// adoptCluster makes the events follow this PostgreSQL cluster's
+// transactions when the database was last used on another one, as after
+// restoring a logical dump or moving by logical replication, and says so in
+// the log. It runs before anything accepts an event.
+func adoptCluster(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) error {
+	adopted, err := postgres.AdoptCluster(ctx, pool)
 	if err != nil {
-		log.WarnContext(ctx, "the event cursors could not be checked", "error", err.Error())
-		return
+		return err
 	}
-	gauge.Set(float64(len(stranded)))
-	if len(stranded) == 0 {
-		return
+	if adopted {
+		log.InfoContext(ctx, "the database came from another PostgreSQL cluster: event streams go on where they stopped")
 	}
-	log.ErrorContext(ctx, "event streams hold cursors of another PostgreSQL cluster and read no new event",
-		"streams", stranded,
-		"cause", "this database was restored from a logical dump, which keeps the cursors while the new cluster numbers its transactions from the start again",
-		"effect", "experiment and evaluation counts stay where they were and sinks deliver nothing until this cluster has begun as many transactions as the one the dump came from",
-		"remedy", "restore a physical backup, which keeps the transaction counter")
+	return nil
 }
 
 // failStart reports a start that did not complete. A start cut short by the

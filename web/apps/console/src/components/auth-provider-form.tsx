@@ -56,7 +56,7 @@ export function AuthProviderForm({
   const { i18n, t } = useLingui();
   const creating = provider === undefined;
   const form = useForm<OidcProviderForm>({
-    resolver: zodResolver(oidcFormSchema(i18n, { creating })),
+    resolver: zodResolver(oidcFormSchema(i18n, { creating, stored: provider })),
     defaultValues: formOf(provider),
   });
   const save = useListMutation(
@@ -138,7 +138,7 @@ export function AuthProviderForm({
           provider?.client_secret_set ? (
             <Trans>
               A secret is stored and never shown again. Leave this empty to keep it, or type a new
-              one to replace it.
+              one to replace it. Changing the issuer or the client ID needs it again.
             </Trans>
           ) : (
             <Trans>Stored encrypted and never shown again.</Trans>

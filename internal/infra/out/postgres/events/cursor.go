@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -35,36 +36,48 @@ func (b Batch) Where(alias string) (string, []any) {
 func xidText(c events.Cursor) string { return strconv.FormatUint(c.XID, 10) }
 
 // Scope narrows a stream to the rows of one project and, when Environments
-// is not empty, of those environments. A rollup reads the whole table, so
-// its cursor passes every project's rows; a sink's stream reads one
-// project's, and its cursor moves past the rows it will never send, so the
-// scope is part of the bound and of the lag, never only of the read. The zero
-// Scope is the whole table.
+// is not empty, of those environments, and, when Floor is set, to the rows
+// received at or after it. A rollup reads the whole table, so its cursor
+// passes every project's rows; a sink's stream reads one project's, and its
+// cursor moves past the rows it will never send, so the scope is part of the
+// bound and of the lag, never only of the read. The zero Scope is the whole
+// table.
 type Scope struct {
 	Project      workspace.ProjectID
 	Environments []workspace.EnvironmentID
+	// Floor leaves out the rows received before it; nil leaves out none.
+	Floor *time.Time
 }
 
 // Where is the condition selecting the rows of the table aliased alias, empty
 // for it itself, that are in the scope, its arguments numbered from first;
 // it is empty for the whole table.
 func (sc Scope) Where(alias string, first int) (string, []any) {
-	if sc.Project.IsZero() {
-		return "", nil
-	}
 	if alias != "" {
 		alias += "."
 	}
-	cond, args := alias+"project_id = $"+strconv.Itoa(first), []any{sc.Project.Bytes()}
-	if len(sc.Environments) > 0 {
-		ids := make([][16]byte, len(sc.Environments))
-		for i, e := range sc.Environments {
-			ids[i] = e.Bytes()
-		}
-		cond += " AND " + alias + "environment_id = ANY($" + strconv.Itoa(first+1) + "::uuid[])"
-		args = append(args, ids)
+	var (
+		conds []string
+		args  []any
+	)
+	arg := func(v any) string {
+		args = append(args, v)
+		return "$" + strconv.Itoa(first+len(args)-1)
 	}
-	return cond, args
+	if !sc.Project.IsZero() {
+		conds = append(conds, alias+"project_id = "+arg(sc.Project.Bytes()))
+		if len(sc.Environments) > 0 {
+			ids := make([][16]byte, len(sc.Environments))
+			for i, e := range sc.Environments {
+				ids[i] = e.Bytes()
+			}
+			conds = append(conds, alias+"environment_id = ANY("+arg(ids)+"::uuid[])")
+		}
+	}
+	if sc.Floor != nil {
+		conds = append(conds, alias+"received_at >= "+arg(*sc.Floor))
+	}
+	return strings.Join(conds, " AND "), args
 }
 
 // Bound returns the next batch of at most limit rows of table in scope past
@@ -109,11 +122,11 @@ func BoundUntil(ctx context.Context, db pgxtx.DB, table string, scope Scope, fro
 	err := db.QueryRow(ctx, `
 		WITH b AS (
 			SELECT xid, seq FROM `+tbl+`
-			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < pg_snapshot_xmin(pg_current_snapshot())`+where+capped+`
+			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < event_horizon()`+where+capped+`
 			ORDER BY xid, seq LIMIT $3),
 		e AS (
 			SELECT xid, seq FROM `+tbl+`
-			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < pg_snapshot_xmin(pg_current_snapshot())`+capped+`
+			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < event_horizon()`+capped+`
 			ORDER BY xid DESC, seq DESC LIMIT 1)
 		SELECT count(*), (SELECT b.xid::text FROM b ORDER BY b.xid DESC, b.seq DESC LIMIT 1),
 			(SELECT b.seq FROM b ORDER BY b.xid DESC, b.seq DESC LIMIT 1),
@@ -248,7 +261,7 @@ func Tail(ctx context.Context, db pgxtx.DB, table string) (events.Cursor, error)
 	// called xid would be what ORDER BY xid sorts by, as text, where "999"
 	// comes after "1000".
 	err := db.QueryRow(ctx, `SELECT xid::text AS xid_text, seq FROM `+pgx.Identifier{table}.Sanitize()+`
-		WHERE xid < pg_snapshot_xmin(pg_current_snapshot()) ORDER BY xid DESC, seq DESC LIMIT 1`).Scan(&xid, &seq)
+		WHERE xid < event_horizon() ORDER BY xid DESC, seq DESC LIMIT 1`).Scan(&xid, &seq)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return events.Cursor{}, nil
 	}
@@ -295,7 +308,7 @@ func Last(ctx context.Context, db pgxtx.DB, table string, scope Scope, to time.T
 	var seq int64
 	// The column is named for its text apart from its own, as Tail's is.
 	err = db.QueryRow(ctx, `SELECT xid::text AS xid_text, seq FROM `+pgx.Identifier{table}.Sanitize()+`
-		WHERE received_at <= $1 AND xid < pg_snapshot_xmin(pg_current_snapshot())`+where+`
+		WHERE received_at <= $1 AND xid < event_horizon()`+where+`
 		ORDER BY xid DESC, seq DESC LIMIT 1`, append([]any{to}, scoped...)...).Scan(&xid, &seq)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return events.Cursor{}, false, nil

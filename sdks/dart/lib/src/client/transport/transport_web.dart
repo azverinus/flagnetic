@@ -35,7 +35,6 @@ extension type _Response._(JSObject _) implements JSObject {
   external int get status;
   external _Headers get headers;
   external _ReadableStream? get body;
-  external JSPromise<JSArrayBuffer> arrayBuffer();
 }
 
 extension type _Headers._(JSObject _) implements JSObject {
@@ -142,11 +141,10 @@ final class _WebTransport implements Transport {
             signal: abort.signal,
           ),
         ).toDart;
-        final body = await response.arrayBuffer().toDart;
         return (
           status: response.status,
           headers: _headersOf(response),
-          body: body.toDart.asUint8List(),
+          body: await _readAll(response.body),
         );
       }().timeout(timeout);
     } on TimeoutException {
@@ -216,6 +214,31 @@ final class _WebTransport implements Transport {
       headers: _headersOf(response),
       body: _read(response.body, abort),
     );
+  }
+
+  /// All of [body], at most [maxResponseBytes]: `arrayBuffer` would hold an
+  /// endless body or a gzip bomb until the tab ran out of memory. Past the
+  /// cap the reader is cancelled, which ends the connection.
+  static Future<List<int>> _readAll(_ReadableStream? body) async {
+    final reader = body?.getReader();
+    final bytes = <int>[];
+    while (reader != null) {
+      final chunk = await reader.read().toDart;
+      if (chunk.done) break;
+      final value = chunk.value;
+      if (value == null) continue;
+      bytes.addAll(value.toDart);
+      if (bytes.length > maxResponseBytes) {
+        unawaited(
+          reader.cancel().toDart.then<void>((_) {}, onError: (Object _) {}),
+        );
+        throw TransportException(
+          TransportFailure.network,
+          'answer larger than $maxResponseBytes bytes',
+        );
+      }
+    }
+    return bytes;
   }
 
   /// The chunks of [body] as they arrive. Cancelling the subscription aborts

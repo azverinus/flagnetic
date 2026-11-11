@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -516,5 +517,36 @@ func TestTheRetentionWorkerPurgesPasswordResetsThirtyDaysAfterUseOrExpiry(t *tes
 	}
 	if n := purged(t, srv, "password_resets"); n != 2 {
 		t.Errorf("purged password resets = %d, want 2", n)
+	}
+}
+
+// Asking for a password reset counts against the address's throttle before it
+// is answered, whether or not the email exists, so the 429 tells nothing about
+// which addresses are members.
+func TestAskingForAPasswordResetIsThrottledPerAddress(t *testing.T) {
+	srv := testkit.StartServer(t, trustLoopback())
+	b := fromAddress(t, srv, someAddress())
+	request := func(email string) *management.RequestPasswordResetResponse {
+		return do(b.RequestPasswordResetWithResponse(t.Context(), management.PasswordResetRequest{Email: email}))
+	}
+	for i := range access.SourceFailureLimit {
+		if res := request("nobody-" + rand.Text() + "@example.com"); res.StatusCode() != http.StatusAccepted {
+			t.Fatalf("request %d = %d %s, want 202", i+1, res.StatusCode(), res.Body)
+		}
+	}
+	member := testkit.NewMember(t, testkit.Pool(t))
+	for name, email := range map[string]string{"an unknown email": "nobody@example.com", "a member's email": member.Email} {
+		res := request(email)
+		assertProblem(t, name+" past the throttle", res.StatusCode(), res.Body, http.StatusTooManyRequests, "rate_limited")
+		p := res.ApplicationproblemJSON429
+		if p == nil || p.RetryAfter == nil || *p.RetryAfter <= 0 {
+			t.Fatalf("%s past the throttle: retry_after missing from %s", name, res.Body)
+		}
+		if header := res.HTTPResponse.Header.Get("Retry-After"); header != fmt.Sprint(*p.RetryAfter) {
+			t.Errorf("%s past the throttle: Retry-After = %q, want %d as in the body", name, header, *p.RetryAfter)
+		}
+	}
+	if code, problem, _ := signInAs(t, b, "nobody@example.com", wrongPassword); code != http.StatusTooManyRequests || problem != "rate_limited" {
+		t.Errorf("sign-in from the same address = %d %s, want 429 rate_limited: the throttle is shared", code, problem)
 	}
 }

@@ -191,7 +191,7 @@ function MailSettingsForm({
   const passwordSet = settings?.password_set ?? false;
   const values = useMemo(() => formOf(settings), [settings]);
   const form = useForm<MailForm>({
-    resolver: zodResolver(mailFormSchema(i18n, { passwordSet })),
+    resolver: zodResolver(mailFormSchema(i18n, { stored: settings })),
     values,
     // Settings read again while the form holds edits, after another admin
     // saved, change only the fields not edited here.
@@ -309,7 +309,8 @@ function MailSettingsForm({
             passwordSet ? (
               <Trans>
                 A password is stored and never shown again. Leave this empty to keep it, or type a
-                new one to replace it. Clearing the username removes both.
+                new one to replace it. Changing the host, port, security or username needs it again.
+                Clearing the username removes both.
               </Trans>
             ) : (
               <Trans>Stored encrypted and never shown again.</Trans>

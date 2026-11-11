@@ -547,8 +547,8 @@ msgid "A new secret signs from now on. The one it replaces keeps signing beside 
 msgstr "A new secret signs from now on. The one it replaces keeps signing beside it for a day, so the receiver can switch to the new secret without refusing an event."
 
 #: src/components/mail-settings.tsx
-msgid "A password is stored and never shown again. Leave this empty to keep it, or type a new one to replace it. Clearing the username removes both."
-msgstr "A password is stored and never shown again. Leave this empty to keep it, or type a new one to replace it. Clearing the username removes both."
+msgid "A password is stored and never shown again. Leave this empty to keep it, or type a new one to replace it. Changing the host, port, security or username needs it again. Clearing the username removes both."
+msgstr "A password is stored and never shown again. Leave this empty to keep it, or type a new one to replace it. Changing the host, port, security or username needs it again. Clearing the username removes both."
 
 #: src/lib/problem-messages.ts
 msgid "A password needs a username."
@@ -649,8 +649,8 @@ msgid "A scope is a word without spaces."
 msgstr "A scope is a word without spaces."
 
 #: src/components/auth-provider-form.tsx
-msgid "A secret is stored and never shown again. Leave this empty to keep it, or type a new one to replace it."
-msgstr "A secret is stored and never shown again. Leave this empty to keep it, or type a new one to replace it."
+msgid "A secret is stored and never shown again. Leave this empty to keep it, or type a new one to replace it. Changing the issuer or the client ID needs it again."
+msgstr "A secret is stored and never shown again. Leave this empty to keep it, or type a new one to replace it. Changing the issuer or the client ID needs it again."
 
 #: src/components/segment-fields.tsx
 msgid "A segment compares declared attributes only; one without conditions holds every context."
@@ -2685,6 +2685,10 @@ msgstr "Enter one address, optionally with a name, such as Flagnetic <flags@exam
 #: src/lib/auth-providers.ts
 msgid "Enter the client ID."
 msgstr "Enter the client ID."
+
+#: src/lib/auth-providers.ts
+msgid "Enter the client secret again: it is stored for the current issuer and client ID only."
+msgstr "Enter the client secret again: it is stored for the current issuer and client ID only."
 
 #: src/lib/auth-providers.ts
 msgid "Enter the client secret."

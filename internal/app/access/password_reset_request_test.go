@@ -44,10 +44,12 @@ func TestNothingIsMailedWhenTheInstanceHasNoBaseURL(t *testing.T) {
 		After: postgres.AfterCommit{}, Clock: c, Logger: logs.Logger(), Background: background, DefaultLocale: "en",
 	})
 	request := func(consoleURL, email string) {
-		appaccess.NewRequestPasswordReset(appaccess.RequestPasswordResetDeps{
+		if err := appaccess.NewRequestPasswordReset(appaccess.RequestPasswordResetDeps{
 			Tx: tx, Store: store, Settings: store, SMTP: store, Postman: postman, Background: background,
-			Audit: testkit.Record(pool), Clock: c, IDs: ids, Random: rand.Reader, Logger: logs.Logger(), ConsoleURL: consoleURL,
-		}).Handle(t.Context(), appaccess.RequestPasswordResetCommand{Email: email, RequestID: "req-" + rand.Text()})
+			Throttle: appaccess.NewSourceThrottle(tx, store), Audit: testkit.Record(pool), Clock: c, IDs: ids, Random: rand.Reader, Logger: logs.Logger(), ConsoleURL: consoleURL,
+		}).Handle(t.Context(), appaccess.RequestPasswordResetCommand{Email: email, RequestID: "req-" + rand.Text()}); err != nil {
+			t.Fatal(err)
+		}
 		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 		defer cancel()
 		background.Wait(ctx)

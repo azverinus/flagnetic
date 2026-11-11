@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.1.1...sdks/python/v0.1.2) (2026-11-11)
+
+
+### Bug Fixes
+
+* **sdk-python:** keep the delivery thread alive through unexpected errors ([#243](https://github.com/azverinus/flagnetic/issues/243)) ([af6c79f](https://github.com/azverinus/flagnetic/commit/af6c79fbcf86c6ae4c91076c1c1caf374d60d706))
+
 ## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.1.0...sdks/python/v0.1.1) (2026-10-28)
 
 

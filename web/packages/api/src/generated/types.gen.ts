@@ -3637,7 +3637,7 @@ export type SinkClickHouseInput = {
   table_prefix?: string;
   username?: string;
   /**
-   * Sealed on arrival. `***` or absent keeps the stored password when editing.
+   * Sealed on arrival. `***` or absent keeps the stored password when editing, unless `url`, `username` or `tls_skip_verify` changes, and then it must be sent again.
    */
   password?: string;
   tls_skip_verify?: boolean;
@@ -3663,7 +3663,7 @@ export type SinkObjectStorageInput = {
   prefix?: string;
   access_key_id?: string;
   /**
-   * Sealed on arrival. `***` or absent keeps the stored key when editing.
+   * Sealed on arrival. `***` or absent keeps the stored key when editing, unless `endpoint` or `access_key_id` changes, and then it must be sent again.
    */
   secret_access_key?: string;
   path_style?: boolean;
@@ -4352,7 +4352,7 @@ export type SmtpSettingsUpdateWritable = {
    */
   username?: string;
   /**
-   * The password for the username. Left out, the stored one is kept; with a username it must not be empty.
+   * The password for the username. Left out, the stored one is kept while `host`, `port`, `security` and `username` stay as stored; a write that changes any of them must send the password again (`credentials_together` at `/password`). With a username it must not be empty.
    */
   password?: string;
   /**
@@ -4848,6 +4848,16 @@ export type RequestPasswordResetErrors = {
    * `unsupported_media_type`: the body is not sent as `application/json`, which the operations opening a session require so a form on another site cannot call them.
    */
   415: Problem;
+  /**
+   * Refused before the password is checked: `locked` while the email is
+   * locked by consecutive failures (from an address its member signed in
+   * from within thirty days, by that address's own consecutive failures
+   * on it), `rate_limited` while the address is
+   * throttled. `retry_after` and the `Retry-After` header give the
+   * seconds until the attempt can be made again.
+   *
+   */
+  429: Problem;
 };
 
 export type RequestPasswordResetError =

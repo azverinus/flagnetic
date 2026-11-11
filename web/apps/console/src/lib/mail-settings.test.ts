@@ -17,7 +17,9 @@ const stored = {
 };
 
 function issues(values: MailForm, passwordSet = false) {
-  const result = mailFormSchema(i18n, { passwordSet }).safeParse(values);
+  const result = mailFormSchema(i18n, {
+    stored: passwordSet ? { ...stored, port: 587, security: "starttls" } : null,
+  }).safeParse(values);
   return result.success
     ? {}
     : Object.fromEntries(result.error.issues.map((issue) => [issue.path.join("."), issue.message]));
@@ -110,6 +112,24 @@ describe("the mail settings form's checks", () => {
       password: "A username needs a password.",
     });
     expect(issues({ ...valid, username: "relay" }, true)).toEqual({});
+  });
+
+  it("asks for the stored password again when the host, port, security or username moves", () => {
+    const kept = { ...valid, username: "relay" };
+    for (const moved of [
+      { host: "other.example.net" },
+      { port: "2525" },
+      { security: "tls" as const },
+      { username: "other" },
+    ]) {
+      expect(issues({ ...kept, ...moved }, true)).toEqual({
+        password: "A username needs a password.",
+      });
+      expect(issues({ ...kept, ...moved, password: "again" }, true)).toEqual({});
+    }
+    expect(issues({ ...kept, host: "SMTP.example.com", from: "other@example.com" }, true)).toEqual(
+      {},
+    );
   });
 
   it("asks for a username with a password", () => {

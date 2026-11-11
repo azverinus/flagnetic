@@ -136,9 +136,35 @@ func TestSMTPSettingsAreWrittenReadAndRemoved(t *testing.T) {
 		t.Error("GET answers the password")
 	}
 
-	// Left out, the password is kept; the other fields are replaced.
-	body.Password, body.Port, want.Port = nil, 2525, 2525
+	// Left out, the password is kept while the host, port, security and
+	// username stay; the other fields are replaced.
+	body.Password, body.From, want.From = nil, "Flags <noreply@example.com>", "Flags <noreply@example.com>"
 	check("a PUT without a password", putSMTP(t, in.admin, body))
+
+	// Pointed elsewhere, the stored password is not carried along: it is
+	// asked for again, whichever of the host, port, security or username
+	// moves.
+	for name, move := range map[string]func(*management.SmtpSettingsUpdate){
+		"host":     func(b *management.SmtpSettingsUpdate) { b.Host = "collector.example.net" },
+		"port":     func(b *management.SmtpSettingsUpdate) { b.Port = 2525 },
+		"security": func(b *management.SmtpSettingsUpdate) { b.Security = management.SmtpSecurityTls },
+		"username": func(b *management.SmtpSettingsUpdate) { b.Username = new("other") },
+	} {
+		moved := body
+		move(&moved)
+		res, putErr := in.admin.UpdateMailSettingsWithResponse(t.Context(), moved)
+		if putErr != nil {
+			t.Fatal(putErr)
+		}
+		p := assertProblem(t, "a new "+name+" without a password", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid_smtp_settings")
+		if p.Errors == nil || len(*p.Errors) != 1 || (*p.Errors)[0].Pointer != "/password" || (*p.Errors)[0].Code != "credentials_together" {
+			t.Errorf("a new %s: violations %+v, want one credentials_together at /password", name, p.Errors)
+		}
+	}
+	body.Port, want.Port = 2525, 2525
+	body.Password = new(password)
+	check("a PUT moving the port with the password again", putSMTP(t, in.admin, body))
+	body.Password = nil
 
 	// Emptied, it is removed, and a username then has none.
 	body.Password = new("")
@@ -168,11 +194,11 @@ func TestSMTPSettingsAreWrittenReadAndRemoved(t *testing.T) {
 	assertProblem(t, "SMTP after removing it", after.StatusCode(), after.Body, http.StatusNotFound, "not_found")
 
 	updates := smtpAudit(t, in.admin, "smtp.updated")
-	if len(updates) != 4 {
-		t.Fatalf("%d smtp.updated entries, want 4: the first PUT, the port, the dropped password, the new password", len(updates))
+	if len(updates) != 5 {
+		t.Fatalf("%d smtp.updated entries, want 5: the first PUT, the sender, the port, the dropped password, the new password", len(updates))
 	}
 	// Newest first.
-	first := updates[3]
+	first := updates[4]
 	firstAfter, _ := first.After.(map[string]any)
 	if first.Before != nil || firstAfter["host"] != "smtp.example.com" || firstAfter["password_set"] != true {
 		t.Errorf("first smtp.updated before = %v, after = %v; want nothing, then the settings with password_set", first.Before, first.After)

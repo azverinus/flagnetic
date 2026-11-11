@@ -420,3 +420,40 @@ func TestDeadLetterActionsAreScopedToTheirSinkAndNeedSinkManage(t *testing.T) {
 func brief(s management.Sink) string {
 	return fmt.Sprintf("{health %s, %d dead letters, stopped at %v, enabled %v}", s.Health, s.DeadLetters, s.StoppedAt, s.Enabled)
 }
+
+func TestARedeliveryOfASinkStartedFromATimeSendsNothingReceivedBeforeTheStart(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t, script(times(5, rejected), []testkit.Reply{{}})...)
+	created, secret := f.create(t, webhook(r, "exposure"))
+
+	// The stream starts behind the open transaction, so its first batch spans
+	// two rows received before the start, which it leaves out, and one after.
+	written, release := f.srv.HoldNextIngest(t)
+	held := f.exposure("u-1", "true", f.clock.Now())
+	first := make(chan answer, 1)
+	go func() { first <- postEvents(t, f.srv, f.server, f.envelope(t, held)) }()
+	<-written
+	f.post(t, f.exposure("u-2", "true", f.clock.Now()))
+	f.clock.Advance(2 * time.Hour)
+	recent := f.exposure("u-3", "true", f.clock.Now())
+	f.post(t, recent)
+	f.enable(t, created, management.SinkEnable{StartFrom: ptr(f.clock.Now().Add(-time.Hour))})
+	release()
+	if a := <-first; a.status != http.StatusAccepted {
+		t.Fatalf("the held batch = %d: %s", a.status, a.body)
+	}
+
+	f.rounds(t, 5)
+	list := f.deadLetters(t, created)
+	if len(list) != 1 || list[0].Rows != 1 {
+		t.Fatalf("dead letters %+v, want one of the event received after the start", list)
+	}
+	f.redeliver(t, created, list[0])
+	calls := callsOf(t, r, secret)
+	if len(calls) != 6 {
+		t.Fatalf("the receiver got %d batches, want the five rejections and the redelivery", len(calls))
+	}
+	if got, want := idsOf(calls[5].Events), []string{eventIDOf(recent)}; !slices.Equal(got, want) {
+		t.Errorf("redelivered %v, want %v: the rows the batch left out stay out", got, want)
+	}
+}

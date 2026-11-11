@@ -252,11 +252,16 @@ func (a *api) AcceptInvitation(ctx context.Context, req AcceptInvitationRequestO
 	return AcceptInvitation200JSONResponse{Body: me, Headers: AcceptInvitation200ResponseHeaders{SetCookie: &cookie}}, nil
 }
 
-// RequestPasswordReset answers 202 at once, whoever the email belongs to; a
-// password reset is issued and mailed after the answer, when there is one to
-// issue.
+// RequestPasswordReset answers 202 at once, whoever the email belongs to, or
+// 429 for a source past the throttle; a password reset is issued and mailed
+// after the answer, when there is one to issue.
 func (a *api) RequestPasswordReset(ctx context.Context, req RequestPasswordResetRequestObject) (RequestPasswordResetResponseObject, error) {
-	a.h.RequestReset.Handle(ctx, appaccess.RequestPasswordResetCommand{Email: req.Body.Email, RequestID: flaghttp.RequestIDOf(ctx)})
+	err := a.h.RequestReset.Handle(ctx, appaccess.RequestPasswordResetCommand{
+		Email: req.Body.Email, ClientIP: flaghttp.ClientOf(ctx).IP, RequestID: flaghttp.RequestIDOf(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
 	return RequestPasswordReset202Response{}, nil
 }
 

@@ -117,7 +117,7 @@ func (h *Test) probe(ctx context.Context, cmd TestCommand, s sinks.Sink, now tim
 		return h.d.probe(ctx, s, secrets, true)
 	}
 	draft, err := h.d.check(ctx, cmd.Project, sinks.Draft{
-		Input: edited(s, *cmd.Config), Secret: cmd.Secret, KeepsSecret: sinks.KeepsSecret(cmd.Secret),
+		Input: edited(s, *cmd.Config), Secret: cmd.Secret, KeepsSecret: sinks.KeepsSecret(cmd.Secret), Stored: &s.Config,
 	}, s.Environments...)
 	if err != nil {
 		return Probed{}, err

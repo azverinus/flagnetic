@@ -141,3 +141,38 @@ func TestTheLastRowReceivedAtOrBeforeATimeIsFoundByTransactionNumber(t *testing.
 		}
 	}
 }
+
+// A floor leaves the rows received before it out of a batch's count and out
+// of the lag, but not out of the batch's end: the cursor passes the rows the
+// stream will never send rather than reading them again on every call.
+func TestAFloorLeavesEarlierRowsOutOfTheBatchAndTheLagAndTheCursorPassesThem(t *testing.T) {
+	pool := testkit.Pool(t)
+	if _, err := pool.Exec(t.Context(), `
+		CREATE TABLE stream_with_floor (xid xid8 NOT NULL, seq bigint NOT NULL, received_at timestamptz NOT NULL);
+		INSERT INTO stream_with_floor VALUES
+			('10', 1, '2026-11-03 10:00:00+00'), ('10', 2, '2026-11-03 11:00:00+00'), ('11', 3, '2026-11-03 12:00:00+00')`); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DROP TABLE stream_with_floor`) })
+	end := events.Cursor{XID: 11, Seq: 3}
+	for name, tc := range map[string]struct {
+		floor  time.Time
+		rows   int
+		oldest time.Time
+		unread bool
+	}{
+		"a floor at the second row": {time.Date(2026, 11, 3, 11, 0, 0, 0, time.UTC), 2, time.Date(2026, 11, 3, 11, 0, 0, 0, time.UTC), true},
+		"a floor after every row":   {time.Date(2026, 11, 3, 13, 0, 0, 0, time.UTC), 0, time.Time{}, false},
+		"a floor before every row":  {time.Date(2026, 11, 3, 9, 0, 0, 0, time.UTC), 3, time.Date(2026, 11, 3, 10, 0, 0, 0, time.UTC), true},
+	} {
+		scope := pgevents.Scope{Floor: &tc.floor}
+		b, err := pgevents.Bound(t.Context(), pool, "stream_with_floor", scope, events.Cursor{}, 10)
+		if err != nil || b.Rows != tc.rows || b.To != end {
+			t.Errorf("%s: batch = %d rows to %+v, %v, want %d rows to %+v", name, b.Rows, b.To, err, tc.rows, end)
+		}
+		oldest, unread, err := pgevents.OldestAfter(t.Context(), pool, "stream_with_floor", scope, events.Cursor{})
+		if err != nil || unread != tc.unread || !oldest.Equal(tc.oldest) {
+			t.Errorf("%s: oldest unread = %v, %v, %v, want %v, %v", name, oldest, unread, err, tc.oldest, tc.unread)
+		}
+	}
+}

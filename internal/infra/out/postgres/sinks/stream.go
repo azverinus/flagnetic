@@ -30,7 +30,7 @@ func rawTable(kind sinks.EventKind) (string, error) {
 
 // pgScope is scope as the events adapter's reader takes it.
 func pgScope(scope sinks.Scope) pgevents.Scope {
-	return pgevents.Scope{Project: scope.Project, Environments: scope.Environments}
+	return pgevents.Scope{Project: scope.Project, Environments: scope.Environments, Floor: scope.Floor}
 }
 
 // Scope returns the scope of a stream of project's sink naming the
