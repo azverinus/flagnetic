@@ -6,7 +6,7 @@
 // is the production one.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { createServerWith, type EventTiming } from "../src/server/client.js";
 import type { Timing } from "../src/server/delivery.js";
 import type { FlagneticServer, LogEvent, LogLevel, ServerOptions } from "../src/server.js";
@@ -681,5 +681,62 @@ describe("close", () => {
     expect(Date.now() - began).toBeLessThan(2_000);
     expect(p.batches).toHaveLength(2);
     expect(p.batches[1]?.eventIds).toStrictEqual(p.batches[0]?.eventIds);
+  });
+});
+
+describe("a malformed answer", () => {
+  // A 202 whose rejected list holds things that are not rejections: the
+  // events endpoint, a proxy or an on-path peer can send it, and an
+  // unhandled rejection ends a Node process by default.
+  const malformed = ['{"rejected":[null]}', '{"rejected":[1,"x",[]]}', '{"rejected":[{"code":5}]}', '{"rejected":[{"index":0}]}'];
+
+  let unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown): void => {
+    unhandled.push(reason);
+  };
+  beforeEach(() => {
+    unhandled = [];
+    process.on("unhandledRejection", onUnhandled);
+  });
+  afterEach(() => {
+    process.off("unhandledRejection", onUnhandled);
+  });
+
+  test.each(malformed)("%s leaves the queue sending and no promise rejected", async (body) => {
+    const p = await platform();
+    const h = start(p, {}, { flushInterval: 20 });
+    await h.client.ready(2_000);
+    p.eventsReplies.push({ kind: "accepted", body });
+    h.client.alias({ fromUnitType: "anonymous", fromUnitId: "d-1", toUnitType: "user", toUnitId: "u-1" });
+    await h.client.flush();
+    await eventually(() => {
+      expect(p.batches).toHaveLength(1);
+    });
+
+    // The next alias still goes out.
+    h.client.alias({ fromUnitType: "anonymous", fromUnitId: "d-2", toUnitType: "user", toUnitId: "u-2" });
+    await h.client.flush();
+    await eventually(() => {
+      expect(p.batches).toHaveLength(2);
+    });
+    await sleep(60);
+    expect(unhandled).toStrictEqual([]);
+  });
+
+  test.each(malformed)("%s does not stop the summaries reporting", async (body) => {
+    const p = await platform();
+    const h = start(p, { sendExposures: false }, { summaryInterval: 40 });
+    await h.client.ready(2_000);
+    p.eventsReplies.push({ kind: "accepted", body });
+    h.client.getString(assigned, "auto_on", "none");
+    await eventually(() => {
+      expect(p.batches).toHaveLength(1);
+    });
+
+    h.client.getString(assigned, "auto_on", "none");
+    await eventually(() => {
+      expect(p.batches).toHaveLength(2);
+    });
+    expect(unhandled).toStrictEqual([]);
   });
 });
