@@ -712,6 +712,9 @@ describe("a malformed answer", () => {
     await eventually(() => {
       expect(p.batches).toHaveLength(1);
     });
+    // The flush interval runs over the emptied queue before anything else
+    // is sent, and settles on whatever the failed send left behind.
+    await sleep(60);
 
     // The next alias still goes out.
     h.client.alias({ fromUnitType: "anonymous", fromUnitId: "d-2", toUnitType: "user", toUnitId: "u-2" });

@@ -110,16 +110,18 @@ export class EventQueue {
 
   // send never rejects: a failure here is logged and the batch stays queued
   // for the next flush, since an unhandled rejection ends a Node process.
+  // Whatever threw, the queue is left free to send again.
   private async send(): Promise<void> {
+    this.sending = true;
     try {
       await this.sendBatch();
     } catch (e) {
+      this.sending = false;
       this.log("warn", "events_failed", { cause: causeOf(e) });
     }
   }
 
   private async sendBatch(): Promise<void> {
-    this.sending = true;
     // At most `batchSize` events, and only as many of them as the
     // endpoint's 1 MiB body holds.
     const batch = this.ingest.pack(this.queue.slice(0, this.config.batchSize))[0] ?? [];
