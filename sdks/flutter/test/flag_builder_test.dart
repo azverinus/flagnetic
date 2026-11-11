@@ -227,24 +227,24 @@ void main() {
         flagKey: 'theme',
         defaultValue: const {'color': 'blue'},
         builder: (context, value, detail) =>
-            _text('${value['color']}/${detail.reason}'),
+            _text('${value['color']}/${detail.reason}/${detail.errorCode}'),
       ),
     );
-    expect(find.text('red/fallthrough'), findsOne);
+    expect(find.text('red/fallthrough/null'), findsOne);
 
     client.offline!.set('theme', null);
     await tester.pump();
     expect(tester.takeException(), isNull);
-    expect(find.text('blue/fallback'), findsOne);
+    expect(find.text('blue/fallback/type_mismatch'), findsOne);
 
     client.offline!.set('theme', <Object?>[1, 2]);
     await tester.pump();
     expect(tester.takeException(), isNull);
-    expect(find.text('blue/fallback'), findsOne);
+    expect(find.text('blue/fallback/type_mismatch'), findsOne);
 
     client.offline!.set('theme', <String, Object?>{'color': 'green'});
     await tester.pump();
-    expect(find.text('green/fallthrough'), findsOne);
+    expect(find.text('green/fallthrough/null'), findsOne);
   });
 }
 
