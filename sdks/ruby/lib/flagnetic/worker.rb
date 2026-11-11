@@ -43,7 +43,12 @@ module Flagnetic
       nil
     rescue Exception # rubocop:disable Lint/RescueException
       # join re-raises what the thread died of; that was logged when it
-      # happened and is not the host's to handle.
+      # happened and is not the host's to handle. Anything else came into
+      # the caller while it waited (an Interrupt, a Timeout) and is the
+      # host's: a thread that is still alive, or ended normally, did not
+      # raise it.
+      raise unless @thread.status.nil?
+
       nil
     end
 

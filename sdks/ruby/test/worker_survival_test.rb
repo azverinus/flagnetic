@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "timeout"
 
 # The background thread is the only thing that keeps a process's ruleset
 # current, so nothing a fetch, a listener or a comparison raises may end it,
@@ -59,6 +60,18 @@ class WorkerSurvivalTest < Minitest::Test
     worker.instance_variable_set(:@thread, thread)
     sleep 0.05
     assert_nil c.close(timeout: 1)
+  end
+
+  def test_close_lets_an_exception_raised_into_the_caller_through
+    @server.publish(document(1, { "on" => true }))
+    c = client(stream: false)
+    assert_equal :fresh, c.ready(timeout: 5)
+    worker = c.instance_variable_get(:@worker)
+    stuck = Thread.new { sleep }
+    worker.instance_variable_set(:@thread, stuck)
+    assert_raises(Timeout::Error) { Timeout.timeout(0.2) { c.close(timeout: 5) } }
+  ensure
+    stuck&.kill
   end
 
   def test_changes_survives_deeply_nested_variation_values
