@@ -109,11 +109,11 @@ func BoundUntil(ctx context.Context, db pgxtx.DB, table string, scope Scope, fro
 	err := db.QueryRow(ctx, `
 		WITH b AS (
 			SELECT xid, seq FROM `+tbl+`
-			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < pg_snapshot_xmin(pg_current_snapshot())`+where+capped+`
+			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < event_horizon()`+where+capped+`
 			ORDER BY xid, seq LIMIT $3),
 		e AS (
 			SELECT xid, seq FROM `+tbl+`
-			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < pg_snapshot_xmin(pg_current_snapshot())`+capped+`
+			WHERE (xid, seq) > ($1::text::xid8, $2) AND xid < event_horizon()`+capped+`
 			ORDER BY xid DESC, seq DESC LIMIT 1)
 		SELECT count(*), (SELECT b.xid::text FROM b ORDER BY b.xid DESC, b.seq DESC LIMIT 1),
 			(SELECT b.seq FROM b ORDER BY b.xid DESC, b.seq DESC LIMIT 1),
@@ -248,7 +248,7 @@ func Tail(ctx context.Context, db pgxtx.DB, table string) (events.Cursor, error)
 	// called xid would be what ORDER BY xid sorts by, as text, where "999"
 	// comes after "1000".
 	err := db.QueryRow(ctx, `SELECT xid::text AS xid_text, seq FROM `+pgx.Identifier{table}.Sanitize()+`
-		WHERE xid < pg_snapshot_xmin(pg_current_snapshot()) ORDER BY xid DESC, seq DESC LIMIT 1`).Scan(&xid, &seq)
+		WHERE xid < event_horizon() ORDER BY xid DESC, seq DESC LIMIT 1`).Scan(&xid, &seq)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return events.Cursor{}, nil
 	}
@@ -295,7 +295,7 @@ func Last(ctx context.Context, db pgxtx.DB, table string, scope Scope, to time.T
 	var seq int64
 	// The column is named for its text apart from its own, as Tail's is.
 	err = db.QueryRow(ctx, `SELECT xid::text AS xid_text, seq FROM `+pgx.Identifier{table}.Sanitize()+`
-		WHERE received_at <= $1 AND xid < pg_snapshot_xmin(pg_current_snapshot())`+where+`
+		WHERE received_at <= $1 AND xid < event_horizon()`+where+`
 		ORDER BY xid DESC, seq DESC LIMIT 1`, append([]any{to}, scoped...)...).Scan(&xid, &seq)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return events.Cursor{}, false, nil

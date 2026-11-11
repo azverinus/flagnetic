@@ -63,6 +63,14 @@ func EmptyDatabase(t testing.TB) string {
 	return url
 }
 
+// OtherCluster returns the connection string of an empty database in a second
+// PostgreSQL cluster, stopped when the test ends: where a logical dump of the
+// package's database is restored to.
+func OtherCluster(t testing.TB) string {
+	t.Helper()
+	return pgtest.OtherCluster(t)
+}
+
 // Clock returns a fake clock reading Start.
 func Clock() *clock.Fake { return clock.NewFake(Start) }
 
