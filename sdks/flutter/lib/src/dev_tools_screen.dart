@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flagnetic/flagnetic.dart';
+// package:material_ui does not exist before Flutter 3.47, which this package still supports.
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 
 import 'dev_tools.dart';

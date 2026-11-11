@@ -1,6 +1,8 @@
 // The Dev Tools screen: lists every flag with value, reason and stage,
 // edits an override of the flag's type and clears all.
 import 'package:flagnetic_flutter/flagnetic_flutter.dart';
+// package:material_ui does not exist before Flutter 3.47, which this package still supports.
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
