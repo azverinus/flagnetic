@@ -10,6 +10,21 @@ import 'types.dart';
 /// One event the ruleset stream dispatched.
 typedef SseEvent = ({String type, String data, String? id});
 
+/// The longest line, and the most data one event may gather, that the parser
+/// holds. The platform writes lines of a few dozen bytes; a stream that
+/// sends more without ending a line is not one, and buffering it would end
+/// in the app running out of memory.
+const maxSseLineBytes = 64 << 10;
+
+/// A stream line or event larger than [maxSseLineBytes].
+final class SseOverflow implements Exception {
+  /// An overflow.
+  const SseOverflow();
+
+  @override
+  String toString() => 'SseOverflow: line larger than $maxSseLineBytes bytes';
+}
+
 /// Reads the `text/event-stream` bytes of the ruleset stream by the WHATWG
 /// rules: CRLF, LF or CR ends a line even when split between reads, a blank
 /// line dispatches what was gathered, a line opening with a colon is a
@@ -53,6 +68,15 @@ final class SseParser {
       start = i + 1;
     }
     _buffer.removeRange(0, start);
+    if (_buffer.length > maxSseLineBytes) _overflow();
+  }
+
+  /// Forgets everything held and reports the overflow: the connection is
+  /// dropped, so the next one starts a new parser anyway.
+  Never _overflow() {
+    _buffer.clear();
+    _data.clear();
+    throw const SseOverflow();
   }
 
   static const List<int> _bom = [0xef, 0xbb, 0xbf];
@@ -78,6 +102,7 @@ final class SseParser {
         _type = value;
       case 'data':
         _data.writeln(value);
+        if (_data.length > maxSseLineBytes) _overflow();
       case 'id':
         if (!value.contains('\u0000')) _id = value;
     }
@@ -260,7 +285,8 @@ final class RulesetStream {
     }
     if (stream.status != 200) {
       _running = false;
-      unawaited(stream.body.drain<void>().catchError((Object _) {}));
+      // An error body may never end: cancelling releases the connection.
+      unawaited(stream.body.listen(null).cancel().catchError((Object _) {}));
       if (stream.status == 401 || stream.status == 403) {
         _closed = true;
         _onRefused(stream.status);
@@ -279,6 +305,13 @@ final class RulesetStream {
         _beat();
         try {
           parser.add(chunk, _event);
+        } on SseOverflow catch (e) {
+          // Nothing more can be trusted on this connection.
+          _running = false;
+          _drop();
+          if (_gone) return;
+          _onDropped?.call();
+          _retryAfterError({'cause': 'parse', 'detail': '$e'});
         } on Object catch (e) {
           _log(LogLevel.warn, LogEvents.sseDropped, {
             'cause': 'parse',
