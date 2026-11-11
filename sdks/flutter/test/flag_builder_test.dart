@@ -194,6 +194,58 @@ void main() {
     );
     expect(find.text(10.0.toString()), findsOne);
   });
+
+  testWidgets('a list served to a typed list builder shows the default', (
+    tester,
+  ) async {
+    final client = offlineClient({
+      'tags': <Object?>['a', 'b'],
+    });
+    addTearDown(client.close);
+    await tester.pumpWidget(
+      FlagBuilder<List<String>>(
+        client: client,
+        flagKey: 'tags',
+        defaultValue: const ['built-in'],
+        builder: (context, value, detail) =>
+            _text('${value.join(',')}/${detail.reason}/${detail.errorCode}'),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    expect(find.text('built-in/fallback/type_mismatch'), findsOne);
+  });
+
+  testWidgets('a null or a list served to a typed map builder shows the '
+      'default', (tester) async {
+    final client = offlineClient({
+      'theme': <String, Object?>{'color': 'red'},
+    });
+    addTearDown(client.close);
+    await tester.pumpWidget(
+      FlagBuilder<Map<String, dynamic>>(
+        client: client,
+        flagKey: 'theme',
+        defaultValue: const {'color': 'blue'},
+        builder: (context, value, detail) =>
+            _text('${value['color']}/${detail.reason}'),
+      ),
+    );
+    expect(find.text('red/fallthrough'), findsOne);
+
+    client.offline!.set('theme', null);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(find.text('blue/fallback'), findsOne);
+
+    client.offline!.set('theme', <Object?>[1, 2]);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(find.text('blue/fallback'), findsOne);
+
+    client.offline!.set('theme', <String, Object?>{'color': 'green'});
+    await tester.pump();
+    expect(find.text('green/fallthrough'), findsOne);
+  });
 }
 
 Widget _text(String value) =>
