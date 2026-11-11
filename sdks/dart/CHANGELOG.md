@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/dart/v0.1.0...sdks/dart/v0.1.1) (2026-11-11)
+
+
+### Bug Fixes
+
+* **sdk-dart:** cancel a timed-out request and bound response bodies ([#253](https://github.com/azverinus/flagnetic/issues/253)) ([43fb2ec](https://github.com/azverinus/flagnetic/commit/43fb2ecd7aaf56103782aec023c42743117eb240))
+
 ## 0.1.0 (2026-10-28)
 
 
