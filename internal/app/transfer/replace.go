@@ -10,8 +10,8 @@ import (
 )
 
 // deleteAbsent deletes what the project has that the document does not name,
-// after the document is merged: experiments, flags, segments, attributes,
-// unit types, then environments. Each is deleted through the context that
+// after the document is merged: environments, then experiments, flags,
+// segments, attributes and unit types. Each is deleted through the context that
 // owns it, which refuses what something still uses; every such refusal is
 // collected, so the answer names all that is in use, and nothing is deleted
 // for good unless all can be, since the refusal rolls the whole import back.
@@ -49,6 +49,29 @@ func (r *mergeRun) deleteAbsent(ctx context.Context) error {
 		}
 	}
 	d := r.h.d
+	// Environments go first: what an environment holds stops naming the
+	// segments, declarations and flags it names, which would otherwise be
+	// refused for a configuration that is going too.
+	for _, key := range del.Environments {
+		env := r.environments[key]
+		keys, err := d.SDKKeys.LiveSDKKeys(ctx, env.ID)
+		if err != nil {
+			return err
+		}
+		if len(keys) > 0 {
+			refused = true
+			for _, k := range keys {
+				used = append(used, flags.Reference{Kind: "sdk_key", Key: k, Environment: key})
+			}
+			continue
+		}
+		if err := remove(key, func() error { return d.WorkspaceImport.DeleteEnvironment(ctx, r.project.ID, key, r.req) },
+			&r.changes.Environments.Deleted); err != nil {
+			return err
+		}
+		delete(r.environments, key)
+		delete(r.moved, key)
+	}
 	for _, key := range del.Experiments {
 		if err := remove(key, func() error { return d.ExperimentsImport.DeleteExperiment(ctx, r.project.ID, key, r.req) },
 			&r.changes.Experiments.Deleted); err != nil {
@@ -91,26 +114,6 @@ func (r *mergeRun) deleteAbsent(ctx context.Context) error {
 			return err
 		}
 		r.allMoved = true
-	}
-	for _, key := range del.Environments {
-		env := r.environments[key]
-		keys, err := d.SDKKeys.LiveSDKKeys(ctx, env.ID)
-		if err != nil {
-			return err
-		}
-		if len(keys) > 0 {
-			refused = true
-			for _, k := range keys {
-				used = append(used, flags.Reference{Kind: "sdk_key", Key: k, Environment: key})
-			}
-			continue
-		}
-		if err := remove(key, func() error { return d.WorkspaceImport.DeleteEnvironment(ctx, r.project.ID, key, r.req) },
-			&r.changes.Environments.Deleted); err != nil {
-			return err
-		}
-		delete(r.environments, key)
-		delete(r.moved, key)
 	}
 	if refused {
 		return flags.ErrInUse(used)

@@ -374,3 +374,15 @@ func TestAReplaceNeedsEverySectionAndAnEnvironment(t *testing.T) {
 		t.Errorf("violations = %v, want unknown_environment", got)
 	}
 }
+
+func TestAReplaceDeletesAnEnvironmentBeforeWhatItsConfigurationsName(t *testing.T) {
+	f := exportedProject(t)
+	k := f.project.Key
+	doc := exported(t, f.admin, k)
+	// Only banner_text's staging configuration serves the segment pro.
+	withoutEnvironment(doc, "staging")
+	without(doc, "segments", "pro")
+
+	r := mustReplace(t, f.admin, k, doc)
+	assertJSON(t, "deleted", []any{r.Changes.Environments.Deleted, r.Changes.Segments.Deleted}, `[["staging"], ["pro"]]`)
+}
