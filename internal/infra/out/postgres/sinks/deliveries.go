@@ -143,7 +143,10 @@ func (s *Store) withStreams(ctx context.Context, list []sinks.Sink) error {
 		})
 		list[i].Streams = streams
 	}
-	return s.withDeadLetters(ctx, list)
+	if err = s.withDeadLetters(ctx, list); err != nil {
+		return err
+	}
+	return s.withGaps(ctx, list)
 }
 
 // LockStream reads the stream of kind of sink for update, holding it against

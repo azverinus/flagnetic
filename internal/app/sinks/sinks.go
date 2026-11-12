@@ -107,9 +107,11 @@ type Deps struct {
 	Rows    Rows
 	Targets Targets
 	Opener  Opener
-	// DeadLetters keeps the sinks' dead letters, and Observer is told what
-	// became of a redelivery.
+	// DeadLetters keeps the sinks' dead letters, Gaps the rows retention
+	// dropped before they were delivered, and Observer is told what became of
+	// a redelivery.
 	DeadLetters DeadLetterStore
+	Gaps        GapStore
 	Observer    Observer
 	// LagWarning is how old the oldest undelivered row may be before a sink
 	// is lagging.

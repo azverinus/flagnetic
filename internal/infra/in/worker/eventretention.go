@@ -10,6 +10,7 @@ import (
 
 	appevents "github.com/azverinus/flagnetic/internal/app/events"
 	"github.com/azverinus/flagnetic/internal/domain/events"
+	"github.com/azverinus/flagnetic/internal/domain/sinks"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 )
 
@@ -34,14 +35,16 @@ type Purge interface {
 // running it at once take turns in PostgreSQL. The rows a drop took from a
 // rollup that had not read them are counted in
 // flagnetic_event_gap_rows_total, registered on reg, and each gap is logged
-// as a warning.
+// as a warning. That covers the rows a sink's stream had not delivered, by the
+// event kind it exports.
 func EventRetention(r Retention, inventory Purge, log *slog.Logger, reg prometheus.Registerer) Worker {
 	gapRows := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: metrics.Namespace, Subsystem: "event", Name: "gap_rows_total",
-		Help: "Raw events retention dropped before the stream reading them had read them, by stream.",
+		Help: "Raw events retention dropped before the stream reading them had read them, by stream: a rollup's, or a sink's by event kind.",
 	}, []string{"stream"})
 	reg.MustRegister(gapRows)
-	for _, s := range []events.Stream{events.StreamExposures, events.StreamEvaluationSummaries, events.StreamAliases} {
+	for _, s := range append([]events.Stream{events.StreamExposures, events.StreamEvaluationSummaries, events.StreamAliases},
+		sinks.GapStreams()...) {
 		gapRows.WithLabelValues(string(s))
 	}
 	return Worker{

@@ -70,6 +70,19 @@ type RetentionStore interface {
 	PurgeClaims(ctx context.Context, typ events.EventType, before time.Time, limit int) (int, error)
 }
 
+// SinkRetention is the sinks' side of a drop, called inside the drop's unit of
+// work: the sinks context implements it, the events context does not know
+// what it records.
+type SinkRetention interface {
+	// LockStreams holds every sink stream reading typ's raw table until the
+	// unit of work ends, those of disabled and stopped sinks included.
+	LockStreams(ctx context.Context, typ events.EventType) error
+	// RecordGaps records, for every sink stream reading typ, the rows the
+	// drop of days takes that it had not delivered, moving its cursor past
+	// them but never past horizon, and returns the gaps.
+	RecordGaps(ctx context.Context, typ events.EventType, days []time.Time, horizon uint64, now time.Time) ([]events.Gap, error)
+}
+
 // RetentionReport is what a round of retention did.
 type RetentionReport struct {
 	// Dropped is how many partitions of each raw table were dropped.
@@ -84,6 +97,7 @@ type RetentionReport struct {
 type RunRetention struct {
 	tx        Transactor
 	store     RetentionStore
+	sinks     SinkRetention
 	clock     clock.Clock
 	ids       *id.Source
 	retention time.Duration
@@ -91,10 +105,12 @@ type RunRetention struct {
 }
 
 // NewRunRetention returns the handler, keeping raw events for retention and
-// creating partitions ahead days after today.
-func NewRunRetention(tx Transactor, store RetentionStore, c clock.Clock, ids *id.Source, retention time.Duration, ahead int,
+// creating partitions ahead days after today. sinks records the rows a drop
+// takes from the sinks' streams.
+func NewRunRetention(tx Transactor, store RetentionStore, sinks SinkRetention, c clock.Clock, ids *id.Source,
+	retention time.Duration, ahead int,
 ) *RunRetention {
-	return &RunRetention{tx: tx, store: store, clock: c, ids: ids, retention: retention, ahead: ahead}
+	return &RunRetention{tx: tx, store: store, sinks: sinks, clock: c, ids: ids, retention: retention, ahead: ahead}
 }
 
 // Handle runs one round. Each raw table is dropped in a unit of work of its
@@ -131,7 +147,9 @@ func (h *RunRetention) Handle(ctx context.Context) (RetentionReport, error) {
 // still be read, and after it nothing tells a row lost from a row never
 // stored. The streams reading the table are held first, in the order every
 // rollup takes them, then the table, so no rollup reads a partition as it
-// goes and none waits on the drop while holding what the drop waits for.
+// goes and none waits on the drop while holding what the drop waits for. The
+// sinks' streams of the table are held after the rollups', and the rows they
+// had not delivered are recorded as gaps in the same unit of work.
 func (h *RunRetention) drop(ctx context.Context, typ events.EventType, now time.Time) (int, []events.Gap, error) {
 	var (
 		dropped int
@@ -156,24 +174,30 @@ func (h *RunRetention) drop(ctx context.Context, typ events.EventType, now time.
 				return err
 			}
 		}
+		if err = h.sinks.LockStreams(ctx, typ); err != nil {
+			return err
+		}
 		if err = h.store.LockPartitions(ctx, typ, due); err != nil {
 			return err
 		}
-		if len(streams) > 0 {
-			var horizon uint64
-			if horizon, err = h.store.Horizon(ctx); err != nil {
-				return err
+		horizon, err := h.store.Horizon(ctx)
+		if err != nil {
+			return err
+		}
+		for _, s := range streams {
+			gap, ok, gapErr := h.gap(ctx, s, typ, due, horizon, now)
+			if gapErr != nil {
+				return gapErr
 			}
-			for _, s := range streams {
-				gap, ok, gapErr := h.gap(ctx, s, typ, due, horizon, now)
-				if gapErr != nil {
-					return gapErr
-				}
-				if ok {
-					gaps = append(gaps, gap)
-				}
+			if ok {
+				gaps = append(gaps, gap)
 			}
 		}
+		sinkGaps, err := h.sinks.RecordGaps(ctx, typ, due, horizon, now)
+		if err != nil {
+			return err
+		}
+		gaps = append(gaps, sinkGaps...)
 		if err = h.store.DropPartitions(ctx, typ, due); err != nil {
 			return err
 		}

@@ -160,6 +160,9 @@ import type {
   DismissDiscoveredAttributeData,
   DismissDiscoveredAttributeErrors,
   DismissDiscoveredAttributeResponses,
+  DismissSinkGapData,
+  DismissSinkGapErrors,
+  DismissSinkGapResponses,
   EnableAuthProviderData,
   EnableAuthProviderErrors,
   EnableAuthProviderResponses,
@@ -397,6 +400,9 @@ import type {
   ListSinkDeadLettersData,
   ListSinkDeadLettersErrors,
   ListSinkDeadLettersResponses,
+  ListSinkGapsData,
+  ListSinkGapsErrors,
+  ListSinkGapsResponses,
   ListSinksData,
   ListSinksErrors,
   ListSinksResponses,
@@ -6506,6 +6512,55 @@ export const redeliverSinkDeadLetter = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver",
+    ...options,
+  });
+
+/**
+ * A sink's gaps
+ *
+ * The rows retention dropped before the sink delivered them, one gap per
+ * drop and event kind, oldest first, dismissed ones included. The sink
+ * went on after each, with the rows still stored. Not paginated.
+ *
+ */
+export const listSinkGaps = <ThrowOnError extends boolean = false>(
+  options: Options<ListSinkGapsData, ThrowOnError>,
+): RequestResult<ListSinkGapsResponses, ListSinkGapsErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListSinkGapsResponses, ListSinkGapsErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/gaps",
+    ...options,
+  });
+
+/**
+ * Dismiss a gap
+ *
+ * Marks the gap as seen, so that it stops counting towards the sink's
+ * `gaps` and the project banner; it stays listed. Idempotent: dismissing
+ * a dismissed gap answers it as it is, keeping the first time. Audited
+ * as `sink.gap_dismissed` the first time only.
+ *
+ */
+export const dismissSinkGap = <ThrowOnError extends boolean = false>(
+  options: Options<DismissSinkGapData, ThrowOnError>,
+): RequestResult<DismissSinkGapResponses, DismissSinkGapErrors, ThrowOnError> =>
+  (options.client ?? client).post<DismissSinkGapResponses, DismissSinkGapErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/sinks/{sink}/gaps/{gap}/dismiss",
     ...options,
   });
 

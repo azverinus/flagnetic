@@ -243,8 +243,11 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Tx: tx, Store: sinkStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
 		Sealer: o.Keyring, Resolver: net.DefaultResolver, TargetPolicy: o.WebhookTargets, SecretOverlap: o.WebhookSecretOverlap,
 		Rows: sinkStore, Targets: sinkTargets, Opener: o.Keyring, Retention: o.EventsRetention, LagWarning: o.SinkLagWarning,
-		DeadLetters: sinkStore,
+		DeadLetters: sinkStore, Gaps: sinkStore,
 	}
+	// Retention drops the partitions sinks read, recording the rows a stream
+	// had not delivered as a gap in the drop's own unit of work.
+	sinkRetention := appsinks.NewRetention(appsinks.RetentionDeps{Store: sinkStore, Rows: sinkStore, Audit: audit, IDs: d.IDs})
 	sinkMetrics := worker.NewSinkMetrics(reg, sinkStore)
 	sinks.Observer = sinkMetrics
 	sinkDelivery := appsinks.NewDeliver(appsinks.DeliverDeps{
@@ -692,6 +695,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		ListSinkDeadLetters:     appsinks.NewListDeadLetters(sinks),
 		RedeliverSinkDeadLetter: appsinks.NewRedeliverDeadLetter(sinks),
 		DiscardSinkDeadLetter:   appsinks.NewDiscardDeadLetter(sinks),
+		ListSinkGaps:            appsinks.NewListGaps(sinks),
+		DismissSinkGap:          appsinks.NewDismissGap(sinks),
 
 		ListSegments: appflags.NewListSegments(tx, flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),
@@ -777,7 +782,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			worker.RollupStream(worker.AliasRollupName, events.StreamAliases,
 				appevents.NewRollUpAliases(tx, eventStore, d.Clock), rollupMetrics),
 			worker.EventRetention(
-				appevents.NewRunRetention(tx, eventStore, d.Clock, d.IDs, o.EventsRetention, o.EventsPartitionsAhead),
+				appevents.NewRunRetention(tx, eventStore, sinkRetention, d.Clock, d.IDs, o.EventsRetention, o.EventsPartitionsAhead),
 				appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention), edge.Logger(), reg),
 			worker.WebhookFanOut(appgovernance.NewRunFanOut(tx, outbox, d.Clock, d.IDs), o.WebhookTick, reg),
 			worker.WebhookDelivery(appgovernance.NewDeliver(appgovernance.DeliverDeps{

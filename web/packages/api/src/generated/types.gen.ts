@@ -3873,6 +3873,42 @@ export type SinkDeadLetterList = {
 };
 
 /**
+ * Rows of one event kind that retention dropped before the sink
+ * delivered them. The sink's stream went on after them. Cursors are
+ * never exposed: the loss is told by how many rows and when they were
+ * received.
+ *
+ */
+export type SinkGap = {
+  id: string;
+  event_kind: SinkEventKind;
+  /**
+   * The rows lost that the sink's project and environments admit.
+   */
+  rows: number;
+  /**
+   * When the first row lost was received.
+   */
+  period_start: string;
+  /**
+   * When the last row lost was received.
+   */
+  period_end: string;
+  /**
+   * When retention dropped them.
+   */
+  dropped_at: string;
+  /**
+   * When a member dismissed the gap; null while it counts.
+   */
+  dismissed_at: string | null;
+};
+
+export type SinkGapList = {
+  items: Array<SinkGap>;
+};
+
+/**
  * `pending` waits for its next attempt; `succeeded` was accepted by the
  * receiver; `failed` was refused in a way a retry would not change;
  * `exhausted` ran out of attempts; `dropped` was left unsent because
@@ -4477,6 +4513,11 @@ export type SinkId = string;
  * The dead letter's identifier.
  */
 export type DeadLetterId = string;
+
+/**
+ * The gap's identifier.
+ */
+export type GapId = string;
 
 /**
  * The experiment's key.
@@ -16670,6 +16711,120 @@ export type RedeliverSinkDeadLetterResponses = {
 
 export type RedeliverSinkDeadLetterResponse =
   RedeliverSinkDeadLetterResponses[keyof RedeliverSinkDeadLetterResponses];
+
+export type ListSinkGapsData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The sink's identifier.
+     */
+    sink: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks/{sink}/gaps";
+};
+
+export type ListSinkGapsErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListSinkGapsError = ListSinkGapsErrors[keyof ListSinkGapsErrors];
+
+export type ListSinkGapsResponses = {
+  /**
+   * The sink's gaps.
+   */
+  200: SinkGapList;
+};
+
+export type ListSinkGapsResponse = ListSinkGapsResponses[keyof ListSinkGapsResponses];
+
+export type DismissSinkGapData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The sink's identifier.
+     */
+    sink: string;
+    /**
+     * The gap's identifier.
+     */
+    gap: string;
+  };
+  query?: never;
+  url: "/projects/{project}/sinks/{sink}/gaps/{gap}/dismiss";
+};
+
+export type DismissSinkGapErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type DismissSinkGapError = DismissSinkGapErrors[keyof DismissSinkGapErrors];
+
+export type DismissSinkGapResponses = {
+  /**
+   * The gap, dismissed.
+   */
+  200: SinkGap;
+};
+
+export type DismissSinkGapResponse = DismissSinkGapResponses[keyof DismissSinkGapResponses];
 
 export type ListInstanceWebhooksData = {
   body?: never;
