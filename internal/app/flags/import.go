@@ -19,6 +19,8 @@ type ImportStore interface {
 	FlagArchiver
 	DefinitionUpdater
 	ConfigurationReplacer
+	SegmentDeleter
+	FlagDeleter
 }
 
 // ImporterDeps are what the Importer runs on.
@@ -51,6 +53,9 @@ type Importer struct {
 	update   *UpdateFlag
 	archive  *ArchiveFlag
 	restore  *RestoreFlag
+
+	deleteSegment *DeleteSegment
+	deleteFlag    *DeleteFlag
 }
 
 // NewImporter returns the importer.
@@ -78,6 +83,10 @@ func NewImporter(d ImporterDeps) *Importer {
 		restore: NewRestoreFlag(ArchivalDeps{
 			Tx: d.Tx, Projects: d.Projects, Store: d.Store, Rulesets: none, Recorder: d.Recorder, Evaluations: d.Evaluations,
 		}),
+		deleteSegment: NewDeleteSegment(DeleteSegmentDeps{
+			Tx: d.Tx, Projects: d.Projects, Store: d.Store, Rulesets: none, Recorder: d.Recorder,
+		}),
+		deleteFlag: NewDeleteFlag(DeleteFlagDeps{Tx: d.Tx, Projects: d.Projects, Store: d.Store, Recorder: d.Recorder}),
 	}
 }
 
@@ -184,6 +193,40 @@ func (i *Importer) archival(ctx context.Context, project workspace.ProjectID, ke
 	ctx, m := marked(ctx)
 	after, err := handle(ctx, FlagCommand{Project: project, Key: key, Expected: precondition.On(before.Version), Request: req})
 	return Effect{Changed: err == nil && after.Flag.Version != before.Version, Rulesets: m.moved}, err
+}
+
+// DeleteSegment deletes a segment as an ordinary request does, refusing one a
+// rule still names, which leaves every environment's ruleset.
+func (i *Importer) DeleteSegment(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) (Effect, error) {
+	before, err := i.d.Store.SegmentByKey(ctx, project, key)
+	if err != nil {
+		return Effect{}, segmentNotFound(err)
+	}
+	ctx, m := marked(ctx)
+	err = i.deleteSegment.Handle(ctx, SegmentCommand{Project: project, Key: key, Expected: precondition.On(before.Version), Request: req})
+	return Effect{Changed: err == nil, Rulesets: m.moved}, err
+}
+
+// DeleteFlag deletes a flag with its configurations as an ordinary request
+// does, archiving it first when it is not archived, with the checks of both:
+// a flag another requires and one a draft or running experiment holds is not
+// archived, and so not deleted.
+func (i *Importer) DeleteFlag(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) (Effect, error) {
+	before, err := i.d.Store.FlagByKey(ctx, project, key)
+	if err != nil {
+		return Effect{}, flagNotFound(err)
+	}
+	ctx, m := marked(ctx)
+	version := before.Version
+	if before.ArchivedAt == nil {
+		archived, err := i.archive.Handle(ctx, FlagCommand{Project: project, Key: key, Expected: precondition.On(version), Request: req})
+		if err != nil {
+			return Effect{}, err
+		}
+		version = archived.Flag.Version
+	}
+	err = i.deleteFlag.Handle(ctx, FlagCommand{Project: project, Key: key, Expected: precondition.On(version), Request: req})
+	return Effect{Changed: err == nil, Rulesets: m.moved}, err
 }
 
 // ImportConfigurationCommand is the configuration a document gives a flag

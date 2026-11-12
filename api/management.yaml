@@ -1150,13 +1150,31 @@ paths:
       - $ref: "#/components/parameters/ProjectKey"
     post:
       operationId: importProject
-      summary: Merge a project document into a project
+      summary: Merge a project document into a project, or replace the project's configuration with it
       description: |
-        Merges the document into the project: every environment, unit type,
-        attribute, segment and flag it names is created, or updated when it
-        differs from what the project has, by key, and everything else is left
-        as it is. A section the document lacks is left untouched, so a partial
-        document is applied as it is. The document is sent as
+        With `mode=merge`, merges the document into the project: every
+        environment, unit type, attribute, segment and flag it names is
+        created, or updated when it differs from what the project has, by key,
+        and everything else is left as it is. A section the document lacks is
+        left untouched, so a partial document is applied as it is.
+
+        With `mode=replace`, merges the document, which then holds every
+        section and at least one environment, and then deletes what it does
+        not name, in this order: experiments, flags, segments, attributes
+        (never a standard one), unit types, environments; the project equals
+        the document. Each deletion is the ordinary one and is recorded as it
+        is, a flag that is not archived being archived first. An experiment the
+        document lacks is deleted only while it is a draft; one that has
+        started is 409 `not_draft`, naming every such experiment in `errors`
+        and deleting nothing. Anything something still uses is not deleted: the
+        import is 409 `in_use`, in a dry run too, listing in `references` all
+        that still names what it would delete, such as a segment a rule serves,
+        a flag another requires, or an experiment of the document holds, a
+        declaration a rule uses, or an `sdk_key` of an environment, since an
+        environment that holds SDK keys is never deleted by an import. A
+        protected environment is not deleted either.
+
+        The document is sent as
         `application/json` or `application/yaml`, as
         `GET /projects/{project}/export` writes it.
 
@@ -1224,10 +1242,10 @@ paths:
         - name: mode
           in: query
           required: true
-          description: How the document is applied; only `merge` is offered.
+          description: How the document is applied, `merge` or `replace`.
           schema:
             type: string
-            enum: [merge]
+            enum: [merge, replace]
         - $ref: "#/components/parameters/ImportDryRun"
         - $ref: "#/components/parameters/ImportIfMatch"
       requestBody:
@@ -12718,7 +12736,7 @@ components:
           $ref: "#/components/schemas/DocumentProject"
         mode:
           type: string
-          enum: [create, merge]
+          enum: [create, merge, replace]
         source:
           type: string
           enum: [document]

@@ -167,14 +167,14 @@ func (a *api) importProject(r *http.Request, params ImportProjectParams) (Import
 	// The generated route does not check the enum; a mode this server does
 	// not offer must not run as a merge.
 	if !params.Mode.Valid() {
-		return nil, flaghttp.InvalidRequest("mode must be merge")
+		return nil, flaghttp.InvalidRequest("mode must be merge or replace")
 	}
 	d, err := readDocument(r)
 	if err != nil {
 		return nil, err
 	}
 	cmd := apptransfer.ImportIntoProjectCommand{
-		Project: projectID(ctx), Document: d, DryRun: params.DryRun != nil && *params.DryRun,
+		Project: projectID(ctx), Mode: transfer.Mode(params.Mode), Document: d, DryRun: params.DryRun != nil && *params.DryRun,
 		Caller: callerMember(ctx), Request: requestOf(ctx),
 	}
 	if params.IfMatch != nil {

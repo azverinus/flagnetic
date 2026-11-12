@@ -18,6 +18,9 @@ type ImportStore interface {
 	EnvironmentUpdater
 	UnitTypeUpdater
 	AttributeUpdater
+	EnvironmentDeleter
+	UnitTypeDeleter
+	AttributeDeleter
 }
 
 // Importer writes the entities of a project document that the workspace
@@ -36,18 +39,33 @@ type Importer struct {
 	env       *UpdateEnvironment
 	unitType  *UpdateUnitType
 	attribute *UpdateAttribute
+
+	deleteEnvironment *DeleteEnvironment
+	deleteUnitType    *DeleteUnitType
+	deleteAttribute   *DeleteAttribute
 }
+
+// ignoredRulesets marks nothing: the import moves each ruleset on once, when
+// it is done, and learns from the port which writes would have moved them.
+type ignoredRulesets struct{}
+
+func (ignoredRulesets) Project(context.Context, workspace.ProjectID) error         { return nil }
+func (ignoredRulesets) Environment(context.Context, workspace.EnvironmentID) error { return nil }
 
 // NewImporter returns the importer writing to store and recording through
 // rec, which has configure give an environment it creates in a project that
-// has flags a configuration of each.
-func NewImporter(tx Transactor, store ImportStore, configure EnvironmentConfigurer, rec Recorder) *Importer {
+// has flags a configuration of each, and guard refuse deleting a unit type or
+// an attribute something still names.
+func NewImporter(tx Transactor, store ImportStore, configure EnvironmentConfigurer, guard DeclarationGuard, rec Recorder) *Importer {
 	return &Importer{
 		tx: tx, store: store, configure: configure, rec: rec,
-		project:   NewUpdateProject(tx, store, rec),
-		env:       NewUpdateEnvironment(tx, store, rec),
-		unitType:  NewUpdateUnitType(tx, store, rec),
-		attribute: NewUpdateAttribute(tx, store, rec),
+		deleteEnvironment: NewDeleteEnvironment(tx, store, rec),
+		deleteUnitType:    NewDeleteUnitType(tx, store, guard, ignoredRulesets{}, rec),
+		deleteAttribute:   NewDeleteAttribute(tx, store, guard, ignoredRulesets{}, rec),
+		project:           NewUpdateProject(tx, store, rec),
+		env:               NewUpdateEnvironment(tx, store, rec),
+		unitType:          NewUpdateUnitType(tx, store, rec),
+		attribute:         NewUpdateAttribute(tx, store, rec),
 	}
 }
 
@@ -208,4 +226,42 @@ func (i *Importer) CreateAttribute(ctx context.Context, project workspace.Projec
 		Project: project, Action: "attribute.created", Entity: attributeEntity(a), After: attributeValues(a),
 	})
 	return a, err
+}
+
+// DeleteEnvironment deletes an environment as an ordinary request does,
+// refusing the project's last and a protected one, with everything it holds.
+func (i *Importer) DeleteEnvironment(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error {
+	e, err := i.store.EnvironmentByKey(ctx, project, key, false)
+	if err != nil {
+		return notFound(err, "environment")
+	}
+	return i.deleteEnvironment.Handle(ctx, DeleteEnvironmentCommand{
+		Project: project, Key: key, Expected: precondition.On(e.Version), Request: req,
+	})
+}
+
+// DeleteUnitType deletes a unit type as an ordinary request does, refusing
+// one a rule, rollout, override or segment still names. It moves no ruleset
+// on, though the ordinary deletion moves every environment's.
+func (i *Importer) DeleteUnitType(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error {
+	u, err := i.store.UnitTypeByKey(ctx, project, key, false)
+	if err != nil {
+		return notFound(err, "unit type")
+	}
+	return i.deleteUnitType.Handle(ctx, DeleteUnitTypeCommand{
+		Project: project, Key: key, Expected: precondition.On(u.Version), Request: req,
+	})
+}
+
+// DeleteAttribute deletes an attribute as an ordinary request does, refusing
+// a standard one and one a rule or segment still names. It moves no ruleset
+// on, though the ordinary deletion moves every environment's.
+func (i *Importer) DeleteAttribute(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error {
+	a, err := i.store.AttributeByKey(ctx, project, key, false)
+	if err != nil {
+		return notFound(err, "attribute")
+	}
+	return i.deleteAttribute.Handle(ctx, DeleteAttributeCommand{
+		Project: project, Key: key, Expected: precondition.On(a.Version), Request: req,
+	})
 }

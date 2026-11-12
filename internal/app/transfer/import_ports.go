@@ -45,6 +45,14 @@ type WorkspaceImport interface {
 	// UpdateAttribute writes an attribute's name and description; its type
 	// never changes.
 	UpdateAttribute(ctx context.Context, project workspace.ProjectID, key, name, description string, req governance.Request) (bool, error)
+	// DeleteEnvironment deletes an environment with everything it holds,
+	// refusing the project's last and a protected one.
+	DeleteEnvironment(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error
+	// DeleteUnitType and DeleteAttribute delete a declaration, refusing one
+	// something still names with in_use. Neither moves a ruleset on, though the
+	// ordinary deletion moves every environment's: the import does.
+	DeleteUnitType(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error
+	DeleteAttribute(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error
 }
 
 // Effect is what a write of an import port did: whether it changed anything,
@@ -139,6 +147,13 @@ type FlagsImport interface {
 	// WriteConfiguration writes the configuration whole; one the flag has
 	// already is not written.
 	WriteConfiguration(ctx context.Context, in ConfigurationImport) (Effect, error)
+	// DeleteSegment deletes a segment, refusing one a rule still names with
+	// in_use.
+	DeleteSegment(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) (Effect, error)
+	// DeleteFlag deletes a flag with its configurations, archiving it first
+	// when it is not archived. A flag another requires, or a draft or running
+	// experiment holds, is in_use.
+	DeleteFlag(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) (Effect, error)
 }
 
 // ExperimentImport is an experiment as a document gives it, to create or to
@@ -185,6 +200,16 @@ type ExperimentsImport interface {
 	// every experiment is written: until then one may take a salt another
 	// gives up later in the same import.
 	CheckSalts(ctx context.Context) error
+	// DeleteExperiment deletes a draft experiment.
+	DeleteExperiment(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error
+}
+
+// SDKKeys tells which SDK keys an environment holds, which keep an import from
+// deleting it.
+type SDKKeys interface {
+	// LiveSDKKeys returns the identifiers of the keys of environment that
+	// still authenticate: neither revoked nor past the end of their overlap.
+	LiveSDKKeys(ctx context.Context, environment workspace.EnvironmentID) ([]string, error)
 }
 
 // Owners resolves the owners a document names, who are email addresses.

@@ -312,7 +312,29 @@ func CheckMerge(d, current Document) error {
 	// gives without its salt keeps the one the project's rule has, an
 	// experiment the same, and no other rollout or experiment may then take
 	// it.
-	f.salts(adoptedConfigurations(d, current), keptSalts(d, current))
+	f.salts(adoptedConfigurations(d, current), keptSalts(d, current, false))
+	if len(f) == 0 {
+		return nil
+	}
+	return apperrors.Invalid(invalidDocument, invalidDocumentDetail, f...)
+}
+
+// CheckReplace returns the refusal of d as a document to replace the
+// configuration of the project whose document is current with, nil when it
+// holds what a document alone, read with the project, can tell. Every
+// section is required, as for a new project, and at least one environment,
+// since the project equals the document once it is applied; a configuration
+// may name only an environment of the document, since the others are
+// deleted. What the project holds that the document does not name is
+// deleted, so its salts are free for the document to reuse.
+func CheckReplace(d, current Document) error {
+	var f faults
+	f.createSections(d)
+	f.uniqueKeys(d)
+	f.declarations(d)
+	f.configurations(d)
+	f.types(d, current)
+	f.salts(adoptedConfigurations(d, current), keptSalts(d, current, true))
 	if len(f) == 0 {
 		return nil
 	}
@@ -384,15 +406,24 @@ func (f *faults) types(d, current Document) {
 // salts of every configuration the document does not give, which no rollout
 // of the document may reuse unless it is the same rule of the same flag, and
 // both salts of every experiment it does not name, which nothing may reuse.
-func keptSalts(d, current Document) map[string]saltOwner {
+// With replace the project keeps only the configurations of the flags and
+// environments the document names, and no experiment it does not name.
+func keptSalts(d, current Document, replace bool) map[string]saltOwner {
 	named := map[string]map[string]Configuration{}
 	for _, f := range d.Flags {
 		named[f.Key] = f.Configurations
 	}
+	environments := map[string]bool{}
+	for _, e := range d.Environments {
+		environments[e.Key] = true
+	}
 	kept := map[string]saltOwner{}
 	for _, fl := range current.Flags {
+		if _, ok := named[fl.Key]; replace && !ok {
+			continue
+		}
 		for _, env := range sortedConfigurationKeys(fl.Configurations) {
-			if _, replaced := named[fl.Key][env]; replaced {
+			if _, replaced := named[fl.Key][env]; replaced || (replace && !environments[env]) {
 				continue
 			}
 			for _, r := range fl.Configurations[env].Rules {
@@ -410,7 +441,7 @@ func keptSalts(d, current Document) map[string]saltOwner {
 		namedExperiments[e.Key] = true
 	}
 	for _, e := range current.Experiments {
-		if namedExperiments[e.Key] {
+		if namedExperiments[e.Key] || replace {
 			continue
 		}
 		for _, salt := range []string{e.InclusionSalt, e.VariationSalt} {

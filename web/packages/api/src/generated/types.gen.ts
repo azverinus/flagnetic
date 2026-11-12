@@ -3937,7 +3937,7 @@ export type WebhookDeliveryList = {
  */
 export type ImportResult = {
   project: DocumentProject;
-  mode: "create" | "merge";
+  mode: "create" | "merge" | "replace";
   source: "document";
   dry_run: boolean;
   changes: ImportChanges;
@@ -6188,9 +6188,9 @@ export type ImportProjectData = {
   };
   query: {
     /**
-     * How the document is applied; only `merge` is offered.
+     * How the document is applied, `merge` or `replace`.
      */
-    mode: "merge";
+    mode: "merge" | "replace";
     /**
      * Run the whole import and roll it back, answering what it would have done.
      */

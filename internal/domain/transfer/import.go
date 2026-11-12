@@ -25,6 +25,9 @@ const (
 	// ModeMerge creates or updates what the document names in a project and
 	// leaves the rest.
 	ModeMerge Mode = "merge"
+	// ModeReplace merges the document into a project, then deletes what the
+	// document does not name, unless something still uses it.
+	ModeReplace Mode = "replace"
 )
 
 // Source is what an import read its changes from.
