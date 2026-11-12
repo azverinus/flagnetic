@@ -264,7 +264,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	configuration := appflags.ConfigurationDeps{Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
 	owners := appaccess.NewOwnership(accessStore)
 	experimentStore := pgexperiments.NewStore(d.Pool)
-	workspaceImporter := appworkspace.NewImporter(tx, ws, appflags.NewConfigureEnvironment(flagStore), rec)
+	workspaceImporter := appworkspace.NewImporter(tx, ws, appflags.NewConfigureEnvironment(flagStore), appflags.NewDeclarationGuard(flagStore), rec)
 	flagImporter := appflags.NewImporter(appflags.ImporterDeps{
 		Tx: tx, Projects: flagStore, Environments: ws, Declarations: ws, Store: flagStore, Owners: owners, Recorder: flagRec,
 		Evaluations: eventStore,
@@ -733,6 +733,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Members: accessStore, History: auditLog,
 			WorkspaceImport: workspaceImporter, FlagsImport: transferFlags{flagImporter},
 			ExperimentsImport: transferExperiments{experimentImporter},
+			SDKKeys:           transferSDKKeys{keys: deliveryStore, clock: d.Clock},
 			Owners:            transferOwners{members: accessStore, ownership: owners}, Rulesets: rulesets, Audit: audit,
 			Clock: d.Clock, IDs: d.IDs,
 		}),

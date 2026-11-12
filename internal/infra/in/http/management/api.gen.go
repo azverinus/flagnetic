@@ -443,8 +443,9 @@ func (e HashCheckIndependenceVerdict) Valid() bool {
 
 // Defines values for ImportResultMode.
 const (
-	ImportResultModeCreate ImportResultMode = "create"
-	ImportResultModeMerge  ImportResultMode = "merge"
+	ImportResultModeCreate  ImportResultMode = "create"
+	ImportResultModeMerge   ImportResultMode = "merge"
+	ImportResultModeReplace ImportResultMode = "replace"
 )
 
 // Valid indicates whether the value is a known member of the ImportResultMode enum.
@@ -453,6 +454,8 @@ func (e ImportResultMode) Valid() bool {
 	case ImportResultModeCreate:
 		return true
 	case ImportResultModeMerge:
+		return true
+	case ImportResultModeReplace:
 		return true
 	default:
 		return false
@@ -1169,13 +1172,16 @@ func (e ListFlagsParamsSort) Valid() bool {
 
 // Defines values for ImportProjectParamsMode.
 const (
-	ImportProjectParamsModeMerge ImportProjectParamsMode = "merge"
+	ImportProjectParamsModeMerge   ImportProjectParamsMode = "merge"
+	ImportProjectParamsModeReplace ImportProjectParamsMode = "replace"
 )
 
 // Valid indicates whether the value is a known member of the ImportProjectParamsMode enum.
 func (e ImportProjectParamsMode) Valid() bool {
 	switch e {
 	case ImportProjectParamsModeMerge:
+		return true
+	case ImportProjectParamsModeReplace:
 		return true
 	default:
 		return false
@@ -6108,7 +6114,7 @@ type ImportProjectJSONBody = openapi_types.File
 
 // ImportProjectParams defines parameters for ImportProject.
 type ImportProjectParams struct {
-	// Mode How the document is applied; only `merge` is offered.
+	// Mode How the document is applied, `merge` or `replace`.
 	Mode ImportProjectParamsMode `form:"mode" json:"mode"`
 
 	// DryRun Run the whole import and roll it back, answering what it would have done.
@@ -10351,13 +10357,31 @@ type ClientInterface interface {
 	// Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
 	CheckHashUniformity(ctx context.Context, project ProjectKey, body CheckHashUniformityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ImportProjectWithBody Merge a project document into a project
+	// ImportProjectWithBody Merge a project document into a project, or replace the project's configuration with it
 	//
-	// Merges the document into the project: every environment, unit type,
-	// attribute, segment and flag it names is created, or updated when it
-	// differs from what the project has, by key, and everything else is left
-	// as it is. A section the document lacks is left untouched, so a partial
-	// document is applied as it is. The document is sent as
+	// With `mode=merge`, merges the document into the project: every
+	// environment, unit type, attribute, segment and flag it names is
+	// created, or updated when it differs from what the project has, by key,
+	// and everything else is left as it is. A section the document lacks is
+	// left untouched, so a partial document is applied as it is.
+	//
+	// With `mode=replace`, merges the document, which then holds every
+	// section and at least one environment, and then deletes what it does
+	// not name, in this order: experiments, flags, segments, attributes
+	// (never a standard one), unit types, environments; the project equals
+	// the document. Each deletion is the ordinary one and is recorded as it
+	// is, a flag that is not archived being archived first. An experiment the
+	// document lacks is deleted only while it is a draft; one that has
+	// started is 409 `not_draft`, naming every such experiment in `errors`
+	// and deleting nothing. Anything something still uses is not deleted: the
+	// import is 409 `in_use`, in a dry run too, listing in `references` all
+	// that still names what it would delete, such as a segment a rule serves,
+	// a flag another requires, or an experiment of the document holds, a
+	// declaration a rule uses, or an `sdk_key` of an environment, since an
+	// environment that holds SDK keys is never deleted by an import. A
+	// protected environment is not deleted either.
+	//
+	// The document is sent as
 	// `application/json` or `application/yaml`, as
 	// `GET /projects/{project}/export` writes it.
 	//
@@ -10424,13 +10448,31 @@ type ClientInterface interface {
 	// Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
 	ImportProjectWithBody(ctx context.Context, project ProjectKey, params *ImportProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ImportProject Merge a project document into a project
+	// ImportProject Merge a project document into a project, or replace the project's configuration with it
 	//
-	// Merges the document into the project: every environment, unit type,
-	// attribute, segment and flag it names is created, or updated when it
-	// differs from what the project has, by key, and everything else is left
-	// as it is. A section the document lacks is left untouched, so a partial
-	// document is applied as it is. The document is sent as
+	// With `mode=merge`, merges the document into the project: every
+	// environment, unit type, attribute, segment and flag it names is
+	// created, or updated when it differs from what the project has, by key,
+	// and everything else is left as it is. A section the document lacks is
+	// left untouched, so a partial document is applied as it is.
+	//
+	// With `mode=replace`, merges the document, which then holds every
+	// section and at least one environment, and then deletes what it does
+	// not name, in this order: experiments, flags, segments, attributes
+	// (never a standard one), unit types, environments; the project equals
+	// the document. Each deletion is the ordinary one and is recorded as it
+	// is, a flag that is not archived being archived first. An experiment the
+	// document lacks is deleted only while it is a draft; one that has
+	// started is 409 `not_draft`, naming every such experiment in `errors`
+	// and deleting nothing. Anything something still uses is not deleted: the
+	// import is 409 `in_use`, in a dry run too, listing in `references` all
+	// that still names what it would delete, such as a segment a rule serves,
+	// a flag another requires, or an experiment of the document holds, a
+	// declaration a rule uses, or an `sdk_key` of an environment, since an
+	// environment that holds SDK keys is never deleted by an import. A
+	// protected environment is not deleted either.
+	//
+	// The document is sent as
 	// `application/json` or `application/yaml`, as
 	// `GET /projects/{project}/export` writes it.
 	//
@@ -16235,13 +16277,31 @@ func (c *Client) CheckHashUniformity(ctx context.Context, project ProjectKey, bo
 	return c.Client.Do(req)
 }
 
-// ImportProjectWithBody Merge a project document into a project
+// ImportProjectWithBody Merge a project document into a project, or replace the project's configuration with it
 //
-// Merges the document into the project: every environment, unit type,
-// attribute, segment and flag it names is created, or updated when it
-// differs from what the project has, by key, and everything else is left
-// as it is. A section the document lacks is left untouched, so a partial
-// document is applied as it is. The document is sent as
+// With `mode=merge`, merges the document into the project: every
+// environment, unit type, attribute, segment and flag it names is
+// created, or updated when it differs from what the project has, by key,
+// and everything else is left as it is. A section the document lacks is
+// left untouched, so a partial document is applied as it is.
+//
+// With `mode=replace`, merges the document, which then holds every
+// section and at least one environment, and then deletes what it does
+// not name, in this order: experiments, flags, segments, attributes
+// (never a standard one), unit types, environments; the project equals
+// the document. Each deletion is the ordinary one and is recorded as it
+// is, a flag that is not archived being archived first. An experiment the
+// document lacks is deleted only while it is a draft; one that has
+// started is 409 `not_draft`, naming every such experiment in `errors`
+// and deleting nothing. Anything something still uses is not deleted: the
+// import is 409 `in_use`, in a dry run too, listing in `references` all
+// that still names what it would delete, such as a segment a rule serves,
+// a flag another requires, or an experiment of the document holds, a
+// declaration a rule uses, or an `sdk_key` of an environment, since an
+// environment that holds SDK keys is never deleted by an import. A
+// protected environment is not deleted either.
+//
+// The document is sent as
 // `application/json` or `application/yaml`, as
 // `GET /projects/{project}/export` writes it.
 //
@@ -16318,13 +16378,31 @@ func (c *Client) ImportProjectWithBody(ctx context.Context, project ProjectKey, 
 	return c.Client.Do(req)
 }
 
-// ImportProject Merge a project document into a project
+// ImportProject Merge a project document into a project, or replace the project's configuration with it
 //
-// Merges the document into the project: every environment, unit type,
-// attribute, segment and flag it names is created, or updated when it
-// differs from what the project has, by key, and everything else is left
-// as it is. A section the document lacks is left untouched, so a partial
-// document is applied as it is. The document is sent as
+// With `mode=merge`, merges the document into the project: every
+// environment, unit type, attribute, segment and flag it names is
+// created, or updated when it differs from what the project has, by key,
+// and everything else is left as it is. A section the document lacks is
+// left untouched, so a partial document is applied as it is.
+//
+// With `mode=replace`, merges the document, which then holds every
+// section and at least one environment, and then deletes what it does
+// not name, in this order: experiments, flags, segments, attributes
+// (never a standard one), unit types, environments; the project equals
+// the document. Each deletion is the ordinary one and is recorded as it
+// is, a flag that is not archived being archived first. An experiment the
+// document lacks is deleted only while it is a draft; one that has
+// started is 409 `not_draft`, naming every such experiment in `errors`
+// and deleting nothing. Anything something still uses is not deleted: the
+// import is 409 `in_use`, in a dry run too, listing in `references` all
+// that still names what it would delete, such as a segment a rule serves,
+// a flag another requires, or an experiment of the document holds, a
+// declaration a rule uses, or an `sdk_key` of an environment, since an
+// environment that holds SDK keys is never deleted by an import. A
+// protected environment is not deleted either.
+//
+// The document is sent as
 // `application/json` or `application/yaml`, as
 // `GET /projects/{project}/export` writes it.
 //
@@ -31961,13 +32039,31 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
 	CheckHashUniformityWithResponse(ctx context.Context, project ProjectKey, body CheckHashUniformityJSONRequestBody, reqEditors ...RequestEditorFn) (*CheckHashUniformityResponse, error)
 
-	// ImportProjectWithBodyWithResponse Merge a project document into a project
+	// ImportProjectWithBodyWithResponse Merge a project document into a project, or replace the project's configuration with it
 	//
-	// Merges the document into the project: every environment, unit type,
-	// attribute, segment and flag it names is created, or updated when it
-	// differs from what the project has, by key, and everything else is left
-	// as it is. A section the document lacks is left untouched, so a partial
-	// document is applied as it is. The document is sent as
+	// With `mode=merge`, merges the document into the project: every
+	// environment, unit type, attribute, segment and flag it names is
+	// created, or updated when it differs from what the project has, by key,
+	// and everything else is left as it is. A section the document lacks is
+	// left untouched, so a partial document is applied as it is.
+	//
+	// With `mode=replace`, merges the document, which then holds every
+	// section and at least one environment, and then deletes what it does
+	// not name, in this order: experiments, flags, segments, attributes
+	// (never a standard one), unit types, environments; the project equals
+	// the document. Each deletion is the ordinary one and is recorded as it
+	// is, a flag that is not archived being archived first. An experiment the
+	// document lacks is deleted only while it is a draft; one that has
+	// started is 409 `not_draft`, naming every such experiment in `errors`
+	// and deleting nothing. Anything something still uses is not deleted: the
+	// import is 409 `in_use`, in a dry run too, listing in `references` all
+	// that still names what it would delete, such as a segment a rule serves,
+	// a flag another requires, or an experiment of the document holds, a
+	// declaration a rule uses, or an `sdk_key` of an environment, since an
+	// environment that holds SDK keys is never deleted by an import. A
+	// protected environment is not deleted either.
+	//
+	// The document is sent as
 	// `application/json` or `application/yaml`, as
 	// `GET /projects/{project}/export` writes it.
 	//
@@ -32034,13 +32130,31 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
 	ImportProjectWithBodyWithResponse(ctx context.Context, project ProjectKey, params *ImportProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportProjectResponse, error)
 
-	// ImportProjectWithResponse Merge a project document into a project
+	// ImportProjectWithResponse Merge a project document into a project, or replace the project's configuration with it
 	//
-	// Merges the document into the project: every environment, unit type,
-	// attribute, segment and flag it names is created, or updated when it
-	// differs from what the project has, by key, and everything else is left
-	// as it is. A section the document lacks is left untouched, so a partial
-	// document is applied as it is. The document is sent as
+	// With `mode=merge`, merges the document into the project: every
+	// environment, unit type, attribute, segment and flag it names is
+	// created, or updated when it differs from what the project has, by key,
+	// and everything else is left as it is. A section the document lacks is
+	// left untouched, so a partial document is applied as it is.
+	//
+	// With `mode=replace`, merges the document, which then holds every
+	// section and at least one environment, and then deletes what it does
+	// not name, in this order: experiments, flags, segments, attributes
+	// (never a standard one), unit types, environments; the project equals
+	// the document. Each deletion is the ordinary one and is recorded as it
+	// is, a flag that is not archived being archived first. An experiment the
+	// document lacks is deleted only while it is a draft; one that has
+	// started is 409 `not_draft`, naming every such experiment in `errors`
+	// and deleting nothing. Anything something still uses is not deleted: the
+	// import is 409 `in_use`, in a dry run too, listing in `references` all
+	// that still names what it would delete, such as a segment a rule serves,
+	// a flag another requires, or an experiment of the document holds, a
+	// declaration a rule uses, or an `sdk_key` of an environment, since an
+	// environment that holds SDK keys is never deleted by an import. A
+	// protected environment is not deleted either.
+	//
+	// The document is sent as
 	// `application/json` or `application/yaml`, as
 	// `GET /projects/{project}/export` writes it.
 	//
@@ -53889,13 +54003,31 @@ func (c *ClientWithResponses) CheckHashUniformityWithResponse(ctx context.Contex
 	return ParseCheckHashUniformityResponse(rsp)
 }
 
-// ImportProjectWithBodyWithResponse Merge a project document into a project
+// ImportProjectWithBodyWithResponse Merge a project document into a project, or replace the project's configuration with it
 //
-// Merges the document into the project: every environment, unit type,
-// attribute, segment and flag it names is created, or updated when it
-// differs from what the project has, by key, and everything else is left
-// as it is. A section the document lacks is left untouched, so a partial
-// document is applied as it is. The document is sent as
+// With `mode=merge`, merges the document into the project: every
+// environment, unit type, attribute, segment and flag it names is
+// created, or updated when it differs from what the project has, by key,
+// and everything else is left as it is. A section the document lacks is
+// left untouched, so a partial document is applied as it is.
+//
+// With `mode=replace`, merges the document, which then holds every
+// section and at least one environment, and then deletes what it does
+// not name, in this order: experiments, flags, segments, attributes
+// (never a standard one), unit types, environments; the project equals
+// the document. Each deletion is the ordinary one and is recorded as it
+// is, a flag that is not archived being archived first. An experiment the
+// document lacks is deleted only while it is a draft; one that has
+// started is 409 `not_draft`, naming every such experiment in `errors`
+// and deleting nothing. Anything something still uses is not deleted: the
+// import is 409 `in_use`, in a dry run too, listing in `references` all
+// that still names what it would delete, such as a segment a rule serves,
+// a flag another requires, or an experiment of the document holds, a
+// declaration a rule uses, or an `sdk_key` of an environment, since an
+// environment that holds SDK keys is never deleted by an import. A
+// protected environment is not deleted either.
+//
+// The document is sent as
 // `application/json` or `application/yaml`, as
 // `GET /projects/{project}/export` writes it.
 //
@@ -53968,13 +54100,31 @@ func (c *ClientWithResponses) ImportProjectWithBodyWithResponse(ctx context.Cont
 	return ParseImportProjectResponse(rsp)
 }
 
-// ImportProjectWithResponse Merge a project document into a project
+// ImportProjectWithResponse Merge a project document into a project, or replace the project's configuration with it
 //
-// Merges the document into the project: every environment, unit type,
-// attribute, segment and flag it names is created, or updated when it
-// differs from what the project has, by key, and everything else is left
-// as it is. A section the document lacks is left untouched, so a partial
-// document is applied as it is. The document is sent as
+// With `mode=merge`, merges the document into the project: every
+// environment, unit type, attribute, segment and flag it names is
+// created, or updated when it differs from what the project has, by key,
+// and everything else is left as it is. A section the document lacks is
+// left untouched, so a partial document is applied as it is.
+//
+// With `mode=replace`, merges the document, which then holds every
+// section and at least one environment, and then deletes what it does
+// not name, in this order: experiments, flags, segments, attributes
+// (never a standard one), unit types, environments; the project equals
+// the document. Each deletion is the ordinary one and is recorded as it
+// is, a flag that is not archived being archived first. An experiment the
+// document lacks is deleted only while it is a draft; one that has
+// started is 409 `not_draft`, naming every such experiment in `errors`
+// and deleting nothing. Anything something still uses is not deleted: the
+// import is 409 `in_use`, in a dry run too, listing in `references` all
+// that still names what it would delete, such as a segment a rule serves,
+// a flag another requires, or an experiment of the document holds, a
+// declaration a rule uses, or an `sdk_key` of an environment, since an
+// environment that holds SDK keys is never deleted by an import. A
+// protected environment is not deleted either.
+//
+// The document is sent as
 // `application/json` or `application/yaml`, as
 // `GET /projects/{project}/export` writes it.
 //
@@ -71165,7 +71315,7 @@ type ServerInterface interface {
 	// CheckHashUniformity Check the hash's uniformity on real unit IDs
 	// (POST /projects/{project}/hash-check)
 	CheckHashUniformity(w http.ResponseWriter, r *http.Request, project ProjectKey)
-	// ImportProject Merge a project document into a project
+	// ImportProject Merge a project document into a project, or replace the project's configuration with it
 	// (POST /projects/{project}/import)
 	ImportProject(w http.ResponseWriter, r *http.Request, project ProjectKey, params ImportProjectParams)
 	// ListProjectInvitations The people invited to a project
@@ -101205,7 +101355,7 @@ type StrictServerInterface interface {
 	// CheckHashUniformity Check the hash's uniformity on real unit IDs
 	// (POST /projects/{project}/hash-check)
 	CheckHashUniformity(ctx context.Context, request CheckHashUniformityRequestObject) (CheckHashUniformityResponseObject, error)
-	// ImportProject Merge a project document into a project
+	// ImportProject Merge a project document into a project, or replace the project's configuration with it
 	// (POST /projects/{project}/import)
 	ImportProject(ctx context.Context, request ImportProjectRequestObject) (ImportProjectResponseObject, error)
 	// ListProjectInvitations The people invited to a project

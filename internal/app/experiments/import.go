@@ -10,12 +10,14 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/id"
+	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
 // ImportStore is what the import writes experiments with.
 type ImportStore interface {
 	ExperimentCreator
 	ExperimentUpdater
+	ExperimentDeleter
 	// DeferSaltChecks lets an experiment of the project take, until
 	// CheckSalts or the end of the unit of work, a salt another still has:
 	// an import may hand one draft's salt to another experiment, or swap two
@@ -49,10 +51,27 @@ type ImporterDeps struct {
 // document names, which is what keeps a unit in its assignment in a copy. It
 // never moves an experiment through its status: an experiment that exists
 // changes only as an edit of its status allows.
-type Importer struct{ d ImporterDeps }
+type Importer struct {
+	d                ImporterDeps
+	deleteExperiment *DeleteExperiment
+}
 
 // NewImporter returns the importer.
-func NewImporter(d ImporterDeps) *Importer { return &Importer{d: d} }
+func NewImporter(d ImporterDeps) *Importer {
+	return &Importer{d: d, deleteExperiment: NewDeleteExperiment(DeleteExperimentDeps{
+		Tx: d.Tx, Projects: d.Projects, Store: d.Store, Recorder: d.Recorder,
+	})}
+}
+
+// DeleteExperiment deletes the draft experiment keyed key as an ordinary
+// request does, recorded as deleted; any other is not_draft or archived.
+func (i *Importer) DeleteExperiment(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error {
+	e, err := i.d.Store.ExperimentByKey(ctx, project, key)
+	if err != nil {
+		return experimentNotFound(err)
+	}
+	return i.deleteExperiment.Handle(ctx, ExperimentCommand{Project: project, Key: key, Expected: precondition.On(e.Version), Request: req})
+}
 
 // ImportCommand is an experiment as a document gives it. Owner is the member
 // the document's owner resolved to, nil when it resolved to none: the

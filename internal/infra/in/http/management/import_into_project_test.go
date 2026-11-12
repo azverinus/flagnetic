@@ -33,7 +33,14 @@ func mergeInto(t *testing.T, c *management.ClientWithResponses, project string, 
 func mergeBody(t *testing.T, c *management.ClientWithResponses, project, contentType string, body []byte, opts ...mergeOptions,
 ) *management.ImportProjectResponse {
 	t.Helper()
-	params := management.ImportProjectParams{Mode: management.ImportProjectParamsModeMerge}
+	return importBody(t, c, project, management.ImportProjectParamsModeMerge, contentType, body, opts...)
+}
+
+func importBody(t *testing.T, c *management.ClientWithResponses, project string, mode management.ImportProjectParamsMode,
+	contentType string, body []byte, opts ...mergeOptions,
+) *management.ImportProjectResponse {
+	t.Helper()
+	params := management.ImportProjectParams{Mode: mode}
 	for _, o := range opts {
 		if o.dryRun {
 			params.DryRun = ptr(true)
@@ -641,8 +648,8 @@ func TestMergeRefusesWhatIsNotADocumentAndAnUnknownProject(t *testing.T) {
 	if res := mergeInto(t, f.admin, k, map[string]any{"schema_version": 1, "colour": "red"}); res.StatusCode() != http.StatusUnprocessableEntity {
 		t.Errorf("an unknown field = %d: %s", res.StatusCode(), res.Body)
 	}
-	// Only a merge is offered: another mode is not run as one.
-	for _, mode := range []management.ImportProjectParamsMode{"replace", "upsert"} {
+	// Only a merge and a replace are offered: another mode is not run as one.
+	for _, mode := range []management.ImportProjectParamsMode{"create", "upsert"} {
 		params := management.ImportProjectParams{Mode: mode, DryRun: ptr(true)}
 		res := do(f.admin.ImportProjectWithBodyWithResponse(t.Context(), k, &params, "application/json", strings.NewReader(`{"schema_version": 1}`)))
 		assertProblem(t, "mode "+string(mode), res.StatusCode(), res.Body, http.StatusBadRequest, "invalid_request")

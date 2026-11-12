@@ -14,7 +14,9 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
+	pgdelivery "github.com/azverinus/flagnetic/internal/infra/out/postgres/delivery"
 	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
 )
 
 // transferFlags gives the transfer context the import port of the flags
@@ -86,6 +88,16 @@ func (f transferFlags) WriteConfiguration(ctx context.Context, in apptransfer.Co
 	return effectOf(e), err
 }
 
+func (f transferFlags) DeleteSegment(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) (apptransfer.Effect, error) {
+	e, err := f.importer.DeleteSegment(ctx, project, key, req)
+	return effectOf(e), err
+}
+
+func (f transferFlags) DeleteFlag(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) (apptransfer.Effect, error) {
+	e, err := f.importer.DeleteFlag(ctx, project, key, req)
+	return effectOf(e), err
+}
+
 // transferExperiments gives the transfer context the import port of the
 // experiments context, which it may not import.
 type transferExperiments struct{ importer *appexperiments.Importer }
@@ -113,6 +125,35 @@ func (e transferExperiments) UpdateExperiment(ctx context.Context, in apptransfe
 }
 
 func (e transferExperiments) CheckSalts(ctx context.Context) error { return e.importer.CheckSalts(ctx) }
+
+func (e transferExperiments) DeleteExperiment(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error {
+	return e.importer.DeleteExperiment(ctx, project, key, req)
+}
+
+// transferSDKKeys gives the transfer context the SDK keys of the delivery
+// context, which it may not import.
+type transferSDKKeys struct {
+	keys  *pgdelivery.Store
+	clock clock.Clock
+}
+
+var _ apptransfer.SDKKeys = transferSDKKeys{}
+
+func (k transferSDKKeys) LiveSDKKeys(ctx context.Context, environment workspace.EnvironmentID) ([]string, error) {
+	all, err := k.keys.SDKKeys(ctx, environment)
+	if err != nil {
+		return nil, err
+	}
+	now := k.clock.Now()
+	var live []string
+	for _, key := range all {
+		if key.RevokedAt != nil || (key.ExpiresAt != nil && !key.ExpiresAt.After(now)) {
+			continue
+		}
+		live = append(live, key.ID.String())
+	}
+	return live, nil
+}
 
 // transferProjects gives the transfer context the project row lock of the
 // workspace context.

@@ -2767,7 +2767,7 @@ export const zDocumentProject = z.object({
  */
 export const zImportResult = z.object({
   project: zDocumentProject,
-  mode: z.enum(["create", "merge"]),
+  mode: z.enum(["create", "merge", "replace"]),
   source: z.enum(["document"]),
   dry_run: z.boolean(),
   changes: zImportChanges,
@@ -3455,7 +3455,7 @@ export const zImportProjectPath = z.object({
 });
 
 export const zImportProjectQuery = z.object({
-  mode: z.enum(["merge"]),
+  mode: z.enum(["merge", "replace"]),
   dry_run: z.boolean().optional().default(false),
 });
 

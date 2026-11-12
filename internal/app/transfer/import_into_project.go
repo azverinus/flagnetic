@@ -30,6 +30,7 @@ type ImportIntoProjectDeps struct {
 	WorkspaceImport   WorkspaceImport
 	FlagsImport       FlagsImport
 	ExperimentsImport ExperimentsImport
+	SDKKeys           SDKKeys
 	Owners            Owners
 	Rulesets          Rulesets
 	Audit             AuditLog
@@ -49,7 +50,10 @@ func NewImportIntoProject(d ImportIntoProjectDeps) *ImportIntoProject {
 // when given, is the entity tag of the project's state the import is based
 // on, as an answer to a dry run gave it. Caller is the member importing.
 type ImportIntoProjectCommand struct {
-	Project  workspace.ProjectID
+	Project workspace.ProjectID
+	// Mode is merge, or replace, which also deletes what the document does not
+	// name; the zero value is merge.
+	Mode     transfer.Mode
 	Document transfer.Document
 	DryRun   bool
 	IfMatch  *string
@@ -188,7 +192,11 @@ type mergeRun struct {
 // apply writes the document in the unit of work ctx carries.
 func (r *mergeRun) apply(ctx context.Context) (ImportResult, error) {
 	r.current = transfer.FromSnapshot(r.snapshot)
-	if err := r.refuse(transfer.CheckMerge(r.doc, r.current)); err != nil {
+	check := transfer.CheckMerge
+	if r.mode() == transfer.ModeReplace {
+		check = transfer.CheckReplace
+	}
+	if err := r.refuse(check(r.doc, r.current)); err != nil {
 		return ImportResult{}, err
 	}
 	r.eff = transfer.Effective(r.current, r.doc)
@@ -206,7 +214,7 @@ func (r *mergeRun) apply(ctx context.Context) (ImportResult, error) {
 	}
 	out := ImportResult{
 		Project: transfer.Project{Key: r.project.Key, Name: r.project.Name, Description: r.project.Description},
-		Mode:    transfer.ModeMerge, Source: transfer.SourceDocument,
+		Mode:    r.mode(), Source: transfer.SourceDocument,
 	}
 	steps := []func(context.Context) error{
 		r.updateProject, r.writeEnvironments, r.writeUnitTypes, r.writeAttributes, r.writeSegments, r.writeFlags,
@@ -220,6 +228,16 @@ func (r *mergeRun) apply(ctx context.Context) (ImportResult, error) {
 	if len(r.faults) > 0 {
 		return out, r.invalid()
 	}
+	if r.mode() == transfer.ModeReplace {
+		if err := r.deleteAbsent(ctx); err != nil {
+			return out, err
+		}
+		if len(r.plan.Experiments.Created)+len(r.plan.Experiments.Updated) > 0 {
+			if err := r.h.d.ExperimentsImport.CheckSalts(ctx); err != nil {
+				return out, err
+			}
+		}
+	}
 	out.Project = transfer.Project{Key: r.project.Key, Name: r.project.Name, Description: r.project.Description}
 	r.listFlagUpdates()
 	out.Changes, out.Warnings = r.changes, r.warnings
@@ -229,7 +247,15 @@ func (r *mergeRun) apply(ctx context.Context) (ImportResult, error) {
 	if err := r.moveRulesets(ctx); err != nil {
 		return out, err
 	}
-	return out, r.record(ctx, transfer.ModeMerge)
+	return out, r.record(ctx, r.mode())
+}
+
+// mode is how the document is applied.
+func (r *mergeRun) mode() transfer.Mode {
+	if r.cmd.Mode == transfer.ModeReplace {
+		return transfer.ModeReplace
+	}
+	return transfer.ModeMerge
 }
 
 // resolve settles what the document says that the project overrules: an
@@ -673,7 +699,10 @@ func (r *mergeRun) writeExperiments(ctx context.Context) error {
 			r.moveEnvironments(effect.Environments)
 		}
 	}
-	if len(r.plan.Experiments.Created)+len(r.plan.Experiments.Updated) == 0 {
+	if len(r.plan.Experiments.Created)+len(r.plan.Experiments.Updated) == 0 || r.mode() == transfer.ModeReplace {
+		// A replace checks the salts once it has deleted what the document
+		// lacks, since an experiment of the document may take the salt of a
+		// draft that goes.
 		return nil
 	}
 	return e.CheckSalts(ctx)
