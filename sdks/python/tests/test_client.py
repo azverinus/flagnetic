@@ -660,7 +660,10 @@ def test_a_key_the_http_library_refuses_never_reaches_the_log(
         client = clients(serving(RULESET), stream=True, logger=logs, _time_divisor=100)
         client.alias("anonymous", "d-1", "user", "u-1")
         client.flush(timeout=2)
-        assert eventually(lambda: [] if logs.count("sse_dropped") and logs.count("fetch_failed") else ["none"]) == []
+        assert (
+            eventually(lambda: [] if logs.count("sse_dropped") and logs.count("fetch_failed") else ["none"])
+            == []
+        )
     logged = repr(logs.events) + caplog.text
     assert SDK_KEY not in logged
     assert logs.count("evaluation_failed") == 0
