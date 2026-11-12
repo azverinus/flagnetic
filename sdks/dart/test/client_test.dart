@@ -79,6 +79,49 @@ void main() {
       );
     });
 
+    test('a key that is no header token is refused without repeating it', () {
+      for (final bad in [
+        'fn_cli_SECRETKEY0\n',
+        ' fn_cli_SECRETKEY0',
+        'fn_cli_SECRET KEY0',
+        'fn_cli_SECRET\tKEY0',
+        'fn_cli_SECRET\u0000KEY0',
+        'fn_cli_SECRETKEY0\u00e9',
+      ]) {
+        Object? error;
+        try {
+          Flagnetic.client(
+            bad,
+            baseUrl: Uri.parse('http://127.0.0.1:1'),
+            context: context,
+          );
+        } on ArgumentError catch (e) {
+          error = e;
+        }
+        expect(error, isA<ArgumentError>(), reason: bad);
+        expect('$error', isNot(contains('SECRET')), reason: bad);
+      }
+    });
+
+    test(
+      'a header the HTTP library refuses is logged by its class alone',
+      () async {
+        final server = await startServer();
+        final logs = LogRecorder();
+        // A newline in the platform makes the User-Agent header invalid, the
+        // one header value the caller still controls after construction.
+        clientOf(server, logs: logs, platform: 'PLATFORMVALUE\n');
+        await eventually(() => logs.count(LogEvents.fetchFailed) >= 1);
+        expect(
+          logs.fieldsOf(LogEvents.fetchFailed).first['detail'],
+          'request not built: FormatException',
+        );
+        final logged = '${logs.events}';
+        expect(logged, isNot(contains(clientKey)));
+        expect(logged, isNot(contains('PLATFORMVALUE')));
+      },
+    );
+
     test('anything else constructs, even without a base URL', () async {
       final logs = LogRecorder();
       final client = Flagnetic.client(

@@ -50,6 +50,25 @@ void main() {
     fail('expected a TransportException');
   }
 
+  test(
+    'a header the HTTP library refuses is reported without its value',
+    () async {
+      final (url, _) = await rawServer(null);
+      final headers = {'Authorization': 'Bearer fn_cli_SECRETKEY0\n'};
+      final post = await failure(
+        transport.postJson(url, headers, [123], const Duration(seconds: 2)),
+      );
+      final stream = await failure(
+        transport.openStream(url, headers, const Duration(seconds: 2)),
+      );
+      for (final e in [post, stream]) {
+        expect(e.kind, TransportFailure.network);
+        expect('$e', isNot(contains('SECRET')));
+        expect(e.detail, contains('FormatException'));
+      }
+    },
+  );
+
   test('a post whose body outlasts the timeout is cut off', () async {
     final (url, closed) = await rawServer(
       'HTTP/1.1 200 OK\r\nContent-Length: 1000\r\n\r\nx',
