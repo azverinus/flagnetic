@@ -76,6 +76,24 @@ export function formatLifetime(i18n: I18n, seconds: number): string {
   );
 }
 
+/**
+ * How far behind a delivery is: seconds under a minute, then whole minutes,
+ * hours or days, rounded down, so a lag shown never exceeds the real one.
+ */
+export function formatLag(i18n: I18n, seconds: number): string {
+  const [unit, size] =
+    seconds >= 86_400
+      ? (["day", 86_400] as const)
+      : seconds >= 3_600
+        ? (["hour", 3_600] as const)
+        : seconds >= 60
+          ? (["minute", 60] as const)
+          : (["second", 1] as const);
+  return new Intl.NumberFormat(i18n.locale, { style: "unit", unit, unitDisplay: "long" }).format(
+    Math.floor(seconds / size),
+  );
+}
+
 /** A language's name in that language, as a language picker shows it. */
 export function languageName(locale: string): string {
   const name = new Intl.DisplayNames([locale], { type: "language" }).of(locale) ?? locale;

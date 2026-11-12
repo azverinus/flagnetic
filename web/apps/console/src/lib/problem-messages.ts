@@ -185,6 +185,18 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       );
     case "unknown_event_type":
       return i18n._(msg`One of the event types is not in the catalogue.`);
+    case "link_local_target":
+      return i18n._(
+        msg`This target is on a link-local address, which the instance never reaches. Use another address.`,
+      );
+    case "unknown_environment":
+      return i18n._(msg`One of the environments does not exist in this project.`);
+    case "no_secret_to_rotate":
+      return i18n._(
+        msg`Only a webhook sink has a secret the server draws. Change this sink's password or secret access key by editing it.`,
+      );
+    case "kind_immutable":
+      return i18n._(msg`A sink's kind cannot be changed. Create a new sink of the other kind.`);
     case "export_too_large":
       return i18n._(
         msg`Too many entries match these filters to download at once. Narrow them, for example with From and To, and try again.`,
@@ -468,9 +480,51 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
         msg`Enter the http or https URL of the identity provider, without credentials, a query or a fragment.`,
       );
     case "insecure_url":
+      // A webhook sink's target is refused for the instance's setting, not a loopback rule.
+      if (violation.pointer.startsWith("/webhook/")) {
+        return i18n._(
+          msg`This instance accepts only https targets. Use an https URL, or ask the operator to allow plain http.`,
+        );
+      }
       return i18n._(
         msg`Use an https URL. Plain http is accepted only on a loopback address such as localhost.`,
       );
+    case "private_network_target":
+      return i18n._(
+        msg`This instance does not reach targets on its own network. Use a public address, or ask the operator to allow private networks.`,
+      );
+    case "link_local_target":
+      return i18n._(
+        msg`This target is on a link-local address, which the instance never reaches. Use another address.`,
+      );
+    case "invalid_url":
+      return i18n._(
+        msg`Enter an absolute http or https URL without credentials or a fragment. A ClickHouse or object storage URL takes no query.`,
+      );
+    case "invalid_table_prefix":
+      return i18n._(msg`Use letters, digits and underscores, not starting with a digit.`);
+    case "invalid_endpoint":
+      return i18n._(
+        msg`Enter a scheme, a host and an optional port, such as https://s3.example.com.`,
+      );
+    case "invalid_bucket":
+      return i18n._(msg`Use letters, digits, dots, hyphens and underscores.`);
+    case "invalid_format":
+      return i18n._(msg`Choose JSON lines or Parquet.`);
+    case "invalid_compression":
+      return i18n._(msg`This compression does not fit the format. Parquet files are always zstd.`);
+    case "invalid_header":
+      return i18n._(
+        msg`A header has a name of letters, digits and symbols without spaces, and a value on one line.`,
+      );
+    case "reserved":
+      return violation.pointer.includes("/headers/")
+        ? i18n._(msg`The X-Flagnetic- headers are the platform's own.`)
+        : i18n._(msg`Delivery sets this setting itself.`);
+    case "invalid_event_kind":
+      return i18n._(msg`Choose exposures, aliases or evaluation summaries.`);
+    case "unknown_environment":
+      return i18n._(msg`The project has no environment with this key.`);
     case "metadata_required":
       return i18n._(msg`Enter the URL of the identity provider's metadata, or paste it.`);
     case "metadata_conflict":
