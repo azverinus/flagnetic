@@ -232,11 +232,9 @@ func (i *Importer) CreateAttribute(ctx context.Context, project workspace.Projec
 // refusing the project's last and a protected one, with everything it holds.
 func (i *Importer) DeleteEnvironment(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error {
 	e, err := i.store.EnvironmentByKey(ctx, project, key, false)
-	expected, err := versionOf(e.Version, err, "environment")
-	if err != nil {
-		return err
-	}
-	return i.deleteEnvironment.Handle(ctx, DeleteEnvironmentCommand{Project: project, Key: key, Expected: expected, Request: req})
+	return deleteOn(e.Version, err, "environment", func(expected precondition.Version) error {
+		return i.deleteEnvironment.Handle(ctx, DeleteEnvironmentCommand{Project: project, Key: key, Expected: expected, Request: req})
+	})
 }
 
 // DeleteUnitType deletes a unit type as an ordinary request does, refusing
@@ -244,11 +242,9 @@ func (i *Importer) DeleteEnvironment(ctx context.Context, project workspace.Proj
 // on, though the ordinary deletion moves every environment's.
 func (i *Importer) DeleteUnitType(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error {
 	u, err := i.store.UnitTypeByKey(ctx, project, key, false)
-	expected, err := versionOf(u.Version, err, "unit type")
-	if err != nil {
-		return err
-	}
-	return i.deleteUnitType.Handle(ctx, DeleteUnitTypeCommand{Project: project, Key: key, Expected: expected, Request: req})
+	return deleteOn(u.Version, err, "unit type", func(expected precondition.Version) error {
+		return i.deleteUnitType.Handle(ctx, DeleteUnitTypeCommand{Project: project, Key: key, Expected: expected, Request: req})
+	})
 }
 
 // DeleteAttribute deletes an attribute as an ordinary request does, refusing
@@ -256,18 +252,16 @@ func (i *Importer) DeleteUnitType(ctx context.Context, project workspace.Project
 // on, though the ordinary deletion moves every environment's.
 func (i *Importer) DeleteAttribute(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error {
 	a, err := i.store.AttributeByKey(ctx, project, key, false)
-	expected, err := versionOf(a.Version, err, "attribute")
-	if err != nil {
-		return err
-	}
-	return i.deleteAttribute.Handle(ctx, DeleteAttributeCommand{Project: project, Key: key, Expected: expected, Request: req})
+	return deleteOn(a.Version, err, "attribute", func(expected precondition.Version) error {
+		return i.deleteAttribute.Handle(ctx, DeleteAttributeCommand{Project: project, Key: key, Expected: expected, Request: req})
+	})
 }
 
-// versionOf returns the version an entity just read is deleted on, or the
-// not-found answer of the read that failed.
-func versionOf(version int64, err error, what string) (precondition.Version, error) {
+// deleteOn deletes an entity just read at version, or answers the not-found
+// of the read that failed.
+func deleteOn(version int64, err error, what string, del func(precondition.Version) error) error {
 	if err != nil {
-		return precondition.None(), notFound(err, what)
+		return notFound(err, what)
 	}
-	return precondition.On(version), nil
+	return del(precondition.On(version))
 }
