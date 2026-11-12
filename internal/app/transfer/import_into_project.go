@@ -232,6 +232,11 @@ func (r *mergeRun) apply(ctx context.Context) (ImportResult, error) {
 		if err := r.deleteAbsent(ctx); err != nil {
 			return out, err
 		}
+		if len(r.plan.Experiments.Created)+len(r.plan.Experiments.Updated) > 0 {
+			if err := r.h.d.ExperimentsImport.CheckSalts(ctx); err != nil {
+				return out, err
+			}
+		}
 	}
 	out.Project = transfer.Project{Key: r.project.Key, Name: r.project.Name, Description: r.project.Description}
 	r.listFlagUpdates()
@@ -694,7 +699,10 @@ func (r *mergeRun) writeExperiments(ctx context.Context) error {
 			r.moveEnvironments(effect.Environments)
 		}
 	}
-	if len(r.plan.Experiments.Created)+len(r.plan.Experiments.Updated) == 0 {
+	if len(r.plan.Experiments.Created)+len(r.plan.Experiments.Updated) == 0 || r.mode() == transfer.ModeReplace {
+		// A replace checks the salts once it has deleted what the document
+		// lacks, since an experiment of the document may take the salt of a
+		// draft that goes.
 		return nil
 	}
 	return e.CheckSalts(ctx)

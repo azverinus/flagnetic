@@ -23,12 +23,16 @@ func (r *mergeRun) deleteAbsent(ctx context.Context) error {
 		return err
 	}
 	used := slices.Clone(del.Held)
+	// refused stays true once a deletion is refused for being in use, so that
+	// the import is refused even were a refusal to name no reference.
+	refused := len(used) > 0
 	// remove deletes the entity keyed key, noting a refusal for being in use
 	// and returning any other error, which ends the import.
 	remove := func(key string, f func() error, deleted *[]string) error {
 		err := f()
 		if refs, inUse := inUseReferences(err); inUse {
 			used = append(used, refs...)
+			refused = true
 			return nil
 		}
 		if err != nil {
@@ -95,6 +99,7 @@ func (r *mergeRun) deleteAbsent(ctx context.Context) error {
 			return err
 		}
 		if len(keys) > 0 {
+			refused = true
 			for _, k := range keys {
 				used = append(used, flags.Reference{Kind: "sdk_key", Key: k, Environment: key})
 			}
@@ -107,7 +112,7 @@ func (r *mergeRun) deleteAbsent(ctx context.Context) error {
 		delete(r.environments, key)
 		delete(r.moved, key)
 	}
-	if len(used) > 0 {
+	if refused {
 		return flags.ErrInUse(used)
 	}
 	return nil

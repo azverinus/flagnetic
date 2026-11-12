@@ -65,6 +65,15 @@ func TestAFlagIsDeletedAfterTheAbsentFlagsThatRequireIt(t *testing.T) {
 		t.Errorf("flags = %v, want %v", del.Flags, want)
 	}
 
+	// A rule's prerequisite condition requires a flag as a prerequisite does.
+	cur.Flags = append(cur.Flags, transfer.Flag{Key: "a_gated", Type: "boolean", Name: "Gated", Configurations: map[string]transfer.Configuration{
+		"production": {Rules: []transfer.Rule{{Conditions: []transfer.Condition{{Kind: "prerequisite", Flag: "extra_too", Variation: "true"}}}}},
+	}})
+	if got, want := transfer.PlanDeletions(cur, doc).Flags, []string{"a_gated", "extra_too", "extra", "checkout"}; !slices.Equal(got, want) {
+		t.Errorf("flags = %v, want %v", got, want)
+	}
+	cur.Flags = cur.Flags[:len(cur.Flags)-1]
+
 	// A flag that is kept is not ordered at all; the one requiring it goes.
 	doc = clone(t, cur)
 	doc.Flags = doc.Flags[:2]

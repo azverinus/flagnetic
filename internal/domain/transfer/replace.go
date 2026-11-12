@@ -124,16 +124,28 @@ func orderedFlags(current Document, keys []string) []string {
 		deleting[k] = true
 	}
 	// requiredBy maps a flag to the flags to delete that require it, in any
-	// environment.
+	// environment, as a prerequisite or in a rule's prerequisite condition:
+	// either keeps the required flag in use.
 	requiredBy := map[string][]string{}
+	require := func(required, by string) {
+		if deleting[required] && !slices.Contains(requiredBy[required], by) {
+			requiredBy[required] = append(requiredBy[required], by)
+		}
+	}
 	for _, f := range current.Flags {
 		if !deleting[f.Key] {
 			continue
 		}
 		for _, env := range sortedConfigurationKeys(f.Configurations) {
-			for _, p := range f.Configurations[env].Prerequisites {
-				if deleting[p.Flag] && !slices.Contains(requiredBy[p.Flag], f.Key) {
-					requiredBy[p.Flag] = append(requiredBy[p.Flag], f.Key)
+			c := f.Configurations[env]
+			for _, p := range c.Prerequisites {
+				require(p.Flag, f.Key)
+			}
+			for _, rule := range c.Rules {
+				for _, cond := range rule.Conditions {
+					if cond.Kind == "prerequisite" {
+						require(cond.Flag, f.Key)
+					}
 				}
 			}
 		}

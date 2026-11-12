@@ -251,6 +251,30 @@ func TestAReplaceDeletesADraftExperimentTheDocumentLacks(t *testing.T) {
 	}
 }
 
+func TestAReplaceMayGiveTheSaltsOfADeletedDraftToANewExperiment(t *testing.T) {
+	f := experimentsToTransfer(t)
+	k := f.project.Key
+	doc := exported(t, f.admin, k)
+	// Renaming the draft deletes it and creates another holding its salts.
+	for _, e := range doc["experiments"].([]any) {
+		if e := e.(map[string]any); e["key"] == "a_draft" {
+			e["key"] = "e_draft"
+		}
+	}
+
+	for _, dry := range []bool{true, false} {
+		res := replaceInto(t, f.admin, k, doc, mergeOptions{dryRun: dry})
+		if res.JSON200 == nil {
+			t.Fatalf("dry run %v: replace = %d: %s", dry, res.StatusCode(), res.Body)
+		}
+		r := res.JSON200
+		assertJSON(t, "experiments", []any{r.Changes.Experiments.Deleted, r.Changes.Experiments.Created}, `[["a_draft"], ["e_draft"]]`)
+	}
+	if got := keysOf(exported(t, f.admin, k), "experiments"); !slices.Equal(got, []string{"b_running", "c_stopped", "d_archived", "e_draft"}) {
+		t.Errorf("experiments after = %v", got)
+	}
+}
+
 func TestAReplaceRefusesAnExperimentThatStartedNamingEveryOne(t *testing.T) {
 	f := experimentsToTransfer(t)
 	k := f.project.Key
