@@ -6,6 +6,7 @@ import { Link, type LinkProps } from "@tanstack/react-router";
 import {
   ActivityIcon,
   BoxesIcon,
+  DatabaseZapIcon,
   FlagIcon,
   FlaskConicalIcon,
   GitPullRequestArrowIcon,
@@ -128,6 +129,12 @@ const projectScreens = [
     label: msg`Webhooks`,
     icon: WebhookIcon,
     permission: "webhook.manage",
+  },
+  {
+    to: "/projects/$project/sinks",
+    label: msg`Sinks`,
+    icon: DatabaseZapIcon,
+    permission: "sink.manage",
   },
   {
     to: "/projects/$project/audit",

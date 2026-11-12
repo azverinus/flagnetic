@@ -192,6 +192,19 @@ describe("a field violation", () => {
     ).toBe("That is not your current password.");
   });
 
+  it("forbids a query only in a URL that cannot carry one", () => {
+    const invalid = (pointer: string) =>
+      violationMessage(i18n, { pointer, code: "invalid_url", detail: "bad" });
+    expect(invalid("/clickhouse/url")).toBe(
+      "Enter an absolute http or https URL without credentials, a query or a fragment.",
+    );
+    for (const pointer of ["/url", "/webhook/url"]) {
+      expect(invalid(pointer)).toBe(
+        "Enter an absolute http or https URL without credentials or a fragment.",
+      );
+    }
+  });
+
   it("falls back to the server's detail for a code it does not know", () => {
     expect(violationMessage(i18n, { pointer: "/x", code: "novel", detail: "Novel rule." })).toBe(
       "Novel rule.",

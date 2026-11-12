@@ -339,6 +339,7 @@ msgid "{revoked, plural, one {Revoked # session.} other {Revoked # sessions.}}"
 msgstr "{revoked, plural, one {Отозван # сеанс.} few {Отозвано # сеанса.} many {Отозвано # сеансов.} other {Отозвано # сеанса.}}"
 
 #: src/components/auth-provider-detail.tsx
+#: src/components/sink-screen.tsx
 #: src/components/webhook-detail.tsx
 msgid "{savedName} is saved."
 msgstr "{savedName} сохранён."
@@ -492,6 +493,14 @@ msgstr "У флага не более 50 тегов."
 msgid "A flag shows up here once it outlives its expected removal, stops being evaluated, loses its owner, finishes its rollout or keeps an overdue experiment."
 msgstr "Флаг появится здесь, когда переживёт ожидаемую дату удаления, перестанет вычисляться, лишится владельца, завершит раскатку или будет держать просроченный эксперимент."
 
+#: src/components/sink-editor.tsx
+msgid "A folder in the bucket the files are written under, without slashes at either end."
+msgstr "Папка в бакете, в которую пишутся файлы, без слэшей по краям."
+
+#: src/lib/problem-messages.ts
+msgid "A header has a name of letters, digits and symbols without spaces, and a value on one line."
+msgstr "Имя заголовка состоит из букв, цифр и символов без пробелов, значение занимает одну строку."
+
 #: src/lib/problem-messages.ts
 msgid "A key never changes once it is set."
 msgstr "Ключ, однажды заданный, больше не меняется."
@@ -542,9 +551,17 @@ msgstr "Рядом с текущей создаётся новая пара кл
 msgid "A new project starts with the environments development, staging and production, the unit types user and anonymous, and the standard attributes."
 msgstr "Новый проект создаётся с окружениями development, staging и production, типами единиц user и anonymous и стандартными атрибутами."
 
+#: src/components/sink-screen.tsx
+msgid "A new secret signs from now on. The one it replaces keeps signing beside it for a day, so the receiver can switch to the new secret without refusing a batch."
+msgstr "Подписывать будет новый секрет. Прежний ещё сутки подписывает вместе с ним, так что получатель успеет перейти на новый секрет, не отклонив ни одной пачки."
+
 #: src/components/webhook-detail.tsx
 msgid "A new secret signs from now on. The one it replaces keeps signing beside it for a day, so the receiver can switch to the new secret without refusing an event."
 msgstr "Подписывать начнёт новый секрет. Прежний подписывает ещё сутки рядом с ним, поэтому получатель может перейти на новый секрет, не отклонив ни одного события."
+
+#: src/components/sink-screen.tsx
+msgid "A new sink is disabled and delivers nothing until it is enabled. Saving is never held back by its target."
+msgstr "Новый приёмник отключён и ничего не доставляет, пока его не включат. Сохранение никогда не зависит от целевой системы."
 
 #: src/components/mail-settings.tsx
 msgid "A password is stored and never shown again. Leave this empty to keep it, or type a new one to replace it. Changing the host, port, security or username needs it again. Clearing the username removes both."
@@ -640,6 +657,10 @@ msgstr "Запущенный эксперимент сначала остана�
 msgid "A running experiment's traffic allocation can only grow."
 msgstr "Охват запущенного эксперимента можно только увеличивать."
 
+#: src/components/sink-editor.tsx
+msgid "A scheme, a host and a port, such as https://s3.example.com. Leave empty for AWS S3."
+msgstr "Схема, хост и порт, например https://s3.example.com. Для AWS S3 оставьте пустым."
+
 #: src/components/scim-tokens.tsx
 msgid "A SCIM token belongs to an auth provider, and there is none yet. Add the provider of your identity provider first."
 msgstr "Токен SCIM принадлежит провайдеру входа, а ни одного пока нет. Сначала добавьте провайдера входа для вашего провайдера идентификации."
@@ -692,6 +713,18 @@ msgstr "Вход, почта которого относится к домена
 msgid "A sign-in whose verified email is in the domains above and has no member yet creates one, active, who holds no access until a project grants them a role."
 msgstr "Вход, подтверждённая почта которого относится к доменам выше и у которого ещё нет участника, создаёт его активным; доступа у него нет, пока проект не выдаст ему роль."
 
+#: src/components/sink-list.tsx
+msgid "A sink keeps a copy of the project's raw events in your own warehouse, bucket or pipeline, so analysts never work on the platform's database."
+msgstr "Приёмник хранит копию необработанных событий проекта в вашем хранилище, бакете или конвейере, чтобы аналитики не работали с базой платформы."
+
+#: src/lib/problem-messages.ts
+msgid "A sink's kind cannot be changed. Create a new sink of the other kind."
+msgstr "Тип приёмника изменить нельзя. Создайте новый приёмник другого типа."
+
+#: src/components/sink-editor.tsx
+msgid "A sink's kind is fixed when it is created."
+msgstr "Тип приёмника задаётся при создании."
+
 #: src/lib/experiments.ts
 #: src/lib/flags.ts
 msgid "A tag has at most 64 characters."
@@ -726,6 +759,10 @@ msgstr "ID единицы — не более {max} байт."
 msgid "A unit ID is at most 256 bytes."
 msgstr "ID единицы — не более 256 байт."
 
+#: src/lib/sinks.ts
+msgid "A unit was shown a variation of an experiment."
+msgstr "Юниту показали вариацию эксперимента."
+
 #: src/lib/problem-messages.ts
 msgid "A username and password are sent only over STARTTLS or TLS, unless the SMTP server is this machine."
 msgstr "Имя пользователя и пароль отправляются только через STARTTLS или TLS, если SMTP-сервер не находится на этой же машине."
@@ -755,6 +792,10 @@ msgstr "Год"
 msgid "About {key}"
 msgstr "Об окружении {key}"
 
+#: src/components/sink-editor.tsx
+msgid "Accept any certificate of the server. Use it only for a server with a self-signed certificate you trust."
+msgstr "Принимать любой сертификат сервера. Включайте только для сервера с самоподписанным сертификатом, которому вы доверяете."
+
 #: src/components/invitation-acceptance.tsx
 msgid "Accept invitation"
 msgstr "Принять приглашение"
@@ -766,6 +807,10 @@ msgstr "Принять через провайдера"
 #: src/components/invitation-acceptance.tsx
 msgid "Accept your invitation"
 msgstr "Примите приглашение"
+
+#: src/components/sink-editor.tsx
+msgid "Access key ID"
+msgstr "Идентификатор ключа доступа"
 
 #: src/components/identity-list.tsx
 msgid "Account"
@@ -814,6 +859,10 @@ msgstr "Автор"
 msgid "Actor kind"
 msgstr "Вид автора"
 
+#: src/components/sink-editor.tsx
+msgid "Add a header"
+msgstr "Добавить заголовок"
+
 #: src/components/group-mappings.tsx
 msgid "Add a mapping"
 msgstr "Добавить соответствие"
@@ -821,6 +870,10 @@ msgstr "Добавить соответствие"
 #: src/components/group-mappings.tsx
 msgid "Add a mapping to give the members of a directory group a role in a project, or make them instance admins."
 msgstr "Добавьте соответствие, чтобы участники группы каталога получали роль в проекте или становились администраторами экземпляра."
+
+#: src/components/sink-editor.tsx
+msgid "Add a setting"
+msgstr "Добавить настройку"
 
 #: src/components/overrides-section.tsx
 msgid "Add an override"
@@ -896,6 +949,10 @@ msgstr "Добавлено — {where}: {value}"
 msgid "Added by"
 msgstr "Кто добавил"
 
+#: src/components/sink-editor.tsx
+msgid "Address the bucket in the path rather than the host name, which most S3-compatible services other than AWS need."
+msgstr "Указывать бакет в пути, а не в имени хоста. Это нужно большинству S3-совместимых сервисов, кроме AWS."
+
 #: src/lib/personal-tokens.ts
 msgid "Administer projects: environments, members and tokens."
 msgstr "Администрировать проекты: окружения, участников и токены."
@@ -921,6 +978,7 @@ msgid "Alerts"
 msgstr "Алерты"
 
 #: src/lib/event-volume.ts
+#: src/lib/sinks.ts
 msgid "Aliases"
 msgstr "Алиасы"
 
@@ -1252,6 +1310,11 @@ msgstr "Не больше {maxAllowedOrigins} источников."
 msgid "At most {maxNoteLength} characters."
 msgstr "Не более {maxNoteLength} символов."
 
+#: src/components/sink-list.tsx
+#: src/components/sink-status.tsx
+msgid "At risk"
+msgstr "Под угрозой"
+
 #: src/components/webhook-delivery-sheet.tsx
 msgid "Attempt {number}"
 msgstr "Попытка {number}"
@@ -1394,6 +1457,14 @@ msgstr "Вернуться ко входу"
 msgid "Based on"
 msgstr "Основан на"
 
+#: src/components/sink-editor.tsx
+msgid "Batch size"
+msgstr "Размер пачки"
+
+#: src/lib/sinks.ts
+msgid "Batching"
+msgstr "Пачки"
+
 #: src/components/audit-entry-sheet.tsx
 msgid "Before"
 msgstr "До"
@@ -1416,6 +1487,7 @@ msgstr "Оба окружения отдают одно и то же."
 msgid "Breadcrumb"
 msgstr "Навигационная цепочка"
 
+#: src/components/sink-editor.tsx
 #: src/components/tester-panel.tsx
 msgid "Bucket"
 msgstr "Корзина"
@@ -1716,6 +1788,14 @@ msgid "Choose at least one event type."
 msgstr "Выберите хотя бы один тип событий."
 
 #: src/lib/problem-messages.ts
+msgid "Choose exposures, aliases or evaluation summaries."
+msgstr "Выберите экспозиции, алиасы или сводки вычислений."
+
+#: src/lib/problem-messages.ts
+msgid "Choose JSON lines or Parquet."
+msgstr "Выберите JSON lines или Parquet."
+
+#: src/lib/problem-messages.ts
 msgid "Choose one of the offered languages."
 msgstr "Выберите один из предложенных языков."
 
@@ -1797,9 +1877,17 @@ msgstr "Сбросить фильтры"
 msgid "Cleared"
 msgstr "Снят"
 
+#: src/lib/sinks.ts
+msgid "ClickHouse"
+msgstr "ClickHouse"
+
 #: src/components/experiment-assignment.tsx
 msgid "ClickHouse query"
 msgstr "Запрос для ClickHouse"
+
+#: src/components/sink-editor.tsx
+msgid "ClickHouse settings sent with every insert. The ones delivery sets itself are refused."
+msgstr "Настройки ClickHouse, отправляемые с каждой вставкой. Те, что доставка задаёт сама, отклоняются."
 
 #: src/lib/sdk-keys.ts
 msgid "Client"
@@ -1877,6 +1965,10 @@ msgstr "Завершение ротации сертификата"
 msgid "Complete rotation"
 msgstr "Завершить ротацию"
 
+#: src/components/sink-editor.tsx
+msgid "Compression"
+msgstr "Сжатие"
+
 #: src/components/change-request-diff.tsx
 #: src/components/condition-row.tsx
 msgid "Condition {position}"
@@ -1931,6 +2023,10 @@ msgstr "Единицы с конфликтами, сначала последн�
 #: src/components/experiment-exposures.tsx
 msgid "Conflicts"
 msgstr "Конфликты"
+
+#: src/lib/sinks.ts
+msgid "Connection"
+msgstr "Подключение"
 
 #: src/lib/conditions.ts
 msgid "contains"
@@ -2021,6 +2117,10 @@ msgstr "Создавать участников при первом входе"
 msgid "Create one to have events posted to a chat channel, an archive or a deployment tool."
 msgstr "Создайте вебхук, чтобы события отправлялись в чат, архив или инструмент развёртывания."
 
+#: src/components/sink-list.tsx
+msgid "Create one to have exposures, aliases and evaluation summaries delivered to ClickHouse, object storage or a webhook."
+msgstr "Создайте его, чтобы экспозиции, алиасы и сводки вычислений доставлялись в ClickHouse, объектное хранилище или вебхук."
+
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "Create project"
 msgstr "Создать проект"
@@ -2029,9 +2129,21 @@ msgstr "Создать проект"
 msgid "Create segment"
 msgstr "Создать сегмент"
 
+#: src/components/sink-editor.tsx
+msgid "Create sink"
+msgstr "Создать приёмник"
+
+#: src/components/sink-editor.tsx
+msgid "Create tables"
+msgstr "Создавать таблицы"
+
 #: src/routes/_signed-in/index.tsx
 msgid "Create the first project to start declaring what it serves."
 msgstr "Создайте первый проект, чтобы начать объявлять, что он отдаёт."
+
+#: src/components/sink-editor.tsx
+msgid "Create the tables when the sink is enabled. Turn it off to bring tables you made yourself."
+msgstr "Создать таблицы при включении приёмника. Выключите, если таблицы вы создали сами."
 
 #: src/components/scim-tokens.tsx
 #: src/components/token-create-form.tsx
@@ -2070,6 +2182,10 @@ msgstr "Текущий пароль"
 #: src/components/theme-choice.tsx
 msgid "Dark"
 msgstr "Тёмная"
+
+#: src/components/sink-editor.tsx
+msgid "Database"
+msgstr "База данных"
 
 #. An attribute type.
 #: src/lib/attribute-types.ts
@@ -2140,8 +2256,13 @@ msgstr "После объявления {key} его можно использо
 msgid "Definition"
 msgstr "Описание"
 
+#: src/lib/sinks.ts
+msgid "Degraded"
+msgstr "Деградация"
+
 #: src/components/auth-provider-detail.tsx
 #: src/components/experiment-transitions.tsx
+#: src/components/sink-screen.tsx
 #: src/components/webhook-detail.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
@@ -2160,6 +2281,8 @@ msgstr "Удалить {key}"
 
 #: src/components/auth-provider-detail.tsx
 #: src/components/auth-provider-list.tsx
+#: src/components/sink-list.tsx
+#: src/components/sink-screen.tsx
 #: src/components/webhook-detail.tsx
 #: src/components/webhook-list.tsx
 msgid "Delete {name}"
@@ -2202,6 +2325,11 @@ msgstr "Удалить сегмент"
 msgid "delete segments"
 msgstr "удалять сегменты"
 
+#: src/components/sink-list.tsx
+#: src/components/sink-screen.tsx
+msgid "Delete sink"
+msgstr "Удалить приёмник"
+
 #: src/lib/access-names.ts
 msgid "delete the project"
 msgstr "удалять проект"
@@ -2239,6 +2367,10 @@ msgstr "Доставка"
 #: src/components/webhook-delivery-sheet.tsx
 msgid "Delivery ID"
 msgstr "ID доставки"
+
+#: src/lib/problem-messages.ts
+msgid "Delivery sets this setting itself."
+msgstr "Эту настройку доставка задаёт сама."
 
 #: src/components/change-request-actions.tsx
 #: src/components/flag-definition-sheet.tsx
@@ -2298,6 +2430,7 @@ msgstr "Отключить {name}"
 
 #: src/components/auth-provider-badges.tsx
 #: src/components/webhook-status.tsx
+#: src/lib/sinks.ts
 msgid "Disabled"
 msgstr "Отключён"
 
@@ -2504,10 +2637,16 @@ msgstr "Включить {name}"
 #: src/components/auth-provider-badges.tsx
 #: src/components/auth-provider-form.tsx
 #: src/components/saml-provider-form.tsx
+#: src/components/sink-list.tsx
 #: src/components/webhook-editor.tsx
 #: src/components/webhook-status.tsx
+#: src/lib/sinks.ts
 msgid "Enabled"
 msgstr "Включён"
+
+#: src/components/sink-editor.tsx
+msgid "Endpoint"
+msgstr "Эндпоинт"
 
 #: src/components/session-list.tsx
 msgid "Ends at the latest"
@@ -2559,12 +2698,14 @@ msgid "Enter a host name or address of at most 253 characters, without spaces."
 msgstr "Введите имя хоста или адрес не длиннее 253 символов, без пробелов."
 
 #: src/lib/problem-messages.ts
+#: src/lib/sinks.ts
 msgid "Enter a name of 1 to 200 characters."
 msgstr "Введите название от 1 до 200 символов."
 
 #: src/lib/auth-providers.ts
 #: src/lib/forms.ts
 #: src/lib/problem-messages.ts
+#: src/lib/sinks.ts
 msgid "Enter a name."
 msgstr "Введите название."
 
@@ -2595,6 +2736,10 @@ msgstr "Введите процент от 0 до 100, не больше дву�
 #: src/lib/problem-messages.ts
 msgid "Enter a scheme, a host and an optional port, such as https://app.example.com."
 msgstr "Укажите схему, хост и, при необходимости, порт, например https://app.example.com."
+
+#: src/lib/problem-messages.ts
+msgid "Enter a scheme, a host and an optional port, such as https://s3.example.com."
+msgstr "Введите схему, хост и необязательный порт, например https://s3.example.com."
 
 #: src/lib/auth-providers.ts
 msgid "Enter a slug."
@@ -2629,9 +2774,21 @@ msgstr "Введите значение типа флага."
 msgid "Enter a value."
 msgstr "Введите значение."
 
+#: src/lib/sinks.ts
+msgid "Enter a whole number of 1 or more, or leave it empty for the default."
+msgstr "Введите целое число от 1 или оставьте поле пустым — будет значение по умолчанию."
+
 #: src/lib/auth-settings.ts
 msgid "Enter a whole number."
 msgstr "Введите целое число."
+
+#: src/lib/problem-messages.ts
+msgid "Enter an absolute http or https URL without credentials or a fragment."
+msgstr "Введите абсолютный URL с http или https без учётных данных и фрагмента."
+
+#: src/lib/problem-messages.ts
+msgid "Enter an absolute http or https URL without credentials, a query or a fragment."
+msgstr "Введите абсолютный URL с http или https без учётных данных, запроса и фрагмента."
 
 #: src/components/webhook-editor.tsx
 msgid "Enter an absolute URL, such as https://example.com/flagnetic."
@@ -2804,7 +2961,9 @@ msgstr "Окружение изменено"
 
 #: src/components/experiment-exposures.tsx
 #: src/components/navigation.tsx
+#: src/components/sink-editor.tsx
 #: src/components/webhook-editor.tsx
+#: src/lib/sinks.ts
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/environments/route.tsx
 #: src/routes/_signed-in/projects/$project/index.tsx
@@ -2852,6 +3011,7 @@ msgid "Evaluation result"
 msgstr "Результат вычисления"
 
 #: src/lib/event-volume.ts
+#: src/lib/sinks.ts
 msgid "Evaluation summaries"
 msgstr "Сводки вычислений"
 
@@ -2870,6 +3030,11 @@ msgstr "Событие"
 #: src/components/webhook-delivery-sheet.tsx
 msgid "Event ID"
 msgstr "ID события"
+
+#: src/components/sink-editor.tsx
+#: src/lib/sinks.ts
+msgid "Event kinds"
+msgstr "Виды событий"
 
 #: src/components/webhook-deliveries.tsx
 msgid "Event type"
@@ -2902,6 +3067,10 @@ msgstr "События, которые хранение удалило рань�
 #: src/lib/webhooks.ts
 msgid "Every audit entry"
 msgstr "Каждая запись журнала аудита"
+
+#: src/components/sink-secret-dialog.tsx
+msgid "Every batch carries a signature made with this secret, which the receiver checks to know the events came from here."
+msgstr "Каждая пачка несёт подпись, сделанную этим секретом. Получатель проверяет её, чтобы убедиться, что события пришли отсюда."
 
 #: src/components/webhook-secret-dialog.tsx
 msgid "Every call carries a signature made with this secret, which the receiver checks to know the event came from here."
@@ -2971,6 +3140,10 @@ msgstr "Все SDK, использующие ключ {keyId}, перестан�
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Every status"
 msgstr "Любой статус"
+
+#: src/components/sink-editor.tsx
+msgid "Every table name starts with this, such as flagnetic_exposures. The default is flagnetic."
+msgstr "Имя каждой таблицы начинается с него, например flagnetic_exposures. По умолчанию flagnetic."
 
 #: src/components/webhook-editor.tsx
 msgid "Every type below, and any added later. Audit entries are chosen apart."
@@ -3099,12 +3272,21 @@ msgstr "Истекла {until}"
 msgid "Expires"
 msgstr "Истекает"
 
+#: src/components/sink-editor.tsx
+msgid "Export only the events of the environments you tick; tick none for every environment."
+msgstr "Выгружать только события отмеченных окружений. Если не отмечено ни одного, выгружаются все окружения."
+
+#: src/components/sink-editor.tsx
+msgid "Export only the kinds you tick; tick none for every kind."
+msgstr "Выгружать только отмеченные виды. Если не отмечено ни одного, выгружаются все виды."
+
 #: src/lib/experiment-alerts.ts
 msgid "Exposure conflicts"
 msgstr "Конфликты экспозиций"
 
 #: src/components/experiment-exposures.tsx
 #: src/lib/event-volume.ts
+#: src/lib/sinks.ts
 msgid "Exposures"
 msgstr "Экспозиции"
 
@@ -3120,6 +3302,10 @@ msgstr "Сбой"
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Failed, stopped"
 msgstr "Сбой, остановлен"
+
+#: src/lib/sinks.ts
+msgid "Failing"
+msgstr "Сбои"
 
 #: src/components/webhook-detail.tsx
 #: src/components/webhook-list.tsx
@@ -3283,6 +3469,10 @@ msgstr "Флаги, которые, возможно, пора убрать из
 msgid "Flags that must serve a variation for this flag to be evaluated here; otherwise it serves its off variation."
 msgstr "Флаги, которые должны отдавать указанный вариант, чтобы этот флаг вычислялся здесь; иначе он отдаёт вариант при выключении."
 
+#: src/components/sink-editor.tsx
+msgid "Flush interval (seconds)"
+msgstr "Интервал отправки (секунды)"
+
 #: src/components/personal-menu.tsx
 #: src/components/profile-form.tsx
 msgid "Follow the browser"
@@ -3293,6 +3483,7 @@ msgstr "Как в браузере"
 msgid "Forgot your password?"
 msgstr "Забыли пароль?"
 
+#: src/components/sink-editor.tsx
 #: src/components/variations-editor.tsx
 msgid "Format"
 msgstr "Отформатировать"
@@ -3359,6 +3550,10 @@ msgstr "К участникам"
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Go to the segments"
 msgstr "К сегментам"
+
+#: src/components/sink-screen.tsx
+msgid "Go to the sinks"
+msgstr "К приёмникам"
 
 #: src/components/not-found.tsx
 msgid "Go to the start page"
@@ -3442,6 +3637,26 @@ msgstr "Есть раскатка"
 msgid "Has rules"
 msgstr "Есть правила"
 
+#: src/components/sink-editor.tsx
+msgid "Header name"
+msgstr "Имя заголовка"
+
+#: src/components/sink-editor.tsx
+msgid "Header value"
+msgstr "Значение заголовка"
+
+#: src/components/sink-editor.tsx
+msgid "Headers"
+msgstr "Заголовки"
+
+#: src/components/sink-list.tsx
+msgid "Health"
+msgstr "Состояние"
+
+#: src/lib/sinks.ts
+msgid "Healthy"
+msgstr "Исправен"
+
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "History"
 msgstr "История"
@@ -3465,6 +3680,18 @@ msgstr "Имя флага в коде, например checkout.newFlow: бук
 #: src/routes/_signed-in/admin/auth-settings.tsx
 msgid "How long sessions last, how long API tokens may live, how long passwords must be, whether members reset a forgotten password by mail, whether they sign in with a password at all, and which email domains sign in through one auth provider only. Every replica of the instance applies a change within a second."
 msgstr "Как долго длятся сессии, как долго живут API-токены, какой длины должны быть пароли, сбрасывают ли участники забытый пароль по почте, входят ли они вообще по паролю и какие почтовые домены входят только через одного провайдера входа. Каждая реплика экземпляра применяет изменение в течение секунды."
+
+#: src/components/sink-editor.tsx
+msgid "How long the sink waits between deliveries once it has caught up, from {flushFrom} to {flushTo}. Empty for the default."
+msgstr "Сколько приёмник ждёт между доставками, когда догнал поток: от {flushFrom} до {flushTo}. Пусто — значение по умолчанию."
+
+#: src/components/sink-editor.tsx
+msgid "How long the sink waits between deliveries once it has caught up. Empty for the default."
+msgstr "Сколько приёмник ждёт между доставками, когда догнал поток. Пусто — значение по умолчанию."
+
+#: src/lib/sinks.ts
+msgid "How often SDKs and remote evaluation served each variation."
+msgstr "Как часто SDK и удалённое вычисление отдавали каждую вариацию."
 
 #: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
 msgid "How rules name the segment. It never changes."
@@ -3542,6 +3769,10 @@ msgstr "Корзина включения"
 #: src/components/experiment-transitions.tsx
 msgid "Inclusion salt"
 msgstr "Соль включения"
+
+#: src/lib/sinks.ts
+msgid "Inserts events into tables of your ClickHouse database over its HTTP interface, so analysts query them in place."
+msgstr "Вставляет события в таблицы вашей базы ClickHouse через её HTTP-интерфейс, чтобы аналитики запрашивали их на месте."
 
 #. An audit entry that belongs to no project.
 #. An audit entry that belongs to no project.
@@ -3703,6 +3934,7 @@ msgid "It cannot start until these are fixed:"
 msgstr "Запуск невозможен, пока не исправлено:"
 
 #: src/components/auth-provider-detail.tsx
+#: src/components/sink-screen.tsx
 #: src/components/webhook-detail.tsx
 msgid "It does not exist here, or it was deleted."
 msgstr "Его здесь нет, или он был удалён."
@@ -3751,8 +3983,13 @@ msgstr "Присоединяемся…"
 msgid "JSON"
 msgstr "JSON"
 
+#: src/components/sink-editor.tsx
+msgid "JSON lines"
+msgstr "JSON lines"
+
 #: src/components/conflict-banner.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/components/sink-editor.tsx
 #: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Keep my edits"
@@ -3815,9 +4052,19 @@ msgstr "Аварийный выключатель: {flagKey} в окружени
 
 #: src/components/auth-provider-list.tsx
 #: src/components/sdk-keys.tsx
+#: src/components/sink-editor.tsx
+#: src/components/sink-list.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Kind"
 msgstr "Вид"
+
+#: src/components/sink-list.tsx
+msgid "Lag"
+msgstr "Отставание"
+
+#: src/lib/sinks.ts
+msgid "Lagging"
+msgstr "Отстаёт"
 
 #: src/components/personal-menu.tsx
 #: src/components/profile-form.tsx
@@ -3831,6 +4078,10 @@ msgstr "Последняя попытка"
 #: src/components/experiment-exposures.tsx
 msgid "Last checked <0/>, while the experiment ran; the stop took no check here, as the environment no longer held its rule."
 msgstr "Последняя проверка — <0/>, пока эксперимент работал; при остановке здесь проверки не было: окружение уже не содержало его правило."
+
+#: src/components/sink-list.tsx
+msgid "Last delivery"
+msgstr "Последняя доставка"
 
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Last evaluated"
@@ -3890,6 +4141,10 @@ msgstr "Последний ответ"
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Leave"
 msgstr "Уйти"
+
+#: src/components/sink-editor.tsx
+msgid "Leave empty to ask the bucket."
+msgstr "Оставьте пустым, чтобы узнать у бакета."
 
 #: src/components/mail-settings.tsx
 msgid "Leave empty when the server takes mail without signing in."
@@ -4260,11 +4515,14 @@ msgstr "Переместить правило {position} выше"
 #: src/components/saml-provider-form.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/segment-fields.tsx
+#: src/components/sink-editor.tsx
+#: src/components/sink-list.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 #: src/components/variations-editor.tsx
 #: src/components/webhook-editor.tsx
 #: src/components/webhook-list.tsx
+#: src/lib/sinks.ts
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
@@ -4398,6 +4656,12 @@ msgstr "Новый SDK-ключ"
 msgid "New segment"
 msgstr "Новый сегмент"
 
+#: src/components/sink-list.tsx
+#: src/components/sink-screen.tsx
+#: src/routes/_signed-in/projects/$project/sinks/new.tsx
+msgid "New sink"
+msgstr "Новый приёмник"
+
 #: src/components/experiment-transitions.tsx
 msgid "New traffic allocation (%)"
 msgstr "Новый охват (%)"
@@ -4432,6 +4696,8 @@ msgstr "Следующий"
 msgid "Next attempt"
 msgstr "Следующая попытка"
 
+#: src/components/sink-list.tsx
+#: src/components/sink-status.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "No"
 msgstr "Нет"
@@ -4628,6 +4894,10 @@ msgstr "За эти дни ни один SDK не сообщил о вычисл
 msgid "No segment matches these filters."
 msgstr "Нет сегментов, подходящих под эти фильтры."
 
+#: src/components/sink-list.tsx
+msgid "No sink yet."
+msgstr "Приёмников пока нет."
+
 #: src/components/mail-settings.tsx
 msgid "No SMTP server is configured, so the instance mails nothing, and members cannot reset a forgotten password themselves."
 msgstr "SMTP-сервер не настроен, поэтому экземпляр ничего не отправляет по почте, а участники не могут сами сбросить забытый пароль."
@@ -4676,6 +4946,7 @@ msgstr "нет"
 
 #: src/components/compare-environments.tsx
 #: src/components/scim-groups.tsx
+#: src/components/sink-editor.tsx
 #: src/components/webhook-detail.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "None"
@@ -4767,6 +5038,11 @@ msgstr "Этот флаг ещё не менялся."
 msgid "Nothing here yet."
 msgstr "Здесь пока ничего нет."
 
+#: src/components/sink-list.tsx
+#: src/components/sink-screen.tsx
+msgid "Nothing more is delivered to it, and its place in the event stream is forgotten. This cannot be undone."
+msgstr "В него больше ничего не доставляется, а его позиция в потоке событий забывается. Это нельзя отменить."
+
 #: src/components/webhook-detail.tsx
 #: src/components/webhook-list.tsx
 msgid "Nothing more is sent under it. This cannot be undone."
@@ -4790,6 +5066,10 @@ msgstr "Число"
 #: src/lib/attribute-types.ts
 msgid "Object"
 msgstr "Объект"
+
+#: src/lib/sinks.ts
+msgid "Object storage"
+msgstr "Объектное хранилище"
 
 #: src/components/experiment-exposures.tsx
 msgid "Observed share"
@@ -4835,6 +5115,14 @@ msgstr "Включён или выключен"
 msgid "once approved"
 msgstr "после одобрения"
 
+#: src/components/sink-editor.tsx
+msgid "One file per batch."
+msgstr "Один файл на пачку."
+
+#: src/lib/problem-messages.ts
+msgid "One of the environments does not exist in this project."
+msgstr "Одного из окружений нет в этом проекте."
+
 #: src/lib/problem-messages.ts
 msgid "One of the event types is not in the catalogue."
 msgstr "Одного из типов событий нет в каталоге."
@@ -4878,6 +5166,10 @@ msgstr "Это можно сделать только в сеансе входа
 #: src/lib/problem-messages.ts
 msgid "Only a stopped experiment has a decision note."
 msgstr "Заметка к решению есть только у остановленного эксперимента."
+
+#: src/lib/problem-messages.ts
+msgid "Only a webhook sink has a secret the server draws. Change this sink's password or secret access key by editing it."
+msgstr "Секрет, который создаёт сервер, есть только у приёмника-вебхука. Пароль или секретный ключ доступа этого приёмника меняются при его редактировании."
 
 #: src/lib/problem-messages.ts
 msgid "Only an active key can be rotated. This one was rotated or revoked."
@@ -5048,6 +5340,14 @@ msgstr "Страницы устаревших флагов"
 msgid "Pages of the history"
 msgstr "Страницы истории"
 
+#: src/components/sink-editor.tsx
+msgid "Parquet"
+msgstr "Parquet"
+
+#: src/components/sink-editor.tsx
+msgid "Parquet files are always compressed with zstd."
+msgstr "Файлы Parquet всегда сжимаются zstd."
+
 #: src/components/compare-environments.tsx
 msgid "Part"
 msgstr "Часть"
@@ -5057,6 +5357,7 @@ msgstr "Часть"
 #: src/components/session-list.tsx
 #: src/components/sign-in-form.tsx
 #: src/components/sign-in-methods.tsx
+#: src/components/sink-editor.tsx
 msgid "Password"
 msgstr "Пароль"
 
@@ -5092,6 +5393,10 @@ msgstr "Вставлены"
 #: src/components/saml-provider-detail.tsx
 msgid "Pasted metadata is never read again; paste a new document to change it."
 msgstr "Вставленные метаданные не перечитываются; чтобы изменить их, вставьте новый документ."
+
+#: src/components/sink-editor.tsx
+msgid "Path-style addressing"
+msgstr "Адресация через путь"
 
 #: src/lib/webhooks.ts
 msgid "Pending"
@@ -5140,6 +5445,14 @@ msgstr "Платформа"
 #: src/components/mail-settings.tsx
 msgid "Port"
 msgstr "Порт"
+
+#: src/lib/sinks.ts
+msgid "Posts each batch to a URL of yours, signed with the sink's secret, for a pipeline you run."
+msgstr "Отправляет каждую пачку на ваш URL, подписав секретом приёмника, — для вашего конвейера."
+
+#: src/components/sink-editor.tsx
+msgid "Prefix"
+msgstr "Префикс"
 
 #: src/components/tester-panel.tsx
 msgid "Prerequisite"
@@ -5456,6 +5769,10 @@ msgstr "Сменить соль"
 msgid "Regenerate the salt?"
 msgstr "Сменить соль?"
 
+#: src/components/sink-editor.tsx
+msgid "Region"
+msgstr "Регион"
+
 #: src/components/auth-provider-detail.tsx
 #: src/components/saml-provider-detail.tsx
 msgid "Register the instance at the identity provider"
@@ -5479,6 +5796,7 @@ msgstr "Отклонил(а) {name}"
 
 #: src/components/conflict-banner.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/components/sink-editor.tsx
 #: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Reload and lose my edits"
@@ -5544,9 +5862,17 @@ msgstr "Удалить SMTP-сервер"
 msgid "Remove tag {tag}"
 msgstr "Удалить тег {tag}"
 
+#: src/components/sink-editor.tsx
+msgid "Remove the header {name}"
+msgstr "Удалить заголовок {name}"
+
 #: src/components/overrides-section.tsx
 msgid "Remove the override of {unit}"
 msgstr "Удалить переопределение {unit}"
+
+#: src/components/sink-editor.tsx
+msgid "Remove the setting {name}"
+msgstr "Удалить настройку {name}"
 
 #: src/components/mail-settings.tsx
 msgid "Remove the SMTP server"
@@ -5619,6 +5945,7 @@ msgid "Required; the author and the audit log see it."
 msgstr "Обязательно; его увидят автор и журнал аудита."
 
 #: src/lib/problem-messages.ts
+#: src/lib/sinks.ts
 msgid "Required."
 msgstr "Обязательное поле."
 
@@ -5767,10 +6094,12 @@ msgstr "Ротировать ключ"
 msgid "Rotate key {name}"
 msgstr "Ротировать ключ {name}"
 
+#: src/components/sink-screen.tsx
 #: src/components/webhook-detail.tsx
 msgid "Rotate secret"
 msgstr "Заменить секрет"
 
+#: src/components/sink-screen.tsx
 #: src/components/webhook-detail.tsx
 msgid "Rotate the secret of {name}"
 msgstr "Заменить секрет {name}"
@@ -5881,6 +6210,7 @@ msgstr "Нарушение соотношения выборки"
 #: src/components/profile-form.tsx
 #: src/components/saml-provider-form.tsx
 #: src/components/sdk-keys.tsx
+#: src/components/sink-editor.tsx
 #: src/components/ui/unsaved-changes-bar.tsx
 #: src/components/webhook-editor.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -6001,6 +6331,10 @@ msgstr "Поиск"
 msgid "Search projects"
 msgstr "Поиск проектов"
 
+#: src/components/sink-editor.tsx
+msgid "Secret access key"
+msgstr "Секретный ключ доступа"
+
 #: src/components/mail-settings.tsx
 msgid "Security"
 msgstr "Защита"
@@ -6089,6 +6423,10 @@ msgstr "Отправляем…"
 msgid "Sent"
 msgstr "Отправляется"
 
+#: src/components/sink-editor.tsx
+msgid "Sent with every call, before the platform's own. Names starting X-Flagnetic- are refused."
+msgstr "Отправляются с каждым вызовом перед заголовками платформы. Имена, начинающиеся с X-Flagnetic-, отклоняются."
+
 #: src/components/auth-provider-form.tsx
 msgid "Separated by spaces. The defaults read the email and the name."
 msgstr "Через пробел. По умолчанию читаются почта и имя."
@@ -6164,8 +6502,17 @@ msgstr "Сначала задайте публичный адрес экземп
 msgid "Set the instance's public address first (FLAGNETIC_BASE_URL): the addresses the identity provider is told are built from it."
 msgstr "Сначала задайте публичный адрес экземпляра (FLAGNETIC_BASE_URL): из него строятся адреса, которые сообщаются провайдеру идентификации."
 
+#: src/components/sink-editor.tsx
+msgid "Setting name"
+msgstr "Имя настройки"
+
+#: src/components/sink-editor.tsx
+msgid "Setting value"
+msgstr "Значение настройки"
+
 #: src/components/auth-provider-detail.tsx
 #: src/components/navigation.tsx
+#: src/components/sink-editor.tsx
 #: src/components/webhook-detail.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "Settings"
@@ -6293,9 +6640,24 @@ msgstr "Вход…"
 msgid "Signs until <0/>"
 msgstr "Подписывает до <0/>"
 
+#: src/routes/_signed-in/projects/$project/sinks/$sink.tsx
+msgid "Sink"
+msgstr "Приёмник"
+
+#: src/components/sink-screen.tsx
+msgid "Sink not found"
+msgstr "Приёмник не найден"
+
+#: src/components/navigation.tsx
+#: src/components/sink-list.tsx
 #: src/lib/webhooks.ts
+#: src/routes/_signed-in/projects/$project/sinks/route.tsx
 msgid "Sinks"
 msgstr "Приёмники данных"
+
+#: src/components/sink-editor.tsx
+msgid "Skip TLS verification"
+msgstr "Не проверять TLS"
 
 #: src/components/app-shell.tsx
 msgid "Skip to content"
@@ -6485,6 +6847,7 @@ msgstr "Снять защиту с {name}"
 
 #: src/components/experiment-transitions.tsx
 #: src/lib/experiments.ts
+#: src/lib/sinks.ts
 msgid "Stopped"
 msgstr "Остановлен"
 
@@ -6500,6 +6863,14 @@ msgstr "Останавливает эксперимент и выкатывае�
 #: src/components/mail-settings.tsx
 msgid "Stored encrypted and never shown again."
 msgstr "Хранится в зашифрованном виде и больше не показывается."
+
+#: src/components/sink-editor.tsx
+msgid "Stored sealed and never shown again."
+msgstr "Хранится зашифрованным и больше нигде не показывается."
+
+#: src/components/sink-editor.tsx
+msgid "Stored sealed and never shown. Unchanged unless you type a new one; after changing the address or the user, type it again."
+msgstr "Хранится зашифрованным и не показывается. Остаётся прежним, пока вы не введёте новый; после смены адреса или пользователя введите его снова."
 
 #. An attribute type.
 #: src/lib/attribute-types.ts
@@ -6559,6 +6930,10 @@ msgstr "Система"
 msgctxt "theme"
 msgid "System"
 msgstr "Как в системе"
+
+#: src/components/sink-editor.tsx
+msgid "Table prefix"
+msgstr "Префикс таблиц"
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -6766,6 +7141,10 @@ msgstr "Язык консоли на всех устройствах, где в�
 #: src/components/change-request-actions.tsx
 msgid "The copy is a new draft."
 msgstr "Копия — новый черновик."
+
+#: src/components/sink-editor.tsx
+msgid "The database the tables are created in or already exist in."
+msgstr "База данных, в которой создаются таблицы или в которой они уже есть."
 
 #: src/components/experiment-fields.tsx
 msgid "The day the experiment is expected to have its answer."
@@ -7133,6 +7512,14 @@ msgstr "В метаданных нет сертификата подписи, п
 msgid "The metadata is at most 1 MiB."
 msgstr "Метаданные не больше 1 МиБ."
 
+#: src/components/sink-editor.tsx
+msgid "The most events one delivery carries, at most {maxBatch}. Empty for the default."
+msgstr "Наибольшее число событий в одной доставке, не больше {maxBatch}. Пусто — значение по умолчанию."
+
+#: src/components/sink-editor.tsx
+msgid "The most events one delivery carries. Empty for the default."
+msgstr "Наибольшее число событий в одной доставке. Пусто — значение по умолчанию."
+
 #: src/components/project-audit.tsx
 msgid "The most recent changes in this project"
 msgstr "Самые недавние изменения в этом проекте"
@@ -7220,6 +7607,10 @@ msgstr "В проекте не объявлен такой атрибут."
 #: src/lib/rule-editor.ts
 msgid "The project does not declare this unit type."
 msgstr "В проекте не объявлен такой тип единицы."
+
+#: src/lib/problem-messages.ts
+msgid "The project has no environment with this key."
+msgstr "В проекте нет окружения с таким ключом."
 
 #: src/routes/_signed-in/projects/$project/environments/$environment.tsx
 msgid "The project has no environment with this key. It may have been deleted."
@@ -7366,6 +7757,10 @@ msgstr "Планировщик повторит попытку в следующ
 msgid "The SDKs that have asked this environment for its ruleset or for values, most recently seen first. A row appears within a minute of an SDK’s request; whether an SDK is connected right now is not shown."
 msgstr "SDK, которые запрашивали у этого окружения набор правил или значения; сверху те, что были замечены последними. Строка появляется в течение минуты после запроса SDK; подключён ли SDK прямо сейчас, не показывается."
 
+#: src/components/sink-secret-dialog.tsx
+msgid "The secret it replaces keeps signing beside this one for a day, so the receiver can take the new one without refusing a batch."
+msgstr "Прежний секрет ещё сутки подписывает вместе с этим, так что получатель успеет перейти на новый, не отклонив ни одной пачки."
+
 #: src/components/webhook-secret-dialog.tsx
 msgid "The secret it replaces keeps signing beside this one for a day, so the receiver can take the new one without refusing an event."
 msgstr "Прежний секрет подписывает ещё сутки рядом с этим, поэтому получатель может перейти на новый, не отклонив ни одного события."
@@ -7421,6 +7816,10 @@ msgstr "Сеанс отозван."
 #: src/components/experiment-fields.tsx
 msgid "The share of units included in the experiment; the others get what the flag's other rules serve."
 msgstr "Доля единиц, попадающих в эксперимент; остальные получают то, что отдают другие правила флага."
+
+#: src/components/sink-secret-dialog.tsx
+msgid "The sink's signing secret"
+msgstr "Секрет подписи приёмника"
 
 #: src/components/sdk-keys.tsx
 msgid "The sites the key may be used from, such as https://app.example.com. Leave it empty to allow any origin."
@@ -7496,6 +7895,10 @@ msgstr "Первые экспозиции единиц соответствую�
 msgid "The unsaved draft cannot be evaluated as it is:"
 msgstr "Несохранённый черновик нельзя вычислить в таком виде:"
 
+#: src/components/sink-editor.tsx
+msgid "The user that inserts the events."
+msgstr "Пользователь, который вставляет события."
+
 #: src/lib/problem-messages.ts
 msgid "The value is out of range."
 msgstr "Значение вне допустимого диапазона."
@@ -7525,6 +7928,10 @@ msgstr "Сумма весов {sum} %, а должна быть {whole} %."
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "The whole tag"
 msgstr "Тег целиком"
+
+#: src/lib/problem-messages.ts
+msgid "The X-Flagnetic- headers are the platform's own."
+msgstr "Заголовки X-Flagnetic- принадлежат платформе."
 
 #: src/components/conflict-banner.tsx
 msgid "Their change:"
@@ -7562,6 +7969,10 @@ msgstr "Этот атрибут уже есть в контексте."
 #: src/lib/flag-detail.ts
 msgid "This cannot be changed here."
 msgstr "Это здесь изменить нельзя."
+
+#: src/lib/problem-messages.ts
+msgid "This compression does not fit the format. Parquet files are always zstd."
+msgstr "Это сжатие не подходит формату. Файлы Parquet всегда сжимаются zstd."
 
 #: src/components/session-list.tsx
 msgid "This device"
@@ -7762,6 +8173,10 @@ msgstr "Сервер пока не может загрузить набор пр
 msgid "This slug is reserved."
 msgstr "Этот слаг зарезервирован."
 
+#: src/lib/problem-messages.ts
+msgid "This target is on a link-local address, which the instance never reaches. Use another address."
+msgstr "Цель находится на link-local адресе, до которого экземпляр никогда не доходит. Укажите другой адрес."
+
 #: src/lib/tester.ts
 msgid "This unit type is in the context already."
 msgstr "Этот тип единицы уже есть в контексте."
@@ -7885,6 +8300,10 @@ msgstr "Временный: новый при каждом входе, поэт�
 #: src/components/query-error.tsx
 msgid "Try again"
 msgstr "Попробовать ещё раз"
+
+#: src/lib/sinks.ts
+msgid "Two identifiers were declared to be the same unit."
+msgstr "Два идентификатора объявили одним и тем же юнитом."
 
 #: src/components/discovered-attributes.tsx
 #: src/components/flag-definition-sheet.tsx
@@ -8025,6 +8444,7 @@ msgstr "Не указан: выбирает провайдер идентифи�
 msgid "Updated"
 msgstr "Изменён"
 
+#: src/components/sink-editor.tsx
 #: src/components/webhook-editor.tsx
 #: src/components/webhook-list.tsx
 msgid "URL"
@@ -8041,6 +8461,14 @@ msgstr "Используйте https-адрес. Простой http допус�
 #: src/components/sign-in-form.tsx
 msgid "Use another email"
 msgstr "Другой адрес"
+
+#: src/lib/problem-messages.ts
+msgid "Use letters, digits and underscores, not starting with a digit."
+msgstr "Используйте буквы, цифры и подчёркивания; нельзя начинать с цифры."
+
+#: src/lib/problem-messages.ts
+msgid "Use letters, digits, dots, hyphens and underscores."
+msgstr "Используйте буквы, цифры, точки, дефисы и подчёркивания."
 
 #: src/components/tester-panel.tsx
 msgid "Use unsaved draft"
@@ -8064,6 +8492,7 @@ msgid "User info endpoint"
 msgstr "Точка сведений о пользователе"
 
 #: src/components/mail-settings.tsx
+#: src/components/sink-editor.tsx
 msgid "Username"
 msgstr "Имя пользователя"
 
@@ -8175,6 +8604,7 @@ msgid "Waiting change requests"
 msgstr "Ждущие запросы на изменение"
 
 #: src/components/webhook-detail.tsx
+#: src/lib/sinks.ts
 #: src/routes/_signed-in/admin/webhooks/$webhook.tsx
 #: src/routes/_signed-in/projects/$project/webhooks/$webhook.tsx
 msgid "Webhook"
@@ -8266,6 +8696,10 @@ msgstr "Как называется проект и для чего он."
 msgid "What the sign-in button says: “Sign in with …”."
 msgstr "Что написано на кнопке входа: «Войти через …»."
 
+#: src/components/sink-editor.tsx
+msgid "What the sink delivers to, to tell the sinks apart."
+msgstr "Куда доставляет приёмник — чтобы различать приёмники."
+
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 msgid "What this change request was based on changed after it was written; it can no longer be approved or applied. Copy it to propose it again."
 msgstr "То, на чём основан этот запрос на изменение, изменилось после его создания; его больше нельзя одобрить или применить. Скопируйте его, чтобы предложить снова."
@@ -8286,9 +8720,21 @@ msgstr "Что будет пользоваться токеном, чтобы п
 msgid "Whatever uses the token is refused from now on. This cannot be undone."
 msgstr "Всё, что пользуется токеном, с этого момента получит отказ. Это нельзя отменить."
 
+#: src/components/sink-editor.tsx
+msgid "Where ClickHouse's HTTP interface answers, such as https://clickhouse.example.com:8443. The user and password have fields of their own."
+msgstr "Где отвечает HTTP-интерфейс ClickHouse, например https://clickhouse.example.com:8443. У пользователя и пароля свои поля."
+
+#: src/components/sink-editor.tsx
+msgid "Where every batch is posted, signed with the sink's secret. The secret is shown once, when the sink is created."
+msgstr "Куда отправляется каждая пачка, подписанная секретом приёмника. Секрет показывается один раз, при создании приёмника."
+
 #: src/components/webhook-editor.tsx
 msgid "Where every event is posted, signed with the subscription's secret."
 msgstr "Куда отправляется каждое событие, подписанное секретом подписки."
+
+#: src/components/sink-editor.tsx
+msgid "Where the events are delivered. It cannot be changed afterwards."
+msgstr "Куда доставляются события. Позже изменить нельзя."
 
 #: src/components/saml-provider-form.tsx
 msgid "Where the identity provider publishes its metadata. Plain http is accepted only on a loopback address."
@@ -8359,6 +8805,10 @@ msgstr "Действует до <0>{until}</0>"
 msgid "Write the hypothesis: an experiment starts only with one."
 msgstr "Напишите гипотезу: без неё эксперимент не запустится."
 
+#: src/lib/sinks.ts
+msgid "Writes a file per batch to an S3-compatible bucket, as JSON lines or Parquet, for a lake or a warehouse to load."
+msgstr "Пишет файл на каждую пачку в S3-совместимый бакет — JSON lines или Parquet, чтобы озеро или хранилище данных их загрузило."
+
 #: src/components/environment-protection.tsx
 msgid "Writes that would change what SDKs receive from {name} are refused until they come through an approved change request. SDKs ignore local overrides there."
 msgstr "Записи, меняющие то, что SDK получают из окружения {name}, будут отклоняться, пока не пройдут через одобренный запрос на изменение. SDK игнорируют там локальные переопределения."
@@ -8367,6 +8817,7 @@ msgstr "Записи, меняющие то, что SDK получают из о
 msgid "X²"
 msgstr "X²"
 
+#: src/components/sink-list.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "Yes"
 msgstr "Да"
