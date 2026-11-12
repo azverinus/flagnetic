@@ -103,6 +103,25 @@ void main() {
       }
     });
 
+    test(
+      'a header the HTTP library refuses is logged by its class alone',
+      () async {
+        final server = await startServer();
+        final logs = LogRecorder();
+        // A newline in the platform makes the User-Agent header invalid, the
+        // one header value the caller still controls after construction.
+        clientOf(server, logs: logs, platform: 'PLATFORMVALUE\n');
+        await eventually(() => logs.count(LogEvents.fetchFailed) >= 1);
+        expect(
+          logs.fieldsOf(LogEvents.fetchFailed).first['detail'],
+          'request not built: FormatException',
+        );
+        final logged = '${logs.events}';
+        expect(logged, isNot(contains(clientKey)));
+        expect(logged, isNot(contains('PLATFORMVALUE')));
+      },
+    );
+
     test('anything else constructs, even without a base URL', () async {
       final logs = LogRecorder();
       final client = Flagnetic.client(
