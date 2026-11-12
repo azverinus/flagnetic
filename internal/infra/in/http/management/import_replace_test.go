@@ -360,7 +360,7 @@ func TestAReplaceNeedsEverySectionAndAnEnvironment(t *testing.T) {
 	doc["flags"] = []any{}
 	doc["experiments"] = []any{}
 	res = replaceInto(t, f.admin, k, doc)
-	if got := violationsOf(t, "no environment", res.StatusCode(), res.Body, "invalid_document"); !slices.Contains(got, "/environments invalid_value") {
+	if got = violationsOf(t, "no environment", res.StatusCode(), res.Body, "invalid_document"); !slices.Contains(got, "/environments invalid_value") {
 		t.Errorf("violations = %v, want /environments invalid_value", got)
 	}
 

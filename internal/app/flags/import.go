@@ -219,8 +219,8 @@ func (i *Importer) DeleteFlag(ctx context.Context, project workspace.ProjectID, 
 	ctx, m := marked(ctx)
 	version := before.Version
 	if before.ArchivedAt == nil {
-		archived, err := i.archive.Handle(ctx, FlagCommand{Project: project, Key: key, Expected: precondition.On(version), Request: req})
-		if err != nil {
+		var archived FlagView
+		if archived, err = i.archive.Handle(ctx, FlagCommand{Project: project, Key: key, Expected: precondition.On(version), Request: req}); err != nil {
 			return Effect{}, err
 		}
 		version = archived.Flag.Version
