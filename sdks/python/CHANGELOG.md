@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.1.2...sdks/python/v0.1.3) (2026-11-12)
+
+
+### Bug Fixes
+
+* **sdk-python:** refuse an SDK key that is no header token and never log it ([#258](https://github.com/azverinus/flagnetic/issues/258)) ([e839cfe](https://github.com/azverinus/flagnetic/commit/e839cfe33b276462099d6fe39f1296cc66d809ef))
+
 ## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.1.1...sdks/python/v0.1.2) (2026-11-11)
 
 
