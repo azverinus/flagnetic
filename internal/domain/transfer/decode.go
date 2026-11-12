@@ -165,12 +165,27 @@ func parseYAML(data []byte) (any, error) {
 	if err := dec.Decode(&second); !errors.Is(err, io.EOF) {
 		return nil, &MalformedError{Detail: "the YAML holds more than one document"}
 	}
+	if refuseAnchors(&n) {
+		return nil, &MalformedError{Detail: "the YAML uses an anchor or an alias, which a project document does not"}
+	}
 	keepTimestampsAsText(&n)
 	var v any
 	if err := n.Decode(&v); err != nil {
 		return nil, &MalformedError{Detail: "the YAML does not parse: " + err.Error()}
 	}
 	return jsonTree(v)
+}
+
+// refuseAnchors reports whether the tree holds an anchor or an alias. A
+// project document needs neither, and decoding an alias copies what it names
+// at every use, so a few bytes of aliases to one large scalar would grow into
+// gigabytes before any limit on the document ran. The tree is checked before it
+// is decoded, and an alias node is not followed.
+func refuseAnchors(n *yaml.Node) bool {
+	if n.Kind == yaml.AliasNode || n.Anchor != "" {
+		return true
+	}
+	return slices.ContainsFunc(n.Content, refuseAnchors)
 }
 
 // keepTimestampsAsText makes every plain scalar that YAML reads as a

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -445,6 +446,43 @@ func TestMalformedAndTrailingInputIsRefusedAsMalformed(t *testing.T) {
 		if !errors.As(err, &m) {
 			t.Errorf("%s: error = %v, want a MalformedError", name, err)
 		}
+	}
+}
+
+func TestYAMLAnchorsAndAliasesAreRefusedAsMalformed(t *testing.T) {
+	for name, body := range map[string]string{
+		"an alias":           "schema_version: 1\nx: &a [1]\ny: *a\n",
+		"an anchor alone":    "schema_version: 1\nflags: &a []\n",
+		"a merge key":        "schema_version: 1\nproject: &p {key: a}\nz:\n  <<: *p\n",
+		"an anchored scalar": "&a schema_version: 1\n",
+	} {
+		_, err := transfer.Decode(transfer.YAML, []byte(body))
+		var m *transfer.MalformedError
+		if !errors.As(err, &m) {
+			t.Errorf("%s: error = %v, want a MalformedError", name, err)
+		}
+	}
+}
+
+func TestAYAMLDocumentOfAliasesIsRefusedWithoutExpandingThem(t *testing.T) {
+	// One anchored scalar of half a MiB repeated by 20000 aliases is about
+	// 100 KiB of text and 10 GB once expanded.
+	var b strings.Builder
+	b.WriteString("schema_version: 1\nanchor: &a " + strings.Repeat("x", 512<<10) + "\ntags:\n")
+	for range 20000 {
+		b.WriteString("  - *a\n")
+	}
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	_, err := transfer.Decode(transfer.YAML, []byte(b.String()))
+	runtime.ReadMemStats(&after)
+
+	var m *transfer.MalformedError
+	if !errors.As(err, &m) {
+		t.Fatalf("error = %v, want a MalformedError", err)
+	}
+	if grown := after.TotalAlloc - before.TotalAlloc; grown > 64<<20 {
+		t.Errorf("refusing the document allocated %d MiB, want far less than its expansion", grown>>20)
 	}
 }
 
