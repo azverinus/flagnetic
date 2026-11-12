@@ -5,7 +5,7 @@ import 'types.dart';
 
 /// The version this package reports in `User-Agent`, the `sdk_version`
 /// attribute and events.
-const sdkVersion = '0.1.1'; // x-release-please-version
+const sdkVersion = '0.1.2'; // x-release-please-version
 
 /// The SDK name in `User-Agent`, the `sdk` attribute and events.
 const sdkName = 'flagnetic-dart';

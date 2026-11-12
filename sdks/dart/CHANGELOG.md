@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/dart/v0.1.1...sdks/dart/v0.1.2) (2026-11-12)
+
+
+### Bug Fixes
+
+* **sdk-dart:** refuse an SDK key that is no header token and never log it ([#265](https://github.com/azverinus/flagnetic/issues/265)) ([3ab14c9](https://github.com/azverinus/flagnetic/commit/3ab14c9859f7527eaf40fcfa6675e94c77bc84d4))
+
 ## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/dart/v0.1.0...sdks/dart/v0.1.1) (2026-11-11)
 
 
