@@ -24,7 +24,7 @@ from enum import Enum
 from typing import Any
 from urllib.parse import urlsplit
 
-from ._delivery import API_PATH
+from ._delivery import API_PATH, send_request
 
 #: This SDK's name in the envelope and in the SDK inventory, as the User-Agent names it.
 SDK_NAME = "flagnetic-python"
@@ -167,7 +167,7 @@ class Ingest:
             self._conn = conn
         deadline = time.monotonic() + self._timeout
         try:
-            conn.request("POST", self._path, body=body, headers=headers)
+            send_request(conn, "POST", self._path, headers, body)
             resp = conn.getresponse()
             status = resp.status
             if status == 202:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gzip
+import http.client
 import json
 import logging
 import os
@@ -622,3 +623,21 @@ def test_flush_without_a_timeout_returns_when_the_thread_is_gone(
     done.start()
     done.join(5)
     assert not done.is_alive()
+
+
+@pytest.mark.parametrize("suffix", ["\n", "\r\n", " ", "\t", "\x00", "\x7f", "é"])
+def test_a_key_that_is_no_header_token_is_refused_without_repeating_it(suffix: str) -> None:
+    key = SDK_KEY + suffix
+    with pytest.raises(ValueError, match="flagnetic") as refused:
+        flagnetic.Client(key, "http://127.0.0.1:1")
+    assert SDK_KEY not in str(refused.value)
+    assert SDK_KEY not in repr(refused.value)
+
+
+def test_an_error_raised_while_building_a_request_is_named_by_its_class_only() -> None:
+    conn = http.client.HTTPConnection("127.0.0.1", 1)
+    secret = "fn_srv_secret\n"
+    with pytest.raises(http.client.HTTPException) as failed:
+        _delivery.send_request(conn, "GET", "/x", {"Authorization": f"Bearer {secret}"})
+    assert secret.strip() not in str(failed.value)
+    assert "ValueError" in str(failed.value)

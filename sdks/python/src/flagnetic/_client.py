@@ -258,6 +258,11 @@ class Client:
 
         if not isinstance(sdk_key, str) or not sdk_key:
             raise ValueError("flagnetic: the SDK key is empty")
+        if not sdk_key.isascii() or not sdk_key.isprintable() or any(c.isspace() for c in sdk_key):
+            # A trailing newline from an env file is the usual cause. The key is not repeated: it is a secret.
+            raise ValueError(
+                "flagnetic: the SDK key holds whitespace or a character that cannot be part of an HTTP header"
+            )
         if sdk_key.startswith(_CLIENT_KEY_PREFIX):
             raise ValueError(
                 "flagnetic: a client SDK key cannot fetch the ruleset; the Python SDK needs a server key"
