@@ -498,9 +498,14 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
         msg`This target is on a link-local address, which the instance never reaches. Use another address.`,
       );
     case "invalid_url":
-      return i18n._(
-        msg`Enter an absolute http or https URL without credentials or a fragment. A ClickHouse or object storage URL takes no query.`,
-      );
+      // A webhook's URL may carry a query; a ClickHouse URL may not, since
+      // the platform builds the query of every insert itself.
+      if (violation.pointer.startsWith("/clickhouse/")) {
+        return i18n._(
+          msg`Enter an absolute http or https URL without credentials, a query or a fragment.`,
+        );
+      }
+      return i18n._(msg`Enter an absolute http or https URL without credentials or a fragment.`);
     case "invalid_table_prefix":
       return i18n._(msg`Use letters, digits and underscores, not starting with a digit.`);
     case "invalid_endpoint":

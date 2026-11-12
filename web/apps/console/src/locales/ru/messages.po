@@ -2783,8 +2783,12 @@ msgid "Enter a whole number."
 msgstr "Введите целое число."
 
 #: src/lib/problem-messages.ts
-msgid "Enter an absolute http or https URL without credentials or a fragment. A ClickHouse or object storage URL takes no query."
-msgstr "Введите абсолютный URL с http или https без учётных данных и фрагмента. URL ClickHouse и объектного хранилища не содержит запроса."
+msgid "Enter an absolute http or https URL without credentials or a fragment."
+msgstr "Введите абсолютный URL с http или https без учётных данных и фрагмента."
+
+#: src/lib/problem-messages.ts
+msgid "Enter an absolute http or https URL without credentials, a query or a fragment."
+msgstr "Введите абсолютный URL с http или https без учётных данных, запроса и фрагмента."
 
 #: src/components/webhook-editor.tsx
 msgid "Enter an absolute URL, such as https://example.com/flagnetic."
