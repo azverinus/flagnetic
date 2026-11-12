@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 
 import flagnetic
-from flagnetic import _delivery
+from flagnetic import _delivery, _ingest
 from mock_server import MockServer, Request, Response
 from protocol import SDK_KEY, Logs, eventually, read, read_json
 
@@ -641,3 +641,26 @@ def test_an_error_raised_while_building_a_request_is_named_by_its_class_only() -
         _delivery.send_request(conn, "GET", "/x", {"Authorization": f"Bearer {secret}"})
     assert secret.strip() not in str(failed.value)
     assert "ValueError" in str(failed.value)
+
+
+def test_a_key_the_http_library_refuses_never_reaches_the_log(
+    clients: Any, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Construction refuses such a key; this hands one past it to show what fetch, stream and report log.
+    bad_key = SDK_KEY + "\n"
+    for target in (_delivery.Delivery, _ingest.Ingest):
+        original = target.__init__
+
+        def with_bad_key(self: Any, *args: Any, _original: Any = original, **kwargs: Any) -> None:
+            _original(self, *args, **{**kwargs, "sdk_key": bad_key})
+
+        monkeypatch.setattr(target, "__init__", with_bad_key)
+    logs = Logs()
+    with caplog.at_level(logging.DEBUG):
+        client = clients(serving(RULESET), stream=True, logger=logs, _time_divisor=100)
+        client.alias("anonymous", "d-1", "user", "u-1")
+        client.flush(timeout=2)
+        assert eventually(lambda: [] if logs.count("sse_dropped") and logs.count("fetch_failed") else ["none"]) == []
+    logged = repr(logs.events) + caplog.text
+    assert SDK_KEY not in logged
+    assert logs.count("evaluation_failed") == 0
