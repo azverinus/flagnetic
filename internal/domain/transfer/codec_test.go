@@ -465,12 +465,15 @@ func TestYAMLAnchorsAndAliasesAreRefusedAsMalformed(t *testing.T) {
 }
 
 func TestAYAMLDocumentOfAliasesIsRefusedWithoutExpandingThem(t *testing.T) {
-	// One anchored scalar of half a MiB repeated by 20000 aliases is about
-	// 100 KiB of text and 10 GB once expanded.
+	// One anchored scalar of 880 KiB listed by 20000 aliases is a document of
+	// about 1 MiB, and some 18 GB once every alias is expanded.
 	var b strings.Builder
-	b.WriteString("schema_version: 1\nanchor: &a " + strings.Repeat("x", 512<<10) + "\ntags:\n")
+	b.WriteString("schema_version: 1\nanchor: &a " + strings.Repeat("x", 880<<10) + "\ntags:\n")
 	for range 20000 {
 		b.WriteString("  - *a\n")
+	}
+	if size := b.Len(); size < 1000<<10 || size > 1<<20 {
+		t.Fatalf("the document is %d bytes, want about 1 MiB", size)
 	}
 	var before, after runtime.MemStats
 	runtime.ReadMemStats(&before)
