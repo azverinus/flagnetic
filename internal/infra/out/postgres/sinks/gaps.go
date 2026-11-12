@@ -25,12 +25,27 @@ const streamLockTimeout = "30s"
 // LockStreams holds every stream of kind, disabled and stopped sinks' included,
 // until the unit of work ends, in the order of their sinks, so that two
 // holders never wait on each other.
+//
+// The streams' projects and sinks are held first, against being deleted or
+// locked for update, in the order deleting a project or a sink, or resuming
+// one, takes them: the gap and the sink.data_lost recorded later reference
+// both, and taking that reference only after the streams would wait on a
+// transaction that waits on a stream, a deadlock, while holding the
+// partitions every ingest needs.
 func (s *Store) LockStreams(ctx context.Context, kind sinks.EventKind) error {
-	if _, err := s.db(ctx).Exec(ctx, `SET LOCAL lock_timeout = '`+streamLockTimeout+`'`); err != nil {
+	db := s.db(ctx)
+	if _, err := db.Exec(ctx, `SET LOCAL lock_timeout = '`+streamLockTimeout+`'`); err != nil {
 		return fmt.Errorf("locking the sink streams of %s: %w", kind, err)
 	}
-	if _, err := s.db(ctx).Exec(ctx, `SELECT 1 FROM sink_streams WHERE event_kind = $1 ORDER BY sink_id FOR UPDATE`, string(kind)); err != nil {
-		return fmt.Errorf("locking the sink streams of %s: %w", kind, err)
+	for _, q := range []string{
+		`SELECT 1 FROM projects WHERE id IN (SELECT s.project_id FROM sinks s JOIN sink_streams ss ON ss.sink_id = s.id
+			WHERE ss.event_kind = $1) ORDER BY id FOR KEY SHARE`,
+		`SELECT 1 FROM sinks WHERE id IN (SELECT sink_id FROM sink_streams WHERE event_kind = $1) ORDER BY id FOR KEY SHARE`,
+		`SELECT 1 FROM sink_streams WHERE event_kind = $1 ORDER BY sink_id FOR UPDATE`,
+	} {
+		if _, err := db.Exec(ctx, q, string(kind)); err != nil {
+			return fmt.Errorf("locking the sink streams of %s: %w", kind, err)
+		}
 	}
 	return nil
 }

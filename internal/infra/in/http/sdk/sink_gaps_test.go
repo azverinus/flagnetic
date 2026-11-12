@@ -329,6 +329,64 @@ func TestTwoReplicasDropOnceAndRecordOneGapPerStream(t *testing.T) {
 	}
 }
 
+func TestRetentionWaitsForASinkBeingChangedBeforeTakingItsStreams(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t)
+	created, _ := f.enabled(t, webhook(r, "exposure"))
+	dayEnd := f.dayEnd()
+	f.post(t, f.exposure("u-1", "true", f.clock.Now()))
+	f.pastRetention(dayEnd)
+
+	// A transaction taking the sink's row and then its streams, as resuming
+	// or deleting the sink does, holds the row while retention starts.
+	pool := testkit.Pool(t)
+	tx, err := pool.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(t.Context()) }()
+	var pid int
+	if err = tx.QueryRow(t.Context(), `SELECT pg_backend_pid() FROM sinks WHERE id = $1 FOR UPDATE`, created.Id.String()).Scan(&pid); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- f.srv.Tick(t, worker.EventRetentionName) }()
+	awaitLockWait(t, pid)
+
+	if _, err = tx.Exec(t.Context(), `SELECT 1 FROM sink_streams WHERE sink_id = $1 FOR UPDATE`, created.Id.String()); err != nil {
+		t.Fatalf("taking the sink's streams while retention waits: %v", err)
+	}
+	if err = tx.Commit(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err = <-done; err != nil {
+		t.Fatalf("retention: %v", err)
+	}
+	if gaps := f.gaps(t, created); len(gaps) != 1 {
+		t.Errorf("gaps %+v, want one", gaps)
+	}
+}
+
+// awaitLockWait waits until a session of the database other than holder waits
+// for a lock.
+func awaitLockWait(t *testing.T, holder int) {
+	t.Helper()
+	pool := testkit.Pool(t)
+	for range 500 {
+		var waiting bool
+		err := pool.QueryRow(t.Context(), `SELECT EXISTS (SELECT FROM pg_stat_activity
+			WHERE datname = current_database() AND wait_event_type = 'Lock' AND pid <> $1)`, holder).Scan(&waiting)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if waiting {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("retention never came to wait on a lock")
+}
+
 func TestGapActionsAreScopedToTheirSinkAndNeedSinkManage(t *testing.T) {
 	f := startDelivering(t)
 	r := testkit.StartReceiver(t)
