@@ -79,6 +79,30 @@ void main() {
       );
     });
 
+    test('a key that is no header token is refused without repeating it', () {
+      for (final bad in [
+        'fn_cli_SECRETKEY0\n',
+        ' fn_cli_SECRETKEY0',
+        'fn_cli_SECRET KEY0',
+        'fn_cli_SECRET\tKEY0',
+        'fn_cli_SECRET\u0000KEY0',
+        'fn_cli_SECRETKEY0\u00e9',
+      ]) {
+        Object? error;
+        try {
+          Flagnetic.client(
+            bad,
+            baseUrl: Uri.parse('http://127.0.0.1:1'),
+            context: context,
+          );
+        } on ArgumentError catch (e) {
+          error = e;
+        }
+        expect(error, isA<ArgumentError>(), reason: bad);
+        expect('$error', isNot(contains('SECRET')), reason: bad);
+      }
+    });
+
     test('anything else constructs, even without a base URL', () async {
       final logs = LogRecorder();
       final client = Flagnetic.client(

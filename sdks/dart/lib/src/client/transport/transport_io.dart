@@ -19,6 +19,20 @@ void Function()? watchPage({
 /// `User-Agent` names the platform.
 String? defaultPlatformAttribute() => null;
 
+/// Sets [headers] on [request]. `dart:io` quotes the offending value in its
+/// `FormatException`, and the `Authorization` header is the SDK key, so a
+/// refusal is reported by its class alone.
+void _setHeaders(HttpClientRequest request, Map<String, String> headers) {
+  try {
+    headers.forEach(request.headers.set);
+  } on Object catch (e) {
+    throw TransportException(
+      TransportFailure.network,
+      'request not built: ${e.runtimeType}',
+    );
+  }
+}
+
 final class _IoTransport implements Transport {
   final HttpClient _http = HttpClient()..autoUncompress = true;
   final Set<HttpClientRequest> _inFlight = {};
@@ -60,7 +74,7 @@ final class _IoTransport implements Transport {
           throw TimeoutException(null);
         }
         _inFlight.add(req);
-        headers.forEach(req.headers.set);
+        _setHeaders(req, headers);
         req.headers.set(HttpHeaders.acceptEncodingHeader, 'gzip');
         if (body != null) req.add(body);
         final response = await req.close();
@@ -130,7 +144,7 @@ final class _IoTransport implements Transport {
           throw TimeoutException(null);
         }
         _inFlight.add(req);
-        headers.forEach(req.headers.set);
+        _setHeaders(req, headers);
         req.headers
           ..set(HttpHeaders.acceptHeader, 'text/event-stream')
           // The bytes must arrive as the server writes them, so nothing may

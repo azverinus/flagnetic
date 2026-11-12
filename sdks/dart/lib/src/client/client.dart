@@ -27,8 +27,10 @@ abstract final class Flagnetic {
   /// context's unit set as `last_good`, else built-in defaults. A store that
   /// answers with a future loads before the first request is sent.
   ///
-  /// Throws [ArgumentError] for a server key (`fn_srv_…`), the one mistake
-  /// the SDK refuses loudly: a server key must never ship in an app. Nothing
+  /// Throws [ArgumentError] for a server key (`fn_srv_…`), which must never
+  /// ship in an app, and for a key holding whitespace or any character that
+  /// cannot be part of an HTTP header (a trailing newline from an env file is
+  /// the usual cause); the message never repeats the key, a secret. Nothing
   /// else this client does throws.
   static FlagneticClient client(
     String sdkKey, {
@@ -43,9 +45,19 @@ abstract final class Flagnetic {
         'sdkKey',
       );
     }
+    if (_notHeaderToken.hasMatch(sdkKey)) {
+      throw ArgumentError(
+        'the key holds whitespace or a character that cannot be part of an '
+            'HTTP header',
+        'sdkKey',
+      );
+    }
     return FlagneticClient._(sdkKey, baseUrl, context, options);
   }
 }
+
+/// Anything but visible ASCII: the key travels in an `Authorization` header.
+final _notHeaderToken = RegExp(r'[^\x21-\x7e]');
 
 /// A listener of changed flag keys.
 typedef ChangeListener = void Function(List<String> changedKeys);
