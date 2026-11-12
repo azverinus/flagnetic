@@ -316,10 +316,75 @@ func CheckTargetAddresses(addrs []netip.Addr, policy TargetPolicy) error {
 }
 
 // TargetAddressRefused reports whether a is an address no subscription may
-// reach without the operator's leave: loopback, private, link-local,
-// unspecified or multicast, written as IPv4 or IPv4-mapped IPv6 alike.
+// reach without the operator's leave: anything but a global unicast address.
+// Every range IANA lists as special-purpose is refused, not only loopback,
+// private and link-local ones: carrier-grade NAT (where pod ranges, VPN
+// meshes and some clouds' metadata services live), benchmarking, reserved and
+// documentation ranges alike. An address that embeds an IPv4 one (NAT64, 6to4)
+// is judged by the IPv4 address it embeds, since that is where the call lands.
+// Written as IPv4 or IPv4-mapped IPv6 alike.
 func TargetAddressRefused(a netip.Addr) bool {
-	return AddressUnreachable(a) || AddressPrivateOrLoopback(a) || AddressLinkLocal(a)
+	a = a.Unmap()
+	if AddressUnreachable(a) {
+		return true
+	}
+	if v4, ok := embeddedIPv4(a); ok {
+		return TargetAddressRefused(v4)
+	}
+	if a.Is4() {
+		return inAny(a, specialIPv4)
+	}
+	return !globalUnicastIPv6.Contains(a) || inAny(a, specialIPv6)
+}
+
+// Special-purpose ranges, from the IANA registries, that are not global.
+// Ranges an address is judged by another way (NAT64 and 6to4) are not listed.
+var (
+	specialIPv4 = prefixes("0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16",
+		"172.16.0.0/12", "192.0.0.0/24", "192.0.2.0/24", "192.88.99.0/24", "192.168.0.0/16", "198.18.0.0/15",
+		"198.51.100.0/24", "203.0.113.0/24", "224.0.0.0/4", "240.0.0.0/4")
+	// globalUnicastIPv6 is the only block IANA hands out for global unicast
+	// use; the rest of the space is reserved or special.
+	globalUnicastIPv6 = netip.MustParsePrefix("2000::/3")
+	specialIPv6       = prefixes("2001::/23", "2001:db8::/32", "3fff::/20", "5f00::/16", "64:ff9b:1::/48")
+	nat64             = netip.MustParsePrefix("64:ff9b::/96")
+	sixToFour         = netip.MustParsePrefix("2002::/16")
+	// awsMetadataIPv6 is where EC2 answers metadata requests over IPv6, inside
+	// the unique local range private networks use.
+	awsMetadataIPv6 = netip.MustParseAddr("fd00:ec2::254")
+)
+
+func prefixes(list ...string) []netip.Prefix {
+	out := make([]netip.Prefix, len(list))
+	for i, s := range list {
+		out[i] = netip.MustParsePrefix(s)
+	}
+	return out
+}
+
+func inAny(a netip.Addr, list []netip.Prefix) bool {
+	for _, p := range list {
+		if p.Contains(a) {
+			return true
+		}
+	}
+	return false
+}
+
+// embeddedIPv4 returns the IPv4 address a NAT64 (64:ff9b::/96) or 6to4
+// (2002::/16) address stands for.
+func embeddedIPv4(a netip.Addr) (netip.Addr, bool) {
+	if !a.Is6() {
+		return netip.Addr{}, false
+	}
+	b := a.As16()
+	switch {
+	case nat64.Contains(a):
+		return netip.AddrFrom4([4]byte(b[12:16])), true
+	case sixToFour.Contains(a):
+		return netip.AddrFrom4([4]byte(b[2:6])), true
+	}
+	return netip.Addr{}, false
 }
 
 // AddressUnreachable reports whether a is an address nothing is ever called
@@ -337,11 +402,15 @@ func AddressPrivateOrLoopback(a netip.Addr) bool {
 	return a.IsLoopback() || a.IsPrivate()
 }
 
-// AddressLinkLocal reports whether a is a link-local address, where cloud
-// metadata services answer.
+// AddressLinkLocal reports whether a is where cloud metadata services answer:
+// a link-local address, EC2's IPv6 metadata address, or a NAT64 or 6to4
+// address embedding a link-local IPv4 one.
 func AddressLinkLocal(a netip.Addr) bool {
 	a = a.Unmap()
-	return a.IsLinkLocalUnicast() || a.IsLinkLocalMulticast()
+	if v4, ok := embeddedIPv4(a); ok {
+		return AddressLinkLocal(v4)
+	}
+	return a.IsLinkLocalUnicast() || a.IsLinkLocalMulticast() || a == awsMetadataIPv6
 }
 
 // webhookSecretLength is the bytes of randomness in a subscription's secret.

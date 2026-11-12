@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -346,8 +345,8 @@ func TestAPrivateTargetIsRefusedAtEveryConnection(t *testing.T) {
 	if refused.Status != management.WebhookDeliveryStatusPending || len(refused.Attempts) != 1 {
 		t.Fatalf("delivery %+v, want one refused attempt and another due", refused)
 	}
-	if a := refused.Attempts[0]; a.StatusCode != nil || a.Error == nil || !strings.Contains(*a.Error, "private") {
-		t.Errorf("attempt %+v, want one naming the refused address", a)
+	if a := refused.Attempts[0]; a.StatusCode != nil || a.Error == nil || *a.Error != "refused_target" {
+		t.Errorf("attempt %+v, want the class refused_target and no more", a)
 	}
 
 	c.Advance(15 * time.Second)

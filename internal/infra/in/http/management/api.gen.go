@@ -10717,9 +10717,10 @@ type ClientInterface interface {
 	//
 	// Checks a configuration as creating a sink would, then calls its target
 	// and answers whether it works, why not, and what is wrong with it that
-	// does not stop delivery. Nothing is stored, created at the target or
-	// audited: a ClickHouse test never creates tables, and says so in its
-	// warnings. A webhook sink is called with a signature made from a
+	// does not stop delivery. Nothing is stored or created at the target: a
+	// ClickHouse test never creates tables, and says so in its warnings. The
+	// test is audited as `sink.config_tested`, by its outcome and not its
+	// target. A webhook sink is called with a signature made from a
 	// secret drawn for the test and thrown away. The target's own words are
 	// never answered, only the failure's class, status and code. Saving a
 	// sink is never blocked by its test.
@@ -10733,9 +10734,10 @@ type ClientInterface interface {
 	//
 	// Checks a configuration as creating a sink would, then calls its target
 	// and answers whether it works, why not, and what is wrong with it that
-	// does not stop delivery. Nothing is stored, created at the target or
-	// audited: a ClickHouse test never creates tables, and says so in its
-	// warnings. A webhook sink is called with a signature made from a
+	// does not stop delivery. Nothing is stored or created at the target: a
+	// ClickHouse test never creates tables, and says so in its warnings. The
+	// test is audited as `sink.config_tested`, by its outcome and not its
+	// target. A webhook sink is called with a signature made from a
 	// secret drawn for the test and thrown away. The target's own words are
 	// never answered, only the failure's class, status and code. Saving a
 	// sink is never blocked by its test.
@@ -16750,9 +16752,10 @@ func (c *Client) CreateSink(ctx context.Context, project ProjectKey, body Create
 //
 // Checks a configuration as creating a sink would, then calls its target
 // and answers whether it works, why not, and what is wrong with it that
-// does not stop delivery. Nothing is stored, created at the target or
-// audited: a ClickHouse test never creates tables, and says so in its
-// warnings. A webhook sink is called with a signature made from a
+// does not stop delivery. Nothing is stored or created at the target: a
+// ClickHouse test never creates tables, and says so in its warnings. The
+// test is audited as `sink.config_tested`, by its outcome and not its
+// target. A webhook sink is called with a signature made from a
 // secret drawn for the test and thrown away. The target's own words are
 // never answered, only the failure's class, status and code. Saving a
 // sink is never blocked by its test.
@@ -16776,9 +16779,10 @@ func (c *Client) TestSinkConfigWithBody(ctx context.Context, project ProjectKey,
 //
 // Checks a configuration as creating a sink would, then calls its target
 // and answers whether it works, why not, and what is wrong with it that
-// does not stop delivery. Nothing is stored, created at the target or
-// audited: a ClickHouse test never creates tables, and says so in its
-// warnings. A webhook sink is called with a signature made from a
+// does not stop delivery. Nothing is stored or created at the target: a
+// ClickHouse test never creates tables, and says so in its warnings. The
+// test is audited as `sink.config_tested`, by its outcome and not its
+// target. A webhook sink is called with a signature made from a
 // secret drawn for the test and thrown away. The target's own words are
 // never answered, only the failure's class, status and code. Saving a
 // sink is never blocked by its test.
@@ -32172,9 +32176,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Checks a configuration as creating a sink would, then calls its target
 	// and answers whether it works, why not, and what is wrong with it that
-	// does not stop delivery. Nothing is stored, created at the target or
-	// audited: a ClickHouse test never creates tables, and says so in its
-	// warnings. A webhook sink is called with a signature made from a
+	// does not stop delivery. Nothing is stored or created at the target: a
+	// ClickHouse test never creates tables, and says so in its warnings. The
+	// test is audited as `sink.config_tested`, by its outcome and not its
+	// target. A webhook sink is called with a signature made from a
 	// secret drawn for the test and thrown away. The target's own words are
 	// never answered, only the failure's class, status and code. Saving a
 	// sink is never blocked by its test.
@@ -32188,9 +32193,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Checks a configuration as creating a sink would, then calls its target
 	// and answers whether it works, why not, and what is wrong with it that
-	// does not stop delivery. Nothing is stored, created at the target or
-	// audited: a ClickHouse test never creates tables, and says so in its
-	// warnings. A webhook sink is called with a signature made from a
+	// does not stop delivery. Nothing is stored or created at the target: a
+	// ClickHouse test never creates tables, and says so in its warnings. The
+	// test is audited as `sink.config_tested`, by its outcome and not its
+	// target. A webhook sink is called with a signature made from a
 	// secret drawn for the test and thrown away. The target's own words are
 	// never answered, only the failure's class, status and code. Saving a
 	// sink is never blocked by its test.
@@ -54035,9 +54041,10 @@ func (c *ClientWithResponses) CreateSinkWithResponse(ctx context.Context, projec
 //
 // Checks a configuration as creating a sink would, then calls its target
 // and answers whether it works, why not, and what is wrong with it that
-// does not stop delivery. Nothing is stored, created at the target or
-// audited: a ClickHouse test never creates tables, and says so in its
-// warnings. A webhook sink is called with a signature made from a
+// does not stop delivery. Nothing is stored or created at the target: a
+// ClickHouse test never creates tables, and says so in its warnings. The
+// test is audited as `sink.config_tested`, by its outcome and not its
+// target. A webhook sink is called with a signature made from a
 // secret drawn for the test and thrown away. The target's own words are
 // never answered, only the failure's class, status and code. Saving a
 // sink is never blocked by its test.
@@ -54057,9 +54064,10 @@ func (c *ClientWithResponses) TestSinkConfigWithBodyWithResponse(ctx context.Con
 //
 // Checks a configuration as creating a sink would, then calls its target
 // and answers whether it works, why not, and what is wrong with it that
-// does not stop delivery. Nothing is stored, created at the target or
-// audited: a ClickHouse test never creates tables, and says so in its
-// warnings. A webhook sink is called with a signature made from a
+// does not stop delivery. Nothing is stored or created at the target: a
+// ClickHouse test never creates tables, and says so in its warnings. The
+// test is audited as `sink.config_tested`, by its outcome and not its
+// target. A webhook sink is called with a signature made from a
 // secret drawn for the test and thrown away. The target's own words are
 // never answered, only the failure's class, status and code. Saving a
 // sink is never blocked by its test.

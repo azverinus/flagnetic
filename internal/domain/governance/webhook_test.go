@@ -109,6 +109,15 @@ func TestAnAddressOutsideThePublicInternetIsRefused(t *testing.T) {
 		"127.0.0.1": true, "::1": true, "10.0.0.1": true, "172.16.0.1": true, "192.168.1.1": true, "fd00::1": true,
 		"169.254.169.254": true, "fe80::1": true, "0.0.0.0": true, "::": true, "224.0.0.1": true, "ff02::1": true,
 		"::ffff:127.0.0.1": true, "93.184.216.34": false, "2606:2800:220:1::1": false,
+		// special-purpose ranges that are neither private nor link-local
+		"100.64.0.1": true, "100.100.100.200": true, "192.0.0.8": true, "198.18.0.1": true, "198.19.255.255": true,
+		"240.0.0.1": true, "255.255.255.255": true, "0.1.2.3": true, "192.0.2.1": true, "198.51.100.7": true,
+		"203.0.113.9": true, "192.88.99.1": true, "fec0::1": true, "2001:db8::1": true, "2001::1": true, "3fff::1": true,
+		"5f00::1": true, "fc00::1": true,
+		// NAT64 and 6to4 are judged by the IPv4 they embed
+		"64:ff9b::a00:1": true, "64:ff9b::a9fe:a9fe": true, "64:ff9b::7f00:1": true, "64:ff9b::5db8:d822": false,
+		"64:ff9b:1::1": true, "2002:a00:1::1": true, "2002:a9fe:a9fe::1": true, "2002:5db8:d822::1": false,
+		"100.63.255.255": false, "100.128.0.1": false, "198.17.255.255": false, "198.20.0.1": false, "239.255.255.255": true,
 	} {
 		err := governance.CheckTargetAddresses([]netip.Addr{netip.MustParseAddr("93.184.216.34"), netip.MustParseAddr(addr)},
 			governance.TargetPolicy{})

@@ -7,6 +7,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/sinks"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
 // Tested is what a test of a sink's target found.
@@ -27,6 +28,7 @@ func tested(p Probed) Tested {
 type TestConfigCommand struct {
 	Project workspace.ProjectID
 	Draft   sinks.Draft
+	Request governance.Request
 }
 
 // TestConfig tests a configuration that is not saved.
@@ -36,9 +38,11 @@ type TestConfig struct{ d Deps }
 func NewTestConfig(d Deps) *TestConfig { return &TestConfig{d: d} }
 
 // Handle checks the configuration as saving one is checked, then calls its
-// target. Nothing is stored, created at the target or audited: a test of a
-// configuration that is not saved is advice. A webhook sink has no secret yet,
-// so the call is signed with one drawn for it and thrown away.
+// target. Nothing is stored or created at the target, but the test is audited
+// as sink.config_tested: it makes a call, with headers the caller chose, from
+// the instance's network, which whoever reads the audit log must be able to
+// see. A webhook sink has no secret yet, so the call is signed with one drawn
+// for it and thrown away.
 func (h *TestConfig) Handle(ctx context.Context, cmd TestConfigCommand) (Tested, error) {
 	draft, err := h.d.check(ctx, cmd.Project, cmd.Draft)
 	if err != nil {
@@ -53,7 +57,27 @@ func (h *TestConfig) Handle(ctx context.Context, cmd TestConfigCommand) (Tested,
 		secrets = []string{drawn.Reveal()}
 	}
 	probed, err := h.d.probe(ctx, sinks.Sink{Project: cmd.Project, Input: draft.Input}, secrets, false)
-	return tested(probed), err
+	if err != nil {
+		return Tested{}, err
+	}
+	result := tested(probed)
+	now := h.d.now()
+	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
+		if txErr := h.d.lockProject(ctx, cmd.Project); txErr != nil {
+			return txErr
+		}
+		doc := testedDoc(result)
+		doc["name"], doc["kind"] = draft.Name, string(draft.Kind)
+		entry, txErr := governance.NewEntry(id.New[governance.Entry](h.d.IDs), now, cmd.Request, governance.Record{
+			Project: cmd.Project, Action: "sink.config_tested",
+			Entity: governance.Entity{Kind: "project", ID: cmd.Project.String()}, After: doc,
+		})
+		if txErr != nil {
+			return txErr
+		}
+		return h.d.Audit.Record(ctx, entry)
+	})
+	return result, err
 }
 
 // TestCommand asks for the stored sink Sink of Project to be tested, or an

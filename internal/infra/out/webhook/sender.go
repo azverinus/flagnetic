@@ -4,26 +4,27 @@ package webhook
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/netip"
-	"net/url"
 	"syscall"
 	"time"
 
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
+	"github.com/azverinus/flagnetic/internal/domain/sinks"
 )
 
 // errRefusedAddress fails an attempt whose target resolved, at the moment
 // of the call, to an address the operator does not allow. It is no answer
 // from the receiver, so the delivery is retried: what a name resolves to
-// can change back.
-var errRefusedAddress = errors.New("the target resolved to a loopback, private, link-local, unspecified or " +
-	"multicast address, which FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS does not allow, so the call was not made")
+// can change back. The sender dials it and the log keeps only its class.
+var errRefusedAddress = errors.New(string(sinks.ClassRefusedTarget))
 
 // Sender posts deliveries to receivers.
 type Sender struct{ client *http.Client }
@@ -35,7 +36,7 @@ var _ appgovernance.Sender = (*Sender)(nil)
 // governance.DeliveryTimeout and follows no redirect: a 3xx would point at a
 // target nobody reviewed, so it is the answer, and a refusal. Unless policy
 // allows private networks, the dialer refuses every address
-// governance.TargetAddressRefused refuses as it connects, whatever the name
+// governance.TargetAddressRefused refuses (anything but a global unicast address) as it connects, whatever the name
 // resolved to when the subscription was written: a name can be pointed
 // anywhere afterwards.
 func NewSender(policy governance.TargetPolicy) *Sender {
@@ -92,17 +93,39 @@ func (s *Sender) Send(ctx context.Context, target string, headers map[string]str
 	return appgovernance.Sent{StatusCode: &code, Body: snippet, Latency: time.Since(started)}
 }
 
-// cause is why a call got no answer, without the method and target the
-// client wraps it in, which the delivery log shows beside it anyway; a
-// refused address is named plainly, since "operation not permitted" would
-// send an operator hunting a firewall.
+// cause is why a call got no answer, reduced to a class from the closed list
+// of sinks.FailureClass: the error's own text can carry the address the name
+// resolved to and what the network said, and the delivery log is read by
+// whoever manages webhooks, who must not learn the network behind a target
+// from it.
 func cause(err error) error {
 	if errors.Is(err, errRefusedAddress) {
 		return errRefusedAddress
 	}
-	var wrapped *url.Error
-	if errors.As(err, &wrapped) {
-		return wrapped.Err
+	return errors.New(string(classify(err)))
+}
+
+// classify returns err's failure class.
+func classify(err error) sinks.FailureClass {
+	var (
+		dns     *net.DNSError
+		verify  *tls.CertificateVerificationError
+		header  tls.RecordHeaderError
+		alert   tls.AlertError
+		unknown x509.UnknownAuthorityError
+		host    x509.HostnameError
+		invalid x509.CertificateInvalidError
+		timeout interface{ Timeout() bool }
+	)
+	switch {
+	case errors.As(err, &dns):
+		return sinks.ClassDNS
+	case errors.Is(err, http.ErrSchemeMismatch), errors.As(err, &verify), errors.As(err, &header), errors.As(err, &alert),
+		errors.As(err, &unknown), errors.As(err, &host), errors.As(err, &invalid):
+		return sinks.ClassTLS
+	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &timeout) && timeout.Timeout():
+		return sinks.ClassTimeout
+	default:
+		return sinks.ClassConnect
 	}
-	return err
 }

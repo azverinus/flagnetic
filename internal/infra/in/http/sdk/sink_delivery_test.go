@@ -17,6 +17,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/testkit"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // sinkTargets lets the server deliver to receivers the tests run on loopback
@@ -1000,6 +1001,11 @@ func TestTestingASinkAnswersWhetherItsTargetWorksAndStoresNothingForAnUnsavedOne
 	}
 	if list := do(f.p.admin.ListSinksWithResponse(t.Context(), f.p.key)); list.JSON200 == nil || len(list.JSON200.Items) != 0 {
 		t.Errorf("sinks after testing unsaved configurations %s, want none", list.Body)
+	}
+	configAction, project := "sink.config_tested", openapi_types.UUID(f.p.projectID(t).Bytes())
+	entries := do(f.p.admin.ListAuditEntriesWithResponse(t.Context(), &management.ListAuditEntriesParams{Project: &project, Action: &configAction}))
+	if entries.JSON200 == nil || len(entries.JSON200.Items) != 2 {
+		t.Errorf("audit entries of tested unsaved configurations %s, want one for each of the two that reached a target", entries.Body)
 	}
 
 	saved, _ := f.create(t, webhook(working))
