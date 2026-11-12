@@ -69,7 +69,8 @@ type DeliveryAttempt struct {
 	LatencyMS  int64
 	// ResponseSnippet is the start of the receiver's answer.
 	ResponseSnippet *string
-	// Error is why no answer came, such as a timeout.
+	// Error is why no answer came, as a class (dns, connect, tls, timeout or
+	// refused_target) and never the network's own words.
 	Error *string
 }
 

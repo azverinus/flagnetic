@@ -119,7 +119,7 @@ func (a *api) TestSinkConfig(ctx context.Context, req TestSinkConfigRequestObjec
 	if draft.Kind == sinks.KindClickHouse || draft.Kind == sinks.KindObjectStorage {
 		draft.Secret = secret
 	}
-	result, err := a.h.TestSinkConfig.Handle(ctx, appsinks.TestConfigCommand{Project: projectID(ctx), Draft: draft})
+	result, err := a.h.TestSinkConfig.Handle(ctx, appsinks.TestConfigCommand{Project: projectID(ctx), Draft: draft, Request: requestOf(ctx)})
 	if err != nil {
 		return nil, err
 	}

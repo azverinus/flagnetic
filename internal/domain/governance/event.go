@@ -446,6 +446,7 @@ var entryOnlyActions = []string{
 	"sdk_key.rotated",
 	"sdk_key.updated",
 	"session.revoked",
+	"sink.config_tested",
 	"sink.created",
 	"sink.dead_letter_discarded",
 	"sink.dead_letter_redelivered",

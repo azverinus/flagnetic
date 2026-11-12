@@ -10662,13 +10662,16 @@ type ClientInterface interface {
 	// range. An environment the project does not have is
 	// `unknown_environment`. A webhook sink's `url` must be `https`
 	// (`insecure_url`) unless the operator set
-	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
-	// loopback, private, link-local, unspecified or multicast address
-	// (`private_network_target`) unless the operator set
-	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
-	// storage target may be on a private or loopback address, never on a
-	// link-local one (`link_local_target`), which no setting lifts. A name
-	// that does not resolve is accepted.
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must resolve only to
+	// global unicast addresses, not loopback, private, link-local,
+	// carrier-grade NAT or any other special-purpose range, nor a NAT64 or
+	// 6to4 address embedding one (`private_network_target`), unless the
+	// operator set `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse
+	// or object storage target may be on a private or loopback address,
+	// never on a link-local one, EC2's IPv6 metadata address
+	// `fd00:ec2::254`, or a NAT64 or 6to4 address embedding a link-local
+	// one (`link_local_target`), which no setting lifts. A name that does
+	// not resolve is accepted.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10700,13 +10703,16 @@ type ClientInterface interface {
 	// range. An environment the project does not have is
 	// `unknown_environment`. A webhook sink's `url` must be `https`
 	// (`insecure_url`) unless the operator set
-	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
-	// loopback, private, link-local, unspecified or multicast address
-	// (`private_network_target`) unless the operator set
-	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
-	// storage target may be on a private or loopback address, never on a
-	// link-local one (`link_local_target`), which no setting lifts. A name
-	// that does not resolve is accepted.
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must resolve only to
+	// global unicast addresses, not loopback, private, link-local,
+	// carrier-grade NAT or any other special-purpose range, nor a NAT64 or
+	// 6to4 address embedding one (`private_network_target`), unless the
+	// operator set `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse
+	// or object storage target may be on a private or loopback address,
+	// never on a link-local one, EC2's IPv6 metadata address
+	// `fd00:ec2::254`, or a NAT64 or 6to4 address embedding a link-local
+	// one (`link_local_target`), which no setting lifts. A name that does
+	// not resolve is accepted.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10717,9 +10723,10 @@ type ClientInterface interface {
 	//
 	// Checks a configuration as creating a sink would, then calls its target
 	// and answers whether it works, why not, and what is wrong with it that
-	// does not stop delivery. Nothing is stored, created at the target or
-	// audited: a ClickHouse test never creates tables, and says so in its
-	// warnings. A webhook sink is called with a signature made from a
+	// does not stop delivery. Nothing is stored or created at the target: a
+	// ClickHouse test never creates tables, and says so in its warnings. The
+	// test is audited as `sink.config_tested`, by its outcome and not its
+	// target. A webhook sink is called with a signature made from a
 	// secret drawn for the test and thrown away. The target's own words are
 	// never answered, only the failure's class, status and code. Saving a
 	// sink is never blocked by its test.
@@ -10733,9 +10740,10 @@ type ClientInterface interface {
 	//
 	// Checks a configuration as creating a sink would, then calls its target
 	// and answers whether it works, why not, and what is wrong with it that
-	// does not stop delivery. Nothing is stored, created at the target or
-	// audited: a ClickHouse test never creates tables, and says so in its
-	// warnings. A webhook sink is called with a signature made from a
+	// does not stop delivery. Nothing is stored or created at the target: a
+	// ClickHouse test never creates tables, and says so in its warnings. The
+	// test is audited as `sink.config_tested`, by its outcome and not its
+	// target. A webhook sink is called with a signature made from a
 	// secret drawn for the test and thrown away. The target's own words are
 	// never answered, only the failure's class, status and code. Saving a
 	// sink is never blocked by its test.
@@ -11214,9 +11222,11 @@ type ClientInterface interface {
 	// changes made after it.
 	//
 	// `url` must be `https` (`insecure_url`) unless the operator set
-	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to a
-	// loopback, private, link-local, unspecified or multicast address is
-	// refused (`private_network_target`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to
+	// anything but a global unicast address (loopback, private, link-local,
+	// carrier-grade NAT and every other special-purpose range, and a NAT64
+	// or 6to4 address embedding one) is refused (`private_network_target`)
+	// unless the operator set
 	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
 	// resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 	// A blank name or one over 200 characters, a `url` that is not an
@@ -11238,9 +11248,11 @@ type ClientInterface interface {
 	// changes made after it.
 	//
 	// `url` must be `https` (`insecure_url`) unless the operator set
-	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to a
-	// loopback, private, link-local, unspecified or multicast address is
-	// refused (`private_network_target`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to
+	// anything but a global unicast address (loopback, private, link-local,
+	// carrier-grade NAT and every other special-purpose range, and a NAT64
+	// or 6to4 address embedding one) is refused (`private_network_target`)
+	// unless the operator set
 	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
 	// resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 	// A blank name or one over 200 characters, a `url` that is not an
@@ -16675,13 +16687,16 @@ func (c *Client) ListSinks(ctx context.Context, project ProjectKey, reqEditors .
 // range. An environment the project does not have is
 // `unknown_environment`. A webhook sink's `url` must be `https`
 // (`insecure_url`) unless the operator set
-// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
-// loopback, private, link-local, unspecified or multicast address
-// (`private_network_target`) unless the operator set
-// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
-// storage target may be on a private or loopback address, never on a
-// link-local one (`link_local_target`), which no setting lifts. A name
-// that does not resolve is accepted.
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must resolve only to
+// global unicast addresses, not loopback, private, link-local,
+// carrier-grade NAT or any other special-purpose range, nor a NAT64 or
+// 6to4 address embedding one (`private_network_target`), unless the
+// operator set `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse
+// or object storage target may be on a private or loopback address,
+// never on a link-local one, EC2's IPv6 metadata address
+// `fd00:ec2::254`, or a NAT64 or 6to4 address embedding a link-local
+// one (`link_local_target`), which no setting lifts. A name that does
+// not resolve is accepted.
 //
 // Takes any type of body and a specified content type.
 //
@@ -16723,13 +16738,16 @@ func (c *Client) CreateSinkWithBody(ctx context.Context, project ProjectKey, con
 // range. An environment the project does not have is
 // `unknown_environment`. A webhook sink's `url` must be `https`
 // (`insecure_url`) unless the operator set
-// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
-// loopback, private, link-local, unspecified or multicast address
-// (`private_network_target`) unless the operator set
-// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
-// storage target may be on a private or loopback address, never on a
-// link-local one (`link_local_target`), which no setting lifts. A name
-// that does not resolve is accepted.
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must resolve only to
+// global unicast addresses, not loopback, private, link-local,
+// carrier-grade NAT or any other special-purpose range, nor a NAT64 or
+// 6to4 address embedding one (`private_network_target`), unless the
+// operator set `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse
+// or object storage target may be on a private or loopback address,
+// never on a link-local one, EC2's IPv6 metadata address
+// `fd00:ec2::254`, or a NAT64 or 6to4 address embedding a link-local
+// one (`link_local_target`), which no setting lifts. A name that does
+// not resolve is accepted.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -16750,9 +16768,10 @@ func (c *Client) CreateSink(ctx context.Context, project ProjectKey, body Create
 //
 // Checks a configuration as creating a sink would, then calls its target
 // and answers whether it works, why not, and what is wrong with it that
-// does not stop delivery. Nothing is stored, created at the target or
-// audited: a ClickHouse test never creates tables, and says so in its
-// warnings. A webhook sink is called with a signature made from a
+// does not stop delivery. Nothing is stored or created at the target: a
+// ClickHouse test never creates tables, and says so in its warnings. The
+// test is audited as `sink.config_tested`, by its outcome and not its
+// target. A webhook sink is called with a signature made from a
 // secret drawn for the test and thrown away. The target's own words are
 // never answered, only the failure's class, status and code. Saving a
 // sink is never blocked by its test.
@@ -16776,9 +16795,10 @@ func (c *Client) TestSinkConfigWithBody(ctx context.Context, project ProjectKey,
 //
 // Checks a configuration as creating a sink would, then calls its target
 // and answers whether it works, why not, and what is wrong with it that
-// does not stop delivery. Nothing is stored, created at the target or
-// audited: a ClickHouse test never creates tables, and says so in its
-// warnings. A webhook sink is called with a signature made from a
+// does not stop delivery. Nothing is stored or created at the target: a
+// ClickHouse test never creates tables, and says so in its warnings. The
+// test is audited as `sink.config_tested`, by its outcome and not its
+// target. A webhook sink is called with a signature made from a
 // secret drawn for the test and thrown away. The target's own words are
 // never answered, only the failure's class, status and code. Saving a
 // sink is never blocked by its test.
@@ -17587,9 +17607,11 @@ func (c *Client) ListWebhooks(ctx context.Context, project ProjectKey, reqEditor
 // changes made after it.
 //
 // `url` must be `https` (`insecure_url`) unless the operator set
-// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to a
-// loopback, private, link-local, unspecified or multicast address is
-// refused (`private_network_target`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to
+// anything but a global unicast address (loopback, private, link-local,
+// carrier-grade NAT and every other special-purpose range, and a NAT64
+// or 6to4 address embedding one) is refused (`private_network_target`)
+// unless the operator set
 // `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
 // resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 // A blank name or one over 200 characters, a `url` that is not an
@@ -17621,9 +17643,11 @@ func (c *Client) CreateWebhookWithBody(ctx context.Context, project ProjectKey, 
 // changes made after it.
 //
 // `url` must be `https` (`insecure_url`) unless the operator set
-// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to a
-// loopback, private, link-local, unspecified or multicast address is
-// refused (`private_network_target`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to
+// anything but a global unicast address (loopback, private, link-local,
+// carrier-grade NAT and every other special-purpose range, and a NAT64
+// or 6to4 address embedding one) is refused (`private_network_target`)
+// unless the operator set
 // `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
 // resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 // A blank name or one over 200 characters, a `url` that is not an
@@ -32117,13 +32141,16 @@ type ClientWithResponsesInterface interface {
 	// range. An environment the project does not have is
 	// `unknown_environment`. A webhook sink's `url` must be `https`
 	// (`insecure_url`) unless the operator set
-	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
-	// loopback, private, link-local, unspecified or multicast address
-	// (`private_network_target`) unless the operator set
-	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
-	// storage target may be on a private or loopback address, never on a
-	// link-local one (`link_local_target`), which no setting lifts. A name
-	// that does not resolve is accepted.
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must resolve only to
+	// global unicast addresses, not loopback, private, link-local,
+	// carrier-grade NAT or any other special-purpose range, nor a NAT64 or
+	// 6to4 address embedding one (`private_network_target`), unless the
+	// operator set `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse
+	// or object storage target may be on a private or loopback address,
+	// never on a link-local one, EC2's IPv6 metadata address
+	// `fd00:ec2::254`, or a NAT64 or 6to4 address embedding a link-local
+	// one (`link_local_target`), which no setting lifts. A name that does
+	// not resolve is accepted.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -32155,13 +32182,16 @@ type ClientWithResponsesInterface interface {
 	// range. An environment the project does not have is
 	// `unknown_environment`. A webhook sink's `url` must be `https`
 	// (`insecure_url`) unless the operator set
-	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
-	// loopback, private, link-local, unspecified or multicast address
-	// (`private_network_target`) unless the operator set
-	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
-	// storage target may be on a private or loopback address, never on a
-	// link-local one (`link_local_target`), which no setting lifts. A name
-	// that does not resolve is accepted.
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must resolve only to
+	// global unicast addresses, not loopback, private, link-local,
+	// carrier-grade NAT or any other special-purpose range, nor a NAT64 or
+	// 6to4 address embedding one (`private_network_target`), unless the
+	// operator set `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse
+	// or object storage target may be on a private or loopback address,
+	// never on a link-local one, EC2's IPv6 metadata address
+	// `fd00:ec2::254`, or a NAT64 or 6to4 address embedding a link-local
+	// one (`link_local_target`), which no setting lifts. A name that does
+	// not resolve is accepted.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -32172,9 +32202,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Checks a configuration as creating a sink would, then calls its target
 	// and answers whether it works, why not, and what is wrong with it that
-	// does not stop delivery. Nothing is stored, created at the target or
-	// audited: a ClickHouse test never creates tables, and says so in its
-	// warnings. A webhook sink is called with a signature made from a
+	// does not stop delivery. Nothing is stored or created at the target: a
+	// ClickHouse test never creates tables, and says so in its warnings. The
+	// test is audited as `sink.config_tested`, by its outcome and not its
+	// target. A webhook sink is called with a signature made from a
 	// secret drawn for the test and thrown away. The target's own words are
 	// never answered, only the failure's class, status and code. Saving a
 	// sink is never blocked by its test.
@@ -32188,9 +32219,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Checks a configuration as creating a sink would, then calls its target
 	// and answers whether it works, why not, and what is wrong with it that
-	// does not stop delivery. Nothing is stored, created at the target or
-	// audited: a ClickHouse test never creates tables, and says so in its
-	// warnings. A webhook sink is called with a signature made from a
+	// does not stop delivery. Nothing is stored or created at the target: a
+	// ClickHouse test never creates tables, and says so in its warnings. The
+	// test is audited as `sink.config_tested`, by its outcome and not its
+	// target. A webhook sink is called with a signature made from a
 	// secret drawn for the test and thrown away. The target's own words are
 	// never answered, only the failure's class, status and code. Saving a
 	// sink is never blocked by its test.
@@ -32703,9 +32735,11 @@ type ClientWithResponsesInterface interface {
 	// changes made after it.
 	//
 	// `url` must be `https` (`insecure_url`) unless the operator set
-	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to a
-	// loopback, private, link-local, unspecified or multicast address is
-	// refused (`private_network_target`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to
+	// anything but a global unicast address (loopback, private, link-local,
+	// carrier-grade NAT and every other special-purpose range, and a NAT64
+	// or 6to4 address embedding one) is refused (`private_network_target`)
+	// unless the operator set
 	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
 	// resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 	// A blank name or one over 200 characters, a `url` that is not an
@@ -32727,9 +32761,11 @@ type ClientWithResponsesInterface interface {
 	// changes made after it.
 	//
 	// `url` must be `https` (`insecure_url`) unless the operator set
-	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to a
-	// loopback, private, link-local, unspecified or multicast address is
-	// refused (`private_network_target`) unless the operator set
+	// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to
+	// anything but a global unicast address (loopback, private, link-local,
+	// carrier-grade NAT and every other special-purpose range, and a NAT64
+	// or 6to4 address embedding one) is refused (`private_network_target`)
+	// unless the operator set
 	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
 	// resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 	// A blank name or one over 200 characters, a `url` that is not an
@@ -53968,13 +54004,16 @@ func (c *ClientWithResponses) ListSinksWithResponse(ctx context.Context, project
 // range. An environment the project does not have is
 // `unknown_environment`. A webhook sink's `url` must be `https`
 // (`insecure_url`) unless the operator set
-// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
-// loopback, private, link-local, unspecified or multicast address
-// (`private_network_target`) unless the operator set
-// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
-// storage target may be on a private or loopback address, never on a
-// link-local one (`link_local_target`), which no setting lifts. A name
-// that does not resolve is accepted.
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must resolve only to
+// global unicast addresses, not loopback, private, link-local,
+// carrier-grade NAT or any other special-purpose range, nor a NAT64 or
+// 6to4 address embedding one (`private_network_target`), unless the
+// operator set `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse
+// or object storage target may be on a private or loopback address,
+// never on a link-local one, EC2's IPv6 metadata address
+// `fd00:ec2::254`, or a NAT64 or 6to4 address embedding a link-local
+// one (`link_local_target`), which no setting lifts. A name that does
+// not resolve is accepted.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -54012,13 +54051,16 @@ func (c *ClientWithResponses) CreateSinkWithBodyWithResponse(ctx context.Context
 // range. An environment the project does not have is
 // `unknown_environment`. A webhook sink's `url` must be `https`
 // (`insecure_url`) unless the operator set
-// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must not resolve to a
-// loopback, private, link-local, unspecified or multicast address
-// (`private_network_target`) unless the operator set
-// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse or object
-// storage target may be on a private or loopback address, never on a
-// link-local one (`link_local_target`), which no setting lifts. A name
-// that does not resolve is accepted.
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and its name must resolve only to
+// global unicast addresses, not loopback, private, link-local,
+// carrier-grade NAT or any other special-purpose range, nor a NAT64 or
+// 6to4 address embedding one (`private_network_target`), unless the
+// operator set `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`. A ClickHouse
+// or object storage target may be on a private or loopback address,
+// never on a link-local one, EC2's IPv6 metadata address
+// `fd00:ec2::254`, or a NAT64 or 6to4 address embedding a link-local
+// one (`link_local_target`), which no setting lifts. A name that does
+// not resolve is accepted.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -54035,9 +54077,10 @@ func (c *ClientWithResponses) CreateSinkWithResponse(ctx context.Context, projec
 //
 // Checks a configuration as creating a sink would, then calls its target
 // and answers whether it works, why not, and what is wrong with it that
-// does not stop delivery. Nothing is stored, created at the target or
-// audited: a ClickHouse test never creates tables, and says so in its
-// warnings. A webhook sink is called with a signature made from a
+// does not stop delivery. Nothing is stored or created at the target: a
+// ClickHouse test never creates tables, and says so in its warnings. The
+// test is audited as `sink.config_tested`, by its outcome and not its
+// target. A webhook sink is called with a signature made from a
 // secret drawn for the test and thrown away. The target's own words are
 // never answered, only the failure's class, status and code. Saving a
 // sink is never blocked by its test.
@@ -54057,9 +54100,10 @@ func (c *ClientWithResponses) TestSinkConfigWithBodyWithResponse(ctx context.Con
 //
 // Checks a configuration as creating a sink would, then calls its target
 // and answers whether it works, why not, and what is wrong with it that
-// does not stop delivery. Nothing is stored, created at the target or
-// audited: a ClickHouse test never creates tables, and says so in its
-// warnings. A webhook sink is called with a signature made from a
+// does not stop delivery. Nothing is stored or created at the target: a
+// ClickHouse test never creates tables, and says so in its warnings. The
+// test is audited as `sink.config_tested`, by its outcome and not its
+// target. A webhook sink is called with a signature made from a
 // secret drawn for the test and thrown away. The target's own words are
 // never answered, only the failure's class, status and code. Saving a
 // sink is never blocked by its test.
@@ -54770,9 +54814,11 @@ func (c *ClientWithResponses) ListWebhooksWithResponse(ctx context.Context, proj
 // changes made after it.
 //
 // `url` must be `https` (`insecure_url`) unless the operator set
-// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to a
-// loopback, private, link-local, unspecified or multicast address is
-// refused (`private_network_target`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to
+// anything but a global unicast address (loopback, private, link-local,
+// carrier-grade NAT and every other special-purpose range, and a NAT64
+// or 6to4 address embedding one) is refused (`private_network_target`)
+// unless the operator set
 // `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
 // resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 // A blank name or one over 200 characters, a `url` that is not an
@@ -54800,9 +54846,11 @@ func (c *ClientWithResponses) CreateWebhookWithBodyWithResponse(ctx context.Cont
 // changes made after it.
 //
 // `url` must be `https` (`insecure_url`) unless the operator set
-// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to a
-// loopback, private, link-local, unspecified or multicast address is
-// refused (`private_network_target`) unless the operator set
+// `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to
+// anything but a global unicast address (loopback, private, link-local,
+// carrier-grade NAT and every other special-purpose range, and a NAT64
+// or 6to4 address embedding one) is refused (`private_network_target`)
+// unless the operator set
 // `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
 // resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 // A blank name or one over 200 characters, a `url` that is not an

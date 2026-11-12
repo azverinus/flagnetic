@@ -319,7 +319,7 @@ Rows that refer to a project without a foreign key, the event IDs kept to recogn
 
 ## Webhook targets
 
-A webhook subscription's target is `https` on the public internet. A target over plain `http` is refused unless `FLAGNETIC_WEBHOOK_ALLOW_HTTP` is set, and one whose name resolves to a loopback, private, link-local, unspecified or multicast address unless `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS` is set, so that whoever manages a project's webhooks cannot make the instance call into the network it runs in. The address is checked again at every connection a delivery makes, whatever the name resolved to when the subscription was written, and a delivery follows no redirect and uses no proxy from the environment. Set them for a receiver on the same host or a trusted network, such as in a trial or a test; see [Webhooks](webhooks.md).
+A webhook subscription's target is `https` on the public internet. A target over plain `http` is refused unless `FLAGNETIC_WEBHOOK_ALLOW_HTTP` is set, and one whose name resolves to anything but a global unicast address (loopback, private, link-local, carrier-grade NAT or any other special-purpose range, or a NAT64 or 6to4 address embedding one) unless `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS` is set, so that whoever manages a project's webhooks cannot make the instance call into the network it runs in. The address is checked again at every connection a delivery makes, whatever the name resolved to when the subscription was written, and a delivery follows no redirect and uses no proxy from the environment. Set them for a receiver on the same host or a trusted network, such as in a trial or a test; see [Webhooks](webhooks.md).
 
 ## Metrics
 
