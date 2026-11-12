@@ -55,15 +55,6 @@ func (f delivering) pastRetention(dayEnd time.Time) {
 	f.clock.Set(dayEnd.Add(retention + time.Hour))
 }
 
-func acceptedBatches(t *testing.T, r *testkit.Receiver, secret string) []string {
-	t.Helper()
-	var out []string
-	for _, c := range callsOf(t, r, secret) {
-		out = append(out, idsOf(c.Events)...)
-	}
-	return out
-}
-
 func TestRetentionOvertakingAFailingSinkRecordsOneGapAndDeliveryContinues(t *testing.T) {
 	f := startDelivering(t)
 	r := testkit.StartReceiver(t, script(times(2, failing), []testkit.Reply{{}})...)

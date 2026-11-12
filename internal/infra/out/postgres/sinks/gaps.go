@@ -57,17 +57,8 @@ func (s *Store) GapStreams(ctx context.Context, kind sinks.EventKind) ([]appsink
 	if err != nil {
 		return nil, fmt.Errorf("reading the sink streams of %s: %w", kind, err)
 	}
-	var streams []streamRow
-	for rows.Next() {
-		r, scanErr := scanStream(rows)
-		if scanErr != nil {
-			rows.Close()
-			return nil, fmt.Errorf("reading a stream: %w", scanErr)
-		}
-		streams = append(streams, r)
-	}
-	rows.Close()
-	if err = rows.Err(); err != nil {
+	streams, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (streamRow, error) { return scanStream(row) })
+	if err != nil {
 		return nil, fmt.Errorf("reading the sink streams of %s: %w", kind, err)
 	}
 	owners, err := s.db(ctx).Query(ctx, `SELECT s.id, s.project_id, s.name, s.kind, s.environments FROM sinks s
@@ -75,29 +66,28 @@ func (s *Store) GapStreams(ctx context.Context, kind sinks.EventKind) ([]appsink
 	if err != nil {
 		return nil, fmt.Errorf("reading the sinks of %s: %w", kind, err)
 	}
-	by := map[sinks.ID]sinks.Sink{}
-	for owners.Next() {
+	list, err := pgx.CollectRows(owners, func(row pgx.CollectableRow) (sinks.Sink, error) {
 		var (
 			sk, project [16]byte
 			v           sinks.Sink
 			sinkKind    string
 		)
-		if err = owners.Scan(&sk, &project, &v.Name, &sinkKind, &v.Environments); err != nil {
-			owners.Close()
-			return nil, fmt.Errorf("reading a sink: %w", err)
+		if scanErr := row.Scan(&sk, &project, &v.Name, &sinkKind, &v.Environments); scanErr != nil {
+			return v, scanErr
 		}
 		v.ID, v.Project, v.Kind = id.FromBytes[sinks.Sink](sk), id.FromBytes[workspace.Project](project), sinks.Kind(sinkKind)
-		by[v.ID] = v
-	}
-	owners.Close()
-	if err = owners.Err(); err != nil {
+		return v, nil
+	})
+	if err != nil {
 		return nil, fmt.Errorf("reading the sinks of %s: %w", kind, err)
+	}
+	by := make(map[sinks.ID]sinks.Sink, len(list))
+	for _, v := range list {
+		by[v.ID] = v
 	}
 	out := make([]appsinks.GapStream, 0, len(streams))
 	for _, r := range streams {
-		if v, ok := by[r.sink]; ok {
-			out = append(out, appsinks.GapStream{Sink: v, Stream: r.stream})
-		}
+		out = append(out, appsinks.GapStream{Sink: by[r.sink], Stream: r.stream})
 	}
 	return out, nil
 }
@@ -200,16 +190,11 @@ func (s *Store) Gaps(ctx context.Context, sink sinks.ID) ([]sinks.Gap, error) {
 	if err != nil {
 		return nil, fmt.Errorf("listing gaps: %w", err)
 	}
-	defer rows.Close()
-	out := []sinks.Gap{}
-	for rows.Next() {
-		g, scanErr := scanGap(rows)
-		if scanErr != nil {
-			return nil, fmt.Errorf("reading a gap: %w", scanErr)
-		}
-		out = append(out, g)
+	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (sinks.Gap, error) { return scanGap(row) })
+	if err != nil {
+		return nil, fmt.Errorf("reading gaps: %w", err)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // Dismiss marks sink's gap dismissed at now, keeping the first time of a gap
