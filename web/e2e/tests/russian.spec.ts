@@ -3,6 +3,7 @@ import {
   createChangeRequest,
   createExperiment,
   createGrant,
+  createSink,
   createWebhook,
   getExperiment,
 } from "@flagnetic/api";
@@ -592,6 +593,51 @@ test.describe("the console in Russian", () => {
     await expect(page.getByText("Этому вебхуку пока ничего не отправлялось.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Отправить тест" })).toBeDisabled();
     await expectNoSeriousViolations(page, "a webhook's delivery log in Russian");
+  });
+  test("reads the sinks, their form and a sink's settings in Russian", async ({ page }) => {
+    const created = must(
+      "creating a sink",
+      await createSink({
+        client: managementClient(),
+        path: { project },
+        body: {
+          name: "Хранилище аналитики",
+          kind: "clickhouse",
+          clickhouse: {
+            url: "https://clickhouse.example.com:8443",
+            database: "analytics",
+            username: "writer",
+            password: "warehouse-password",
+          },
+        },
+      }),
+    );
+    await signIn(page, anna, russian);
+    await page.goto(`/projects/${project}/sinks`);
+
+    await expect(page.getByRole("heading", { name: "Приёмники данных", level: 1 })).toBeVisible();
+    const row = page
+      .getByRole("table", { name: "Приёмники данных" })
+      .getByRole("row", { name: /Хранилище аналитики/ });
+    await expect(row).toContainText("ClickHouse");
+    await expect(row).toContainText("Отключён");
+    await expect(row).toContainText("Никогда");
+    await expectNoSeriousViolations(page, "the sinks list in Russian");
+
+    await page.getByRole("button", { name: "Новый приёмник" }).first().click();
+    await expect(page.getByRole("radio", { name: /Объектное хранилище/ })).toBeVisible();
+    await expect(page.getByLabel("Размер пачки")).toHaveAttribute("placeholder", "5000");
+    await page.getByRole("button", { name: "Создать приёмник" }).click();
+    await expect(page.getByText("Введите название.")).toBeVisible();
+    await expectNoSeriousViolations(page, "the new sink form in Russian");
+
+    await page.goto(`/projects/${project}/sinks/${created.id}`);
+    await expect(
+      page.getByRole("heading", { name: "Хранилище аналитики", level: 1 }),
+    ).toBeVisible();
+    await expect(page.getByLabel("Пароль")).toHaveAttribute("placeholder", "***");
+    await expect(page.getByText("Тип приёмника задаётся при создании.")).toBeVisible();
+    await expectNoSeriousViolations(page, "a sink's settings in Russian");
   });
   test("reads the audit download and the project deletion in Russian", async ({ page }) => {
     const doomed = await seedProject("tver");

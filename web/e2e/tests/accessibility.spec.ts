@@ -6,6 +6,7 @@ import {
   createExperiment,
   createInstanceWebhook,
   createSegment,
+  createSink,
   createWebhook,
   issuePasswordReset,
   listProjectAuditEntries,
@@ -44,6 +45,7 @@ type Seeded = {
   auditEntry: string;
   changeRequest: string;
   webhook: string;
+  sink: string;
   instanceWebhook: string;
   authProvider: string;
 };
@@ -156,6 +158,8 @@ const signedIn: Route[] = [
     "tokens",
     "settings",
     "webhooks",
+    "sinks",
+    "sinks/new",
     "audit",
     "event-volume",
   ].map((screen) => ({
@@ -208,6 +212,11 @@ const signedIn: Route[] = [
     route: "/projects/$project/webhooks/$webhook",
     path: (s: Seeded) => `/projects/${s.project}/webhooks/${s.webhook}?tab=${tab}`,
   })),
+  {
+    name: "project sink",
+    route: "/projects/$project/sinks/$sink",
+    path: (s) => `/projects/${s.project}/sinks/${s.sink}`,
+  },
   {
     name: "project audit entry",
     route: "/projects/$project/audit/$entry",
@@ -312,6 +321,19 @@ async function seed(): Promise<Seeded> {
       },
     }),
   );
+  // Disabled, so nothing is ever delivered to it.
+  const sink = must(
+    `creating a sink in ${project}`,
+    await createSink({
+      client: managementClient(),
+      path: { project },
+      body: {
+        name: "Sweep sink",
+        kind: "webhook",
+        webhook: { url: "https://hooks.example.com/flagnetic" },
+      },
+    }),
+  );
   const instanceWebhook = must(
     "creating an instance webhook",
     await createInstanceWebhook({
@@ -356,6 +378,7 @@ async function seed(): Promise<Seeded> {
     auditEntry,
     changeRequest: changeRequest.id,
     webhook: webhook.id,
+    sink: sink.id,
     instanceWebhook: instanceWebhook.id,
     authProvider,
   };
