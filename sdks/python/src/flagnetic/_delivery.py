@@ -155,6 +155,27 @@ class Host(Protocol):
 _MAX_DOUBLINGS = 64
 
 
+class RequestNotBuilt(http.client.HTTPException):
+    """The HTTP library refused a request: names the error, never its text, which may hold a header."""
+
+
+def send_request(
+    conn: http.client.HTTPConnection,
+    method: str,
+    path: str,
+    headers: dict[str, str],
+    body: bytes | None = None,
+) -> None:
+    """``conn.request`` with a refusal to build the request reported by its class alone.
+
+    ``http.client`` quotes the offending header in its ``ValueError``; the Authorization header is the key.
+    """
+    try:
+        conn.request(method, path, body=body, headers=headers)
+    except ValueError as err:
+        raise RequestNotBuilt(f"request not built: {type(err).__name__}") from None
+
+
 def backoff_ceiling(failures: int, base: float, limit: float) -> float:
     """The exponential ceiling of the nth consecutive failure: the base doubling up to the limit."""
     doublings = min(max(failures - 1, 0), _MAX_DOUBLINGS)
@@ -497,7 +518,7 @@ class Delivery:
             # A close that came while connecting found no socket to shut down.
             if self._closing.is_set():
                 return _FETCH_CLOSING
-            conn.request("GET", self._ruleset_path, headers=headers)
+            send_request(conn, "GET", self._ruleset_path, headers)
             resp = conn.getresponse()
             status = resp.status
             if status == 304:
@@ -590,7 +611,7 @@ class Delivery:
             if self._closing.is_set():
                 conn.close()
                 return
-            conn.request("GET", self._stream_path, headers=headers)
+            send_request(conn, "GET", self._stream_path, headers)
             resp = conn.getresponse()
         except TimeoutError as err:
             conn.close()
