@@ -158,7 +158,7 @@ Their `data` always has the same fields, null where one does not apply:
 | `consecutive_dead_letters` | `sink.stopped` | the dead letters in a row that stopped the sink |
 | `lag_seconds` | `sink.at_risk` | the age of the oldest undelivered row |
 | `loss_warning_hours` | `sink.at_risk` | the loss warning that was reached |
-| `gap` | `sink.data_lost` | the gap retention left |
+| `gap` | `sink.data_lost` | the gap retention left: its `id`, the `rows` lost, when the first and the last were received (`period_start`, `period_end`) and when they were dropped (`dropped_at`) |
 
 ### Platform
 

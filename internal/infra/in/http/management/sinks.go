@@ -7,6 +7,7 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	appsinks "github.com/azverinus/flagnetic/internal/app/sinks"
+	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/sinks"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -428,5 +429,34 @@ func deadLetterOut(dl sinks.DeadLetter) SinkDeadLetter {
 		FirstReceivedAt: dl.FirstReceivedAt, LastReceivedAt: dl.LastReceivedAt, Attempts: dl.Attempts,
 		LastFailure: SinkFailure{Class: SinkFailureClass(r.Class), Status: r.Status, Code: r.Code, At: dl.LastFailure.At},
 		Status:      SinkDeadLetterStatus(dl.Status), CreatedAt: dl.CreatedAt, RedeliveredAt: dl.RedeliveredAt,
+	}
+}
+
+// ListSinkGaps answers a sink's gaps.
+func (a *api) ListSinkGaps(ctx context.Context, req ListSinkGapsRequestObject) (ListSinkGapsResponseObject, error) {
+	list, err := a.h.ListSinkGaps.Handle(ctx, projectID(ctx), id.FromBytes[sinks.Sink](req.Sink))
+	if err != nil {
+		return nil, err
+	}
+	return ListSinkGaps200JSONResponse{Items: each(list, sinkGapOut)}, nil
+}
+
+// DismissSinkGap marks a gap as seen.
+func (a *api) DismissSinkGap(ctx context.Context, req DismissSinkGapRequestObject) (DismissSinkGapResponseObject, error) {
+	g, err := a.h.DismissSinkGap.Handle(ctx, appsinks.DismissGapCommand{
+		Project: projectID(ctx), Sink: id.FromBytes[sinks.Sink](req.Sink), Gap: id.FromBytes[events.Gap](req.Gap), Request: requestOf(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return DismissSinkGap200JSONResponse(sinkGapOut(g)), nil
+}
+
+// sinkGapOut answers g: the rows lost by how many and when they were
+// received, never by position.
+func sinkGapOut(g sinks.Gap) SinkGap {
+	return SinkGap{
+		Id: openapi_types.UUID(g.ID.Bytes()), EventKind: SinkEventKind(g.EventKind), Rows: g.Rows,
+		PeriodStart: g.PeriodStart, PeriodEnd: g.PeriodEnd, DroppedAt: g.DroppedAt, DismissedAt: g.DismissedAt,
 	}
 }

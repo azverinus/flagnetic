@@ -226,6 +226,8 @@ type Handlers struct {
 	ListSinkDeadLetters     *appsinks.ListDeadLetters
 	RedeliverSinkDeadLetter *appsinks.RedeliverDeadLetter
 	DiscardSinkDeadLetter   *appsinks.DiscardDeadLetter
+	ListSinkGaps            *appsinks.ListGaps
+	DismissSinkGap          *appsinks.DismissGap
 
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment

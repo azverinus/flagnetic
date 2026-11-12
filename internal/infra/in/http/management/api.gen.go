@@ -4530,6 +4530,36 @@ type SinkFailure struct {
 // words are never kept or answered.
 type SinkFailureClass string
 
+// SinkGap Rows of one event kind that retention dropped before the sink
+// delivered them. The sink's stream went on after them. Cursors are
+// never exposed: the loss is told by how many rows and when they were
+// received.
+type SinkGap struct {
+	// DismissedAt When a member dismissed the gap; null while it counts.
+	DismissedAt *time.Time `json:"dismissed_at"`
+
+	// DroppedAt When retention dropped them.
+	DroppedAt time.Time `json:"dropped_at"`
+
+	// EventKind A kind of raw event a sink exports, each delivered through a stream of its own.
+	EventKind SinkEventKind      `json:"event_kind"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// PeriodEnd When the last row lost was received.
+	PeriodEnd time.Time `json:"period_end"`
+
+	// PeriodStart When the first row lost was received.
+	PeriodStart time.Time `json:"period_start"`
+
+	// Rows The rows lost that the sink's project and environments admit.
+	Rows int64 `json:"rows"`
+}
+
+// SinkGapList defines model for SinkGapList.
+type SinkGapList struct {
+	Items []SinkGap `json:"items"`
+}
+
 // SinkHealth The first that holds: `disabled` by a member; `stopped` after the
 // target kept rejecting batches, until resumed; `failing` while a
 // stream cannot reach its target; `degraded` while a dead letter waits;
@@ -5288,6 +5318,9 @@ type ExposureEnvironment = string
 
 // FlagKey defines model for FlagKey.
 type FlagKey = string
+
+// GapID defines model for GapID.
+type GapID = openapi_types.UUID
 
 // GrantID defines model for GrantID.
 type GrantID = string
@@ -10884,6 +10917,25 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/sinks/{sink}/enable (the `EnableSink` operationId).
 	EnableSink(ctx context.Context, project ProjectKey, sink SinkID, body EnableSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSinkGaps A sink's gaps
+	//
+	// The rows retention dropped before the sink delivered them, one gap per
+	// drop and event kind, oldest first, dismissed ones included. The sink
+	// went on after each, with the rows still stored. Not paginated.
+	//
+	// Corresponds with GET /projects/{project}/sinks/{sink}/gaps (the `ListSinkGaps` operationId).
+	ListSinkGaps(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DismissSinkGap Dismiss a gap
+	//
+	// Marks the gap as seen, so that it stops counting towards the sink's
+	// `gaps` and the project banner; it stays listed. Idempotent: dismissing
+	// a dismissed gap answers it as it is, keeping the first time. Audited
+	// as `sink.gap_dismissed` the first time only.
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/gaps/{gap}/dismiss (the `DismissSinkGap` operationId).
+	DismissSinkGap(ctx context.Context, project ProjectKey, sink SinkID, gap GapID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ReplaySinkWithBody Replay a sink from a time
 	//
@@ -17030,6 +17082,45 @@ func (c *Client) EnableSinkWithBody(ctx context.Context, project ProjectKey, sin
 // Corresponds with POST /projects/{project}/sinks/{sink}/enable (the `EnableSink` operationId).
 func (c *Client) EnableSink(ctx context.Context, project ProjectKey, sink SinkID, body EnableSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewEnableSinkRequest(c.Server, project, sink, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListSinkGaps A sink's gaps
+//
+// The rows retention dropped before the sink delivered them, one gap per
+// drop and event kind, oldest first, dismissed ones included. The sink
+// went on after each, with the rows still stored. Not paginated.
+//
+// Corresponds with GET /projects/{project}/sinks/{sink}/gaps (the `ListSinkGaps` operationId).
+func (c *Client) ListSinkGaps(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSinkGapsRequest(c.Server, project, sink)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DismissSinkGap Dismiss a gap
+//
+// Marks the gap as seen, so that it stops counting towards the sink's
+// `gaps` and the project banner; it stays listed. Idempotent: dismissing
+// a dismissed gap answers it as it is, keeping the first time. Audited
+// as `sink.gap_dismissed` the first time only.
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/gaps/{gap}/dismiss (the `DismissSinkGap` operationId).
+func (c *Client) DismissSinkGap(ctx context.Context, project ProjectKey, sink SinkID, gap GapID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDismissSinkGapRequest(c.Server, project, sink, gap)
 	if err != nil {
 		return nil, err
 	}
@@ -26824,6 +26915,95 @@ func NewEnableSinkRequestWithBody(server string, project ProjectKey, sink SinkID
 	return req, nil
 }
 
+// NewListSinkGapsRequest constructs an http.Request for the ListSinkGaps method
+func NewListSinkGapsRequest(server string, project ProjectKey, sink SinkID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s/gaps", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDismissSinkGapRequest constructs an http.Request for the DismissSinkGap method
+func NewDismissSinkGapRequest(server string, project ProjectKey, sink SinkID, gap GapID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "sink", sink, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "gap", gap, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/sinks/%s/gaps/%s/dismiss", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewReplaySinkRequest calls the generic ReplaySink builder with application/json body
 func NewReplaySinkRequest(server string, project ProjectKey, sink SinkID, body ReplaySinkJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -32373,6 +32553,29 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/sinks/{sink}/enable (the `EnableSink` operationId).
 	EnableSinkWithResponse(ctx context.Context, project ProjectKey, sink SinkID, body EnableSinkJSONRequestBody, reqEditors ...RequestEditorFn) (*EnableSinkResponse, error)
+
+	// ListSinkGapsWithResponse A sink's gaps
+	//
+	// The rows retention dropped before the sink delivered them, one gap per
+	// drop and event kind, oldest first, dismissed ones included. The sink
+	// went on after each, with the rows still stored. Not paginated.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/sinks/{sink}/gaps (the `ListSinkGaps` operationId).
+	ListSinkGapsWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*ListSinkGapsResponse, error)
+
+	// DismissSinkGapWithResponse Dismiss a gap
+	//
+	// Marks the gap as seen, so that it stops counting towards the sink's
+	// `gaps` and the project banner; it stays listed. Idempotent: dismissing
+	// a dismissed gap answers it as it is, keeping the first time. Audited
+	// as `sink.gap_dismissed` the first time only.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/sinks/{sink}/gaps/{gap}/dismiss (the `DismissSinkGap` operationId).
+	DismissSinkGapWithResponse(ctx context.Context, project ProjectKey, sink SinkID, gap GapID, reqEditors ...RequestEditorFn) (*DismissSinkGapResponse, error)
 
 	// ReplaySinkWithBodyWithResponse Replay a sink from a time
 	//
@@ -46325,6 +46528,144 @@ func (r EnableSinkResponse) ContentType() string {
 	return ""
 }
 
+// ListSinkGapsResponse401Headers the declared response headers of an HTTP 401 response for ListSinkGaps
+type ListSinkGapsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListSinkGapsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SinkGapList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListSinkGapsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSinkGapsResponse) GetJSON200() *SinkGapList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListSinkGapsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListSinkGapsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListSinkGapsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSinkGapsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSinkGapsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSinkGapsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSinkGapsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DismissSinkGapResponse401Headers the declared response headers of an HTTP 401 response for DismissSinkGap
+type DismissSinkGapResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DismissSinkGapResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SinkGap
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DismissSinkGapResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DismissSinkGapResponse) GetJSON200() *SinkGap {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DismissSinkGapResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DismissSinkGapResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DismissSinkGapResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r DismissSinkGapResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DismissSinkGapResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DismissSinkGapResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DismissSinkGapResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ReplaySinkResponse200Headers the declared response headers of an HTTP 200 response for ReplaySink
 type ReplaySinkResponse200Headers struct {
 	ETag *string
@@ -54313,6 +54654,41 @@ func (c *ClientWithResponses) EnableSinkWithResponse(ctx context.Context, projec
 		return nil, err
 	}
 	return ParseEnableSinkResponse(rsp)
+}
+
+// ListSinkGapsWithResponse A sink's gaps
+//
+// The rows retention dropped before the sink delivered them, one gap per
+// drop and event kind, oldest first, dismissed ones included. The sink
+// went on after each, with the rows still stored. Not paginated.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/sinks/{sink}/gaps (the `ListSinkGaps` operationId).
+func (c *ClientWithResponses) ListSinkGapsWithResponse(ctx context.Context, project ProjectKey, sink SinkID, reqEditors ...RequestEditorFn) (*ListSinkGapsResponse, error) {
+	rsp, err := c.ListSinkGaps(ctx, project, sink, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSinkGapsResponse(rsp)
+}
+
+// DismissSinkGapWithResponse Dismiss a gap
+//
+// Marks the gap as seen, so that it stops counting towards the sink's
+// `gaps` and the project banner; it stays listed. Idempotent: dismissing
+// a dismissed gap answers it as it is, keeping the first time. Audited
+// as `sink.gap_dismissed` the first time only.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/sinks/{sink}/gaps/{gap}/dismiss (the `DismissSinkGap` operationId).
+func (c *ClientWithResponses) DismissSinkGapWithResponse(ctx context.Context, project ProjectKey, sink SinkID, gap GapID, reqEditors ...RequestEditorFn) (*DismissSinkGapResponse, error) {
+	rsp, err := c.DismissSinkGap(ctx, project, sink, gap, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDismissSinkGapResponse(rsp)
 }
 
 // ReplaySinkWithBodyWithResponse Replay a sink from a time
@@ -67431,6 +67807,126 @@ func ParseEnableSinkResponse(rsp *http.Response) (*EnableSinkResponse, error) {
 	return response, nil
 }
 
+// ParseListSinkGapsResponse parses an HTTP response from a ListSinkGapsWithResponse call
+func ParseListSinkGapsResponse(rsp *http.Response) (*ListSinkGapsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSinkGapsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SinkGapList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListSinkGapsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDismissSinkGapResponse parses an HTTP response from a DismissSinkGapWithResponse call
+func ParseDismissSinkGapResponse(rsp *http.Response) (*DismissSinkGapResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DismissSinkGapResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SinkGap
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DismissSinkGapResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseReplaySinkResponse parses an HTTP response from a ReplaySinkWithResponse call
 func ParseReplaySinkResponse(rsp *http.Response) (*ReplaySinkResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -70732,6 +71228,12 @@ type ServerInterface interface {
 	// EnableSink Enable a sink
 	// (POST /projects/{project}/sinks/{sink}/enable)
 	EnableSink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
+	// ListSinkGaps A sink's gaps
+	// (GET /projects/{project}/sinks/{sink}/gaps)
+	ListSinkGaps(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
+	// DismissSinkGap Dismiss a gap
+	// (POST /projects/{project}/sinks/{sink}/gaps/{gap}/dismiss)
+	DismissSinkGap(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, gap GapID)
 	// ReplaySink Replay a sink from a time
 	// (POST /projects/{project}/sinks/{sink}/replay)
 	ReplaySink(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID)
@@ -77766,6 +78268,85 @@ func (siw *ServerInterfaceWrapper) EnableSink(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ListSinkGaps operation middleware
+func (siw *ServerInterfaceWrapper) ListSinkGaps(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSinkGaps(w, r, project, sink)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DismissSinkGap operation middleware
+func (siw *ServerInterfaceWrapper) DismissSinkGap(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sink" -------------
+	var sink SinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sink", r.PathValue("sink"), &sink, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sink", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "gap" -------------
+	var gap GapID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "gap", r.PathValue("gap"), &gap, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "gap", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DismissSinkGap(w, r, project, sink, gap)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ReplaySink operation middleware
 func (siw *ServerInterfaceWrapper) ReplaySink(w http.ResponseWriter, r *http.Request) {
 
@@ -79590,6 +80171,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/dead-letters", wrapper.ListSinkDeadLetters)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/dead-letters/{deadLetter}", wrapper.DiscardSinkDeadLetter)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/dead-letters/{deadLetter}/redeliver", wrapper.RedeliverSinkDeadLetter)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/gaps", wrapper.ListSinkGaps)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/sinks/{sink}/gaps/{gap}/dismiss", wrapper.DismissSinkGap)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/webhooks", wrapper.ListInstanceWebhooks)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/webhooks", wrapper.CreateInstanceWebhook)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/webhooks/{webhook}", wrapper.DeleteInstanceWebhook)
@@ -96334,6 +96917,155 @@ func (response EnableSink422ApplicationProblemPlusJSONResponse) VisitEnableSinkR
 	return err
 }
 
+type ListSinkGapsRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+}
+
+type ListSinkGapsResponseObject interface {
+	VisitListSinkGapsResponse(w http.ResponseWriter) error
+}
+
+type ListSinkGaps200JSONResponse SinkGapList
+
+func (response ListSinkGaps200JSONResponse) VisitListSinkGapsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSinkGaps401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListSinkGaps401ApplicationProblemPlusJSONResponse) VisitListSinkGapsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSinkGaps403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListSinkGaps403ApplicationProblemPlusJSONResponse) VisitListSinkGapsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSinkGaps404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListSinkGaps404ApplicationProblemPlusJSONResponse) VisitListSinkGapsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DismissSinkGapRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Sink    SinkID     `json:"sink"`
+	Gap     GapID      `json:"gap"`
+}
+
+type DismissSinkGapResponseObject interface {
+	VisitDismissSinkGapResponse(w http.ResponseWriter) error
+}
+
+type DismissSinkGap200JSONResponse SinkGap
+
+func (response DismissSinkGap200JSONResponse) VisitDismissSinkGapResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DismissSinkGap401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DismissSinkGap401ApplicationProblemPlusJSONResponse) VisitDismissSinkGapResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DismissSinkGap403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DismissSinkGap403ApplicationProblemPlusJSONResponse) VisitDismissSinkGapResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DismissSinkGap404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DismissSinkGap404ApplicationProblemPlusJSONResponse) VisitDismissSinkGapResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ReplaySinkRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Sink    SinkID     `json:"sink"`
@@ -100536,6 +101268,12 @@ type StrictServerInterface interface {
 	// EnableSink Enable a sink
 	// (POST /projects/{project}/sinks/{sink}/enable)
 	EnableSink(ctx context.Context, request EnableSinkRequestObject) (EnableSinkResponseObject, error)
+	// ListSinkGaps A sink's gaps
+	// (GET /projects/{project}/sinks/{sink}/gaps)
+	ListSinkGaps(ctx context.Context, request ListSinkGapsRequestObject) (ListSinkGapsResponseObject, error)
+	// DismissSinkGap Dismiss a gap
+	// (POST /projects/{project}/sinks/{sink}/gaps/{gap}/dismiss)
+	DismissSinkGap(ctx context.Context, request DismissSinkGapRequestObject) (DismissSinkGapResponseObject, error)
 	// ReplaySink Replay a sink from a time
 	// (POST /projects/{project}/sinks/{sink}/replay)
 	ReplaySink(ctx context.Context, request ReplaySinkRequestObject) (ReplaySinkResponseObject, error)
@@ -105375,6 +106113,61 @@ func (sh *strictHandler) EnableSink(w http.ResponseWriter, r *http.Request, proj
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(EnableSinkResponseObject); ok {
 		if err := validResponse.VisitEnableSinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSinkGaps operation middleware
+func (sh *strictHandler) ListSinkGaps(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID) {
+	var request ListSinkGapsRequestObject
+
+	request.Project = project
+	request.Sink = sink
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSinkGaps(ctx, request.(ListSinkGapsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSinkGaps")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSinkGapsResponseObject); ok {
+		if err := validResponse.VisitListSinkGapsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DismissSinkGap operation middleware
+func (sh *strictHandler) DismissSinkGap(w http.ResponseWriter, r *http.Request, project ProjectKey, sink SinkID, gap GapID) {
+	var request DismissSinkGapRequestObject
+
+	request.Project = project
+	request.Sink = sink
+	request.Gap = gap
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DismissSinkGap(ctx, request.(DismissSinkGapRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DismissSinkGap")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DismissSinkGapResponseObject); ok {
+		if err := validResponse.VisitDismissSinkGapResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

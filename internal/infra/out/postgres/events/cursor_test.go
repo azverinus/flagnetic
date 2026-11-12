@@ -7,7 +7,10 @@ import (
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/events"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
+	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -174,5 +177,44 @@ func TestAFloorLeavesEarlierRowsOutOfTheBatchAndTheLagAndTheCursorPassesThem(t *
 		if err != nil || unread != tc.unread || !oldest.Equal(tc.oldest) {
 			t.Errorf("%s: oldest unread = %v, %v, %v, want %v, %v", name, oldest, unread, err, tc.oldest, tc.unread)
 		}
+	}
+}
+
+// A drop finds the rows it takes, and the first row it leaves, by transaction
+// number and in the reader's scope: transaction 10 comes after 9 and 99 before
+// 100 although the text sorts the other way, and another project's rows are
+// neither lost to a sink of this one nor where it goes on from.
+func TestADropFindsTheRowsItTakesAndLeavesByTransactionNumberInScope(t *testing.T) {
+	pool := testkit.Pool(t)
+	src := id.NewSource(clock.System{})
+	mine, other := id.New[workspace.Project](src), id.New[workspace.Project](src)
+	if _, err := pool.Exec(t.Context(), `CREATE TABLE drop_by_number (xid xid8 NOT NULL, seq bigint NOT NULL,
+		received_at timestamptz NOT NULL, project_id uuid NOT NULL, environment_id uuid)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(t.Context(), `INSERT INTO drop_by_number VALUES
+			('10', 1, '2026-11-03 01:00:00+00', $1, NULL), ('9', 2, '2026-11-03 02:00:00+00', $1, NULL),
+			('50', 3, '2026-11-03 03:00:00+00', $2, NULL),
+			('100', 4, '2026-11-04 01:00:00+00', $1, NULL), ('99', 5, '2026-11-04 02:00:00+00', $1, NULL),
+			('98', 6, '2026-11-04 03:00:00+00', $2, NULL)`, mine.Bytes(), other.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DROP TABLE drop_by_number`) })
+	days := []time.Time{time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)}
+
+	lost, err := pgevents.LostIn(t.Context(), pool, "drop_by_number", pgevents.Scope{Project: mine}, days, events.Cursor{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lost.Rows != 2 || lost.First != (events.Cursor{XID: 9, Seq: 2}) || lost.Last != (events.Cursor{XID: 10, Seq: 1}) {
+		t.Errorf("lost %+v, want the project's two rows, transaction 9 to transaction 10", lost)
+	}
+	next, err := pgevents.FirstStoredIn(t.Context(), pool, "drop_by_number", pgevents.Scope{Project: mine}, days, events.Cursor{})
+	if err != nil || next == nil || *next != (events.Cursor{XID: 99, Seq: 5}) {
+		t.Errorf("first row kept = %+v, %v, want transaction 99, not 100 and not another project's 98", next, err)
+	}
+	all, err := pgevents.LostIn(t.Context(), pool, "drop_by_number", pgevents.Scope{}, days, events.Cursor{})
+	if err != nil || all.Rows != 3 {
+		t.Errorf("lost over every project = %+v, %v, want 3 rows", all, err)
 	}
 }

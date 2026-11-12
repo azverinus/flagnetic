@@ -372,8 +372,8 @@ func TestRedeliveringADeadLetterWhoseRowsAreGoneIsRefused(t *testing.T) {
 	if n := len(r.Calls()); n != sent {
 		t.Errorf("the receiver got %d calls, want nothing sent for rows that are gone", n-sent)
 	}
-	if after := f.deadLetters(t, created); len(after) != 1 || after[0].Attempts != 5 {
-		t.Errorf("dead letters after the refusal %+v, want it unchanged", after)
+	if after := f.deadLetters(t, created); len(after) != 1 || after[0].Attempts != 5 || after[0].Status != management.SinkDeadLetterStatusExpired {
+		t.Errorf("dead letters after the refusal %+v, want it expired by the drop, its attempts unchanged", after)
 	}
 }
 

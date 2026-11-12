@@ -2639,6 +2639,32 @@ export const zSinkDeadLetterList = z.object({
 });
 
 /**
+ * Rows of one event kind that retention dropped before the sink
+ * delivered them. The sink's stream went on after them. Cursors are
+ * never exposed: the loss is told by how many rows and when they were
+ * received.
+ *
+ */
+export const zSinkGap = z.object({
+  id: z.uuid(),
+  event_kind: zSinkEventKind,
+  rows: z.coerce
+    .bigint()
+    .gte(BigInt(1))
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  period_start: z.iso.datetime(),
+  period_end: z.iso.datetime(),
+  dropped_at: z.iso.datetime(),
+  dismissed_at: z.iso.datetime().nullable(),
+});
+
+export const zSinkGapList = z.object({
+  items: z.array(zSinkGap),
+});
+
+/**
  * `pending` waits for its next attempt; `succeeded` was accepted by the
  * receiver; `failed` was refused in a way a retry would not change;
  * `exhausted` ran out of attempts; `dropped` was left unsent because
@@ -3084,6 +3110,11 @@ export const zSinkId = z.uuid();
  * The dead letter's identifier.
  */
 export const zDeadLetterId = z.uuid();
+
+/**
+ * The gap's identifier.
+ */
+export const zGapId = z.uuid();
 
 /**
  * The experiment's key.
@@ -5315,6 +5346,27 @@ export const zRedeliverSinkDeadLetterPath = z.object({
  * The dead letter after the attempt.
  */
 export const zRedeliverSinkDeadLetterResponse = zSinkDeadLetter;
+
+export const zListSinkGapsPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+});
+
+/**
+ * The sink's gaps.
+ */
+export const zListSinkGapsResponse = zSinkGapList;
+
+export const zDismissSinkGapPath = z.object({
+  project: z.string(),
+  sink: z.uuid(),
+  gap: z.uuid(),
+});
+
+/**
+ * The gap, dismissed.
+ */
+export const zDismissSinkGapResponse = zSinkGap;
 
 /**
  * The instance's webhook subscriptions.

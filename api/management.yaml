@@ -7191,6 +7191,60 @@ paths:
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/Invalid"
+  /projects/{project}/sinks/{sink}/gaps:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/SinkID"
+    get:
+      operationId: listSinkGaps
+      summary: A sink's gaps
+      description: |
+        The rows retention dropped before the sink delivered them, one gap per
+        drop and event kind, oldest first, dismissed ones included. The sink
+        went on after each, with the rows still stored. Not paginated.
+      x-permission: sink.manage
+      tags: [sinks]
+      responses:
+        "200":
+          description: The sink's gaps.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SinkGapList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/sinks/{sink}/gaps/{gap}/dismiss:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/SinkID"
+      - $ref: "#/components/parameters/GapID"
+    post:
+      operationId: dismissSinkGap
+      summary: Dismiss a gap
+      description: |
+        Marks the gap as seen, so that it stops counting towards the sink's
+        `gaps` and the project banner; it stays listed. Idempotent: dismissing
+        a dismissed gap answers it as it is, keeping the first time. Audited
+        as `sink.gap_dismissed` the first time only.
+      x-permission: sink.manage
+      tags: [sinks]
+      responses:
+        "200":
+          description: The gap, dismissed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SinkGap"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /webhooks:
     get:
       operationId: listInstanceWebhooks
@@ -7684,6 +7738,14 @@ components:
       in: path
       required: true
       description: The dead letter's identifier.
+      schema:
+        type: string
+        format: uuid
+    GapID:
+      name: gap
+      in: path
+      required: true
+      description: The gap's identifier.
       schema:
         type: string
         format: uuid
@@ -12635,6 +12697,50 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SinkDeadLetter"
+    SinkGap:
+      type: object
+      description: |
+        Rows of one event kind that retention dropped before the sink
+        delivered them. The sink's stream went on after them. Cursors are
+        never exposed: the loss is told by how many rows and when they were
+        received.
+      required: [id, event_kind, rows, period_start, period_end, dropped_at, dismissed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_kind:
+          $ref: "#/components/schemas/SinkEventKind"
+        rows:
+          type: integer
+          format: int64
+          minimum: 1
+          description: The rows lost that the sink's project and environments admit.
+        period_start:
+          type: string
+          format: date-time
+          description: When the first row lost was received.
+        period_end:
+          type: string
+          format: date-time
+          description: When the last row lost was received.
+        dropped_at:
+          type: string
+          format: date-time
+          description: When retention dropped them.
+        dismissed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When a member dismissed the gap; null while it counts.
+    SinkGapList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SinkGap"
     WebhookDeliveryStatus:
       type: string
       description: |

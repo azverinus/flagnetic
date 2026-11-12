@@ -454,6 +454,7 @@ var entryOnlyActions = []string{
 	"sink.deleted",
 	"sink.disabled",
 	"sink.enabled",
+	"sink.gap_dismissed",
 	"sink.replayed",
 	"sink.resumed",
 	"sink.secret_rotated",

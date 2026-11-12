@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/azverinus/flagnetic/internal/domain/events"
+	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
@@ -101,21 +102,39 @@ func end(days []time.Time) time.Time { return slices.MaxFunc(days, time.Time.Com
 
 // Lost returns what the partitions of days of typ's raw table hold past from.
 func (s *Store) Lost(ctx context.Context, typ events.EventType, days []time.Time, from events.Cursor) (events.Lost, error) {
-	table := rawTables[typ]
+	return LostIn(ctx, s.db(ctx), rawTables[typ], Scope{}, days, from)
+}
+
+// narrowing is the condition narrowing a read to scope, as a clause to append to
+// a WHERE, its arguments numbered from first.
+func narrowing(scope Scope, first int) (string, []any) {
+	where, args := scope.Where("", first)
+	if where != "" {
+		where = " AND " + where
+	}
+	return where, args
+}
+
+// LostIn returns what the partitions of days of table hold past from in
+// scope: the rows a reader of that scope had not read. A sink reads one
+// project's rows, so what another project's or an environment its filter
+// leaves out is not lost to it.
+func LostIn(ctx context.Context, db pgxtx.DB, table string, scope Scope, days []time.Time, from events.Cursor) (events.Lost, error) {
 	var (
 		lost                   events.Lost
 		firstXID, lastXID      *uint64
 		firstSeq, lastSeq      *int64
 		periodStart, periodEnd *time.Time
 	)
-	err := s.db(ctx).QueryRow(ctx, `
+	narrow, narrowArgs := narrowing(scope, 4)
+	err := db.QueryRow(ctx, `
 		WITH l AS (
 			SELECT xid, seq, received_at FROM `+pgx.Identifier{table}.Sanitize()+`
-			WHERE received_at < $3 AND (xid, seq) > ($1::text::xid8, $2))
+			WHERE received_at < $3 AND (xid, seq) > ($1::text::xid8, $2)`+narrow+`)
 		SELECT count(*), min(received_at), max(received_at),
 			(SELECT xid::text::bigint FROM l ORDER BY xid, seq LIMIT 1), (SELECT seq FROM l ORDER BY xid, seq LIMIT 1),
 			(SELECT xid::text::bigint FROM l ORDER BY xid DESC, seq DESC LIMIT 1), (SELECT seq FROM l ORDER BY xid DESC, seq DESC LIMIT 1)
-		FROM l`, xidText(from), from.Seq, end(days)).
+		FROM l`, append([]any{xidText(from), from.Seq, end(days)}, narrowArgs...)...).
 		Scan(&lost.Rows, &periodStart, &periodEnd, &firstXID, &firstSeq, &lastXID, &lastSeq)
 	if err != nil {
 		return events.Lost{}, fmt.Errorf("reading the rows of %s due to go: %w", table, err)
@@ -133,14 +152,21 @@ func (s *Store) Lost(ctx context.Context, typ events.EventType, days []time.Time
 // the partitions of days, nil when there is none.
 func (s *Store) FirstStoredAfter(ctx context.Context, typ events.EventType, days []time.Time, from events.Cursor,
 ) (*events.Cursor, error) {
-	table := rawTables[typ]
+	return FirstStoredIn(ctx, s.db(ctx), rawTables[typ], Scope{}, days, from)
+}
+
+// FirstStoredIn returns the first row of table in scope past from outside the
+// partitions of days, nil when there is none.
+func FirstStoredIn(ctx context.Context, db pgxtx.DB, table string, scope Scope, days []time.Time, from events.Cursor,
+) (*events.Cursor, error) {
 	var (
 		xid uint64
 		seq int64
 	)
-	err := s.db(ctx).QueryRow(ctx, `SELECT xid::text::bigint, seq FROM `+pgx.Identifier{table}.Sanitize()+`
-		WHERE received_at >= $3 AND (xid, seq) > ($1::text::xid8, $2) ORDER BY xid, seq LIMIT 1`,
-		xidText(from), from.Seq, end(days)).Scan(&xid, &seq)
+	narrow, narrowArgs := narrowing(scope, 4)
+	err := db.QueryRow(ctx, `SELECT xid::text::bigint, seq FROM `+pgx.Identifier{table}.Sanitize()+`
+		WHERE received_at >= $3 AND (xid, seq) > ($1::text::xid8, $2)`+narrow+` ORDER BY xid, seq LIMIT 1`,
+		append([]any{xidText(from), from.Seq, end(days)}, narrowArgs...)...).Scan(&xid, &seq)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -172,12 +198,12 @@ func (s *Store) SaveGap(ctx context.Context, gap events.Gap) error {
 	return nil
 }
 
-// Gaps returns the gaps whose rows were received from from to to, in the
+// Gaps returns the gaps of the rollup streams, not a sink's, whose rows were received from from to to, in the
 // order they were received.
 func (s *Store) Gaps(ctx context.Context, from, to time.Time) ([]events.Gap, error) {
 	rows, err := s.db(ctx).Query(ctx, `SELECT id, stream, event_type, from_xid::text::bigint, from_seq, to_xid::text::bigint, to_seq,
 			period_start, period_end, rows, dropped_at
-		FROM event_gaps WHERE period_start <= $2 AND period_end >= $1 ORDER BY period_start, id`, from, to)
+		FROM event_gaps WHERE sink_id IS NULL AND period_start <= $2 AND period_end >= $1 ORDER BY period_start, id`, from, to)
 	if err != nil {
 		return nil, fmt.Errorf("reading gaps: %w", err)
 	}
