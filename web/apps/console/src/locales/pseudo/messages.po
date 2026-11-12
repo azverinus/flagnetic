@@ -2472,6 +2472,10 @@ msgstr ""
 msgid "Display name"
 msgstr ""
 
+#: src/components/export-project.tsx
+msgid "Document format"
+msgstr ""
+
 #: src/lib/conditions.ts
 msgid "does not contain"
 msgstr ""
@@ -2516,6 +2520,10 @@ msgstr ""
 
 #: src/components/delete-project.tsx
 msgid "Download the audit log first if you want to keep it: it is kept on the instance, but only an instance admin can read it there."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/import-export.tsx
+msgid "Downloads the flags, segments, experiments, environments, unit types and attributes of the project, with the rule ids and salts that keep every unit in its bucket."
 msgstr ""
 
 #: src/lib/change-requests.ts
@@ -3272,6 +3280,11 @@ msgstr ""
 msgid "Expires"
 msgstr ""
 
+#: src/components/export-project.tsx
+#: src/routes/_signed-in/projects/$project/import-export.tsx
+msgid "Export"
+msgstr ""
+
 #: src/components/sink-editor.tsx
 msgid "Export only the events of the environments you tick; tick none for every environment."
 msgstr ""
@@ -3730,12 +3743,33 @@ msgstr ""
 msgid "If this email belongs to a member who can reset their password, a link to reset it is on its way. It works for an hour."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/import-export.tsx
+msgid "Import"
+msgstr ""
+
 #: src/lib/access-names.ts
 msgid "import a project document into the project"
 msgstr ""
 
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/import-export.tsx
+msgid "Import and export"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/import-export.tsx
+msgid "Import from Firebase"
+msgstr ""
+
 #: src/components/saml-provider-detail.tsx
 msgid "Import the SP metadata at the identity provider, or enter the ACS URL and the entity ID by hand."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/import-export.tsx
+msgid "Importing a Firebase Remote Config template is not available here yet."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/import-export.tsx
+msgid "Importing a project document is not available here yet."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
@@ -4504,6 +4538,10 @@ msgstr ""
 
 #: src/components/rule-editor.tsx
 msgid "Move rule {position} up"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/import-export.tsx
+msgid "Move the project's configuration as one project document, in JSON or YAML. Members, tokens, SDK keys, webhooks, change requests and the audit log are never in it."
 msgstr ""
 
 #: src/components/auth-provider-form.tsx

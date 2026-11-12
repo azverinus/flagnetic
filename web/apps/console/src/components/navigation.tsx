@@ -5,6 +5,7 @@ import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, type LinkProps } from "@tanstack/react-router";
 import {
   ActivityIcon,
+  ArrowLeftRightIcon,
   BoxesIcon,
   DatabaseZapIcon,
   FlagIcon,
@@ -146,6 +147,12 @@ const projectScreens = [
     to: "/projects/$project/event-volume",
     label: msg`Event volume`,
     icon: ActivityIcon,
+    permission: "project.read",
+  },
+  {
+    to: "/projects/$project/import-export",
+    label: msg`Import and export`,
+    icon: ArrowLeftRightIcon,
     permission: "project.read",
   },
   {
