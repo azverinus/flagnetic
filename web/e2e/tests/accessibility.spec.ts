@@ -162,6 +162,7 @@ const signedIn: Route[] = [
     "sinks/new",
     "audit",
     "event-volume",
+    "import-export",
   ].map((screen) => ({
     name: `project ${screen}`,
     route: `/projects/$project/${screen}`,
