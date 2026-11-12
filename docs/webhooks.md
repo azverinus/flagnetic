@@ -46,7 +46,7 @@ A subscription is refused with 422 and one of these codes:
 | `invalid_webhook` | a blank name or one over 200 characters, a `url` that is not an absolute http or https URL without credentials or a fragment, no event type, or an environment the project does not have; `errors` points at each |
 | `unknown_event_type` | an event type outside the catalogue |
 | `insecure_url` | an `http` target, unless the operator set `FLAGNETIC_WEBHOOK_ALLOW_HTTP` |
-| `private_network_target` | a target whose name resolves to a loopback, private, link-local, unspecified or multicast address, unless the operator set `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS` |
+| `private_network_target` | a target whose name resolves to anything but a global unicast address (loopback, private, link-local, carrier-grade NAT or any other special-purpose range, or a NAT64 or 6to4 address embedding one), unless the operator set `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS` |
 
 A name that does not resolve when the subscription is written is accepted: the receiver may not be up yet.
 

@@ -540,10 +540,13 @@ func Settings() []Setting {
 			Name:    "FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS",
 			Key:     "webhook_allow_private_networks",
 			Default: "false",
-			Description: "Accept webhook targets that resolve to loopback, private, link-local, unspecified or multicast addresses. " +
+			Description: "Accept webhook targets that resolve to anything but a global unicast address: loopback, private, link-local, " +
+				"carrier-grade NAT (100.64.0.0/10), benchmarking, reserved, documentation and other special-purpose ranges, " +
+				"and NAT64 or 6to4 addresses that embed one. " +
 				"Without it such a target is refused `private_network_target` when a subscription or a webhook sink is written, " +
 				"so that whoever manages webhooks or sinks cannot reach the network the instance runs in. " +
-				"ClickHouse and object storage sinks may reach private networks regardless, and never a link-local address.",
+				"ClickHouse and object storage sinks may reach private networks regardless, and never a link-local address, " +
+				"EC2's IPv6 metadata address `fd00:ec2::254`, or a NAT64 or 6to4 address embedding a link-local one.",
 			Example: "true",
 			apply:   boolSetting(func(c *Config, b bool) { c.WebhookAllowPrivateNetworks = b }),
 		},

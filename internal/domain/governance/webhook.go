@@ -197,7 +197,7 @@ var (
 		"the target must be https; the operator allows http with FLAGNETIC_WEBHOOK_ALLOW_HTTP",
 		apperrors.Violation{Pointer: "/url", Code: "insecure_url", Detail: "the target must be https"})
 	errPrivateNetworkTarget = apperrors.Invalid("private_network_target",
-		"the target resolves to a loopback, private, link-local, unspecified or multicast address; "+
+		"the target resolves to an address that is not global unicast, such as a loopback, private, link-local or carrier-grade NAT one; "+
 			"the operator allows those with FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS",
 		apperrors.Violation{Pointer: "/url", Code: "private_network_target",
 			Detail: "the target is not on the public internet"})
