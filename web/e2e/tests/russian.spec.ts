@@ -28,6 +28,7 @@ import { runningExperimentInProduction } from "../support/experiments";
 import { readKeycloak } from "../support/keycloak";
 import { configureSmtp, removeSmtp } from "../support/mailpit";
 import { sdkRequest, seedSdkKey } from "../support/sdk";
+import { documentWithFlagToggled } from "../support/transfer";
 
 /**
  * A member who never chose a language, in a browser that asks for Russian:
@@ -655,6 +656,29 @@ test.describe("the console in Russian", () => {
     await expect(dialog.getByRole("button", { name: "Скачать CSV" })).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Удалить проект" })).toBeDisabled();
     await expectNoSeriousViolations(page, "the project deletion dialog in Russian");
+  });
+
+  test("reads the import review and a project that moved in Russian", async ({ page }) => {
+    const imported = await seedProject("kaluga");
+    await seedFlag(imported, stringFlag("checkout_redesign"));
+    await signIn(page, admin, russian);
+    await page.goto(`/projects/${imported}/import-export`);
+    await expect(page.getByRole("heading", { name: "Импорт и экспорт", level: 1 })).toBeVisible();
+
+    await page
+      .getByLabel("Документ проекта")
+      .setInputFiles(await documentWithFlagToggled(imported, "checkout_redesign", "production"));
+    await page.getByRole("button", { name: "Проверить, что изменится" }).click();
+    const flags = page.getByRole("region", { name: "Флаги" });
+    await expect(flags.getByRole("list", { name: "Изменения в checkout_redesign" })).toContainText(
+      "/configurations/production/on",
+    );
+    await expect(page.getByText(/без запроса на изменение: .*Production/)).toBeVisible();
+    await expectNoSeriousViolations(page, "the import review in Russian");
+
+    await seedFlag(imported, stringFlag("another_flag"));
+    await page.getByRole("button", { name: "Применить" }).click();
+    await expect(page.getByRole("alert")).toContainText("Проект изменился после проверки");
   });
 
   test("reads the auth providers, their form and the sign-in errors in Russian", async ({

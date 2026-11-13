@@ -55,6 +55,10 @@ msgstr ""
 msgid "{count, plural, one {# event type} other {# event types}}"
 msgstr ""
 
+#: src/components/import-project.tsx
+msgid "{count, plural, one {# warning} other {# warnings}}"
+msgstr ""
+
 #: src/components/duration-input.tsx
 msgid "{count, plural, one {day} other {days}}"
 msgstr ""
@@ -85,6 +89,10 @@ msgstr ""
 
 #: src/components/daily-chart.tsx
 msgid "{days, plural, one {Last # day} other {Last # days}}"
+msgstr ""
+
+#: src/lib/project-import.ts
+msgid "{email} may not own anything in this project, so the importing member owns it instead."
 msgstr ""
 
 #: src/components/condition-row.tsx
@@ -499,6 +507,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "A header has a name of letters, digits and symbols without spaces, and a value on one line."
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "A JSON or YAML file, such as an export of this or another project."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -945,6 +957,10 @@ msgstr ""
 msgid "Added — {where}: {value}"
 msgstr ""
 
+#: src/components/import-project.tsx
+msgid "Added {path}: {value}"
+msgstr ""
+
 #: src/components/overrides-section.tsx
 msgid "Added by"
 msgstr ""
@@ -1184,6 +1200,7 @@ msgid "Applies to the flag in every environment."
 msgstr ""
 
 #: src/components/change-request-actions.tsx
+#: src/components/import-project.tsx
 msgid "Apply"
 msgstr ""
 
@@ -1357,6 +1374,7 @@ msgstr ""
 msgid "Attribute updated"
 msgstr ""
 
+#: src/components/import-project.tsx
 #: src/components/navigation.tsx
 #: src/components/saml-provider-form.tsx
 #: src/components/tester-panel.tsx
@@ -1591,6 +1609,10 @@ msgstr ""
 msgid "Changes"
 msgstr ""
 
+#: src/components/import-project.tsx
+msgid "Changes to {key}"
+msgstr ""
+
 #: src/components/change-request-diff.tsx
 #: src/components/structural-diff-view.tsx
 msgid "Changes to the configuration"
@@ -1614,12 +1636,28 @@ msgstr ""
 msgid "Changing it signs out every other device you are signed in on; this one stays signed in."
 msgstr ""
 
+#: src/components/import-project.tsx
+msgid "Check again"
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Check what it would change"
+msgstr ""
+
 #: src/components/experiment-exposures.tsx
 msgid "Checked <0/>."
 msgstr ""
 
 #: src/components/rule-editor.tsx
 msgid "Checked top to bottom; the first whose conditions all hold serves. Reorder by dragging, with the arrows, or with Alt+Arrow Up and Down."
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Checking what the import would change…"
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Choose a .json, .yaml or .yml file."
 msgstr ""
 
 #: src/components/enforced-domains-field.tsx
@@ -1783,6 +1821,10 @@ msgstr ""
 msgid "Choose an experiment."
 msgstr ""
 
+#: src/components/import-project.tsx
+msgid "Choose another file"
+msgstr ""
+
 #: src/components/webhook-editor.tsx
 msgid "Choose at least one event type."
 msgstr ""
@@ -1854,6 +1896,10 @@ msgstr ""
 
 #: src/components/tags-input.tsx
 msgid "Chosen tags"
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Chosen: <0>{name}</0>"
 msgstr ""
 
 #: src/components/auth-provider-form.tsx
@@ -2048,6 +2094,10 @@ msgstr ""
 msgid "Continue"
 msgstr ""
 
+#: src/components/import-project.tsx
+msgid "Copied {from} to {path}"
+msgstr ""
+
 #: src/components/copyable-value.tsx
 #: src/components/experiment-assignment.tsx
 #: src/components/ui/reveal-secret.tsx
@@ -2159,6 +2209,7 @@ msgid "Create webhook"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
+#: src/components/import-project.tsx
 #: src/components/scim-tokens.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/token-list.tsx
@@ -2351,6 +2402,10 @@ msgstr ""
 msgid "deleted"
 msgstr ""
 
+#: src/components/import-project.tsx
+msgid "Deleted"
+msgstr ""
+
 #: src/components/delete-project.tsx
 msgid "Deleting removes the project with its flags, segments, experiments, environments and SDK keys at once, and its key becomes free. Its audit entries stay readable in the instance's audit log."
 msgstr ""
@@ -2474,6 +2529,10 @@ msgstr ""
 
 #: src/components/export-project.tsx
 msgid "Document format"
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Document: <0>{name}</0>"
 msgstr ""
 
 #: src/lib/conditions.ts
@@ -2968,6 +3027,7 @@ msgid "Environment updated"
 msgstr ""
 
 #: src/components/experiment-exposures.tsx
+#: src/components/import-project.tsx
 #: src/components/navigation.tsx
 #: src/components/sink-editor.tsx
 #: src/components/webhook-editor.tsx
@@ -3256,6 +3316,7 @@ msgstr ""
 msgid "Experiment updated"
 msgstr ""
 
+#: src/components/import-project.tsx
 #: src/components/navigation.tsx
 #: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -3337,6 +3398,10 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Fallthrough variation changed from <0>{before}</0> to <1>{after}</1>."
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Faults in the document"
 msgstr ""
 
 #: src/components/saml-provider-form.tsx
@@ -3467,6 +3532,7 @@ msgstr ""
 msgid "Flag restored"
 msgstr ""
 
+#: src/components/import-project.tsx
 #: src/components/navigation.tsx
 #: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -3756,6 +3822,10 @@ msgstr ""
 msgid "Import and export"
 msgstr ""
 
+#: src/components/import-project.tsx
+msgid "Import another document"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/import-export.tsx
 msgid "Import from Firebase"
 msgstr ""
@@ -3764,12 +3834,12 @@ msgstr ""
 msgid "Import the SP metadata at the identity provider, or enter the ACS URL and the entity ID by hand."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/import-export.tsx
-msgid "Importing a Firebase Remote Config template is not available here yet."
+#: src/components/import-project.tsx
+msgid "Imported."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/import-export.tsx
-msgid "Importing a project document is not available here yet."
+msgid "Importing a Firebase Remote Config template is not available here yet."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
@@ -4495,6 +4565,10 @@ msgstr ""
 msgid "Membership (condition {position})"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/import-export.tsx
+msgid "Merges a project document into this project: what it names is created or updated, and nothing is deleted. You see everything it would change before you apply it."
+msgstr ""
+
 #: src/components/saml-provider-detail.tsx
 #: src/components/saml-provider-form.tsx
 msgid "Metadata"
@@ -4542,6 +4616,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/import-export.tsx
 msgid "Move the project's configuration as one project document, in JSON or YAML. Members, tokens, SDK keys, webhooks, change requests and the audit log are never in it."
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Moved {from} to {path}"
 msgstr ""
 
 #: src/components/auth-provider-form.tsx
@@ -5577,6 +5655,10 @@ msgstr ""
 msgid "Project created"
 msgstr ""
 
+#: src/components/import-project.tsx
+msgid "Project document"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Project imported"
 msgstr ""
@@ -5937,6 +6019,10 @@ msgstr ""
 msgid "Removed — {where}"
 msgstr ""
 
+#: src/components/import-project.tsx
+msgid "Removed {path}"
+msgstr ""
+
 #: src/components/experiment-transitions.tsx
 msgid "Removed: its rules were deleted."
 msgstr ""
@@ -5961,6 +6047,7 @@ msgstr ""
 msgid "Request ID"
 msgstr ""
 
+#: src/components/import-project.tsx
 #: src/components/query-error.tsx
 #: src/lib/toast.ts
 msgid "Request ID: {requestId}"
@@ -6404,6 +6491,7 @@ msgstr ""
 msgid "Segment updated"
 msgstr ""
 
+#: src/components/import-project.tsx
 #: src/components/navigation.tsx
 #: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
@@ -6526,6 +6614,10 @@ msgstr ""
 #: src/routes/_signed-in/settings/route.tsx
 #: src/routes/_signed-in/settings/sessions.tsx
 msgid "Sessions"
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Set {path} to {value}"
 msgstr ""
 
 #: src/components/password-reset-completion.tsx
@@ -7252,6 +7344,10 @@ msgstr ""
 msgid "The environment is protected: this change goes live only through an approved change request."
 msgstr ""
 
+#: src/lib/project-import.ts
+msgid "The environment keeps its protection; the document's value for it is not applied."
+msgstr ""
+
 #: src/components/compare-environments.tsx
 msgid "The environments serve differently where marked."
 msgstr ""
@@ -7598,6 +7694,10 @@ msgstr ""
 msgid "The override of {unit} is saved."
 msgstr ""
 
+#: src/lib/project-import.ts
+msgid "The owner may not own anything in this project, so the importing member owns it instead."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "The owner must be an active member holding a role in the project, or an instance admin."
 msgstr ""
@@ -7629,6 +7729,10 @@ msgstr ""
 
 #: src/components/delete-project.tsx
 msgid "The project {key} is deleted."
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "The project changed after this check, so nothing was imported. Check again to see what the import would change now."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -8036,6 +8140,10 @@ msgstr ""
 msgid "This flag is archived; restore it or choose another."
 msgstr ""
 
+#: src/components/import-project.tsx
+msgid "This import writes to protected environments directly, without a change request: {touchedNames}."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "This instance accepts only https targets. Use an https URL, or ask the operator to allow plain http."
 msgstr ""
@@ -8363,6 +8471,10 @@ msgstr ""
 msgid "Types seen"
 msgstr ""
 
+#: src/components/import-project.tsx
+msgid "Unchanged. The project already matches this document."
+msgstr ""
+
 #: src/components/experiment-exposures.tsx
 msgid "Unit"
 msgstr ""
@@ -8423,6 +8535,7 @@ msgstr ""
 msgid "Unit type updated"
 msgstr ""
 
+#: src/components/import-project.tsx
 #: src/components/navigation.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Unit types"
@@ -8477,6 +8590,7 @@ msgstr ""
 msgid "Unspecified: the identity provider chooses"
 msgstr ""
 
+#: src/components/import-project.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Updated"
@@ -8639,6 +8753,10 @@ msgstr ""
 
 #: src/components/waiting-change-requests.tsx
 msgid "Waiting change requests"
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Warnings"
 msgstr ""
 
 #: src/components/webhook-detail.tsx

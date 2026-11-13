@@ -5,6 +5,8 @@ import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
 import { managementClient, must, seedMember, seedProject, signIn } from "../support/console";
+import { readConfiguration, seedFlag, stringFlag } from "../support/flags";
+import { documentWithFlagToggled, exportedDocument } from "../support/transfer";
 
 const password = "harness-quince-ferry-5521";
 
@@ -106,5 +108,126 @@ test.describe("import and export page", () => {
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(0);
+  });
+});
+
+/** Chooses a file and asks for the dry run. */
+async function check(page: Page, file: { name: string; mimeType: string; buffer: Buffer }) {
+  await page.getByLabel("Project document").setInputFiles(file);
+  await page.getByRole("button", { name: "Check what it would change" }).click();
+}
+
+test.describe("importing a project document", () => {
+  test("re-importing an export shows everything unchanged, survives a reload and cannot be applied", async ({
+    page,
+  }) => {
+    const project = await seedProject("reimport");
+    await seedFlag(project, stringFlag("checkout_redesign"));
+    await signIn(page);
+    await openPage(page, project);
+
+    const document = await exportedDocument(project);
+    await check(page, {
+      name: `${project}.json`,
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(document)),
+    });
+    await expect(
+      page.getByText("Unchanged. The project already matches this document."),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Apply", exact: true })).toBeDisabled();
+    await expectNoSeriousViolations(page, "the import review with nothing to apply");
+
+    await page.reload();
+    await expect(page.getByText(`Document: ${project}.json`)).toBeVisible();
+    await expect(
+      page.getByText("Unchanged. The project already matches this document."),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Choose another file" }).click();
+    await expect(page.getByLabel("Project document")).toBeVisible();
+  });
+
+  test("returns to the upload when the document was lost", async ({ page }) => {
+    const project = await seedProject("lostdoc");
+    await signIn(page);
+    await openPage(page, project);
+    await page.evaluate(
+      (key) => window.sessionStorage.setItem(key, JSON.stringify({ step: "review" })),
+      `flagnetic.import.${project}`,
+    );
+
+    await page.reload();
+
+    await expect(page.getByLabel("Project document")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Apply", exact: true })).toHaveCount(0);
+  });
+
+  test("shows the changes of an edited document, names the protected environment and applies them", async ({
+    page,
+  }) => {
+    const project = await seedProject("mergeapply");
+    await seedFlag(project, stringFlag("checkout_redesign"));
+    await signIn(page);
+    await openPage(page, project);
+    const before = await readConfiguration(project, "checkout_redesign", "production");
+
+    await check(page, await documentWithFlagToggled(project, "checkout_redesign", "production"));
+
+    const flags = page.getByRole("region", { name: "Flags" });
+    const patch = flags.getByRole("list", { name: "Changes to checkout_redesign" });
+    await expect(patch).toContainText("/configurations/production/on");
+    await expect(page.getByText(/without a change request: .*Production/)).toBeVisible();
+    await expectNoSeriousViolations(page, "the import review with changes");
+
+    await page.getByRole("button", { name: "Apply", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Imported.");
+    const after = await readConfiguration(project, "checkout_redesign", "production");
+    expect(after.on).toBe(!before.on);
+  });
+
+  test("explains a project that moved after the dry run and applies after a new one", async ({
+    page,
+  }) => {
+    const project = await seedProject("moved");
+    await seedFlag(project, stringFlag("checkout_redesign"));
+    await signIn(page);
+    await openPage(page, project);
+    const before = await readConfiguration(project, "checkout_redesign", "production");
+    await check(page, await documentWithFlagToggled(project, "checkout_redesign", "production"));
+    await expect(page.getByRole("button", { name: "Apply", exact: true })).toBeEnabled();
+
+    // Someone else changes the project between the dry run and the apply.
+    await seedFlag(project, stringFlag("another_flag"));
+    await page.getByRole("button", { name: "Apply", exact: true }).click();
+
+    const alert = page.getByRole("alert");
+    await expect(alert).toContainText("The project changed after this check");
+    expect((await readConfiguration(project, "checkout_redesign", "production")).on).toBe(
+      before.on,
+    );
+
+    await alert.getByRole("button", { name: "Check again" }).click();
+    await page.getByRole("button", { name: "Apply", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Imported.");
+    expect((await readConfiguration(project, "checkout_redesign", "production")).on).toBe(
+      !before.on,
+    );
+  });
+
+  test("shows the pointer of each fault in a document the server refuses", async ({ page }) => {
+    const project = await seedProject("refused");
+    await signIn(page);
+    await openPage(page, project);
+
+    await check(page, {
+      name: "broken.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify({ schema_version: 1, mystery: true })),
+    });
+
+    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Apply", exact: true })).toHaveCount(0);
+    await expectNoSeriousViolations(page, "the import review of a refused document");
   });
 });
