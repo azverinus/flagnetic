@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/azverinus/flagnetic/compare/sdks/dart/v0.1.2...sdks/dart/v0.1.3) (2026-11-13)
+
+
+### Bug Fixes
+
+* **sdk-dart:** fire on a changed served flag, wholeness by static type ([#280](https://github.com/azverinus/flagnetic/issues/280)) ([9f52f44](https://github.com/azverinus/flagnetic/commit/9f52f44c76344ceeaeb3a3e1a75513f6a8783e7c))
+
 ## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/dart/v0.1.1...sdks/dart/v0.1.2) (2026-11-12)
 
 
