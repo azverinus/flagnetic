@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/azverinus/flagnetic/internal/domain/sinks"
+	"github.com/google/uuid"
+
+	domain "github.com/azverinus/flagnetic/internal/domain/sinks"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -35,9 +39,9 @@ func docType(t *testing.T, chType string) string {
 
 // jsonColumns are the keys of an exported row's JSON object in order, each
 // with the kind of JSON value it holds.
-func jsonColumns(t *testing.T, row sinks.Row) (names []string, kinds map[string]string) {
+func jsonColumns(t *testing.T, row domain.Row) (names []string, kinds map[string]string) {
 	t.Helper()
-	b, err := sinks.MarshalRow(row)
+	b, err := domain.MarshalRow(row)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,10 +77,10 @@ func jsonColumns(t *testing.T, row sinks.Row) (names []string, kinds map[string]
 
 func TestTheDocumentedColumnsAreTheExportedRowsColumns(t *testing.T) {
 	doc := testkit.Doc(t, "exported-events.md")
-	for _, kind := range sinks.EventKinds {
+	for _, kind := range domain.EventKinds {
 		documented := testkit.DocColumns(t, doc, string(kind))
-		names, kinds := jsonColumns(t, sinks.SampleRows(kind, "shop", time.Now())[0])
-		table, ok := sinks.ClickHouseTableOf(kind)
+		names, kinds := jsonColumns(t, domain.SampleRows(kind, "shop", time.Now())[0])
+		table, ok := domain.ClickHouseTableOf(kind)
 		if !ok {
 			t.Fatalf("no ClickHouse table for %s", kind)
 		}
@@ -117,7 +121,7 @@ func normalizeSQL(s string) string {
 
 func TestTheDocumentedClickHouseDDLIsWhatThePlatformCreates(t *testing.T) {
 	doc := testkit.Doc(t, "exported-events.md")
-	for _, table := range sinks.ClickHouseTables() {
+	for _, table := range domain.ClickHouseTables() {
 		// The statement the platform sends, but for its IF NOT EXISTS and the
 		// database a sink's configuration names.
 		want := table.CreateStatement("db", "flagnetic")
@@ -141,26 +145,48 @@ func TestTheDocumentedClickHouseDDLIsWhatThePlatformCreates(t *testing.T) {
 
 func TestTheDocumentedObjectKeysAndWebhookEnvelopeAreWhatTheSinksWrite(t *testing.T) {
 	doc := testkit.Doc(t, "exported-events.md")
-	for _, want := range []string{
-		"{prefix}/{event_kind}/dt={YYYY-MM-DD}/{project_key}-{first_seq}-{last_seq}-{batch_hash}.{extension}",
-		"`jsonl.gz` (`application/gzip`)", "`jsonl.zst` (`application/zstd`)",
-		"`jsonl` (`application/x-ndjson`)", "`parquet` (`application/vnd.apache.parquet`)",
-		"{prefix}/_flagnetic_probe", "7d4f8c1e-2a6b-4e5d-9c3f-0b1a8e6d5c42",
-	} {
-		if !strings.Contains(doc, want) {
-			t.Errorf("exported-events.md does not say %s", want)
-		}
+	rows := domain.SampleRows(domain.EventExposure, "shop", time.Now())
+
+	// The documented key template, filled in with one batch's values, is the
+	// key the sink writes that batch under.
+	template := regexp.MustCompile("(?m)^(\\{prefix\\}/\\{event_kind\\}/\\S+)$").FindStringSubmatch(doc)
+	if template == nil {
+		t.Fatal("exported-events.md has no object key template")
 	}
-	rows := sinks.SampleRows(sinks.EventExposure, "shop", time.Now())
+	cfg := domain.ObjectStorage{Prefix: "lake", Format: "jsonl", Compression: "gzip"}
+	ext, _ := cfg.FileType()
+	documentedKey := strings.NewReplacer(
+		"{prefix}", "lake", "{event_kind}", string(domain.EventExposure),
+		"{YYYY-MM-DD}", rows[0].Received().UTC().Format("2006-01-02"), "{project_key}", "shop",
+		"{first_seq}", strconv.FormatInt(rows[0].Sequence(), 10),
+		"{last_seq}", strconv.FormatInt(rows[len(rows)-1].Sequence(), 10),
+		"{batch_hash}", "3f1c9a0b7e2d4c6a8b0e1f2d3c", "{extension}", ext,
+	).Replace(template[1])
+	if got := cfg.BatchKey(domain.EventExposure, "shop", "dlv_3f1c9a0b7e2d4c6a8b0e1f2d3c", rows); got != documentedKey {
+		t.Errorf("a batch is written under %s, the page documents %s", got, documentedKey)
+	}
+	if probe := (domain.ObjectStorage{Prefix: "{prefix}"}).ProbeKey(); !strings.Contains(doc, "`"+probe+"`") {
+		t.Errorf("exported-events.md does not name the probe object %s", probe)
+	}
+
+	// The documented namespace derives the report IDs the platform exports.
+	namespace := regexp.MustCompile("in the namespace `([0-9a-f-]{36})`").FindStringSubmatch(doc)
+	if namespace == nil {
+		t.Fatal("exported-events.md names no report ID namespace")
+	}
+	if want := uuid.NewSHA1(uuid.MustParse(namespace[1]), []byte("12:34")).String(); domain.ReportID(12, 34) != want {
+		t.Errorf("ReportID(12, 34) = %s, the documented derivation gives %s", domain.ReportID(12, 34), want)
+	}
+
 	for _, c := range []struct {
 		format, compression string
 	}{{"jsonl", "gzip"}, {"jsonl", "zstd"}, {"jsonl", "none"}, {"parquet", "zstd"}} {
-		ext, contentType := sinks.ObjectStorage{Format: c.format, Compression: c.compression}.FileType()
+		ext, contentType := domain.ObjectStorage{Format: c.format, Compression: c.compression}.FileType()
 		if !strings.Contains(doc, fmt.Sprintf("`%s` (`%s`)", ext, contentType)) {
 			t.Errorf("exported-events.md does not pair `%s` with `%s`", ext, contentType)
 		}
 	}
-	body, err := sinks.WebhookBody(sinks.ID{}, "shop", "dlv_x", "exposure", false, rows[:1])
+	body, err := domain.WebhookBody(domain.ID{}, "shop", "dlv_x", "exposure", false, rows[:1])
 	if err != nil {
 		t.Fatal(err)
 	}

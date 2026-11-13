@@ -10569,7 +10569,10 @@ export type GetExperimentExposuresError =
 
 export type GetExperimentExposuresResponses = {
   /**
-   * The experiment's exposures in the environment.
+   * The experiment's exposures in the environment. A sink's exported rows reproduce
+   * them with the SQL recipe in
+   * [Exported events](https://github.com/azverinus/flagnetic/blob/main/docs/exported-events.md).
+   *
    */
   200: ExperimentExposures;
 };

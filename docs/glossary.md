@@ -400,7 +400,7 @@ What a test of a sink's stored configuration, or its enable, found that does not
 _Avoid_: notice, lint, schema drift
 
 **Dead letter**:
-The record of an in-flight batch set aside after its rejections ran out: the stream's cursor range, the environments filter, attempts and last error, never the rows themselves. The cursor moves past it; a member redelivers it (under a new delivery ID, outside the stream's cursor) while its rows are still stored, or discards it.
+The record of an in-flight batch set aside after its rejections ran out: the stream's cursor range, the environments filter, attempts and the last failure class, never the rows themselves. The cursor moves past it; a member redelivers it (under a new delivery ID, outside the stream's cursor) while its rows are still stored, or discards it.
 _Avoid_: failed batch, poison message, DLQ
 
 **Stopped sink**:
@@ -412,7 +412,7 @@ A sink one of whose streams has an undelivered row within the loss warning (`FLA
 _Avoid_: critical, overdue, warning (the word is reserved for a sink warning)
 
 **Gap**:
-The explicit record of rows a stream (a sink's delivery or a rollup) lost because retention dropped their partition while its cursor still pointed before them: the cursor range lost and when it was dropped. The cursor moves to just before the first row still stored and the stream continues; a member dismisses the gap once seen, and it stays listed.
+The explicit record of rows a stream (a sink's delivery or a rollup) lost because retention dropped their partition while its cursor still pointed before them: the cursor range lost and when it was dropped. The cursor moves to just before the first row still stored and the stream continues; a member dismisses a sink's gap once seen, and it stays listed. A rollup's gap is only shown.
 _Avoid_: hole, data loss event, missing range
 
 ## Governance

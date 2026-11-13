@@ -18,7 +18,7 @@ Batching is the sink's own `batch_size` (the most rows one delivery carries) and
 
 ### ClickHouse
 
-`clickhouse`: `url` (the HTTP interface, for example `https://clickhouse.internal:8443`, without credentials), `database`, `table_prefix` (`flagnetic` by default), `username`, `password` (secret), `tls_skip_verify` (false by default), `create_tables` (true by default) and `settings` (extra query parameters for every insert; the ones delivery sets itself are refused). The platform creates the three tables on enable when `create_tables` is true, and what they look like is on [Exported events](exported-events.md#clickhouse). A table you manage yourself may lack optional columns: that is a [warning](#warnings), not an error.
+`clickhouse`: `url` (the HTTP interface, for example `https://clickhouse.internal:8443`, without credentials), `database`, `table_prefix` (`flagnetic` by default), `username`, `password` (secret), `tls_skip_verify` (false by default), `create_tables` (true by default) and `settings` (extra query parameters for every insert; the ones delivery sets itself are refused). When `create_tables` is true the platform creates the table of each event kind the sink exports that is missing, on enable, on a test of the saved sink, and before an insert that finds it gone; a test of an unsaved configuration creates nothing and warns instead. What the tables look like is on [Exported events](exported-events.md#clickhouse). A table you manage yourself may lack optional columns: that is a [warning](#warnings), not an error.
 
 ### Object storage
 
@@ -72,9 +72,9 @@ Every failed call has one class, from a closed list:
 | `status` | The target answered a status that says it is busy or broken (408, 429, 5xx) | without limit |
 | `refused_target` | The address is one a sink of this kind may not reach; no call was made | without limit, since what a name resolves to can change |
 | `redirect` | The target answered with a redirect, which no sink follows | without limit |
-| `rejected` | The target understood the batch and refuses it: any other 4xx, or a ClickHouse exception saying the table or the data does not fit | `FLAGNETIC_SINK_REJECTION_ATTEMPTS` times, then a dead letter |
+| `rejected` | The target understood the batch and refuses it: any other 4xx, or a ClickHouse exception saying the table or the data does not fit or the call is not allowed, whatever its status | until it has been rejected `FLAGNETIC_SINK_REJECTION_ATTEMPTS` times, then a dead letter |
 
-A transient failure is retried with the same batch under the same delivery ID, after a second, doubling to five minutes, each wait moved by up to 20 % either way; the batch keeps its place and nothing behind it is sent. Only a rejection is counted: it is retried `FLAGNETIC_SINK_REJECTION_ATTEMPTS` times, then the batch becomes a dead letter.
+A transient failure is retried with the same batch under the same delivery ID, after a second, doubling up to five minutes, each wait moved by up to 20 % either way but never past five minutes; the batch keeps its place and nothing behind it is sent. Only a rejection is counted: the batch becomes a dead letter at its `FLAGNETIC_SINK_REJECTION_ATTEMPTS`th rejection.
 
 ## Dead letters, stopping and resume
 
@@ -86,7 +86,7 @@ A **dead letter** records a batch set aside after its rejections ran out: the ev
 
 ## Replay
 
-`POST …/sinks/{sink}/replay` with `from`, optionally `to` and `event_kinds` sends events again by the time they were received, to fill a new table, recover from a dead letter whose rows have gone, or load history after widening the environments filter. `from` must be within retention. Without `to` the replay runs on into the live stream; with it, the stream returns to where it was when the replay ends. Replayed rows are sent under their own delivery IDs, so a target that deduplicates on the delivery ID sees them as new; deduplicate on the row IDs, as [Exported events](exported-events.md#delivery-guarantees) says. A replay is also the way to deliver events received before a sink was first enabled.
+`POST …/sinks/{sink}/replay` with `from`, optionally `to` and `event_kinds` sends events again by the time they were received, to fill a new table, recover from a dead letter whose rows have gone, or load history after widening the environments filter. `from` must be within retention. Without `to` the replay runs on into the live stream; with it, the stream returns to where it was when the replay ends. A replayed batch's delivery ID is the hash of its own range and rows, so it differs from the original batch's unless the replay happens to cut exactly the same batch; a target that deduplicates on the delivery ID alone may drop such a batch, so deduplicate on the row IDs, as [Exported events](exported-events.md#delivery-guarantees) says. A replay is also the way to deliver events received before a sink was first enabled.
 
 ## At risk and gaps
 
@@ -107,7 +107,7 @@ A sink's rows carry the key of their environment, which is gone when the environ
 
 ## Warnings
 
-A **sink warning** is what the last test or enable found that does not stop delivery. For ClickHouse it is an optional column of the export schema a table lacks, which inserts skip. The next test or enable replaces them all. A missing table, or a table without a required column, is not a warning but a failure of the test, the enable and the insert, with the code `60` (`UNKNOWN_TABLE`) or `16` (`NO_SUCH_COLUMN_IN_TABLE`).
+A **sink warning** is what the last test of the saved sink, or its enable, found that does not stop delivery. For ClickHouse it is an optional column of the export schema a table lacks, which inserts skip. The next test of the saved sink or enable replaces them all; a test of an unsaved configuration, or with a configuration in its body, answers its warnings without storing them, and among them a missing table it would create. A table without a required column, or a missing table when `create_tables` is false, is not a warning but a failure of the test, the enable and the insert, with the code `16` (`NO_SUCH_COLUMN_IN_TABLE`) or `60` (`UNKNOWN_TABLE`).
 
 ## Metrics
 
