@@ -36,6 +36,9 @@ Commands:
   import        Create a project from a document, or merge a document into a
                 project or replace the project's configuration with it
                 (import -h)
+  import-firebase
+                Merge a Firebase Remote Config template into one environment
+                of a project (import-firebase -h)
   admin         Administer the instance from the command line (admin help)
   hash-check    Check the bucketing hash's uniformity on unit IDs, offline
                 (hash-check -h)
@@ -170,6 +173,8 @@ func Main(args []string, lookupEnv func(string) (string, bool), stdout, stderr i
 			exited <- export(stop, args[1:], lookupEnv, stdout, stderr)
 		case "import":
 			exited <- importDocument(stop, args[1:], lookupEnv, o.stdin, stdout, stderr)
+		case "import-firebase":
+			exited <- importFirebase(stop, args[1:], lookupEnv, o.stdin, stdout, stderr)
 		case "hash-check":
 			exited <- hashCheck(args[1:], o.stdin, stdout, stderr)
 		case "healthcheck":

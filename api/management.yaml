@@ -1298,6 +1298,107 @@ paths:
                 $ref: "#/components/schemas/Problem"
         "422":
           $ref: "#/components/responses/Invalid"
+  /projects/{project}/import/firebase:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    post:
+      operationId: importFirebaseTemplate
+      summary: Merge a Firebase Remote Config template into one environment of a project
+      description: |
+        Translates a Firebase Remote Config template, as the Remote Config REST
+        API and `firebase remoteconfig:get` return it, into flags and rules and
+        merges them into one environment. Fields of the template this server
+        does not use are ignored, so a template from a newer Firebase imports.
+
+        A parameter, top level or in a group, becomes a flag with the same key;
+        its group is a tag. The default value is the flag's off and fallthrough
+        variation, and each conditional value becomes one rule per alternative
+        of its condition, in the template's order of conditions, described
+        `Firebase condition "<name>"`. A new flag is on in the environment and
+        off in the others. A flag the project has keeps its name, owner, other
+        environments, prerequisites and overrides, gains the variations it
+        lacks, and has its description replaced only by a non-empty one; a rule
+        equal to one it has keeps its identifier and salt, so importing a
+        template again changes nothing. A flag of another type is 422
+        `type_immutable`.
+
+        What cannot be reproduced is answered as a warning with a pointer into
+        the template: `in_app_default`, `condition_skipped`,
+        `rollout_reshuffled`, `attribute_declared`, `rule_limit` and
+        `archived_flag`. A template that cannot be translated, an
+        `environment` or a `unit_type` the project lacks is 422
+        `invalid_document` with every fault found in `errors`; a fault of the
+        query points at `/query/environment` or `/query/unit_type`.
+
+        Like any import it applies whole or not at all, bypasses protection,
+        records each entity it writes and then one `project.imported` entry
+        with the source `firebase`, and with `dry_run` runs and rolls back,
+        answering an `ETag` that `If-Match` can send back. Only the owner of a
+        project, never a project token, may import. A body is accepted up to
+        32 MiB.
+      x-permission: project.import
+      x-max-body-bytes: 33554432
+      tags: [transfer]
+      parameters:
+        - name: environment
+          in: query
+          required: true
+          description: The key of the environment the template is merged into.
+          schema:
+            type: string
+        - name: unit_type
+          in: query
+          description: The key of the unit type percent rollouts bucket on; `anonymous` unless given.
+          schema:
+            type: string
+            default: anonymous
+        - $ref: "#/components/parameters/ImportDryRun"
+        - $ref: "#/components/parameters/ImportIfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              format: binary
+              description: A Remote Config template as JSON.
+      responses:
+        "200":
+          description: What the import did, or with a dry run would do.
+          headers:
+            ETag:
+              schema:
+                type: string
+              description: |
+                On a dry run, the identifier of the project's latest audit
+                entry, quoted; absent for a project that has none, and on an
+                import that was applied.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FirebaseImportResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
+        "415":
+          description: "`unsupported_media_type`: the template is not sent as `application/json`."
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /projects/{project}/environments:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -12845,7 +12946,7 @@ components:
           enum: [create, merge, replace]
         source:
           type: string
-          enum: [document]
+          enum: [document, firebase]
         dry_run:
           type: boolean
         changes:
@@ -12854,6 +12955,66 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ImportWarning"
+    FirebaseImportResult:
+      description: |
+        What an import of a Remote Config template did, or with a dry run would
+        do: an `ImportResult` with the flags of the template as the project
+        stores them in the target environment and the attributes it declared.
+      allOf:
+        - $ref: "#/components/schemas/ImportResult"
+        - type: object
+          required: [flags, attributes]
+          properties:
+            flags:
+              type: array
+              description: One per parameter of the template, by key.
+              items:
+                $ref: "#/components/schemas/FirebaseFlag"
+            attributes:
+              type: array
+              description: The attributes the translation declared, by key.
+              items:
+                $ref: "#/components/schemas/FirebaseAttribute"
+    FirebaseFlag:
+      type: object
+      description: A flag of the template as the project stores it in the target environment.
+      required: [key, type, description, tags, variations, "on", off_variation, fallthrough, rules]
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          description: "`boolean`, `string`, `number` or `json`."
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        variations:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentVariation"
+        "on":
+          type: boolean
+        off_variation:
+          type: string
+        fallthrough:
+          type: string
+        rules:
+          type: array
+          description: In the order the template's conditions come.
+          items:
+            $ref: "#/components/schemas/DocumentRule"
+    FirebaseAttribute:
+      type: object
+      required: [key, type]
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          description: "`string`, `number` or `semver`."
     ImportChanges:
       type: object
       description: The keys of the entities an import created, updated and deleted, by kind. Standard attributes are never in it.

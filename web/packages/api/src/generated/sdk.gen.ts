@@ -283,6 +283,9 @@ import type {
   GetWebhookDeliveryResponses,
   GetWebhookErrors,
   GetWebhookResponses,
+  ImportFirebaseTemplateData,
+  ImportFirebaseTemplateErrors,
+  ImportFirebaseTemplateResponses,
   ImportNewProjectData,
   ImportNewProjectErrors,
   ImportNewProjectResponses,
@@ -1631,6 +1634,67 @@ export const importProject = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/import",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Merge a Firebase Remote Config template into one environment of a project
+ *
+ * Translates a Firebase Remote Config template, as the Remote Config REST
+ * API and `firebase remoteconfig:get` return it, into flags and rules and
+ * merges them into one environment. Fields of the template this server
+ * does not use are ignored, so a template from a newer Firebase imports.
+ *
+ * A parameter, top level or in a group, becomes a flag with the same key;
+ * its group is a tag. The default value is the flag's off and fallthrough
+ * variation, and each conditional value becomes one rule per alternative
+ * of its condition, in the template's order of conditions, described
+ * `Firebase condition "<name>"`. A new flag is on in the environment and
+ * off in the others. A flag the project has keeps its name, owner, other
+ * environments, prerequisites and overrides, gains the variations it
+ * lacks, and has its description replaced only by a non-empty one; a rule
+ * equal to one it has keeps its identifier and salt, so importing a
+ * template again changes nothing. A flag of another type is 422
+ * `type_immutable`.
+ *
+ * What cannot be reproduced is answered as a warning with a pointer into
+ * the template: `in_app_default`, `condition_skipped`,
+ * `rollout_reshuffled`, `attribute_declared`, `rule_limit` and
+ * `archived_flag`. A template that cannot be translated, an
+ * `environment` or a `unit_type` the project lacks is 422
+ * `invalid_document` with every fault found in `errors`; a fault of the
+ * query points at `/query/environment` or `/query/unit_type`.
+ *
+ * Like any import it applies whole or not at all, bypasses protection,
+ * records each entity it writes and then one `project.imported` entry
+ * with the source `firebase`, and with `dry_run` runs and rolls back,
+ * answering an `ETag` that `If-Match` can send back. Only the owner of a
+ * project, never a project token, may import. A body is accepted up to
+ * 32 MiB.
+ *
+ */
+export const importFirebaseTemplate = <ThrowOnError extends boolean = false>(
+  options: Options<ImportFirebaseTemplateData, ThrowOnError>,
+): RequestResult<ImportFirebaseTemplateResponses, ImportFirebaseTemplateErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    ImportFirebaseTemplateResponses,
+    ImportFirebaseTemplateErrors,
+    ThrowOnError
+  >({
+    bodySerializer: null,
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/import/firebase",
     ...options,
     headers: {
       "Content-Type": "application/json",

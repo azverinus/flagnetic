@@ -241,9 +241,10 @@ type Handlers struct {
 	ExportAuditEntries *appgovernance.ExportAuditEntries
 	StreamChanges      *appgovernance.StreamChanges
 
-	ExportProject     *apptransfer.ExportProject
-	ImportNewProject  *apptransfer.ImportNewProject
-	ImportIntoProject *apptransfer.ImportIntoProject
+	ExportProject          *apptransfer.ExportProject
+	ImportNewProject       *apptransfer.ImportNewProject
+	ImportIntoProject      *apptransfer.ImportIntoProject
+	ImportFirebaseTemplate *apptransfer.ImportFirebaseTemplate
 }
 
 // api serves every operation of the document.

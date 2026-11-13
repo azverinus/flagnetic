@@ -2716,6 +2716,11 @@ export const zWebhookDeliveryList = z.object({
   next_cursor: z.string().nullable(),
 });
 
+export const zFirebaseAttribute = z.object({
+  key: z.string(),
+  type: z.string(),
+});
+
 export const zJsonPatchOperation = z.object({
   op: z.enum(["add", "remove", "replace", "move", "copy", "test"]),
   path: z.string(),
@@ -2768,7 +2773,7 @@ export const zDocumentProject = z.object({
 export const zImportResult = z.object({
   project: zDocumentProject,
   mode: z.enum(["create", "merge", "replace"]),
-  source: z.enum(["document"]),
+  source: z.enum(["document", "firebase"]),
   dry_run: z.boolean(),
   changes: zImportChanges,
   warnings: z.array(zImportWarning),
@@ -2860,6 +2865,34 @@ export const zDocumentRule = z.object({
   conditions: z.array(zDocumentCondition),
   serve: zDocumentServe,
 });
+
+/**
+ * A flag of the template as the project stores it in the target environment.
+ */
+export const zFirebaseFlag = z.object({
+  key: z.string(),
+  type: z.string(),
+  description: z.string(),
+  tags: z.array(z.string()),
+  variations: z.array(zDocumentVariation),
+  on: z.boolean(),
+  off_variation: z.string(),
+  fallthrough: z.string(),
+  rules: z.array(zDocumentRule),
+});
+
+/**
+ * What an import of a Remote Config template did, or with a dry run would
+ * do: an `ImportResult` with the flags of the template as the project
+ * stores them in the target environment and the attributes it declared.
+ *
+ */
+export const zFirebaseImportResult = zImportResult.and(
+  z.object({
+    flags: z.array(zFirebaseFlag),
+    attributes: z.array(zFirebaseAttribute),
+  }),
+);
 
 export const zDocumentConfiguration = z.object({
   on: z.boolean(),
@@ -3463,6 +3496,30 @@ export const zImportProjectQuery = z.object({
  * What the import did, or with a dry run would do.
  */
 export const zImportProjectResponse = zImportResult;
+
+/**
+ * A Remote Config template as JSON.
+ */
+export const zImportFirebaseTemplateBody = z.string();
+
+export const zImportFirebaseTemplateHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zImportFirebaseTemplatePath = z.object({
+  project: z.string(),
+});
+
+export const zImportFirebaseTemplateQuery = z.object({
+  environment: z.string(),
+  unit_type: z.string().optional().default("anonymous"),
+  dry_run: z.boolean().optional().default(false),
+});
+
+/**
+ * What the import did, or with a dry run would do.
+ */
+export const zImportFirebaseTemplateResponse = zFirebaseImportResult;
 
 export const zListEnvironmentsPath = z.object({
   project: z.string(),

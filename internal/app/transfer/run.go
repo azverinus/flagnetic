@@ -26,6 +26,8 @@ type run struct {
 	ids    *id.Source
 	req    governance.Request
 	caller *access.MemberID
+	// source is what the import read, the document unless set.
+	source string
 
 	project  workspace.Project
 	changes  transfer.Changes
@@ -130,10 +132,18 @@ func (r *run) record(ctx context.Context, mode transfer.Mode) error {
 	entry, err := governance.NewEntry(id.New[governance.Entry](r.ids), r.clock.Now(), r.req, governance.Record{
 		Project: r.project.ID, Action: "project.imported",
 		Entity: governance.Entity{Kind: "project", ID: r.project.ID.String(), Key: r.project.Key},
-		After:  map[string]any{"mode": mode, "source": transfer.SourceDocument, "counts": r.changes.Counts()},
+		After:  map[string]any{"mode": mode, "source": r.sourceName(), "counts": r.changes.Counts()},
 	})
 	if err != nil {
 		return err
 	}
 	return r.audit.Record(ctx, entry)
+}
+
+// sourceName is what the import read its changes from.
+func (r *run) sourceName() string {
+	if r.source == "" {
+		return transfer.SourceDocument
+	}
+	return r.source
 }

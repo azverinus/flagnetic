@@ -448,6 +448,15 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		CreateGroup: appidentity.NewCreateSCIMGroup(scimGroups), ReplaceGroup: appidentity.NewReplaceSCIMGroup(scimGroups),
 		PatchGroup: appidentity.NewPatchSCIMGroup(scimGroups), DeleteGroup: appidentity.NewDeleteSCIMGroup(scimGroups),
 	})
+	importIntoProject := apptransfer.ImportIntoProjectDeps{
+		Tx: tx, Projects: transferProjects{ws}, Workspace: ws, Flags: flagStore, Experiments: experimentStore,
+		Members: accessStore, History: auditLog,
+		WorkspaceImport: workspaceImporter, FlagsImport: transferFlags{flagImporter},
+		ExperimentsImport: transferExperiments{experimentImporter},
+		SDKKeys:           transferSDKKeys{keys: deliveryStore, clock: d.Clock},
+		Owners:            transferOwners{members: accessStore, ownership: owners}, Rulesets: rulesets, Audit: audit,
+		Clock: d.Clock, IDs: d.IDs,
+	}
 	management.Mount(edge, management.Handlers{
 		ListAuthProviders:                       appidentity.NewListProviders(identityStore),
 		ListEnabledAuthProviders:                appidentity.NewListEnabledProviders(identityStore),
@@ -735,15 +744,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Owners: transferOwners{members: accessStore, ownership: owners}, Rulesets: rulesets, Audit: audit,
 			Clock: d.Clock, IDs: d.IDs,
 		}),
-		ImportIntoProject: apptransfer.NewImportIntoProject(apptransfer.ImportIntoProjectDeps{
-			Tx: tx, Projects: transferProjects{ws}, Workspace: ws, Flags: flagStore, Experiments: experimentStore,
-			Members: accessStore, History: auditLog,
-			WorkspaceImport: workspaceImporter, FlagsImport: transferFlags{flagImporter},
-			ExperimentsImport: transferExperiments{experimentImporter},
-			SDKKeys:           transferSDKKeys{keys: deliveryStore, clock: d.Clock},
-			Owners:            transferOwners{members: accessStore, ownership: owners}, Rulesets: rulesets, Audit: audit,
-			Clock: d.Clock, IDs: d.IDs,
-		}),
+		ImportIntoProject:      apptransfer.NewImportIntoProject(importIntoProject),
+		ImportFirebaseTemplate: apptransfer.NewImportFirebaseTemplate(importIntoProject),
 	}, reg, managementOptions)
 	// Every replica keeps the SDK keys it authenticated, dropped on a
 	// notification of each change, and writes their uses in rounds.
