@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import functools
 import json
 import threading
 import time
@@ -144,6 +143,13 @@ def test_a_batch_the_server_will_never_take_is_dropped_and_not_sent_again(ingest
     assert [f["cause"] for f in logs.named("queue_dropped")] == ["client_error"]
 
 
+def _nested(depth: int) -> Any:
+    value: Any = ["bad-nested"]
+    for _ in range(depth):
+        value = [value]
+    return value
+
+
 @pytest.mark.parametrize(
     "unit_id",
     [
@@ -151,7 +157,7 @@ def test_a_batch_the_server_will_never_take_is_dropped_and_not_sent_again(ingest
         "bad-\ud800-unit",
         float("nan"),
         float("inf"),
-        functools.reduce(lambda inner, _: [inner], range(100_000), ["bad-nested"]),
+        _nested(100_000),
     ],
     ids=["not_a_json_value", "lone_surrogate", "nan", "infinity", "too_deep"],
 )
