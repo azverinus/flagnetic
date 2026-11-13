@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/ruby/v0.1.1...sdks/ruby/v0.1.2) (2026-11-13)
+
+
+### Bug Fixes
+
+* **sdk-ruby:** match regular expressions in linear time ([#281](https://github.com/azverinus/flagnetic/issues/281)) ([b69c8f0](https://github.com/azverinus/flagnetic/commit/b69c8f0cbe03f3e2e6997c0fdace18658e1120d3))
+
 ## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/ruby/v0.1.0...sdks/ruby/v0.1.1) (2026-11-11)
 
 
