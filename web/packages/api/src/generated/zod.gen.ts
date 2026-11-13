@@ -2349,6 +2349,9 @@ export const zSinkKind = z.enum(["clickhouse", "object_storage", "webhook"]);
 
 /**
  * A kind of raw event a sink exports, each delivered through a stream of its own.
+ * The columns of each kind's rows, with their types, are in
+ * [Exported events](https://github.com/azverinus/flagnetic/blob/main/docs/exported-events.md).
+ *
  */
 export const zSinkEventKind = z.enum(["exposure", "alias", "evaluation_summary"]);
 
@@ -4307,7 +4310,10 @@ export const zGetExperimentExposuresQuery = z.object({
 });
 
 /**
- * The experiment's exposures in the environment.
+ * The experiment's exposures in the environment. A sink's exported rows reproduce
+ * them with the SQL recipe in
+ * [Exported events](https://github.com/azverinus/flagnetic/blob/main/docs/exported-events.md).
+ *
  */
 export const zGetExperimentExposuresResponse = zExperimentExposures;
 
