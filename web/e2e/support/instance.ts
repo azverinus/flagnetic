@@ -172,6 +172,11 @@ export async function serve(
       FLAGNETIC_WEBHOOK_ALLOW_HTTP: "true",
       FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS: "true",
       FLAGNETIC_WEBHOOK_TICK: "1s",
+      // A rejecting sink target sets a batch aside after two rejections and
+      // stops the sink after two such batches, so a spec need not wait for
+      // the production defaults.
+      FLAGNETIC_SINK_REJECTION_ATTEMPTS: "2",
+      FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS: "2",
       ...clockSettings,
     }),
     cwd: repoRoot,

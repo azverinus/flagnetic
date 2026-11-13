@@ -5,6 +5,7 @@ import { clickhouseSink, objectStorageSink, webhookSink } from "@/test/sinks";
 
 import {
   bodyOf,
+  attentionReasons,
   changedFieldNames,
   emptyForm,
   failureText,
@@ -12,10 +13,14 @@ import {
   healthName,
   isUnchanged,
   lastDelivery,
+  latestFailure,
+  needsAttention,
   patchOf,
   pointerOfName,
+  replayBodyOf,
   startFromOf,
   testBodyOf,
+  validateSinkSearch,
 } from "./sinks";
 
 describe("the sink form", () => {
@@ -208,5 +213,96 @@ describe("a time to start from", () => {
     expect(startFromOf("")).toBeUndefined();
     expect(startFromOf("not a date")).toBeUndefined();
     expect(startFromOf("2026-11-01T10:30")).toBe(new Date("2026-11-01T10:30").toISOString());
+  });
+});
+
+describe("a sink that needs attention", () => {
+  const stopped = { ...webhookSink, health: "stopped" as const };
+
+  it("is one that is stopped, at risk or holds an undismissed gap, and no other", () => {
+    expect(needsAttention(webhookSink)).toBe(false);
+    expect(needsAttention({ ...webhookSink, health: "failing", dead_letters: 2 })).toBe(false);
+    expect(needsAttention(stopped)).toBe(true);
+    expect(needsAttention({ ...webhookSink, at_risk: true })).toBe(true);
+    expect(needsAttention({ ...webhookSink, gaps: 1 })).toBe(true);
+  });
+
+  it("says why, in the order of urgency", () => {
+    expect(attentionReasons(i18n, { ...stopped, at_risk: true, gaps: 2 })).toEqual([
+      "stopped",
+      "at risk of losing events",
+      "2 undismissed gaps",
+    ]);
+    expect(attentionReasons(i18n, { ...webhookSink, gaps: 1 })).toEqual(["1 undismissed gap"]);
+  });
+
+  it("names the latest failure across its streams, with the kind it happened on", () => {
+    const at = (time: string) => ({
+      class: "rejected" as const,
+      status: 422,
+      code: null,
+      at: time,
+    });
+    const sink = {
+      ...stopped,
+      streams: [
+        {
+          event_kind: "exposure" as const,
+          last_delivered_at: null,
+          last_failure: at("2026-11-01T10:00:00Z"),
+        },
+        {
+          event_kind: "alias" as const,
+          last_delivered_at: null,
+          last_failure: at("2026-11-01T11:00:00Z"),
+        },
+        { event_kind: "evaluation_summary" as const, last_delivered_at: null, last_failure: null },
+      ],
+    };
+    expect(latestFailure(sink)?.eventKind).toBe("alias");
+    expect(latestFailure(webhookSink)).toBeUndefined();
+  });
+});
+
+describe("a replay", () => {
+  it("sends the times as instants and every kind when none is ticked", () => {
+    const result = replayBodyOf(i18n, {
+      from: "2026-11-01T10:00",
+      to: "",
+      event_kinds: [],
+    });
+    expect(result).toEqual({ body: { from: new Date("2026-11-01T10:00").toISOString() } });
+  });
+
+  it("sends an end and the kinds ticked", () => {
+    const result = replayBodyOf(i18n, {
+      from: "2026-11-01T10:00",
+      to: "2026-11-02T10:00",
+      event_kinds: ["exposure"],
+    });
+    expect(result).toEqual({
+      body: {
+        from: new Date("2026-11-01T10:00").toISOString(),
+        to: new Date("2026-11-02T10:00").toISOString(),
+        event_kinds: ["exposure"],
+      },
+    });
+  });
+
+  it("is refused without a start, or with an end before it", () => {
+    expect(replayBodyOf(i18n, { from: "", to: "", event_kinds: [] })).toEqual({
+      problems: [{ path: "from", message: "Choose a time." }],
+    });
+    expect(
+      replayBodyOf(i18n, { from: "2026-11-02T10:00", to: "2026-11-01T10:00", event_kinds: [] }),
+    ).toEqual({ problems: [{ path: "to", message: "Choose a time after the start." }] });
+  });
+});
+
+describe("a sink screen's search", () => {
+  it("keeps a tab it knows and drops anything else", () => {
+    expect(validateSinkSearch({ tab: "gaps" })).toEqual({ tab: "gaps" });
+    expect(validateSinkSearch({ tab: "dead-letters" })).toEqual({ tab: "dead-letters" });
+    expect(validateSinkSearch({ tab: "elsewhere" })).toEqual({});
   });
 });

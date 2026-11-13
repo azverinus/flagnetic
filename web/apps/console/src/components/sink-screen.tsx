@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { QueryError } from "@/components/query-error";
 import { EnableSinkDialog, SampleSinkDialog } from "@/components/sink-actions";
 import { SinkEditor } from "@/components/sink-editor";
+import { DeadLettersTab, GapsTab, ReplayTab, SinkAlerts } from "@/components/sink-recovery";
 import { SinkSecretDialog } from "@/components/sink-secret-dialog";
 import { SinkStreams } from "@/components/sink-streams";
 import { SinkAtRisk, SinkHealthBadge } from "@/components/sink-status";
@@ -16,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs } from "@/components/ui/tabs";
 import { formatLag } from "@/i18n/format";
 import { ApiError } from "@/lib/errors";
 import { useListMutation } from "@/lib/mutations";
@@ -148,6 +150,7 @@ function SinkPage({ project, sink }: { project: string; sink: Sink }) {
     },
   });
   const name = sink.name;
+  const { dead_letters: deadLetters, gaps } = sink;
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
       <PageHeader
@@ -199,29 +202,63 @@ function SinkPage({ project, sink }: { project: string; sink: Sink }) {
           <SinkAtRisk sink={sink} />
         </Fact>
       </dl>
-      {sink.warnings.length > 0 ? (
-        <section className="flex flex-col gap-1 text-sm">
-          <h2 className="font-medium">
-            <Trans>What the last check found</Trans>
-          </h2>
-          <ul className="list-disc pl-5 text-muted-foreground">
-            {sink.warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-      <SinkStreams sink={sink} />
-      {/* A new version starts the form over from what was saved. */}
-      <SinkEditor
-        key={sink.version}
-        project={project}
-        sink={sink}
-        onSaved={(saved) => {
-          remember(saved);
-          const { name: savedName } = saved;
-          toast.success(t`${savedName} is saved.`);
-        }}
+      <SinkAlerts project={project} sink={sink} onResumed={remember} />
+      <Tabs
+        label={t`Sink`}
+        tabs={[
+          {
+            value: "settings",
+            label: <Trans>Settings</Trans>,
+            content: (
+              <div className="flex flex-col gap-6">
+                {sink.warnings.length > 0 ? (
+                  <section className="flex flex-col gap-1 text-sm">
+                    <h2 className="font-medium">
+                      <Trans>What the last check found</Trans>
+                    </h2>
+                    <ul className="list-disc pl-5 text-muted-foreground">
+                      {sink.warnings.map((warning) => (
+                        <li key={warning}>{warning}</li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+                <SinkStreams sink={sink} />
+                {/* A new version starts the form over from what was saved. */}
+                <SinkEditor
+                  key={sink.version}
+                  project={project}
+                  sink={sink}
+                  onSaved={(saved) => {
+                    remember(saved);
+                    const { name: savedName } = saved;
+                    toast.success(t`${savedName} is saved.`);
+                  }}
+                />
+              </div>
+            ),
+          },
+          {
+            value: "dead-letters",
+            label:
+              sink.dead_letters > 0 ? (
+                <Trans>Dead letters ({deadLetters})</Trans>
+              ) : (
+                <Trans>Dead letters</Trans>
+              ),
+            content: <DeadLettersTab project={project} sink={sink} />,
+          },
+          {
+            value: "replay",
+            label: <Trans>Replay</Trans>,
+            content: <ReplayTab project={project} sink={sink} onReplayed={remember} />,
+          },
+          {
+            value: "gaps",
+            label: sink.gaps > 0 ? <Trans>Gaps ({gaps})</Trans> : <Trans>Gaps</Trans>,
+            content: <GapsTab project={project} sink={sink} />,
+          },
+        ]}
       />
       <EnableSinkDialog
         project={project}

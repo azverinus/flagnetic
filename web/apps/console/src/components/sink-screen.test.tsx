@@ -228,4 +228,26 @@ describe("a sink's detail", () => {
     const sent = server.requests.find((r) => r.url.endsWith("/sample"))!;
     expect(await sent.json()).toEqual({ event_kinds: ["exposure", "alias"] });
   });
+
+  it("counts the dead letters and the gaps in their tabs, and keeps the settings in the first", async () => {
+    const sink: Sink = { ...webhookSink, health: "degraded", dead_letters: 2, gaps: 1 };
+    fakeServer({ ...common, [`GET ${base(sink.id)}`]: { status: 200, body: sink } });
+    await renderWithRouter(() => <SinkScreen project="checkout" sink={sink.id} />);
+
+    expect(await screen.findByRole("tab", { name: "Settings" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("tab", { name: "Dead letters (2)" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Gaps (1)" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Replay" })).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent("Events were lost");
+  });
+
+  it("offers to resume a stopped sink", async () => {
+    const sink: Sink = { ...webhookSink, health: "stopped", stopped_at: "2026-11-01T10:00:00Z" };
+    fakeServer({ ...common, [`GET ${base(sink.id)}`]: { status: 200, body: sink } });
+    await renderWithRouter(() => <SinkScreen project="checkout" sink={sink.id} />);
+    expect(await screen.findByRole("button", { name: "Resume" })).toBeVisible();
+  });
 });

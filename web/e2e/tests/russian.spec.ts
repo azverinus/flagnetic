@@ -639,6 +639,18 @@ test.describe("the console in Russian", () => {
     await expect(page.getByLabel("Пароль")).toHaveAttribute("placeholder", "***");
     await expect(page.getByText("Тип приёмника задаётся при создании.")).toBeVisible();
     await expectNoSeriousViolations(page, "a sink's settings in Russian");
+    for (const [tab, empty] of [
+      ["Недоставленные пакеты", "Недоставленных пакетов нет."],
+      ["Пропуски", "События не терялись."],
+    ]) {
+      await page.getByRole("tab", { name: tab! }).click();
+      await expect(page.getByText(empty!)).toBeVisible();
+      await expectNoSeriousViolations(page, `a sink's ${tab} tab in Russian`);
+    }
+    await page.getByRole("tab", { name: "Повтор" }).click();
+    await expect(page.getByRole("button", { name: "Повторить…" })).toBeVisible();
+    await expectNoSeriousViolations(page, "a sink's replay tab in Russian");
+    await page.getByRole("tab", { name: "Настройки" }).click();
     await expect(page.getByRole("heading", { name: "Потоки" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Проверить соединение" })).toBeVisible();
     await page.getByRole("button", { name: "Включить", exact: true }).click();

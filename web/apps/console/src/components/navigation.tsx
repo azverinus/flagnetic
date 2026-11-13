@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useId } from "react";
 
+import { SinkAttentionMarker } from "@/components/sink-banner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Permission } from "@/lib/access-names";
@@ -315,6 +316,9 @@ export function ProjectNavigation({ project, collapsed }: { project: string; col
             >
               <ScreenLabel screen={screen} collapsed={collapsed}>
                 {decides ? <AwaitingDecisionCount project={project} /> : null}
+                {screen.to === "/projects/$project/sinks" ? (
+                  <SinkAttentionMarker project={project} />
+                ) : null}
               </ScreenLabel>
             </Link>
           );

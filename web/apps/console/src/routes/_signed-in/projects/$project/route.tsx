@@ -7,6 +7,7 @@ import { projectNameCrumb } from "@/components/breadcrumb";
 import { QueryError } from "@/components/query-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AccessProvider } from "@/components/access-provider";
+import { ProjectSinkBanner } from "@/components/sink-banner";
 import { ProjectWebhookBanner } from "@/components/webhook-disabled-banner";
 import { ChangeStream } from "@/lib/change-stream";
 import { ApiError } from "@/lib/errors";
@@ -78,6 +79,7 @@ function ProjectLayout() {
     <AccessProvider project={key}>
       <ChangeStream project={key}>
         <ProjectWebhookBanner project={key} />
+        <ProjectSinkBanner project={key} />
         <Outlet />
       </ChangeStream>
     </AccessProvider>

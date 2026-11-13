@@ -22,6 +22,21 @@ msgstr "{0, plural, one {# конфликтная экспозиция} few {# �
 msgid "{0, plural, one {# member stays instance admin, being the last active one.} other {# members stay instance admins, being the last active ones.}}"
 msgstr "{0, plural, one {# участник остаётся администратором экземпляра, потому что он последний активный.} few {# участника остаются администраторами экземпляра, потому что они последние активные.} many {# участников остаются администраторами экземпляра, потому что они последние активные.} other {# участника остаются администраторами экземпляра, потому что они последние активные.}}"
 
+#. placeholder {0}: attention.length
+#: src/components/sink-banner.tsx
+msgid "{0, plural, one {# sink needs your attention.} other {# sinks need your attention.}}"
+msgstr "{0, plural, one {# приёмнику данных нужно ваше внимание.} few {# приёмникам данных нужно ваше внимание.} many {# приёмникам данных нужно ваше внимание.} other {# приёмникам данных нужно ваше внимание.}}"
+
+#. placeholder {0}: attention.length
+#: src/components/sink-banner.tsx
+msgid "{0, plural, one {# sink needs your attention} other {# sinks need your attention}}"
+msgstr "{0, plural, one {# приёмнику данных нужно ваше внимание} few {# приёмникам данных нужно ваше внимание} many {# приёмникам данных нужно ваше внимание} other {# приёмникам данных нужно ваше внимание}}"
+
+#. placeholder {0}: sink.gaps
+#: src/lib/sinks.ts
+msgid "{0, plural, one {# undismissed gap} other {# undismissed gaps}}"
+msgstr "{0, plural, one {# непринятый пропуск} few {# непринятых пропуска} many {# непринятых пропусков} other {# непринятого пропуска}}"
+
 #. placeholder {0}: disabled.length
 #: src/components/webhook-disabled-banner.tsx
 msgid "{0, plural, one {The platform disabled # webhook after its receiver kept failing. It is sent nothing until it is enabled again.} other {The platform disabled # webhooks after their receivers kept failing. They are sent nothing until they are enabled again.}}"
@@ -334,6 +349,10 @@ msgstr "Окружение {name} защищено. Аварийный выкл�
 msgid "{name} is reactivated."
 msgstr "Участник {name} снова активен."
 
+#: src/components/sink-recovery.tsx
+msgid "{name} is resumed."
+msgstr "{name} возобновлён."
+
 #: src/components/member-actions.tsx
 msgid "{name} keeps only the roles their grants give them in each project."
 msgstr "У участника {name} останутся только роли, выданные ему в проектах."
@@ -448,6 +467,10 @@ msgstr "24 часа"
 #: src/lib/sdk-keys.ts
 msgid "7 days"
 msgstr "7 дней"
+
+#: src/components/sink-recovery.tsx
+msgid "A batch the target rejected over and over is set aside here so the stream can go on. Redelivering sends its rows again, outside the stream; discarding forgets them."
+msgstr "Пакет, который получатель отклонял раз за разом, откладывается сюда, чтобы поток мог идти дальше. Повторная доставка отправляет его строки ещё раз, вне потока; сброс забывает их."
 
 #: src/components/variations-editor.tsx
 msgid "A boolean flag always has exactly the variations true and false."
@@ -860,6 +883,7 @@ msgstr "Действие"
 
 #: src/components/overrides-section.tsx
 #: src/components/row-dialogs.tsx
+#: src/components/sink-recovery.tsx
 msgid "Actions"
 msgstr "Действия"
 
@@ -1346,10 +1370,19 @@ msgstr "Не более {maxNoteLength} символов."
 msgid "At risk"
 msgstr "Под угрозой"
 
+#: src/lib/sinks.ts
+msgid "at risk of losing events"
+msgstr "под угрозой потери событий"
+
+#: src/components/sink-recovery.tsx
+msgid "At risk of losing events"
+msgstr "Под угрозой потери событий"
+
 #: src/components/webhook-delivery-sheet.tsx
 msgid "Attempt {number}"
 msgstr "Попытка {number}"
 
+#: src/components/sink-recovery.tsx
 #: src/components/webhook-deliveries.tsx
 #: src/components/webhook-delivery-sheet.tsx
 msgid "Attempts"
@@ -1779,6 +1812,10 @@ msgstr "Выберите сегмент."
 msgid "Choose a stronger password."
 msgstr "Выберите более надёжный пароль."
 
+#: src/lib/sinks.ts
+msgid "Choose a time after the start."
+msgstr "Выберите время после начала."
+
 #: src/lib/problem-messages.ts
 msgid "Choose a time at most a year ahead."
 msgstr "Выберите время не дальше чем через год."
@@ -1788,6 +1825,7 @@ msgid "Choose a time in the future."
 msgstr "Выберите момент в будущем."
 
 #: src/components/sink-actions.tsx
+#: src/lib/sinks.ts
 msgid "Choose a time."
 msgstr "Выберите время."
 
@@ -2300,6 +2338,15 @@ msgstr "Деактивация сразу завершает все сеансы
 msgid "Deactivation ends every session and API token of yours at once, this one included, and you cannot sign in until another instance admin reactivates you."
 msgstr "Деактивация сразу завершает все ваши сеансы, включая этот, и отзывает все ваши API-токены. Войти вы сможете, только когда другой администратор экземпляра активирует вас снова."
 
+#: src/components/sink-recovery.tsx
+#: src/components/sink-screen.tsx
+msgid "Dead letters"
+msgstr "Недоставленные пакеты"
+
+#: src/components/sink-screen.tsx
+msgid "Dead letters ({deadLetters})"
+msgstr "Недоставленные пакеты ({deadLetters})"
+
 #: src/components/experiment-transitions.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 msgid "Decision"
@@ -2526,13 +2573,26 @@ msgstr "Отключён"
 msgid "Disabled after persistent failure"
 msgstr "Отключён после постоянных сбоев"
 
+#: src/components/sink-recovery.tsx
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Discard"
 msgstr "Отменить изменения"
 
+#: src/components/sink-recovery.tsx
+msgid "Discard dead letter"
+msgstr "Сбросить пакет"
+
 #: src/components/configuration-editor.tsx
 msgid "Discard my draft"
 msgstr "Отбросить мой черновик"
+
+#: src/components/sink-recovery.tsx
+msgid "Discard the {eventKind} dead letter"
+msgstr "Сбросить недоставленный пакет: {eventKind}"
+
+#: src/components/sink-recovery.tsx
+msgid "Discard this dead letter"
+msgstr "Сбросить недоставленный пакет"
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Discovered"
@@ -2541,6 +2601,10 @@ msgstr "Обнаруженные"
 #: src/components/discovered-attributes.tsx
 msgid "Discovered attributes"
 msgstr "Обнаруженные атрибуты"
+
+#: src/components/sink-recovery.tsx
+msgid "Dismiss"
+msgstr "Принять"
 
 #: src/components/discovered-attributes.tsx
 msgid "Dismiss {dismissedKey}"
@@ -2553,6 +2617,14 @@ msgstr "Скрыть {key}"
 #: src/components/discovered-attributes.tsx
 msgid "Dismiss attribute"
 msgstr "Скрыть атрибут"
+
+#: src/components/sink-recovery.tsx
+msgid "Dismiss the {eventKind} gap"
+msgstr "Принять пропуск: {eventKind}"
+
+#: src/components/sink-recovery.tsx
+msgid "Dismissed"
+msgstr "Принят"
 
 #: src/components/invite-form.tsx
 #: src/components/member-form.tsx
@@ -2628,6 +2700,7 @@ msgid "Drag rule {position}"
 msgstr "Перетащить правило {position}"
 
 #: src/components/event-volume.tsx
+#: src/components/sink-recovery.tsx
 #: src/lib/webhooks.ts
 msgid "Dropped"
 msgstr "Удалены"
@@ -3143,12 +3216,14 @@ msgstr "Событие"
 msgid "Event ID"
 msgstr "ID события"
 
+#: src/components/sink-recovery.tsx
 #: src/components/sink-streams.tsx
 msgid "Event kind"
 msgstr "Вид события"
 
 #: src/components/sink-actions.tsx
 #: src/components/sink-editor.tsx
+#: src/components/sink-recovery.tsx
 #: src/lib/sinks.ts
 msgid "Event kinds"
 msgstr "Виды событий"
@@ -3180,6 +3255,10 @@ msgstr "События по дням"
 #: src/components/event-volume.tsx
 msgid "Events retention dropped before a rollup had read them: they are missing from the counts above and from everything read from them, such as evaluations and exposures. A rollup reads every project's events, so a gap counts the events of every project of the instance."
 msgstr "События, которые хранение удалило раньше, чем их прочитал агрегатор: их нет в подсчётах выше и во всём, что из них считается, например в вычислениях и экспозициях. Агрегатор читает события всех проектов, поэтому пропуск считает события всех проектов инстанса."
+
+#: src/components/sink-recovery.tsx
+msgid "Events were lost"
+msgstr "События потеряны"
 
 #: src/lib/webhooks.ts
 msgid "Every audit entry"
@@ -3376,6 +3455,7 @@ msgstr "Эксперименты"
 #: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
 #: src/lib/sdk-keys.ts
+#: src/lib/sinks.ts
 msgid "Expired"
 msgstr "Истёк"
 
@@ -3625,6 +3705,7 @@ msgid "Found"
 msgstr "Найдено"
 
 #: src/components/audit-log.tsx
+#: src/components/sink-recovery.tsx
 #: src/components/webhook-deliveries.tsx
 msgid "From"
 msgstr "С"
@@ -3647,8 +3728,14 @@ msgid "Gap"
 msgstr "Пропуск"
 
 #: src/components/event-volume.tsx
+#: src/components/sink-recovery.tsx
+#: src/components/sink-screen.tsx
 msgid "Gaps"
 msgstr "Пропуски"
+
+#: src/components/sink-screen.tsx
+msgid "Gaps ({gaps})"
+msgstr "Пропуски ({gaps})"
 
 #: src/components/saml-provider-detail.tsx
 msgid "Generate next certificate"
@@ -3920,6 +4007,10 @@ msgstr "в сегменте {segment}"
 msgid "In what SDKs receive."
 msgstr "По тому, что получают SDK."
 
+#: src/components/sink-recovery.tsx
+msgid "In your time zone, within the retention window."
+msgstr "В вашем часовом поясе, в пределах срока хранения."
+
 #: src/components/sink-actions.tsx
 msgid "In your time zone. A stream the sink already has keeps its place."
 msgstr "В вашем часовом поясе. Поток, который у приёмника уже есть, остаётся на своём месте."
@@ -4141,6 +4232,14 @@ msgstr "Его условия не покидают сервер: его исп�
 msgid "Its owner is deactivated, or is neither an instance admin nor holding a grant in the project."
 msgstr "Его владелец деактивирован или не является администратором экземпляра и не имеет доступа к проекту."
 
+#: src/components/sink-recovery.tsx
+msgid "Its rows are not sent to the target. They can still reach it by a replay while retention holds them. This cannot be undone."
+msgstr "Его строки не будут отправлены получателю. Они ещё могут дойти до него повторной отправкой, пока их хранит ретеншен. Это нельзя отменить."
+
+#: src/components/sink-recovery.tsx
+msgid "Its target kept rejecting batches, so the sink delivers nothing until it is resumed. Resuming does not send the dead letters again; redeliver them once the target takes batches."
+msgstr "Получатель продолжал отклонять пакеты, поэтому приёмник ничего не доставляет, пока его не возобновят. Возобновление не отправляет недоставленные пакеты заново; доставьте их повторно, когда получатель начнёт принимать пакеты."
+
 #: src/components/invitation-acceptance.tsx
 msgid "Joining…"
 msgstr "Присоединяемся…"
@@ -4259,9 +4358,14 @@ msgstr "Последнее вычисление"
 msgid "Last evaluated by an SDK: <0/>"
 msgstr "Последнее вычисление в SDK: <0/>"
 
+#: src/components/sink-recovery.tsx
 #: src/components/sink-streams.tsx
 msgid "Last failure"
 msgstr "Последний сбой"
+
+#: src/components/sink-recovery.tsx
+msgid "Last failure on the {stream} stream: {lastFailure}"
+msgstr "Последний сбой потока «{stream}»: {lastFailure}"
 
 #: src/components/saml-provider-detail.tsx
 msgid "Last read"
@@ -4317,6 +4421,10 @@ msgstr "Уйти"
 #: src/components/sink-editor.tsx
 msgid "Leave empty to ask the bucket."
 msgstr "Оставьте пустым, чтобы узнать у бакета."
+
+#: src/components/sink-recovery.tsx
+msgid "Leave empty to replay on into the live stream."
+msgstr "Оставьте пустым, чтобы повтор дошёл до живого потока."
 
 #: src/components/mail-settings.tsx
 msgid "Leave empty when the server takes mail without signing in."
@@ -4915,6 +5023,10 @@ msgstr "Ни один запрос на изменение не подходит
 msgid "No conditions: matches every context."
 msgstr "Без условий: подходит любой контекст."
 
+#: src/components/sink-recovery.tsx
+msgid "No dead letters."
+msgstr "Недоставленных пакетов нет."
+
 #: src/components/webhook-deliveries.tsx
 msgid "No delivery matches the filters."
 msgstr "Ни одна доставка не подходит под фильтры."
@@ -4934,6 +5046,10 @@ msgstr "За эти дни вычислений нет."
 #: src/components/event-volume.tsx
 msgid "No event was lost in these days."
 msgstr "За эти дни ни одно событие не потеряно."
+
+#: src/components/sink-recovery.tsx
+msgid "No events were lost."
+msgstr "События не терялись."
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "No experiment matches these filters."
@@ -5141,6 +5257,10 @@ msgstr "Нет"
 #: src/components/project-switcher.tsx
 msgid "none chosen"
 msgstr "не выбран"
+
+#: src/components/sink-recovery.tsx
+msgid "None ticked means every kind the sink exports."
+msgstr "Если ничего не отмечено, берутся все виды, которые экспортирует приёмник."
 
 #: src/lib/sdk-keys.ts
 msgid "None, end the old key now"
@@ -5583,6 +5703,7 @@ msgstr "Вставленные метаданные не перечитываю�
 msgid "Path-style addressing"
 msgstr "Адресация через путь"
 
+#: src/lib/sinks.ts
 #: src/lib/webhooks.ts
 msgid "Pending"
 msgstr "Ожидает"
@@ -5906,6 +6027,7 @@ msgid "Rebase the change request"
 msgstr "Перебазировать запрос на изменение"
 
 #: src/components/event-volume.tsx
+#: src/components/sink-recovery.tsx
 msgid "Received"
 msgstr "Получены"
 
@@ -5925,13 +6047,22 @@ msgstr "Записывается в журнал аудита."
 msgid "Recorded in the audit log. Characters still needed: {missing}."
 msgstr "Записывается в журнал аудита. Не хватает символов: {missing}."
 
+#: src/components/sink-recovery.tsx
 #: src/components/webhook-delivery-sheet.tsx
 msgid "Redeliver"
 msgstr "Отправить снова"
 
+#: src/components/sink-recovery.tsx
+msgid "Redeliver the {eventKind} dead letter"
+msgstr "Доставить повторно недоставленный пакет: {eventKind}"
+
 #: src/components/webhook-deliveries.tsx
 msgid "Redeliver the {type} delivery"
 msgstr "Отправить доставку {type} снова"
+
+#: src/lib/sinks.ts
+msgid "Redelivered"
+msgstr "Доставлен повторно"
 
 #: src/components/auth-provider-detail.tsx
 msgid "Redirect URI"
@@ -6104,6 +6235,19 @@ msgstr "Переименовать {key}"
 msgid "Replace the overrides of {to} with those of {source}"
 msgstr "Заменить переопределения {to} переопределениями {source}"
 
+#: src/components/sink-recovery.tsx
+#: src/components/sink-screen.tsx
+msgid "Replay"
+msgstr "Повтор"
+
+#: src/components/sink-recovery.tsx
+msgid "Replay {name}"
+msgstr "Повторить отправку: {name}"
+
+#: src/components/sink-recovery.tsx
+msgid "Replay…"
+msgstr "Повторить…"
+
 #: src/components/flag-evaluations.tsx
 msgid "Reported by SDKs"
 msgstr "По данным SDK"
@@ -6158,6 +6302,26 @@ msgstr "Восстановить флаг"
 #: src/components/structural-diff-view.tsx
 msgid "Restored."
 msgstr "Восстановлен из архива."
+
+#: src/components/sink-recovery.tsx
+msgid "Resume"
+msgstr "Возобновить"
+
+#: src/components/sink-recovery.tsx
+msgid "Retention dropped events before this sink delivered them. Dismiss each gap once you have seen it."
+msgstr "Ретеншен удалил события раньше, чем этот приёмник их доставил. Примите каждый пропуск, когда ознакомитесь с ним."
+
+#: src/components/sink-recovery.tsx
+msgid "Retention drops raw events once they are older than the retention window, whether or not every sink has delivered them. A gap says which were lost; dismissing it only stops it counting towards the warnings."
+msgstr "Ретеншен удаляет сырые события, когда они старше срока хранения, доставили их все приёмники или нет. Пропуск говорит, какие события потеряны; принятие лишь убирает его из предупреждений."
+
+#: src/lib/problem-messages.ts
+msgid "Retention has dropped every row of this dead letter, so there is nothing left to send."
+msgstr "Ретеншен удалил все строки этого пакета, отправлять больше нечего."
+
+#: src/components/sink-recovery.tsx
+msgid "Retention is about to drop events this sink has not delivered. Get it delivering again before they are gone, or replay them from a time still within retention."
+msgstr "Ретеншен вот-вот удалит события, которые этот приёмник не доставил. Верните доставку, пока они не пропали, или повторите их отправку с момента в пределах срока хранения."
 
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Reusable sets of attribute conditions; a rule targets a segment by name and follows every change to it."
@@ -6301,6 +6465,14 @@ msgstr "Заменить секрет {name}"
 #: src/lib/sdk-keys.ts
 msgid "Rotating"
 msgstr "Ротируется"
+
+#: src/components/sink-recovery.tsx
+msgid "Rows"
+msgstr "Строки"
+
+#: src/components/sink-recovery.tsx
+msgid "Rows lost"
+msgstr "Потеряно строк"
 
 #: src/components/tester-panel.tsx
 msgid "Rule"
@@ -6533,6 +6705,10 @@ msgstr "Секретный ключ доступа"
 msgid "Security"
 msgstr "Защита"
 
+#: src/components/sink-recovery.tsx
+msgid "See the gaps"
+msgstr "Открыть пропуски"
+
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
@@ -6622,6 +6798,10 @@ msgstr "Отправляем тестовое письмо через сохра
 #: src/components/password-reset-request.tsx
 msgid "Sending…"
 msgstr "Отправляем…"
+
+#: src/components/sink-recovery.tsx
+msgid "Sends the events received since a time again, in order, then the stream goes on. Use it to fill a target after it lost data or after a dead letter was discarded."
+msgstr "Отправляет события, полученные с выбранного времени, ещё раз и по порядку, затем поток продолжается. Подойдёт, чтобы наполнить получателя после потери данных или после сброса недоставленного пакета."
 
 #: src/components/sink-test.tsx
 msgid "sent"
@@ -6725,6 +6905,7 @@ msgstr "Значение настройки"
 #: src/components/auth-provider-detail.tsx
 #: src/components/navigation.tsx
 #: src/components/sink-editor.tsx
+#: src/components/sink-screen.tsx
 #: src/components/webhook-detail.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "Settings"
@@ -6852,6 +7033,7 @@ msgstr "Вход…"
 msgid "Signs until <0/>"
 msgstr "Подписывает до <0/>"
 
+#: src/components/sink-screen.tsx
 #: src/routes/_signed-in/projects/$project/sinks/$sink.tsx
 msgid "Sink"
 msgstr "Приёмник"
@@ -7033,6 +7215,7 @@ msgid "State"
 msgstr "Состояние"
 
 #: src/components/sdk-keys.tsx
+#: src/components/sink-recovery.tsx
 #: src/components/webhook-deliveries.tsx
 #: src/components/webhook-delivery-sheet.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
@@ -7065,11 +7248,19 @@ msgstr "Снять защиту"
 msgid "Stop protecting {name}"
 msgstr "Снять защиту с {name}"
 
+#: src/lib/sinks.ts
+msgid "stopped"
+msgstr "остановлен"
+
 #: src/components/experiment-transitions.tsx
 #: src/lib/experiments.ts
 #: src/lib/sinks.ts
 msgid "Stopped"
 msgstr "Остановлен"
+
+#: src/components/sink-recovery.tsx
+msgid "Stopped by the platform"
+msgstr "Остановлен платформой"
 
 #: src/components/change-request-diff.tsx
 msgid "Stops the experiment and removes the rules serving it."
@@ -7398,6 +7589,10 @@ msgstr "База данных, в которой создаются таблиц
 msgid "The day the experiment is expected to have its answer."
 msgstr "День, к которому эксперимент должен дать ответ."
 
+#: src/components/sink-recovery.tsx
+msgid "The dead letter could not be redelivered."
+msgstr "Не удалось доставить недоставленный пакет повторно."
+
 #: src/components/experiment-transitions.tsx
 msgid "The decision note is saved."
 msgstr "Заметка к решению сохранена."
@@ -7409,6 +7604,10 @@ msgstr "Определение сохранено."
 #: src/components/sink-screen.tsx
 msgid "The delivery in progress finishes and nothing new starts. The sink keeps its place in the event stream, so enabling it again continues where it stopped."
 msgstr "Доставка, которая идёт сейчас, завершится, новая не начнётся. Приёмник сохраняет своё место в потоке событий, поэтому после повторного включения доставка продолжится с того места, где остановилась."
+
+#: src/components/sink-recovery.tsx
+msgid "The delivery in progress is dropped. A target that does not deduplicate sees these rows twice."
+msgstr "Текущая доставка отбрасывается. Получатель без дедупликации увидит эти строки дважды."
 
 #: src/components/member-credentials.tsx
 msgid "The devices {name} is signed in on"
@@ -7445,6 +7644,10 @@ msgstr "Почтовые домены, за которые ручается пр
 #: src/lib/problem-messages.ts
 msgid "The email or the password is not right."
 msgstr "Неверный адрес электронной почты или пароль."
+
+#: src/lib/problem-messages.ts
+msgid "The end of a replay cannot be before its start."
+msgstr "Конец повтора не может быть раньше его начала."
 
 #: src/components/audit-entry-sheet.tsx
 msgid "The entry records no values."
@@ -7967,6 +8170,10 @@ msgstr "URI перенаправления строится из публичн�
 msgid "The replacement SDK key"
 msgstr "SDK-ключ на замену"
 
+#: src/components/sink-recovery.tsx
+msgid "The replay is queued. {name} sends the events again from its next batch."
+msgstr "Повтор поставлен в очередь. {name} отправит события заново, начиная со следующего пакета."
+
 #: src/lib/problem-messages.ts
 msgid "The request came from another site and was refused."
 msgstr "Запрос пришёл с другого сайта и был отклонён."
@@ -8150,9 +8357,21 @@ msgstr "Получатель не ответил вовремя"
 msgid "The target is checked first; a sink that cannot deliver is not enabled."
 msgstr "Сначала проверяется получатель: приёмник, который не может доставлять, не включается."
 
+#: src/components/sink-recovery.tsx
+msgid "The target receives again every row of {kinds} received at or after {since} and at or before {until}."
+msgstr "Получатель ещё раз получит все строки ({kinds}), принятые не раньше {since} и не позже {until}."
+
+#: src/components/sink-recovery.tsx
+msgid "The target receives again every row of {kinds} received at or after {since}, and the stream then goes on."
+msgstr "Получатель ещё раз получит все строки ({kinds}), принятые не раньше {since}, после чего поток продолжится."
+
 #: src/lib/sinks.ts
 msgid "The target rejected the batch"
 msgstr "Получатель отклонил пакет"
+
+#: src/components/sink-recovery.tsx
+msgid "The target rejected the dead letter again."
+msgstr "Получатель снова отклонил пакет."
 
 #: src/components/sink-test.tsx
 msgid "The test failed:"
@@ -8516,6 +8735,7 @@ msgid "TLS from the first byte, usually port 465"
 msgstr "TLS с первого байта, обычно порт 465"
 
 #: src/components/audit-log.tsx
+#: src/components/sink-recovery.tsx
 #: src/components/webhook-deliveries.tsx
 msgid "To"
 msgstr "По"
