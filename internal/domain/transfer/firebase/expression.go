@@ -100,6 +100,10 @@ func (p *expressionParser) and() (alternatives, error) {
 	if err != nil {
 		return nil, err
 	}
+	// One term alone expands to a rule per value of contains or matches.
+	if len(a) > flags.MaxRules {
+		return nil, fmt.Errorf("it makes more than %d rules", flags.MaxRules)
+	}
 	for p.space(); strings.HasPrefix(p.s[p.i:], "&&"); p.space() {
 		p.i += 2
 		b, err := p.primary()

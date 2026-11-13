@@ -359,6 +359,34 @@ func TestRulesPastTheLimitAreSkippedAndTheOthersStay(t *testing.T) {
 	}
 }
 
+func TestARulePastTheLimitDeclaresNothingAndWarnsOfNoRollout(t *testing.T) {
+	tpl := decode(t, `{"conditions": [
+			{"name": "many", "expression": `+asJSON(t, strings.Repeat("device.os == 'a' || ", flags.MaxRules-1)+"device.os == 'b'")+`},
+			{"name": "late", "expression": "app.userProperty['Plan'] == 'x' && percent <= 10"}],
+		"parameters": {"p": {"defaultValue": {"value": "a"}, "conditionalValues": {"many": {"value": "b"}, "late": {"value": "c"}}}}}`)
+	r := translate(t, tpl, project())
+	if len(r.Attributes) != 0 {
+		t.Errorf("attributes = %+v, want none for a rule left out", r.Attributes)
+	}
+	if got := warnings(r); !reflect.DeepEqual(got, []warning{{firebase.WarnRuleLimit, "/parameters/p/conditionalValues/late"}}) {
+		t.Errorf("warnings = %+v, want rule_limit only", got)
+	}
+}
+
+func TestOneTermExpandingPastTheLimitCannotBeRead(t *testing.T) {
+	values := make([]string, flags.MaxRules+1)
+	for i := range values {
+		values[i] = fmt.Sprintf("'v%d'", i)
+	}
+	tpl := decode(t, `{"conditions": [{"name": "c", "expression": `+asJSON(t, "app.userProperty['plan'].contains(["+strings.Join(values, ", ")+"])")+`}],
+		"parameters": {"p": {"defaultValue": {"value": "a"}, "conditionalValues": {"c": {"value": "b"}}}}}`)
+	r := translate(t, tpl, project())
+	if len(r.Flags[0].Rules) != 0 || len(r.Attributes) != 0 || len(r.Warnings) != 1 ||
+		!strings.Contains(r.Warnings[0].Detail, "the expression cannot be read: it makes more than 50 rules") {
+		t.Errorf("rules = %d, attributes = %+v, warnings = %+v; want the rules skipped", len(r.Flags[0].Rules), r.Attributes, r.Warnings)
+	}
+}
+
 func TestPersonalizationAndRolloutValuesSkipTheirRules(t *testing.T) {
 	tpl := decode(t, `{"conditions": [{"name": "a", "expression": "true"}, {"name": "b", "expression": "true"}],
 		"parameters": {"p": {"defaultValue": {"value": "x"}, "conditionalValues": {

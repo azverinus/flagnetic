@@ -248,15 +248,17 @@ func (tr *translation) flag(p grouped, conditions []Condition) (Flag, []apperror
 			continue
 		}
 		for _, cl := range e.alternatives {
-			r, ok := tr.rule(p, c, pointer, cl)
-			if !ok {
-				continue
-			}
+			// The limit is checked before the rule is translated, so that a
+			// rule left out declares no attribute and warns of no rollout.
 			if len(rules) == flags.MaxRules {
 				reason := fmt.Sprintf("a configuration holds at most %d rules", flags.MaxRules)
 				tr.warn(WarnRuleLimit, pointer, fmt.Sprintf("%s, condition %s: the rule for \"%s\" is skipped: %s",
 					p.key, c.Name, strings.Join(cl.terms, " && "), reason),
 					map[string]any{"parameter": p.key, "condition": c.Name, "max": flags.MaxRules})
+				continue
+			}
+			r, ok := tr.rule(p, c, pointer, cl)
+			if !ok {
 				continue
 			}
 			r.Description = fmt.Sprintf("Firebase condition %q", c.Name)
