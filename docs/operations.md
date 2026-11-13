@@ -21,6 +21,8 @@ Any number of replicas can run against one database; every replica serves every 
 | `flagnetic admin unlock` | Turns local login back on, lifts every SSO-enforced domain and clears every lockout; see [Break-glass](#break-glass-flagnetic-admin-unlock). |
 | `flagnetic hash-check` | Runs the [uniformity check](experiments.md#the-uniformity-check) offline on a list of unit IDs; needs neither a database nor a configuration. |
 | `flagnetic healthcheck` | Asks the replica on the configured listen address whether it is ready; exits 0 when it is, 1 otherwise. |
+| `flagnetic export` | Writes a project's document, YAML by default, to standard output or `--output`, over the API with `--token`, `--token-file` or `FLAGNETIC_TOKEN` at `--url` or `FLAGNETIC_URL` (default `http://localhost:8080`); needs neither a database nor a configuration. |
+| `flagnetic import` | Creates a project from a document (the default mode, with `--project` as the new key and `--name`), or with `--mode merge` or `--mode replace` and `--project` applies it to an existing one; `--dry-run` answers what would change, `--if-match` refuses the import when the project moved since that `ETag`. The result is printed as indented JSON, each warning on standard error as `warning: <code> <pointer>: <detail>`. |
 | `flagnetic version` | Prints the version. |
 
 Exit codes: `0` success, `1` a runtime failure (PostgreSQL unreachable or too old, a migration failed, a port taken), `2` a usage or configuration error (an unknown command, a malformed or missing setting). A deploy that exits 2 will not get better by restarting. `healthcheck` is the exception: it exits 0 or 1 only, a refused configuration included, because container runtimes read any other code as something else than unhealthy.
