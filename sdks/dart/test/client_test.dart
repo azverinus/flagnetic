@@ -331,7 +331,9 @@ void main() {
       expect(changes, [
         ['checkout'],
         ['brand_new'],
-        ['brand_new', 'new_search'],
+        // `checkout` was set to false with reason targeting_match; the
+        // reload serves false with reason off: the served flag changed.
+        ['brand_new', 'checkout', 'new_search'],
       ]);
 
       client.alias(

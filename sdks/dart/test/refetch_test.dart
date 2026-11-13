@@ -6,6 +6,7 @@ library;
 // the SSE opt-in, all coalesced into one in-flight request. Durations are
 // the protocol's divided by 1000, as in the other behaviour tests.
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flagnetic/flagnetic.dart';
 import 'package:flagnetic/src/client/options.dart';
@@ -173,6 +174,64 @@ void main() {
         answersOf('server/evaluation-after-kill-switch.json'),
       );
     });
+
+    test(
+      'an experiment starting on an unchanged value fires a change',
+      () async {
+        final server = await MockServer.start();
+        final changes = <List<String>>[];
+        final client = Flagnetic.client(
+          clientKey,
+          baseUrl: server.url,
+          context: anonymous,
+          options: scaledOptions(pollInterval: const Duration(hours: 1)),
+        );
+        addTearDown(() async {
+          await client.close();
+          await server.close();
+        });
+        client.onChange(changes.add);
+        await (await server.next()).respondJson(evaluation);
+        await eventually(() => client.stage == Stage.fresh);
+        changes.clear();
+
+        // `checkout` keeps the value true; only the reason, the variation and
+        // the experiment block say a control user is now in an experiment.
+        final started =
+            jsonDecode(jsonEncode(evaluation)) as Map<String, Object?>;
+        final flags = started['flags']! as Map<String, Object?>;
+        flags['checkout'] = {
+          ...flags['checkout']! as Map<String, Object?>,
+          'reason': 'experiment',
+          'variation': 'control',
+          'experiment': {
+            'key': 'checkout_v2',
+            'variation': 'control',
+            'unit_type': 'anonymous',
+            'unit_id': 'd-8f1c',
+            'inclusion_salt': 'a3f9c2e17b4d0e58',
+            'variation_salt': '7e1d4c90b2a6f3d1',
+            'inclusion_bucket': 3537,
+            'variation_bucket': 2898,
+          },
+        };
+        var settled = client.refresh();
+        await (await server.next()).respondJson(started);
+        await settled;
+        expect(changes, [
+          ['checkout'],
+        ]);
+        final detail = client.getDetail('checkout', false);
+        expect(detail.value, true);
+        expect(detail.variation, 'control');
+
+        // The same document again: nothing served differs.
+        settled = client.refresh();
+        await (await server.next()).respondJson(started);
+        await settled;
+        expect(changes, hasLength(1));
+      },
+    );
 
     test('the interval runs while foregrounded and stops in the background, '
         'where foreground starts it again', () async {
