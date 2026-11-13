@@ -1,7 +1,7 @@
 import type { Sink, SinkKind, SinkWithSecret } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { PlusIcon, Trash2Icon } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { PlugZapIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { type ReactNode, useId } from "react";
 import {
   Controller,
@@ -17,6 +17,7 @@ import {
 
 import { ConflictBanner } from "@/components/conflict-banner";
 import { EnvironmentName } from "@/components/protected-mark";
+import { SinkTestOutcome } from "@/components/sink-test";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { FormPage } from "@/components/ui/form-page";
@@ -26,7 +27,7 @@ import { SwitchField } from "@/components/ui/switch-field";
 import { UnsavedChangesBar } from "@/components/ui/unsaved-changes-bar";
 import { ApiError } from "@/lib/errors";
 import { useListMutation } from "@/lib/mutations";
-import { violationMessage } from "@/lib/problem-messages";
+import { problemMessage, violationMessage } from "@/lib/problem-messages";
 import { environmentsQuery } from "@/lib/queries";
 import {
   batchingDefaults,
@@ -44,8 +45,10 @@ import {
   sinkApi,
   sinkEventKinds,
   sinkKinds,
+  sinkKey,
   sinksKey,
   type SinkForm,
+  testBodyOf,
 } from "@/lib/sinks";
 import { useFormConflict } from "@/lib/use-form-conflict";
 
@@ -94,6 +97,7 @@ export function SinkEditor({ project, sink, initialKind, onSaved }: SinkEditorPr
   const environments = useQuery(environmentsQuery(project));
   const api = sinkApi(project);
   const editing = sink !== undefined;
+  const testHeading = useId();
 
   const resolver: Resolver<SinkForm> = (values) => {
     const problems = formProblems(i18n, values, editing);
@@ -130,14 +134,33 @@ export function SinkEditor({ project, sink, initialKind, onSaved }: SinkEditorPr
     // Creating a webhook sink answers its secret.
     { secret: !editing },
   );
+  // Testing stores nothing, so it never blocks saving: the form is only
+  // checked for what a request cannot be made without.
+  const test = useMutation({
+    mutationFn: (values: SinkForm) =>
+      sink ? api.test(sink.id, testBodyOf(sink, values)) : api.testConfig(bodyOf(values)),
+    meta: { toast: false },
+    onSuccess: async () => {
+      // A saved sink's test stores what it found as the sink's warnings.
+      if (sink) await queryClient.invalidateQueries({ queryKey: sinkKey(project, sink.id) });
+    },
+  });
+  const runTest = form.handleSubmit((values) => {
+    save.reset();
+    test.mutate(values);
+  });
   const send = (at: number | undefined) =>
     form.handleSubmit((values) => {
       conflicts.clear();
+      test.reset();
       save.mutate({ values, at }, { onError: (error) => conflicts.meet(error) });
     });
 
   const refusal = conflicts.refusal(save.error);
   const hereRefusal = explainedByFields(refusal) ? undefined : refusal;
+  // The refusal of a save or of a test, whichever was made last, under the fields.
+  const fieldRefusal = save.error ?? test.error;
+  const testRefusal = explainedByFields(test.error) ? undefined : test.error;
   const { errors } = form.formState;
 
   return (
@@ -192,7 +215,7 @@ export function SinkEditor({ project, sink, initialKind, onSaved }: SinkEditorPr
           label={<Trans>Name</Trans>}
           hint={<Trans>What the sink delivers to, to tell the sinks apart.</Trans>}
           error={errors.name?.message}
-          refusal={save.error}
+          refusal={fieldRefusal}
           pointer="/name"
         >
           <Input autoComplete="off" autoFocus={!editing} {...form.register("name")} />
@@ -217,11 +240,11 @@ export function SinkEditor({ project, sink, initialKind, onSaved }: SinkEditorPr
         )}
 
         {kind === "clickhouse" ? (
-          <ClickHouseFields form={form} refusal={save.error} editing={editing} />
+          <ClickHouseFields form={form} refusal={fieldRefusal} editing={editing} />
         ) : kind === "object_storage" ? (
-          <ObjectStorageFields form={form} refusal={save.error} editing={editing} />
+          <ObjectStorageFields form={form} refusal={fieldRefusal} editing={editing} />
         ) : (
-          <WebhookFields form={form} refusal={save.error} />
+          <WebhookFields form={form} refusal={fieldRefusal} />
         )}
 
         <Controller
@@ -257,7 +280,7 @@ export function SinkEditor({ project, sink, initialKind, onSaved }: SinkEditorPr
                   </span>
                 </label>
               ))}
-              <PointerErrors error={save.error} prefix="/event_kinds" />
+              <PointerErrors error={fieldRefusal} prefix="/event_kinds" />
             </fieldset>
           )}
         />
@@ -293,12 +316,48 @@ export function SinkEditor({ project, sink, initialKind, onSaved }: SinkEditorPr
                   <EnvironmentName environment={environment} />
                 </label>
               ))}
-              <PointerErrors error={save.error} prefix="/environments" />
+              <PointerErrors error={fieldRefusal} prefix="/environments" />
             </fieldset>
           )}
         />
 
-        <BatchingFields form={form} kind={kind} refusal={save.error} />
+        <BatchingFields form={form} kind={kind} refusal={fieldRefusal} />
+
+        <section className="flex flex-col gap-2" aria-labelledby={testHeading}>
+          <h2 id={testHeading} className="text-sm font-medium">
+            <Trans>Test connection</Trans>
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {editing ? (
+              <Trans>
+                Calls the target with what the form holds now. A secret left empty is the stored
+                one. Nothing is saved, and saving is never held back by the test.
+              </Trans>
+            ) : (
+              <Trans>
+                Calls the target with what the form holds. Nothing is saved or created, and saving
+                is never held back by the test.
+              </Trans>
+            )}
+          </p>
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={test.isPending}
+              onClick={() => void runTest()}
+            >
+              <PlugZapIcon aria-hidden />
+              <Trans>Test connection</Trans>
+            </Button>
+          </div>
+          {test.data ? <SinkTestOutcome result={test.data} /> : null}
+          {testRefusal instanceof ApiError ? (
+            <p role="alert" className="text-sm text-destructive">
+              {problemMessage(i18n, testRefusal)}
+            </p>
+          ) : null}
+        </section>
       </FormPage>
       {editing ? (
         <UnsavedChangesBar

@@ -2,18 +2,21 @@ import type { Sink } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { KeyRoundIcon, Trash2Icon } from "lucide-react";
-import { useState } from "react";
+import { KeyRoundIcon, PlayIcon, PowerOffIcon, SendIcon, Trash2Icon } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 
 import { QueryError } from "@/components/query-error";
+import { EnableSinkDialog, SampleSinkDialog } from "@/components/sink-actions";
 import { SinkEditor } from "@/components/sink-editor";
 import { SinkSecretDialog } from "@/components/sink-secret-dialog";
-import { SinkHealthBadge } from "@/components/sink-status";
+import { SinkStreams } from "@/components/sink-streams";
+import { SinkAtRisk, SinkHealthBadge } from "@/components/sink-status";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatLag } from "@/i18n/format";
 import { ApiError } from "@/lib/errors";
 import { useListMutation } from "@/lib/mutations";
 import { kindName, sinkApi, sinkKey, sinkQuery, sinksKey } from "@/lib/sinks";
@@ -111,6 +114,9 @@ function SinkPage({ project, sink }: { project: string; sink: Sink }) {
   const api = sinkApi(project);
   const [rotating, setRotating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [enabling, setEnabling] = useState(false);
+  const [disabling, setDisabling] = useState(false);
+  const [sampling, setSampling] = useState(false);
   const [secret, setSecret] = useState<string>();
 
   /** Puts the sink a write answered in place of the one read. */
@@ -133,19 +139,37 @@ function SinkPage({ project, sink }: { project: string; sink: Sink }) {
       void navigate({ to: "/projects/$project/sinks", params: { project } });
     },
   });
+  const disable = useMutation({
+    mutationFn: () => api.disable(sink),
+    meta: { toast: false },
+    onSuccess: async (saved) => {
+      remember(saved);
+      setDisabling(false);
+    },
+  });
   const name = sink.name;
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
       <PageHeader
         title={sink.name}
-        description={
-          <span className="flex flex-wrap items-center gap-2">
-            <SinkHealthBadge sink={sink} />
-            <span>{kindName(i18n, sink.kind)}</span>
-          </span>
-        }
+        description={<span>{kindName(i18n, sink.kind)}</span>}
         actions={
           <>
+            {sink.enabled ? (
+              <Button variant="outline" onClick={() => setDisabling(true)}>
+                <PowerOffIcon aria-hidden />
+                <Trans>Disable</Trans>
+              </Button>
+            ) : (
+              <Button onClick={() => setEnabling(true)}>
+                <PlayIcon aria-hidden />
+                <Trans>Enable</Trans>
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setSampling(true)}>
+              <SendIcon aria-hidden />
+              <Trans>Send sample</Trans>
+            </Button>
             {sink.kind === "webhook" ? (
               <Button variant="outline" onClick={() => setRotating(true)}>
                 <KeyRoundIcon aria-hidden />
@@ -159,6 +183,35 @@ function SinkPage({ project, sink }: { project: string; sink: Sink }) {
           </>
         }
       />
+      <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+        <Fact label={<Trans>Health</Trans>}>
+          <SinkHealthBadge sink={sink} />
+        </Fact>
+        <Fact label={<Trans>Enabled</Trans>}>{sink.enabled ? t`Yes` : t`No`}</Fact>
+        <Fact label={<Trans>Lag</Trans>}>
+          {sink.lag_seconds === null ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            formatLag(i18n, sink.lag_seconds)
+          )}
+        </Fact>
+        <Fact label={<Trans>At risk</Trans>}>
+          <SinkAtRisk sink={sink} />
+        </Fact>
+      </dl>
+      {sink.warnings.length > 0 ? (
+        <section className="flex flex-col gap-1 text-sm">
+          <h2 className="font-medium">
+            <Trans>What the last check found</Trans>
+          </h2>
+          <ul className="list-disc pl-5 text-muted-foreground">
+            {sink.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      <SinkStreams sink={sink} />
       {/* A new version starts the form over from what was saved. */}
       <SinkEditor
         key={sink.version}
@@ -170,6 +223,39 @@ function SinkPage({ project, sink }: { project: string; sink: Sink }) {
           toast.success(t`${savedName} is saved.`);
         }}
       />
+      <EnableSinkDialog
+        project={project}
+        sink={sink}
+        open={enabling}
+        onOpenChange={setEnabling}
+        onEnabled={(enabled) => {
+          remember(enabled);
+          setEnabling(false);
+          toast.success(t`${name} is enabled.`);
+        }}
+      />
+      <SampleSinkDialog project={project} sink={sink} open={sampling} onOpenChange={setSampling} />
+      <ConfirmDialog
+        open={disabling}
+        onOpenChange={(open) => {
+          if (!open) {
+            disable.reset();
+            setDisabling(false);
+          }
+        }}
+        title={t`Disable ${name}`}
+        confirmLabel={<Trans>Disable sink</Trans>}
+        pending={disable.isPending}
+        refusal={disable.error}
+        onConfirm={() => disable.mutate()}
+      >
+        <p>
+          <Trans>
+            The delivery in progress finishes and nothing new starts. The sink keeps its place in
+            the event stream, so enabling it again continues where it stopped.
+          </Trans>
+        </p>
+      </ConfirmDialog>
       <ConfirmDialog
         open={rotating}
         onOpenChange={(open) => {
@@ -225,6 +311,15 @@ function SinkPage({ project, sink }: { project: string; sink: Sink }) {
           </Trans>
         </p>
       </ConfirmDialog>
+    </div>
+  );
+}
+
+function Fact({ label, children }: { label: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd>{children}</dd>
     </div>
   );
 }

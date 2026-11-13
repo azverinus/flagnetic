@@ -306,3 +306,81 @@ describe("editing a sink", () => {
     expect(await second.json()).toMatchObject({ clickhouse: { database: "events" } });
   });
 });
+
+describe("testing the connection", () => {
+  it("tests an unsaved configuration and shows ok, warnings and the failure by class, status and code", async () => {
+    let answer: unknown = {
+      ok: true,
+      class: null,
+      status: null,
+      code: null,
+      warnings: ["Column x is missing."],
+    };
+    const server = fakeServer({
+      ...common,
+      [`POST ${sinks}/test`]: () => ({ status: 200, body: answer }),
+    });
+    await renderEditor();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("radio", { name: /^Webhook/ }));
+    await user.type(screen.getByLabelText("Name"), "Pipeline");
+    await user.type(screen.getByLabelText("URL"), "https://pipeline.example.com/in");
+    await user.click(screen.getByRole("button", { name: "Test connection" }));
+
+    expect(await screen.findByText("The target answered and can take a batch.")).toBeVisible();
+    expect(screen.getByText("Column x is missing.")).toBeVisible();
+    const tested = await server.requests.find((r) => r.url.endsWith("/sinks/test"))!.json();
+    expect(tested).toMatchObject({
+      kind: "webhook",
+      webhook: { url: "https://pipeline.example.com/in" },
+    });
+
+    answer = { ok: false, class: "rejected", status: 403, code: "AccessDenied", warnings: [] };
+    await user.click(screen.getByRole("button", { name: "Test connection" }));
+    expect(
+      await screen.findByText(/The target rejected the batch \(status 403, code AccessDenied\)/),
+    ).toBeVisible();
+    // Saving was never offered less: the button stays.
+    expect(screen.getByRole("button", { name: "Create sink" })).toBeEnabled();
+  });
+
+  it("asks for what a request cannot be made without before testing", async () => {
+    const server = fakeServer(common);
+    await renderEditor();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Test connection" }));
+    expect(await screen.findByText("Enter a name.")).toBeVisible();
+    expect(server.requests.some((r) => r.method === "POST")).toBe(false);
+  });
+
+  it("tests a saved sink as stored, then an edit against the stored credential", async () => {
+    const server = fakeServer({
+      ...common,
+      [`POST ${sinks}/${clickhouseSink.id}/test`]: {
+        status: 200,
+        body: { ok: true, class: null, status: null, code: null, warnings: [] },
+      },
+    });
+    await renderEditor({ sink: clickhouseSink });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Test connection" }));
+    expect(await screen.findByText("The target answered and can take a batch.")).toBeVisible();
+    const first = server.requests.find((r) => r.url.endsWith("/test"))!;
+    expect(await first.json()).toEqual({});
+
+    const database = screen.getByLabelText("Database");
+    await user.clear(database);
+    await user.type(database, "other");
+    await user.click(screen.getByRole("button", { name: "Test connection" }));
+    await waitFor(() =>
+      expect(server.requests.filter((r) => r.url.endsWith("/test"))).toHaveLength(2),
+    );
+    const second = (await server.requests.filter((r) => r.url.endsWith("/test"))[1]!.json()) as {
+      clickhouse: Record<string, unknown>;
+    };
+    expect(second.clickhouse.database).toBe("other");
+    expect(second.clickhouse).not.toHaveProperty("password");
+  });
+});

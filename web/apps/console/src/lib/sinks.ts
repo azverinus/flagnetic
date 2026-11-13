@@ -2,15 +2,21 @@ import {
   zName,
   createSink,
   deleteSink,
+  enableSink,
   getSink,
   listSinks,
   rotateSinkSecret,
+  sampleSink,
   type Sink,
   type SinkCreate,
   type SinkEventKind,
+  type SinkFailureClass,
   type SinkHealth,
   type SinkKind,
   type SinkPatch,
+  type SinkTest,
+  testSink,
+  testSinkConfig,
   updateSink,
 } from "@flagnetic/api";
 import type { I18n } from "@lingui/core";
@@ -46,6 +52,30 @@ export function sinkApi(project: string) {
     remove: (sink: { id: string; version: number }) =>
       unwrap(deleteSink({ path: { project, sink: sink.id }, headers: ifMatch(sink.version) })),
     rotateSecret: (sink: string) => unwrap(rotateSinkSecret({ path: { project, sink } })),
+    /** `startFrom` is a time within retention; absent, the streams start from now. */
+    enable: (sink: string, startFrom?: string) =>
+      unwrap(
+        enableSink({
+          path: { project, sink },
+          body: startFrom === undefined ? {} : { start_from: startFrom },
+        }),
+      ),
+    /** Stops delivery and keeps the cursor, so enabling it again continues. */
+    disable: (sink: { id: string; version: number }) =>
+      unwrap(
+        updateSink({
+          path: { project, sink: sink.id },
+          body: { enabled: false },
+          headers: ifMatch(sink.version),
+        }),
+      ),
+    /** Tests a configuration nothing has stored yet. */
+    testConfig: (body: SinkCreate) => unwrap(testSinkConfig({ path: { project }, body })),
+    /** Tests the stored configuration, or the one in `body` against the stored credentials. */
+    test: (sink: string, body?: SinkTest) =>
+      unwrap(testSink({ path: { project, sink }, body: body ?? {} })),
+    sample: (sink: string, eventKinds: SinkEventKind[]) =>
+      unwrap(sampleSink({ path: { project, sink }, body: { event_kinds: eventKinds } })),
   };
 }
 
@@ -161,6 +191,85 @@ export function healthTone(health: SinkHealth): "default" | "muted" | "destructi
     default:
       return "destructive";
   }
+}
+
+/** Why a call to a target failed, in a few words. */
+export function failureClassName(i18n: I18n, failureClass: SinkFailureClass): string {
+  switch (failureClass) {
+    case "dns":
+      return i18n._(msg`The address could not be resolved`);
+    case "connect":
+      return i18n._(msg`The connection failed`);
+    case "tls":
+      return i18n._(msg`The TLS handshake failed`);
+    case "timeout":
+      return i18n._(msg`The target did not answer in time`);
+    case "refused_target":
+      return i18n._(msg`The address is one this instance does not reach`);
+    case "redirect":
+      return i18n._(msg`The target answered with a redirect`);
+    case "status":
+      return i18n._(msg`The target answered with an error status`);
+    case "rejected":
+      return i18n._(msg`The target rejected the batch`);
+  }
+}
+
+/**
+ * A failure as the target's answer names it: the class in words, then the
+ * HTTP status and the protocol's own code when there are any. Never the
+ * target's own text, which the server does not send.
+ */
+export function failureText(
+  i18n: I18n,
+  failure: {
+    class: SinkFailureClass | string | null;
+    status?: number | null;
+    code?: string | null;
+  },
+): string {
+  const known = sinkFailureClasses.find((candidate) => candidate === failure.class);
+  const head = known
+    ? failureClassName(i18n, known)
+    : failure.class
+      ? failure.class
+      : i18n._(msg`The target did not answer as needed`);
+  const status = failure.status ?? undefined;
+  const code = failure.code ?? undefined;
+  if (status !== undefined && code) return i18n._(msg`${head} (status ${status}, code ${code})`);
+  if (status !== undefined) return i18n._(msg`${head} (status ${status})`);
+  if (code) return i18n._(msg`${head} (code ${code})`);
+  return head;
+}
+
+const sinkFailureClasses: readonly SinkFailureClass[] = [
+  "dns",
+  "connect",
+  "tls",
+  "timeout",
+  "refused_target",
+  "redirect",
+  "status",
+  "rejected",
+];
+
+/** The sub-object a test of a saved sink sends, or none to test what is stored. */
+export function testBodyOf(sink: Sink, values: SinkForm): SinkTest | undefined {
+  const config = configOf(values);
+  const secretTyped =
+    (values.kind === "clickhouse" && values.clickhouse.password !== "") ||
+    (values.kind === "object_storage" && values.object_storage.secret_access_key !== "");
+  if (!secretTyped && JSON.stringify(config) === JSON.stringify(configOf(formOf(sink)))) {
+    return undefined;
+  }
+  return config;
+}
+
+/** The moment a "from a time" input holds, as the server takes it, or none while it is empty or no date. */
+export function startFromOf(local: string): string | undefined {
+  if (local.trim() === "") return undefined;
+  const at = new Date(local);
+  return Number.isNaN(at.getTime()) ? undefined : at.toISOString();
 }
 
 /** When a sink last delivered any event kind, or none. */

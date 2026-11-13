@@ -145,6 +145,18 @@ msgstr "{flag} serves {variation}"
 msgid "{from} to {to}"
 msgstr "{from} to {to}"
 
+#: src/lib/sinks.ts
+msgid "{head} (code {code})"
+msgstr "{head} (code {code})"
+
+#: src/lib/sinks.ts
+msgid "{head} (status {status}, code {code})"
+msgstr "{head} (status {status}, code {code})"
+
+#: src/lib/sinks.ts
+msgid "{head} (status {status})"
+msgstr "{head} (status {status})"
+
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "{holder} no longer holds {role} in this project and keeps their other roles here."
 msgstr "{holder} no longer holds {role} in this project and keeps their other roles here."
@@ -273,6 +285,7 @@ msgstr "{name} is disabled."
 
 #: src/components/auth-provider-detail.tsx
 #: src/components/auth-provider-list.tsx
+#: src/components/sink-screen.tsx
 #: src/components/webhook-list.tsx
 msgid "{name} is enabled."
 msgstr "{name} is enabled."
@@ -1328,6 +1341,7 @@ msgid "At most {maxNoteLength} characters."
 msgstr "At most {maxNoteLength} characters."
 
 #: src/components/sink-list.tsx
+#: src/components/sink-screen.tsx
 #: src/components/sink-status.tsx
 msgid "At risk"
 msgstr "At risk"
@@ -1509,6 +1523,14 @@ msgstr "Breadcrumb"
 #: src/components/tester-panel.tsx
 msgid "Bucket"
 msgstr "Bucket"
+
+#: src/components/sink-editor.tsx
+msgid "Calls the target with what the form holds now. A secret left empty is the stored one. Nothing is saved, and saving is never held back by the test."
+msgstr "Calls the target with what the form holds now. A secret left empty is the stored one. Nothing is saved, and saving is never held back by the test."
+
+#: src/components/sink-editor.tsx
+msgid "Calls the target with what the form holds. Nothing is saved or created, and saving is never held back by the test."
+msgstr "Calls the target with what the form holds. Nothing is saved or created, and saving is never held back by the test."
 
 #: src/components/experiment-transitions.tsx
 #: src/components/kill-switch-dialog.tsx
@@ -1765,6 +1787,10 @@ msgstr "Choose a time at most a year ahead."
 msgid "Choose a time in the future."
 msgstr "Choose a time in the future."
 
+#: src/components/sink-actions.tsx
+msgid "Choose a time."
+msgstr "Choose a time."
+
 #: src/components/discovered-attributes.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Choose a type"
@@ -1959,6 +1985,7 @@ msgstr "Clone {key}"
 msgid "Clone experiment"
 msgstr "Clone experiment"
 
+#: src/components/sink-actions.tsx
 #: src/components/ui/dialog.tsx
 #: src/components/ui/reveal-secret.tsx
 #: src/components/ui/sheet.tsx
@@ -2476,12 +2503,18 @@ msgid "Directory group"
 msgstr "Directory group"
 
 #: src/components/auth-provider-detail.tsx
+#: src/components/sink-screen.tsx
 msgid "Disable"
 msgstr "Disable"
 
 #: src/components/auth-provider-list.tsx
+#: src/components/sink-screen.tsx
 msgid "Disable {name}"
 msgstr "Disable {name}"
+
+#: src/components/sink-screen.tsx
+msgid "Disable sink"
+msgstr "Disable sink"
 
 #: src/components/auth-provider-badges.tsx
 #: src/components/webhook-status.tsx
@@ -2599,6 +2632,10 @@ msgstr "Drag rule {position}"
 msgid "Dropped"
 msgstr "Dropped"
 
+#: src/components/sink-streams.tsx
+msgid "Each event kind gets a stream once the sink is enabled."
+msgstr "Each event kind gets a stream once the sink is enabled."
+
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Each experiment compares variations of one flag over the units of one unit type; a flag's rule serves it in the environments that hold it."
 msgstr "Each experiment compares variations of one flag over the units of one unit type; a flag's rule serves it in the environments that hold it."
@@ -2691,20 +2728,27 @@ msgid "Empty context"
 msgstr "Empty context"
 
 #: src/components/auth-provider-detail.tsx
+#: src/components/sink-screen.tsx
 #: src/components/webhook-detail.tsx
 msgid "Enable"
 msgstr "Enable"
 
 #: src/components/auth-provider-list.tsx
+#: src/components/sink-actions.tsx
 #: src/components/webhook-disabled-banner.tsx
 #: src/components/webhook-list.tsx
 msgid "Enable {name}"
 msgstr "Enable {name}"
 
+#: src/components/sink-actions.tsx
+msgid "Enable sink"
+msgstr "Enable sink"
+
 #: src/components/auth-provider-badges.tsx
 #: src/components/auth-provider-form.tsx
 #: src/components/saml-provider-form.tsx
 #: src/components/sink-list.tsx
+#: src/components/sink-screen.tsx
 #: src/components/webhook-editor.tsx
 #: src/components/webhook-status.tsx
 #: src/lib/sinks.ts
@@ -3099,6 +3143,11 @@ msgstr "Event"
 msgid "Event ID"
 msgstr "Event ID"
 
+#: src/components/sink-streams.tsx
+msgid "Event kind"
+msgstr "Event kind"
+
+#: src/components/sink-actions.tsx
 #: src/components/sink-editor.tsx
 #: src/lib/sinks.ts
 msgid "Event kinds"
@@ -3580,6 +3629,14 @@ msgstr "Found"
 msgid "From"
 msgstr "From"
 
+#: src/components/sink-actions.tsx
+msgid "From a time: also the events received since then, still within retention."
+msgstr "From a time: also the events received since then, still within retention."
+
+#: src/components/sink-actions.tsx
+msgid "From now: only events received from now on."
+msgstr "From now: only events received from now on."
+
 #. A grant made by an auth provider's group mapping.
 #: src/lib/project-members.ts
 msgid "From the group mappings of {provider}, granted on {when}"
@@ -3729,6 +3786,7 @@ msgid "Headers"
 msgstr "Headers"
 
 #: src/components/sink-list.tsx
+#: src/components/sink-screen.tsx
 msgid "Health"
 msgstr "Health"
 
@@ -3861,6 +3919,10 @@ msgstr "in the segment {segment}"
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "In what SDKs receive."
 msgstr "In what SDKs receive."
+
+#: src/components/sink-actions.tsx
+msgid "In your time zone. A stream the sink already has keeps its place."
+msgstr "In your time zone. A stream the sink already has keeps its place."
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Include archived experiments"
@@ -4163,6 +4225,7 @@ msgid "Kind"
 msgstr "Kind"
 
 #: src/components/sink-list.tsx
+#: src/components/sink-screen.tsx
 msgid "Lag"
 msgstr "Lag"
 
@@ -4184,6 +4247,7 @@ msgid "Last checked <0/>, while the experiment ran; the stop took no check here,
 msgstr "Last checked <0/>, while the experiment ran; the stop took no check here, as the environment no longer held its rule."
 
 #: src/components/sink-list.tsx
+#: src/components/sink-streams.tsx
 msgid "Last delivery"
 msgstr "Last delivery"
 
@@ -4194,6 +4258,10 @@ msgstr "Last evaluated"
 #: src/components/flag-evaluations.tsx
 msgid "Last evaluated by an SDK: <0/>"
 msgstr "Last evaluated by an SDK: <0/>"
+
+#: src/components/sink-streams.tsx
+msgid "Last failure"
+msgstr "Last failure"
 
 #: src/components/saml-provider-detail.tsx
 msgid "Last read"
@@ -4813,6 +4881,7 @@ msgid "Next attempt"
 msgstr "Next attempt"
 
 #: src/components/sink-list.tsx
+#: src/components/sink-screen.tsx
 #: src/components/sink-status.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "No"
@@ -6512,6 +6581,10 @@ msgstr "Semantic version"
 msgid "Send a password reset link"
 msgstr "Send a password reset link"
 
+#: src/components/sink-actions.tsx
+msgid "Send a sample to {name}"
+msgstr "Send a sample to {name}"
+
 #: src/components/mail-settings.tsx
 msgid "Send a test mail"
 msgstr "Send a test mail"
@@ -6527,6 +6600,11 @@ msgstr "Send it as a bearer token in the Authorization header. Keep it where onl
 #: src/components/webhook-editor.tsx
 msgid "Send only the events of the environments you tick; tick none for every environment. An event of no environment is always sent."
 msgstr "Send only the events of the environments you tick; tick none for every environment. An event of no environment is always sent."
+
+#: src/components/sink-actions.tsx
+#: src/components/sink-screen.tsx
+msgid "Send sample"
+msgstr "Send sample"
 
 #: src/components/webhook-detail.tsx
 msgid "Send test"
@@ -6544,6 +6622,10 @@ msgstr "Sending a test mail through the saved settings…"
 #: src/components/password-reset-request.tsx
 msgid "Sending…"
 msgstr "Sending…"
+
+#: src/components/sink-test.tsx
+msgid "sent"
+msgstr "sent"
 
 #: src/components/webhook-detail.tsx
 msgid "Sent"
@@ -6897,9 +6979,17 @@ msgstr "Start {key}"
 msgid "Start certificate rotation"
 msgstr "Start certificate rotation"
 
+#: src/components/sink-actions.tsx
+msgid "Start delivering"
+msgstr "Start delivering"
+
 #: src/components/experiment-transitions.tsx
 msgid "Start experiment"
 msgstr "Start experiment"
+
+#: src/components/sink-actions.tsx
+msgid "Start from"
+msgstr "Start from"
 
 #: src/lib/experiment-transitions.ts
 #: src/lib/experiments.ts
@@ -7001,6 +7091,10 @@ msgstr "Stored sealed and never shown again."
 #: src/components/sink-editor.tsx
 msgid "Stored sealed and never shown. Unchanged unless you type a new one; after changing the address or the user, type it again."
 msgstr "Stored sealed and never shown. Unchanged unless you type a new one; after changing the address or the user, type it again."
+
+#: src/components/sink-streams.tsx
+msgid "Streams"
+msgstr "Streams"
 
 #. An attribute type.
 #: src/lib/attribute-types.ts
@@ -7114,9 +7208,17 @@ msgstr "Temporary"
 msgid "Temporary, to be removed by {expected}"
 msgstr "Temporary, to be removed by {expected}"
 
+#: src/components/sink-actions.tsx
+msgid "Ten rows of each kind you tick, marked as samples. Nothing is stored and no stream moves."
+msgstr "Ten rows of each kind you tick, marked as samples. Nothing is stored and no stream moves."
+
 #: src/components/auth-provider-detail.tsx
 msgid "Test"
 msgstr "Test"
+
+#: src/components/sink-editor.tsx
+msgid "Test connection"
+msgstr "Test connection"
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Tester"
@@ -7150,9 +7252,21 @@ msgstr "That linking was started in another browser, window or session, so nothi
 msgid "That sign-in was started in another browser or window, so it was not completed. Start it again from here."
 msgstr "That sign-in was started in another browser or window, so it was not completed. Start it again from here."
 
+#: src/lib/problem-messages.ts
+msgid "That time is before the oldest event still kept. Choose a later one."
+msgstr "That time is before the oldest event still kept. Choose a later one."
+
 #: src/components/saml-provider-detail.tsx
 msgid "The ACS URL and the entity ID are built from the instance's public address (FLAGNETIC_BASE_URL), which is not set. Set it, and the addresses show here."
 msgstr "The ACS URL and the entity ID are built from the instance's public address (FLAGNETIC_BASE_URL), which is not set. Set it, and the addresses show here."
+
+#: src/lib/sinks.ts
+msgid "The address could not be resolved"
+msgstr "The address could not be resolved"
+
+#: src/lib/sinks.ts
+msgid "The address is one this instance does not reach"
+msgstr "The address is one this instance does not reach"
 
 #: src/components/experiment-alerts.tsx
 msgid "The alert is acknowledged."
@@ -7264,6 +7378,10 @@ msgstr "The configuration of {source} is copied into {to}."
 msgid "The configuration's history in this environment has no such version."
 msgstr "The configuration's history in this environment has no such version."
 
+#: src/lib/sinks.ts
+msgid "The connection failed"
+msgstr "The connection failed"
+
 #: src/components/profile-form.tsx
 msgid "The console's language on every device you sign in on. Following the browser uses the first of its languages the console offers."
 msgstr "The console's language on every device you sign in on. Following the browser uses the first of its languages the console offers."
@@ -7287,6 +7405,10 @@ msgstr "The decision note is saved."
 #: src/components/flag-definition-sheet.tsx
 msgid "The definition is saved."
 msgstr "The definition is saved."
+
+#: src/components/sink-screen.tsx
+msgid "The delivery in progress finishes and nothing new starts. The sink keeps its place in the event stream, so enabling it again continues where it stopped."
+msgstr "The delivery in progress finishes and nothing new starts. The sink keeps its place in the event stream, so enabling it again continues where it stopped."
 
 #: src/components/member-credentials.tsx
 msgid "The devices {name} is signed in on"
@@ -7959,6 +8081,10 @@ msgstr "The session is revoked."
 msgid "The share of units included in the experiment; the others get what the flag's other rules serve."
 msgstr "The share of units included in the experiment; the others get what the flag's other rules serve."
 
+#: src/lib/problem-messages.ts
+msgid "The sink is not ready to be enabled: {failure}."
+msgstr "The sink is not ready to be enabled: {failure}."
+
 #: src/components/sink-secret-dialog.tsx
 msgid "The sink's signing secret"
 msgstr "The sink's signing secret"
@@ -8000,9 +8126,45 @@ msgstr "The SMTP server the instance sends its mail through."
 msgid "The SMTP server's host name or address."
 msgstr "The SMTP server's host name or address."
 
+#: src/components/sink-test.tsx
+msgid "The target answered and can take a batch."
+msgstr "The target answered and can take a batch."
+
+#: src/lib/sinks.ts
+msgid "The target answered with a redirect"
+msgstr "The target answered with a redirect"
+
+#: src/lib/sinks.ts
+msgid "The target answered with an error status"
+msgstr "The target answered with an error status"
+
+#: src/lib/sinks.ts
+msgid "The target did not answer as needed"
+msgstr "The target did not answer as needed"
+
+#: src/lib/sinks.ts
+msgid "The target did not answer in time"
+msgstr "The target did not answer in time"
+
+#: src/components/sink-actions.tsx
+msgid "The target is checked first; a sink that cannot deliver is not enabled."
+msgstr "The target is checked first; a sink that cannot deliver is not enabled."
+
+#: src/lib/sinks.ts
+msgid "The target rejected the batch"
+msgstr "The target rejected the batch"
+
+#: src/components/sink-test.tsx
+msgid "The test failed:"
+msgstr "The test failed:"
+
 #: src/components/mail-settings.tsx
 msgid "The test mail goes to {recipient} through the saved settings."
 msgstr "The test mail goes to {recipient} through the saved settings."
+
+#: src/lib/sinks.ts
+msgid "The TLS handshake failed"
+msgstr "The TLS handshake failed"
 
 #: src/lib/problem-messages.ts
 msgid "The token in use does not carry the scope this needs."
@@ -8843,6 +9005,10 @@ msgstr "What the experiment expects to find, written before it runs."
 msgid "What the flag serves in two environments, judged by what SDKs receive: rule descriptions and override notes do not count."
 msgstr "What the flag serves in two environments, judged by what SDKs receive: rule descriptions and override notes do not count."
 
+#: src/components/sink-screen.tsx
+msgid "What the last check found"
+msgstr "What the last check found"
+
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "What the project is called and what it is for."
 msgstr "What the project is called and what it is for."
@@ -8974,6 +9140,7 @@ msgid "X²"
 msgstr "X²"
 
 #: src/components/sink-list.tsx
+#: src/components/sink-screen.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "Yes"
 msgstr "Yes"

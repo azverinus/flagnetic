@@ -2,6 +2,9 @@ import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
 import { seedProject, signIn } from "../support/console";
+import { runningExperimentInProduction } from "../support/experiments";
+import { postExposures, seedSdkKey } from "../support/sdk";
+import { startReceiver, type Receiver } from "../support/webhook-receiver";
 
 /** The secret in the open reveal dialog, stored and closed. */
 async function takeSecret(page: Page): Promise<string> {
@@ -17,6 +20,16 @@ async function takeSecret(page: Page): Promise<string> {
   await expect(reveal).toBeHidden();
   await expect(page.getByText(secret)).toHaveCount(0);
   return secret;
+}
+
+/** The batches of one event kind a receiver was posted, the sample ones apart from the real. */
+function batchesOf(receiver: Receiver, eventKind: string, sample: boolean) {
+  return receiver.received
+    .map(
+      (delivery) =>
+        JSON.parse(delivery.body) as { event_kind: string; sample: boolean; events: unknown[] },
+    )
+    .filter((batch) => batch.event_kind === eventKind && batch.sample === sample);
 }
 
 const sinkRow = (page: Page, name: string) =>
@@ -178,5 +191,117 @@ test.describe("sinks", () => {
     await deletion.getByRole("button", { name: "Delete sink" }).click();
     await expect(sinkRow(page, "Lake")).toHaveCount(0);
     await expect(sinkRow(page, "Pipeline")).toHaveCount(1);
+  });
+  test("a maintainer tests before the first save, sends a sample, enables, sees events delivered and disables", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    const receiver = await startReceiver();
+    try {
+      const project = await seedProject("sinks-detail");
+      await runningExperimentInProduction(project);
+      const key = await seedSdkKey(project, "production", { kind: "server", name: "Checkout" });
+      await signIn(page);
+
+      // A target that does not answer is reported by class, and saving is not held back.
+      await page.goto(`/projects/${project}/sinks/new`);
+      await page.getByRole("radio", { name: /^Webhook/ }).check();
+      await page.getByLabel("Name", { exact: true }).fill("Pipeline");
+      const url = page.getByRole("textbox", { name: "URL", exact: true });
+      await url.fill("http://127.0.0.1:9/flagnetic");
+      await page.getByRole("button", { name: "Test connection" }).click();
+      await expect(page.getByText(/The test failed:/)).toBeVisible();
+      await expectNoSeriousViolations(page, "a failed test of a new sink");
+
+      // The receiver answers: the test passes, and it was sent a call carrying no rows.
+      await url.fill(receiver.url);
+      await page.getByRole("button", { name: "Test connection" }).click();
+      await expect(page.getByText("The target answered and can take a batch.")).toBeVisible();
+      expect(batchesOf(receiver, "test", false).length).toBeGreaterThan(0);
+      await page.getByRole("button", { name: "Create sink" }).click();
+      await takeSecret(page);
+      await expect(page.getByRole("heading", { name: "Pipeline", level: 1 })).toBeVisible();
+
+      // Before it is enabled: disabled, no lag, no streams yet.
+      const summary = page.locator("dl");
+      await expect(summary).toContainText("Disabled");
+      await expect(
+        page.getByText("Each event kind gets a stream once the sink is enabled."),
+      ).toBeVisible();
+      await expectNoSeriousViolations(page, "a disabled sink's page");
+
+      // A saved sink is tested as stored.
+      await page.getByRole("button", { name: "Test connection" }).click();
+      await expect(page.getByText("The target answered and can take a batch.")).toBeVisible();
+
+      // A sample reaches a disabled sink, marked as such, one batch per kind.
+      await page.getByRole("button", { name: "Send sample" }).first().click();
+      const sample = page.getByRole("dialog", { name: "Send a sample to Pipeline" });
+      await expectNoSeriousViolations(page, "the sample dialog");
+      await sample.getByRole("button", { name: "Send sample" }).click();
+      await expect(sample.getByRole("listitem")).toHaveCount(3);
+      await expect(sample.getByText("sent")).toHaveCount(3);
+      await sample.getByRole("button", { name: "Close" }).first().click();
+      expect(batchesOf(receiver, "exposure", true)).toHaveLength(1);
+      expect(batchesOf(receiver, "exposure", true)[0]!.events).toHaveLength(10);
+
+      // Enabling from now: the target is checked, and an exposure then reaches it.
+      await page.getByRole("button", { name: "Enable", exact: true }).click();
+      const enable = page.getByRole("dialog", { name: "Enable Pipeline" });
+      await expectNoSeriousViolations(page, "the enable dialog");
+      await enable.getByRole("button", { name: "Enable sink" }).click();
+      await expect(page.getByText("Pipeline is enabled.")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Disable", exact: true })).toBeVisible();
+      await postExposures(key, [
+        {
+          experiment: "cta_copy",
+          flag: "checkout_cta",
+          variation: "control",
+          unitType: "user",
+          unitId: "user-1",
+          at: new Date(),
+        },
+      ]);
+      await expect
+        .poll(() => batchesOf(receiver, "exposure", false).length, { timeout: 30_000 })
+        .toBe(1);
+      expect(batchesOf(receiver, "exposure", false)[0]!.events).toHaveLength(1);
+
+      // The streams table shows the delivery once the page reads the sink again.
+      await page.reload();
+      const streams = page.getByRole("table", { name: "Streams" });
+      await expect(streams.getByRole("row", { name: /Exposures/ })).not.toContainText("Never");
+      await expectNoSeriousViolations(page, "an enabled sink's page");
+
+      // Disabling says the place is kept.
+      await page.getByRole("button", { name: "Disable", exact: true }).click();
+      const disable = page.getByRole("dialog", { name: "Disable Pipeline" });
+      await expect(disable.getByText(/keeps its place in the event stream/)).toBeVisible();
+      await disable.getByRole("button", { name: "Disable sink" }).click();
+      await expect(page.getByRole("button", { name: "Enable", exact: true })).toBeVisible();
+    } finally {
+      await receiver.close();
+    }
+  });
+
+  test("enabling a sink whose target does not answer is refused inline, naming the failure", async ({
+    page,
+  }) => {
+    const project = await seedProject("sinks-refused");
+    await signIn(page);
+    await page.goto(`/projects/${project}/sinks/new`);
+    await page.getByRole("radio", { name: /^Webhook/ }).check();
+    await page.getByLabel("Name", { exact: true }).fill("Gone");
+    await page.getByRole("textbox", { name: "URL", exact: true }).fill("http://127.0.0.1:9/gone");
+    await page.getByRole("button", { name: "Create sink" }).click();
+    await takeSecret(page);
+
+    await page.getByRole("button", { name: "Enable", exact: true }).click();
+    const enable = page.getByRole("dialog", { name: "Enable Gone" });
+    await enable.getByRole("button", { name: "Enable sink" }).click();
+    await expect(enable.getByText(/The sink is not ready to be enabled:/)).toBeVisible();
+    await expectNoSeriousViolations(page, "a refused enable");
+    await enable.getByRole("button", { name: "Cancel" }).click();
+    await expect(page.getByRole("button", { name: "Enable", exact: true })).toBeVisible();
   });
 });

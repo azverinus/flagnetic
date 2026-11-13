@@ -2,9 +2,11 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { fakeServer } from "@/test/fake-server";
+import { fakeServer, problem } from "@/test/fake-server";
 import { renderWithRouter } from "@/test/render";
 import { clickhouseSink, webhookSink } from "@/test/sinks";
+
+import type { Sink } from "@flagnetic/api";
 
 import { SinkScreen } from "./sink-screen";
 
@@ -73,5 +75,157 @@ describe("a sink's screen", () => {
           .map((m) => m.state),
       ),
     ).not.toContain(secret);
+  });
+});
+
+const enabled: Sink = {
+  ...webhookSink,
+  enabled: true,
+  health: "failing",
+  at_risk: true,
+  lag_seconds: 125,
+  version: 2,
+  streams: [
+    {
+      event_kind: "exposure",
+      last_delivered_at: "2026-11-02T09:00:00Z",
+      last_failure: null,
+    },
+    {
+      event_kind: "alias",
+      last_delivered_at: null,
+      last_failure: { class: "status", status: 502, code: null, at: "2026-11-02T10:00:00Z" },
+    },
+  ],
+};
+
+describe("a sink's detail", () => {
+  it("shows health, lag, at risk and each stream's last delivery and failure", async () => {
+    fakeServer({
+      ...common,
+      [`GET ${base(enabled.id)}`]: { status: 200, body: enabled },
+    });
+    await renderWithRouter(() => <SinkScreen project="checkout" sink={enabled.id} />);
+
+    expect(await screen.findByText("Failing")).toBeVisible();
+    expect(screen.getByText("2 minutes")).toBeVisible();
+    expect(screen.getByText("At risk", { selector: "span" })).toBeVisible();
+    const row = screen.getByRole("row", { name: /Aliases/ });
+    expect(
+      within(row).getByText("The target answered with an error status (status 502)"),
+    ).toBeVisible();
+    expect(within(row).getByText("Never")).toBeVisible();
+    expect(within(screen.getByRole("row", { name: /Exposures/ })).queryByText("Never")).toBeNull();
+    expect(screen.getByRole("button", { name: "Disable" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Enable" })).toBeNull();
+  });
+
+  it("explains a refusal to enable inline, naming the failure, and keeps the dialog open", async () => {
+    fakeServer({
+      ...common,
+      [`GET ${base(webhookSink.id)}`]: { status: 200, body: webhookSink },
+      [`POST ${base(webhookSink.id)}/enable`]: problem(422, "sink_not_ready", {
+        failure: "status",
+        failure_status: 503,
+      }),
+    });
+    await renderWithRouter(() => <SinkScreen project="checkout" sink={webhookSink.id} />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Enable" }));
+    const dialog = await screen.findByRole("dialog", { name: "Enable Pipeline" });
+    await user.click(within(dialog).getByRole("button", { name: "Enable sink" }));
+
+    expect(
+      await within(dialog).findByText(
+        "The sink is not ready to be enabled: The target answered with an error status (status 503).",
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole("dialog", { name: "Enable Pipeline" })).toBeVisible();
+  });
+
+  it("enables from now, or from a chosen time", async () => {
+    const server = fakeServer({
+      ...common,
+      [`GET ${base(webhookSink.id)}`]: { status: 200, body: webhookSink },
+      [`POST ${base(webhookSink.id)}/enable`]: {
+        status: 200,
+        body: { ...webhookSink, enabled: true, health: "healthy", version: 2 },
+      },
+    });
+    await renderWithRouter(() => <SinkScreen project="checkout" sink={webhookSink.id} />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Enable" }));
+    const dialog = await screen.findByRole("dialog", { name: "Enable Pipeline" });
+    await user.click(within(dialog).getByRole("radio", { name: /From a time/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Enable sink" }));
+    expect(await within(dialog).findByText("Choose a time.")).toBeVisible();
+
+    await user.type(within(dialog).getByLabelText("Start from"), "2026-11-01T10:30");
+    await user.click(within(dialog).getByRole("button", { name: "Enable sink" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Enable Pipeline" })).toBeNull(),
+    );
+    const enable = server.requests.find((r) => r.url.endsWith("/enable"))!;
+    expect(await enable.json()).toEqual({
+      start_from: new Date("2026-11-01T10:30").toISOString(),
+    });
+  });
+
+  it("disables after saying the cursor is kept", async () => {
+    const server = fakeServer({
+      ...common,
+      [`GET ${base(enabled.id)}`]: { status: 200, body: enabled },
+      [`PATCH ${base(enabled.id)}`]: {
+        status: 200,
+        body: { ...enabled, enabled: false, health: "disabled", version: 3 },
+      },
+    });
+    await renderWithRouter(() => <SinkScreen project="checkout" sink={enabled.id} />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Disable" }));
+    const dialog = await screen.findByRole("dialog", { name: "Disable Pipeline" });
+    expect(within(dialog).getByText(/keeps its place in the event stream/)).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "Disable sink" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Disable Pipeline" })).toBeNull(),
+    );
+    const patch = server.requests.find((r) => r.method === "PATCH")!;
+    expect(await patch.json()).toEqual({ enabled: false });
+    expect(patch.headers.get("If-Match")).toBe('"2"');
+    expect(await screen.findByRole("button", { name: "Enable" })).toBeVisible();
+  });
+
+  it("sends a sample and shows each kind's result, a failure by class and status", async () => {
+    const server = fakeServer({
+      ...common,
+      [`GET ${base(webhookSink.id)}`]: { status: 200, body: webhookSink },
+      [`POST ${base(webhookSink.id)}/sample`]: {
+        status: 200,
+        body: {
+          results: [
+            { event_kind: "exposure", ok: true, class: null, status: null, code: null },
+            { event_kind: "alias", ok: false, class: "status", status: 500, code: null },
+            { event_kind: "evaluation_summary", ok: true, class: null, status: null, code: null },
+          ],
+        },
+      },
+    });
+    await renderWithRouter(() => <SinkScreen project="checkout" sink={webhookSink.id} />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Send sample" }));
+    const dialog = await screen.findByRole("dialog", { name: "Send a sample to Pipeline" });
+    await user.click(within(dialog).getByRole("checkbox", { name: "Evaluation summaries" }));
+    await user.click(within(dialog).getByRole("button", { name: "Send sample" }));
+
+    expect(
+      await within(dialog).findByText("The target answered with an error status (status 500)"),
+    ).toBeVisible();
+    const sent = server.requests.find((r) => r.url.endsWith("/sample"))!;
+    expect(await sent.json()).toEqual({ event_kinds: ["exposure", "alias"] });
   });
 });
