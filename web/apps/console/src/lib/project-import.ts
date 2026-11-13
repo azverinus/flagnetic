@@ -117,7 +117,7 @@ export function isUnchanged(result: ImportResult): boolean {
 /** One operation of a patch, ready to be written as a sentence. */
 export type PatchLine = {
   op: JsonPatchOperation["op"];
-  /** The JSON Pointer into the entity, as the server wrote it, unescaped per segment. */
+  /** The JSON Pointer into the entity, as the server wrote it. */
   path: string;
   from?: string;
   /** The value as JSON, shortened when it is long; absent for an operation that carries none. */
@@ -264,6 +264,12 @@ export function saveImportSession(project: string, session: ImportSession): void
       window.sessionStorage.setItem(sessionKey(project), JSON.stringify(session));
     }
   } catch {
-    // Storage may be full or blocked; the flow then ends at the upload after a reload.
+    // Storage may be full or blocked. What an earlier step kept is dropped,
+    // so a reload returns to the upload instead of reviewing an older document.
+    try {
+      window.sessionStorage.removeItem(sessionKey(project));
+    } catch {
+      // Blocked storage keeps nothing to drop.
+    }
   }
 }

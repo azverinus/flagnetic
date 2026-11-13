@@ -123,6 +123,26 @@ describe("importing a project document", () => {
     expect(await screen.findByText(/without a change request: Production/)).toBeInTheDocument();
   });
 
+  it("offers Apply only once the protected environments can be named", async () => {
+    let answerEnvironments: (answer: typeof environments) => void = () => {};
+    const server = fakeServer({
+      "GET /projects/checkout/environments": () =>
+        new Promise((resolve) => {
+          answerEnvironments = resolve;
+        }),
+      [path]: { status: 200, body: changed, headers: { ETag: '"entry-7"' } },
+    });
+    renderWithProviders(<ImportProject project="checkout" />);
+
+    await chooseAndCheck();
+    await waitFor(() => expect(server.requests.some((r) => r.method === "POST")).toBe(true));
+    expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
+
+    answerEnvironments(environments);
+    expect(await screen.findByText(/without a change request: Production/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply" })).toBeEnabled();
+  });
+
   it("renders every warning by its code with its pointer", async () => {
     fakeServer({
       "GET /projects/checkout/environments": environments,

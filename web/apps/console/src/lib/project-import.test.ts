@@ -1,5 +1,5 @@
 import type { ImportKindChanges, ImportResult } from "@flagnetic/api";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { activateForTests } from "@/test/render";
 
@@ -248,6 +248,22 @@ describe("keeping the session across a reload", () => {
     window.sessionStorage.setItem("flagnetic.import.checkout", "{not json");
     expect(loadImportSession("checkout")).toEqual({ step: "upload" });
     window.sessionStorage.setItem("flagnetic.import.checkout", JSON.stringify({ step: "done" }));
+    expect(loadImportSession("checkout")).toEqual({ step: "upload" });
+  });
+
+  it("drops what an earlier step kept when the browser cannot keep the new document", () => {
+    saveImportSession("checkout", { step: "review", document });
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    try {
+      saveImportSession("checkout", {
+        step: "review",
+        document: { ...document, name: "larger.json" },
+      });
+    } finally {
+      setItem.mockRestore();
+    }
     expect(loadImportSession("checkout")).toEqual({ step: "upload" });
   });
 

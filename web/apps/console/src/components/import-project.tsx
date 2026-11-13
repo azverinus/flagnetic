@@ -179,7 +179,9 @@ function Review({
   };
 
   let body: ReactNode;
-  if (dryRun.isPending || dryRun.isFetching) {
+  // The environments name the protected ones the import writes to, so Apply
+  // waits for them rather than being offered before that notice can show.
+  if (dryRun.isPending || dryRun.isFetching || environments.isPending) {
     body = (
       <p role="status" className="text-sm text-muted-foreground">
         <Trans>Checking what the import would change…</Trans>
