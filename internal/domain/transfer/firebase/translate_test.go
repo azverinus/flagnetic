@@ -2,6 +2,7 @@ package firebase_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -627,16 +628,10 @@ func TestAnArchivedFlagIsConfiguredAndWarned(t *testing.T) {
 func violations(t *testing.T, err error) []apperrors.Violation {
 	t.Helper()
 	var e *apperrors.Error
-	if !asError(err, &e) || e.Code != "invalid_document" {
+	if !errors.As(err, &e) || e.Code != "invalid_document" {
 		t.Fatalf("error = %v, want invalid_document", err)
 	}
 	return e.Violations
-}
-
-func asError(err error, target **apperrors.Error) bool {
-	e, ok := err.(*apperrors.Error)
-	*target = e
-	return ok
 }
 
 func TestTranslateRefusesWhatCannotBeTranslated(t *testing.T) {

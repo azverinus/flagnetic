@@ -585,13 +585,13 @@ func (t *termTokens) operator(percent bool) (string, []token, error) {
 	switch tok := t.next(); {
 	case tok.is(tokenPunct, ".") && (t.peek(0).kind == tokenIdent || t.peek(0).kind == tokenOp):
 		op = t.next().text
-		if err := t.expect(tokenPunct, "("); err != nil {
+		if err = t.expect(tokenPunct, "("); err != nil {
 			return "", nil, err
 		}
 		if values, err = t.list(); err != nil {
 			return "", nil, err
 		}
-		if err := t.expect(tokenPunct, ")"); err != nil {
+		if err = t.expect(tokenPunct, ")"); err != nil {
 			return "", nil, err
 		}
 	case tok.kind == tokenOp:
