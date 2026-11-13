@@ -354,18 +354,6 @@ func TestEveryEventKindReadsBackInEveryFormat(t *testing.T) {
 	}
 }
 
-func TestTheTargetsHoldAnObjectStorageTargetBesideTheWebhookOne(t *testing.T) {
-	targets := sinks.NewTargets(governance.TargetPolicy{}, nil)
-	for _, kind := range []domain.Kind{domain.KindWebhook, domain.KindObjectStorage} {
-		if _, ok := targets.For(kind); !ok {
-			t.Errorf("no target for %s sinks", kind)
-		}
-	}
-	if _, ok := targets.For(domain.KindClickHouse); ok {
-		t.Error("a ClickHouse target before ClickHouse is delivered to")
-	}
-}
-
 func TestAProbeThatCannotWriteIsRefused(t *testing.T) {
 	store := testkit.StartObjectStorage(t)
 	c := objectStorageSink(store, store.Endpoint, "no-such-bucket-at-all", nil)

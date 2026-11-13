@@ -260,13 +260,10 @@ func TestAProbeFailsOnAnAnswerFromAServerThatIsDownOrDoesNotTrustThePlatform(t *
 
 func TestTheTargetsAnswerForEveryKindThatCanBeDeliveredTo(t *testing.T) {
 	targets := sinks.NewTargets(governance.TargetPolicy{}, nil)
-	for _, k := range []domain.Kind{domain.KindWebhook, domain.KindClickHouse} {
+	for _, k := range []domain.Kind{domain.KindWebhook, domain.KindClickHouse, domain.KindObjectStorage} {
 		if _, ok := targets.For(k); !ok {
 			t.Errorf("no target for %s", k)
 		}
-	}
-	if _, ok := targets.For(domain.KindObjectStorage); ok {
-		t.Error("a target for object storage before it is built")
 	}
 }
 
