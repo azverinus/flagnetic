@@ -59,6 +59,16 @@ type ImportIntoProjectCommand struct {
 	IfMatch  *string
 	Caller   *access.MemberID
 	Request  governance.Request
+
+	// source says what the document was read from, the document itself
+	// unless set.
+	source string
+	// prepare, when set, makes the document from what the project holds,
+	// inside the unit of work, and says what it warns of besides.
+	prepare func(ctx context.Context, s transfer.Snapshot) (transfer.Document, []transfer.Warning, error)
+	// after runs in the unit of work once the document is written, before a
+	// dry run rolls it back.
+	after func(ctx context.Context) error
 }
 
 // errVersionMismatch refuses an import based on a state the project has left.
@@ -108,14 +118,29 @@ func (h *ImportIntoProject) Handle(ctx context.Context, cmd ImportIntoProjectCom
 		if err != nil {
 			return err
 		}
+		doc := cmd.Document
+		var warnings []transfer.Warning
+		if cmd.prepare != nil {
+			if doc, warnings, err = cmd.prepare(ctx, snapshot); err != nil {
+				return err
+			}
+		}
 		imp := &mergeRun{
-			h: h, cmd: cmd, doc: cmd.Document, snapshot: snapshot,
-			run: run{owners: h.d.Owners, audit: h.d.Audit, clock: h.d.Clock, ids: h.d.IDs, req: cmd.Request, caller: cmd.Caller, project: project},
+			h: h, cmd: cmd, doc: doc, snapshot: snapshot,
+			run: run{
+				owners: h.d.Owners, audit: h.d.Audit, clock: h.d.Clock, ids: h.d.IDs, req: cmd.Request, caller: cmd.Caller,
+				project: project, source: cmd.source, warnings: warnings,
+			},
 		}
 		res, err = imp.apply(ctx)
 		res.Latest = latest
 		if err != nil {
 			return err
+		}
+		if cmd.after != nil {
+			if err := cmd.after(ctx); err != nil {
+				return err
+			}
 		}
 		if cmd.DryRun {
 			return errDryRun
@@ -214,7 +239,7 @@ func (r *mergeRun) apply(ctx context.Context) (ImportResult, error) {
 	}
 	out := ImportResult{
 		Project: transfer.Project{Key: r.project.Key, Name: r.project.Name, Description: r.project.Description},
-		Mode:    r.mode(), Source: transfer.SourceDocument,
+		Mode:    r.mode(), Source: r.sourceName(),
 	}
 	steps := []func(context.Context) error{
 		r.updateProject, r.writeEnvironments, r.writeUnitTypes, r.writeAttributes, r.writeSegments, r.writeFlags,

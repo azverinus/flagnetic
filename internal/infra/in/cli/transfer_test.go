@@ -199,6 +199,10 @@ func TestUsageErrorsExitTwo(t *testing.T) {
 		"export without a token":        {[]string{"export", "--project", "p"}, "token"},
 		"import without a token":        {[]string{"import", "--file", file}, "token"},
 		"an unknown flag":               {[]string{"export", "--project", "p", "--nope", "--token", "t"}, "nope"},
+		"firebase without a file":       {[]string{"import-firebase", "--project", "p", "--environment", "e", "--token", "t"}, "--file"},
+		"firebase without a project":    {[]string{"import-firebase", "--file", file, "--environment", "e", "--token", "t"}, "--project"},
+		"firebase without environment":  {[]string{"import-firebase", "--file", file, "--project", "p", "--token", "t"}, "--environment"},
+		"firebase without a token":      {[]string{"import-firebase", "--file", file, "--project", "p", "--environment", "e"}, "token"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			r := run(map[string]string{"FLAGNETIC_URL": "http://127.0.0.1:1"}, nil, tc.args...)
@@ -314,7 +318,7 @@ func TestADocumentIsSentAsJSONForAJSONFileAndAsYAMLOtherwise(t *testing.T) {
 
 func TestHelpListsTheTransferCommands(t *testing.T) {
 	r := run(nil, nil, "help")
-	for _, want := range []string{"export", "import"} {
+	for _, want := range []string{"export", "import", "import-firebase"} {
 		if r.code != 0 || !strings.Contains(r.stdout, want) {
 			t.Errorf("help lacks %q:\n%s", want, r.stdout)
 		}
@@ -361,5 +365,65 @@ func TestTheETagOfAnExportAndOfADryRunCanBeSentBackAsIfMatch(t *testing.T) {
 	}
 	if m := i.cli("import", "--file", file, "--mode", "merge", "--project", "shop", "--if-match", `"0"`); m.code != 1 || !strings.Contains(m.stderr, "412 version_mismatch") {
 		t.Errorf("merge with a stale etag: exit %d, stderr %q", m.code, m.stderr)
+	}
+}
+
+func TestImportFirebaseMergesATemplateIntoOneEnvironment(t *testing.T) {
+	i := newTransferInstance(t)
+	i.createProject(t, "shop", "Shop")
+	template := filepath.Join(i.dir, "template.json")
+	if err := os.WriteFile(template, []byte(`{
+		"conditions": [{"name": "ios", "expression": "device.os == 'ios'"}, {"name": "later", "expression": "dateTime >= dateTime('2026-10-01T00:00:00')"}],
+		"parameters": {"banner": {"defaultValue": {"value": "Hello"}, "conditionalValues": {"ios": {"value": "Hi"}, "later": {"value": "Bye"}}}}}`),
+		0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	dry := i.cli("import-firebase", "--file", template, "--project", "shop", "--environment", "production", "--dry-run")
+	if dry.code != 0 || !strings.Contains(dry.stderr, "etag: ") || !strings.Contains(dry.stderr, "warning: condition_skipped /parameters/banner/conditionalValues/later:") {
+		t.Fatalf("dry run: exit %d, stderr %q", dry.code, dry.stderr)
+	}
+	if strings.Contains(i.export(t, "shop", "json"), `"banner"`) {
+		t.Fatal("a dry run wrote the flag")
+	}
+
+	r := i.cli("import-firebase", "--file", template, "--project", "shop", "--environment", "production", "--unit-type", "user")
+	if r.code != 0 {
+		t.Fatalf("import-firebase: exit %d: %s", r.code, r.stderr)
+	}
+	var got management.FirebaseImportResult
+	if err := json.Unmarshal([]byte(r.stdout), &got); err != nil {
+		t.Fatalf("stdout is not the result: %v\n%s", err, r.stdout)
+	}
+	if got.Source != management.FirebaseImportResultSourceFirebase || len(got.Flags) != 1 || got.Flags[0].Key != "banner" ||
+		len(got.Flags[0].Rules) != 1 || len(got.Changes.Flags.Created) != 1 {
+		t.Errorf("result = %s", r.stdout)
+	}
+	if !strings.Contains(i.export(t, "shop", "json"), `"banner"`) {
+		t.Error("the flag is not in the project")
+	}
+
+	again := i.cli("import-firebase", "--file", template, "--project", "shop", "--environment", "production", "--unit-type", "user")
+	var second management.FirebaseImportResult
+	if again.code != 0 || json.Unmarshal([]byte(again.stdout), &second) != nil || len(second.Changes.Flags.Created) != 0 ||
+		len(second.Changes.Flags.Updated) != 0 {
+		t.Errorf("a re-import: exit %d: %s", again.code, again.stdout)
+	}
+}
+
+func TestImportFirebaseRefusesWithItsFaultsAndExitOne(t *testing.T) {
+	i := newTransferInstance(t)
+	i.createProject(t, "shop", "Shop")
+	template := filepath.Join(i.dir, "template.json")
+	if err := os.WriteFile(template, []byte(`{"parameters": {"a": {"defaultValue": {"value": "x"}}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	r := i.cli("import-firebase", "--file", template, "--project", "shop", "--environment", "qa")
+	if r.code != 1 || !strings.Contains(r.stderr, "422 invalid_document") || !strings.Contains(r.stderr, "/query/environment unknown_environment") {
+		t.Errorf("an unknown environment: exit %d, stderr %q", r.code, r.stderr)
+	}
+	if r := i.cli("import-firebase", "--file", filepath.Join(i.dir, "missing.json"), "--project", "shop", "--environment", "production"); r.code != 1 {
+		t.Errorf("a missing file: exit %d, want 1", r.code)
 	}
 }

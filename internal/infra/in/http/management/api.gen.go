@@ -360,6 +360,45 @@ func (e ExperimentTransitionAction) Valid() bool {
 	}
 }
 
+// Defines values for FirebaseImportResultMode.
+const (
+	FirebaseImportResultModeCreate  FirebaseImportResultMode = "create"
+	FirebaseImportResultModeMerge   FirebaseImportResultMode = "merge"
+	FirebaseImportResultModeReplace FirebaseImportResultMode = "replace"
+)
+
+// Valid indicates whether the value is a known member of the FirebaseImportResultMode enum.
+func (e FirebaseImportResultMode) Valid() bool {
+	switch e {
+	case FirebaseImportResultModeCreate:
+		return true
+	case FirebaseImportResultModeMerge:
+		return true
+	case FirebaseImportResultModeReplace:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FirebaseImportResultSource.
+const (
+	FirebaseImportResultSourceDocument FirebaseImportResultSource = "document"
+	FirebaseImportResultSourceFirebase FirebaseImportResultSource = "firebase"
+)
+
+// Valid indicates whether the value is a known member of the FirebaseImportResultSource enum.
+func (e FirebaseImportResultSource) Valid() bool {
+	switch e {
+	case FirebaseImportResultSourceDocument:
+		return true
+	case FirebaseImportResultSourceFirebase:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FlagType.
 const (
 	FlagTypeBoolean FlagType = "boolean"
@@ -465,12 +504,15 @@ func (e ImportResultMode) Valid() bool {
 // Defines values for ImportResultSource.
 const (
 	ImportResultSourceDocument ImportResultSource = "document"
+	ImportResultSourceFirebase ImportResultSource = "firebase"
 )
 
 // Valid indicates whether the value is a known member of the ImportResultSource enum.
 func (e ImportResultSource) Valid() bool {
 	switch e {
 	case ImportResultSourceDocument:
+		return true
+	case ImportResultSourceFirebase:
 		return true
 	default:
 		return false
@@ -2696,6 +2738,56 @@ type ExposureRejections struct {
 type ExposureTimeline struct {
 	Items []ExposureDay `json:"items"`
 }
+
+// FirebaseAttribute defines model for FirebaseAttribute.
+type FirebaseAttribute struct {
+	Key string `json:"key"`
+
+	// Type `string`, `number` or `semver`.
+	Type string `json:"type"`
+}
+
+// FirebaseFlag A flag of the template as the project stores it in the target environment.
+type FirebaseFlag struct {
+	Description  string `json:"description"`
+	Fallthrough  string `json:"fallthrough"`
+	Key          string `json:"key"`
+	OffVariation string `json:"off_variation"`
+	On           bool   `json:"on"`
+
+	// Rules In the order the template's conditions come.
+	Rules []DocumentRule `json:"rules"`
+	Tags  []string       `json:"tags"`
+
+	// Type `boolean`, `string`, `number` or `json`.
+	Type       string              `json:"type"`
+	Variations []DocumentVariation `json:"variations"`
+}
+
+// FirebaseImportResult What an import of a Remote Config template did, or with a dry run would
+// do: an `ImportResult` with the flags of the template as the project
+// stores them in the target environment and the attributes it declared.
+type FirebaseImportResult struct {
+	// Attributes The attributes the translation declared, by key.
+	Attributes []FirebaseAttribute `json:"attributes"`
+
+	// Changes The keys of the entities an import created, updated and deleted, by kind. Standard attributes are never in it.
+	Changes ImportChanges `json:"changes"`
+	DryRun  bool          `json:"dry_run"`
+
+	// Flags One per parameter of the template, by key.
+	Flags    []FirebaseFlag             `json:"flags"`
+	Mode     FirebaseImportResultMode   `json:"mode"`
+	Project  DocumentProject            `json:"project"`
+	Source   FirebaseImportResultSource `json:"source"`
+	Warnings []ImportWarning            `json:"warnings"`
+}
+
+// FirebaseImportResultMode defines model for FirebaseImportResult.Mode.
+type FirebaseImportResultMode string
+
+// FirebaseImportResultSource defines model for FirebaseImportResult.Source.
+type FirebaseImportResultSource string
 
 // Flag A flag's definition with its configuration in every environment, and
 // when an SDK last evaluated it in each, both by the environments'
@@ -6131,6 +6223,28 @@ type ImportProjectParams struct {
 // ImportProjectParamsMode defines parameters for ImportProject.
 type ImportProjectParamsMode string
 
+// ImportFirebaseTemplateJSONBody defines parameters for ImportFirebaseTemplate.
+type ImportFirebaseTemplateJSONBody = openapi_types.File
+
+// ImportFirebaseTemplateParams defines parameters for ImportFirebaseTemplate.
+type ImportFirebaseTemplateParams struct {
+	// Environment The key of the environment the template is merged into.
+	Environment string `form:"environment" json:"environment"`
+
+	// UnitType The key of the unit type percent rollouts bucket on; `anonymous` unless given.
+	UnitType *string `form:"unit_type,omitempty" json:"unit_type,omitempty"`
+
+	// DryRun Run the whole import and roll it back, answering what it would have done.
+	DryRun *ImportDryRun `form:"dry_run,omitempty" json:"dry_run,omitempty"`
+
+	// IfMatch The state of the project this import is based on, as the `ETag` of a
+	// dry run or an export answered it. Optional: without it the import
+	// applies to the project as it is. With it, an import is refused
+	// `412 version_mismatch` when the project has changed since, judged
+	// under the project's lock before anything is written.
+	IfMatch *ImportIfMatch `json:"If-Match,omitempty"`
+}
+
 // DeleteSegmentParams defines parameters for DeleteSegment.
 type DeleteSegmentParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
@@ -6412,6 +6526,9 @@ type CheckHashUniformityJSONRequestBody = HashCheckRequest
 
 // ImportProjectJSONRequestBody defines body for ImportProject for application/json ContentType.
 type ImportProjectJSONRequestBody = ImportProjectJSONBody
+
+// ImportFirebaseTemplateJSONRequestBody defines body for ImportFirebaseTemplate for application/json ContentType.
+type ImportFirebaseTemplateJSONRequestBody = ImportFirebaseTemplateJSONBody
 
 // InviteProjectMemberJSONRequestBody defines body for InviteProjectMember for application/json ContentType.
 type InviteProjectMemberJSONRequestBody = ProjectInvitationCreate
@@ -10538,6 +10655,84 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
 	ImportProject(ctx context.Context, project ProjectKey, params *ImportProjectParams, body ImportProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportFirebaseTemplateWithBody Merge a Firebase Remote Config template into one environment of a project
+	//
+	// Translates a Firebase Remote Config template, as the Remote Config REST
+	// API and `firebase remoteconfig:get` return it, into flags and rules and
+	// merges them into one environment. Fields of the template this server
+	// does not use are ignored, so a template from a newer Firebase imports.
+	//
+	// A parameter, top level or in a group, becomes a flag with the same key;
+	// its group is a tag. The default value is the flag's off and fallthrough
+	// variation, and each conditional value becomes one rule per alternative
+	// of its condition, in the template's order of conditions, described
+	// `Firebase condition "<name>"`. A new flag is on in the environment and
+	// off in the others. A flag the project has keeps its name, owner, other
+	// environments, prerequisites and overrides, gains the variations it
+	// lacks, and has its description replaced only by a non-empty one; a rule
+	// equal to one it has keeps its identifier and salt, so importing a
+	// template again changes nothing. A flag of another type is 422
+	// `type_immutable`.
+	//
+	// What cannot be reproduced is answered as a warning with a pointer into
+	// the template: `in_app_default`, `condition_skipped`,
+	// `rollout_reshuffled`, `attribute_declared`, `rule_limit` and
+	// `archived_flag`. A template that cannot be translated, an
+	// `environment` or a `unit_type` the project lacks is 422
+	// `invalid_document` with every fault found in `errors`; a fault of the
+	// query points at `/query/environment` or `/query/unit_type`.
+	//
+	// Like any import it applies whole or not at all, bypasses protection,
+	// records each entity it writes and then one `project.imported` entry
+	// with the source `firebase`, and with `dry_run` runs and rolls back,
+	// answering an `ETag` that `If-Match` can send back. Only the owner of a
+	// project, never a project token, may import. A body is accepted up to
+	// 32 MiB.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/import/firebase (the `ImportFirebaseTemplate` operationId).
+	ImportFirebaseTemplateWithBody(ctx context.Context, project ProjectKey, params *ImportFirebaseTemplateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportFirebaseTemplate Merge a Firebase Remote Config template into one environment of a project
+	//
+	// Translates a Firebase Remote Config template, as the Remote Config REST
+	// API and `firebase remoteconfig:get` return it, into flags and rules and
+	// merges them into one environment. Fields of the template this server
+	// does not use are ignored, so a template from a newer Firebase imports.
+	//
+	// A parameter, top level or in a group, becomes a flag with the same key;
+	// its group is a tag. The default value is the flag's off and fallthrough
+	// variation, and each conditional value becomes one rule per alternative
+	// of its condition, in the template's order of conditions, described
+	// `Firebase condition "<name>"`. A new flag is on in the environment and
+	// off in the others. A flag the project has keeps its name, owner, other
+	// environments, prerequisites and overrides, gains the variations it
+	// lacks, and has its description replaced only by a non-empty one; a rule
+	// equal to one it has keeps its identifier and salt, so importing a
+	// template again changes nothing. A flag of another type is 422
+	// `type_immutable`.
+	//
+	// What cannot be reproduced is answered as a warning with a pointer into
+	// the template: `in_app_default`, `condition_skipped`,
+	// `rollout_reshuffled`, `attribute_declared`, `rule_limit` and
+	// `archived_flag`. A template that cannot be translated, an
+	// `environment` or a `unit_type` the project lacks is 422
+	// `invalid_document` with every fault found in `errors`; a fault of the
+	// query points at `/query/environment` or `/query/unit_type`.
+	//
+	// Like any import it applies whole or not at all, bypasses protection,
+	// records each entity it writes and then one `project.imported` entry
+	// with the source `firebase`, and with `dry_run` runs and rolls back,
+	// answering an `ETag` that `If-Match` can send back. Only the owner of a
+	// project, never a project token, may import. A body is accepted up to
+	// 32 MiB.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/import/firebase (the `ImportFirebaseTemplate` operationId).
+	ImportFirebaseTemplate(ctx context.Context, project ProjectKey, params *ImportFirebaseTemplateParams, body ImportFirebaseTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListProjectInvitations The people invited to a project
 	//
@@ -16469,6 +16664,104 @@ func (c *Client) ImportProjectWithBody(ctx context.Context, project ProjectKey, 
 // Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
 func (c *Client) ImportProject(ctx context.Context, project ProjectKey, params *ImportProjectParams, body ImportProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewImportProjectRequest(c.Server, project, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportFirebaseTemplateWithBody Merge a Firebase Remote Config template into one environment of a project
+//
+// Translates a Firebase Remote Config template, as the Remote Config REST
+// API and `firebase remoteconfig:get` return it, into flags and rules and
+// merges them into one environment. Fields of the template this server
+// does not use are ignored, so a template from a newer Firebase imports.
+//
+// A parameter, top level or in a group, becomes a flag with the same key;
+// its group is a tag. The default value is the flag's off and fallthrough
+// variation, and each conditional value becomes one rule per alternative
+// of its condition, in the template's order of conditions, described
+// `Firebase condition "<name>"`. A new flag is on in the environment and
+// off in the others. A flag the project has keeps its name, owner, other
+// environments, prerequisites and overrides, gains the variations it
+// lacks, and has its description replaced only by a non-empty one; a rule
+// equal to one it has keeps its identifier and salt, so importing a
+// template again changes nothing. A flag of another type is 422
+// `type_immutable`.
+//
+// What cannot be reproduced is answered as a warning with a pointer into
+// the template: `in_app_default`, `condition_skipped`,
+// `rollout_reshuffled`, `attribute_declared`, `rule_limit` and
+// `archived_flag`. A template that cannot be translated, an
+// `environment` or a `unit_type` the project lacks is 422
+// `invalid_document` with every fault found in `errors`; a fault of the
+// query points at `/query/environment` or `/query/unit_type`.
+//
+// Like any import it applies whole or not at all, bypasses protection,
+// records each entity it writes and then one `project.imported` entry
+// with the source `firebase`, and with `dry_run` runs and rolls back,
+// answering an `ETag` that `If-Match` can send back. Only the owner of a
+// project, never a project token, may import. A body is accepted up to
+// 32 MiB.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/import/firebase (the `ImportFirebaseTemplate` operationId).
+func (c *Client) ImportFirebaseTemplateWithBody(ctx context.Context, project ProjectKey, params *ImportFirebaseTemplateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportFirebaseTemplateRequestWithBody(c.Server, project, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportFirebaseTemplate Merge a Firebase Remote Config template into one environment of a project
+//
+// Translates a Firebase Remote Config template, as the Remote Config REST
+// API and `firebase remoteconfig:get` return it, into flags and rules and
+// merges them into one environment. Fields of the template this server
+// does not use are ignored, so a template from a newer Firebase imports.
+//
+// A parameter, top level or in a group, becomes a flag with the same key;
+// its group is a tag. The default value is the flag's off and fallthrough
+// variation, and each conditional value becomes one rule per alternative
+// of its condition, in the template's order of conditions, described
+// `Firebase condition "<name>"`. A new flag is on in the environment and
+// off in the others. A flag the project has keeps its name, owner, other
+// environments, prerequisites and overrides, gains the variations it
+// lacks, and has its description replaced only by a non-empty one; a rule
+// equal to one it has keeps its identifier and salt, so importing a
+// template again changes nothing. A flag of another type is 422
+// `type_immutable`.
+//
+// What cannot be reproduced is answered as a warning with a pointer into
+// the template: `in_app_default`, `condition_skipped`,
+// `rollout_reshuffled`, `attribute_declared`, `rule_limit` and
+// `archived_flag`. A template that cannot be translated, an
+// `environment` or a `unit_type` the project lacks is 422
+// `invalid_document` with every fault found in `errors`; a fault of the
+// query points at `/query/environment` or `/query/unit_type`.
+//
+// Like any import it applies whole or not at all, bypasses protection,
+// records each entity it writes and then one `project.imported` entry
+// with the source `firebase`, and with `dry_run` runs and rolls back,
+// answering an `ETag` that `If-Match` can send back. Only the owner of a
+// project, never a project token, may import. A body is accepted up to
+// 32 MiB.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/import/firebase (the `ImportFirebaseTemplate` operationId).
+func (c *Client) ImportFirebaseTemplate(ctx context.Context, project ProjectKey, params *ImportFirebaseTemplateParams, body ImportFirebaseTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportFirebaseTemplateRequest(c.Server, project, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -26071,6 +26364,115 @@ func NewImportProjectRequestWithBody(server string, project ProjectKey, params *
 	return req, nil
 }
 
+// NewImportFirebaseTemplateRequest calls the generic ImportFirebaseTemplate builder with application/json body
+func NewImportFirebaseTemplateRequest(server string, project ProjectKey, params *ImportFirebaseTemplateParams, body ImportFirebaseTemplateJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewImportFirebaseTemplateRequestWithBody(server, project, params, "application/json", bodyReader)
+}
+
+// NewImportFirebaseTemplateRequestWithBody constructs an http.Request for the ImportFirebaseTemplate method, with any body, and a specified content type
+func NewImportFirebaseTemplateRequestWithBody(server string, project ProjectKey, params *ImportFirebaseTemplateParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/import/firebase", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "environment", params.Environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if params.UnitType != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "unit_type", *params.UnitType, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.DryRun != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "dry_run", *params.DryRun, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewListProjectInvitationsRequest constructs an http.Request for the ListProjectInvitations method
 func NewListProjectInvitationsRequest(server string, project ProjectKey) (*http.Request, error) {
 	var err error
@@ -32220,6 +32622,84 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/import (the `ImportProject` operationId).
 	ImportProjectWithResponse(ctx context.Context, project ProjectKey, params *ImportProjectParams, body ImportProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportProjectResponse, error)
+
+	// ImportFirebaseTemplateWithBodyWithResponse Merge a Firebase Remote Config template into one environment of a project
+	//
+	// Translates a Firebase Remote Config template, as the Remote Config REST
+	// API and `firebase remoteconfig:get` return it, into flags and rules and
+	// merges them into one environment. Fields of the template this server
+	// does not use are ignored, so a template from a newer Firebase imports.
+	//
+	// A parameter, top level or in a group, becomes a flag with the same key;
+	// its group is a tag. The default value is the flag's off and fallthrough
+	// variation, and each conditional value becomes one rule per alternative
+	// of its condition, in the template's order of conditions, described
+	// `Firebase condition "<name>"`. A new flag is on in the environment and
+	// off in the others. A flag the project has keeps its name, owner, other
+	// environments, prerequisites and overrides, gains the variations it
+	// lacks, and has its description replaced only by a non-empty one; a rule
+	// equal to one it has keeps its identifier and salt, so importing a
+	// template again changes nothing. A flag of another type is 422
+	// `type_immutable`.
+	//
+	// What cannot be reproduced is answered as a warning with a pointer into
+	// the template: `in_app_default`, `condition_skipped`,
+	// `rollout_reshuffled`, `attribute_declared`, `rule_limit` and
+	// `archived_flag`. A template that cannot be translated, an
+	// `environment` or a `unit_type` the project lacks is 422
+	// `invalid_document` with every fault found in `errors`; a fault of the
+	// query points at `/query/environment` or `/query/unit_type`.
+	//
+	// Like any import it applies whole or not at all, bypasses protection,
+	// records each entity it writes and then one `project.imported` entry
+	// with the source `firebase`, and with `dry_run` runs and rolls back,
+	// answering an `ETag` that `If-Match` can send back. Only the owner of a
+	// project, never a project token, may import. A body is accepted up to
+	// 32 MiB.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/import/firebase (the `ImportFirebaseTemplate` operationId).
+	ImportFirebaseTemplateWithBodyWithResponse(ctx context.Context, project ProjectKey, params *ImportFirebaseTemplateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportFirebaseTemplateResponse, error)
+
+	// ImportFirebaseTemplateWithResponse Merge a Firebase Remote Config template into one environment of a project
+	//
+	// Translates a Firebase Remote Config template, as the Remote Config REST
+	// API and `firebase remoteconfig:get` return it, into flags and rules and
+	// merges them into one environment. Fields of the template this server
+	// does not use are ignored, so a template from a newer Firebase imports.
+	//
+	// A parameter, top level or in a group, becomes a flag with the same key;
+	// its group is a tag. The default value is the flag's off and fallthrough
+	// variation, and each conditional value becomes one rule per alternative
+	// of its condition, in the template's order of conditions, described
+	// `Firebase condition "<name>"`. A new flag is on in the environment and
+	// off in the others. A flag the project has keeps its name, owner, other
+	// environments, prerequisites and overrides, gains the variations it
+	// lacks, and has its description replaced only by a non-empty one; a rule
+	// equal to one it has keeps its identifier and salt, so importing a
+	// template again changes nothing. A flag of another type is 422
+	// `type_immutable`.
+	//
+	// What cannot be reproduced is answered as a warning with a pointer into
+	// the template: `in_app_default`, `condition_skipped`,
+	// `rollout_reshuffled`, `attribute_declared`, `rule_limit` and
+	// `archived_flag`. A template that cannot be translated, an
+	// `environment` or a `unit_type` the project lacks is 422
+	// `invalid_document` with every fault found in `errors`; a fault of the
+	// query points at `/query/environment` or `/query/unit_type`.
+	//
+	// Like any import it applies whole or not at all, bypasses protection,
+	// records each entity it writes and then one `project.imported` entry
+	// with the source `firebase`, and with `dry_run` runs and rolls back,
+	// answering an `ETag` that `If-Match` can send back. Only the owner of a
+	// project, never a project token, may import. A body is accepted up to
+	// 32 MiB.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/import/firebase (the `ImportFirebaseTemplate` operationId).
+	ImportFirebaseTemplateWithResponse(ctx context.Context, project ProjectKey, params *ImportFirebaseTemplateParams, body ImportFirebaseTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportFirebaseTemplateResponse, error)
 
 	// ListProjectInvitationsWithResponse The people invited to a project
 	//
@@ -45059,6 +45539,124 @@ func (r ImportProjectResponse) ContentType() string {
 	return ""
 }
 
+// ImportFirebaseTemplateResponse200Headers the declared response headers of an HTTP 200 response for ImportFirebaseTemplate
+type ImportFirebaseTemplateResponse200Headers struct {
+	ETag *string
+}
+
+// ImportFirebaseTemplateResponse401Headers the declared response headers of an HTTP 401 response for ImportFirebaseTemplate
+type ImportFirebaseTemplateResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ImportFirebaseTemplateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FirebaseImportResult
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *RequestTooLarge
+	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
+	ApplicationproblemJSON415 *Problem
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ImportFirebaseTemplateResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ImportFirebaseTemplateResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ImportFirebaseTemplateResponse) GetJSON200() *FirebaseImportResult {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ImportFirebaseTemplateResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ImportFirebaseTemplateResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ImportFirebaseTemplateResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ImportFirebaseTemplateResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r ImportFirebaseTemplateResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r ImportFirebaseTemplateResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r ImportFirebaseTemplateResponse) GetApplicationproblemJSON413() *RequestTooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
+func (r ImportFirebaseTemplateResponse) GetApplicationproblemJSON415() *Problem {
+	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ImportFirebaseTemplateResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r ImportFirebaseTemplateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportFirebaseTemplateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportFirebaseTemplateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ImportFirebaseTemplateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListProjectInvitationsResponse401Headers the declared response headers of an HTTP 401 response for ListProjectInvitations
 type ListProjectInvitationsResponse401Headers struct {
 	WWWAuthenticate *string
@@ -54195,6 +54793,96 @@ func (c *ClientWithResponses) ImportProjectWithResponse(ctx context.Context, pro
 		return nil, err
 	}
 	return ParseImportProjectResponse(rsp)
+}
+
+// ImportFirebaseTemplateWithBodyWithResponse Merge a Firebase Remote Config template into one environment of a project
+//
+// Translates a Firebase Remote Config template, as the Remote Config REST
+// API and `firebase remoteconfig:get` return it, into flags and rules and
+// merges them into one environment. Fields of the template this server
+// does not use are ignored, so a template from a newer Firebase imports.
+//
+// A parameter, top level or in a group, becomes a flag with the same key;
+// its group is a tag. The default value is the flag's off and fallthrough
+// variation, and each conditional value becomes one rule per alternative
+// of its condition, in the template's order of conditions, described
+// `Firebase condition "<name>"`. A new flag is on in the environment and
+// off in the others. A flag the project has keeps its name, owner, other
+// environments, prerequisites and overrides, gains the variations it
+// lacks, and has its description replaced only by a non-empty one; a rule
+// equal to one it has keeps its identifier and salt, so importing a
+// template again changes nothing. A flag of another type is 422
+// `type_immutable`.
+//
+// What cannot be reproduced is answered as a warning with a pointer into
+// the template: `in_app_default`, `condition_skipped`,
+// `rollout_reshuffled`, `attribute_declared`, `rule_limit` and
+// `archived_flag`. A template that cannot be translated, an
+// `environment` or a `unit_type` the project lacks is 422
+// `invalid_document` with every fault found in `errors`; a fault of the
+// query points at `/query/environment` or `/query/unit_type`.
+//
+// Like any import it applies whole or not at all, bypasses protection,
+// records each entity it writes and then one `project.imported` entry
+// with the source `firebase`, and with `dry_run` runs and rolls back,
+// answering an `ETag` that `If-Match` can send back. Only the owner of a
+// project, never a project token, may import. A body is accepted up to
+// 32 MiB.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/import/firebase (the `ImportFirebaseTemplate` operationId).
+func (c *ClientWithResponses) ImportFirebaseTemplateWithBodyWithResponse(ctx context.Context, project ProjectKey, params *ImportFirebaseTemplateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportFirebaseTemplateResponse, error) {
+	rsp, err := c.ImportFirebaseTemplateWithBody(ctx, project, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportFirebaseTemplateResponse(rsp)
+}
+
+// ImportFirebaseTemplateWithResponse Merge a Firebase Remote Config template into one environment of a project
+//
+// Translates a Firebase Remote Config template, as the Remote Config REST
+// API and `firebase remoteconfig:get` return it, into flags and rules and
+// merges them into one environment. Fields of the template this server
+// does not use are ignored, so a template from a newer Firebase imports.
+//
+// A parameter, top level or in a group, becomes a flag with the same key;
+// its group is a tag. The default value is the flag's off and fallthrough
+// variation, and each conditional value becomes one rule per alternative
+// of its condition, in the template's order of conditions, described
+// `Firebase condition "<name>"`. A new flag is on in the environment and
+// off in the others. A flag the project has keeps its name, owner, other
+// environments, prerequisites and overrides, gains the variations it
+// lacks, and has its description replaced only by a non-empty one; a rule
+// equal to one it has keeps its identifier and salt, so importing a
+// template again changes nothing. A flag of another type is 422
+// `type_immutable`.
+//
+// What cannot be reproduced is answered as a warning with a pointer into
+// the template: `in_app_default`, `condition_skipped`,
+// `rollout_reshuffled`, `attribute_declared`, `rule_limit` and
+// `archived_flag`. A template that cannot be translated, an
+// `environment` or a `unit_type` the project lacks is 422
+// `invalid_document` with every fault found in `errors`; a fault of the
+// query points at `/query/environment` or `/query/unit_type`.
+//
+// Like any import it applies whole or not at all, bypasses protection,
+// records each entity it writes and then one `project.imported` entry
+// with the source `firebase`, and with `dry_run` runs and rolls back,
+// answering an `ETag` that `If-Match` can send back. Only the owner of a
+// project, never a project token, may import. A body is accepted up to
+// 32 MiB.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/import/firebase (the `ImportFirebaseTemplate` operationId).
+func (c *ClientWithResponses) ImportFirebaseTemplateWithResponse(ctx context.Context, project ProjectKey, params *ImportFirebaseTemplateParams, body ImportFirebaseTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportFirebaseTemplateResponse, error) {
+	rsp, err := c.ImportFirebaseTemplate(ctx, project, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportFirebaseTemplateResponse(rsp)
 }
 
 // ListProjectInvitationsWithResponse The people invited to a project
@@ -66524,6 +67212,118 @@ func ParseImportProjectResponse(rsp *http.Response) (*ImportProjectResponse, err
 	return response, nil
 }
 
+// ParseImportFirebaseTemplateResponse parses an HTTP response from a ImportFirebaseTemplateWithResponse call
+func ParseImportFirebaseTemplateResponse(rsp *http.Response) (*ImportFirebaseTemplateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportFirebaseTemplateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FirebaseImportResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest RequestTooLarge
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ImportFirebaseTemplateResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers ImportFirebaseTemplateResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListProjectInvitationsResponse parses an HTTP response from a ListProjectInvitationsWithResponse call
 func ParseListProjectInvitationsResponse(rsp *http.Response) (*ListProjectInvitationsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -71318,6 +72118,9 @@ type ServerInterface interface {
 	// ImportProject Merge a project document into a project, or replace the project's configuration with it
 	// (POST /projects/{project}/import)
 	ImportProject(w http.ResponseWriter, r *http.Request, project ProjectKey, params ImportProjectParams)
+	// ImportFirebaseTemplate Merge a Firebase Remote Config template into one environment of a project
+	// (POST /projects/{project}/import/firebase)
+	ImportFirebaseTemplate(w http.ResponseWriter, r *http.Request, project ProjectKey, params ImportFirebaseTemplateParams)
 	// ListProjectInvitations The people invited to a project
 	// (GET /projects/{project}/invitations)
 	ListProjectInvitations(w http.ResponseWriter, r *http.Request, project ProjectKey)
@@ -77685,6 +78488,95 @@ func (siw *ServerInterfaceWrapper) ImportProject(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// ImportFirebaseTemplate operation middleware
+func (siw *ServerInterfaceWrapper) ImportFirebaseTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ImportFirebaseTemplateParams
+
+	// ------------- Required query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "unit_type" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "unit_type", r.URL.Query(), &params.UnitType, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "unit_type"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "unit_type", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "dry_run" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "dry_run", r.URL.Query(), &params.DryRun, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "dry_run"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dry_run", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch ImportIfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ImportFirebaseTemplate(w, r, project, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListProjectInvitations operation middleware
 func (siw *ServerInterfaceWrapper) ListProjectInvitations(w http.ResponseWriter, r *http.Request) {
 
@@ -80162,6 +81054,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/me", wrapper.GetProjectMe)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/export", wrapper.ExportProject)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/import", wrapper.ImportProject)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/import/firebase", wrapper.ImportFirebaseTemplate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments", wrapper.ListEnvironments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/environments", wrapper.CreateEnvironment)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.DeleteEnvironment)
@@ -95131,6 +96024,185 @@ func (response ImportProject422ApplicationProblemPlusJSONResponse) VisitImportPr
 	return err
 }
 
+type ImportFirebaseTemplateRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Params  ImportFirebaseTemplateParams
+	Body    *ImportFirebaseTemplateJSONRequestBody
+}
+
+type ImportFirebaseTemplateResponseObject interface {
+	VisitImportFirebaseTemplateResponse(w http.ResponseWriter) error
+}
+
+type ImportFirebaseTemplate200ResponseHeaders struct {
+	ETag *string
+}
+
+type ImportFirebaseTemplate200JSONResponse struct {
+	Body    FirebaseImportResult
+	Headers ImportFirebaseTemplate200ResponseHeaders
+}
+
+func (response ImportFirebaseTemplate200JSONResponse) VisitImportFirebaseTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportFirebaseTemplate400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ImportFirebaseTemplate400ApplicationProblemPlusJSONResponse) VisitImportFirebaseTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportFirebaseTemplate401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ImportFirebaseTemplate401ApplicationProblemPlusJSONResponse) VisitImportFirebaseTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportFirebaseTemplate403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ImportFirebaseTemplate403ApplicationProblemPlusJSONResponse) VisitImportFirebaseTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportFirebaseTemplate404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ImportFirebaseTemplate404ApplicationProblemPlusJSONResponse) VisitImportFirebaseTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportFirebaseTemplate409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ImportFirebaseTemplate409ApplicationProblemPlusJSONResponse) VisitImportFirebaseTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportFirebaseTemplate412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response ImportFirebaseTemplate412ApplicationProblemPlusJSONResponse) VisitImportFirebaseTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportFirebaseTemplate413ApplicationProblemPlusJSONResponse struct {
+	RequestTooLargeApplicationProblemPlusJSONResponse
+}
+
+func (response ImportFirebaseTemplate413ApplicationProblemPlusJSONResponse) VisitImportFirebaseTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportFirebaseTemplate415ApplicationProblemPlusJSONResponse Problem
+
+func (response ImportFirebaseTemplate415ApplicationProblemPlusJSONResponse) VisitImportFirebaseTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportFirebaseTemplate422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response ImportFirebaseTemplate422ApplicationProblemPlusJSONResponse) VisitImportFirebaseTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListProjectInvitationsRequestObject struct {
 	Project ProjectKey `json:"project"`
 }
@@ -101358,6 +102430,9 @@ type StrictServerInterface interface {
 	// ImportProject Merge a project document into a project, or replace the project's configuration with it
 	// (POST /projects/{project}/import)
 	ImportProject(ctx context.Context, request ImportProjectRequestObject) (ImportProjectResponseObject, error)
+	// ImportFirebaseTemplate Merge a Firebase Remote Config template into one environment of a project
+	// (POST /projects/{project}/import/firebase)
+	ImportFirebaseTemplate(ctx context.Context, request ImportFirebaseTemplateRequestObject) (ImportFirebaseTemplateResponseObject, error)
 	// ListProjectInvitations The people invited to a project
 	// (GET /projects/{project}/invitations)
 	ListProjectInvitations(ctx context.Context, request ListProjectInvitationsRequestObject) (ListProjectInvitationsResponseObject, error)
@@ -105674,6 +106749,40 @@ func (sh *strictHandler) ImportProject(w http.ResponseWriter, r *http.Request, p
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ImportProjectResponseObject); ok {
 		if err := validResponse.VisitImportProjectResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ImportFirebaseTemplate operation middleware
+func (sh *strictHandler) ImportFirebaseTemplate(w http.ResponseWriter, r *http.Request, project ProjectKey, params ImportFirebaseTemplateParams) {
+	var request ImportFirebaseTemplateRequestObject
+
+	request.Project = project
+	request.Params = params
+
+	var body ImportFirebaseTemplateJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ImportFirebaseTemplate(ctx, request.(ImportFirebaseTemplateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ImportFirebaseTemplate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ImportFirebaseTemplateResponseObject); ok {
+		if err := validResponse.VisitImportFirebaseTemplateResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

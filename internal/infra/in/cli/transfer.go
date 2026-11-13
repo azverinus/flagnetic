@@ -234,6 +234,80 @@ func importDocument(ctx context.Context, args []string, lookupEnv func(string) (
 	return exitOK
 }
 
+const importFirebaseUsage = `usage: flagnetic import-firebase --file FILE|- --project KEY --environment KEY [--unit-type KEY]
+                                 [--dry-run] [--if-match ETAG]
+                                 [--url URL] [--token TOKEN | --token-file FILE]`
+
+// importFirebase merges a Firebase Remote Config template into one
+// environment of a project.
+func importFirebase(ctx context.Context, args []string, lookupEnv func(string) (string, bool), stdin io.Reader, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("import-firebase", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.Usage = func() { fmt.Fprintln(stderr, importFirebaseUsage); fs.PrintDefaults() }
+	var conn connection
+	conn.register(fs, lookupEnv)
+	file := fs.String("file", "", "the Remote Config template as JSON; - reads standard input (required)")
+	projectKey := fs.String("project", "", "key of the project to import into (required)")
+	environment := fs.String("environment", "", "key of the environment the template is merged into (required)")
+	unitType := fs.String("unit-type", "", "key of the unit type percent rollouts bucket on (the server's default, anonymous, unless given)")
+	dryRunFlag := fs.Bool("dry-run", false, "print what would change and write nothing")
+	ifMatch := fs.String("if-match", "", "refuse when the project changed since this ETag")
+	if err := fs.Parse(args); err != nil {
+		return exitUsage
+	}
+	switch {
+	case fs.NArg() > 0:
+		fmt.Fprintf(stderr, "import-firebase: unexpected argument %q\n", fs.Arg(0))
+		return exitUsage
+	case *file == "":
+		fmt.Fprintln(stderr, "import-firebase: --file is required")
+		return exitUsage
+	case *projectKey == "":
+		fmt.Fprintln(stderr, "import-firebase: --project is required")
+		return exitUsage
+	case *environment == "":
+		fmt.Fprintln(stderr, "import-firebase: --environment is required")
+		return exitUsage
+	}
+	client, err := conn.client()
+	if err != nil {
+		fmt.Fprintf(stderr, "import-firebase: %v\n", err)
+		return exitUsage
+	}
+	template, _, err := readDocument(*file, stdin)
+	if err != nil {
+		fmt.Fprintf(stderr, "import-firebase: %v\n", err)
+		return exitFailure
+	}
+	params := management.ImportFirebaseTemplateParams{Environment: *environment, UnitType: optional(*unitType), IfMatch: optional(*ifMatch)}
+	if *dryRunFlag {
+		yes := true
+		params.DryRun = &yes
+	}
+	res, err := client.ImportFirebaseTemplateWithBodyWithResponse(ctx, *projectKey, &params, "application/json", bytes.NewReader(template))
+	if err != nil {
+		fmt.Fprintf(stderr, "import-firebase: %v\n", err)
+		return exitFailure
+	}
+	if res.JSON200 == nil {
+		fmt.Fprintf(stderr, "import-firebase: %s\n", describeRefusal(res.StatusCode(), res.Body))
+		return exitFailure
+	}
+	if *dryRunFlag {
+		printETag(stderr, res.HTTPResponse.Header)
+	}
+	for _, w := range res.JSON200.Warnings {
+		fmt.Fprintf(stderr, "warning: %s %s: %s\n", w.Code, w.Pointer, w.Detail)
+	}
+	out, err := json.MarshalIndent(res.JSON200, "", "  ")
+	if err != nil {
+		fmt.Fprintf(stderr, "import-firebase: %v\n", err)
+		return exitFailure
+	}
+	fmt.Fprintln(stdout, string(out))
+	return exitOK
+}
+
 // readDocument reads the document at path, or standard input for "-", with
 // its content type: JSON for a .json file, otherwise YAML, of which JSON is
 // a subset.

@@ -11,7 +11,9 @@ import (
 
 	apptransfer "github.com/azverinus/flagnetic/internal/app/transfer"
 	"github.com/azverinus/flagnetic/internal/domain/transfer"
+	"github.com/azverinus/flagnetic/internal/domain/transfer/firebase"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/google/uuid"
 )
 
 // ExportProject answers the project's configuration as a project document.
@@ -95,6 +97,21 @@ func (s rawBodies) ImportProject(w http.ResponseWriter, r *http.Request, _ Proje
 	if err != nil {
 		s.a.edge.WriteError(w, r, httpError(err))
 	}
+}
+
+func (s rawBodies) ImportFirebaseTemplate(w http.ResponseWriter, r *http.Request, _ ProjectKey, params ImportFirebaseTemplateParams) {
+	res, err := s.a.importFirebaseTemplate(r, params)
+	if err == nil {
+		err = res.VisitImportFirebaseTemplateResponse(w)
+	}
+	if err != nil {
+		s.a.edge.WriteError(w, r, httpError(err))
+	}
+}
+
+// ImportFirebaseTemplate is never routed to: rawBodies serves the operation.
+func (a *api) ImportFirebaseTemplate(context.Context, ImportFirebaseTemplateRequestObject) (ImportFirebaseTemplateResponseObject, error) {
+	return nil, errors.New("management: importFirebaseTemplate reads its own body and is served by the raw route")
 }
 
 // ImportProject is never routed to: rawBodies serves the operation.
@@ -237,4 +254,97 @@ func orEmpty(keys []string) []string {
 		return []string{}
 	}
 	return keys
+}
+
+// importFirebaseTemplate reads the template the request sends, which must be
+// JSON, leniently: a template from a newer Firebase holds fields this server
+// does not know. A body that is no template is 422 with the fault pointing
+// into it, as every other fault of a template is.
+func (a *api) importFirebaseTemplate(r *http.Request, params ImportFirebaseTemplateParams) (ImportFirebaseTemplateResponseObject, error) {
+	ctx := r.Context()
+	if media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || media != "application/json" {
+		return nil, flaghttp.UnsupportedMediaType("the template must be sent as application/json")
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	template, err := firebase.Decode(body)
+	if err != nil {
+		return nil, err
+	}
+	cmd := apptransfer.ImportFirebaseTemplateCommand{
+		Project: projectID(ctx), Template: template, Environment: params.Environment, DryRun: params.DryRun != nil && *params.DryRun,
+		Caller: callerMember(ctx), Request: requestOf(ctx),
+	}
+	if params.UnitType != nil {
+		cmd.UnitType = *params.UnitType
+	}
+	if params.IfMatch != nil {
+		tag := strings.Trim(strings.TrimSpace(*params.IfMatch), `"`)
+		cmd.IfMatch = &tag
+	}
+	res, err := a.h.ImportFirebaseTemplate.Handle(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	out := ImportFirebaseTemplate200JSONResponse{Body: firebaseResultOut(res)}
+	if res.DryRun && !res.Latest.IsZero() {
+		etag := `"` + res.Latest.String() + `"`
+		out.Headers.ETag = &etag
+	}
+	return out, nil
+}
+
+func firebaseResultOut(r apptransfer.FirebaseImportResult) FirebaseImportResult {
+	base := importResultOut(r.ImportResult)
+	out := FirebaseImportResult{
+		Project: base.Project, Mode: FirebaseImportResultMode(base.Mode), Source: FirebaseImportResultSource(base.Source),
+		DryRun: base.DryRun, Changes: base.Changes, Warnings: base.Warnings,
+		Flags: make([]FirebaseFlag, len(r.Flags)), Attributes: make([]FirebaseAttribute, len(r.Attributes)),
+	}
+	for i, f := range r.Flags {
+		out.Flags[i] = FirebaseFlag{
+			Key: f.Key, Type: string(f.Type), Description: f.Description, Tags: f.Tags, On: f.On, OffVariation: f.OffVariation,
+			Fallthrough: f.Fallthrough, Variations: make([]DocumentVariation, len(f.Variations)), Rules: make([]DocumentRule, len(f.Rules)),
+		}
+		for j, v := range f.Variations {
+			name, description := v.Name, v.Description
+			out.Flags[i].Variations[j] = DocumentVariation{Key: v.Key, Value: v.Value, Name: &name, Description: &description}
+		}
+		for j, rule := range f.Rules {
+			out.Flags[i].Rules[j] = documentRuleOut(rule)
+		}
+	}
+	for i, a := range r.Attributes {
+		out.Attributes[i] = FirebaseAttribute{Key: a.Key, Type: string(a.Type)}
+	}
+	return out
+}
+
+// documentRuleOut returns a rule as the document spells it. A serve writes
+// only the fields of its kind, and an empty optional field is left out.
+func documentRuleOut(r transfer.Rule) DocumentRule {
+	out := DocumentRule{Description: &r.Description, Conditions: make([]DocumentCondition, len(r.Conditions))}
+	if u, err := uuid.Parse(r.ID); err == nil {
+		out.Id = &u
+	}
+	for i, c := range r.Conditions {
+		out.Conditions[i] = DocumentCondition{
+			Kind: c.Kind, Attribute: textOrNil(c.Attribute), Op: textOrNil(c.Op), Value: c.Value, Segment: textOrNil(c.Segment),
+			Flag: textOrNil(c.Flag), Variation: textOrNil(c.Variation),
+		}
+	}
+	out.Serve = DocumentServe{
+		Kind: r.Serve.Kind, Variation: textOrNil(r.Serve.Variation), Experiment: textOrNil(r.Serve.Experiment),
+		UnitType: textOrNil(r.Serve.UnitType), Percentage: r.Serve.Percentage, Salt: textOrNil(r.Serve.Salt),
+	}
+	return out
+}
+
+func textOrNil(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

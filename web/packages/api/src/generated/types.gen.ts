@@ -3974,10 +3974,56 @@ export type WebhookDeliveryList = {
 export type ImportResult = {
   project: DocumentProject;
   mode: "create" | "merge" | "replace";
-  source: "document";
+  source: "document" | "firebase";
   dry_run: boolean;
   changes: ImportChanges;
   warnings: Array<ImportWarning>;
+};
+
+/**
+ * What an import of a Remote Config template did, or with a dry run would
+ * do: an `ImportResult` with the flags of the template as the project
+ * stores them in the target environment and the attributes it declared.
+ *
+ */
+export type FirebaseImportResult = ImportResult & {
+  /**
+   * One per parameter of the template, by key.
+   */
+  flags: Array<FirebaseFlag>;
+  /**
+   * The attributes the translation declared, by key.
+   */
+  attributes: Array<FirebaseAttribute>;
+};
+
+/**
+ * A flag of the template as the project stores it in the target environment.
+ */
+export type FirebaseFlag = {
+  key: string;
+  /**
+   * `boolean`, `string`, `number` or `json`.
+   */
+  type: string;
+  description: string;
+  tags: Array<string>;
+  variations: Array<DocumentVariation>;
+  on: boolean;
+  off_variation: string;
+  fallthrough: string;
+  /**
+   * In the order the template's conditions come.
+   */
+  rules: Array<DocumentRule>;
+};
+
+export type FirebaseAttribute = {
+  key: string;
+  /**
+   * `string`, `number` or `semver`.
+   */
+  type: string;
 };
 
 /**
@@ -6302,6 +6348,110 @@ export type ImportProjectResponses = {
 };
 
 export type ImportProjectResponse = ImportProjectResponses[keyof ImportProjectResponses];
+
+export type ImportFirebaseTemplateData = {
+  /**
+   * A Remote Config template as JSON.
+   */
+  body: Blob | File;
+  headers?: {
+    /**
+     * The state of the project this import is based on, as the `ETag` of a
+     * dry run or an export answered it. Optional: without it the import
+     * applies to the project as it is. With it, an import is refused
+     * `412 version_mismatch` when the project has changed since, judged
+     * under the project's lock before anything is written.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query: {
+    /**
+     * The key of the environment the template is merged into.
+     */
+    environment: string;
+    /**
+     * The key of the unit type percent rollouts bucket on; `anonymous` unless given.
+     */
+    unit_type?: string;
+    /**
+     * Run the whole import and roll it back, answering what it would have done.
+     */
+    dry_run?: boolean;
+  };
+  url: "/projects/{project}/import/firebase";
+};
+
+export type ImportFirebaseTemplateErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * `request_too_large`: the body is larger than the operation accepts; one that checks a password accepts 8 KiB.
+   */
+  413: Problem;
+  /**
+   * `unsupported_media_type`: the template is not sent as `application/json`.
+   */
+  415: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type ImportFirebaseTemplateError =
+  ImportFirebaseTemplateErrors[keyof ImportFirebaseTemplateErrors];
+
+export type ImportFirebaseTemplateResponses = {
+  /**
+   * What the import did, or with a dry run would do.
+   */
+  200: FirebaseImportResult;
+};
+
+export type ImportFirebaseTemplateResponse =
+  ImportFirebaseTemplateResponses[keyof ImportFirebaseTemplateResponses];
 
 export type ListEnvironmentsData = {
   body?: never;
