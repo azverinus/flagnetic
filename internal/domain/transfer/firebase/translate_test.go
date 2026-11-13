@@ -211,6 +211,8 @@ func TestTheTermTable(t *testing.T) {
 			[]rule{{[]flags.Condition{attr("build_number", "in", []any{7.0, 9.0})}, v2}}, nil},
 		"numeric custom signal": {`app.customSignal['tier'].>([2])`,
 			[]rule{{[]flags.Condition{attr("tier", "gt", 2.0)}, v2}}, nil},
+		"version user property": {`version(app.userProperty['build_tag']).<(['3.1'])`,
+			[]rule{{[]flags.Condition{attr("build_tag", "lt", "3.1")}, v2}}, nil},
 		"version custom signal": {`version(app.customSignal['sdk_level']).>=(['2.0'])`,
 			[]rule{{[]flags.Condition{attr("sdk_level", "gte", "2.0")}, v2}}, nil},
 		"string equality on a user property": {`app.userProperty['tier'] == 'gold'`,

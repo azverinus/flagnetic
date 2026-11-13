@@ -275,7 +275,7 @@ func translateComparison(e element, op string, values []token) (alternatives, st
 	if e.name == "percent" {
 		return translatePercent(op, values)
 	}
-	if e.version && e.name != "app.customSignal" {
+	if e.version && e.name != "app.customSignal" && e.name != "app.userProperty" {
 		return nil, "version(" + e.name + ") is not supported"
 	}
 	switch e.name {
