@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.4.0](https://github.com/azverinus/flagnetic/compare/v0.3.0...v0.4.0) (2026-11-13)
+
+
+### Features
+
+* **console:** export the project document from an Import and export page ([#261](https://github.com/azverinus/flagnetic/issues/261)) ([0456401](https://github.com/azverinus/flagnetic/commit/045640121b817ab88ffc1a32f2e839e2a78b40e4))
+* **console:** import a project document with a dry run review ([#272](https://github.com/azverinus/flagnetic/issues/272)) ([818bc12](https://github.com/azverinus/flagnetic/commit/818bc12735972ae4c8687972b15c0c6d76a3f7a0))
+* **console:** list, create and edit a project's sinks ([#262](https://github.com/azverinus/flagnetic/issues/262)) ([c4007de](https://github.com/azverinus/flagnetic/commit/c4007def08f9baa2a5288c7f0e055eb1a4e69081))
+* **console:** recover a sink from its page and flag sinks that need attention ([#287](https://github.com/azverinus/flagnetic/issues/287)) ([1c8d0b5](https://github.com/azverinus/flagnetic/commit/1c8d0b53840f837d2fb48c4abe4872f6419ee247))
+* **console:** replace mode, create from a document and the export on project deletion ([#286](https://github.com/azverinus/flagnetic/issues/286)) ([29e34f3](https://github.com/azverinus/flagnetic/commit/29e34f3d74cf618c9c883745d6467431899619a8))
+* **console:** test, enable, disable and sample a sink from its page ([#274](https://github.com/azverinus/flagnetic/issues/274)) ([9c5d1e1](https://github.com/azverinus/flagnetic/commit/9c5d1e184e4a5a2c3182f0550e06a337d1be1cd1))
+* **sinks:** deliver batches to S3-compatible object storage ([#277](https://github.com/azverinus/flagnetic/issues/277)) ([752a92e](https://github.com/azverinus/flagnetic/commit/752a92e0fc6b31240405821996fc47b803714a87))
+* **sinks:** deliver events to ClickHouse over its HTTP interface ([#275](https://github.com/azverinus/flagnetic/issues/275)) ([4685e1d](https://github.com/azverinus/flagnetic/commit/4685e1d3d7d08042f460df938a5884120f36bd23))
+* **sinks:** flag a sink at risk before retention drops its undelivered rows ([#271](https://github.com/azverinus/flagnetic/issues/271)) ([3e349df](https://github.com/azverinus/flagnetic/commit/3e349df5dc18dc16aa119cbf1d626277aa7004d1))
+* **sinks:** record rows retention drops before a sink delivered them as gaps ([#267](https://github.com/azverinus/flagnetic/issues/267)) ([0e596cd](https://github.com/azverinus/flagnetic/commit/0e596cd1318e597b5b608119e433ce5167f1a486))
+* **transfer:** export and import a project from the command line ([#273](https://github.com/azverinus/flagnetic/issues/273)) ([a1d0ba8](https://github.com/azverinus/flagnetic/commit/a1d0ba8f8e6628b8882979ebf9c744e165cbceed))
+* **transfer:** import a Firebase Remote Config template into one environment ([#288](https://github.com/azverinus/flagnetic/issues/288)) ([0479ed3](https://github.com/azverinus/flagnetic/commit/0479ed3e633809bc485c1b0a04c40893bfa53d02))
+* **transfer:** replace a project's configuration with a document ([#268](https://github.com/azverinus/flagnetic/issues/268)) ([a58b09e](https://github.com/azverinus/flagnetic/commit/a58b09e6498b21a9f01563b16e85e026487fa468))
+* **transfer:** translate a Firebase Remote Config template into flags and rules ([#270](https://github.com/azverinus/flagnetic/issues/270)) ([d2bb558](https://github.com/azverinus/flagnetic/commit/d2bb5584966f9f9e1f6643f5ac99cf5d95198d71))
+
+
+### Bug Fixes
+
+* **governance:** allow only global unicast webhook targets ([#260](https://github.com/azverinus/flagnetic/issues/260)) ([097567c](https://github.com/azverinus/flagnetic/commit/097567ceaf61d566e14a43b81f39df2cafef1277))
+* **sdk-api:** refuse exposures of a draft experiment ([#276](https://github.com/azverinus/flagnetic/issues/276)) ([de8dda8](https://github.com/azverinus/flagnetic/commit/de8dda8eec2d16ec32406160dfa0aa4dd76deff2))
+* **sdk-js:** cap Retry-After on a ruleset fetch at the retry backoff cap ([#278](https://github.com/azverinus/flagnetic/issues/278)) ([e41a18a](https://github.com/azverinus/flagnetic/commit/e41a18a14645822803b1410c877a6bb95c6f3e71))
+* **transfer:** refuse YAML anchors and aliases in a project document ([#264](https://github.com/azverinus/flagnetic/issues/264)) ([46b426c](https://github.com/azverinus/flagnetic/commit/46b426ceb12f8d78568befee10a3e714e6cf955e))
+
 ## [0.3.0](https://github.com/azverinus/flagnetic/compare/v0.2.0...v0.3.0) (2026-11-11)
 
 
