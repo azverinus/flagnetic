@@ -298,22 +298,32 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
 }
 
 /**
- * What an `in_use` refusal names, joined as the member's language joins a
- * list: each flag or segment by its key, with the environment it is named
- * in when it is one.
+ * What an `in_use` refusal names, one phrase per reference: a flag, a
+ * segment, an experiment or an SDK key by its key, with the environment it
+ * is named in when it is one.
  */
-function referenceList(i18n: I18n, error: ApiError): string | undefined {
+export function referenceNames(i18n: I18n, error: ApiError): string[] {
   const references = error.problem.references;
-  if (!Array.isArray(references) || references.length === 0) return undefined;
-  const named = references.map(({ kind, key, environment }) => {
+  if (!Array.isArray(references)) return [];
+  return references.map(({ kind, key, environment }) => {
     const what =
       kind === "flag"
         ? i18n._(msg`the flag ${key}`)
         : kind === "segment"
           ? i18n._(msg`the segment ${key}`)
-          : key;
+          : kind === "experiment"
+            ? i18n._(msg`the experiment ${key}`)
+            : kind === "sdk_key"
+              ? i18n._(msg`the SDK key ${key}`)
+              : key;
     return environment ? i18n._(msg`${what} in ${environment}`) : what;
   });
+}
+
+/** The references of an `in_use` refusal joined as the member's language joins a list. */
+function referenceList(i18n: I18n, error: ApiError): string | undefined {
+  const named = referenceNames(i18n, error);
+  if (named.length === 0) return undefined;
   return new Intl.ListFormat(i18n.locale, { type: "conjunction" }).format(named);
 }
 

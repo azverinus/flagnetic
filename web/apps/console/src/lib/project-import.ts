@@ -4,6 +4,7 @@ import {
   type ImportResult,
   type ImportUpdate,
   type ImportWarning,
+  importNewProject,
   importProject,
   type JsonPatchOperation,
 } from "@flagnetic/api";
@@ -84,6 +85,88 @@ export async function applyImport(
   etag: string,
 ): Promise<ImportResult> {
   return (await send(project, mode, document, false, etag || undefined)).result;
+}
+
+/** What a new project is created with: the document's key and name, unless the member chose others. */
+export type NewProjectIdentity = { key: string; name: string };
+
+async function sendNew(
+  document: HeldDocument,
+  identity: NewProjectIdentity,
+  dryRun: boolean,
+): Promise<DryRun> {
+  // An empty key or name is left out, so the server keeps the document's own
+  // rather than refusing an empty one: the form leaves them empty when it
+  // could not read them from the document.
+  const settled = await importNewProject({
+    query: {
+      key: identity.key || undefined,
+      name: identity.name || undefined,
+      dry_run: dryRun,
+    },
+    body: new Blob([document.text], { type: document.mediaType }),
+    headers: { "Content-Type": document.mediaType },
+  });
+  const result = await unwrap(Promise.resolve(settled));
+  return { result, etag: settled.response?.headers.get("etag") ?? "" };
+}
+
+/** What creating a project from the document would do. */
+export function dryRunNewProject(
+  document: HeldDocument,
+  identity: NewProjectIdentity,
+): Promise<DryRun> {
+  return sendNew(document, identity, true);
+}
+
+/** Creates the project from the document. */
+export async function createFromDocument(
+  document: HeldDocument,
+  identity: NewProjectIdentity,
+): Promise<ImportResult> {
+  return (await sendNew(document, identity, false)).result;
+}
+
+/**
+ * The key and name the document gives its project, for the form to offer
+ * as defaults. JSON is parsed; YAML is read line by line for the two
+ * scalars under the top-level `project`, since the console carries no
+ * YAML parser. Whatever cannot be read is left empty.
+ */
+export function documentIdentity(document: HeldDocument): NewProjectIdentity {
+  const none = { key: "", name: "" };
+  if (document.mediaType === "application/json") {
+    try {
+      const project = (JSON.parse(document.text) as { project?: Record<string, unknown> }).project;
+      return {
+        key: typeof project?.key === "string" ? project.key : "",
+        name: typeof project?.name === "string" ? project.name : "",
+      };
+    } catch {
+      return none;
+    }
+  }
+  const found = { ...none };
+  let inside = false;
+  for (const line of document.text.split(/\r?\n/)) {
+    if (/^\S/.test(line)) {
+      inside = /^project:\s*(#.*)?$/.test(line);
+      continue;
+    }
+    if (!inside) continue;
+    const scalar = /^\s+(key|name):\s*(.*?)\s*$/.exec(line);
+    if (scalar?.[1] === undefined || scalar[2] === undefined) continue;
+    const raw = scalar[2].replace(/\s+#.*$/, "");
+    const value = /^(["'])(.*)\1$/.exec(raw)?.[2] ?? raw;
+    if (scalar[1] === "key") found.key = value;
+    else found.name = value;
+  }
+  return found;
+}
+
+/** How many entities the import would delete, over every kind. */
+export function deletionCount(result: ImportResult): number {
+  return changeKinds.reduce((sum, kind) => sum + result.changes[kind].deleted.length, 0);
 }
 
 export type ChangeKind =
@@ -215,6 +298,7 @@ export function warningMessage(i18n: I18n, warning: ImportWarning): string {
 /** What the page keeps across a reload: the step and the document. */
 export type ImportSession = {
   step: "upload" | "review";
+  mode?: ImportMode;
   document?: HeldDocument;
 };
 
@@ -226,6 +310,7 @@ function isImportSession(value: unknown): value is ImportSession {
   const document = held.document;
   return (
     (held.step === "upload" || held.step === "review") &&
+    (held.mode === undefined || held.mode === "merge" || held.mode === "replace") &&
     (document === undefined ||
       (typeof document === "object" &&
         document !== null &&
@@ -258,7 +343,7 @@ export function loadImportSession(project: string): ImportSession {
 /** Keeps the session, or forgets it when it is back at the start. */
 export function saveImportSession(project: string, session: ImportSession): void {
   try {
-    if (session.step === "upload" && session.document === undefined) {
+    if (session.step === "upload" && session.document === undefined && session.mode !== "replace") {
       window.sessionStorage.removeItem(sessionKey(project));
     } else {
       window.sessionStorage.setItem(sessionKey(project), JSON.stringify(session));

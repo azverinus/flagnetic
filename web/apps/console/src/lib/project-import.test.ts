@@ -7,6 +7,8 @@ import { i18n } from "@lingui/core";
 
 import {
   changedKinds,
+  deletionCount,
+  documentIdentity,
   documentMediaType,
   isUnchanged,
   loadImportSession,
@@ -271,5 +273,60 @@ describe("keeping the session across a reload", () => {
     saveImportSession("checkout", { step: "review", document });
     saveImportSession("checkout", { step: "upload" });
     expect(window.sessionStorage.getItem("flagnetic.import.checkout")).toBeNull();
+  });
+});
+
+describe("documentIdentity", () => {
+  it("reads the key and name of a JSON document", () => {
+    const text = JSON.stringify({ schema_version: 1, project: { key: "shop", name: "The shop" } });
+    expect(documentIdentity({ name: "a.json", mediaType: "application/json", text })).toEqual({
+      key: "shop",
+      name: "The shop",
+    });
+  });
+
+  it("reads the key and name under the top-level project of a YAML document", () => {
+    const text = [
+      "schema_version: 1",
+      "project:",
+      '  key: "shop"   # the key',
+      "  description: ''",
+      "  name: The shop",
+      "environments:",
+      "  - key: production",
+      "    name: Production",
+    ].join("\n");
+    expect(documentIdentity({ name: "a.yaml", mediaType: "application/yaml", text })).toEqual({
+      key: "shop",
+      name: "The shop",
+    });
+  });
+
+  it("leaves both empty for what it cannot read", () => {
+    const none = { key: "", name: "" };
+    expect(documentIdentity({ name: "a.json", mediaType: "application/json", text: "{" })).toEqual(
+      none,
+    );
+    expect(
+      documentIdentity({ name: "a.yaml", mediaType: "application/yaml", text: "flags: []\n" }),
+    ).toEqual(none);
+  });
+});
+
+describe("deletionCount", () => {
+  it("adds the deletions of every kind", () => {
+    const none = { created: [], updated: [], deleted: [] };
+    expect(
+      deletionCount({
+        changes: {
+          environments: none,
+          unit_types: none,
+          attributes: { ...none, deleted: ["a"] },
+          segments: { ...none, deleted: ["b", "c"] },
+          flags: none,
+          experiments: none,
+        },
+      } as unknown as ImportResult),
+    ).toBe(3);
   });
 });

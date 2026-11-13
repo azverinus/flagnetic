@@ -50,8 +50,8 @@ function ImportExport() {
             title={t`Import`}
             description={
               <Trans>
-                Merges a project document into this project: what it names is created or updated,
-                and nothing is deleted. You see everything it would change before you apply it.
+                Merges a project document into this project, or replaces the project's configuration
+                with it. You see everything it would create, update and delete before you apply it.
               </Trans>
             }
           >
