@@ -115,6 +115,7 @@ func export(ctx context.Context, args []string, lookupEnv func(string) (string, 
 		fmt.Fprintf(stderr, "export: %s\n", describeRefusal(res.StatusCode, body))
 		return exitFailure
 	}
+	printETag(stderr, res.Header)
 	if *output == "" {
 		_, err = stdout.Write(body)
 	} else {
@@ -185,6 +186,7 @@ func importDocument(ctx context.Context, args []string, lookupEnv func(string) (
 		result *management.ImportResult
 	)
 	yes := true
+	var header http.Header
 	var dry *management.ImportDryRun
 	if *dryRunFlag {
 		dry = &yes
@@ -201,6 +203,7 @@ func importDocument(ctx context.Context, args []string, lookupEnv func(string) (
 		if result == nil {
 			result = res.JSON200
 		}
+		header = res.HTTPResponse.Header
 	} else {
 		res, err := client.ImportProjectWithBodyWithResponse(ctx, *projectKey, &management.ImportProjectParams{
 			Mode: management.ImportProjectParamsMode(*mode), DryRun: dry, IfMatch: optional(*ifMatch),
@@ -210,10 +213,14 @@ func importDocument(ctx context.Context, args []string, lookupEnv func(string) (
 			return exitFailure
 		}
 		status, body, result = res.StatusCode(), res.Body, res.JSON200
+		header = res.HTTPResponse.Header
 	}
 	if result == nil {
 		fmt.Fprintf(stderr, "import: %s\n", describeRefusal(status, body))
 		return exitFailure
+	}
+	if *dryRunFlag {
+		printETag(stderr, header)
 	}
 	for _, w := range result.Warnings {
 		fmt.Fprintf(stderr, "warning: %s %s: %s\n", w.Code, w.Pointer, w.Detail)
@@ -303,4 +310,12 @@ func optional(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// printETag tells the operator which state of the project a document or a dry
+// run answers, so that --if-match can name it.
+func printETag(stderr io.Writer, h http.Header) {
+	if etag := h.Get("ETag"); etag != "" {
+		fmt.Fprintf(stderr, "etag: %s\n", etag)
+	}
 }

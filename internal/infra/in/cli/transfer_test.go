@@ -340,3 +340,26 @@ func TestFailuresBeforeAndAfterTheRequestExitOne(t *testing.T) {
 		t.Errorf("export with an absent token file: exit %d, stderr %q", r.code, r.stderr)
 	}
 }
+
+func TestTheETagOfAnExportAndOfADryRunCanBeSentBackAsIfMatch(t *testing.T) {
+	i := newTransferInstance(t)
+	i.createProject(t, "shop", "Shop")
+	r := i.cli("export", "--project", "shop", "--format", "json")
+	etag := strings.TrimSpace(strings.TrimPrefix(strings.SplitN(r.stderr, "\n", 2)[0], "etag: "))
+	if r.code != 0 || !strings.HasPrefix(r.stderr, "etag: ") || etag == "" {
+		t.Fatalf("export: exit %d, stderr %q; want an etag line", r.code, r.stderr)
+	}
+	file := filepath.Join(i.dir, "shop.json")
+	if err := os.WriteFile(file, []byte(r.stdout), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if d := i.cli("import", "--file", file, "--mode", "merge", "--project", "shop", "--dry-run"); d.code != 0 || !strings.Contains(d.stderr, "etag: "+etag) {
+		t.Errorf("dry run: exit %d, stderr %q; want the same etag %s", d.code, d.stderr, etag)
+	}
+	if m := i.cli("import", "--file", file, "--mode", "merge", "--project", "shop", "--if-match", etag); m.code != 0 || strings.Contains(m.stderr, "etag:") {
+		t.Errorf("merge with the etag: exit %d, stderr %q", m.code, m.stderr)
+	}
+	if m := i.cli("import", "--file", file, "--mode", "merge", "--project", "shop", "--if-match", `"0"`); m.code != 1 || !strings.Contains(m.stderr, "412 version_mismatch") {
+		t.Errorf("merge with a stale etag: exit %d, stderr %q", m.code, m.stderr)
+	}
+}
