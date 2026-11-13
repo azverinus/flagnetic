@@ -17,7 +17,8 @@ import (
 // Targets are the targets of the kinds of sink that can be delivered to, each
 // calling its system through a client guarded for its kind.
 type Targets struct {
-	webhook *Webhook
+	webhook    *Webhook
+	clickhouse *ClickHouse
 }
 
 var _ appsinks.Targets = (*Targets)(nil)
@@ -25,13 +26,21 @@ var _ appsinks.Targets = (*Targets)(nil)
 // NewTargets returns the targets, whose webhook receivers the operator's
 // policy may allow to be on private networks.
 func NewTargets(policy governance.TargetPolicy, resolver Resolver) *Targets {
-	return &Targets{webhook: NewWebhook(NewClient(sinks.KindWebhook, Options{Policy: policy, Resolver: resolver}))}
+	return &Targets{
+		webhook: NewWebhook(NewClient(sinks.KindWebhook, Options{Policy: policy, Resolver: resolver})),
+		clickhouse: NewClickHouse(
+			NewClient(sinks.KindClickHouse, Options{Resolver: resolver}),
+			NewClient(sinks.KindClickHouse, Options{Resolver: resolver, TLSSkipVerify: true})),
+	}
 }
 
 // For returns the target of kind k.
 func (t *Targets) For(k sinks.Kind) (appsinks.Target, bool) {
-	if k == sinks.KindWebhook {
+	switch k {
+	case sinks.KindWebhook:
 		return t.webhook, true
+	case sinks.KindClickHouse:
+		return t.clickhouse, true
 	}
 	return nil, false
 }

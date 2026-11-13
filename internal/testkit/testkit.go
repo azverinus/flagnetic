@@ -34,6 +34,7 @@ func Main(m *testing.M) int {
 	defer stopDex()
 	defer stopKeycloak()
 	defer stopMailpits()
+	defer stopClickHouse()
 	return pgtest.Main(m, func(ctx context.Context, pool *pgxpool.Pool) error {
 		_, err := postgres.Migrate(ctx, pool, postgres.Migrations())
 		return err
