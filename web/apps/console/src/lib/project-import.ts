@@ -95,8 +95,15 @@ async function sendNew(
   identity: NewProjectIdentity,
   dryRun: boolean,
 ): Promise<DryRun> {
+  // An empty key or name is left out, so the server keeps the document's own
+  // rather than refusing an empty one: the form leaves them empty when it
+  // could not read them from the document.
   const settled = await importNewProject({
-    query: { key: identity.key, name: identity.name, dry_run: dryRun },
+    query: {
+      key: identity.key || undefined,
+      name: identity.name || undefined,
+      dry_run: dryRun,
+    },
     body: new Blob([document.text], { type: document.mediaType }),
     headers: { "Content-Type": document.mediaType },
   });

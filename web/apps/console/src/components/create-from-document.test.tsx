@@ -73,6 +73,25 @@ describe("creating a project from a document", () => {
     expect(posts[1]!.headers.get("Content-Type")).toBe("application/json");
   });
 
+  it("leaves out a key and name it could not read, so the document's own are kept", async () => {
+    const server = fakeServer({
+      "POST /projects/import": { status: 200, body: answer("shop", true) },
+    });
+    await renderWithRouter(() => <CreateFromDocument />);
+
+    await userEvent.upload(
+      screen.getByLabelText("Project document"),
+      new File(["project: {key: shop, name: Shop}\n"], "shop.yaml"),
+    );
+    expect(screen.getByLabelText("Key")).toHaveValue("");
+    await userEvent.click(screen.getByRole("button", { name: "Check what it would create" }));
+
+    await screen.findByRole("region", { name: "Flags" });
+    const query = new URL(server.requests.find((r) => r.method === "POST")!.url).searchParams;
+    expect(query.has("key")).toBe(false);
+    expect(query.has("name")).toBe(false);
+  });
+
   it("explains a taken key beside the key field", async () => {
     fakeServer({ "POST /projects/import": problem(409, "already_exists") });
     await renderWithRouter(() => <CreateFromDocument />);
