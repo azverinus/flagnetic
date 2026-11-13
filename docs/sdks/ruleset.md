@@ -42,3 +42,14 @@ Every error is a problem document (`application/problem+json`) in the same shape
 ## Rate limits
 
 Each key's requests are limited by every replica (see [Rate limits on the SDK API](../operations.md#rate-limits-on-the-sdk-api)). A limited answer carries `RateLimit-Limit` and `RateLimit-Remaining`, and so does a refusal of the request once its key is judged, a body over its size limit included; a refused one is `429 rate_limited` with `Retry-After` and `RateLimit-Reset` in whole seconds, after which the SDK tries again.
+
+### `Retry-After` on a ruleset fetch
+
+A failed ruleset fetch is retried by each SDK's own capped, jittered backoff; none lets a header hold the ruleset back for longer than that cap, since a rate limiter, a CDN or a maintenance page in front of the server can answer any status with `Retry-After: 86400`, and a ruleset frozen for a day would keep a kill switch from taking effect.
+
+| SDK | What it does with `Retry-After` on a ruleset fetch |
+| --- | --- |
+| JavaScript (`flagnetic/server`) | Waits at least the header's delay (seconds or an HTTP date), but never longer than the backoff cap of 5 minutes (15 minutes after a refused key). |
+| Go, Python and Ruby | Ignores it and retries by backoff alone. |
+
+Dart, Flutter and `flagnetic/client` hold a client key, so they never download the ruleset; the server evaluates for them.

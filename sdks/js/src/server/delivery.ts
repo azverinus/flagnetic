@@ -232,9 +232,12 @@ export class Delivery {
         return;
       }
       const cap = f.status !== undefined && unauthorized(f.status) ? this.config.timing.unauthorizedMax : this.config.timing.retryMax;
-      // A far-off `Retry-After` is clamped to the longest delay a timer
-      // holds: beyond it the timer overflows and fires at once.
-      const delay = Math.min(Math.max(this.fetchBackoff.next(cap), f.retryAfter ?? 0), MAX_TIMER_DELAY);
+      // `Retry-After` can only lengthen the wait up to the backoff cap: a
+      // WAF, a CDN or a maintenance page answering with a day, or an HTTP-date
+      // read against a skewed clock, must not freeze the ruleset (a kill
+      // switch included) for that long. The timer limit also clamps a cap
+      // configured beyond what a timer holds, where it would fire at once.
+      const delay = Math.min(Math.max(this.fetchBackoff.next(cap), f.retryAfter ?? 0), cap, MAX_TIMER_DELAY);
       this.host.log("warn", "fetch_failed", {
         cause: f.message,
         ...(f.status !== undefined && { status: f.status }),

@@ -222,18 +222,20 @@ describe("the ruleset fetch", () => {
   test("a 429 waits at least its Retry-After", async () => {
     const p = await platform(rulesetOf(1, {}));
     p.rulesetReplies.push({ kind: "status", status: 429, headers: { "Retry-After": "0.3" } });
-    const h = start(p, { stream: false }, {}, () => 0);
+    const h = start(p, { stream: false }, { retryMax: 1000 }, () => 0);
     await expect(h.client.ready(2000)).resolves.toBe("fresh");
     expect(gapsOf(p.rulesetRequests().map((r) => r.at))[0]).toBeGreaterThanOrEqual(290);
   });
 
-  test("a Retry-After beyond what a timer holds still waits instead of retrying at once", async () => {
+  test.each(["86400", "99999999"])("a Retry-After of %s s is capped at the longest retry delay", async (seconds) => {
     const p = await platform(rulesetOf(1, {}));
-    p.rulesetReplies.push({ kind: "status", status: 429, headers: { "Retry-After": "99999999" } });
-    start(p, { stream: false }, {}, () => 0);
-    await p.until(() => p.rulesetRequests().length >= 1);
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(p.rulesetRequests()).toHaveLength(1);
+    p.rulesetReplies.push({ kind: "status", status: 429, headers: { "Retry-After": seconds } });
+    const h = start(p, { stream: false }, { retryInitial: 10, retryMax: 200 }, () => 0);
+    // Without the cap the ruleset, a kill switch included, would stay frozen for the header's days.
+    await expect(h.client.ready(3000)).resolves.toBe("fresh");
+    const gap = gapsOf(p.rulesetRequests().map((r) => r.at))[0];
+    expect(gap).toBeGreaterThanOrEqual(190);
+    expect(gap).toBeLessThan(1000);
   });
 
   test.each([
