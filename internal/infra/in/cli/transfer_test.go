@@ -76,11 +76,19 @@ func TestExportWritesAFileAndImportCreatesACopyUnderAnotherKey(t *testing.T) {
 	original := i.export(t, "shop", "json")
 
 	file := filepath.Join(i.dir, "shop.yaml")
+	// A file already there loses its old mode and content: the document
+	// names owners by email address.
+	if err := os.WriteFile(file, []byte("old content that is longer than nothing\n"), 0o644); err != nil { //nolint:gosec // the test needs a readable file
+		t.Fatal(err)
+	}
 	if r := i.cli("export", "--project", "shop", "--output", file); r.code != 0 || r.stdout != "" {
 		t.Fatalf("export to a file: exit %d, stdout %q, stderr %s", r.code, r.stdout, r.stderr)
 	}
-	if b, err := os.ReadFile(file); err != nil || strings.HasPrefix(string(b), "{") {
+	if b, err := os.ReadFile(file); err != nil || strings.HasPrefix(string(b), "{") || strings.Contains(string(b), "old content") {
 		t.Fatalf("the file holds %q (%v); want a YAML document", b, err)
+	}
+	if st, err := os.Stat(file); err != nil || st.Mode().Perm() != 0o600 {
+		t.Fatalf("the file's mode is %v (%v); want 0600", st.Mode().Perm(), err)
 	}
 
 	r := i.cli("import", "--file", file, "--project", "copy", "--name", "Shop copy")
@@ -166,7 +174,7 @@ func TestImportRefusesAMalformedDocumentWithItsFaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := i.cli("import", "--file", file, "--project", "broken")
-	if r.code != 1 || !strings.Contains(r.stderr, "422 ") {
+	if r.code != 1 || !strings.Contains(r.stderr, "422 invalid_document: ") || !strings.Contains(r.stderr, "\n  /not_a_field unknown_field: ") {
 		t.Errorf("import of a malformed document: exit %d, stderr %q", r.code, r.stderr)
 	}
 }
@@ -276,6 +284,31 @@ func TestWarningsGoToStandardErrorOneLineEach(t *testing.T) {
 	}
 	if query != "mode=merge" || ifMatch != `"7"` || contentType != "application/yaml" {
 		t.Errorf("request: query %q, If-Match %q, Content-Type %q", query, ifMatch, contentType)
+	}
+}
+
+func TestADocumentIsSentAsJSONForAJSONFileAndAsYAMLOtherwise(t *testing.T) {
+	var contentTypes []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		contentTypes = append(contentTypes, r.Header.Get("Content-Type"))
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"type":"about:blank","title":"Conflict","status":409,"code":"already_exists","request_id":"r1"}`))
+	}))
+	t.Cleanup(srv.Close)
+	dir := t.TempDir()
+	env := map[string]string{"FLAGNETIC_URL": srv.URL, "FLAGNETIC_TOKEN": "t"}
+	for _, name := range []string{"doc.json", "DOC.JSON", "doc.yaml", "doc"} {
+		file := filepath.Join(dir, name)
+		if err := os.WriteFile(file, []byte("{}"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		run(env, nil, "import", "--file", file)
+	}
+	run(env, []cli.Option{cli.WithStdin(strings.NewReader("{}"))}, "import", "--file", "-")
+	want := "application/json|application/json|application/yaml|application/yaml|application/yaml"
+	if got := strings.Join(contentTypes, "|"); got != want {
+		t.Errorf("Content-Type = %s, want %s", got, want)
 	}
 }
 

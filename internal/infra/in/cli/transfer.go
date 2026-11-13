@@ -118,8 +118,7 @@ func export(ctx context.Context, args []string, lookupEnv func(string) (string, 
 	if *output == "" {
 		_, err = stdout.Write(body)
 	} else {
-		// A document names owners by email address, so it is not for everyone.
-		err = os.WriteFile(*output, body, 0o600)
+		err = writePrivateFile(*output, body)
 	}
 	if err != nil {
 		fmt.Fprintf(stderr, "export: %v\n", err)
@@ -278,6 +277,25 @@ func describeRefusal(status int, body []byte) string {
 		}
 	}
 	return b.String()
+}
+
+// writePrivateFile writes b to path readable by its owner alone: a document
+// names owners by email address, so it is not for everyone. The mode is set
+// on an existing file too, which os.WriteFile would leave as it was.
+func writePrivateFile(path string, b []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600) //nolint:gosec // the operator chooses the path
+	if err != nil {
+		return err
+	}
+	if err := f.Chmod(0o600); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if _, err := f.Write(b); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 func optional(s string) *string {
