@@ -303,7 +303,7 @@ class EventQueue:
             # Encoded now, where the event is one among those being recorded: left to the flush, one
             # that does not encode would fail every batch it heads until newer events evicted it.
             encoded_size(event)
-        except (TypeError, ValueError) as err:
+        except (TypeError, ValueError, RecursionError) as err:
             # The fault only: the exception text of a value that is no JSON value can hold the
             # event's content, and unit IDs are not logged.
             self._log(

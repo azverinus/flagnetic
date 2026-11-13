@@ -93,7 +93,7 @@ def event_id(at: datetime) -> str:
 
 
 def encoded_size(event: Event) -> int:
-    return len(json.dumps(event, separators=(",", ":"), ensure_ascii=False).encode())
+    return len(json.dumps(event, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode())
 
 
 class Ingest:
@@ -218,6 +218,8 @@ class Ingest:
             },
             separators=(",", ":"),
             ensure_ascii=False,
+            # NaN and Infinity are no JSON: a body holding one fails to parse and loses every event in it.
+            allow_nan=False,
         ).encode()
 
     @staticmethod

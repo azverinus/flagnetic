@@ -50,7 +50,8 @@ LISTENER_FAILED = "listener_failed"
 #: retry_in (seconds), status for an HTTP status, and kind for the evaluation summary.
 EVENTS_FAILED = "events_failed"
 #: warning: events or summary rows were given up on. Fields: cause (queue_full, not_serialisable,
-#: client_error, refused_by_the_server, window_too_old) and what was dropped.
+#: client_error, refused_by_the_server, window_too_old) and what was dropped; fault, the kind of
+#: encoding error, for not_serialisable.
 QUEUE_DROPPED = "queue_dropped"
 #: warning: send_exposures is off, so no exposure or alias leaves this client; logged at construction.
 EXPOSURES_OFF = "exposures_off"

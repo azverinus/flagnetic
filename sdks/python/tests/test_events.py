@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import threading
 import time
@@ -145,8 +146,14 @@ def test_a_batch_the_server_will_never_take_is_dropped_and_not_sent_again(ingest
 
 @pytest.mark.parametrize(
     "unit_id",
-    [uuid.UUID("8f1c0000-0000-4000-8000-000000000000"), "bad-\ud800-unit"],
-    ids=["not_a_json_value", "lone_surrogate"],
+    [
+        uuid.UUID("8f1c0000-0000-4000-8000-000000000000"),
+        "bad-\ud800-unit",
+        float("nan"),
+        float("inf"),
+        functools.reduce(lambda inner, _: [inner], range(100_000), ["bad-nested"]),
+    ],
+    ids=["not_a_json_value", "lone_surrogate", "nan", "infinity", "too_deep"],
 )
 def test_an_event_that_does_not_serialise_is_dropped_alone(ingest: Any, unit_id: Any) -> None:
     logs = Logs()
