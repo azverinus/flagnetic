@@ -3,6 +3,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { ExportProject } from "@/components/export-project";
+import { ImportProject } from "@/components/import-project";
 import { PageHeader } from "@/components/ui/page-header";
 import { SettingsSection } from "@/components/ui/settings-section";
 import { useCan } from "@/lib/access";
@@ -45,10 +46,16 @@ function ImportExport() {
       </SettingsSection>
       {mayImport ? (
         <>
-          <SettingsSection title={t`Import`}>
-            <p className="text-sm text-muted-foreground">
-              <Trans>Importing a project document is not available here yet.</Trans>
-            </p>
+          <SettingsSection
+            title={t`Import`}
+            description={
+              <Trans>
+                Merges a project document into this project: what it names is created or updated,
+                and nothing is deleted. You see everything it would change before you apply it.
+              </Trans>
+            }
+          >
+            <ImportProject project={project} />
           </SettingsSection>
           <SettingsSection title={t`Import from Firebase`}>
             <p className="text-sm text-muted-foreground">
