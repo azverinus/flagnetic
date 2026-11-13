@@ -6,6 +6,7 @@ import { formatLifetime, formatNumber, formatWait } from "@/i18n/format";
 
 import { permissionName } from "./access-names";
 import { ApiError } from "./errors";
+import { failureText } from "./sinks";
 
 /**
  * Server refusals in the member's language. The server names every refusal
@@ -194,6 +195,19 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
     case "no_secret_to_rotate":
       return i18n._(
         msg`Only a webhook sink has a secret the server draws. Change this sink's password or secret access key by editing it.`,
+      );
+    case "sink_not_ready": {
+      const failure = failureText(i18n, {
+        class: typeof error.problem.failure === "string" ? error.problem.failure : null,
+        status:
+          typeof error.problem.failure_status === "number" ? error.problem.failure_status : null,
+        code: typeof error.problem.failure_code === "string" ? error.problem.failure_code : null,
+      });
+      return i18n._(msg`The sink is not ready to be enabled: ${failure}.`);
+    }
+    case "out_of_retention":
+      return i18n._(
+        msg`That time is before the oldest event still kept. Choose a later one, or enable from now.`,
       );
     case "kind_immutable":
       return i18n._(msg`A sink's kind cannot be changed. Create a new sink of the other kind.`);

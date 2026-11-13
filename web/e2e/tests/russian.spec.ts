@@ -639,6 +639,12 @@ test.describe("the console in Russian", () => {
     await expect(page.getByLabel("Пароль")).toHaveAttribute("placeholder", "***");
     await expect(page.getByText("Тип приёмника задаётся при создании.")).toBeVisible();
     await expectNoSeriousViolations(page, "a sink's settings in Russian");
+    await expect(page.getByRole("heading", { name: "Потоки" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Проверить соединение" })).toBeVisible();
+    await page.getByRole("button", { name: "Включить", exact: true }).click();
+    const enable = page.getByRole("dialog", { name: `Включить Хранилище аналитики` });
+    await expect(enable.getByRole("button", { name: "Включить приёмник" })).toBeVisible();
+    await expectNoSeriousViolations(page, "the enable dialog in Russian");
   });
   test("reads the audit download and the project deletion in Russian", async ({ page }) => {
     const doomed = await seedProject("tver");

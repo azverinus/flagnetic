@@ -7,12 +7,15 @@ import {
   bodyOf,
   changedFieldNames,
   emptyForm,
+  failureText,
   formOf,
   healthName,
   isUnchanged,
   lastDelivery,
   patchOf,
   pointerOfName,
+  startFromOf,
+  testBodyOf,
 } from "./sinks";
 
 describe("the sink form", () => {
@@ -150,5 +153,60 @@ describe("a sink's state", () => {
     ] as const) {
       expect(healthName(i18n, health)).not.toBe("");
     }
+  });
+});
+
+describe("a failure of a target", () => {
+  it("names the class, then the status and the code when the target gave them", () => {
+    expect(failureText(i18n, { class: "connect", status: null, code: null })).toBe(
+      "The connection failed",
+    );
+    expect(failureText(i18n, { class: "status", status: 502, code: null })).toBe(
+      "The target answered with an error status (status 502)",
+    );
+    expect(failureText(i18n, { class: "rejected", status: 400, code: "UNKNOWN_TABLE" })).toBe(
+      "The target rejected the batch (status 400, code UNKNOWN_TABLE)",
+    );
+    expect(failureText(i18n, { class: "status", status: null, code: "AccessDenied" })).toBe(
+      "The target answered with an error status (code AccessDenied)",
+    );
+  });
+
+  it("says something for a class this console does not know yet, never the target's words", () => {
+    expect(failureText(i18n, { class: "newer", status: null, code: null })).toBe("newer");
+    expect(failureText(i18n, { class: null, status: null, code: null })).toBe(
+      "The target did not answer as needed",
+    );
+  });
+});
+
+describe("testing a saved sink", () => {
+  it("tests what is stored while the connection is as stored", () => {
+    const form = formOf(clickhouseSink);
+    form.name = "Renamed";
+    form.batch_size = "10";
+    expect(testBodyOf(clickhouseSink, form)).toBeUndefined();
+  });
+
+  it("tests the form's configuration once it differs, a blank secret taking the stored one", () => {
+    const form = formOf(webhookSink);
+    form.webhook.url = "https://other.example.com/in";
+    expect(testBodyOf(webhookSink, form)).toEqual({
+      webhook: { url: "https://other.example.com/in", headers: { Authorization: "Bearer t" } },
+    });
+    const typed = formOf(clickhouseSink);
+    typed.clickhouse.password = "new";
+    expect(testBodyOf(clickhouseSink, typed)?.clickhouse?.password).toBe("new");
+    const kept = formOf(clickhouseSink);
+    kept.clickhouse.database = "other";
+    expect(testBodyOf(clickhouseSink, kept)?.clickhouse).not.toHaveProperty("password");
+  });
+});
+
+describe("a time to start from", () => {
+  it("is the instant a local time names, or none while empty", () => {
+    expect(startFromOf("")).toBeUndefined();
+    expect(startFromOf("not a date")).toBeUndefined();
+    expect(startFromOf("2026-11-01T10:30")).toBe(new Date("2026-11-01T10:30").toISOString());
   });
 });
