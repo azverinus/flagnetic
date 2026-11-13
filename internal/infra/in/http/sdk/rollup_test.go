@@ -428,30 +428,3 @@ func TestTwoReplicasRollingUpAtOnceCountEachExposureOnce(t *testing.T) {
 		t.Errorf("true = %+v, want each of the 50 exposures counted once", v)
 	}
 }
-
-func TestTheRollupPassesOverTheExposuresOfADeletedExperiment(t *testing.T) {
-	f := startRollup(t)
-	f.p.experiment(t, "banner_test", "checkout", "user", "true", 5000, "false", 5000)
-	f.post(t, f.exposure("u", "true", f.clock.Now()), with(f.exposure("u", "false", f.clock.Now()), map[string]any{"experiment_key": "banner_test"}))
-	got := do(f.p.admin.GetExperimentWithResponse(t.Context(), f.p.key, "banner_test"))
-	etag := got.HTTPResponse.Header.Get("ETag")
-	res := do(f.p.admin.DeleteExperimentWithResponse(t.Context(), f.p.key, "banner_test",
-		&management.DeleteExperimentParams{IfMatch: &etag}))
-	if res.StatusCode() != http.StatusNoContent {
-		t.Fatalf("DELETE …/experiments/banner_test = %d: %s", res.StatusCode(), res.Body)
-	}
-
-	f.rollUp(t)
-	if v := byVariation(f.exposures(t))["true"]; v.FirstExposures != 1 {
-		t.Errorf("true = %+v, want the exposure of the experiment still there rolled up", v)
-	}
-	project := projectIDOf(t, f.p)
-	counts, err := pgevents.NewStore(testkit.Pool(t)).EventCounts(t.Context(), project, f.clock.Now(), f.clock.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-	received := events.EventDay{Project: project, Day: f.clock.Now().UTC().Truncate(24 * time.Hour), Type: events.EventExposure}
-	if counts[received] != 2 {
-		t.Errorf("event counts = %+v, want both exposures the project received, the deleted experiment's too", counts)
-	}
-}

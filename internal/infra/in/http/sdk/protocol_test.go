@@ -158,13 +158,10 @@ func (p project) protocolProject(t *testing.T) map[string]string {
 	// protected, as a new project's production is.
 	p.setProtected(t, "production", true)
 
-	// The experiment the documents' exposures belong to. It is a draft, which
-	// an SDK's ruleset does not show, so the ruleset documents stay as they are.
-	experiment := do(p.admin.CreateExperimentWithResponse(t.Context(), p.key, management.ExperimentCreate{
-		Key: "banner_test", Name: "Banner test", Flag: "banner_text", UnitType: "user",
-		Variations: []management.ExperimentWeight{{Variation: "short", Weight: 5000}, {Variation: "long", Weight: 5000}},
-	}))
-	ok(experiment.StatusCode(), experiment.Body, "create experiment banner_test")
+	// The experiment the documents' exposures belong to. It runs, since an
+	// exposure of a draft is refused; no rule serves it, so the ruleset
+	// documents stay as they are.
+	p.experiment(t, "banner_test", "banner_text", "user", "short", 5000, "long", 5000)
 
 	keys := map[string]string{}
 	_, keys["<server key>"] = p.sdkKey(t, "production", management.SdkKeyKindServer)

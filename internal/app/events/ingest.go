@@ -213,10 +213,12 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 			}
 			if rj := events.CheckExposure(*x, experiment, detailed); rj != nil {
 				judged[i] = e.Reject(rj.Code, rj.Detail)
-				// Only a refusal for an experiment that exists is counted: a
-				// key nobody declared would let whoever holds a client key
-				// grow the table with keys of their own making.
-				if exists {
+				// Only a refusal for a started experiment is counted: a key
+				// nobody declared would let whoever holds a client key grow
+				// the table with keys of their own making, and a draft is
+				// refused as if it did not exist, with no unit assigned
+				// whose refusals could be told apart.
+				if exists && facts.Status != experiments.StatusDraft {
 					refused[rejectionKey{facts.ID, rj.Code}]++
 				}
 				continue

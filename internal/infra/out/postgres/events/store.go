@@ -389,7 +389,7 @@ func (s *Store) Experiments(ctx context.Context, project workspace.ProjectID, ke
 		return out, nil
 	}
 	rows, err := s.db(ctx).Query(ctx, `
-		SELECT e.id, e.key, f.key, e.unit_type, e.variations,
+		SELECT e.id, e.key, e.status, f.key, e.unit_type, e.variations,
 		       ARRAY(SELECT v->>'key' FROM jsonb_array_elements(f.variations) AS v)
 		FROM experiments e JOIN flags f ON f.id = e.flag_id
 		WHERE e.project_id = $1 AND e.key = ANY($2)
@@ -404,9 +404,10 @@ func (s *Store) Experiments(ctx context.Context, project workspace.ProjectID, ke
 			f          events.ExperimentFacts
 			experiment [16]byte
 			key        string
+			status     string
 			variations []byte
 		)
-		if err = rows.Scan(&experiment, &key, &f.FlagKey, &f.UnitType, &variations, &f.FlagVariations); err != nil {
+		if err = rows.Scan(&experiment, &key, &status, &f.FlagKey, &f.UnitType, &variations, &f.FlagVariations); err != nil {
 			return nil, fmt.Errorf("reading experiments for exposures: %w", err)
 		}
 		var weights []struct {
@@ -419,6 +420,7 @@ func (s *Store) Experiments(ctx context.Context, project workspace.ProjectID, ke
 			f.Variations = append(f.Variations, w.Variation)
 		}
 		f.ID = id.FromBytes[experiments.Experiment](experiment)
+		f.Status = experiments.Status(status)
 		out[key] = f
 	}
 	if err = rows.Err(); err != nil {

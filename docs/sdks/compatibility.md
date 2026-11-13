@@ -16,7 +16,7 @@ Single sign-on is not there yet. The server needs PostgreSQL 16 or later.
 
 ### Experiments
 
-A 0.1 server has no experiments and rejects every exposure `unknown_experiment`. A server from 0.2 on accepts an exposure of an experiment the project has, in any status, and rejects the others per event with `unknown_experiment`, `unit_type_mismatch`, `unknown_variation` or `event_invalid` (see [Events](events.md#the-batch-and-each-event)); the batch is answered `202` either way, so an SDK built against 0.1 sends exposures unchanged and needs no upgrade. Its ruleset carries a running experiment's rules, which the SDKs already evaluate: the experiment scenarios of the [behaviour matrix](behaviour-matrix.md) prove it for each.
+A 0.1 server has no experiments and rejects every exposure `unknown_experiment`. A server from 0.2 on accepts an exposure of an experiment the project has that has started, in any status but draft, and rejects the others per event with `unknown_experiment`, `unit_type_mismatch`, `unknown_variation` or `event_invalid` (see [Events](events.md#the-batch-and-each-event)); the batch is answered `202` either way, so an SDK built against 0.1 sends exposures unchanged and needs no upgrade. Its ruleset carries a running experiment's rules, which the SDKs already evaluate: the experiment scenarios of the [behaviour matrix](behaviour-matrix.md) prove it for each.
 
 ### Protected environments
 

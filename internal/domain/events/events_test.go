@@ -9,6 +9,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
 	"github.com/azverinus/flagnetic/internal/domain/events"
+	"github.com/azverinus/flagnetic/internal/domain/experiments"
 )
 
 var received = time.Date(2026, 9, 19, 10, 0, 0, 0, time.UTC)
@@ -319,9 +320,15 @@ func mustJSON(v any) json.RawMessage {
 
 func onboarding() *events.ExperimentFacts {
 	return &events.ExperimentFacts{
-		FlagKey: "onboarding", UnitType: "user", Variations: []string{"control", "guided"},
+		Status: experiments.StatusRunning, FlagKey: "onboarding", UnitType: "user", Variations: []string{"control", "guided"},
 		FlagVariations: []string{"control", "guided", "classic"},
 	}
+}
+
+func draft() *events.ExperimentFacts {
+	f := onboarding()
+	f.Status = experiments.StatusDraft
+	return f
 }
 
 func exposed(t *testing.T, changes map[string]any) events.Exposure {
@@ -342,6 +349,8 @@ func TestAnExposureIsCheckedAgainstItsExperimentInOrder(t *testing.T) {
 		client     string
 	}{
 		"no such experiment": {exposed(t, nil), nil, events.RejectUnknownExperiment,
+			`no experiment is keyed "onboarding_test"`, `no experiment is keyed "onboarding_test"`},
+		"a draft experiment": {exposed(t, nil), draft(), events.RejectUnknownExperiment,
 			`no experiment is keyed "onboarding_test"`, `no experiment is keyed "onboarding_test"`},
 		"another unit type": {exposed(t, map[string]any{"unit_type": "anonymous"}), onboarding(), events.RejectUnitTypeMismatch,
 			`experiment "onboarding_test" assigns units of type "user", not "anonymous"`,

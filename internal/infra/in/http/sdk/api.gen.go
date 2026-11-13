@@ -718,8 +718,9 @@ type ClientInterface interface {
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 	// `unknown_experiment` (an exposure naming no experiment of the
-	// project; an experiment of any status exists, since a mobile app
-	// flushes its queue days late), `unit_type_mismatch` (an exposure
+	// project, or a draft, which is served to no unit; a started
+	// experiment of any status exists, since a mobile app flushes its
+	// queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
 	// exposure with `override` true may name any variation of the
@@ -792,8 +793,9 @@ type ClientInterface interface {
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 	// `unknown_experiment` (an exposure naming no experiment of the
-	// project; an experiment of any status exists, since a mobile app
-	// flushes its queue days late), `unit_type_mismatch` (an exposure
+	// project, or a draft, which is served to no unit; a started
+	// experiment of any status exists, since a mobile app flushes its
+	// queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
 	// exposure with `override` true may name any variation of the
@@ -866,8 +868,9 @@ type ClientInterface interface {
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 	// `unknown_experiment` (an exposure naming no experiment of the
-	// project; an experiment of any status exists, since a mobile app
-	// flushes its queue days late), `unit_type_mismatch` (an exposure
+	// project, or a draft, which is served to no unit; a started
+	// experiment of any status exists, since a mobile app flushes its
+	// queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
 	// exposure with `override` true may name any variation of the
@@ -1060,8 +1063,9 @@ func (c *Client) Evaluate(ctx context.Context, params *EvaluateParams, body Eval
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 // time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 // `unknown_experiment` (an exposure naming no experiment of the
-// project; an experiment of any status exists, since a mobile app
-// flushes its queue days late), `unit_type_mismatch` (an exposure
+// project, or a draft, which is served to no unit; a started
+// experiment of any status exists, since a mobile app flushes its
+// queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
 // exposure with `override` true may name any variation of the
@@ -1144,8 +1148,9 @@ func (c *Client) PostEventsWithBody(ctx context.Context, params *PostEventsParam
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 // time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 // `unknown_experiment` (an exposure naming no experiment of the
-// project; an experiment of any status exists, since a mobile app
-// flushes its queue days late), `unit_type_mismatch` (an exposure
+// project, or a draft, which is served to no unit; a started
+// experiment of any status exists, since a mobile app flushes its
+// queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
 // exposure with `override` true may name any variation of the
@@ -1228,8 +1233,9 @@ func (c *Client) PostEvents(ctx context.Context, params *PostEventsParams, body 
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 // time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 // `unknown_experiment` (an exposure naming no experiment of the
-// project; an experiment of any status exists, since a mobile app
-// flushes its queue days late), `unit_type_mismatch` (an exposure
+// project, or a draft, which is served to no unit; a started
+// experiment of any status exists, since a mobile app flushes its
+// queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
 // exposure with `override` true may name any variation of the
@@ -1767,8 +1773,9 @@ type ClientWithResponsesInterface interface {
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 	// `unknown_experiment` (an exposure naming no experiment of the
-	// project; an experiment of any status exists, since a mobile app
-	// flushes its queue days late), `unit_type_mismatch` (an exposure
+	// project, or a draft, which is served to no unit; a started
+	// experiment of any status exists, since a mobile app flushes its
+	// queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
 	// exposure with `override` true may name any variation of the
@@ -1841,8 +1848,9 @@ type ClientWithResponsesInterface interface {
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 	// `unknown_experiment` (an exposure naming no experiment of the
-	// project; an experiment of any status exists, since a mobile app
-	// flushes its queue days late), `unit_type_mismatch` (an exposure
+	// project, or a draft, which is served to no unit; a started
+	// experiment of any status exists, since a mobile app flushes its
+	// queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
 	// exposure with `override` true may name any variation of the
@@ -1915,8 +1923,9 @@ type ClientWithResponsesInterface interface {
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 	// `unknown_experiment` (an exposure naming no experiment of the
-	// project; an experiment of any status exists, since a mobile app
-	// flushes its queue days late), `unit_type_mismatch` (an exposure
+	// project, or a draft, which is served to no unit; a started
+	// experiment of any status exists, since a mobile app flushes its
+	// queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
 	// exposure with `override` true may name any variation of the
@@ -2589,8 +2598,9 @@ func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, params *
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 // time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 // `unknown_experiment` (an exposure naming no experiment of the
-// project; an experiment of any status exists, since a mobile app
-// flushes its queue days late), `unit_type_mismatch` (an exposure
+// project, or a draft, which is served to no unit; a started
+// experiment of any status exists, since a mobile app flushes its
+// queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
 // exposure with `override` true may name any variation of the
@@ -2669,8 +2679,9 @@ func (c *ClientWithResponses) PostEventsWithBodyWithResponse(ctx context.Context
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 // time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 // `unknown_experiment` (an exposure naming no experiment of the
-// project; an experiment of any status exists, since a mobile app
-// flushes its queue days late), `unit_type_mismatch` (an exposure
+// project, or a draft, which is served to no unit; a started
+// experiment of any status exists, since a mobile app flushes its
+// queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
 // exposure with `override` true may name any variation of the
@@ -2749,8 +2760,9 @@ func (c *ClientWithResponses) PostEventsWithResponse(ctx context.Context, params
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 // time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
 // `unknown_experiment` (an exposure naming no experiment of the
-// project; an experiment of any status exists, since a mobile app
-// flushes its queue days late), `unit_type_mismatch` (an exposure
+// project, or a draft, which is served to no unit; a started
+// experiment of any status exists, since a mobile app flushes its
+// queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
 // exposure with `override` true may name any variation of the

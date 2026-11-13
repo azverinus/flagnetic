@@ -43,7 +43,7 @@ Otherwise each event is judged on its own and a refused one is listed in `reject
 | `event_id_invalid` | `event_id` is not a lowercase UUIDv7. |
 | `out_of_window` | The time in `event_id`, or `occurred_at` (`interval_end` for a summary), is older than the retention window once a wrong device clock's shift (below) is applied. |
 | `undeclared_unit_type` | An alias names a unit type the project does not declare. |
-| `unknown_experiment` | An exposure names no experiment of the project. An experiment of any status exists, a draft or a stopped one too, since a mobile app may flush its queue days after the exposure. |
+| `unknown_experiment` | An exposure names no experiment of the project, or a draft, which is served to no unit so no SDK holds an exposure of one. A started experiment of any status exists, a stopped one too, since a mobile app may flush its queue days after the exposure. |
 | `unit_type_mismatch` | An exposure's `unit_type` is not the unit type its experiment assigns. |
 | `unknown_variation` | An exposure names a variation its experiment does not weigh. An exposure with `override` true may name any variation of the experiment's flag instead, since an override decides the variation whatever the weights are. |
 
@@ -56,7 +56,7 @@ An exposure carries what the evaluation that assigned the unit answered, so the 
  "ruleset_version": 1, "platform": "linux", "app_version": "1.18.0"}
 ```
 
-An exposure of an experiment the project has is accepted whatever the experiment's status, a draft or a stopped one too, and counted toward its [exposures](../experiments.md#exposures).
+An exposure of an experiment the project has is accepted whatever the experiment's status once it has started, a stopped one too, and refused while it is a draft. An exposure is accepted for what it says: the server does not recompute the unit's assignment, so an exposure posted with a client key is untrusted (see [What a client key still learns](../operations.md#what-a-client-key-still-learns)). It is counted toward its [exposures](../experiments.md#exposures).
 
 An exposure is judged against its experiment in this order, and refused with the first check it fails: the experiment exists, the unit type is its own, the variation is one it weighs, then `flag_key` must be the experiment's flag and `evaluation_reason` `experiment` or `override` (both `event_invalid`). The codes are the same for every key; the `detail` of a refusal is specific for a server key and, for a client key, names no unit type, flag, variation or status of the experiment: a key that ships inside an app learns nothing of an experiment from it. Exposures refused for an experiment that exists are counted per experiment, environment and reason, and the counts go with the experiment; an exposure naming an experiment that does not exist is counted nowhere.
 

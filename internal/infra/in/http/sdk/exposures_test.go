@@ -1,11 +1,15 @@
 package sdk_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
@@ -32,9 +36,9 @@ func (p project) flagWithVariations(t *testing.T, key string, kv ...string) {
 	}
 }
 
-// experiment creates a draft experiment keyed key on flag, assigning unitType,
-// with the weights given as variation, basis points pairs.
-func (p project) experiment(t *testing.T, key, flag, unitType string, weights ...any) experiments.ExperimentID {
+// draftExperiment creates a draft experiment keyed key on flag, assigning
+// unitType, with the weights given as variation, basis points pairs.
+func (p project) draftExperiment(t *testing.T, key, flag, unitType string, weights ...any) management.Experiment {
 	t.Helper()
 	var ws []management.ExperimentWeight
 	for i := 0; i+1 < len(weights); i += 2 {
@@ -42,11 +46,39 @@ func (p project) experiment(t *testing.T, key, flag, unitType string, weights ..
 	}
 	res := do(p.admin.CreateExperimentWithResponse(t.Context(), p.key, management.ExperimentCreate{
 		Key: key, Name: "Experiment " + key, Flag: flag, UnitType: unitType, Variations: ws,
+		Hypothesis:    ptr("The variation raises the metric."),
+		ExpectedEndAt: &openapi_types.Date{Time: time.Date(2099, time.December, 1, 0, 0, 0, 0, time.UTC)},
 	}))
 	if res.JSON201 == nil {
 		t.Fatalf("POST …/experiments = %d: %s", res.StatusCode(), res.Body)
 	}
-	return id.FromBytes[experiments.Experiment](res.JSON201.Id)
+	return *res.JSON201
+}
+
+// experiment creates and starts an experiment keyed key on flag, assigning
+// unitType, with the weights given as variation, basis points pairs: an
+// exposure of a draft is refused, since a draft is served to no unit. The
+// package's tests share one schema and the checks go over every running
+// experiment, each test on a clock of its own, so the experiment is stopped
+// when the test ends.
+func (p project) experiment(t *testing.T, key, flag, unitType string, weights ...any) experiments.ExperimentID {
+	t.Helper()
+	created := p.draftExperiment(t, key, flag, unitType, weights...)
+	started := do(p.admin.StartExperimentWithResponse(t.Context(), p.key, key,
+		&management.StartExperimentParams{IfMatch: ptr(strconv.Quote(strconv.FormatInt(created.Version, 10)))}))
+	if started.JSON200 == nil {
+		t.Fatalf("start %s = %d: %s", key, started.StatusCode(), started.Body)
+	}
+	t.Cleanup(func() {
+		got := do(p.admin.GetExperimentWithResponse(context.Background(), p.key, key))
+		if got.JSON200 == nil || got.JSON200.Status != management.ExperimentStatusRunning {
+			return
+		}
+		do(p.admin.StopExperimentWithResponse(context.Background(), p.key, key,
+			&management.StopExperimentParams{IfMatch: ptr(strconv.Quote(strconv.FormatInt(got.JSON200.Version, 10)))},
+			management.ExperimentStop{Outcome: "removed"}))
+	})
+	return id.FromBytes[experiments.Experiment](created.Id)
 }
 
 // exposureEvent is an exposure of the experiment checkout_test, which assigns
@@ -78,7 +110,7 @@ func with(event map[string]any, changes map[string]any) map[string]any {
 	return out
 }
 
-// exposuresFixture is a project with the draft experiment checkout_test and a
+// exposuresFixture is a project with the running experiment checkout_test and a
 // key of each kind in production.
 type exposuresFixture struct {
 	srv        *testkit.Server
@@ -120,8 +152,6 @@ func (f exposuresFixture) refused(t *testing.T, environment string) map[events.R
 }
 
 func TestAnExposureOfAnExperimentIsStoredOnce(t *testing.T) {
-	// The experiment is a draft: an exposure may belong to an experiment of
-	// any status, since a mobile app flushes its queue days late.
 	f := startExposures(t)
 	body := batch(exposureEvent(1, map[string]any{"app_version": nil}), exposureEvent(2, map[string]any{
 		"variation_key": "false", "unit_id": "u-1002", "override": true, "evaluation_reason": "override", "ruleset_version": 4,
@@ -165,6 +195,51 @@ func TestAnOverrideExposureOfAVariationTheFlagLacksIsRefused(t *testing.T) {
 	}
 	if stored := f.stored(t); len(stored) != 0 {
 		t.Errorf("exposures stored = %+v, want none", stored)
+	}
+}
+
+func TestAnExposureOfADraftExperimentIsRefused(t *testing.T) {
+	f := startExposures(t)
+	f.p.flagWithVariations(t, "banner", "short", "Try", "long", "Start")
+	draft := f.p.draftExperiment(t, "banner_test", "banner", "user", "short", 5000, "long", 5000)
+	exposure := with(exposureEvent(1, nil), map[string]any{
+		"experiment_key": "banner_test", "flag_key": "banner", "variation_key": "short",
+	})
+	for name, key := range map[string]string{"client key": f.client, "server key": f.server} {
+		got := batchResult(t, f.srv, key, batch(exposure))
+		if got.Accepted != 0 || len(got.Rejected) != 1 || got.Rejected[0].Code != "unknown_experiment" {
+			t.Errorf("%s: batch = %+v, want the exposure refused as unknown_experiment", name, got)
+		}
+	}
+	if stored := f.stored(t); len(stored) != 0 {
+		t.Errorf("exposures stored = %+v, want none", stored)
+	}
+	// Refused as if it did not exist, so the draft's refusals count nothing.
+	counts, err := pgevents.NewStore(testkit.Pool(t)).RejectionCountsOf(t.Context(),
+		id.FromBytes[experiments.Experiment](draft.Id), f.p.environmentID(t, "production"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(counts) != 0 {
+		t.Errorf("the draft's refusals = %+v, want none counted", counts)
+	}
+}
+
+func TestAnExposureOfAStoppedExperimentIsAccepted(t *testing.T) {
+	// A mobile app may flush its queue days after the experiment stopped.
+	f := startExposures(t)
+	got := do(f.p.admin.GetExperimentWithResponse(t.Context(), f.p.key, "checkout_test"))
+	if got.JSON200 == nil {
+		t.Fatalf("GET …/experiments/checkout_test = %d: %s", got.StatusCode(), got.Body)
+	}
+	stopped := do(f.p.admin.StopExperimentWithResponse(t.Context(), f.p.key, "checkout_test",
+		&management.StopExperimentParams{IfMatch: ptr(strconv.Quote(strconv.FormatInt(got.JSON200.Version, 10)))},
+		management.ExperimentStop{Outcome: "removed"}))
+	if stopped.JSON200 == nil {
+		t.Fatalf("stopping checkout_test = %d: %s", stopped.StatusCode(), stopped.Body)
+	}
+	if res := batchResult(t, f.srv, f.client, batch(exposureEvent(1, nil))); res.Accepted != 1 || len(res.Rejected) != 0 {
+		t.Errorf("batch = %+v, want the exposure of the stopped experiment accepted", res)
 	}
 }
 
