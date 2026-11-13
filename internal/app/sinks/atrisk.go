@@ -49,9 +49,15 @@ type EvaluateAtRisk struct {
 	d AtRiskDeps
 
 	mu sync.Mutex
-	// judged is when each sink was last judged by this replica.
+	// judged is when each sink was last judged by this replica, and listed
+	// when the sinks were last listed.
 	judged map[sinks.ID]time.Time
+	listed time.Time
 }
+
+// listEvery is how seldom the sinks are listed to find those due: the worker
+// runs every second, and no sink is due that often.
+const listEvery = AtRiskEvery / 6
 
 // NewEvaluateAtRisk returns the use case.
 func NewEvaluateAtRisk(d AtRiskDeps) *EvaluateAtRisk {
@@ -65,6 +71,9 @@ func NewEvaluateAtRisk(d AtRiskDeps) *EvaluateAtRisk {
 // others; the errors are returned together.
 func (h *EvaluateAtRisk) Handle(ctx context.Context) error {
 	now := h.d.Clock.Now().UTC().Truncate(time.Microsecond)
+	if !h.listDue(now) {
+		return nil
+	}
 	list, err := h.d.Store.Tracked(ctx)
 	if err != nil {
 		return fmt.Errorf("listing the sinks to judge: %w", err)
@@ -80,6 +89,18 @@ func (h *EvaluateAtRisk) Handle(ctx context.Context) error {
 	}
 	h.forgetExcept(list)
 	return errors.Join(errs...)
+}
+
+// listDue reports whether the sinks are to be listed now, and notes that they
+// were.
+func (h *EvaluateAtRisk) listDue(now time.Time) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if d := now.Sub(h.listed); d >= 0 && d < listEvery {
+		return false
+	}
+	h.listed = now
+	return true
 }
 
 // due reports whether sink is to be judged now, and notes that it was.
