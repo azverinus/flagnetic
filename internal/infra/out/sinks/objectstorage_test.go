@@ -8,8 +8,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -370,5 +373,24 @@ func TestAProbeThatCannotWriteIsRefused(t *testing.T) {
 	want := domain.Failure{Class: domain.ClassRejected, Status: 404, Code: "NoSuchBucket"}
 	if probed.Failure == nil || *probed.Failure != want {
 		t.Errorf("Probe = %v, want %v", probed.Failure, want)
+	}
+}
+
+func TestAServiceThatRedirectsIsNotFollowed(t *testing.T) {
+	var followed atomic.Bool
+	elsewhere := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { followed.Store(true) }))
+	defer elsewhere.Close()
+	redirecting := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, elsewhere.URL+r.URL.Path, http.StatusTemporaryRedirect)
+	}))
+	defer redirecting.Close()
+	store := testkit.StartObjectStorage(t)
+	c := objectStorageSink(store, redirecting.URL, "lake", nil)
+	got := objectStorage().Deliver(t.Context(), c, appsinks.Delivery{ID: "dlv_abc", Kind: domain.EventExposure, Rows: exposures(1), Now: received})
+	if got == nil || got.Class != domain.ClassRedirect || got.Status != http.StatusTemporaryRedirect {
+		t.Errorf("Deliver = %v, want class redirect with status 307", got)
+	}
+	if followed.Load() {
+		t.Error("the redirect was followed")
 	}
 }
