@@ -2,7 +2,7 @@
 
 Self-hosted, open-source feature flags and experiments. One Go binary with an embedded web console; PostgreSQL is the only thing it needs.
 
-> **Status: developer preview.** Version 0.2 is the second release: try it, build against its SDKs, and tell us what breaks, but do not run it where an outage would hurt. The SDK API and the ruleset format only grow from 0.1 on, and upgrades only migrate forward, without data loss; the management API and the console may still change in 0.x, each change marked in the release notes. See [what 0.x promises](docs/sdks/compatibility.md#what-0x-promises).
+> **Status: developer preview.** Version 0.3 is the third release: try it, build against its SDKs, and tell us what breaks, but do not run it where an outage would hurt. The SDK API and the ruleset format only grow from 0.1 on, and upgrades only migrate forward, without data loss; the management API and the console may still change in 0.x, each change marked in the release notes. See [what 0.x promises](docs/sdks/compatibility.md#what-0x-promises).
 
 ## Why
 
