@@ -49,8 +49,8 @@ LISTENER_FAILED = "listener_failed"
 #: warning: a batch of events failed and goes again with the same event IDs. Fields: cause, events,
 #: retry_in (seconds), status for an HTTP status, and kind for the evaluation summary.
 EVENTS_FAILED = "events_failed"
-#: warning: events or summary rows were given up on. Fields: cause (queue_full, client_error,
-#: refused_by_the_server, window_too_old) and what was dropped.
+#: warning: events or summary rows were given up on. Fields: cause (queue_full, not_serialisable,
+#: client_error, refused_by_the_server, window_too_old) and what was dropped.
 QUEUE_DROPPED = "queue_dropped"
 #: warning: send_exposures is off, so no exposure or alias leaves this client; logged at construction.
 EXPOSURES_OFF = "exposures_off"

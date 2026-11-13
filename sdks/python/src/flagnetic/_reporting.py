@@ -18,7 +18,7 @@ from typing import Any
 
 from . import _events
 from ._delivery import backoff_ceiling, full_jitter
-from ._ingest import MAX_SUMMARY_ROWS, Event, Ingest, Outcome, Sent, event_id, iso
+from ._ingest import MAX_SUMMARY_ROWS, Event, Ingest, Outcome, Sent, encoded_size, event_id, iso
 
 Log = Callable[..., None]
 
@@ -268,6 +268,12 @@ class Timing:
     batch_size: int = 500
 
 
+def _fault(err: Exception) -> str:
+    if isinstance(err, UnicodeEncodeError):
+        return f"UnicodeEncodeError: {err.reason}"
+    return type(err).__name__
+
+
 class EventQueue:
     """The bounded in-memory queue of exposures and aliases.
 
@@ -293,6 +299,21 @@ class EventQueue:
         self._full = False
 
     def record(self, event: Event) -> None:
+        try:
+            # Encoded now, where the event is one among those being recorded: left to the flush, one
+            # that does not encode would fail every batch it heads until newer events evicted it.
+            encoded_size(event)
+        except (TypeError, ValueError) as err:
+            # The fault only: the exception text of a value that is no JSON value can hold the
+            # event's content, and unit IDs are not logged.
+            self._log(
+                logging.WARNING,
+                _events.QUEUE_DROPPED,
+                cause="not_serialisable",
+                events=1,
+                fault=_fault(err),
+            )
+            return
         with self._lock:
             self._queue.append(event)
             over = len(self._queue) - self._timing.capacity
