@@ -205,11 +205,11 @@ func importDocument(ctx context.Context, args []string, lookupEnv func(string) (
 		}
 		header = res.HTTPResponse.Header
 	} else {
-		res, err := client.ImportProjectWithBodyWithResponse(ctx, *projectKey, &management.ImportProjectParams{
+		res, reqErr := client.ImportProjectWithBodyWithResponse(ctx, *projectKey, &management.ImportProjectParams{
 			Mode: management.ImportProjectParamsMode(*mode), DryRun: dry, IfMatch: optional(*ifMatch),
 		}, contentType, bytes.NewReader(document))
-		if err != nil {
-			fmt.Fprintf(stderr, "import: %v\n", err)
+		if reqErr != nil {
+			fmt.Fprintf(stderr, "import: %v\n", reqErr)
 			return exitFailure
 		}
 		status, body, result = res.StatusCode(), res.Body, res.JSON200
