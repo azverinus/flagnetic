@@ -8,7 +8,7 @@ Include what you found, how to reproduce it, the version or commit, and the impa
 
 ## Supported versions
 
-Until 1.0, fixes go to `main` and the latest release only, currently 0.2.
+Until 1.0, fixes go to `main` and the latest release only, currently 0.3.
 
 ## Scope
 

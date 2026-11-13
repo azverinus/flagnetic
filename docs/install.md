@@ -2,7 +2,7 @@
 
 Flagnetic is one binary, `flagnetic`, with the web console built in, and PostgreSQL is the only thing it needs. This guide installs it with Docker Compose or as a binary, puts it behind TLS and a reverse proxy, sizes its PostgreSQL connections and upgrades it. [Operations](operations.md) covers running it once it is up, and the [configuration reference](configuration.md) lists every setting.
 
-Flagnetic 0.2 is a developer preview: try it, build against it, and do not run it where an outage would hurt. See [what 0.x promises](sdks/compatibility.md#what-0x-promises) before you rely on it.
+Flagnetic 0.3 is a developer preview: try it, build against it, and do not run it where an outage would hurt. See [what 0.x promises](sdks/compatibility.md#what-0x-promises) before you rely on it.
 
 ## What you need
 
@@ -25,7 +25,7 @@ docker compose up -d
 Compose reads the secret key from `.env` and refuses to start without it. The server image is `ghcr.io/azverinus/flagnetic`, for `linux/amd64` and `linux/arm64`, with build provenance and an SBOM. The compose file pulls `latest`; to pin a release, add it to `.env` before `docker compose up -d`:
 
 ```bash
-echo "FLAGNETIC_VERSION=0.2.0" >> .env
+echo "FLAGNETIC_VERSION=0.3.0" >> .env
 ```
 
 `docker compose build` builds the image from your checkout instead.
@@ -55,7 +55,7 @@ Such a dump moves an instance to another PostgreSQL cluster: the first replica t
 From the release image, for Linux (add `--platform linux/arm64` to `docker create` for ARM):
 
 ```bash
-docker create --name flagnetic-binary ghcr.io/azverinus/flagnetic:0.2.0
+docker create --name flagnetic-binary ghcr.io/azverinus/flagnetic:0.3.0
 docker cp flagnetic-binary:/usr/local/bin/flagnetic ./flagnetic
 docker rm flagnetic-binary
 ```
