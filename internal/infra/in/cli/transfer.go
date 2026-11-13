@@ -192,11 +192,11 @@ func importDocument(ctx context.Context, args []string, lookupEnv func(string) (
 		dry = &yes
 	}
 	if *mode == "create" {
-		res, err := client.ImportNewProjectWithBodyWithResponse(ctx, &management.ImportNewProjectParams{
+		res, reqErr := client.ImportNewProjectWithBodyWithResponse(ctx, &management.ImportNewProjectParams{
 			Key: optional(*projectKey), Name: optional(*name), DryRun: dry,
 		}, contentType, bytes.NewReader(document))
-		if err != nil {
-			fmt.Fprintf(stderr, "import: %v\n", err)
+		if reqErr != nil {
+			fmt.Fprintf(stderr, "import: %v\n", reqErr)
 			return exitFailure
 		}
 		status, body, result = res.StatusCode(), res.Body, res.JSON201
