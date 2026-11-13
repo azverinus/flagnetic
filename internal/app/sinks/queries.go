@@ -2,7 +2,6 @@ package sinks
 
 import (
 	"context"
-	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/sinks"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -63,23 +62,9 @@ func (d Deps) withLag(ctx context.Context, s sinks.Sink) (sinks.Sink, error) {
 	if !s.Enabled {
 		return s, nil
 	}
-	scope, named, err := d.Rows.Scope(ctx, s.Project, s.Environments)
+	lag, _, _, err := worstLag(ctx, d.Rows, d.now(), s)
 	if err != nil {
 		return s, err
-	}
-	lag := time.Duration(0)
-	now := d.now()
-	for _, st := range s.Streams {
-		if !named {
-			break
-		}
-		at, ok, err := d.Rows.OldestUnread(ctx, st.EventKind, st.LiveScope(scope), st.Live())
-		if err != nil {
-			return s, err
-		}
-		if ok {
-			lag = max(lag, now.Sub(at))
-		}
 	}
 	s.Lag = &lag
 	return s, nil

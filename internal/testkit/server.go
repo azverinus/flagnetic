@@ -319,6 +319,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		Keyring: secret.NewKeyring(secret.New(SecretKey)), PasswordHashConcurrency: defaultHashConcurrency, Options: o.web,
 		RulesetLoadFault: o.fault, IngestHold: hold, SinkFault: sinkFault, RateLimits: limits,
 		EventsRetention:       time.Duration(cfg.EventsRetentionDays) * 24 * time.Hour,
+		EventsLossWarning:     time.Duration(cfg.EventsLossWarningHours) * time.Hour,
 		EventsPartitionsAhead: cfg.EventsPartitionsAhead,
 		SDKInventoryRetention: time.Duration(cfg.SDKInventoryRetentionDays) * 24 * time.Hour,
 		WebhookTargets:        o.targets,

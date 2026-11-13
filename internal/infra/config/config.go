@@ -94,6 +94,9 @@ type Config struct {
 	// within which an event's time, shifted by the batch's clock skew, is
 	// accepted. Event IDs are kept longer, to recognise retries and replays.
 	EventsRetentionDays int
+	// EventsLossWarningHours is how many hours before retention drops a raw
+	// event a sink that has not delivered it is flagged at risk.
+	EventsLossWarningHours int
 	// EventsPartitionsAhead is how many days after today the raw event
 	// tables' partitions are created ahead of time.
 	EventsPartitionsAhead int
@@ -506,6 +509,18 @@ func Settings() []Setting {
 				"for a year, or the window plus a day when that is longer, so it outlives the raw events.",
 			Example: "30",
 			apply:   wholeNumber(func(c *Config, n int) { c.EventsRetentionDays = n }),
+		},
+		{
+			Name:    "FLAGNETIC_EVENTS_LOSS_WARNING_HOURS",
+			Key:     "events_loss_warning_hours",
+			Default: "72",
+			Unit:    "hours",
+			Description: "How many hours before retention drops a raw event a sink that has not delivered it is flagged at risk: " +
+				"the sink's `at_risk` is set and `sink.at_risk` is told once, for disabled and stopped sinks too. " +
+				"A sink that falls behind by less than the retention window minus this loses nothing. " +
+				"A value of the retention window or more flags every sink with an undelivered event.",
+			Example: "72",
+			apply:   wholeNumber(func(c *Config, n int) { c.EventsLossWarningHours = n }),
 		},
 		{
 			Name:    "FLAGNETIC_EVENTS_PARTITIONS_AHEAD",

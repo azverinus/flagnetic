@@ -34,6 +34,11 @@ type SinkDeliverer interface {
 	AttemptSink(ctx context.Context, token appsinks.LeaseToken, c appsinks.ClaimedSink) (map[sinks.EventKind]appsinks.Result, error)
 }
 
+// AtRiskEvaluator judges whether sinks are about to lose events to retention.
+type AtRiskEvaluator interface {
+	Handle(ctx context.Context) error
+}
+
 // SinkMetrics are the series the delivery of sinks reports, and what the use
 // case tells its observer through.
 type SinkMetrics struct {
@@ -50,14 +55,20 @@ type PendingDeadLetters interface {
 	PendingDeadLetters(ctx context.Context) (map[sinks.ID]int, error)
 }
 
+// SinkRisk says which sinks are marked at risk.
+type SinkRisk interface {
+	AtRiskStates(ctx context.Context) (map[sinks.ID]bool, error)
+}
+
 // NewSinkMetrics registers the series on reg:
 // flagnetic_sink_batches_total by sink, event kind and result,
 // flagnetic_sink_lag_seconds by sink and event kind,
 // flagnetic_sink_rows_skipped_total by reason, and
-// flagnetic_sink_dead_letters by sink, which is read from pending whenever
-// it is scraped, so that every replica answers the same and a sink that is
-// gone leaves no series behind.
-func NewSinkMetrics(reg prometheus.Registerer, pending PendingDeadLetters) *SinkMetrics {
+// flagnetic_sink_dead_letters by sink and flagnetic_sink_at_risk by sink,
+// which are read from pending and risk whenever they are scraped, so that
+// every replica answers the same and a sink that is gone leaves no series
+// behind.
+func NewSinkMetrics(reg prometheus.Registerer, pending PendingDeadLetters, risk SinkRisk) *SinkMetrics {
 	m := &SinkMetrics{
 		batches: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: metrics.Namespace, Subsystem: "sink", Name: "batches_total",
@@ -72,7 +83,7 @@ func NewSinkMetrics(reg prometheus.Registerer, pending PendingDeadLetters) *Sink
 			Help: "Rows a sink passed without exporting them, by reason: environment_deleted.",
 		}, []string{"reason"}),
 	}
-	reg.MustRegister(m.batches, m.lag, m.skipped, deadLetterGauge{pending})
+	reg.MustRegister(m.batches, m.lag, m.skipped, deadLetterGauge{pending}, atRiskGauge{risk})
 	return m
 }
 
@@ -103,6 +114,34 @@ func (g deadLetterGauge) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
+var atRiskDesc = prometheus.NewDesc(
+	prometheus.BuildFQName(metrics.Namespace, "sink", "at_risk"),
+	"Whether a sink is at risk of losing events to retention, by sink: 1 while its oldest undelivered event is within the loss warning of the edge of retention, otherwise 0.",
+	[]string{"sink"}, nil)
+
+// atRiskGauge reports which sinks are at risk, as they are when it is
+// scraped.
+type atRiskGauge struct{ risk SinkRisk }
+
+func (atRiskGauge) Describe(ch chan<- *prometheus.Desc) { ch <- atRiskDesc }
+
+func (g atRiskGauge) Collect(ch chan<- prometheus.Metric) {
+	ctx, cancel := context.WithTimeout(context.Background(), deadLetterScrapeTimeout)
+	defer cancel()
+	states, err := g.risk.AtRiskStates(ctx)
+	if err != nil {
+		// A scrape that cannot read reports nothing, rather than zero.
+		return
+	}
+	for sink, atRisk := range states {
+		v := 0.0
+		if atRisk {
+			v = 1
+		}
+		ch <- prometheus.MustNewConstMetric(atRiskDesc, prometheus.GaugeValue, v, sink.String())
+	}
+}
+
 // Batch counts one batch attempted.
 func (m *SinkMetrics) Batch(sink sinks.ID, kind sinks.EventKind, result string) {
 	m.batches.WithLabelValues(sink.String(), string(kind), result).Inc()
@@ -126,7 +165,11 @@ func (m *SinkMetrics) RowsSkipped(reason string, n int) {
 // nothing is due and no attempt is under way, so a round driven by Tick leaves
 // every attempt it started recorded. A stream whose batch was full is due again
 // at once, and is attempted again in the same round.
-func SinkDelivery(d SinkDeliverer, interval time.Duration, log *slog.Logger) Worker {
+//
+// Each round also judges, once it has delivered, the sinks that are due to be
+// judged for being at risk: a sink that cannot be delivered to, or is disabled
+// or stopped, is judged all the same.
+func SinkDelivery(d SinkDeliverer, risk AtRiskEvaluator, interval time.Duration, log *slog.Logger) Worker {
 	return Worker{
 		Name: SinkDeliveryName, Interval: interval,
 		// The claiming stops after sinkRoundFor; the attempts started by then
@@ -134,8 +177,16 @@ func SinkDelivery(d SinkDeliverer, interval time.Duration, log *slog.Logger) Wor
 		Timeout: sinkRoundFor + 2*sinks.ObjectStorageCallTimeout,
 		Round: func(ctx context.Context) error {
 			r := &sinkRound{d: d, log: log, slots: make(chan struct{}, sinksAtOnce), busy: map[sinks.ID]bool{}, woken: make(chan struct{}, 1)}
-			defer r.attempts.Wait()
-			return r.run(ctx, interval)
+			err := r.run(ctx, interval)
+			r.attempts.Wait()
+			// A sink is judged after the attempts of the round, so that one
+			// that just caught up is not reported at risk for a minute more.
+			// A failure to judge is logged and fails nothing: delivery does
+			// not depend on it.
+			if riskErr := risk.Handle(ctx); riskErr != nil && ctx.Err() == nil {
+				log.ErrorContext(ctx, "judging which sinks are at risk failed", "error", riskErr.Error())
+			}
+			return err
 		},
 	}
 }
