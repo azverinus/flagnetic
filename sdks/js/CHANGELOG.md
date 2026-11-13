@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/azverinus/flagnetic/compare/sdks/js/v0.1.3...sdks/js/v0.1.4) (2026-11-13)
+
+
+### Bug Fixes
+
+* **sdk-js:** cap Retry-After on a ruleset fetch at the retry backoff cap ([#278](https://github.com/azverinus/flagnetic/issues/278)) ([e41a18a](https://github.com/azverinus/flagnetic/commit/e41a18a14645822803b1410c877a6bb95c6f3e71))
+
 ## [0.1.3](https://github.com/azverinus/flagnetic/compare/sdks/js/v0.1.2...sdks/js/v0.1.3) (2026-11-11)
 
 
