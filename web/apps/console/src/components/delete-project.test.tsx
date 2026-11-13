@@ -45,6 +45,8 @@ describe("deleting a project", () => {
     const dialog = await screen.findByRole("dialog", { name: "Delete checkout" });
     expect(within(dialog).getByRole("button", { name: "Download CSV" })).toBeVisible();
     expect(within(dialog).getByRole("button", { name: "Download JSON Lines" })).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Export as JSON" })).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Export as YAML" })).toBeVisible();
     const confirm = within(dialog).getByRole("button", { name: "Delete project" });
     expect(confirm).toBeDisabled();
 

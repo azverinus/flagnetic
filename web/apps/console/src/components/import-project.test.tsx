@@ -297,4 +297,61 @@ describe("importing a project document", () => {
       expect(screen.getByRole("button", { name: "Check what it would change" })).toBeDisabled(),
     );
   });
+
+  it("replaces: sends mode=replace, emphasises what is deleted and keeps the mode across a reload", async () => {
+    const replaced = answer({
+      segments: { created: [], updated: [], deleted: ["beta"] },
+      flags: { created: [], updated: [], deleted: ["old_flag", "older_flag"] },
+    });
+    const server = fakeServer({
+      "GET /projects/checkout/environments": environments,
+      [path]: {
+        status: 200,
+        body: { ...replaced, mode: "replace" },
+        headers: { ETag: '"entry-7"' },
+      },
+    });
+    const first = renderWithProviders(<ImportProject project="checkout" />);
+    await userEvent.click(screen.getByRole("combobox", { name: "Mode" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Replace" }));
+    await chooseAndCheck();
+
+    const warning = await screen.findByRole("alert");
+    expect(warning).toHaveTextContent("This import deletes 3 entities from the project");
+    const request = server.requests.find((r) => r.method === "POST")!;
+    expect(new URL(request.url).searchParams.get("mode")).toBe("replace");
+    expect(screen.getByRole("button", { name: "Apply" })).toBeEnabled();
+    first.unmount();
+
+    renderWithProviders(<ImportProject project="checkout" />);
+    await screen.findByRole("alert");
+    const posts = server.requests.filter((r) => r.method === "POST");
+    expect(new URL(posts[1]!.url).searchParams.get("mode")).toBe("replace");
+  });
+
+  it("lists every reference of an in_use refusal, SDK keys included", async () => {
+    fakeServer({
+      "GET /projects/checkout/environments": environments,
+      [path]: problem(409, "in_use", {
+        references: [
+          { kind: "segment", key: "beta", environment: "production" },
+          { kind: "sdk_key", key: "0192a000-0000-7000-8000-000000000009", environment: "staging" },
+          { kind: "experiment", key: "pricing", environment: null },
+        ],
+      }),
+    });
+    renderWithProviders(<ImportProject project="checkout" />);
+    await userEvent.click(screen.getByRole("combobox", { name: "Mode" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Replace" }));
+
+    await chooseAndCheck();
+
+    const references = await screen.findByRole("list", { name: "Still in use by" });
+    expect(references).toHaveTextContent("the segment beta in production");
+    expect(references).toHaveTextContent(
+      "the SDK key 0192a000-0000-7000-8000-000000000009 in staging",
+    );
+    expect(references).toHaveTextContent("the experiment pricing");
+    expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
+  });
 });

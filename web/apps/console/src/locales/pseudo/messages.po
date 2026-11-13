@@ -75,6 +75,10 @@ msgstr ""
 msgid "{count, plural, one {second} other {seconds}}"
 msgstr ""
 
+#: src/components/import-project.tsx
+msgid "{count, plural, one {This import deletes # entity from the project. Deletions cannot be undone.} other {This import deletes # entities from the project. Deletions cannot be undone.}}"
+msgstr ""
+
 #: src/components/experiment-transitions.tsx
 msgid "{created} by {creator}"
 msgstr ""
@@ -520,6 +524,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "A header has a name of letters, digits and symbols without spaces, and a value on one line."
+msgstr ""
+
+#: src/components/create-from-document.tsx
+msgid "A JSON or YAML file, such as an export of a project of this or another instance."
 msgstr ""
 
 #: src/components/import-project.tsx
@@ -1666,6 +1674,10 @@ msgstr ""
 msgid "Check what it would change"
 msgstr ""
 
+#: src/components/create-from-document.tsx
+msgid "Check what it would create"
+msgstr ""
+
 #: src/components/experiment-exposures.tsx
 msgid "Checked <0/>."
 msgstr ""
@@ -1678,6 +1690,7 @@ msgstr ""
 msgid "Checking what the import would change…"
 msgstr ""
 
+#: src/components/create-from-document.tsx
 #: src/components/import-project.tsx
 msgid "Choose a .json, .yaml or .yml file."
 msgstr ""
@@ -2181,6 +2194,14 @@ msgstr ""
 msgid "Create flag"
 msgstr ""
 
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "Create from a document"
+msgstr ""
+
+#: src/components/create-from-document.tsx
+msgid "Create from this document"
+msgstr ""
+
 #: src/components/sdk-keys.tsx
 msgid "Create key"
 msgstr ""
@@ -2246,6 +2267,10 @@ msgstr ""
 
 #: src/components/project-token-list.tsx
 msgid "Created by"
+msgstr ""
+
+#: src/components/create-from-document.tsx
+msgid "Creates the project <0>{createdKey}</0> holding:"
 msgstr ""
 
 #: src/components/saml-provider-detail.tsx
@@ -3395,12 +3420,24 @@ msgstr ""
 msgid "Export"
 msgstr ""
 
+#: src/components/download-project-document.tsx
+msgid "Export as JSON"
+msgstr ""
+
+#: src/components/download-project-document.tsx
+msgid "Export as YAML"
+msgstr ""
+
 #: src/components/sink-editor.tsx
 msgid "Export only the events of the environments you tick; tick none for every environment."
 msgstr ""
 
 #: src/components/sink-editor.tsx
 msgid "Export only the kinds you tick; tick none for every kind."
+msgstr ""
+
+#: src/components/download-project-document.tsx
+msgid "Export the project's configuration"
 msgstr ""
 
 #: src/lib/experiment-alerts.ts
@@ -4169,6 +4206,7 @@ msgstr ""
 msgid "Kept in this browser, and used on the sign-in page too. System follows your device's setting."
 msgstr ""
 
+#: src/components/create-from-document.tsx
 #: src/components/discovered-attributes.tsx
 #: src/components/experiment-fields.tsx
 #: src/components/experiment-transitions.tsx
@@ -4633,8 +4671,16 @@ msgstr ""
 msgid "Membership (condition {position})"
 msgstr ""
 
+#: src/components/import-project.tsx
+msgid "Merge"
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Merge creates or updates what the document names and leaves everything else alone."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/import-export.tsx
-msgid "Merges a project document into this project: what it names is created or updated, and nothing is deleted. You see everything it would change before you apply it."
+msgid "Merges a project document into this project, or replaces the project's configuration with it. You see everything it would create, update and delete before you apply it."
 msgstr ""
 
 #: src/components/saml-provider-detail.tsx
@@ -4660,6 +4706,18 @@ msgstr ""
 
 #: src/components/experiment-transitions.tsx
 msgid "Missing to start"
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Mode"
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Mode: Merge"
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Mode: Replace"
 msgstr ""
 
 #: src/components/navigation.tsx
@@ -4692,6 +4750,7 @@ msgstr ""
 
 #: src/components/auth-provider-form.tsx
 #: src/components/auth-provider-list.tsx
+#: src/components/create-from-document.tsx
 #: src/components/experiment-fields.tsx
 #: src/components/experiment-transitions.tsx
 #: src/components/flag-definition-sheet.tsx
@@ -5724,6 +5783,7 @@ msgstr ""
 msgid "Project created"
 msgstr ""
 
+#: src/components/create-from-document.tsx
 #: src/components/import-project.tsx
 msgid "Project document"
 msgstr ""
@@ -6098,6 +6158,14 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Rename {key}"
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Replace"
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Replace makes the project's configuration equal to the document: what the document does not name is deleted, unless something still uses it."
 msgstr ""
 
 #: src/components/compare-environments.tsx
@@ -7009,6 +7077,10 @@ msgstr ""
 msgid "Starting puts it into the ruleset of each of these environments at once, and its flag, unit type and weights stay as they are while it runs:"
 msgstr ""
 
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "Starts a project from a project document, such as the export of a project of this or another instance. The project holds exactly what the document names, plus the standard attributes."
+msgstr ""
+
 #: src/components/change-request-diff.tsx
 msgid "Starts the experiment: it is put into the ruleset of each environment holding it."
 msgstr ""
@@ -7043,6 +7115,10 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Status changed from {before} to {after}."
+msgstr ""
+
+#: src/components/import-project.tsx
+msgid "Still in use by"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
@@ -7418,6 +7494,10 @@ msgstr ""
 msgid "The devices you are signed in on"
 msgstr ""
 
+#: src/components/create-from-document.tsx
+msgid "The document's own unless you change it. It never changes afterwards."
+msgstr ""
+
 #: src/components/experiment-transitions.tsx
 msgid "The draft {key} is created."
 msgstr ""
@@ -7480,6 +7560,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/event-volume.tsx
 msgid "The events SDKs posted to the project per UTC day they were received, as the rollups counted them. The counts stay after retention drops the events themselves."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "the experiment {key}"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
@@ -7927,6 +8011,10 @@ msgstr ""
 msgid "The project received no event in these days."
 msgstr ""
 
+#: src/components/delete-project.tsx
+msgid "The project's configuration, which is not in the audit log, can be exported as a project document and imported again, into a new project or another instance."
+msgstr ""
+
 #: src/components/navigation.tsx
 msgid "The project's screens could not be read."
 msgstr ""
@@ -8015,6 +8103,10 @@ msgstr ""
 
 #: src/components/schedule-failure-notice.tsx
 msgid "The scheduler tries again at its next round and stops after repeated failures. To propose it again, cancel this change request and copy it."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "the SDK key {key}"
 msgstr ""
 
 #: src/components/sdk-inventory.tsx
@@ -8319,6 +8411,7 @@ msgstr ""
 msgid "This instance allows a token at most {lifetime} ahead."
 msgstr ""
 
+#: src/components/create-from-document.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "This instance already has a project with that key."
 msgstr ""

@@ -43,3 +43,25 @@ test("an owner deletes a project after downloading its audit log and typing its 
   const read = await getProject({ client: managementClient(), path: { project: key } });
   expect(read.response?.status).toBe(404);
 });
+
+test("the deletion dialog offers the project's export before the key is typed", async ({
+  page,
+}) => {
+  const key = await seedProject("exportfirst");
+  await signIn(page);
+  await page.goto(`/projects/${key}/settings`);
+  await page.getByRole("button", { name: "Delete project" }).click();
+  const dialog = page.getByRole("dialog", { name: `Delete ${key}` });
+
+  const downloading = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: "Export as YAML" }).click();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toMatch(new RegExp(`^${key}-.*\\.yaml$`));
+  expect(await readFile((await download.path())!, "utf8")).toContain("schema_version");
+  await expectNoSeriousViolations(page, "the deletion dialog with the export");
+
+  // The project is still there: only the typed key deletes it.
+  await expect(dialog.getByRole("button", { name: "Delete project" })).toBeDisabled();
+  const read = await getProject({ client: managementClient(), path: { project: key } });
+  expect(read.response?.status).toBe(200);
+});

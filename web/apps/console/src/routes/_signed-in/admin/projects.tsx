@@ -8,6 +8,7 @@ import { useId } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { CreateFromDocument } from "@/components/create-from-document";
 import { ProjectsTable } from "@/components/projects-table";
 import { QueryError } from "@/components/query-error";
 import { Field } from "@/components/ui/field";
@@ -32,6 +33,7 @@ function InstanceProjects() {
   const { t } = useLingui();
   const projects = useQuery(projectsQuery);
   const newProject = useId();
+  const fromDocument = useId();
   const allProjects = useId();
 
   return (
@@ -50,6 +52,19 @@ function InstanceProjects() {
           <Trans>New project</Trans>
         </h2>
         <CreateProject />
+      </section>
+      <section aria-labelledby={fromDocument} className="flex flex-col gap-4">
+        <h2 id={fromDocument} className="text-base font-semibold">
+          <Trans>Create from a document</Trans>
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          <Trans>
+            Starts a project from a project document, such as the export of a project of this or
+            another instance. The project holds exactly what the document names, plus the standard
+            attributes.
+          </Trans>
+        </p>
+        <CreateFromDocument />
       </section>
       <section aria-labelledby={allProjects} className="flex flex-col gap-4">
         <h2 id={allProjects} className="text-base font-semibold">

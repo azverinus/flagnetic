@@ -75,6 +75,10 @@ msgstr "{count, plural, one {минута} few {минуты} many {минут} 
 msgid "{count, plural, one {second} other {seconds}}"
 msgstr "{count, plural, one {секунда} few {секунды} many {секунд} other {секунды}}"
 
+#: src/components/import-project.tsx
+msgid "{count, plural, one {This import deletes # entity from the project. Deletions cannot be undone.} other {This import deletes # entities from the project. Deletions cannot be undone.}}"
+msgstr "{count, plural, one {Этот импорт удалит # объект из проекта. Удаление нельзя отменить.} few {Этот импорт удалит # объекта из проекта. Удаление нельзя отменить.} many {Этот импорт удалит # объектов из проекта. Удаление нельзя отменить.} other {Этот импорт удалит # объекта из проекта. Удаление нельзя отменить.}}"
+
 #: src/components/experiment-transitions.tsx
 msgid "{created} by {creator}"
 msgstr "{created}, {creator}"
@@ -521,6 +525,10 @@ msgstr "Папка в бакете, в которую пишутся файлы,
 #: src/lib/problem-messages.ts
 msgid "A header has a name of letters, digits and symbols without spaces, and a value on one line."
 msgstr "Имя заголовка состоит из букв, цифр и символов без пробелов, значение занимает одну строку."
+
+#: src/components/create-from-document.tsx
+msgid "A JSON or YAML file, such as an export of a project of this or another instance."
+msgstr "Файл JSON или YAML, например экспорт проекта этого или другого экземпляра."
 
 #: src/components/import-project.tsx
 msgid "A JSON or YAML file, such as an export of this or another project."
@@ -1666,6 +1674,10 @@ msgstr "Проверить снова"
 msgid "Check what it would change"
 msgstr "Проверить, что изменится"
 
+#: src/components/create-from-document.tsx
+msgid "Check what it would create"
+msgstr "Проверить, что будет создано"
+
 #: src/components/experiment-exposures.tsx
 msgid "Checked <0/>."
 msgstr "Проверено <0/>."
@@ -1678,6 +1690,7 @@ msgstr "Проверяются сверху вниз; срабатывает п�
 msgid "Checking what the import would change…"
 msgstr "Проверяем, что изменит импорт…"
 
+#: src/components/create-from-document.tsx
 #: src/components/import-project.tsx
 msgid "Choose a .json, .yaml or .yml file."
 msgstr "Выберите файл .json, .yaml или .yml."
@@ -2181,6 +2194,14 @@ msgstr "Создать эксперимент"
 msgid "Create flag"
 msgstr "Создать флаг"
 
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "Create from a document"
+msgstr "Создать из документа"
+
+#: src/components/create-from-document.tsx
+msgid "Create from this document"
+msgstr "Создать из этого документа"
+
 #: src/components/sdk-keys.tsx
 msgid "Create key"
 msgstr "Создать ключ"
@@ -2247,6 +2268,10 @@ msgstr "Создан"
 #: src/components/project-token-list.tsx
 msgid "Created by"
 msgstr "Создатель"
+
+#: src/components/create-from-document.tsx
+msgid "Creates the project <0>{createdKey}</0> holding:"
+msgstr "Создаст проект <0>{createdKey}</0> со следующим содержимым:"
 
 #: src/components/saml-provider-detail.tsx
 msgid "Current"
@@ -3395,6 +3420,14 @@ msgstr "Истекает"
 msgid "Export"
 msgstr "Экспорт"
 
+#: src/components/download-project-document.tsx
+msgid "Export as JSON"
+msgstr "Экспорт в JSON"
+
+#: src/components/download-project-document.tsx
+msgid "Export as YAML"
+msgstr "Экспорт в YAML"
+
 #: src/components/sink-editor.tsx
 msgid "Export only the events of the environments you tick; tick none for every environment."
 msgstr "Выгружать только события отмеченных окружений. Если не отмечено ни одного, выгружаются все окружения."
@@ -3402,6 +3435,10 @@ msgstr "Выгружать только события отмеченных ок
 #: src/components/sink-editor.tsx
 msgid "Export only the kinds you tick; tick none for every kind."
 msgstr "Выгружать только отмеченные виды. Если не отмечено ни одного, выгружаются все виды."
+
+#: src/components/download-project-document.tsx
+msgid "Export the project's configuration"
+msgstr "Экспорт конфигурации проекта"
 
 #: src/lib/experiment-alerts.ts
 msgid "Exposure conflicts"
@@ -4169,6 +4206,7 @@ msgstr "Сохранять работу старого ключа"
 msgid "Kept in this browser, and used on the sign-in page too. System follows your device's setting."
 msgstr "Хранится в этом браузере и применяется и на странице входа. Вариант «Как в системе» следует настройке устройства."
 
+#: src/components/create-from-document.tsx
 #: src/components/discovered-attributes.tsx
 #: src/components/experiment-fields.tsx
 #: src/components/experiment-transitions.tsx
@@ -4633,9 +4671,17 @@ msgstr "Участники, которые могут одобрять запр�
 msgid "Membership (condition {position})"
 msgstr "Принадлежность (условие {position})"
 
+#: src/components/import-project.tsx
+msgid "Merge"
+msgstr "Слияние"
+
+#: src/components/import-project.tsx
+msgid "Merge creates or updates what the document names and leaves everything else alone."
+msgstr "Слияние создаёт или обновляет то, что названо в документе, и не трогает остальное."
+
 #: src/routes/_signed-in/projects/$project/import-export.tsx
-msgid "Merges a project document into this project: what it names is created or updated, and nothing is deleted. You see everything it would change before you apply it."
-msgstr "Объединяет документ проекта с этим проектом: то, что в нём названо, создаётся или обновляется, ничего не удаляется. Всё, что изменится, вы увидите до применения."
+msgid "Merges a project document into this project, or replaces the project's configuration with it. You see everything it would create, update and delete before you apply it."
+msgstr "Сливает документ проекта с этим проектом или заменяет им конфигурацию проекта. Перед применением вы видите всё, что будет создано, изменено и удалено."
 
 #: src/components/saml-provider-detail.tsx
 #: src/components/saml-provider-form.tsx
@@ -4661,6 +4707,18 @@ msgstr "Несоответствие: первые экспозиции един
 #: src/components/experiment-transitions.tsx
 msgid "Missing to start"
 msgstr "Чего не хватает для запуска"
+
+#: src/components/import-project.tsx
+msgid "Mode"
+msgstr "Режим"
+
+#: src/components/import-project.tsx
+msgid "Mode: Merge"
+msgstr "Режим: слияние"
+
+#: src/components/import-project.tsx
+msgid "Mode: Replace"
+msgstr "Режим: замена"
 
 #: src/components/navigation.tsx
 msgid "More than {awaitingCountLimit} change requests await your decision"
@@ -4692,6 +4750,7 @@ msgstr "Перемещено из {from} в {path}"
 
 #: src/components/auth-provider-form.tsx
 #: src/components/auth-provider-list.tsx
+#: src/components/create-from-document.tsx
 #: src/components/experiment-fields.tsx
 #: src/components/experiment-transitions.tsx
 #: src/components/flag-definition-sheet.tsx
@@ -5724,6 +5783,7 @@ msgstr "Проект"
 msgid "Project created"
 msgstr "Проект создан"
 
+#: src/components/create-from-document.tsx
 #: src/components/import-project.tsx
 msgid "Project document"
 msgstr "Документ проекта"
@@ -6099,6 +6159,14 @@ msgstr "Убран: его правила удалены."
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Rename {key}"
 msgstr "Переименовать {key}"
+
+#: src/components/import-project.tsx
+msgid "Replace"
+msgstr "Замена"
+
+#: src/components/import-project.tsx
+msgid "Replace makes the project's configuration equal to the document: what the document does not name is deleted, unless something still uses it."
+msgstr "Замена приводит конфигурацию проекта в точное соответствие с документом: то, чего в документе нет, удаляется, если это нигде не используется."
 
 #: src/components/compare-environments.tsx
 msgid "Replace the overrides of {to} with those of {source}"
@@ -7009,6 +7077,10 @@ msgstr "Запущен"
 msgid "Starting puts it into the ruleset of each of these environments at once, and its flag, unit type and weights stay as they are while it runs:"
 msgstr "Запуск сразу добавит его в набор правил каждого из этих окружений, а флаг, тип единицы и веса останутся неизменными, пока он запущен:"
 
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "Starts a project from a project document, such as the export of a project of this or another instance. The project holds exactly what the document names, plus the standard attributes."
+msgstr "Создаёт проект из документа проекта, например из экспорта проекта этого или другого экземпляра. В проекте будет ровно то, что названо в документе, и стандартные атрибуты."
+
 #: src/components/change-request-diff.tsx
 msgid "Starts the experiment: it is put into the ruleset of each environment holding it."
 msgstr "Запускает эксперимент: он попадает в набор правил каждого окружения, где он есть."
@@ -7044,6 +7116,10 @@ msgstr "Статус"
 #: src/components/structural-diff-view.tsx
 msgid "Status changed from {before} to {after}."
 msgstr "Статус изменён: был «{before}», стал «{after}»."
+
+#: src/components/import-project.tsx
+msgid "Still in use by"
+msgstr "Всё ещё используется"
 
 #: src/components/experiment-transitions.tsx
 msgid "Stop"
@@ -7418,6 +7494,10 @@ msgstr "Устройства, на которых вошёл участник {n
 msgid "The devices you are signed in on"
 msgstr "Устройства, на которых выполнен вход"
 
+#: src/components/create-from-document.tsx
+msgid "The document's own unless you change it. It never changes afterwards."
+msgstr "Как в документе, если не изменить. Потом ключ никогда не меняется."
+
 #: src/components/experiment-transitions.tsx
 msgid "The draft {key} is created."
 msgstr "Черновик {key} создан."
@@ -7481,6 +7561,10 @@ msgstr "Событие поставлено в очередь на повтор�
 #: src/routes/_signed-in/projects/$project/event-volume.tsx
 msgid "The events SDKs posted to the project per UTC day they were received, as the rollups counted them. The counts stay after retention drops the events themselves."
 msgstr "События, которые SDK прислали в проект, по дню получения (UTC), как их подсчитали агрегаторы. Подсчёты остаются и после того, как хранение удалит сами события."
+
+#: src/lib/problem-messages.ts
+msgid "the experiment {key}"
+msgstr "эксперимент {key}"
 
 #: src/components/experiment-transitions.tsx
 msgid "The experiment {key} is archived."
@@ -7927,6 +8011,10 @@ msgstr "Проект сохранён."
 msgid "The project received no event in these days."
 msgstr "За эти дни проект не получил ни одного события."
 
+#: src/components/delete-project.tsx
+msgid "The project's configuration, which is not in the audit log, can be exported as a project document and imported again, into a new project or another instance."
+msgstr "Конфигурацию проекта, которой нет в журнале аудита, можно выгрузить как документ проекта и позже импортировать снова: в новый проект или в другой экземпляр."
+
 #: src/components/navigation.tsx
 msgid "The project's screens could not be read."
 msgstr "Не удалось загрузить разделы проекта."
@@ -8016,6 +8104,10 @@ msgstr "Планировщик остановился после {attempts} не
 #: src/components/schedule-failure-notice.tsx
 msgid "The scheduler tries again at its next round and stops after repeated failures. To propose it again, cancel this change request and copy it."
 msgstr "Планировщик повторит попытку в следующем проходе и остановится после нескольких сбоев. Чтобы предложить заново, отмените этот запрос на изменение и скопируйте его."
+
+#: src/lib/problem-messages.ts
+msgid "the SDK key {key}"
+msgstr "ключ SDK {key}"
 
 #: src/components/sdk-inventory.tsx
 msgid "The SDKs that have asked this environment for its ruleset or for values, most recently seen first. A row appears within a minute of an SDK’s request; whether an SDK is connected right now is not shown."
@@ -8319,6 +8411,7 @@ msgstr "Наибольший срок действия токена на это�
 msgid "This instance allows a token at most {lifetime} ahead."
 msgstr "Наибольший срок действия токена на этом экземпляре — {lifetime}."
 
+#: src/components/create-from-document.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "This instance already has a project with that key."
 msgstr "В этом экземпляре уже есть проект с таким ключом."

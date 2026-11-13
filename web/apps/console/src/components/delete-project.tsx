@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/can";
 import { DownloadAudit } from "@/components/download-audit";
+import { DownloadProjectDocument } from "@/components/download-project-document";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ApiError, unwrap } from "@/lib/errors";
@@ -101,6 +102,13 @@ export function DeleteProject({ project }: { project: Project }) {
           </Trans>
         </p>
         <DownloadAudit scope={{ project: key }} search={unfiltered} />
+        <p>
+          <Trans>
+            The project's configuration, which is not in the audit log, can be exported as a project
+            document and imported again, into a new project or another instance.
+          </Trans>
+        </p>
+        <DownloadProjectDocument project={key} />
       </ConfirmDialog>
     </section>
   );

@@ -1,12 +1,33 @@
-import { createGrant, exportProject } from "@flagnetic/api";
+import { createGrant, createSdkKey, exportProject } from "@flagnetic/api";
 import { readFile } from "node:fs/promises";
 
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
-import { managementClient, must, seedMember, seedProject, signIn } from "../support/console";
+import {
+  managementClient,
+  must,
+  type SignInWords,
+  seedMember,
+  seedProject,
+  signIn,
+} from "../support/console";
+import { admin } from "../support/instance";
 import { readConfiguration, seedFlag, stringFlag } from "../support/flags";
-import { documentWithFlagToggled, exportedDocument } from "../support/transfer";
+import {
+  documentFile,
+  documentWithFlagToggled,
+  exportedDocument,
+  exportedObject,
+} from "../support/transfer";
+
+/** The sign-in page as it reads in Russian. */
+const russian: SignInWords = {
+  email: "Электронная почта",
+  password: "Пароль",
+  submit: "Войти",
+  next: "Продолжить",
+};
 
 const password = "harness-quince-ferry-5521";
 
@@ -229,5 +250,88 @@ test.describe("importing a project document", () => {
     await expect(page.getByRole("alert")).toBeVisible();
     await expect(page.getByRole("button", { name: "Apply", exact: true })).toHaveCount(0);
     await expectNoSeriousViolations(page, "the import review of a refused document");
+  });
+});
+
+/** Switches the import to replace mode. */
+async function chooseReplace(page: Page) {
+  await page.getByRole("combobox", { name: "Mode" }).click();
+  await page.getByRole("option", { name: "Replace" }).click();
+}
+
+test.describe("replacing a project's configuration with a document", () => {
+  test("shows what a replace deletes, emphasised, and deletes it on apply", async ({ page }) => {
+    const project = await seedProject("replace");
+    await seedFlag(project, stringFlag("checkout_redesign"));
+    await seedFlag(project, stringFlag("legacy_banner"));
+    await signIn(page);
+    await openPage(page, project);
+    const document = await exportedObject(project);
+    document.flags = document.flags.filter((flag) => flag.key !== "legacy_banner");
+
+    await chooseReplace(page);
+    await check(page, documentFile(document, `${project}.json`));
+
+    await expect(page.getByRole("alert")).toContainText(
+      "This import deletes 1 entity from the project",
+    );
+    const flags = page.getByRole("region", { name: "Flags" });
+    await expect(flags).toContainText("Deleted");
+    await expect(flags).toContainText("legacy_banner");
+    await expectNoSeriousViolations(page, "the replace review with a deletion");
+
+    await page.getByRole("button", { name: "Apply", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Imported.");
+    const gone = await exportedObject(project);
+    expect(gone.flags.map((flag) => flag.key)).toEqual(["checkout_redesign"]);
+  });
+
+  test("refuses a replace that would delete what is in use and lists the references", async ({
+    page,
+  }) => {
+    const project = await seedProject("replaceuse");
+    must(
+      "creating an SDK key",
+      await createSdkKey({
+        client: managementClient(),
+        path: { project, environment: "staging" },
+        body: { kind: "server", name: "Staging service" },
+      }),
+    );
+    await signIn(page);
+    await openPage(page, project);
+    const document = await exportedObject(project);
+    document.environments = document.environments.filter((env) => env.key !== "staging");
+    for (const flag of document.flags) delete flag.configurations.staging;
+
+    await chooseReplace(page);
+    await check(page, documentFile(document, `${project}.json`));
+
+    const references = page.getByRole("list", { name: "Still in use by" });
+    await expect(references).toContainText("the SDK key");
+    await expect(references).toContainText("in staging");
+    await expect(page.getByRole("button", { name: "Apply", exact: true })).toHaveCount(0);
+    await expectNoSeriousViolations(page, "the replace review with an in_use refusal");
+  });
+
+  test.describe("in Russian", () => {
+    test.use({ locale: "ru-RU" });
+
+    test("reads the mode and the deletions in Russian", async ({ page }) => {
+      const project = await seedProject("replaceru");
+      await seedFlag(project, stringFlag("legacy_banner"));
+      await signIn(page, admin, russian);
+      await page.goto(`/projects/${project}/import-export`);
+      const document = await exportedObject(project);
+      document.flags = [];
+
+      await page.getByRole("combobox", { name: "Режим" }).click();
+      await page.getByRole("option", { name: "Замена" }).click();
+      await page.getByLabel("Документ проекта").setInputFiles(documentFile(document, "p.json"));
+      await page.getByRole("button", { name: "Проверить, что изменится" }).click();
+
+      await expect(page.getByRole("alert")).toContainText("Этот импорт удалит 1 объект");
+      await expectNoSeriousViolations(page, "the replace review in Russian");
+    });
   });
 });
