@@ -152,8 +152,6 @@ func (f exposuresFixture) refused(t *testing.T, environment string) map[events.R
 }
 
 func TestAnExposureOfAnExperimentIsStoredOnce(t *testing.T) {
-	// An exposure may belong to a stopped experiment too, since a mobile
-	// app flushes its queue days late.
 	f := startExposures(t)
 	body := batch(exposureEvent(1, map[string]any{"app_version": nil}), exposureEvent(2, map[string]any{
 		"variation_key": "false", "unit_id": "u-1002", "override": true, "evaluation_reason": "override", "ruleset_version": 4,
@@ -203,7 +201,7 @@ func TestAnOverrideExposureOfAVariationTheFlagLacksIsRefused(t *testing.T) {
 func TestAnExposureOfADraftExperimentIsRefused(t *testing.T) {
 	f := startExposures(t)
 	f.p.flagWithVariations(t, "banner", "short", "Try", "long", "Start")
-	f.p.draftExperiment(t, "banner_test", "banner", "user", "short", 5000, "long", 5000)
+	draft := f.p.draftExperiment(t, "banner_test", "banner", "user", "short", 5000, "long", 5000)
 	exposure := with(exposureEvent(1, nil), map[string]any{
 		"experiment_key": "banner_test", "flag_key": "banner", "variation_key": "short",
 	})
@@ -215,6 +213,33 @@ func TestAnExposureOfADraftExperimentIsRefused(t *testing.T) {
 	}
 	if stored := f.stored(t); len(stored) != 0 {
 		t.Errorf("exposures stored = %+v, want none", stored)
+	}
+	// Refused as if it did not exist, so the draft's refusals count nothing.
+	counts, err := pgevents.NewStore(testkit.Pool(t)).RejectionCountsOf(t.Context(),
+		id.FromBytes[experiments.Experiment](draft.Id), f.p.environmentID(t, "production"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(counts) != 0 {
+		t.Errorf("the draft's refusals = %+v, want none counted", counts)
+	}
+}
+
+func TestAnExposureOfAStoppedExperimentIsAccepted(t *testing.T) {
+	// A mobile app may flush its queue days after the experiment stopped.
+	f := startExposures(t)
+	got := do(f.p.admin.GetExperimentWithResponse(t.Context(), f.p.key, "checkout_test"))
+	if got.JSON200 == nil {
+		t.Fatalf("GET …/experiments/checkout_test = %d: %s", got.StatusCode(), got.Body)
+	}
+	stopped := do(f.p.admin.StopExperimentWithResponse(t.Context(), f.p.key, "checkout_test",
+		&management.StopExperimentParams{IfMatch: ptr(strconv.Quote(strconv.FormatInt(got.JSON200.Version, 10)))},
+		management.ExperimentStop{Outcome: "removed"}))
+	if stopped.JSON200 == nil {
+		t.Fatalf("stopping checkout_test = %d: %s", stopped.StatusCode(), stopped.Body)
+	}
+	if res := batchResult(t, f.srv, f.client, batch(exposureEvent(1, nil))); res.Accepted != 1 || len(res.Rejected) != 0 {
+		t.Errorf("batch = %+v, want the exposure of the stopped experiment accepted", res)
 	}
 }
 

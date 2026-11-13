@@ -316,6 +316,16 @@ test.describe("experiments", () => {
         },
       ],
     }));
+    // An exposure of a draft is refused, since a draft is served to no unit.
+    const draft = await readExperiment(project, "cta_copy");
+    must(
+      "starting cta_copy",
+      await startExperiment({
+        client: managementClient(),
+        path: { project, experiment: "cta_copy" },
+        headers: { "If-Match": `"${draft.version}"` },
+      }),
+    );
     const key = await seedSdkKey(project, "staging", { kind: "server", name: "Checkout" });
     const now = Date.now();
     const exposure = (unitId: string, variation: string, minutesAgo: number) => ({
