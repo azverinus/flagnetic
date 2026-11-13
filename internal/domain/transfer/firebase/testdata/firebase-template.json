@@ -1,0 +1,62 @@
+{
+  "conditions": [
+    {
+      "name": "android_old",
+      "expression": "device.os == 'android' && app.version.<(['1.41.0'])",
+      "tagColor": "BLUE"
+    },
+    {
+      "name": "ios_or_beta_app",
+      "expression": "device.os == 'ios' || app.id == '1:1234:android:beta'"
+    },
+    {
+      "name": "ten_percent",
+      "expression": "percent <= 10"
+    },
+    {
+      "name": "launch_day",
+      "expression": "dateTime >= dateTime('2026-10-01T00:00:00')"
+    },
+    {
+      "name": "pro_or_early",
+      "expression": "app.userProperty['Plan Type'].exactlyMatches(['pro']) || app.firstOpenTimestamp <= ('2026-01-01T00:00:00')"
+    }
+  ],
+  "parameters": {
+    "new_matching": {
+      "defaultValue": {"value": "false"},
+      "conditionalValues": {
+        "launch_day": {"value": "true"},
+        "ten_percent": {"value": "true"},
+        "android_old": {"value": "true"}
+      },
+      "description": "The new matching screen.",
+      "valueType": "BOOLEAN"
+    },
+    "banner_text": {
+      "defaultValue": {"value": "Hello"},
+      "conditionalValues": {
+        "pro_or_early": {"value": "Welcome, pro"},
+        "android_old": {"value": "Hello"},
+        "ios_or_beta_app": {"value": "Hi"}
+      }
+    }
+  },
+  "parameterGroups": {
+    "Onboarding": {
+      "description": "The first session.",
+      "parameters": {
+        "onboarding_steps": {
+          "defaultValue": {"value": "3"},
+          "conditionalValues": {"android_old": {"value": "5"}},
+          "valueType": "NUMBER"
+        },
+        "legacy_limits": {
+          "defaultValue": {"useInAppDefault": true},
+          "valueType": "JSON"
+        }
+      }
+    }
+  },
+  "version": {"versionNumber": "42", "updateOrigin": "CONSOLE", "updateType": "INCREMENTAL_UPDATE"}
+}

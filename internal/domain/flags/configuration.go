@@ -113,6 +113,13 @@ func InitialConfiguration(f Flag, environment workspace.EnvironmentID, by *acces
 	}
 }
 
+// MaxRules is how many rules a configuration holds at most, and
+// MaxConditions how many conditions a rule or a segment holds at most.
+const (
+	MaxRules      = maxRules
+	MaxConditions = maxConditions
+)
+
 // Bounds of a configuration, which every SDK evaluates on every call.
 const (
 	maxRules             = 50
