@@ -86,32 +86,34 @@ export function CreateFromDocument() {
       >
         <Input type="file" accept=".json,.yaml,.yml" onChange={(event) => void choose(event)} />
       </Field>
-      <Field
-        label={t`Key`}
-        hint={t`The document's own unless you change it. It never changes afterwards.`}
-        error={taken ? t`This instance already has a project with that key.` : undefined}
-      >
-        <Input
-          autoComplete="off"
-          value={key}
-          disabled={document === undefined}
-          onChange={(event) => {
-            setKey(event.target.value);
-            edited();
-          }}
-        />
-      </Field>
-      <Field label={t`Name`}>
-        <Input
-          autoComplete="off"
-          value={name}
-          disabled={document === undefined}
-          onChange={(event) => {
-            setName(event.target.value);
-            edited();
-          }}
-        />
-      </Field>
+      {document ? (
+        <>
+          <Field
+            label={t`Key`}
+            hint={t`The document's own unless you change it. It never changes afterwards.`}
+            error={taken ? t`This instance already has a project with that key.` : undefined}
+          >
+            <Input
+              autoComplete="off"
+              value={key}
+              onChange={(event) => {
+                setKey(event.target.value);
+                edited();
+              }}
+            />
+          </Field>
+          <Field label={t`Name`}>
+            <Input
+              autoComplete="off"
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value);
+                edited();
+              }}
+            />
+          </Field>
+        </>
+      ) : null}
       {refusal && !taken ? <ImportRefusal error={refusal} /> : null}
       {result ? (
         <div className="flex flex-col gap-4">

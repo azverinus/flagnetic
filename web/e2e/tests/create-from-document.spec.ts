@@ -20,8 +20,8 @@ test.describe("creating a project from a document", () => {
 
     await page.getByLabel("Project document").setInputFiles(documentFile(document, "export.json"));
     // The key and name default to the document's.
-    await expect(page.getByLabel("Key", { exact: true }).last()).toHaveValue(source);
     const section = page.getByRole("region", { name: "Create from a document" });
+    await expect(section.getByLabel("Key")).toHaveValue(source);
     await section.getByLabel("Key").fill(copy);
     await section.getByRole("button", { name: "Check what it would create" }).click();
     await expect(section.getByRole("region", { name: "Flags" })).toContainText("checkout_redesign");
