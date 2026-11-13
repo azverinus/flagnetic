@@ -9,11 +9,14 @@ import (
 )
 
 // ExperimentFacts is as much of an experiment as an exposure is judged
-// against: the flag it runs on, the unit type it assigns, and the variations
-// it weighs. An experiment of any status has them, since a mobile app may
-// flush its exposures days after the experiment stopped.
+// against: its status, the flag it runs on, the unit type it assigns, and the
+// variations it weighs. A started experiment of any status has them, since a
+// mobile app may flush its exposures days after the experiment stopped.
 type ExperimentFacts struct {
-	ID       experiments.ExperimentID
+	ID experiments.ExperimentID
+	// Status is the experiment's status. A draft is not served to any unit,
+	// so no SDK holds an exposure of one.
+	Status   experiments.Status
 	FlagKey  string
 	UnitType string
 	// Variations are the variations the experiment weighs.
@@ -26,7 +29,9 @@ type ExperimentFacts struct {
 // CheckExposure judges x against the experiment it names, nil when none
 // exists, and returns why it is refused, or nil when it agrees. The checks
 // run in a fixed order, so every SDK is told the same of the same exposure:
-// the experiment exists, the unit type is its own, the variation is one it
+// the experiment exists and has started (a draft assigns no unit, so an
+// exposure naming one was made up, and is refused as if no experiment were
+// keyed so), the unit type is its own, the variation is one it
 // weighs (an override exposure is checked against the flag's variations
 // instead, since an override decides the variation whatever the weights),
 // then the flag and the evaluation reason.
@@ -48,7 +53,7 @@ func CheckExposure(x Exposure, experiment *ExperimentFacts, detailed bool) *Reje
 		return &Rejection{Code: code, Detail: client}
 	}
 	switch {
-	case experiment == nil:
+	case experiment == nil || experiment.Status == experiments.StatusDraft:
 		return reject(RejectUnknownExperiment, fmt.Sprintf("no experiment is keyed %q", x.ExperimentKey),
 			fmt.Sprintf("no experiment is keyed %q", x.ExperimentKey))
 	case x.UnitType != experiment.UnitType:
