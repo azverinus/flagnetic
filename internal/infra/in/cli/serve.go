@@ -103,6 +103,7 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		Keyring: secret.NewKeyring(cfg.SecretKey), PasswordHashConcurrency: cfg.PasswordHashConcurrency,
 		RateLimits:            cfg.RateLimits,
 		EventsRetention:       time.Duration(cfg.EventsRetentionDays) * 24 * time.Hour,
+		EventsLossWarning:     time.Duration(cfg.EventsLossWarningHours) * time.Hour,
 		EventsPartitionsAhead: cfg.EventsPartitionsAhead,
 		SDKInventoryRetention: time.Duration(cfg.SDKInventoryRetentionDays) * 24 * time.Hour,
 		Schedule: compose.Schedule{

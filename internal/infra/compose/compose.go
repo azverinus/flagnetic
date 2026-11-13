@@ -93,6 +93,9 @@ type Options struct {
 	RateLimits config.RateLimits
 	// EventsRetention is how long raw events are kept.
 	EventsRetention time.Duration
+	// EventsLossWarning is how long before retention drops a row a sink that
+	// has not delivered it is at risk.
+	EventsLossWarning time.Duration
 	// EventsPartitionsAhead is how many days after today the raw event
 	// tables' partitions are created ahead of time.
 	EventsPartitionsAhead int
@@ -248,12 +251,16 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// Retention drops the partitions sinks read, recording the rows a stream
 	// had not delivered as a gap in the drop's own unit of work.
 	sinkRetention := appsinks.NewRetention(appsinks.RetentionDeps{Store: sinkStore, Rows: sinkStore, Audit: audit, IDs: d.IDs})
-	sinkMetrics := worker.NewSinkMetrics(reg, sinkStore)
+	sinkMetrics := worker.NewSinkMetrics(reg, sinkStore, sinkStore)
 	sinks.Observer = sinkMetrics
 	sinkDelivery := appsinks.NewDeliver(appsinks.DeliverDeps{
 		Tx: tx, Store: sinkStore, Rows: sinkStore, Targets: sinkTargets, Opener: o.Keyring, Audit: audit, Clock: d.Clock,
 		IDs: d.IDs, Observer: sinkMetrics, Random: mrand.Float64,
 		RejectionAttempts: o.SinkRejectionAttempts, StopAfterDeadLetters: o.SinkStopAfterDeadLetters,
+	})
+	sinkAtRisk := appsinks.NewEvaluateAtRisk(appsinks.AtRiskDeps{
+		Tx: tx, Store: sinkStore, Rows: sinkStore, Audit: audit, Clock: d.Clock, IDs: d.IDs,
+		Retention: o.EventsRetention, LossWarning: o.EventsLossWarning,
 	})
 	deliveryRequests := appgovernance.DeliveryRequestDeps{
 		Tx: tx, Webhooks: webhookStore, Deliveries: webhookStore, Queue: outbox, Clock: d.Clock, IDs: d.IDs,
@@ -791,7 +798,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 				Opener: o.Keyring, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, Audit: audit, Outbox: outbox,
 				Notifier: webhookDisabledMail,
 			}), o.WebhookTick, edge.Logger(), reg),
-			worker.SinkDelivery(sinkDelivery, o.SinkTick, edge.Logger()),
+			worker.SinkDelivery(sinkDelivery, sinkAtRisk, o.SinkTick, edge.Logger()),
 			worker.WebhookRetention(appgovernance.NewRunWebhookRetention(tx, deliveryLog, d.Clock), reg),
 			worker.StaleFlagDigest(appgovernance.NewRunDigestRound(digest, o.DigestSlot).Handle),
 			worker.ProjectPurge(appworkspace.NewPurgeDeletedProjects(tx, ws)),

@@ -78,3 +78,26 @@ func TestBackoffDoublesFromASecondToFiveMinutesWithinItsSpread(t *testing.T) {
 		t.Errorf("backoff before any failure = %s, want the first second", got)
 	}
 }
+
+func TestASinkIsAtRiskOnceItsOldestUndeliveredRowIsWithinTheLossWarningOfRetentionsEdge(t *testing.T) {
+	const retention, warning = 30 * 24 * time.Hour, 72 * time.Hour
+	edge := retention - warning
+	for name, tc := range map[string]struct {
+		lag       time.Duration
+		retention time.Duration
+		warning   time.Duration
+		want      bool
+	}{
+		"far from the edge":                  {lag: 24 * time.Hour, retention: retention, warning: warning, want: false},
+		"a second short of the warning":      {lag: edge - time.Second, retention: retention, warning: warning, want: false},
+		"exactly at the warning":             {lag: edge, retention: retention, warning: warning, want: true},
+		"past the warning":                   {lag: edge + time.Hour, retention: retention, warning: warning, want: true},
+		"a warning as long as retention":     {lag: time.Second, retention: 48 * time.Hour, warning: 48 * time.Hour, want: true},
+		"a warning longer than retention":    {lag: 0, retention: 24 * time.Hour, warning: 72 * time.Hour, want: true},
+		"no warning means only past the end": {lag: retention - time.Second, retention: retention, warning: 0, want: false},
+	} {
+		if got := sinks.AtRisk(tc.lag, tc.retention, tc.warning); got != tc.want {
+			t.Errorf("%s: AtRisk(%s, %s, %s) = %v, want %v", name, tc.lag, tc.retention, tc.warning, got, tc.want)
+		}
+	}
+}

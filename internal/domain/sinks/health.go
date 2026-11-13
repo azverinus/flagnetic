@@ -53,3 +53,13 @@ func (s Sink) Failing() bool {
 	}
 	return false
 }
+
+// AtRisk reports whether a sink whose oldest undelivered row is lag old is
+// about to lose data: retention drops a row once it is older than retention,
+// so a row that is within warning of that age will be dropped before it is
+// delivered unless the sink catches up or retention grows. It is judged only
+// for a sink that has an undelivered row, and independently of the sink's
+// health, since a disabled or stopped sink loses rows just the same.
+func AtRisk(lag, retention, warning time.Duration) bool {
+	return lag >= retention-warning
+}
