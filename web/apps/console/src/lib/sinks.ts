@@ -169,7 +169,12 @@ export function latestFailure(
   let latest: ReturnType<typeof latestFailure>;
   for (const stream of sink.streams) {
     const failure = stream.last_failure;
-    if (failure && (latest === undefined || failure.at > latest.failure.at)) {
+    // Compared as instants: the server trims trailing zeros of the
+    // fraction, so two times of one second differ in length as text.
+    if (
+      failure &&
+      (latest === undefined || Date.parse(failure.at) > Date.parse(latest.failure.at))
+    ) {
       latest = { eventKind: stream.event_kind, failure };
     }
   }

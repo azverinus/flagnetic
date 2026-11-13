@@ -48,6 +48,7 @@ describe("noticeKeys", () => {
     ["api_token", "tokens"],
     ["change_request", "change-requests"],
     ["webhook", "webhooks"],
+    ["sink", "sinks"],
   ])("a %s notice refreshes %s", (kind, segment) => {
     expect(noticeKeys("shop", { kind })).toContainEqual(["projects", "shop", segment]);
   });

@@ -262,6 +262,26 @@ describe("a sink that needs attention", () => {
     expect(latestFailure(sink)?.eventKind).toBe("alias");
     expect(latestFailure(webhookSink)).toBeUndefined();
   });
+
+  it("compares failure times as instants, not as text", () => {
+    const failure = (at: string) => ({ class: "rejected" as const, status: 422, code: null, at });
+    const sink = {
+      ...stopped,
+      streams: [
+        {
+          event_kind: "exposure" as const,
+          last_delivered_at: null,
+          last_failure: failure("2026-11-01T10:00:00.5Z"),
+        },
+        {
+          event_kind: "alias" as const,
+          last_delivered_at: null,
+          last_failure: failure("2026-11-01T10:00:00Z"),
+        },
+      ],
+    };
+    expect(latestFailure(sink)?.eventKind).toBe("exposure");
+  });
 });
 
 describe("a replay", () => {
