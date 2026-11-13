@@ -135,8 +135,16 @@ module Flagnetic
           @program = Program.new([], [], [], [])
         end
 
+        # compile walks the tree with a work list, not recursion: a tree can
+        # be a few thousand levels deep, more than the stack of a thread or a
+        # fiber holds. An entry is a Node to emit or a Proc to run, such as
+        # one patching a jump once its target is known.
         def compile(root)
-          emit_node(root)
+          @work = [root]
+          until @work.empty?
+            item = @work.pop
+            item.is_a?(Node) ? emit_node(item) : item.call
+          end
           emit(MATCH)
           @program.each(&:freeze)
           @program.freeze
@@ -154,11 +162,17 @@ module Flagnetic
 
         def here = @program.ops.size
 
+        # schedule queues steps to run in the order given, before anything
+        # queued earlier.
+        def schedule(steps)
+          @work.concat(steps.reverse)
+        end
+
         def emit_node(node)
           case node.kind
           when Node::CHAR then emit_char(node.set)
           when Node::ASSERT then emit(ASSERT, node.what)
-          when Node::CAT then node.subs.each { |sub| emit_node(sub) }
+          when Node::CAT then schedule(node.subs)
           when Node::ALT then emit_alternation(node.subs)
           else emit_repeat(node)
           end
@@ -172,37 +186,48 @@ module Flagnetic
         # split(a, L1); a; jmp end; L1: split(b, L2); b; jmp end; L2: c
         def emit_alternation(subs)
           exits = []
+          steps = []
           subs.each_with_index do |sub, k|
-            if k == subs.size - 1
-              emit_node(sub)
-            else
-              fork = emit(SPLIT, here + 1)
-              emit_node(sub)
+            next steps << sub if k == subs.size - 1
+
+            fork = nil
+            steps << -> { fork = emit(SPLIT, here + 1) }
+            steps << sub
+            steps << lambda {
               exits << emit(JMP)
               @program.y[fork] = here
-            end
+            }
           end
-          exits.each { |e| @program.x[e] = here }
+          steps << -> { exits.each { |e| @program.x[e] = here } }
+          schedule(steps)
         end
 
         def emit_repeat(node)
           sub = node.subs[0]
-          node.lo.times { emit_node(sub) }
+          steps = Array.new(node.lo, sub)
           if node.hi.negative?
-            # L: split(body, out); body; jmp L
-            fork = emit(SPLIT, here + 1)
-            emit_node(sub)
-            emit(JMP, fork)
-            @program.y[fork] = here
+            loop_steps(sub, steps)
           else
             # Each optional copy may skip to the end: the language of x{lo,hi}.
-            forks = Array.new(node.hi - node.lo) do
-              fork = emit(SPLIT, here + 1)
-              emit_node(sub)
-              fork
+            forks = []
+            (node.hi - node.lo).times do
+              steps << -> { forks << emit(SPLIT, here + 1) }
+              steps << sub
             end
-            forks.each { |f| @program.y[f] = here }
+            steps << -> { forks.each { |f| @program.y[f] = here } }
           end
+          schedule(steps)
+        end
+
+        # L: split(body, out); body; jmp L
+        def loop_steps(sub, steps)
+          fork = nil
+          steps << -> { fork = emit(SPLIT, here + 1) }
+          steps << sub
+          steps << lambda {
+            emit(JMP, fork)
+            @program.y[fork] = here
+          }
         end
       end
 

@@ -61,6 +61,14 @@ class RegexTest < Minitest::Test
     assert_equal true, matches("^a{1000}$", "a" * 1000)
   end
 
+  # A fiber's stack is a fraction of a thread's; compiling a deeply nested
+  # pattern must not depend on it.
+  def test_deeply_nested_pattern_compiles_on_a_fiber_stack
+    pattern = "^#{"(?:a" * 300}#{")*" * 300}$"
+
+    assert_equal true, Fiber.new { matches(pattern, "aaa") }.resume
+  end
+
   private
 
   def matches(pattern, input) = RegexHelper.matches(pattern, input)
