@@ -519,14 +519,12 @@ final class FlagneticClient {
 
   /// The flag [key] with why it was served. The type of [defaultValue]
   /// names the flag type asked for: `bool` is boolean, `String` is string,
-  /// `num` is number, anything else is JSON. An `int` default reads the flag
-  /// as [getInt] does.
-  Detail getDetail(String key, Object? defaultValue) => _serve(
-    key,
-    flagTypeOf(defaultValue),
-    defaultValue,
-    whole: defaultValue is int,
-  );
+  /// `num` is number, anything else is JSON. A default whose static type is
+  /// `int` reads the flag as [getInt] does. The static type decides, not the
+  /// runtime value: compiled for the web `1.0 is int` is true, which would
+  /// turn a double default into an integer read there only.
+  Detail getDetail<T extends Object?>(String key, T defaultValue) =>
+      _serve(key, flagTypeOf(defaultValue), defaultValue, whole: T == int);
 
   /// Calls [listener] with the keys whose value changed,
   /// added and removed flags included. Returns a function removing it.

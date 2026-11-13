@@ -209,7 +209,7 @@ final class ValuesDocument {
   /// (an offline document written by hand) is treated as unprotected.
   final bool protectedEnvironment;
 
-  /// The keys whose served value differs between [before] and [after],
+  /// The keys whose served flag differs between [before] and [after],
   /// added and removed flags included, sorted.
   static List<String> changedKeys(
     ValuesDocument? before,
@@ -217,12 +217,22 @@ final class ValuesDocument {
   ) {
     final old = before?.flags ?? const <String, ServedFlag>{};
     final now = after.flags;
+    // The whole flag counts, not the value alone: a detail reports the
+    // reason, the variation and the experiment block too, and a reader of
+    // details must learn of an experiment starting on the value it already
+    // served.
     bool same(ServedFlag? a, ServedFlag? b) =>
         a != null &&
         b != null &&
         a.type == b.type &&
+        a.reason == b.reason &&
         a.hasValue == b.hasValue &&
-        jsonEquals(a.value, b.value);
+        jsonEquals(a.value, b.value) &&
+        a.variation == b.variation &&
+        a.errorCode == b.errorCode &&
+        a.overrideInfluenced == b.overrideInfluenced &&
+        a.automaticExposure == b.automaticExposure &&
+        _sameExperiment(a.experiment, b.experiment);
     final keys = {
       for (final key in {...old.keys, ...now.keys})
         if (!same(old[key], now[key])) key,
@@ -247,6 +257,18 @@ ServedFlag? _flag(Map<String, Object?> json) {
     experiment: _experiment(json['experiment']),
   );
 }
+
+bool _sameExperiment(Experiment? a, Experiment? b) => a == null || b == null
+    ? a == b
+    : a.key == b.key &&
+          a.variation == b.variation &&
+          a.unitType == b.unitType &&
+          a.unitId == b.unitId &&
+          a.inclusionSalt == b.inclusionSalt &&
+          a.variationSalt == b.variationSalt &&
+          a.inclusionBucket == b.inclusionBucket &&
+          a.variationBucket == b.variationBucket &&
+          a.override == b.override;
 
 String? _string(Object? v) => v is String ? v : null;
 
