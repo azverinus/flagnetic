@@ -97,7 +97,7 @@ func TestTheDocumentedColumnsAreTheExportedRowsColumns(t *testing.T) {
 				continue
 			}
 			typ := docType(t, chType)
-			if kinds[name] != typ && !(kinds[name] == "number" && slices.Contains([]string{"int", "int64", "timestamp"}, typ)) {
+			if kinds[name] != typ && (kinds[name] != "number" || !slices.Contains([]string{"int", "int64", "timestamp"}, typ)) {
 				t.Errorf("%s.%s is JSON %s and ClickHouse %s", kind, name, kinds[name], chType)
 			}
 			want = append(want, testkit.DocColumn{Name: name, Type: typ})
@@ -149,7 +149,7 @@ func TestTheDocumentedObjectKeysAndWebhookEnvelopeAreWhatTheSinksWrite(t *testin
 
 	// The documented key template, filled in with one batch's values, is the
 	// key the sink writes that batch under.
-	template := regexp.MustCompile("(?m)^(\\{prefix\\}/\\{event_kind\\}/\\S+)$").FindStringSubmatch(doc)
+	template := regexp.MustCompile(`(?m)^(\{prefix\}/\{event_kind\}/\S+)$`).FindStringSubmatch(doc)
 	if template == nil {
 		t.Fatal("exported-events.md has no object key template")
 	}

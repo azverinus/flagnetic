@@ -17,7 +17,7 @@ func Doc(t testing.TB, name string) string {
 	if !ok {
 		t.Fatal("cannot find the repository")
 	}
-	b, err := os.ReadFile(filepath.Join(filepath.Dir(file), "..", "..", "docs", name))
+	b, err := os.ReadFile(filepath.Join(filepath.Dir(file), "..", "..", "docs", name)) //nolint:gosec // a test reads the page it holds to the code
 	if err != nil {
 		t.Fatal(err)
 	}
