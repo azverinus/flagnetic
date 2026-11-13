@@ -49,5 +49,7 @@ A failed ruleset fetch is retried by each SDK's own capped, jittered backoff; no
 
 | SDK | What it does with `Retry-After` on a ruleset fetch |
 | --- | --- |
-| JavaScript | Waits at least the header's delay (seconds or an HTTP date), but never longer than the backoff cap of 5 minutes (15 minutes after a refused key). |
-| Go, Python, Ruby, Dart and Flutter | Ignores it and retries by backoff alone. |
+| JavaScript (`flagnetic/server`) | Waits at least the header's delay (seconds or an HTTP date), but never longer than the backoff cap of 5 minutes (15 minutes after a refused key). |
+| Go, Python and Ruby | Ignores it and retries by backoff alone. |
+
+Dart, Flutter and `flagnetic/client` hold a client key, so they never download the ruleset; the server evaluates for them.
