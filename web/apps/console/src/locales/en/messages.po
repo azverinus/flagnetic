@@ -7253,8 +7253,8 @@ msgid "That sign-in was started in another browser or window, so it was not comp
 msgstr "That sign-in was started in another browser or window, so it was not completed. Start it again from here."
 
 #: src/lib/problem-messages.ts
-msgid "That time is before the oldest event still kept. Choose a later one, or enable from now."
-msgstr "That time is before the oldest event still kept. Choose a later one, or enable from now."
+msgid "That time is before the oldest event still kept. Choose a later one."
+msgstr "That time is before the oldest event still kept. Choose a later one."
 
 #: src/components/saml-provider-detail.tsx
 msgid "The ACS URL and the entity ID are built from the instance's public address (FLAGNETIC_BASE_URL), which is not set. Set it, and the addresses show here."

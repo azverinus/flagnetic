@@ -7253,7 +7253,7 @@ msgid "That sign-in was started in another browser or window, so it was not comp
 msgstr ""
 
 #: src/lib/problem-messages.ts
-msgid "That time is before the oldest event still kept. Choose a later one, or enable from now."
+msgid "That time is before the oldest event still kept. Choose a later one."
 msgstr ""
 
 #: src/components/saml-provider-detail.tsx

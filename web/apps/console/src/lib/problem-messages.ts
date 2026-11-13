@@ -206,9 +206,7 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(msg`The sink is not ready to be enabled: ${failure}.`);
     }
     case "out_of_retention":
-      return i18n._(
-        msg`That time is before the oldest event still kept. Choose a later one, or enable from now.`,
-      );
+      return i18n._(msg`That time is before the oldest event still kept. Choose a later one.`);
     case "kind_immutable":
       return i18n._(msg`A sink's kind cannot be changed. Create a new sink of the other kind.`);
     case "export_too_large":
