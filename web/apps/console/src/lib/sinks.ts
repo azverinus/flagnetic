@@ -2,25 +2,35 @@ import {
   zName,
   createSink,
   deleteSink,
+  discardSinkDeadLetter,
+  dismissSinkGap,
   enableSink,
   getSink,
+  listSinkDeadLetters,
+  listSinkGaps,
   listSinks,
+  redeliverSinkDeadLetter,
+  replaySink,
+  resumeSink,
   rotateSinkSecret,
   sampleSink,
   type Sink,
+  type SinkDeadLetterStatus,
   type SinkCreate,
   type SinkEventKind,
   type SinkFailureClass,
   type SinkHealth,
   type SinkKind,
   type SinkPatch,
+  type SinkReplay,
+  type SinkStream,
   type SinkTest,
   testSink,
   testSinkConfig,
   updateSink,
 } from "@flagnetic/api";
 import type { I18n } from "@lingui/core";
-import { msg } from "@lingui/core/macro";
+import { msg, plural } from "@lingui/core/macro";
 import { queryOptions } from "@tanstack/react-query";
 
 import { unwrap } from "./errors";
@@ -76,6 +86,20 @@ export function sinkApi(project: string) {
       unwrap(testSink({ path: { project, sink }, body: body ?? {} })),
     sample: (sink: string, eventKinds: SinkEventKind[]) =>
       unwrap(sampleSink({ path: { project, sink }, body: { event_kinds: eventKinds } })),
+    /** Starts a stopped sink again where it was; a sink that is not stopped is answered as it is. */
+    resume: (sink: string) => unwrap(resumeSink({ path: { project, sink } })),
+    /** Sends the events received since `from` again; the sink applies it before its next batch. */
+    replay: (sink: string, body: SinkReplay) =>
+      unwrap(replaySink({ path: { project, sink }, body })),
+    deadLetters: (sink: string) => unwrap(listSinkDeadLetters({ path: { project, sink } })),
+    /** Sends a dead letter's stored rows to the target now; the answer is the dead letter after the attempt. */
+    redeliver: (sink: string, deadLetter: string) =>
+      unwrap(redeliverSinkDeadLetter({ path: { project, sink, deadLetter } })),
+    discard: (sink: string, deadLetter: string) =>
+      unwrap(discardSinkDeadLetter({ path: { project, sink, deadLetter } })),
+    gaps: (sink: string) => unwrap(listSinkGaps({ path: { project, sink } })),
+    dismissGap: (sink: string, gap: string) =>
+      unwrap(dismissSinkGap({ path: { project, sink, gap } })),
   };
 }
 
@@ -93,6 +117,107 @@ export function sinkQuery(project: string, sink: string) {
     queryFn: () => sinkApi(project).get(sink),
     retry: false,
   });
+}
+
+/** A sink's dead letters, the newest first as the server lists them. */
+export function deadLettersQuery(project: string, sink: string) {
+  return queryOptions({
+    queryKey: [...keys.one(project, sink), "dead-letters"] as const,
+    queryFn: async () => (await sinkApi(project).deadLetters(sink)).items,
+  });
+}
+
+/** A sink's gaps, dismissed ones included. */
+export function gapsQuery(project: string, sink: string) {
+  return queryOptions({
+    queryKey: [...keys.one(project, sink), "gaps"] as const,
+    queryFn: async () => (await sinkApi(project).gaps(sink)).items,
+  });
+}
+
+/** The tabs of a sink's page beside its settings, which are the plain address. */
+export type SinkSearch = { tab?: "dead-letters" | "replay" | "gaps" };
+
+/** Reads a sink screen's search parameters, dropping anything it cannot use. */
+export function validateSinkSearch(search: Record<string, unknown>): SinkSearch {
+  const tab = search.tab;
+  return tab === "dead-letters" || tab === "replay" || tab === "gaps" ? { tab } : {};
+}
+
+/** Whether a sink is stopped, at risk of losing events or has a gap nobody dismissed. */
+export function needsAttention(sink: Sink): boolean {
+  return sink.health === "stopped" || sink.at_risk || sink.gaps > 0;
+}
+
+/** Why a sink needs attention, each in a few words; none when it does not. */
+export function attentionReasons(i18n: I18n, sink: Sink): string[] {
+  const reasons: string[] = [];
+  if (sink.health === "stopped") reasons.push(i18n._(msg`stopped`));
+  if (sink.at_risk) reasons.push(i18n._(msg`at risk of losing events`));
+  if (sink.gaps > 0) {
+    reasons.push(
+      i18n._(msg`${plural(sink.gaps, { one: "# undismissed gap", other: "# undismissed gaps" })}`),
+    );
+  }
+  return reasons;
+}
+
+/** The last failure across a sink's streams, with the event kind it happened on. */
+export function latestFailure(
+  sink: Sink,
+): { eventKind: SinkEventKind; failure: NonNullable<SinkStream["last_failure"]> } | undefined {
+  let latest: ReturnType<typeof latestFailure>;
+  for (const stream of sink.streams) {
+    const failure = stream.last_failure;
+    // Compared as instants: the server trims trailing zeros of the
+    // fraction, so two times of one second differ in length as text.
+    if (
+      failure &&
+      (latest === undefined || Date.parse(failure.at) > Date.parse(latest.failure.at))
+    ) {
+      latest = { eventKind: stream.event_kind, failure };
+    }
+  }
+  return latest;
+}
+
+/** The name of a dead letter's status. */
+export function deadLetterStatusName(i18n: I18n, status: SinkDeadLetterStatus): string {
+  switch (status) {
+    case "pending":
+      return i18n._(msg`Pending`);
+    case "redelivered":
+      return i18n._(msg`Redelivered`);
+    case "expired":
+      return i18n._(msg`Expired`);
+  }
+}
+
+/** What a replay form holds: times as a `datetime-local` input does, and the kinds ticked. */
+export type ReplayForm = { from: string; to: string; event_kinds: SinkEventKind[] };
+
+/** The body replaying a sink, or why the form cannot be sent yet. */
+export function replayBodyOf(
+  i18n: I18n,
+  values: ReplayForm,
+): { body: SinkReplay } | { problems: { path: string; message: string }[] } {
+  const from = startFromOf(values.from);
+  const to = startFromOf(values.to);
+  const problems: { path: string; message: string }[] = [];
+  if (from === undefined) problems.push({ path: "from", message: i18n._(msg`Choose a time.`) });
+  if (values.to.trim() !== "" && to === undefined) {
+    problems.push({ path: "to", message: i18n._(msg`Choose a time.`) });
+  } else if (from !== undefined && to !== undefined && to < from) {
+    problems.push({ path: "to", message: i18n._(msg`Choose a time after the start.`) });
+  }
+  if (problems.length > 0 || from === undefined) return { problems };
+  return {
+    body: {
+      from,
+      ...(to === undefined ? {} : { to }),
+      ...(values.event_kinds.length === 0 ? {} : { event_kinds: values.event_kinds }),
+    },
+  };
 }
 
 export const sinkKinds: readonly SinkKind[] = ["clickhouse", "object_storage", "webhook"];

@@ -73,6 +73,10 @@ export function noticeKeys(project: string, notice: Pick<ChangeNotice, "kind">):
       return [at("change-requests")];
     case "webhook":
       return [at("webhooks")];
+    case "sink":
+      // Health, dead letters and gaps are entries of the audit log by the
+      // system, so a sink's list, page and recovery tables follow them.
+      return [at("sinks")];
     default:
       return [at()];
   }

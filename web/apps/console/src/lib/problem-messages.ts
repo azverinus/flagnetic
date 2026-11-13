@@ -205,6 +205,12 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       });
       return i18n._(msg`The sink is not ready to be enabled: ${failure}.`);
     }
+    case "rows_expired":
+      return i18n._(
+        msg`Retention has dropped every row of this dead letter, so there is nothing left to send.`,
+      );
+    case "invalid_replay_range":
+      return i18n._(msg`The end of a replay cannot be before its start.`);
     case "out_of_retention":
       return i18n._(msg`That time is before the oldest event still kept. Choose a later one.`);
     case "kind_immutable":

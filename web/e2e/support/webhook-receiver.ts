@@ -6,6 +6,8 @@ export type ReceivedDelivery = {
   body: string;
   /** The envelope's `type`. */
   type: string;
+  /** Whether the receiver answered it with a success. */
+  acknowledged: boolean;
 };
 
 /**
@@ -16,11 +18,14 @@ export type ReceivedDelivery = {
 export type Receiver = {
   url: string;
   received: ReceivedDelivery[];
+  /** The status it answers with; a spec sets it to make the receiver reject. */
+  status: number;
   close: () => Promise<void>;
 };
 
 export async function startReceiver(): Promise<Receiver> {
   const received: ReceivedDelivery[] = [];
+  const state = { status: 200 };
   const server: Server = createServer((request, response) => {
     const chunks: Buffer[] = [];
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -32,9 +37,9 @@ export async function startReceiver(): Promise<Receiver> {
       } catch {
         // Recorded as it came; the spec says what it expected.
       }
-      received.push({ headers: request.headers, body, type });
-      response.writeHead(200, { "Content-Type": "text/plain" });
-      response.end("received");
+      received.push({ headers: request.headers, body, type, acknowledged: state.status < 300 });
+      response.writeHead(state.status, { "Content-Type": "text/plain" });
+      response.end(state.status < 300 ? "received" : "rejected");
     });
   });
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
@@ -43,6 +48,12 @@ export async function startReceiver(): Promise<Receiver> {
   return {
     url: `http://127.0.0.1:${address.port}/flagnetic`,
     received,
+    get status() {
+      return state.status;
+    },
+    set status(value: number) {
+      state.status = value;
+    },
     close: () => new Promise<void>((done) => server.close(() => done())),
   };
 }
