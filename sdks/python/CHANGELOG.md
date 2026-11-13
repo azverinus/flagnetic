@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.1.3...sdks/python/v0.1.4) (2026-11-13)
+
+
+### Bug Fixes
+
+* **sdk-python:** drop an event that does not serialise alone ([#279](https://github.com/azverinus/flagnetic/issues/279)) ([5197ea9](https://github.com/azverinus/flagnetic/commit/5197ea9c9d775a224e45c3aafdbfc443aaf1e1f6))
+
 ## [0.1.3](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.1.2...sdks/python/v0.1.3) (2026-11-12)
 
 
