@@ -142,7 +142,7 @@ func (s *Store) readExposures(ctx context.Context, where string, args []any) (si
 	rows, err := s.db(ctx).Query(ctx, `
 		SELECT r.event_id::text, p.key, env.key, r.experiment_key, r.flag_key, r.variation_key, r.unit_type, r.unit_id,
 			r.evaluation_reason, r.override, coalesce(r.platform, ''), coalesce(r.app_version, ''), r.sdk_name,
-			r.sdk_version, r.ruleset_version, r.occurred_at, r.received_at
+			r.sdk_version, r.ruleset_version, r.occurred_at, r.received_at, r.seq
 		FROM exposure_events r
 		JOIN projects p ON p.id = r.project_id
 		LEFT JOIN environments env ON env.id = r.environment_id
@@ -158,7 +158,7 @@ func (s *Store) readExposures(ctx context.Context, where string, args []any) (si
 		)
 		if err := row.Scan(&x.EventID, &x.ProjectKey, &environment, &x.ExperimentKey, &x.FlagKey, &x.VariationKey,
 			&x.UnitType, &x.UnitID, &x.EvaluationReason, &x.Override, &x.Platform, &x.AppVersion, &x.SDKName,
-			&x.SDKVersion, &x.RulesetVersion, &occurredAt, &receivedAt); err != nil {
+			&x.SDKVersion, &x.RulesetVersion, &occurredAt, &receivedAt, &x.Seq); err != nil {
 			return nil, false, err
 		}
 		if environment == nil {
@@ -172,7 +172,7 @@ func (s *Store) readExposures(ctx context.Context, where string, args []any) (si
 func (s *Store) readAliases(ctx context.Context, where string, args []any) (sinks.Page, error) {
 	rows, err := s.db(ctx).Query(ctx, `
 		SELECT r.event_id::text, p.key, env.key, r.from_unit_type, r.from_unit_id, r.to_unit_type, r.to_unit_id,
-			coalesce(r.platform, ''), r.sdk_name, r.sdk_version, r.occurred_at, r.received_at
+			coalesce(r.platform, ''), r.sdk_name, r.sdk_version, r.occurred_at, r.received_at, r.seq
 		FROM alias_events r
 		JOIN projects p ON p.id = r.project_id
 		LEFT JOIN environments env ON env.id = r.environment_id
@@ -187,7 +187,7 @@ func (s *Store) readAliases(ctx context.Context, where string, args []any) (sink
 			occurredAt, receivedAt time.Time
 		)
 		if err := row.Scan(&a.EventID, &a.ProjectKey, &environment, &a.FromUnitType, &a.FromUnitID, &a.ToUnitType,
-			&a.ToUnitID, &a.Platform, &a.SDKName, &a.SDKVersion, &occurredAt, &receivedAt); err != nil {
+			&a.ToUnitID, &a.Platform, &a.SDKName, &a.SDKVersion, &occurredAt, &receivedAt, &a.Seq); err != nil {
 			return nil, false, err
 		}
 		if environment == nil {
@@ -214,11 +214,10 @@ func (s *Store) readSummaries(ctx context.Context, where string, args []any) (si
 		var (
 			m                                sinks.SummaryRow
 			event, xid                       *string
-			seq                              int64
 			environment                      *string
 			windowStart, windowEnd, received time.Time
 		)
-		if err := row.Scan(&m.Source, &event, &xid, &seq, &m.ProjectKey, &environment, &m.FlagKey, &m.VariationKey,
+		if err := row.Scan(&m.Source, &event, &xid, &m.Seq, &m.ProjectKey, &environment, &m.FlagKey, &m.VariationKey,
 			&m.EvaluationReason, &m.Count, &windowStart, &windowEnd, &m.SDKName, &m.SDKVersion, &m.Platform,
 			&m.AppVersion, &m.RulesetVersion, &received); err != nil {
 			return nil, false, err
@@ -235,7 +234,7 @@ func (s *Store) readSummaries(ctx context.Context, where string, args []any) (si
 			if err != nil {
 				return nil, false, fmt.Errorf("reading a transaction ID: %w", err)
 			}
-			m.ReportID = sinks.ReportID(x, seq)
+			m.ReportID = sinks.ReportID(x, m.Seq)
 		}
 		m.EnvironmentKey, m.WindowStart, m.WindowEnd, m.ReceivedAt = *environment, windowStart.UTC(), windowEnd.UTC(), received.UTC()
 		return m, true, nil

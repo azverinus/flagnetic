@@ -34,6 +34,10 @@ type Row interface {
 	ID() string
 	// Received is when the platform received the row.
 	Received() time.Time
+	// Sequence is the sequence number of the raw row, which orders the rows of
+	// a batch and names the range of the file an object storage sink writes.
+	// It is never exported as a column.
+	Sequence() int64
 	// wire is the row as the schema lays it out, in the order of its columns.
 	wire() any
 }
@@ -58,6 +62,8 @@ type ExposureRow struct {
 	RulesetVersion   int64
 	OccurredAt       time.Time
 	ReceivedAt       time.Time
+	// Seq is the raw row's sequence number.
+	Seq int64
 }
 
 // ID is the exposure's event ID.
@@ -65,6 +71,9 @@ func (r ExposureRow) ID() string { return r.EventID }
 
 // Received is when the exposure was received.
 func (r ExposureRow) Received() time.Time { return r.ReceivedAt }
+
+// Sequence is the sequence number of the raw row.
+func (r ExposureRow) Sequence() int64 { return r.Seq }
 
 type exposureWire struct {
 	SchemaVersion    int    `json:"schema_version"`
@@ -111,6 +120,8 @@ type AliasRow struct {
 	SDKVersion     string
 	OccurredAt     time.Time
 	ReceivedAt     time.Time
+	// Seq is the raw row's sequence number.
+	Seq int64
 }
 
 // ID is the alias's event ID.
@@ -118,6 +129,9 @@ func (r AliasRow) ID() string { return r.EventID }
 
 // Received is when the alias was received.
 func (r AliasRow) Received() time.Time { return r.ReceivedAt }
+
+// Sequence is the sequence number of the raw row.
+func (r AliasRow) Sequence() int64 { return r.Seq }
 
 type aliasWire struct {
 	SchemaVersion  int    `json:"schema_version"`
@@ -166,6 +180,8 @@ type SummaryRow struct {
 	ReceivedAt       time.Time
 	// Source says who counted: sdk, or remote_evaluation for the server.
 	Source string
+	// Seq is the raw row's sequence number.
+	Seq int64
 }
 
 // ID is the row's report ID.
@@ -173,6 +189,9 @@ func (r SummaryRow) ID() string { return r.ReportID }
 
 // Received is when the summary was received.
 func (r SummaryRow) Received() time.Time { return r.ReceivedAt }
+
+// Sequence is the sequence number of the raw row.
+func (r SummaryRow) Sequence() int64 { return r.Seq }
 
 type summaryWire struct {
 	SchemaVersion    int    `json:"schema_version"`
