@@ -526,8 +526,9 @@ final class FlagneticClient {
   Detail getDetail<T extends Object?>(String key, T defaultValue) =>
       _serve(key, flagTypeOf(defaultValue), defaultValue, whole: T == int);
 
-  /// Calls [listener] with the keys whose value changed,
-  /// added and removed flags included. Returns a function removing it.
+  /// Calls [listener] with the keys whose served flag changed (the value,
+  /// the reason, the variation or the experiment block), added and removed
+  /// flags included. Returns a function removing it.
   void Function() onChange(ChangeListener listener) {
     _changeListeners.add(listener);
     return () => _changeListeners.remove(listener);
