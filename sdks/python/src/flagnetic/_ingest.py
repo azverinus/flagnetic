@@ -92,8 +92,8 @@ def event_id(at: datetime) -> str:
     return f"{text[:8]}-{text[8:12]}-{text[12:16]}-{text[16:20]}-{text[20:]}"
 
 
-def _size(event: Event) -> int:
-    return len(json.dumps(event, separators=(",", ":"), ensure_ascii=False).encode())
+def encoded_size(event: Event) -> int:
+    return len(json.dumps(event, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode())
 
 
 class Ingest:
@@ -137,7 +137,7 @@ class Ingest:
         size = 0
         for event in events:
             # One comma per event after the first.
-            cost = _size(event) + 1
+            cost = encoded_size(event) + 1
             if current and (len(current) == MAX_EVENTS_PER_BATCH or size + cost > budget):
                 batches.append(current)
                 current, size = [], 0
@@ -218,6 +218,8 @@ class Ingest:
             },
             separators=(",", ":"),
             ensure_ascii=False,
+            # NaN and Infinity are no JSON: a body holding one fails to parse and loses every event in it.
+            allow_nan=False,
         ).encode()
 
     @staticmethod

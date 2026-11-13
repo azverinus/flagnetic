@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 import threading
 import time
+import uuid
 from collections.abc import Callable
 from typing import Any
 
 import pytest
 
 import flagnetic
+from flagnetic import _reporting as reporting
 from mock_server import MockServer, Request, Response
 from protocol import SDK_KEY, Logs, eventually, read, read_json
 
@@ -140,6 +142,52 @@ def test_a_batch_the_server_will_never_take_is_dropped_and_not_sent_again(ingest
     client.flush()
     assert len(server.events("alias")) == 1
     assert [f["cause"] for f in logs.named("queue_dropped")] == ["client_error"]
+
+
+@pytest.mark.parametrize(
+    "unit_id",
+    [
+        uuid.UUID("8f1c0000-0000-4000-8000-000000000000"),
+        "bad-\ud800-unit",
+        float("nan"),
+        float("inf"),
+    ],
+    ids=["not_a_json_value", "lone_surrogate", "nan", "infinity"],
+)
+def test_an_event_that_does_not_serialise_is_dropped_alone(ingest: Any, unit_id: Any) -> None:
+    logs = Logs()
+    server, client = ingest(send_summaries=False, logger=logs)
+    client.alias("anonymous", "d-1", "user", "u-1")
+    client.alias("anonymous", unit_id, "user", "u-2")
+    client.alias("anonymous", "d-3", "user", "u-3")
+    client.flush()
+    assert [e["from_unit_id"] for e in server.events("alias")] == ["d-1", "d-3"]
+    (dropped,) = logs.named("queue_dropped")
+    assert (dropped["cause"], dropped["events"]) == ("not_serialisable", 1)
+    assert dropped["fault"]
+    assert "u-2" not in repr(dropped) and "bad-" not in repr(dropped) and "8f1c" not in repr(dropped)
+
+
+def test_an_event_nested_past_the_interpreters_limit_is_dropped_alone(
+    ingest: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Whether a deep value raises depends on the interpreter, so the encoder's failure is staged.
+    logs = Logs()
+    server, client = ingest(send_summaries=False, logger=logs)
+
+    def encode(event: Any) -> int:
+        if event["from_unit_id"] == "d-2":
+            raise RecursionError
+        return 0
+
+    monkeypatch.setattr(reporting, "encoded_size", encode)
+    for i in (1, 2, 3):
+        client.alias("anonymous", f"d-{i}", "user", "u-1")
+    monkeypatch.undo()
+    client.flush()
+    assert [e["from_unit_id"] for e in server.events("alias")] == ["d-1", "d-3"]
+    (dropped,) = logs.named("queue_dropped")
+    assert (dropped["cause"], dropped["fault"]) == ("not_serialisable", "RecursionError")
 
 
 def test_a_summary_that_failed_merges_into_the_next_window(ingest: Any) -> None:
