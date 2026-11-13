@@ -12204,7 +12204,10 @@ components:
     SinkEventKind:
       type: string
       enum: [exposure, alias, evaluation_summary]
-      description: A kind of raw event a sink exports, each delivered through a stream of its own.
+      description: |
+        A kind of raw event a sink exports, each delivered through a stream of its own.
+        The columns of each kind's rows, with their types, are in
+        [Exported events](https://github.com/azverinus/flagnetic/blob/main/docs/exported-events.md).
     SinkHealth:
       type: string
       enum: [disabled, stopped, failing, degraded, lagging, healthy]
@@ -12334,6 +12337,9 @@ components:
       description: |
         A project's sink. It carries exactly the one of `clickhouse`,
         `object_storage` and `webhook` that its `kind` names.
+        What a sink writes, with the compatibility promise, is in
+        [Exported events](https://github.com/azverinus/flagnetic/blob/main/docs/exported-events.md);
+        how to run one is in [Sinks](https://github.com/azverinus/flagnetic/blob/main/docs/sinks.md).
       required: [id, name, kind, event_kinds, environments, batch_size, flush_interval, enabled, health, at_risk,
         lag_seconds, dead_letters, gaps, stopped_at, warnings, streams, created_at, updated_at, version]
       oneOf:

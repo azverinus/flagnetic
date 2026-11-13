@@ -12,6 +12,8 @@
 - [Single sign-on](sso.md): OIDC and SAML auth providers and setting them up with Keycloak, Entra ID, Okta and Google, their domains, group mappings, SSO enforcement, how a sign-in matches a member, and what each sign-in error means.
 - [Provisioning members with SCIM](scim.md): SCIM tokens, setting up Entra ID and Okta, how Users are created, adopted, updated and deprovisioned, and what a provisioned member's directory decides.
 - [Webhooks](webhooks.md): subscribing a receiver to a project's events, its secret, the targets the platform calls, and the event catalogue.
+- [Sinks](sinks.md): a project's copy of its raw events in ClickHouse, object storage or a signed webhook: configuring, guarding, testing and enabling a sink, health, failure classes, dead letters, replay, at risk and gaps, metrics.
+- [Exported events](exported-events.md): the export schema and its compatibility promise, the ClickHouse DDL, the object key scheme, the webhook envelope, and a SQL recipe reproducing first exposures, the sample-ratio check and assignments.
 - [Segments](segments.md) and [Targeting](targeting.md): reusable sets of conditions, and the operators and limits of every condition.
 - [Operations](operations.md) and the [configuration reference](configuration.md): running the server, how changes reach SDKs across replicas, and what to watch.
 

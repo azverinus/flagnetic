@@ -4321,6 +4321,9 @@ type SignInRequest struct {
 
 // Sink A project's sink. It carries exactly the one of `clickhouse`,
 // `object_storage` and `webhook` that its `kind` names.
+// What a sink writes, with the compatibility promise, is in
+// [Exported events](https://github.com/azverinus/flagnetic/blob/main/docs/exported-events.md);
+// how to run one is in [Sinks](https://github.com/azverinus/flagnetic/blob/main/docs/sinks.md).
 type Sink struct {
 	// AtRisk Whether retention is about to drop events the sink has not delivered.
 	AtRisk bool `json:"at_risk"`
@@ -4477,6 +4480,8 @@ type SinkDeadLetter struct {
 	CreatedAt time.Time `json:"created_at"`
 
 	// EventKind A kind of raw event a sink exports, each delivered through a stream of its own.
+	// The columns of each kind's rows, with their types, are in
+	// [Exported events](https://github.com/azverinus/flagnetic/blob/main/docs/exported-events.md).
 	EventKind       SinkEventKind      `json:"event_kind"`
 	FirstReceivedAt time.Time          `json:"first_received_at"`
 	Id              openapi_types.UUID `json:"id"`
@@ -4515,6 +4520,8 @@ type SinkEnable struct {
 }
 
 // SinkEventKind A kind of raw event a sink exports, each delivered through a stream of its own.
+// The columns of each kind's rows, with their types, are in
+// [Exported events](https://github.com/azverinus/flagnetic/blob/main/docs/exported-events.md).
 type SinkEventKind string
 
 // SinkFailure The last failed call of a stream.
@@ -4548,6 +4555,8 @@ type SinkGap struct {
 	DroppedAt time.Time `json:"dropped_at"`
 
 	// EventKind A kind of raw event a sink exports, each delivered through a stream of its own.
+	// The columns of each kind's rows, with their types, are in
+	// [Exported events](https://github.com/azverinus/flagnetic/blob/main/docs/exported-events.md).
 	EventKind SinkEventKind      `json:"event_kind"`
 	Id        openapi_types.UUID `json:"id"`
 
@@ -4703,6 +4712,8 @@ type SinkSampleResult struct {
 // SinkStream One event kind's delivery. Cursors are never exposed.
 type SinkStream struct {
 	// EventKind A kind of raw event a sink exports, each delivered through a stream of its own.
+	// The columns of each kind's rows, with their types, are in
+	// [Exported events](https://github.com/azverinus/flagnetic/blob/main/docs/exported-events.md).
 	EventKind       SinkEventKind `json:"event_kind"`
 	LastDeliveredAt *time.Time    `json:"last_delivered_at"`
 	LastFailure     *SinkFailure  `json:"last_failure"`

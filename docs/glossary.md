@@ -364,8 +364,12 @@ _Avoid_: telemetry, usage stats, analytics, metrics
 ## Events and export
 
 **Sink**:
-A configured destination that receives a durable copy of events: ClickHouse, object storage or a webhook. Analysts work on sinks, never on the platform's own database.
+A project's configured destination that receives a durable, at-least-once copy of its exposures, aliases and evaluation summaries: ClickHouse, object storage or a signed webhook. Analysts work on their own copy, never on the platform's database. See [Sinks](sinks.md).
 _Avoid_: export target, destination, integration, connector
+
+**Export schema**:
+The flat, snake_case row every sink kind exports for an event kind, with a `schema_version`: the same columns whether they reach ClickHouse, a bucket or a webhook, in Unix milliseconds for time. It, the ClickHouse DDL, the object key scheme and the webhook envelope change only additively; a breaking change arrives as a new `schema_version` beside the old. See [Exported events](exported-events.md).
+_Avoid_: event format, payload schema, wire format
 
 **Stream**:
 One reader of a raw event table moving an `(xid, seq)` cursor of its own: a rollup stream (such as `exposures`, keeping first exposures and daily counts, `evaluation_summaries`, keeping evaluations per day, or `aliases`, counting the aliases received per day), or one `(sink, event kind)` pair, a sink with all three event kinds selected moving three streams, each at its own pace. It reads only rows of transactions below the snapshot horizon, which have all ended, so its cursor is a position below which every row is either already applied or delivered, or never will be.
@@ -378,6 +382,10 @@ _Avoid_: pending batch, outstanding batch
 **Sink health**:
 A sink's composed state: disabled, healthy, lagging, degraded, failing or stopped. Answered from its streams' live position and failure count, never cached from the last attempt.
 _Avoid_: status
+
+**Failure class**:
+Why a call to a sink's target failed, from a closed list (`dns`, `connect`, `tls`, `timeout`, `refused_target`, `redirect`, `status`, `rejected`), with the HTTP status when the target answered and the protocol's own error code when it speaks one. A target's own words are never kept or shown, because a sink may reach internal hosts. Only `rejected` counts toward a dead letter.
+_Avoid_: error type, error message, reason
 
 **Rejection**:
 A target refusing a batch outright (a 4xx other than 408 and 429, or a ClickHouse exception saying the schema or the data does not fit): retried a bounded number of times, unlike a transient failure, which is retried without limit.
