@@ -9,11 +9,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
+
 	apptransfer "github.com/azverinus/flagnetic/internal/app/transfer"
 	"github.com/azverinus/flagnetic/internal/domain/transfer"
 	"github.com/azverinus/flagnetic/internal/domain/transfer/firebase"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
-	"github.com/google/uuid"
 )
 
 // ExportProject answers the project's configuration as a project document.
