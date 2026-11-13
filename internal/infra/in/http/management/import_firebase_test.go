@@ -353,6 +353,18 @@ func TestOnlyAnOwnerImportsAFirebaseTemplateAndIfMatchGuardsTheState(t *testing.
 		t.Fatalf("an import on the state it has = %d: %s", res.StatusCode(), res.Body)
 	}
 
+	// A new flag has the default lifetime and the importing member as its
+	// owner, and the summary entry names Firebase as the source.
+	ownerID := do(owner.GetMeWithResponse(t.Context())).JSON200.Member.Id
+	if f := getFlag(t, admin, k, "new_matching"); f.Owner != ownerID || f.Lifetime != management.LifetimeTemporary || f.ExpectedRemovalAt == nil {
+		t.Errorf("new_matching = owner %s, lifetime %s until %v, want the importing owner and the default lifetime", f.Owner, f.Lifetime, f.ExpectedRemovalAt)
+	}
+	entries := do(admin.ListProjectAuditEntriesWithResponse(t.Context(), k, &management.ListProjectAuditEntriesParams{Action: ptr("project.imported")}))
+	if entries.JSON200 == nil || len(entries.JSON200.Items) != 1 || field(entries.JSON200.Items[0].After, "source") != "firebase" ||
+		field(entries.JSON200.Items[0].After, "mode") != "merge" {
+		t.Errorf("project.imported entries = %s, want one with source firebase in merge mode", entries.Body)
+	}
+
 	if res := do(admin.ImportFirebaseTemplateWithBodyWithResponse(t.Context(), "nope", &management.ImportFirebaseTemplateParams{Environment: "production"},
 		"application/json", bytes.NewReader(template))); res.StatusCode() != http.StatusNotFound {
 		t.Errorf("an unknown project = %d, want 404", res.StatusCode())

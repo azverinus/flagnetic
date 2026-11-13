@@ -68,11 +68,11 @@ func (d *documentDownload) VisitExportProjectResponse(w http.ResponseWriter) err
 	return err
 }
 
-// rawBodies serves the operations whose body is a project document, which
-// it reads itself: the generated server would decode JSON into a type that
-// forgets the unknown fields, repeated keys and exact numbers a strict
-// reading of the document needs, and hands YAML over without the media
-// type. The seam has judged the request before it gets here, as for every
+// rawBodies serves the operations whose body is a project document or a
+// Firebase Remote Config template, which it reads itself: the generated
+// server would decode JSON into a type that forgets the unknown fields,
+// repeated keys and exact numbers a strict reading of the document needs,
+// and hands YAML over without the media type. The seam has judged the request before it gets here, as for every
 // other operation.
 type rawBodies struct {
 	ServerInterface

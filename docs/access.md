@@ -30,7 +30,7 @@ Every operation of the management API declares the one thing it needs in the Ope
 | `webhook.manage` | creating, reading, editing, enabling and deleting a project's webhook subscriptions, rotating their secrets, testing them, reading and redelivering their deliveries, and sending the stale-flag digest now | `project:admin` | |
 | `sink.manage` | creating, reading, editing and deleting a project's sinks, rotating a webhook sink's secret, resuming a stopped sink, listing, redelivering and discarding its dead letters, and listing and dismissing its gaps; reading needs it too, since a sink's configuration names internal hosts, buckets and URLs that may carry tokens | `project:admin` | |
 | `project.delete` | deleting a project with everything in it, from a signed-in session only | `project:admin` | ✓ |
-| `project.import` | merging a project document into a project, in every environment whether it is protected or not | `project:admin` | ✓ |
+| `project.import` | merging a project document or a Firebase Remote Config template into a project, in every environment whether it is protected or not | `project:admin` | ✓ |
 
 A permission marked members only changes who has access to a project or whose review a change needs, so no project token exercises it, whatever its role (see [Project tokens](#project-tokens)): a pipeline cannot unprotect an environment, write it and protect it again, nor approve the change it proposed. A project token whose role holds `change_request.approve` is refused deciding a change request with `403 token_cannot_approve`, which says why more plainly than the permission it lacks.
 
