@@ -24,11 +24,11 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-// minioImage is the MinIO every object storage test meets, pinned so that a
-// run never drifts with a moving tag. It is the last release MinIO published
-// as an image, and from quay.io, since Docker Hub no longer carries it.
+// minioImage is the MinIO every object storage test meets, pinned by digest so
+// that a run never drifts with a moving tag. MinIO no longer publishes images
+// anyone can pull, so it is the build Chainguard publishes without sign-in.
 // Replacing it touches this constant alone.
-const minioImage = "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z"
+const minioImage = "cgr.dev/chainguard/minio@sha256:96b6cf3e14084d3427ec46de10c2873af61b945ad9272eec266cfc8df551cba5"
 
 // ObjectStorage is the package's S3-compatible store: MinIO in a container, or
 // the one S3_ENDPOINT names.
