@@ -100,10 +100,17 @@ func TestASinkReadsAnExposureAsItsExportSchemaSaysAndEndsABatchAtItsSize(t *test
 		EventID: rows[0].ID(), ProjectKey: f.p.key, EnvironmentKey: "production", ExperimentKey: "checkout_test",
 		FlagKey: "checkout", VariationKey: "true", UnitType: "user", UnitID: "u-1", EvaluationReason: "experiment",
 		Platform: "android", AppVersion: "1.18.0", SDKName: "flagnetic-dart", SDKVersion: "1.0.0", RulesetVersion: 1,
-		OccurredAt: now, ReceivedAt: now,
+		OccurredAt: now, ReceivedAt: now, Seq: rows[0].Sequence(),
 	}
 	if rows[0] != want {
 		t.Errorf("first row = %+v, want %+v", rows[0], want)
+	}
+	// The sequence number is the raw row's, which names the range of a file:
+	// positive, and rising with the order the rows were committed in.
+	for i, r := range rows {
+		if r.Sequence() <= 0 || i > 0 && r.Sequence() <= rows[i-1].Sequence() {
+			t.Errorf("row %d has sequence %d after %d", i, r.Sequence(), rows[max(i-1, 0)].Sequence())
+		}
 	}
 	if o := rows[2].(sinks.ExposureRow); !o.Override || o.EvaluationReason != "override" {
 		t.Errorf("third row = %+v, want the override marked", o)
@@ -132,10 +139,10 @@ func TestASinkReadsAnAliasWithAnAbsentPlatformAsAnEmptyString(t *testing.T) {
 	want := sinks.AliasRow{
 		EventID: eventID(now, 90), ProjectKey: f.p.key, EnvironmentKey: "production", FromUnitType: "anonymous",
 		FromUnitID: "d-8f1c", ToUnitType: "user", ToUnitID: "u-1001", Platform: "", SDKName: "flagnetic-dart",
-		SDKVersion: "1.0.0", OccurredAt: protocolTime, ReceivedAt: now,
+		SDKVersion: "1.0.0", OccurredAt: protocolTime, ReceivedAt: now, Seq: rows[0].Sequence(),
 	}
-	if rows[0] != want {
-		t.Errorf("alias = %+v, want %+v", rows[0], want)
+	if rows[0] != want || want.Seq <= 0 {
+		t.Errorf("alias = %+v, want %+v with a sequence number", rows[0], want)
 	}
 }
 
