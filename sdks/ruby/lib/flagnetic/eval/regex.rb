@@ -1,17 +1,20 @@
 # frozen_string_literal: true
 
 require_relative "unicode_tables"
+require_relative "regex_vm"
 
 module Flagnetic
   # Eval is the evaluator; see flagnetic/eval.rb.
   module Eval
     # Regex compiles the pattern of a matches condition. Patterns are RE2
-    # syntax, as the reference evaluator (Go's regexp) reads them. Ruby's
-    # engine reads a different dialect: ^ and $ are line anchors, \s includes
+    # syntax, as the reference evaluator (Go's regexp) reads them. Ruby's own
+    # engine reads a different dialect (^ and $ are line anchors, \s includes
     # \v, (?m) means what RE2 calls (?s), (?i) folds ß to ss, lookarounds and
-    # backreferences exist. So a pattern is never handed to Regexp as is: it
-    # is parsed as RE2 and translated into an Onigmo expression that matches
-    # exactly the same strings.
+    # backreferences exist) and backtracks, so a context value an end user
+    # chooses could make it burn CPU or, cut off by a time limit, answer
+    # differently from the server. So a pattern is never handed to Regexp: it
+    # is parsed as RE2, compiled to the program of a Pike VM and matched in
+    # time linear in the input.
     #
     # The policy:
     #
@@ -23,7 +26,9 @@ module Flagnetic
     #   uses Go's simple folding orbits, not Ruby's.
     # - What RE2 rejects is rejected: lookarounds, backreferences, atomic
     #   groups, possessive or nested repetition, \Z, \G, \h, \K, \R, \C,
-    #   comments, unknown escapes and flags. The condition is then
+    #   comments, unknown escapes and flags, repeat counts above 1000 (also
+    #   when nested repeats multiply past it), groups nested deeper than 1000
+    #   and programs of more than Go's size limit. The condition is then
     #   inconsistent_ruleset, as in every other evaluator.
     # - \p and \P under (?i) match the property's code points and every
     #   code point sharing a folding orbit with one, as Go does; whether a
@@ -31,42 +36,32 @@ module Flagnetic
     #   Go's.
     # - A match searches anywhere in the string unless the pattern is
     #   anchored. Every byte of invalid UTF-8 in the matched string reads as
-    #   one U+FFFD, as Go decodes it. On
-    #   Ruby 3.2 and later a match is cut off after MATCH_TIMEOUT seconds and
-    #   the condition is false; RE2 is linear time and never needs to.
+    #   one U+FFFD, as Go decodes it.
     module Regex
       # Error is a pattern outside RE2 syntax or outside RE2.
       class Error < StandardError; end
 
-      MATCH_TIMEOUT = 0.1
-
       REPLACEMENT = [0xFFFD].pack("U")
       private_constant :REPLACEMENT
 
-      TIMEOUT_ERROR = defined?(Regexp::TimeoutError) ? Regexp::TimeoutError : Class.new(StandardError)
-      private_constant :TIMEOUT_ERROR
-
       # Pattern is a compiled matches pattern.
       class Pattern
-        def initialize(regexp)
-          @regexp = regexp
+        def initialize(program)
+          @program = program
           freeze
         end
 
         # match? reports whether s contains a match.
         def match?(str)
-          @regexp.match?(str.valid_encoding? ? str : str.scrub { |bad| REPLACEMENT * bad.bytesize })
-        rescue TIMEOUT_ERROR
-          false
+          str = str.scrub { |bad| REPLACEMENT * bad.bytesize } unless str.valid_encoding?
+          Vm.search(@program, str.codepoints)
         end
       end
 
-      # compile translates an RE2 pattern into a Pattern, raising Error when
-      # it is not one this evaluator can match with RE2 semantics.
+      # compile parses an RE2 pattern into a Pattern, raising Error when it
+      # is not one this evaluator can match with RE2 semantics.
       def self.compile(pattern)
-        source = Translator.new(pattern).translate
-        options = Regexp.respond_to?(:timeout) ? { timeout: MATCH_TIMEOUT } : {}
-        Pattern.new(Regexp.new(source, **options))
+        Pattern.new(Compiler.compile(Parser.new(pattern).parse))
       rescue RegexpError => e
         raise Error, e.message
       end
@@ -98,11 +93,11 @@ module Flagnetic
       SIMPLE_ESCAPES = { "a" => 0x07, "f" => 0x0C, "n" => 0x0A, "r" => 0x0D, "t" => 0x09, "v" => 0x0B }.freeze
       PROPERTY_NAMES = (["Any"] + UnicodeTables::PROPERTY_NAMES).to_h { |n| [n, true] }.freeze
       MAX_REPEAT = 1000
-
-      W = "[0-9A-Za-z_]"
-      WORD_BOUNDARY = "(?:(?<=#{W})(?!#{W})|(?<!#{W})(?=#{W}))".freeze
-      NOT_WORD_BOUNDARY = "(?:(?<=#{W})(?=#{W})|(?<!#{W})(?!#{W}))".freeze
-      private_constant :W
+      MAX_DEPTH = 1000
+      # Go's limit on the size of a compiled expression, in instructions.
+      MAX_SIZE = (128 << 20) / 40
+      NO_NEWLINE = [[0, 9], [0xB, MAX_RUNE]].freeze
+      ANYTHING = [[0, MAX_RUNE]].freeze
 
       FOLD = 1
       MULTILINE = 2
@@ -160,16 +155,12 @@ module Flagnetic
           normalize(out)
         end
 
-        # folded_property is a Onigmo class matching the code points with
-        # property name, or without it when negated, and, under (?i), those
-        # an orbit of simple case folding ties to one that has it. Go adds
-        # the same code points (its FoldCategory and FoldScript tables).
-        def folded_property(name, negated)
-          extra = fold_extra(name)
-          return "\\p{#{"^" if negated}#{name}}" if extra.empty?
-
-          items = extra.map { |c| format("\\u{%x}", c) }.join
-          negated ? "[\\p{^#{name}}&&[^#{items}]]" : "[\\p{#{name}}#{items}]"
+        # property is the class of the code points with property name, or
+        # without it when negated, and, under (?i), those an orbit of simple
+        # case folding ties to one that has it. Go adds the same code points
+        # (its FoldCategory and FoldScript tables).
+        def property(name, negated, fold)
+          Property.new(name, negated, fold && name != "Any" ? fold_extra(name) : [])
         end
 
         # fold_extra lists the code points without property name that share
@@ -185,23 +176,12 @@ module Flagnetic
             end
           end
         end
-
-        # without_surrogates drops code points no Ruby string can hold; no Go
-        # string decodes to them either, so they never match.
-        def without_surrogates(ranges)
-          normalize(ranges).flat_map do |lo, hi|
-            next [[lo, hi]] if hi < SURROGATES.begin || lo > SURROGATES.end
-
-            [([lo, SURROGATES.begin - 1] if lo < SURROGATES.begin),
-             ([SURROGATES.end + 1, hi] if hi > SURROGATES.end)].compact
-          end
-        end
       end
 
-      # Translator is a recursive-descent parser of RE2 syntax that emits the
-      # equivalent Onigmo source as it goes. Every group is emitted
-      # non-capturing: a condition only asks whether the pattern matches.
-      class Translator
+      # Parser is a recursive-descent parser of RE2 syntax into a Node tree.
+      # Groups are never captured: a condition only asks whether the pattern
+      # matches.
+      class Parser
         def initialize(pattern)
           pattern = pattern.dup.force_encoding(Encoding::UTF_8)
           raise Error, "invalid UTF-8" unless pattern.valid_encoding?
@@ -210,11 +190,12 @@ module Flagnetic
           @pos = 0
         end
 
-        def translate
-          out = body(0, top: true)
+        def parse
+          node = body(0, 0, top: true)
           raise Error, "unexpected )" unless eof?
+          raise Error, "expression too large" if node.size > MAX_SIZE
 
-          out
+          node
         end
 
         private
@@ -235,79 +216,73 @@ module Flagnetic
           advance
         end
 
-        # Sequence is the Onigmo source of one group body as it is emitted,
-        # with where its last repeatable operand starts.
-        class Sequence
-          attr_reader :source
+        def cat(items) = items.size == 1 ? items[0] : Node.new(Node::CAT, subs: items)
 
-          def initialize
-            @source = +""
-            @operand = nil
-            @repeated = false
-          end
+        def alt(subs) = subs.size == 1 ? subs[0] : Node.new(Node::ALT, subs: subs)
 
-          def operand(src)
-            @operand = @source.size
-            @repeated = false
-            @source << src
-          end
-
-          # separate ends the current operand: after | or a flag group a
-          # repetition has no argument.
-          def separate(src = "")
-            @operand = nil
-            @source << src
-          end
-
-          def repeat(quantifier)
-            raise Error, "missing argument to repetition operator" if @operand.nil?
-            raise Error, "invalid nested repetition operator" if @repeated
-
-            @source.insert(@operand, "(?:")
-            @source << ")" << quantifier
-            @repeated = true
-          end
-        end
+        def char(ranges) = Node.new(Node::CHAR, set: CharSet.new(ranges, [], false))
 
         # body parses alternatives up to an unmatched ) or the end. A flag
         # group without a body changes flags up to the end of the enclosing
         # group, across alternatives, as in RE2.
-        def body(flags, top: false)
-          seq = Sequence.new
+        def body(flags, depth, top: false)
+          alternatives = []
+          items = []
+          repeated = false
           until eof? || (peek == ")" && !top)
+            repeat = false
             case peek
             when ")" then raise Error, "unexpected )"
             when "|"
               advance
-              seq.separate("|")
-            when "*", "+", "?", "{" then repeat_or_literal(seq, flags)
-            when "(" then flags = group(seq, flags)
-            when "\\" then escape(seq, flags)
-            else seq.operand(plain_atom(flags))
+              alternatives << cat(items)
+              items = []
+            when "*", "+", "?", "{" then repeat = repeat_or_literal(items, flags, repeated)
+            when "(" then flags = group(items, flags, depth)
+            when "\\" then escape(items, flags)
+            else items << plain_atom(flags)
             end
+            repeated = repeat
           end
-          seq.source
+          alt([*alternatives, cat(items)])
         end
 
-        def repeat_or_literal(seq, flags)
-          quantifier = repetition
-          return seq.repeat(quantifier) if quantifier
+        # repeat_or_literal applies a repetition to the last item, or reads a
+        # { that starts no well-formed repetition as a literal. It reports
+        # whether it repeated.
+        def repeat_or_literal(items, flags, repeated)
+          counts = repetition
+          if counts
+            repeat(items, *counts, repeated)
+            return true
+          end
 
           advance
-          seq.operand(literal("{".ord, flags))
+          items << literal("{".ord, flags)
+          false
+        end
+
+        def repeat(items, lo, hi, counted, repeated)
+          raise Error, "invalid nested repetition operator" if repeated
+          raise Error, "missing argument to repetition operator" if items.empty?
+
+          node = Node.new(Node::REPEAT, subs: [items.pop], lo: lo, hi: hi, counted: counted)
+          raise Error, "invalid repeat count" if counted && (lo >= 2 || hi >= 2) && node.need > MAX_REPEAT
+          raise Error, "expression too large" if node.size > MAX_SIZE
+
+          items << node
         end
 
         # group reads a group or a flag group and returns the flags in force
         # after it.
-        def group(seq, flags)
+        def group(items, flags, depth)
           advance
-          inner = group_flags(flags)
-          if inner.is_a?(Array)
-            seq.separate
-            return inner.first
-          end
+          raise Error, "expression nests too deeply" if depth + 1 > MAX_DEPTH
 
-          seq.operand("(?:#{body(inner)})")
+          inner = group_flags(flags)
+          return inner.first if inner.is_a?(Array)
+
+          items << body(inner, depth + 1)
           expect(")", "missing )")
           flags
         end
@@ -316,39 +291,36 @@ module Flagnetic
           c = advance
           case c
           when "[" then char_class(flags)
-          when "." then flags.anybits?(DOT_NL) ? "(?m:.)" : "[^\\n]"
-          when "^" then flags.anybits?(MULTILINE) ? "(?:\\A|(?<=\\n))" : "\\A"
-          when "$" then flags.anybits?(MULTILINE) ? "(?:\\z|(?=\\n))" : "\\z"
+          when "." then char(flags.anybits?(DOT_NL) ? ANYTHING : NO_NEWLINE)
+          when "^" then Node.new(Node::ASSERT, what: flags.anybits?(MULTILINE) ? Vm::BEGIN_LINE : Vm::BEGIN_TEXT)
+          when "$" then Node.new(Node::ASSERT, what: flags.anybits?(MULTILINE) ? Vm::END_LINE : Vm::END_TEXT)
           else literal(c.ord, flags)
           end
         end
 
         # repetition consumes *, +, ? or a well-formed {n}, {n,} or {n,m},
-        # and a lazy ?, returning the Onigmo quantifier. A { that does not
-        # start a well-formed repetition is a literal: it returns nil and
-        # consumes nothing. Laziness never changes whether a string matches.
+        # and a lazy ?, returning [lo, hi, counted] (hi -1 when unbounded). A
+        # { that does not start a well-formed repetition is a literal: it
+        # returns nil and consumes nothing. Laziness never changes whether a
+        # string matches.
         def repetition
           c = peek
-          quantifier =
+          counts =
             if c == "{"
               counts = repeat_counts
               return nil unless counts
 
-              min, max = counts
-              invalid = min.negative? || min > MAX_REPEAT || max > MAX_REPEAT || (max >= 0 && min > max)
+              lo, hi = counts
+              invalid = lo.negative? || lo > MAX_REPEAT || hi > MAX_REPEAT || (hi >= 0 && lo > hi)
               raise Error, "invalid repeat count" if invalid
 
-              if max == min
-                "{#{min}}"
-              else
-                "{#{min},#{max.negative? ? "" : max}}"
-              end
+              [lo, hi, true]
             else
               advance
-              c
+              [c == "+" ? 1 : 0, c == "?" ? 1 : -1, false]
             end
           advance if peek == "?"
-          quantifier
+          counts
         end
 
         # repeat_counts reads {n}, {n,} or {n,m} as [min, max] (max -1 when
@@ -426,11 +398,11 @@ module Flagnetic
           raise Error, "missing )"
         end
 
-        # escape emits what follows a backslash; every character of
+        # escape adds what follows a backslash to items; every character of
         # \Q...\E is an operand of its own.
-        def escape(seq, flags)
+        def escape(items, flags)
           atom = escape_atom(flags)
-          atom.is_a?(Array) ? atom.each { |a| seq.operand(a) } : seq.operand(atom)
+          atom.is_a?(Array) ? items.concat(atom) : items << atom
         end
 
         # escape_atom translates what follows a backslash outside a class.
@@ -440,10 +412,10 @@ module Flagnetic
           raise Error, "trailing backslash" if eof?
 
           case peek
-          when "A" then advance && "\\A"
-          when "z" then advance && "\\z"
-          when "b" then advance && WORD_BOUNDARY
-          when "B" then advance && NOT_WORD_BOUNDARY
+          when "A" then advance && Node.new(Node::ASSERT, what: Vm::BEGIN_TEXT)
+          when "z" then advance && Node.new(Node::ASSERT, what: Vm::END_TEXT)
+          when "b" then advance && Node.new(Node::ASSERT, what: Vm::WORD_BOUNDARY)
+          when "B" then advance && Node.new(Node::ASSERT, what: Vm::NOT_WORD_BOUNDARY)
           when "Q" then advance && quoted_literals(flags)
           when "d", "s", "w", "D", "S", "W"
             ranges, props = perl_class(flags)
@@ -536,9 +508,8 @@ module Flagnetic
             name = name[1..]
           end
           raise Error, "invalid character class range" unless PROPERTY_NAMES.key?(name)
-          return [[], [Sets.folded_property(name, negated)]] if flags.anybits?(FOLD) && name != "Any"
 
-          [[], ["\\p{#{"^" if negated}#{name}}"]]
+          [[], [Sets.property(name, negated, flags.anybits?(FOLD))]]
         end
 
         # char_class reads a class after its [.
@@ -610,37 +581,15 @@ module Flagnetic
 
         def literal(code_point, flags)
           ranges = [[code_point, code_point]]
-          ranges = Sets.fold(ranges) if flags.anybits?(FOLD)
-          if ranges.size == 1 && ranges[0][0] == ranges[0][1] && !SURROGATES.cover?(code_point)
-            rune(code_point)
-          else
-            set(
-              ranges, [], negated: false
-            )
-          end
+          char(flags.anybits?(FOLD) ? Sets.fold(ranges) : ranges)
         end
 
-        # set emits a class. Ruby cannot hold surrogates, so they are dropped
-        # from both a set and its negation; neither matches them in RE2.
+        # set builds the class of a [...] or an escape.
         def set(ranges, props, negated:)
-          ranges = Sets.without_surrogates(ranges)
-          if ranges.empty? && props.empty?
-            negated ? "(?m:.)" : "(?!)"
-          else
-            items = ranges.map { |lo, hi| lo == hi ? rune(lo) : "#{rune(lo)}-#{rune(hi)}" }
-            "[#{"^" if negated}#{items.join}#{props.join}]"
-          end
-        end
-
-        def rune(code_point)
-          if code_point < 0x80 && code_point.chr.match?(/\A[0-9A-Za-z]\z/)
-            code_point.chr
-          else
-            format("\\u{%x}", code_point)
-          end
+          Node.new(Node::CHAR, set: CharSet.new(Sets.normalize(ranges), props, negated))
         end
       end
-      private_constant :Translator, :Sets
+      private_constant :Parser, :Sets
     end
     private_constant :Regex, :UnicodeTables
   end

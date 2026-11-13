@@ -39,7 +39,7 @@ Metrics/PerceivedComplexity:
   Max: 15
 
 Naming/MethodParameterName:
-  AllowedNames: [op, cf, id]
+  AllowedNames: [op, cf, id, x, y, pc, cp, lo, hi]
 
 Metrics/ParameterLists:
   CountKeywordArgs: false

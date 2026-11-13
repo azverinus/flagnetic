@@ -33,6 +33,34 @@ class RegexTest < Minitest::Test
     assert matches("^a..b$", "a\xE2\x82b".b)
   end
 
+  # Nested bounded repeats make a backtracking engine burn CPU on input an
+  # end user chooses; the answer must be RE2's, and quick, not a cut-off.
+  def test_nested_repeats_answer_as_re2_does_without_a_time_limit
+    pattern = "^(?:(?:a{1,60}){1,16}X|a+Y)$"
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+    assert_equal true, matches(pattern, "#{"a" * 50}Y")
+    assert_equal false, matches(pattern, "#{"a" * 50}Z")
+    assert_equal false, matches("^(a+)+$", "#{"a" * 5000}!")
+    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 2
+  end
+
+  # A flag group opens no operand, so a repetition after it repeats what
+  # came before, as in Go.
+  def test_repetition_after_a_flag_group_repeats_the_previous_operand
+    assert_equal true, matches("^a(?i)*$", "aaa")
+    assert_equal true, matches("^a*(?i)*$", "aaa")
+    assert_equal "invalid", matches("(?i)*", "a")
+    assert_equal "invalid", matches("a|(?i)*", "a")
+  end
+
+  def test_limits_are_go_s
+    assert_equal "invalid", matches("a{1001}", "a")
+    assert_equal "invalid", matches("(?:a{1000}){2}", "a")
+    assert_equal "invalid", matches("#{"(" * 1001}a#{")" * 1001}", "a")
+    assert_equal true, matches("^a{1000}$", "a" * 1000)
+  end
+
   private
 
   def matches(pattern, input) = RegexHelper.matches(pattern, input)
