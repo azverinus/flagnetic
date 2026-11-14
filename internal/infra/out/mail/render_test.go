@@ -210,6 +210,43 @@ func TestTheInvitationMailNamesWhoInvitesAndToWhat(t *testing.T) {
 	}
 }
 
+func TestTheInvitationMailToAnEnforcedDomainOffersOnlyItsProvider(t *testing.T) {
+	r, err := mail.NewRenderer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		locale, provider, want string
+	}{
+		{"en", "Acme SSO", "sign in with"},
+		{"ru", "Acme SSO", "войдите через"},
+	} {
+		got, err := r.Render(appaccess.Mail{
+			Kind: access.MailInvitation, Locale: tc.locale, To: appaccess.MailRecipient{Name: "Ada", Email: "ada@acme.example"},
+			Data: appaccess.InvitationMailData{
+				URL: "https://flags.example.com/invitations/x", Provider: "<Acme> SSO", InvitedBy: "Grace Hopper",
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for name, part := range map[string]string{"text": got.Text, "HTML": got.HTML} {
+			lower := strings.ToLower(part)
+			if !strings.Contains(lower, tc.want) {
+				t.Errorf("%s %s: lacks %q:\n%s", tc.locale, name, tc.want, part)
+			}
+			for _, absent := range []string{"choose a password", "выберите пароль"} {
+				if strings.Contains(lower, absent) {
+					t.Errorf("%s %s: offers a password (%q):\n%s", tc.locale, name, absent, part)
+				}
+			}
+		}
+		if !strings.Contains(got.Text, "<Acme> SSO") || !strings.Contains(got.HTML, "&lt;Acme&gt; SSO") {
+			t.Errorf("%s: provider not named, or not escaped in HTML:\n%s\n%s", tc.locale, got.Text, got.HTML)
+		}
+	}
+}
+
 func TestTheInvitationMailEscapesWhatItIsGivenInHTML(t *testing.T) {
 	r, err := mail.NewRenderer()
 	if err != nil {

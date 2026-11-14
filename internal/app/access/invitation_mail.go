@@ -22,6 +22,18 @@ type InvitationMailData struct {
 	// Role in; both are empty when it grants none.
 	Project string
 	Role    access.RoleName
+	// Provider is the display name of the auth provider the invitee's email
+	// domain is enforced to, "" when it is not: the mail then offers signing
+	// in through it alone and no password.
+	Provider string
+}
+
+// ProviderNamer names the auth provider an enforced domain sends its members
+// to.
+type ProviderNamer interface {
+	// ProviderDisplayName returns the display name of the provider with the
+	// slug, and whether one has that slug.
+	ProviderDisplayName(ctx context.Context, slug string) (name string, found bool, err error)
 }
 
 // InvitationDetailsReader reads what an invitation's mail and page name
@@ -41,13 +53,18 @@ type InvitationMailer struct {
 	postman    *Postman
 	smtp       SMTPReader
 	details    InvitationDetailsReader
+	settings   AuthSettingsReader
+	providers  ProviderNamer
 	consoleURL string
 }
 
-// NewInvitationMailer returns the mailer; consoleURL is the address the
-// console is served at, "" when the instance has none.
-func NewInvitationMailer(postman *Postman, smtp SMTPReader, details InvitationDetailsReader, consoleURL string) *InvitationMailer {
-	return &InvitationMailer{postman: postman, smtp: smtp, details: details, consoleURL: consoleURL}
+// NewInvitationMailer returns the mailer; settings and providers tell which
+// provider an enforced domain's invitation offers, and consoleURL is the
+// address the console is served at, "" when the instance has none.
+func NewInvitationMailer(postman *Postman, smtp SMTPReader, details InvitationDetailsReader, settings AuthSettingsReader,
+	providers ProviderNamer, consoleURL string,
+) *InvitationMailer {
+	return &InvitationMailer{postman: postman, smtp: smtp, details: details, settings: settings, providers: providers, consoleURL: consoleURL}
 }
 
 // invitationLinkPath is where the console opens an invitation, followed by
@@ -59,7 +76,9 @@ const invitationLinkPath = "/invitations/"
 // answered: mailed, without its secret, which only the mail carries. The mail
 // names the inviter and the project and role the invitation grants, and is
 // written in the invitee's language, else the inviter's, else the
-// instance's. When the instance cannot mail, issued is returned as it is, for
+// instance's. An invitee whose email domain is enforced, judged from the
+// auth settings as they are now, is offered signing in through its provider
+// alone, since a password could not accept the invitation. When the instance cannot mail, issued is returned as it is, for
 // its issuer to pass the link on; a nil mailer never mails. Whether the mail
 // is sent later never undoes the invitation: a lost one is reissued.
 func (im *InvitationMailer) mail(ctx context.Context, invitee access.Member, issued IssuedInvitation, requestID string,
@@ -81,6 +100,22 @@ func (im *InvitationMailer) mail(ctx context.Context, invitee access.Member, iss
 	}
 	if g := issued.Grant; g != nil && details.ProjectName != "" {
 		data.Project, data.Role = details.ProjectName, g.Role
+	}
+	settings, err := im.settings.AuthSettings(ctx)
+	if err != nil {
+		return IssuedInvitation{}, err
+	}
+	if d, ok := settings.EnforcedFor(invitee.Email); ok {
+		// A provider removed since leaves the slug, which still tells the
+		// person where to sign in.
+		data.Provider = d.Provider
+		name, found, err := im.providers.ProviderDisplayName(ctx, d.Provider)
+		if err != nil {
+			return IssuedInvitation{}, err
+		}
+		if found {
+			data.Provider = name
+		}
 	}
 	im.postman.Queue(ctx, Mail{
 		Kind: access.MailInvitation, To: MailRecipient{Name: invitee.DisplayName, Email: invitee.Email},
