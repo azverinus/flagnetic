@@ -495,3 +495,129 @@ func TestABoundedReplayOfWhatWasReceivedBeforeASinksStartSendsItAndTheLiveStream
 		t.Errorf("after the replay the receiver got %v, want the live stream from where it was", got)
 	}
 }
+
+// invertedReceipts leaves three rows in the stream's order whose receipt times
+// do not follow it, as an ingest that read its clock before another's does:
+// inside is received inside the window and is written by a transaction held open while the next row commits; before
+// is received before the window yet comes after inside in the stream's order;
+// after is received after the window. The held transaction is then released
+// and the rows delivered, so the stream's live position is past all of them.
+//
+// It returns the window's start and its end, and the clock is left past
+// every receipt so that the worker is due.
+func (f delivering) invertedReceipts(t *testing.T) (inside, before, after any, from, to time.Time) {
+	t.Helper()
+	base := f.clock.Now()
+	from, to = base.Add(2*time.Hour), base.Add(3*time.Hour)
+
+	f.clock.Set(base.Add(150 * time.Minute))
+	inside = f.exposure("u-inside", "true", f.clock.Now())
+	written, release := f.srv.HoldNextIngest(t)
+	held := make(chan answer, 1)
+	go func() { held <- postEvents(t, f.srv, f.server, f.envelope(t, inside)) }()
+	<-written
+
+	f.clock.Set(base.Add(30 * time.Minute))
+	before = f.exposure("u-before", "true", f.clock.Now())
+	f.post(t, before)
+
+	f.clock.Set(base.Add(5 * time.Hour))
+	after = f.exposure("u-after", "true", f.clock.Now())
+	f.post(t, after)
+
+	release()
+	if a := <-held; a.status != http.StatusAccepted {
+		t.Fatalf("the held batch = %d: %s", a.status, a.body)
+	}
+	f.clock.Set(base.Add(10 * time.Hour))
+	tick(t, f.srv)
+	return inside, before, after, from, to
+}
+
+func TestABoundedReplayBehindAnOpenTransactionSendsNothingReceivedBeforeItsStart(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t)
+	sink, secret := f.enabled(t, webhook(r, "exposure"))
+	inside, before, after, from, to := f.invertedReceipts(t)
+	if got, _ := delivered(t, r, secret, 0); !slices.Equal(got, ids(inside, before, after)) {
+		t.Fatalf("delivered %v, want the three rows in the stream's order", got)
+	}
+	first := len(batchCalls(r))
+
+	f.replay(t, sink, management.SinkReplay{From: from, To: &to})
+	tick(t, f.srv)
+	if got, _ := delivered(t, r, secret, first); !slices.Equal(got, ids(inside)) {
+		t.Fatalf("replayed %v, want only the row received inside the window, the held transaction's", got)
+	}
+}
+
+func TestAReplayRunningOnBehindAnOpenTransactionSendsNothingReceivedBeforeItsStart(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t)
+	sink, secret := f.enabled(t, webhook(r, "exposure"))
+	inside, before, after, from, _ := f.invertedReceipts(t)
+	if got, _ := delivered(t, r, secret, 0); !slices.Equal(got, ids(inside, before, after)) {
+		t.Fatalf("delivered %v, want the three rows in the stream's order", got)
+	}
+	first := len(batchCalls(r))
+
+	f.replay(t, sink, management.SinkReplay{From: from})
+	tick(t, f.srv)
+	if got, _ := delivered(t, r, secret, first); !slices.Equal(got, ids(inside, after)) {
+		t.Fatalf("replayed %v, want the rows received since its start, not the one received before", got)
+	}
+}
+
+func TestAReplayStartingAfterTheStreamsFloorSendsNothingReceivedBeforeItsStart(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t)
+	created, secret := f.create(t, webhook(r, "exposure"))
+	sink := f.enable(t, created, management.SinkEnable{StartFrom: ptr(f.clock.Now())})
+	inside, before, after, from, to := f.invertedReceipts(t)
+	if got, _ := delivered(t, r, secret, 0); !slices.Equal(got, ids(inside, before, after)) {
+		t.Fatalf("delivered %v, want the three rows in the stream's order", got)
+	}
+	first := len(batchCalls(r))
+
+	f.replay(t, sink, management.SinkReplay{From: from})
+	tick(t, f.srv)
+	if got, _ := delivered(t, r, secret, first); !slices.Equal(got, ids(inside, after)) {
+		t.Fatalf("replayed %v, want the rows received since its start, not the one received before it", got)
+	}
+	first = len(batchCalls(r))
+
+	// The floor the replay set stays for what follows, and a bounded replay
+	// returns to the floor the stream had.
+	f.replay(t, sink, management.SinkReplay{From: from, To: &to})
+	tick(t, f.srv)
+	if got, _ := delivered(t, r, secret, first); !slices.Equal(got, ids(inside)) {
+		t.Errorf("a bounded replay sent %v, want only the row received inside its window", got)
+	}
+}
+
+func TestABatchOfABoundedReplaySetAsideKeepsTheReplaysFloorWhenRedelivered(t *testing.T) {
+	f := startDelivering(t)
+	// The live batch is acknowledged; the replay's batch is rejected until it
+	// is set aside, and its redelivery acknowledged.
+	r := testkit.StartReceiver(t, script([]testkit.Reply{{}}, times(5, rejected), []testkit.Reply{{}})...)
+	sink, secret := f.enabled(t, webhook(r, "exposure"))
+	inside, before, after, from, to := f.invertedReceipts(t)
+	if got, _ := delivered(t, r, secret, 0); !slices.Equal(got, ids(inside, before, after)) {
+		t.Fatalf("delivered %v, want the three rows in the stream's order", got)
+	}
+
+	f.replay(t, sink, management.SinkReplay{From: from, To: &to})
+	f.rounds(t, 5)
+	list := f.deadLetters(t, sink)
+	if len(list) != 1 || list[0].Rows != 1 {
+		t.Fatalf("dead letters %+v, want the replay's batch of the row received inside the window", list)
+	}
+	f.redeliver(t, sink, list[0])
+	calls := callsOf(t, r, secret)
+	if len(calls) != 7 {
+		t.Fatalf("the receiver got %d batches, want the live one, the five rejections and the redelivery", len(calls))
+	}
+	if got, want := idsOf(calls[6].Events), ids(inside); !slices.Equal(got, want) {
+		t.Errorf("redelivered %v, want %v: the row received before the window stays out", got, want)
+	}
+}
