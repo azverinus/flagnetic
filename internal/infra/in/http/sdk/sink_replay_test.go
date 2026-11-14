@@ -496,7 +496,7 @@ func TestABoundedReplayOfWhatWasReceivedBeforeASinksStartSendsItAndTheLiveStream
 	}
 }
 
-// invertedReceipts leaves four rows in the stream's order whose receipt times
+// invertedReceipts leaves three rows in the stream's order whose receipt times
 // do not follow it, as an ingest that read its clock before another's does:
 // inside is received inside the window and is written by a transaction held open while the next row commits; before
 // is received before the window yet comes after inside in the stream's order;
@@ -592,5 +592,32 @@ func TestAReplayStartingAfterTheStreamsFloorSendsNothingReceivedBeforeItsStart(t
 	tick(t, f.srv)
 	if got, _ := delivered(t, r, secret, first); !slices.Equal(got, ids(inside)) {
 		t.Errorf("a bounded replay sent %v, want only the row received inside its window", got)
+	}
+}
+
+func TestABatchOfABoundedReplaySetAsideKeepsTheReplaysFloorWhenRedelivered(t *testing.T) {
+	f := startDelivering(t)
+	// The live batch is acknowledged; the replay's batch is rejected until it
+	// is set aside, and its redelivery acknowledged.
+	r := testkit.StartReceiver(t, script([]testkit.Reply{{}}, times(5, rejected), []testkit.Reply{{}})...)
+	sink, secret := f.enabled(t, webhook(r, "exposure"))
+	inside, before, after, from, to := f.invertedReceipts(t, r)
+	if got, _ := delivered(t, r, secret, 0); !slices.Equal(got, ids(inside, before, after)) {
+		t.Fatalf("delivered %v, want the three rows in the stream's order", got)
+	}
+
+	f.replay(t, sink, management.SinkReplay{From: from, To: &to})
+	f.rounds(t, 5)
+	list := f.deadLetters(t, sink)
+	if len(list) != 1 || list[0].Rows != 1 {
+		t.Fatalf("dead letters %+v, want the replay's batch of the row received inside the window", list)
+	}
+	f.redeliver(t, sink, list[0])
+	calls := callsOf(t, r, secret)
+	if len(calls) != 7 {
+		t.Fatalf("the receiver got %d batches, want the live one, the five rejections and the redelivery", len(calls))
+	}
+	if got, want := idsOf(calls[6].Events), ids(inside); !slices.Equal(got, want) {
+		t.Errorf("redelivered %v, want %v: the row received before the window stays out", got, want)
 	}
 }
