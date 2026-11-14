@@ -7732,6 +7732,10 @@ msgstr ""
 msgid "The auth settings are saved."
 msgstr ""
 
+#: src/components/firebase-wizard.tsx
+msgid "The browser could not read the file."
+msgstr ""
+
 #: src/components/experiment-assignment.tsx
 msgid "The browser refused the clipboard. Select the query and copy it by hand."
 msgstr ""
@@ -8406,6 +8410,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "The project is saved."
+msgstr ""
+
+#: src/components/firebase-wizard.tsx
+msgid "The project needs an environment and a unit type before a template can be imported."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/event-volume.tsx

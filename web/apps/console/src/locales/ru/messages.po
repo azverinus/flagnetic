@@ -7732,6 +7732,10 @@ msgstr "Атрибут {key} больше не объявлен, и его кл�
 msgid "The auth settings are saved."
 msgstr "Настройки аутентификации сохранены."
 
+#: src/components/firebase-wizard.tsx
+msgid "The browser could not read the file."
+msgstr "Браузер не смог прочитать файл."
+
 #: src/components/experiment-assignment.tsx
 msgid "The browser refused the clipboard. Select the query and copy it by hand."
 msgstr "Браузер не дал доступ к буферу обмена. Выделите запрос и скопируйте его вручную."
@@ -8407,6 +8411,10 @@ msgstr "В проекте нет такого сегмента."
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "The project is saved."
 msgstr "Проект сохранён."
+
+#: src/components/firebase-wizard.tsx
+msgid "The project needs an environment and a unit type before a template can be imported."
+msgstr "Чтобы импортировать шаблон, в проекте должны быть окружение и тип единицы."
 
 #: src/routes/_signed-in/projects/$project/event-volume.tsx
 msgid "The project received no event in these days."

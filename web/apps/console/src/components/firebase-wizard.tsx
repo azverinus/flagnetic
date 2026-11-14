@@ -73,11 +73,20 @@ export function FirebaseWizard({ project }: { project: string }) {
   const template = read !== undefined && "template" in read ? read.template : undefined;
   const excluded = session.excluded ?? [];
   const target: FirebaseTarget | undefined = (() => {
-    const environment = session.environment ?? environments.data?.[0]?.key;
+    // A stored choice is kept only while the project still has it: an environment or unit
+    // type deleted since would otherwise be sent to the server and shown as no option.
+    const environmentKeys = (environments.data ?? []).map((environment) => environment.key);
+    const environment =
+      session.environment !== undefined && environmentKeys.includes(session.environment)
+        ? session.environment
+        : environmentKeys[0];
     const unitTypeKeys = (unitTypes.data ?? []).map((unitType) => unitType.key);
     const unitType =
-      session.unitType ??
-      (unitTypeKeys.includes(defaultUnitType) ? defaultUnitType : unitTypeKeys[0]);
+      session.unitType !== undefined && unitTypeKeys.includes(session.unitType)
+        ? session.unitType
+        : unitTypeKeys.includes(defaultUnitType)
+          ? defaultUnitType
+          : unitTypeKeys[0];
     return environment === undefined || unitType === undefined
       ? undefined
       : { environment, unitType };
@@ -111,9 +120,17 @@ export function FirebaseWizard({ project }: { project: string }) {
           onContinue={() => move({ ...session, step: "parameters" })}
           canContinue={template !== undefined}
         />
-      ) : environments.isPending || unitTypes.isPending || target === undefined ? (
+      ) : environments.isError || unitTypes.isError ? (
+        <ImportRefusal error={environments.error ?? unitTypes.error} />
+      ) : environments.isPending || unitTypes.isPending ? (
         <p role="status" className="text-sm text-muted-foreground">
           <Trans>Loading the project's environments and unit types…</Trans>
+        </p>
+      ) : target === undefined ? (
+        <p role="alert" className="text-sm text-destructive">
+          <Trans>
+            The project needs an environment and a unit type before a template can be imported.
+          </Trans>
         </p>
       ) : current === "parameters" ? (
         <Parameters
@@ -197,7 +214,13 @@ function Upload({
   const choose = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const text = await file.text();
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      setUnreadable(t`The browser could not read the file.`);
+      return;
+    }
     const read = parseTemplate(text);
     if ("error" in read) {
       setUnreadable(
@@ -261,6 +284,8 @@ function Parameters({
 }) {
   const { i18n, t } = useLingui();
   // The whole template is read, so unticking a parameter never hides how a condition maps.
+  // A refusal does not hold the member here: leaving out the parameter at fault is how it is
+  // fixed, and the preview's dry run reads only the parameters still included.
   const mapping = useQuery({
     queryKey: [
       "firebase-dry-run",
@@ -370,7 +395,7 @@ function Parameters({
         <Button variant="outline" onClick={onBack}>
           <Trans>Back</Trans>
         </Button>
-        <Button disabled={included === 0 || !mapping.isSuccess} onClick={onContinue}>
+        <Button disabled={included === 0 || mapping.isPending || mapping.isFetching} onClick={onContinue}>
           <Plural
             value={included}
             one="Continue with # parameter"

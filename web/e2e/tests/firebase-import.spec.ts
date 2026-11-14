@@ -192,8 +192,9 @@ test.describe("the Firebase wizard", () => {
     await expect(page.getByRole("list", { name: "Faults in the document" })).toContainText(
       "/parameters/broken/valueType",
     );
-    await expect(page.getByRole("button", { name: /^Continue with/ })).toBeDisabled();
     await expectNoSeriousViolations(page, "the Firebase wizard's refused template");
+    await page.getByLabel("Include broken").uncheck();
+    await expect(page.getByRole("button", { name: /^Continue with/ })).toBeDisabled();
   });
 
   test.describe("in Russian", () => {

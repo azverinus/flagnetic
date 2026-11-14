@@ -262,18 +262,21 @@ describe("the Firebase wizard", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("Imported into");
   });
 
-  it("shows the faults the server found in the template, with their pointers", async () => {
-    fakeServer({
+  it("shows the faults the server found in the template, and goes on without the parameter at fault", async () => {
+    const server = fakeServer({
       ...routes(),
-      [path]: problem(422, "invalid_document", {
-        errors: [
-          {
-            pointer: "/parameters/new_matching/valueType",
-            code: "invalid_value_type",
-            detail: "valueType is one of STRING, BOOLEAN, NUMBER and JSON",
-          },
-        ],
-      }),
+      [path]: async (request) =>
+        (await sentKeys(request)).includes("new_matching")
+          ? problem(422, "invalid_document", {
+              errors: [
+                {
+                  pointer: "/parameters/new_matching/valueType",
+                  code: "invalid_value_type",
+                  detail: "valueType is one of STRING, BOOLEAN, NUMBER and JSON",
+                },
+              ],
+            })
+          : { status: 200, body: answer(true, ["banner_text"]), headers: { ETag: '"e1"' } },
     });
     await renderWithRouter(() => <FirebaseWizard project="mobile" />);
 
@@ -281,7 +284,64 @@ describe("the Firebase wizard", () => {
 
     const faults = await screen.findByRole("list", { name: "Faults in the document" });
     expect(faults).toHaveTextContent("/parameters/new_matching/valueType");
-    expect(screen.getByRole("button", { name: /^Continue with/ })).toBeDisabled();
+    await userEvent.click(screen.getByLabelText("Include new_matching"));
+    await userEvent.click(screen.getByRole("button", { name: "Continue with 2 parameters" }));
+    await userEvent.click(screen.getByRole("button", { name: "Preview the import" }));
+
+    expect(await screen.findByRole("button", { name: "Apply" })).toBeEnabled();
+    const preview = server.requests.filter((r) => r.method === "POST").at(-1)!;
+    expect(await sentKeys(preview)).toEqual(["banner_text", "onboarding_steps"]);
+  });
+
+  it("says why it cannot go on when the project's environments cannot be read", async () => {
+    fakeServer({
+      "GET /projects/mobile/environments": problem(500, "internal"),
+      "GET /projects/mobile/unit-types": unitTypes,
+    });
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+
+    await upload();
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByText(/Loading the project's environments/)).toBeNull();
+  });
+
+  it("says the project needs a unit type when it has none", async () => {
+    fakeServer({
+      ...routes(),
+      "GET /projects/mobile/unit-types": { status: 200, body: { items: [] } },
+    });
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+
+    await upload();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The project needs an environment and a unit type",
+    );
+  });
+
+  it("falls back to the defaults when a stored environment or unit type is gone", async () => {
+    const server = fakeServer({
+      ...routes(),
+      [path]: { status: 200, body: answer(true, ["new_matching"]), headers: { ETag: '"e1"' } },
+    });
+    window.sessionStorage.setItem(
+      "flagnetic.import-firebase.mobile",
+      JSON.stringify({
+        step: "parameters",
+        fileName: "remoteconfig.json",
+        text: JSON.stringify(template),
+        environment: "staging",
+        unitType: "device",
+      }),
+    );
+
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+    await screen.findByRole("list", { name: "Condition mapping" });
+
+    const url = new URL(server.requests.find((r) => r.method === "POST")!.url);
+    expect(url.searchParams.get("environment")).toBe("development");
+    expect(url.searchParams.get("unit_type")).toBe("anonymous");
   });
 
   it("refuses a file that is not a template before going on", async () => {
@@ -294,6 +354,18 @@ describe("the Firebase wizard", () => {
     );
 
     expect(await screen.findByText(/The file is not JSON/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+  });
+
+  it("says so when the browser cannot read the chosen file", async () => {
+    fakeServer(routes());
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+    const file = new File(["{}"], "t.json");
+    file.text = () => Promise.reject(new Error("gone"));
+
+    await userEvent.upload(screen.getByLabelText("Remote Config template"), file);
+
+    expect(await screen.findByText("The browser could not read the file.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
