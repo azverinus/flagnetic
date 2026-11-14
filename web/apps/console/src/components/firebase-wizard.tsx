@@ -395,7 +395,10 @@ function Parameters({
         <Button variant="outline" onClick={onBack}>
           <Trans>Back</Trans>
         </Button>
-        <Button disabled={included === 0 || mapping.isPending || mapping.isFetching} onClick={onContinue}>
+        <Button
+          disabled={included === 0 || mapping.isPending || mapping.isFetching}
+          onClick={onContinue}
+        >
           <Plural
             value={included}
             one="Continue with # parameter"
