@@ -181,7 +181,7 @@ experiments: []
 
 ### Optional fields on import
 
-A hand-written document may leave out: a rule's `id` and a rollout's `salt` (minted; a present id must be a UUID and a present salt 16 characters of `[a-z0-9]`), a draft experiment's salts (drawn), and `owner`, every `description`, `tags`, `prerequisites`, `overrides` and `note`. In a merge every top-level section is optional (an absent section is left untouched); `create` and `replace` need every section. An export writes every optional field: an absent text is `""`, an absent list `[]`, an absent instant, day or decision `null`.
+A hand-written document may leave out: a rule's `id` and a rollout's `salt` (minted; a present id must be a UUID and a present salt 16 characters of `[a-z0-9]`), a draft experiment's salts (drawn; a present one must be 16 lower-case hexadecimal characters), and `owner`, every `description`, `tags`, `prerequisites`, `overrides` and `note`. In a merge every top-level section is optional (an absent section is left untouched); `create` and `replace` need every section. An export writes every optional field: an absent text is `""`, an absent list `[]`, an absent instant, day or decision `null`.
 
 ### Ordering and byte stability
 
@@ -205,7 +205,7 @@ Anyone who can read a project exports it:
 GET /api/v1/projects/{project}/export?format=json|yaml
 ```
 
-The answer is `application/json` or `application/yaml` with a `Content-Disposition` naming the file and an `ETag`: the identifier of the project's latest audit entry, which an import can send back as [`If-Match`](#dry-runs-and-if-match). An unknown `format` is `400`.
+The answer is `application/json` or `application/yaml` with a `Content-Disposition` naming the file and an `ETag`: the identifier of the project's latest audit entry, quoted (a project with no audit entry has none), which an import can send back as [`If-Match`](#dry-runs-and-if-match). An unknown `format` is `400`.
 
 ## Importing
 
@@ -236,7 +236,7 @@ A replace is refused whole, and nothing is deleted, when:
 - anything to delete is still used: `409 in_use` with every reference in `references[{kind, key, environment}]`: a segment a rule names, a flag an experiment of the document holds, a unit type or attribute a rule names;
 - an absent environment is protected: `409 environment_protected`;
 - an absent environment has live SDK keys (neither revoked nor past a rotation overlap): `409 in_use`, the keys as `sdk_key` references;
-- it would leave no environment.
+- it would leave no environment: this one is `422 invalid_document`, `invalid_value` at `/environments`.
 
 ### Experiments
 
@@ -276,7 +276,7 @@ An entity equal to the document is not written. An import that changes nothing w
 
 Add `dry_run=true` to any import to see what it would do. The whole transaction runs, including every check the database makes, and is rolled back: the answer is the one the real import would give, and nothing is written, bumped or recorded.
 
-Every dry run, like an export, answers with an `ETag`: the identifier of the project's latest audit entry. Send it back as `If-Match` on the real import and the import is applied only if the project has not moved since: otherwise it is refused `412 version_mismatch` before any write, so you never apply a diff you did not see. Without the header an import applies to the project as it is.
+A dry run into an existing project (merge, replace or Firebase), like an export, answers with an `ETag`: the identifier of the project's latest audit entry, quoted. A create has no project to move, so it has no `ETag` and takes no `If-Match`. Send it back as `If-Match` on the real import and the import is applied only if the project has not moved since: otherwise it is refused `412 version_mismatch` before any write, so you never apply a diff you did not see. Without the header an import applies to the project as it is.
 
 A document that breaks a rule is refused `422 invalid_document`, whole, with `errors[{pointer, code, detail, params}]`: a JSON Pointer into the document and the code an ordinary write would use (`invalid_flag`, `invalid_configuration`, `type_immutable`, `unknown_field`, `required`, …). Every fault found is reported, so one run fixes the file.
 
@@ -324,14 +324,14 @@ flagnetic import --file shop.yaml --project shop-copy --name "Shop copy"
 
 # See what a merge would do, then apply it only if nothing moved.
 flagnetic import --file shop.yaml --mode merge --project shop --dry-run
-flagnetic import --file shop.yaml --mode merge --project shop --if-match '"4821"'
+flagnetic import --file shop.yaml --mode merge --project shop --if-match '"0193a8f2-7c1e-7b3d-9e4a-5f6b7c8d9e0f"'
 ```
 
 - `export --project K [--format yaml|json] [--output F]`: writes to stdout unless `--output` is given (the file is written `0600`).
 - `import --file F|- [--mode create|merge|replace] [--project K] [--name N] [--dry-run] [--if-match ETAG]`: a `.json` file is sent as JSON, anything else and `-` (standard input) as YAML. The mode is `create` by default; `--project` is required for merge and replace and is the new key for create; `--name` only with create.
 - `import-firebase --file F --project K --environment E [--unit-type T] [--dry-run] [--if-match ETAG]`.
 
-Results are indented JSON on standard output. Each warning goes to standard error as `warning: <code> <pointer>: <detail>`, and an export and every dry run print `etag: <value>` there. A refusal prints `<status> <code>: <detail>`, its references, and each fault of a `422` as `  <pointer> <code>: <detail>`. The exit code is `0` on success, `1` when the server refused or the request failed, `2` for misuse (a missing flag, an unknown format, `--if-match` with create).
+Results are indented JSON on standard output. Each warning goes to standard error as `warning: <code> <pointer>: <detail>`, and an export and a dry run of a merge, replace or Firebase import print `etag: <value>` there. A refusal prints `<status> <code>: <detail>`, its references, and each fault of a `422` as `  <pointer> <code>: <detail>`. The exit code is `0` on success, `1` when the server refused or the request failed, `2` for misuse (a missing flag, an unknown format, `--if-match` with create).
 
 ## Importing from Firebase Remote Config
 
@@ -388,7 +388,7 @@ Conditions Flagnetic cannot reproduce are **skipped**, with a warning naming the
 | `rule_limit` | the conditional value | `parameter`, `condition`, `max` |
 | `archived_flag` | the parameter | `parameter` |
 
-`rollout_reshuffled` is a warning on every percent condition: Firebase and Flagnetic hash units differently, so the units that were in a percentage are not the same units in the rollout. The pointer of a Firebase warning is `/parameters/<key>/conditionalValues/<condition>`, or `/parameterGroups/<group>/parameters/<key>` for a grouped parameter. A document import's own warnings are `owner_replaced {email}` and `protection_kept`.
+`rollout_reshuffled` is a warning on every percent condition: Firebase and Flagnetic hash units differently, so the units that were in a percentage are not the same units in the rollout. A parameter's pointer is `/parameters/<key>`, or `/parameterGroups/<group>/parameters/<key>` for a grouped parameter; its default value is `<parameter>/defaultValue` and a conditional value `<parameter>/conditionalValues/<condition>`. The condition's expression is `/conditions/<index>/expression`. A document import's own warnings are `owner_replaced {email}` and `protection_kept`.
 
 A template fault is `422 invalid_document` with every fault reported, each with its pointer into the template: `invalid_json`, `required`, `duplicate_condition`, `unknown_condition`, `duplicate_parameter`, `invalid_value_type`, `invalid_value`, `type_immutable`.
 
