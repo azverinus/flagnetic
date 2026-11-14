@@ -48,6 +48,17 @@ docker compose exec -T postgres pg_dump -U flagnetic flagnetic > flagnetic.sql
 
 Such a dump moves an instance to another PostgreSQL cluster: the first replica to start there notices the move and the rollups and sinks go on from where they stopped (see [After restoring a logical dump](operations.md#after-restoring-a-logical-dump)). A physical backup (`pg_basebackup`, a snapshot of the volume, or your provider's snapshots and point-in-time recovery) restores faster and keeps everything exactly.
 
+### Try it with the demo project
+
+[`deploy/demo-project.yaml`](../deploy/demo-project.yaml) is a small project to look at: three environments, a segment, flags with a rule and a rollout, and a draft experiment. Import it with the API token the bootstrap printed:
+
+```bash
+export FLAGNETIC_TOKEN=<the API token>
+flagnetic import --file deploy/demo-project.yaml
+```
+
+The command talks to `http://localhost:8080`; point it elsewhere with `--url` or `FLAGNETIC_URL`. See [Exporting and importing a project](transfer.md).
+
 ## As a binary
 
 ### Get the binary

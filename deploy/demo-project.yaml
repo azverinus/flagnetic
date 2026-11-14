@@ -1,0 +1,146 @@
+# A small project to look at: import it into a fresh instance with
+#
+#   flagnetic import --file deploy/demo-project.yaml
+#
+# It is a hand-written project document (see docs/transfer.md). It names no
+# ids, salts or owners: the server mints the rule ids and rollout salts, and
+# the importing member owns every flag and experiment.
+schema_version: 1
+
+project:
+  key: demo
+  name: Demo
+  description: A small project to look at, with a segment, flags that target and roll out, and a draft experiment.
+
+environments:
+  - key: development
+    name: Development
+    protected: false
+  - key: staging
+    name: Staging
+    protected: false
+  - key: production
+    name: Production
+    protected: true
+
+unit_types:
+  - key: user
+    name: User
+    description: A signed-in person.
+
+attributes:
+  - key: plan
+    type: string
+    name: Plan
+    description: The subscription plan of the signed-in user.
+
+segments:
+  - key: paying_customers
+    name: Paying customers
+    description: Users on a paid plan.
+    conditions:
+      - kind: attribute
+        attribute: plan
+        op: in
+        value: [pro, enterprise]
+
+flags:
+  - key: new_checkout
+    type: boolean
+    name: New checkout
+    description: The redesigned checkout. Paying customers see it first, then a quarter of everyone else in production.
+    tags: [checkout]
+    variations:
+      - key: "true"
+        value: true
+      - key: "false"
+        value: false
+    configurations:
+      development:
+        "on": true
+        off_variation: "false"
+        fallthrough: "true"
+      staging:
+        "on": true
+        off_variation: "false"
+        fallthrough: "true"
+      production:
+        "on": true
+        off_variation: "false"
+        fallthrough: "false"
+        rules:
+          - description: Paying customers
+            conditions:
+              - kind: in_segment
+                segment: paying_customers
+            serve:
+              kind: variation
+              variation: "true"
+          - description: A quarter of everyone else
+            conditions: []
+            serve:
+              kind: rollout
+              variation: "true"
+              unit_type: user
+              percentage: 2500
+
+  - key: checkout_button_text
+    type: string
+    name: Checkout button text
+    description: The label of the checkout button, compared by the draft experiment.
+    tags: [checkout]
+    variations:
+      - key: control
+        value: Buy now
+      - key: variant
+        value: Complete your order
+    configurations:
+      development:
+        "on": true
+        off_variation: control
+        fallthrough: control
+      staging:
+        "on": true
+        off_variation: control
+        fallthrough: control
+      production:
+        "on": true
+        off_variation: control
+        fallthrough: control
+
+  - key: dark_mode
+    type: boolean
+    name: Dark mode
+    description: Lets users switch the console of the app to a dark theme. Off until it is ready.
+    variations:
+      - key: "true"
+        value: true
+      - key: "false"
+        value: false
+    configurations:
+      development:
+        "on": true
+        off_variation: "false"
+        fallthrough: "true"
+      staging:
+        "on": false
+        off_variation: "false"
+        fallthrough: "true"
+      production:
+        "on": false
+        off_variation: "false"
+        fallthrough: "true"
+
+experiments:
+  - key: checkout_button_text_test
+    name: Checkout button text
+    hypothesis: A button that names the result of pressing it completes more orders than "Buy now".
+    flag: checkout_button_text
+    unit_type: user
+    variations:
+      - variation: control
+        weight: 5000
+      - variation: variant
+        weight: 5000
+    traffic_allocation: 5000
+    status: draft

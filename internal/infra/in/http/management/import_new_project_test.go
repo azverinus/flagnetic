@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -520,4 +521,29 @@ func TestAnImportRecordsEachEntityThenOneSummaryEntryUnderTheRequestsID(t *testi
 		t.Fatalf("project.imported after = %v", last.After)
 	}
 	assertJSON(t, "counts of flags", after["counts"].(map[string]any)["flags"], `{"created": 2, "updated": 0, "deleted": 0}`)
+}
+
+// TestTheDemoProjectDocumentCreatesAProjectWithoutWarnings keeps the
+// document the install guide tells an operator to import loadable: it is
+// written by hand, so nothing but an import checks it.
+func TestTheDemoProjectDocumentCreatesAProjectWithoutWarnings(t *testing.T) {
+	document, err := os.ReadFile("../../../../../deploy/demo-project.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+
+	res := importNew(t, admin, management.ImportNewProjectParams{}, "application/yaml", document)
+	if res.JSON201 == nil {
+		t.Fatalf("import = %d: %s", res.StatusCode(), res.Body)
+	}
+	r := res.JSON201
+	if r.Project.Key != "demo" {
+		t.Errorf("project = %+v, want the key demo", r.Project)
+	}
+	assertJSON(t, "warnings", r.Warnings, `[]`)
+	assertJSON(t, "flags created", r.Changes.Flags.Created, `["new_checkout", "checkout_button_text", "dark_mode"]`)
+	assertJSON(t, "experiments created", r.Changes.Experiments.Created, `["checkout_button_text_test"]`)
+	assertJSON(t, "segments created", r.Changes.Segments.Created, `["paying_customers"]`)
 }
