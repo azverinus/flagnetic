@@ -14,6 +14,7 @@
 - [Webhooks](webhooks.md): subscribing a receiver to a project's events, its secret, the targets the platform calls, and the event catalogue.
 - [Sinks](sinks.md): a project's copy of its raw events in ClickHouse, object storage or a signed webhook: configuring, guarding, testing and enabling a sink, health, failure classes, dead letters, replay, at risk and gaps, metrics.
 - [Exported events](exported-events.md): the export schema and its compatibility promise, the ClickHouse DDL, the object key scheme, the webhook envelope, and a SQL recipe reproducing first exposures, the sample-ratio check and assignments.
+- [Exporting and importing a project](transfer.md): the project document field by field and its compatibility promise, create, merge and replace, dry runs and `If-Match`, protection and owners, the audit trail, the CLI, importing from Firebase Remote Config, and the demo project.
 - [Segments](segments.md) and [Targeting](targeting.md): reusable sets of conditions, and the operators and limits of every condition.
 - [Operations](operations.md) and the [configuration reference](configuration.md): running the server, how changes reach SDKs across replicas, and what to watch.
 

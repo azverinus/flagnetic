@@ -55,6 +55,7 @@ Data crosses layers as: HTTP DTO → command → domain model → result → HTT
 | events | exposures, aliases, evaluation summaries, rollups, retention |
 | governance | protected environments, change requests, scheduled changes, the audit log, webhooks, notices |
 | sinks | data export: a project's sinks to ClickHouse, object storage and webhooks, their credentials, targets and delivery |
+| transfer | the project document: exporting a project's configuration, importing it (create, merge, replace, dry runs), and translating a Firebase Remote Config template; it owns no tables and writes through import ports of workspace, flags and experiments |
 
 A context reaches another only through an application port, never by importing the other context's adapters.
 

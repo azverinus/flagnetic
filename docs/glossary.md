@@ -28,12 +28,24 @@ _Avoid_: master key, encryption key, salt (reserved for the public bucketing sal
 The isolation boundary for flags, experiments, segments, environments and members. Nothing is shared across projects. Deleting a project removes everything in it at once except its audit entries, which keep its identifier and are read through the instance's audit log, and frees its key; there is no restore.
 _Avoid_: workspace, tenant, app, organization
 
+**Project document**:
+A project's whole configuration as one JSON or YAML file: its environments, unit types, declared attributes, segments, flags with their configuration in every environment, and experiments, keyed, with the rule ids and salts that keep a unit in its bucket, owners as email addresses, and nothing about members, credentials, webhooks, change requests, audit or events. It has its own `schema_version`, and every version a server ever exported stays importable. See [Exporting and importing a project](transfer.md).
+_Avoid_: export file, backup, dump, template (reserved for a Firebase Remote Config template)
+
+**Import**:
+Applying a project document to a project, or creating a project from one, whole or not at all: `create` makes a new project, `merge` creates or updates what the document names, `replace` also deletes what it does not name unless something still uses it. An import is owner-only, bypasses protection, never changes whether an existing environment is protected, and is recorded entity by entity like a direct write, plus one `project.imported` entry.
+_Avoid_: restore, load, sync, upload
+
+**Dry run**:
+An import run in full, every check the database makes included, and rolled back, so that it answers exactly what the real import would: the entities created, updated (with a JSON Patch each) and deleted, and every warning. Its `ETag` sent back as `If-Match` applies an import only if the project has not moved since.
+_Avoid_: preview, simulation, plan
+
 **Environment**:
 A named deployment target inside a project, such as production or staging. Every flag exists in every environment of its project; only its configuration differs per environment.
 _Avoid_: stage, tier, env
 
 **Protected environment**:
-An environment whose ruleset changes only through a change request, whatever entity a write touches; the kill switch and import are the exceptions. Production is protected by default.
+An environment whose ruleset changes only through a change request, whatever entity a write touches; the kill switch and an import are the exceptions, and an import never changes whether an environment is protected. Production is protected by default.
 _Avoid_: locked environment, prod-only
 
 **Member**:
