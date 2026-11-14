@@ -174,15 +174,16 @@ func samePtr(a, b *events.Cursor) bool {
 	return *a == *b
 }
 
-func TestAReplayLowersTheFloorOnlyWhenItRunsOnIntoTheLiveStreamFromEarlier(t *testing.T) {
+func TestAReplayCarriesItsOwnFloorAtItsStart(t *testing.T) {
 	c := func(seq int64) events.Cursor { return events.Cursor{XID: 10, Seq: seq} }
 	live := c(100)
 	floor := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	earlier, later := floor.Add(-time.Hour), floor.Add(time.Hour)
 	tests := []struct {
-		name string
-		in   sinks.ReplayAsk
-		want *time.Time
+		name       string
+		in         sinks.ReplayAsk
+		want       *time.Time
+		wantReplay *time.Time
 	}{
 		{
 			name: "an open ended replay from before the floor lowers it to its start",
@@ -190,26 +191,37 @@ func TestAReplayLowersTheFloorOnlyWhenItRunsOnIntoTheLiveStreamFromEarlier(t *te
 			want: &earlier,
 		},
 		{
-			name: "an open ended replay from after the floor keeps it",
+			name: "an open ended replay from after the floor raises it to its start",
 			in:   sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, From: later, Floor: &floor},
-			want: &floor,
+			want: &later,
 		},
 		{
-			name: "a stream with no floor gets none",
+			name: "an open ended replay on a stream with no floor sets one",
 			in:   sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, From: earlier},
-		},
-		{
-			name: "a bound past the live position runs on, and lowers it",
-			in: sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, Bounded: true, Stop: c(150), StopFound: true,
-				From: earlier, Floor: &floor},
 			want: &earlier,
 		},
 		{
-			name: "a bounded replay keeps it for the live stream it returns to",
-			in: sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, Bounded: true, Stop: c(60), StopFound: true,
-				From: earlier, Floor: &floor},
-			want: &floor,
+			name: "a bound past the live position runs on, and sets it",
+			in: sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, Bounded: true, Stop: c(150), StopFound: true,
+				From: later, Floor: &floor},
+			want: &later,
 		},
+		{
+			name: "a bounded replay keeps the stream's for the live stream it returns to and reads with its own",
+			in: sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, Bounded: true, Stop: c(60), StopFound: true,
+				From: later, Floor: &floor},
+			want:       &floor,
+			wantReplay: &later,
+		},
+		{
+			name: "a bounded replay on a stream with no floor leaves it so",
+			in: sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, Bounded: true, Stop: c(60), StopFound: true,
+				From: later},
+			wantReplay: &later,
+		},
+	}
+	same := func(a, b *time.Time) bool {
+		return (a == nil) == (b == nil) && (a == nil || a.Equal(*b))
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -217,14 +229,17 @@ func TestAReplayLowersTheFloorOnlyWhenItRunsOnIntoTheLiveStreamFromEarlier(t *te
 			if !moves {
 				t.Fatal("PlanReplay() does not move the stream")
 			}
-			if (got.Floor == nil) != (tc.want == nil) || (got.Floor != nil && !got.Floor.Equal(*tc.want)) {
-				t.Fatalf("PlanReplay() floor = %v, want %v", got.Floor, tc.want)
+			if !same(got.Floor, tc.want) {
+				t.Errorf("PlanReplay() floor = %v, want %v", got.Floor, tc.want)
+			}
+			if !same(got.ReplayFloor, tc.wantReplay) {
+				t.Errorf("PlanReplay() replay floor = %v, want %v", got.ReplayFloor, tc.wantReplay)
 			}
 		})
 	}
 }
 
-func TestAStreamReadsWithItsFloorExceptWhileABoundedReplayRuns(t *testing.T) {
+func TestAStreamReadsWithItsFloorExceptWhileABoundedReplayRunsWhichReadsWithItsOwn(t *testing.T) {
 	floor := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	cursor, resume := events.Cursor{XID: 1, Seq: 2}, events.Cursor{XID: 5, Seq: 6}
 	scope := sinks.Scope{}
@@ -232,9 +247,10 @@ func TestAStreamReadsWithItsFloorExceptWhileABoundedReplayRuns(t *testing.T) {
 	if got := live.ReadScope(scope).Floor; got == nil || !got.Equal(floor) {
 		t.Errorf("ReadScope() floor = %v, want the stream's", got)
 	}
-	replaying := sinks.Stream{Cursor: cursor, Stop: &cursor, Resume: &resume, Floor: &floor}
-	if got := replaying.ReadScope(scope).Floor; got != nil {
-		t.Errorf("ReadScope() floor = %v while a bounded replay runs, want none", got)
+	start := floor.Add(time.Hour)
+	replaying := sinks.Stream{Cursor: cursor, Stop: &cursor, Resume: &resume, Floor: &floor, ReplayFloor: &start}
+	if got := replaying.ReadScope(scope).Floor; got == nil || !got.Equal(start) {
+		t.Errorf("ReadScope() floor = %v while a bounded replay runs, want the replay's", got)
 	}
 	if got := replaying.LiveScope(scope).Floor; got == nil || !got.Equal(floor) {
 		t.Errorf("LiveScope() floor = %v while a bounded replay runs, want the stream's", got)

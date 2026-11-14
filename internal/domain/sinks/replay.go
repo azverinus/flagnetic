@@ -79,7 +79,8 @@ type ReplayAsk struct {
 	Bounded   bool
 	Stop      events.Cursor
 	StopFound bool
-	// From is the time the replay starts at, and Floor the stream's floor.
+	// From is the time the replay starts at, and Floor the stream's floor,
+	// which a bounded replay leaves for the live stream it returns to.
 	From  time.Time
 	Floor *time.Time
 }
@@ -93,11 +94,13 @@ type ReplayPlan struct {
 	// replay that runs on into the live stream.
 	Stop, Resume *events.Cursor
 	// Floor is the stream's floor once the replay is set: a replay running on
-	// into the live stream lowers it to the replay's start when that is
-	// earlier, since every row received since is to be sent again; a bounded
-	// one leaves it, since it reads its window without it and the live
-	// stream it returns to keeps it.
+	// into the live stream sets it to the replay's start, since every row
+	// received since is to be sent again and none received before; a bounded
+	// one leaves it, since the live stream it returns to keeps it.
 	Floor *time.Time
+	// ReplayFloor is the floor a bounded replay reads its window with: its
+	// start. Nil for one that runs on.
+	ReplayFloor *time.Time
 }
 
 // PlanReplay decides what a replay does to a stream, and false when it does
@@ -108,27 +111,19 @@ type ReplayPlan struct {
 // one that runs on into it, since returning to the live position would send
 // the rows between again.
 func PlanReplay(a ReplayAsk) (ReplayPlan, bool) {
+	from := a.From
 	if !a.StartFound || !cursorBefore(a.Start, a.Live) {
 		return ReplayPlan{}, false
 	}
 	if !a.Bounded {
-		return ReplayPlan{Cursor: a.Start, Floor: lowered(a.Floor, a.From)}, true
+		return ReplayPlan{Cursor: a.Start, Floor: &from}, true
 	}
 	if !a.StopFound || !cursorBefore(a.Start, a.Stop) {
 		return ReplayPlan{}, false
 	}
 	if !cursorBefore(a.Stop, a.Live) {
-		return ReplayPlan{Cursor: a.Start, Floor: lowered(a.Floor, a.From)}, true
+		return ReplayPlan{Cursor: a.Start, Floor: &from}, true
 	}
 	stop, resume := a.Stop, a.Live
-	return ReplayPlan{Cursor: a.Start, Stop: &stop, Resume: &resume, Floor: a.Floor}, true
-}
-
-// lowered is floor lowered to from when from is earlier; nil, no floor, stays
-// nil.
-func lowered(floor *time.Time, from time.Time) *time.Time {
-	if floor == nil || !from.Before(*floor) {
-		return floor
-	}
-	return &from
+	return ReplayPlan{Cursor: a.Start, Stop: &stop, Resume: &resume, Floor: a.Floor, ReplayFloor: &from}, true
 }

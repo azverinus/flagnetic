@@ -31,7 +31,7 @@ func cursorOf(text string, seq int64) (events.Cursor, error) {
 const streamColumns = `ss.sink_id, ss.event_kind, ss.cursor_xid::text, ss.cursor_seq, ss.last_delivered_at,
 	ss.consecutive_failures, ss.last_failure_class, ss.last_failure_status, ss.last_failure_code, ss.last_failure_at,
 	ss.inflight_xid::text, ss.inflight_seq, ss.inflight_environments, ss.inflight_rejections,
-	ss.replay_stop_xid::text, ss.replay_stop_seq, ss.replay_resume_xid::text, ss.replay_resume_seq, ss.received_floor`
+	ss.replay_stop_xid::text, ss.replay_stop_seq, ss.replay_resume_xid::text, ss.replay_resume_seq, ss.received_floor, ss.replay_floor`
 
 type streamRow struct {
 	sink       sinks.ID
@@ -55,16 +55,16 @@ func scanStream(row pgx.Row) (streamRow, error) {
 		inflightRejections       int
 		stopXID, resumeXID       *string
 		stopSeq, resumeSeq       *int64
-		floor                    *time.Time
+		floor, replayFloor       *time.Time
 	)
 	if err := row.Scan(&sk, &kind, &cursorXID, &cursorSeq, &delivered, &failures, &class, &failStatus, &code, &failedAt,
 		&inflightXID, &inflightSeq, &environments, &inflightRejections, &stopXID, &stopSeq, &resumeXID, &resumeSeq,
-		&floor); err != nil {
+		&floor, &replayFloor); err != nil {
 		return r, err
 	}
 	r.sink = id.FromBytes[sinks.Sink](sk)
 	r.stream = sinks.Stream{EventKind: sinks.EventKind(kind), LastDeliveredAt: utc(delivered), ConsecutiveFailures: failures,
-		Floor: utc(floor)}
+		Floor: utc(floor), ReplayFloor: utc(replayFloor)}
 	var err error
 	if r.stream.Cursor, err = cursorOf(cursorXID, cursorSeq); err != nil {
 		return r, err
@@ -182,9 +182,9 @@ func (s *Store) Replay(ctx context.Context, sink sinks.ID, kind sinks.EventKind,
 		    replay_stop_xid = $5::text::xid8, replay_stop_seq = $6,
 		    replay_resume_xid = $7::text::xid8, replay_resume_seq = $8,
 		    inflight_xid = NULL, inflight_seq = NULL, inflight_environments = NULL, inflight_rejections = 0,
-		    lease_token = NULL, lease_until = NULL, next_attempt_at = $9, received_floor = $10
+		    lease_token = NULL, lease_until = NULL, next_attempt_at = $9, received_floor = $10, replay_floor = $11
 		WHERE sink_id = $1 AND event_kind = $2`,
-		sink.Bytes(), string(kind), xid(plan.Cursor), plan.Cursor.Seq, stopXID, stopSeq, resumeXID, resumeSeq, now, plan.Floor)
+		sink.Bytes(), string(kind), xid(plan.Cursor), plan.Cursor.Seq, stopXID, stopSeq, resumeXID, resumeSeq, now, plan.Floor, plan.ReplayFloor)
 	if err != nil {
 		return fmt.Errorf("replaying a stream: %w", err)
 	}
@@ -401,6 +401,7 @@ func (s *Store) Ack(ctx context.Context, stream appsinks.StreamRef, token appsin
 		    replay_stop_seq = CASE WHEN s.over THEN NULL ELSE ss.replay_stop_seq END,
 		    replay_resume_xid = CASE WHEN s.over THEN NULL ELSE ss.replay_resume_xid END,
 		    replay_resume_seq = CASE WHEN s.over THEN NULL ELSE ss.replay_resume_seq END,
+		    replay_floor = CASE WHEN s.over THEN NULL ELSE ss.replay_floor END,
 		    inflight_xid = NULL, inflight_seq = NULL, inflight_environments = NULL, inflight_rejections = 0,
 		    lease_token = NULL, lease_until = NULL, next_attempt_at = $6,
 		    consecutive_failures = 0,

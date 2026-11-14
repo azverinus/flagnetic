@@ -74,16 +74,20 @@ type Stream struct {
 	// it and the first one received since the start are read too, and must
 	// not be sent.
 	Floor *time.Time
+	// ReplayFloor is the floor of the window a bounded replay reads while it
+	// runs, nil otherwise: the replay's start. It is a floor of its own and
+	// not the stream's, which the live stream the replay returns to keeps.
+	ReplayFloor *time.Time
 }
 
 // ReadScope is scope as the stream chooses and reads its next batch: with the
-// stream's floor, except while a bounded replay runs, which sends the rows of
-// the window it was asked for whenever they were received relative to the
-// floor. The live stream the replay returns to keeps the floor.
+// stream's floor, except while a bounded replay runs, which sends the rows
+// received inside the window it was asked for, with the floor of its own at
+// the window's start. The live stream the replay returns to keeps the floor.
 func (s Stream) ReadScope(scope Scope) Scope {
 	scope.Floor = s.Floor
 	if s.Stop != nil {
-		scope.Floor = nil
+		scope.Floor = s.ReplayFloor
 	}
 	return scope
 }
