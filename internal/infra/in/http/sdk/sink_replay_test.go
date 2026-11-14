@@ -505,7 +505,7 @@ func TestABoundedReplayOfWhatWasReceivedBeforeASinksStartSendsItAndTheLiveStream
 //
 // It returns the window's start and its end, and the clock is left past
 // every receipt so that the worker is due.
-func (f delivering) invertedReceipts(t *testing.T, r *testkit.Receiver) (inside, before, after any, from, to time.Time) {
+func (f delivering) invertedReceipts(t *testing.T) (inside, before, after any, from, to time.Time) {
 	t.Helper()
 	base := f.clock.Now()
 	from, to = base.Add(2*time.Hour), base.Add(3*time.Hour)
@@ -538,7 +538,7 @@ func TestABoundedReplayBehindAnOpenTransactionSendsNothingReceivedBeforeItsStart
 	f := startDelivering(t)
 	r := testkit.StartReceiver(t)
 	sink, secret := f.enabled(t, webhook(r, "exposure"))
-	inside, before, after, from, to := f.invertedReceipts(t, r)
+	inside, before, after, from, to := f.invertedReceipts(t)
 	if got, _ := delivered(t, r, secret, 0); !slices.Equal(got, ids(inside, before, after)) {
 		t.Fatalf("delivered %v, want the three rows in the stream's order", got)
 	}
@@ -555,7 +555,7 @@ func TestAReplayRunningOnBehindAnOpenTransactionSendsNothingReceivedBeforeItsSta
 	f := startDelivering(t)
 	r := testkit.StartReceiver(t)
 	sink, secret := f.enabled(t, webhook(r, "exposure"))
-	inside, before, after, from, _ := f.invertedReceipts(t, r)
+	inside, before, after, from, _ := f.invertedReceipts(t)
 	if got, _ := delivered(t, r, secret, 0); !slices.Equal(got, ids(inside, before, after)) {
 		t.Fatalf("delivered %v, want the three rows in the stream's order", got)
 	}
@@ -573,7 +573,7 @@ func TestAReplayStartingAfterTheStreamsFloorSendsNothingReceivedBeforeItsStart(t
 	r := testkit.StartReceiver(t)
 	created, secret := f.create(t, webhook(r, "exposure"))
 	sink := f.enable(t, created, management.SinkEnable{StartFrom: ptr(f.clock.Now())})
-	inside, before, after, from, to := f.invertedReceipts(t, r)
+	inside, before, after, from, to := f.invertedReceipts(t)
 	if got, _ := delivered(t, r, secret, 0); !slices.Equal(got, ids(inside, before, after)) {
 		t.Fatalf("delivered %v, want the three rows in the stream's order", got)
 	}
@@ -601,7 +601,7 @@ func TestABatchOfABoundedReplaySetAsideKeepsTheReplaysFloorWhenRedelivered(t *te
 	// is set aside, and its redelivery acknowledged.
 	r := testkit.StartReceiver(t, script([]testkit.Reply{{}}, times(5, rejected), []testkit.Reply{{}})...)
 	sink, secret := f.enabled(t, webhook(r, "exposure"))
-	inside, before, after, from, to := f.invertedReceipts(t, r)
+	inside, before, after, from, to := f.invertedReceipts(t)
 	if got, _ := delivered(t, r, secret, 0); !slices.Equal(got, ids(inside, before, after)) {
 		t.Fatalf("delivered %v, want the three rows in the stream's order", got)
 	}
