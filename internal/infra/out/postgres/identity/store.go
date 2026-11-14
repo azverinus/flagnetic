@@ -143,6 +143,16 @@ func (s *Store) Provider(ctx context.Context, slug string) (identity.Provider, e
 	return s.one(ctx, "", slug)
 }
 
+// ProviderDisplayName returns the display name of the provider with slug, and
+// whether one has that slug.
+func (s *Store) ProviderDisplayName(ctx context.Context, slug string) (string, bool, error) {
+	p, err := s.Provider(ctx, slug)
+	if errors.Is(err, appidentity.ErrNotFound) {
+		return "", false, nil
+	}
+	return p.DisplayName, err == nil, err
+}
+
 // ProviderByID returns the provider with the identifier, or
 // appidentity.ErrNotFound.
 func (s *Store) ProviderByID(ctx context.Context, provider identity.ProviderID) (identity.Provider, error) {

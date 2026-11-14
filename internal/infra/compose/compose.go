@@ -374,7 +374,6 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	if o.BaseURL != nil {
 		publicURL = strings.TrimSuffix(o.BaseURL.String(), "/")
 	}
-	invitationMail := appaccess.NewInvitationMailer(postman, smtpSettings, accessStore, publicURL)
 	webhookDisabledMail := disabledWebhookMail{appaccess.NewWebhookDisabledMailer(postman, smtpSettings, accessStore, publicURL)}
 	// One hasher serves every use case of the replica, so its bound is the
 	// replica's.
@@ -391,6 +390,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// key. Each context that holds something referring to a provider adds its
 	// own check to References.
 	identityStore := pgidentity.NewStore(d.Pool)
+	invitationMail := appaccess.NewInvitationMailer(postman, smtpSettings, accessStore, accessStore, identityStore, publicURL)
 	samlClient := saml.NewClient()
 	provisioning := appaccess.NewProvisioning(tx, accessStore, audit, d.Clock, d.IDs)
 	authProviders := appidentity.ProviderDeps{
