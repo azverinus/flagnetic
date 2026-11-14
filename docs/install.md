@@ -57,13 +57,7 @@ export FLAGNETIC_TOKEN=<the API token>
 flagnetic import --file deploy/demo-project.yaml
 ```
 
-The command talks to `http://localhost:8080`; point it elsewhere with `--url` or `FLAGNETIC_URL`. Without the binary on the host, run the one in the container and pass the file on standard input:
-
-```bash
-docker compose exec -T -e FLAGNETIC_TOKEN flagnetic flagnetic import --file - < deploy/demo-project.yaml
-```
-
-See [Exporting and importing a project](transfer.md).
+The command talks to `http://localhost:8080`; point it elsewhere with `--url` or `FLAGNETIC_URL`. See [Exporting and importing a project](transfer.md).
 
 ## As a binary
 
