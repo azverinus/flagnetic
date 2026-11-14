@@ -213,6 +213,54 @@ describe("explaining a warning", () => {
     ).toContain("keeps its protection");
   });
 
+  it("explains each Firebase warning from its parameters", () => {
+    const say = (code: string, params: Record<string, unknown>) =>
+      warningMessage(i18n, { code, pointer: "/p", detail: "server words", params });
+    expect(say("in_app_default", { parameter: "p", condition: "c", serves: "false" })).toBe(
+      "p, condition c: the value is left to the app in Firebase, so the flag serves false instead.",
+    );
+    expect(say("in_app_default", { parameter: "p", serves: "" })).toBe(
+      "p: the value is left to the app in Firebase, so the flag serves  instead.",
+    );
+    expect(say("condition_skipped", { parameter: "p", condition: "c", reason: "dateTime" })).toBe(
+      "p, condition c: the rule is skipped. dateTime",
+    );
+    expect(
+      say("rollout_reshuffled", { parameter: "p", condition: "c", unit_type: "anonymous" }),
+    ).toContain("new salt");
+    expect(
+      say("rollout_reshuffled", {
+        parameter: "p",
+        condition: "c",
+        unit_type: "anonymous",
+        range_start: 10,
+      }),
+    ).toContain("does not start at 0");
+    expect(
+      say("attribute_declared", {
+        parameter: "p",
+        condition: "c",
+        source: "user property",
+        key: "Plan Type",
+        attribute: "plan_type",
+      }),
+    ).toBe(
+      "p, condition c: user property Plan Type becomes the attribute plan_type; contexts must carry it under that key.",
+    );
+    expect(say("rule_limit", { parameter: "p", condition: "c", max: 50 })).toContain(
+      "at most 50 rules",
+    );
+    expect(say("archived_flag", { parameter: "p" })).toBe(
+      "p: the flag is archived; it is configured and stays archived.",
+    );
+  });
+
+  it("uses the server's words for a Firebase warning whose parameters are missing", () => {
+    expect(
+      warningMessage(i18n, { code: "condition_skipped", pointer: "/p", detail: "server words" }),
+    ).toBe("server words");
+  });
+
   it("falls back to the server's words for a code it does not know", () => {
     expect(
       warningMessage(i18n, {

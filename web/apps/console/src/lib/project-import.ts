@@ -290,9 +290,76 @@ export function warningMessage(i18n: I18n, warning: ImportWarning): string {
       return i18n._(
         msg`The environment keeps its protection; the document's value for it is not applied.`,
       );
+    case "in_app_default": {
+      const { parameter, condition, serves } = textParams(warning);
+      if (parameter === undefined) return warning.detail;
+      const value = serves ?? "";
+      return condition === undefined
+        ? i18n._(
+            msg`${parameter}: the value is left to the app in Firebase, so the flag serves ${value} instead.`,
+          )
+        : i18n._(
+            msg`${parameter}, condition ${condition}: the value is left to the app in Firebase, so the flag serves ${value} instead.`,
+          );
+    }
+    case "condition_skipped": {
+      const { parameter, condition } = textParams(warning);
+      if (parameter === undefined || condition === undefined) return warning.detail;
+      // The reason is the server's own sentence: it names the term it cannot reproduce.
+      const reason = textParams(warning).reason ?? "";
+      return i18n._(msg`${parameter}, condition ${condition}: the rule is skipped. ${reason}`);
+    }
+    case "rollout_reshuffled": {
+      const { parameter, condition, unit_type: unitType } = textParams(warning);
+      if (parameter === undefined || condition === undefined || unitType === undefined) {
+        return warning.detail;
+      }
+      return warning.params?.range_start === undefined
+        ? i18n._(
+            msg`${parameter}, condition ${condition}: the percentage becomes a rollout on ${unitType} units with a new salt, so which units are inside changes.`,
+          )
+        : i18n._(
+            msg`${parameter}, condition ${condition}: Firebase's percent range does not start at 0; a rollout keeps only its width, so ranges that were apart can now overlap.`,
+          );
+    }
+    case "attribute_declared": {
+      const { parameter, condition, source, key, attribute } = textParams(warning);
+      if (parameter === undefined || condition === undefined || attribute === undefined) {
+        return warning.detail;
+      }
+      const from = `${source ?? ""} ${key ?? ""}`.trim();
+      return i18n._(
+        msg`${parameter}, condition ${condition}: ${from} becomes the attribute ${attribute}; contexts must carry it under that key.`,
+      );
+    }
+    case "rule_limit": {
+      const { parameter, condition } = textParams(warning);
+      const max = warning.params?.max;
+      if (parameter === undefined || condition === undefined || typeof max !== "number") {
+        return warning.detail;
+      }
+      return i18n._(
+        msg`${parameter}, condition ${condition}: a rule is left out, since a configuration holds at most ${max} rules.`,
+      );
+    }
+    case "archived_flag": {
+      const { parameter } = textParams(warning);
+      return parameter === undefined
+        ? warning.detail
+        : i18n._(msg`${parameter}: the flag is archived; it is configured and stays archived.`);
+    }
     default:
       return warning.detail;
   }
+}
+
+/** The warning's parameters that are text; the others are left out. */
+function textParams(warning: ImportWarning): Record<string, string | undefined> {
+  const out: Record<string, string | undefined> = {};
+  for (const [name, value] of Object.entries(warning.params ?? {})) {
+    if (typeof value === "string") out[name] = value;
+  }
+  return out;
 }
 
 /** What the page keeps across a reload: the step and the document. */

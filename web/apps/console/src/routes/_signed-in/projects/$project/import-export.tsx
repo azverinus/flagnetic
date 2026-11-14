@@ -3,6 +3,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { ExportProject } from "@/components/export-project";
+import { FirebaseWizard } from "@/components/firebase-wizard";
 import { ImportProject } from "@/components/import-project";
 import { PageHeader } from "@/components/ui/page-header";
 import { SettingsSection } from "@/components/ui/settings-section";
@@ -57,10 +58,17 @@ function ImportExport() {
           >
             <ImportProject project={project} />
           </SettingsSection>
-          <SettingsSection title={t`Import from Firebase`}>
-            <p className="text-sm text-muted-foreground">
-              <Trans>Importing a Firebase Remote Config template is not available here yet.</Trans>
-            </p>
+          <SettingsSection
+            title={t`Import from Firebase`}
+            description={
+              <Trans>
+                Turns the parameters of a Firebase Remote Config template into flags, and its
+                conditions into rules, in one environment. You see the flags, rules and warnings
+                before you apply it.
+              </Trans>
+            }
+          >
+            <FirebaseWizard project={project} />
           </SettingsSection>
         </>
       ) : null}
