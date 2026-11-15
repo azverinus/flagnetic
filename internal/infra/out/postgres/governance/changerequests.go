@@ -37,7 +37,7 @@ func (s *ChangeRequests) db(ctx context.Context) pgxtx.DB { return pgxtx.Querier
 // entity it proposes for run one at a time.
 func (s *ChangeRequests) LockProject(ctx context.Context, project workspace.ProjectID) error {
 	var one int
-	err := s.db(ctx).QueryRow(ctx, `SELECT 1 FROM projects WHERE id = $1 FOR UPDATE`, project.Bytes()).Scan(&one)
+	err := s.db(ctx).QueryRow(ctx, `SELECT 1 FROM projects WHERE id = $1 FOR NO KEY UPDATE`, project.Bytes()).Scan(&one)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return appgovernance.ErrNotFound
 	}
