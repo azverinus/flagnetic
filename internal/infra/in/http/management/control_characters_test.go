@@ -46,7 +46,7 @@ func TestAJSONBodyHoldingNULIsRefusedWhateverMediaTypeItClaims(t *testing.T) {
 			t.Fatal(err)
 		}
 		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		got := violationsOf(t, "a body sent as "+media, resp.StatusCode, body, "invalid_character")
 		if want := []string{"/name invalid_character"}; !slices.Equal(got, want) {
 			t.Errorf("%q: violations = %q, want %q", media, got, want)
@@ -86,7 +86,7 @@ func TestSearchTextAndCursorsHoldingNULAreBadRequests(t *testing.T) {
 			t.Fatal(err)
 		}
 		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		assertProblem(t, name, resp.StatusCode, body, http.StatusBadRequest, "invalid_request")
 	}
 }
@@ -105,7 +105,7 @@ func TestExperimentAndChangeRequestCursorsHoldingNULAreBadRequests(t *testing.T)
 			t.Fatal(err)
 		}
 		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		assertProblem(t, path, resp.StatusCode, body, http.StatusBadRequest, "invalid_request")
 	}
 }

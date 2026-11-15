@@ -1,6 +1,7 @@
 package text_test
 
 import (
+	"errors"
 	"net/url"
 	"reflect"
 	"testing"
@@ -79,9 +80,7 @@ func TestErrorIsInvalidWithItsViolations(t *testing.T) {
 }
 
 func asError(err error, target **apperrors.Error) bool {
-	e, ok := err.(*apperrors.Error)
-	*target = e
-	return ok
+	return errors.As(err, target)
 }
 
 func TestAllowedURLReadsThePathAndQueryDecoded(t *testing.T) {
