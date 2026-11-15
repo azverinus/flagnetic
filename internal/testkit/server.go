@@ -138,6 +138,9 @@ type serverOptions struct {
 	// auditExportMax is the most entries a download of the audit log holds,
 	// 0 for the configuration's default.
 	auditExportMax int
+	// auditExportConcurrent is how many downloads of the audit log run at
+	// once; 0 keeps the configuration's.
+	auditExportConcurrent int
 	// digest is when the weekly stale-flag digest is due, the
 	// configuration's default when nil.
 	digest *governance.DigestSlot
@@ -210,6 +213,12 @@ func WithRateLimits(change func(*config.RateLimits)) ServerOption {
 // the audit log may hold, instead of the configuration's default.
 func WithAuditExportMaxEntries(n int) ServerOption {
 	return func(o *serverOptions) { o.auditExportMax = n }
+}
+
+// WithAuditExportMaxConcurrent serves with n as the most downloads of the
+// audit log running at once, instead of the configuration's default.
+func WithAuditExportMaxConcurrent(n int) ServerOption {
+	return func(o *serverOptions) { o.auditExportConcurrent = n }
 }
 
 // WithDigestSlot serves with the weekly stale-flag digest due at slot instead
@@ -327,8 +336,9 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		SinkTick:              cfg.SinkTick,
 		SinkLagWarning:        cfg.SinkLagWarning,
 		SinkRejectionAttempts: cfg.SinkRejectionAttempts, SinkStopAfterDeadLetters: cfg.SinkStopAfterDeadLetters,
-		WebhookSecretOverlap:  cfg.WebhookSecretOverlap,
-		AuditExportMaxEntries: cmp.Or(o.auditExportMax, cfg.AuditExportMaxEntries),
+		WebhookSecretOverlap:     cfg.WebhookSecretOverlap,
+		AuditExportMaxEntries:    cmp.Or(o.auditExportMax, cfg.AuditExportMaxEntries),
+		AuditExportMaxConcurrent: cmp.Or(o.auditExportConcurrent, cfg.AuditExportMaxConcurrent),
 		Schedule: compose.Schedule{
 			MinLead: cfg.ScheduleMinLead, Tick: cfg.ScheduleTick, MaxFailures: cfg.ScheduleMaxFailures,
 		},

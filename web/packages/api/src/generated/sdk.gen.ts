@@ -4513,7 +4513,12 @@ export const listProjectAuditEntries = <ThrowOnError extends boolean = false>(
  * The entries are counted first: a filter matching more than
  * `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
  * `export_too_large` before anything is sent; narrow it with `from` and
- * `to`. The entries are then streamed from one snapshot of the log.
+ * `to`. The entries are then streamed a page at a time, newest first, from
+ * where the download started: an entry written meanwhile is not in it.
+ * A replica serves at most `FLAGNETIC_AUDIT_EXPORT_MAX_CONCURRENT` (4
+ * unless set) downloads at once; one asked beyond that is refused
+ * `too_many_exports` with `Retry-After`. A client that stops taking the
+ * download is dropped after `FLAGNETIC_HTTP_WRITE_TIMEOUT`.
  *
  */
 export const exportProjectAuditEntries = <ThrowOnError extends boolean = false>(
@@ -5739,7 +5744,12 @@ export const listAuditEntries = <ThrowOnError extends boolean = false>(
  * The entries are counted first: a filter matching more than
  * `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
  * `export_too_large` before anything is sent; narrow it with `from` and
- * `to`. The entries are then streamed from one snapshot of the log.
+ * `to`. The entries are then streamed a page at a time, newest first, from
+ * where the download started: an entry written meanwhile is not in it.
+ * A replica serves at most `FLAGNETIC_AUDIT_EXPORT_MAX_CONCURRENT` (4
+ * unless set) downloads at once; one asked beyond that is refused
+ * `too_many_exports` with `Retry-After`. A client that stops taking the
+ * download is dropped after `FLAGNETIC_HTTP_WRITE_TIMEOUT`.
  *
  * `project` narrows it to one project's entries.
  *

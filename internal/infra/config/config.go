@@ -86,6 +86,7 @@ type Config struct {
 	HTTPReadHeaderTimeout time.Duration
 	HTTPIdleTimeout       time.Duration
 	HTTPBodyReadTimeout   time.Duration
+	HTTPWriteTimeout      time.Duration
 	HTTPMaxBodyBytes      int64
 
 	// RateLimits are the limits of the SDK API.
@@ -136,6 +137,9 @@ type Config struct {
 	// AuditExportMaxEntries is the most entries one download of the audit
 	// log may hold.
 	AuditExportMaxEntries int
+	// AuditExportMaxConcurrent is how many downloads of the audit log one
+	// replica serves at once.
+	AuditExportMaxConcurrent int
 	// DigestWeekday and DigestHour, in UTC, are when the weekly stale-flag
 	// digest is sent.
 	DigestWeekday time.Weekday
@@ -484,6 +488,16 @@ func Settings() []Setting {
 			apply:       durationSetting(func(c *Config, d time.Duration) { c.HTTPBodyReadTimeout = d }),
 		},
 		{
+			Name:    "FLAGNETIC_HTTP_WRITE_TIMEOUT",
+			Key:     "http_write_timeout",
+			Default: "30s",
+			Unit:    "duration",
+			Description: "How long a client may take to accept what the server writes to it: each chunk of a response, or each frame of a stream, " +
+				"must be taken within it, or the server drops the connection. It bounds a stalled reader, not the length of a response or a stream.",
+			Example: "30s",
+			apply:   durationSetting(func(c *Config, d time.Duration) { c.HTTPWriteTimeout = d }),
+		},
+		{
 			Name:        "FLAGNETIC_HTTP_MAX_BODY_BYTES",
 			Key:         "http_max_body_bytes",
 			Default:     "1048576",
@@ -664,6 +678,16 @@ func Settings() []Setting {
 				"`export_too_large` before anything is sent; narrowing it by time brings it under.",
 			Example: "100000",
 			apply:   wholeNumber(func(c *Config, n int) { c.AuditExportMaxEntries = n }),
+		},
+		{
+			Name:    "FLAGNETIC_AUDIT_EXPORT_MAX_CONCURRENT",
+			Key:     "audit_export_max_concurrent",
+			Default: "4",
+			Unit:    "downloads",
+			Description: "How many downloads of the audit log one replica serves at once. A download asked while every slot is taken is refused " +
+				"`too_many_exports` (429) with `Retry-After`.",
+			Example: "4",
+			apply:   wholeNumber(func(c *Config, n int) { c.AuditExportMaxConcurrent = n }),
 		},
 		{
 			Name:    "FLAGNETIC_DIGEST_WEEKDAY",

@@ -205,27 +205,6 @@ func (l *AuditLog) CountEntries(ctx context.Context, f appgovernance.AuditFilter
 	return n, nil
 }
 
-// EachEntry calls fn with every entry matching f, newest first, as the
-// database sends it: no page is held in memory.
-func (l *AuditLog) EachEntry(ctx context.Context, f appgovernance.AuditFilter, fn func(governance.Entry) error) error {
-	where, args := auditWhere(f, governance.EntryID{})
-	rows, err := pgxtx.Querier(ctx, l.pool).Query(ctx, `SELECT `+entryColumns+` FROM audit_entries`+where+` ORDER BY id DESC`, args...)
-	if err != nil {
-		return fmt.Errorf("reading audit entries: %w", err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		e, err := scanEntry(rows)
-		if err != nil {
-			return err
-		}
-		if err := fn(e); err != nil {
-			return err
-		}
-	}
-	return rows.Err()
-}
-
 // escapeLike makes every character of s match itself in a LIKE pattern
 // escaped by a backslash, so a search for 50% finds 50% and nothing else.
 func escapeLike(s string) string {

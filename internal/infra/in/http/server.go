@@ -46,6 +46,11 @@ type Options struct {
 	// BodyReadTimeout bounds reading a request's body, except on stream
 	// routes; 0 sets none.
 	BodyReadTimeout time.Duration
+	// WriteTimeout bounds each write of a response, and each frame of a
+	// stream, to the client: a client that stops reading is dropped after it,
+	// so it cannot hold the handler, its connection and what the handler
+	// holds. It does not bound a response's length; 0 sets none.
+	WriteTimeout time.Duration
 	// MaxBodyBytes limits a request's body unless its route declares its own
 	// limit; 0 sets none.
 	MaxBodyBytes int64
@@ -61,6 +66,7 @@ func OptionsFrom(cfg config.Config) Options {
 		ReadHeaderTimeout: cfg.HTTPReadHeaderTimeout,
 		IdleTimeout:       cfg.HTTPIdleTimeout,
 		BodyReadTimeout:   cfg.HTTPBodyReadTimeout,
+		WriteTimeout:      cfg.HTTPWriteTimeout,
 		MaxBodyBytes:      cfg.HTTPMaxBodyBytes,
 	}
 }
@@ -236,7 +242,8 @@ func cleanPath(p string) string {
 }
 
 // HTTPServer returns an http.Server serving the edge with its connection
-// timeouts. It sets no write timeout, which would cut off streams. Its
+// timeouts. It sets no write timeout of the whole response, which would cut
+// off streams: the edge bounds each write instead. Its
 // shutdown drains the edge, so the streams still open end rather than hold
 // the shutdown until its grace period runs out.
 func (s *Server) HTTPServer() *http.Server {
@@ -296,6 +303,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // route serves r on rw by the route it matches. conn is the connection's
 // own writer, which body limits and deadlines act on.
 func (s *Server) route(conn, rw http.ResponseWriter, r *http.Request, st *requestState) {
+	rw, done := withWriteDeadline(conn, rw, s.opts.WriteTimeout)
+	defer done()
 	_, pattern := s.mux.Handler(r)
 	route, ok := s.patterns[pattern]
 	if !ok && s.servesConsole(r) {

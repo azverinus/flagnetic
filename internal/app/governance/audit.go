@@ -59,52 +59,82 @@ type AuditReader interface {
 	Entry(ctx context.Context, project workspace.ProjectID, entryID governance.EntryID) (governance.Entry, error)
 }
 
-// AuditExporter reads the audit log whole, for a download.
+// AuditExporter counts the audit log's entries for a download, which then
+// reads them a page at a time through the AuditReader.
 type AuditExporter interface {
 	// CountEntries returns how many entries match f, or limit when more do.
 	CountEntries(ctx context.Context, f AuditFilter, limit int) (int, error)
-	// EachEntry calls fn with every entry matching f, newest first, as it is
-	// read, and stops at the first error fn returns.
-	EachEntry(ctx context.Context, f AuditFilter, fn func(governance.Entry) error) error
 }
 
-// Snapshotter runs a read in one consistent view of the database.
-type Snapshotter interface {
-	Snapshot(ctx context.Context, fn func(ctx context.Context) error) error
-}
+// exportPageSize is how many entries one statement of a download reads. A
+// download holds a connection only for the length of one such statement, never
+// while it waits for a slow client to take what it was sent, so a client that
+// stops reading cannot keep a connection, or a snapshot that holds vacuum
+// back, for as long as it likes.
+const exportPageSize = 1000
+
+// exportRetry is what a download refused for lack of a slot is told to wait.
+const exportRetry = 5 * time.Second
+
+// ErrTooManyExports answers a download asked while the replica serves the
+// most downloads it allows.
+var ErrTooManyExports = apperrors.RateLimited("too_many_exports",
+	"the server is serving the most audit downloads it allows at once; retry after Retry-After seconds", exportRetry)
 
 // ExportAuditEntries reads the entries of a download.
 type ExportAuditEntries struct {
-	snapshots Snapshotter
-	store     AuditExporter
-	max       int
+	counter AuditExporter
+	reader  AuditReader
+	max     int
+	slots   chan struct{}
 }
 
 // NewExportAuditEntries returns the handler, which refuses a download of
-// more than limit entries.
-func NewExportAuditEntries(snapshots Snapshotter, store AuditExporter, limit int) *ExportAuditEntries {
-	return &ExportAuditEntries{snapshots: snapshots, store: store, max: limit}
+// more than limit entries and serves at most concurrent downloads at once.
+func NewExportAuditEntries(counter AuditExporter, reader AuditReader, limit, concurrent int) *ExportAuditEntries {
+	return &ExportAuditEntries{counter: counter, reader: reader, max: limit, slots: make(chan struct{}, concurrent)}
 }
 
-// Handle counts the entries matching f and refuses ErrExportTooLarge above
-// the cap. Otherwise it calls begin once, so the caller can start its
-// answer, then each with every entry newest first. The count and the entries
-// are read from one snapshot, so the entries streamed are the ones counted.
+// Handle refuses ErrTooManyExports when every slot is taken, counts the
+// entries matching f and refuses export_too_large above the cap. Otherwise it
+// calls begin once, so the caller can start its answer, then each with every
+// entry newest first, read a page at a time from the entry the last page
+// ended at. An entry written meanwhile is newer than where the download
+// started, so the entries streamed are the ones counted.
 func (h *ExportAuditEntries) Handle(ctx context.Context, f AuditFilter, begin func() error, each func(governance.Entry) error) error {
-	return h.snapshots.Snapshot(ctx, func(ctx context.Context) error {
-		n, err := h.store.CountEntries(ctx, f, h.max+1)
+	select {
+	case h.slots <- struct{}{}:
+		defer func() { <-h.slots }()
+	default:
+		return ErrTooManyExports
+	}
+	n, err := h.counter.CountEntries(ctx, f, h.max+1)
+	if err != nil {
+		return err
+	}
+	if n > h.max {
+		return apperrors.Invalid("export_too_large", fmt.Sprintf(
+			"the filters match more than %d entries, the most one download holds; narrow them with from and to", h.max))
+	}
+	if err := begin(); err != nil {
+		return err
+	}
+	var after governance.EntryID
+	for {
+		page, err := h.reader.Entries(ctx, f, after, exportPageSize)
 		if err != nil {
 			return err
 		}
-		if n > h.max {
-			return apperrors.Invalid("export_too_large", fmt.Sprintf(
-				"the filters match more than %d entries, the most one download holds; narrow them with from and to", h.max))
+		for _, e := range page {
+			if err := each(e); err != nil {
+				return err
+			}
 		}
-		if err := begin(); err != nil {
-			return err
+		if len(page) < exportPageSize {
+			return nil
 		}
-		return h.store.EachEntry(ctx, f, each)
-	})
+		after = page[len(page)-1].ID
+	}
 }
 
 // ListAuditEntries reads the audit log a page at a time.

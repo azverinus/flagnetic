@@ -5,15 +5,21 @@ import (
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
+	"io"
+	"net"
 	"net/http"
 	"reflect"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
+	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -217,5 +223,112 @@ func TestTheInstanceAuditLogDownloadsForAnInstanceAdminAlone(t *testing.T) {
 	instance := do(l.admin.ListAuditEntriesWithResponse(ctx, &management.ListAuditEntriesParams{Limit: ptr(200)})).JSON200.Items
 	if n := bytes.Count(all.Body, []byte("\n")); n != len(instance) || n <= 5 {
 		t.Errorf("the instance's export holds %d lines, want the %d entries of the instance, those of no project too", n, len(instance))
+	}
+}
+
+// seededDownload is an instance download of an audit log of a few thousand
+// large entries, which fills the buffers between server and client many
+// times over, so a client that stops reading stalls the server's writes.
+type seededDownload struct {
+	srv   *testkit.Server
+	pool  *pgxpool.Pool
+	token string
+}
+
+func seedDownload(t *testing.T, opts ...testkit.ServerOption) seededDownload {
+	t.Helper()
+	pool := testkit.FreshPool(t)
+	srv := testkit.StartServer(t, append([]testkit.ServerOption{testkit.WithPool(pool)}, opts...)...)
+	token := testkit.Bootstrap(t, pool)
+	testkit.SeedAuditEntries(t, pool, 3000, 20_000)
+	return seededDownload{srv: srv, pool: pool, token: token}
+}
+
+// stalled starts the instance download and reads only the head of its
+// answer, leaving the body unread behind a receive buffer too small to hold
+// any of it.
+func (d seededDownload) stalled(t *testing.T) net.Conn {
+	t.Helper()
+	conn, err := (&net.Dialer{}).DialContext(t.Context(), "tcp", strings.TrimPrefix(d.srv.URL, "http://"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	_ = conn.(*net.TCPConn).SetReadBuffer(1024)
+	_, _ = io.WriteString(conn, "GET /api/v1/audit/export HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer "+d.token+"\r\n\r\n")
+	br := bufio.NewReaderSize(conn, 256)
+	status, err := br.ReadString('\n')
+	if err != nil || !strings.Contains(status, "200") {
+		t.Fatalf("download head = %q, %v", status, err)
+	}
+	return conn
+}
+
+func TestADownloadToAClientThatStopsReadingEndsAndReleasesItsConnection(t *testing.T) {
+	d := seedDownload(t, testkit.WithEdge(func(o *flaghttp.Options) { o.WriteTimeout = 300 * time.Millisecond }))
+	d.stalled(t)
+
+	deadline := time.Now().Add(10 * time.Second)
+	for len(d.srv.Logs.Find("audit download cut short")) == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the download was still held ten seconds after its client stopped reading")
+		}
+		if n := d.pool.Stat().AcquiredConns(); n != 0 {
+			t.Fatalf("%d connections held while the download waited on its client", n)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if n := d.pool.Stat().AcquiredConns(); n != 0 {
+		t.Errorf("%d connections held after the download ended", n)
+	}
+}
+
+func TestADownloadSpanningSeveralPagesHoldsEveryEntryOnceNewestFirst(t *testing.T) {
+	d := seedDownload(t, testkit.WithEdge(func(o *flaghttp.Options) { o.WriteTimeout = 2 * time.Second }))
+	res := request(t, http.MethodGet, d.srv.URL+"/api/v1/audit/export", d.token)
+	if res.status != http.StatusOK {
+		t.Fatalf("status = %d", res.status)
+	}
+	// 3000 seeded entries and those the bootstrap wrote, across pages of a
+	// thousand.
+	if n := bytes.Count(res.body, []byte("\n")); n < 3000 {
+		t.Errorf("the download holds %d lines, want the 3000 seeded and more", n)
+	}
+	ids := map[string]bool{}
+	var last string
+	for line := range bytes.Lines(res.body) {
+		var e management.AuditEntry
+		if err := json.Unmarshal(line, &e); err != nil {
+			t.Fatalf("line: %v", err)
+		}
+		id := e.Id.String()
+		if ids[id] {
+			t.Fatalf("entry %s appears twice across pages", id)
+		}
+		if ids[id] = true; last != "" && id > last {
+			t.Fatalf("entry %s after %s: not newest first", id, last)
+		}
+		last = id
+	}
+}
+
+func TestDownloadsBeyondTheCapRunningAtOnceAreRefusedUntilOneEnds(t *testing.T) {
+	d := seedDownload(t, testkit.WithAuditExportMaxConcurrent(1))
+	held := d.stalled(t)
+
+	res := request(t, http.MethodGet, d.srv.URL+"/api/v1/audit/export", d.token)
+	assertProblem(t, "a second download", res.status, res.body, http.StatusTooManyRequests, "too_many_exports")
+
+	_ = held.Close()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		res = request(t, http.MethodGet, d.srv.URL+"/api/v1/audit/export", d.token)
+		if res.status == http.StatusOK {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the slot was not freed ten seconds after its client left: %d", res.status)
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 }
