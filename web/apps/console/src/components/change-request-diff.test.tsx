@@ -2,6 +2,7 @@ import type { ChangeRequest, Flag, FlagConfiguration, Segment } from "@flagnetic
 import { screen, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { RawNumber } from "@/lib/lossless-json";
 import { activateForTests, renderWithProviders } from "@/test/render";
 
 import { ChangeRequestDiff } from "./change-request-diff";
@@ -174,6 +175,29 @@ describe("a definition change request's diff", () => {
     expect(changes("Changes to the definition")).toEqual([
       expect.stringMatching(/^Automatic exposure/),
       'Variation b serves "Order now" instead of "Order".',
+    ]);
+  });
+
+  it("shows a value whose numbers changed only in how they are written", () => {
+    const numeric = {
+      ...flag,
+      variations: [{ key: "a", value: { ratio: 1 }, name: "a", description: "" }],
+    } as unknown as Flag;
+    const proposedValue = { ratio: new RawNumber("1.0") };
+    renderWithProviders(
+      <ChangeRequestDiff
+        changeRequest={flagDefinition({
+          proposed: {
+            automatic_exposure: false,
+            variations: [{ key: "a", value: proposedValue, name: "a", description: "" }],
+          },
+          diff: [{ op: "replace", path: "/variations/0/value", value: proposedValue }],
+        })}
+        current={numeric}
+      />,
+    );
+    expect(changes("Changes to the definition")).toEqual([
+      'Variation a serves {"ratio":1.0} instead of {"ratio":1}.',
     ]);
   });
 

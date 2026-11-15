@@ -30,6 +30,7 @@ import { formatNumber } from "@/i18n/format";
 import type { AttributeTypes } from "@/lib/conditions";
 import { ApiError, unwrap } from "@/lib/errors";
 import { configurationViolationMessage } from "@/lib/flag-detail";
+import { stringifyLossless } from "@/lib/lossless-json";
 import { problemMessage } from "@/lib/problem-messages";
 import type { RuleDraft } from "@/lib/rule-editor";
 import {
@@ -560,7 +561,7 @@ function TesterResult({ outcome }: { outcome: Outcome }) {
               <Trans>No value</Trans>
             </span>
           ) : (
-            <code className="font-mono text-xs">{JSON.stringify(result.value)}</code>
+            <code className="font-mono text-xs">{stringifyLossless(result.value)}</code>
           )}
         </Fact>
         {result.variation !== undefined ? (

@@ -3,6 +3,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { activateForTests } from "@/test/render";
 
+import { stringifyLossless } from "./lossless-json";
+
 import {
   attributeOptions,
   type ConditionDraft,
@@ -146,6 +148,15 @@ describe("values", () => {
     });
   });
 
+  it("sends a number as it was written and refuses one not written in decimal", () => {
+    const value = (text: string) =>
+      (conditionOf(attribute({ attribute: "build_number", text }), types) as { value: unknown })
+        .value;
+    expect(stringifyLossless(value("12345678901234567890"))).toBe("12345678901234567890");
+    expect(value("0x10")).toBe("0x10");
+    expect(value("")).toBe("");
+  });
+
   it("reads a saved condition back to what it was", () => {
     const saved = [
       { kind: "attribute", attribute: "build_number", op: "in", value: [1, 2] },
@@ -239,6 +250,10 @@ describe("what a condition still needs", () => {
 
   it("checks a value by the attribute's type", () => {
     expect(issue(attribute({ attribute: "build_number", text: "many" }))).toBe("Enter a number.");
+    for (const text of ["0x10", ".5", "+1", "5.", "Infinity", "1e400"]) {
+      expect(issue(attribute({ attribute: "build_number", text })), text).toBe("Enter a number.");
+    }
+    expect(issue(attribute({ attribute: "build_number", text: " -0.5e3 " }))).toBeUndefined();
     expect(issue(attribute({ attribute: "app_version", text: "2.0" }))).toBe(
       "Enter a full semantic version, such as 1.41.0.",
     );

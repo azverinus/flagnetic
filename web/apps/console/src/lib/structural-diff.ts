@@ -11,6 +11,8 @@ import type {
   Variation,
 } from "@flagnetic/api";
 
+import { RawNumber } from "./lossless-json";
+
 /**
  * What changed between two versions of an entity, item by item rather
  * than line by line: a rule moved, a condition added to the second rule,
@@ -136,11 +138,15 @@ export type SegmentChange =
  */
 export function fingerprint(value: unknown): string {
   return JSON.stringify(value, (_, inner: unknown) =>
-    inner !== null && typeof inner === "object" && !Array.isArray(inner)
-      ? Object.fromEntries(
-          Object.entries(inner as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : 1)),
-        )
-      : inner,
+    // A number is compared by the text it was written as, so two that a
+    // double cannot tell apart are two values.
+    inner instanceof RawNumber
+      ? `\u{10FFFF}${inner.source}`
+      : inner !== null && typeof inner === "object" && !Array.isArray(inner)
+        ? Object.fromEntries(
+            Object.entries(inner as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : 1)),
+          )
+        : inner,
   );
 }
 

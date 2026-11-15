@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { formatDateTime, formatDay } from "@/i18n/format";
 import { describeCondition, describeServe } from "@/lib/conditions";
 import { experimentStatusName, percentText } from "@/lib/experiments";
+import { stringifyLossless } from "@/lib/lossless-json";
 import type {
   ConfigurationChange,
   DefinitionChange,
@@ -261,7 +262,7 @@ export function ConfigurationDiff({ changes }: { changes: readonly Configuration
 }
 
 function VariationText({ variation }: { variation: Variation }) {
-  return <Value>{JSON.stringify(variation.value)}</Value>;
+  return <Value>{stringifyLossless(variation.value)}</Value>;
 }
 
 function DefinitionChangeItem({
@@ -373,7 +374,7 @@ function DefinitionChangeItem({
         );
       }
       const valueChanged =
-        JSON.stringify(change.before!.value) !== JSON.stringify(change.after!.value);
+        stringifyLossless(change.before!.value) !== stringifyLossless(change.after!.value);
       return (
         <li>
           {valueChanged ? (

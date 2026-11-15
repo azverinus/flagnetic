@@ -4,6 +4,8 @@ import { msg } from "@lingui/core/macro";
 
 import { formatNumber } from "@/i18n/format";
 
+import { isJsonNumber, numberOf, stringifyLossless } from "./lossless-json";
+
 /** An operator of an attribute condition, as the API names it. */
 export type Operator =
   | "eq"
@@ -93,7 +95,7 @@ export function operatorLabel(i18n: I18n, op: string): string {
 function valueText(value: unknown): string {
   if (Array.isArray(value)) return value.map(valueText).join(", ");
   if (typeof value === "string") return value;
-  return JSON.stringify(value);
+  return stringifyLossless(value);
 }
 
 /** A condition in one line, such as "country equals DE". */
@@ -262,7 +264,7 @@ export function withOperator(
 }
 
 function textOf(raw: unknown): string {
-  return typeof raw === "string" ? raw : raw === undefined ? "" : JSON.stringify(raw);
+  return typeof raw === "string" ? raw : raw === undefined ? "" : stringifyLossless(raw);
 }
 
 /** A saved condition as the editor edits it. */
@@ -289,12 +291,23 @@ export function conditionDraft(condition: Condition, types: AttributeTypes): Con
   }
 }
 
+/**
+ * Whether text is a finite number written in decimal, as JSON writes one:
+ * not `0x10`, `.5`, `+1` or `Infinity`, which would be sent as text.
+ */
+export function isNumberText(raw: string): boolean {
+  const token = raw.trim();
+  return isJsonNumber(token) && Number.isFinite(Number(token));
+}
+
 /** One value as the attribute's type reads it, or the text as typed if it does not parse. */
 function parsed(type: AttributeType, raw: string): unknown {
   switch (entryType(type)) {
     case "number": {
-      const value = raw.trim() === "" ? NaN : Number(raw);
-      return Number.isFinite(value) ? value : raw;
+      const token = raw.trim();
+      if (!isJsonNumber(token)) return raw;
+      const value = numberOf(token);
+      return Number.isFinite(Number(value)) ? value : raw;
     }
     case "boolean":
       return raw === "true" ? true : raw === "false" ? false : raw;
@@ -375,9 +388,7 @@ export function localDateTime(instant: string): string {
 function valueIssue(i18n: I18n, type: AttributeType, op: string, raw: string): string | undefined {
   switch (entryType(type)) {
     case "number":
-      return Number.isFinite(raw.trim() === "" ? NaN : Number(raw))
-        ? undefined
-        : i18n._(msg`Enter a number.`);
+      return isNumberText(raw) ? undefined : i18n._(msg`Enter a number.`);
     case "semver":
       return isFullSemver(raw)
         ? undefined

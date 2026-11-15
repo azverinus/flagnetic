@@ -7,6 +7,8 @@ import {
 import type { I18n, MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
+import { stringifyLossless } from "./lossless-json";
+
 /**
  * The audit log's filters as search parameters, so a filtered view, its
  * page and an open entry can be shared and survive a reload. `from` and
@@ -259,7 +261,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function json(value: unknown): string | undefined {
-  return value === undefined ? undefined : JSON.stringify(value);
+  return value === undefined ? undefined : stringifyLossless(value);
 }
 
 /**

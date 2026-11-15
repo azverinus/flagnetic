@@ -8,26 +8,28 @@ export type RulesetFile = { name: string; text: string };
 /**
  * The file an environment's ruleset is saved as, named after the project,
  * the environment and the ruleset's version so that two downloads of one
- * environment never overwrite each other, and written readably since it
- * is meant to be opened, diffed and fed to a test helper.
+ * environment never overwrite each other. Its text is the document as the
+ * server sent it, byte for byte: the file is what the SDKs receive, and
+ * is meant to be diffed and fed to a test helper, so it is neither laid
+ * out again nor has a number in it rewritten.
  */
-export function rulesetFile(
-  project: string,
-  environment: string,
-  document: Record<string, unknown>,
-): RulesetFile {
-  const { version } = document;
+export function rulesetFile(project: string, environment: string, text: string): RulesetFile {
+  let version: unknown;
+  try {
+    version = (JSON.parse(text) as { version?: unknown } | null)?.version;
+  } catch {
+    // Not JSON: it is still saved as it came, under a name without a version.
+  }
   const suffix = typeof version === "number" ? `-${version}` : "";
-  return {
-    name: `${project}-${environment}-ruleset${suffix}.json`,
-    text: `${JSON.stringify(document, null, 2)}\n`,
-  };
+  return { name: `${project}-${environment}-ruleset${suffix}.json`, text };
 }
 
 /** Reads the environment's ruleset and hands it to the browser as a download. */
 export async function downloadRuleset(project: string, environment: string): Promise<void> {
-  const document = await unwrap(getEnvironmentRuleset({ path: { project, environment } }));
-  const file = rulesetFile(project, environment, document);
+  const text = await unwrap(
+    getEnvironmentRuleset({ path: { project, environment }, parseAs: "text" }),
+  );
+  const file = rulesetFile(project, environment, text as unknown as string);
   const url = URL.createObjectURL(new Blob([file.text], { type: "application/json" }));
   const link = Object.assign(window.document.createElement("a"), {
     href: url,

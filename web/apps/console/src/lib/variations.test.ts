@@ -1,12 +1,16 @@
+import type { Variation } from "@flagnetic/api";
 import { i18n } from "@lingui/core";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { activateForTests } from "@/test/render";
 
+import { parseLossless, stringifyLossless } from "./lossless-json";
+
 import {
   newVariation,
   startingVariations,
   type VariationDraft,
+  variationDrafts,
   variationInputs,
   variationIssues,
 } from "./variations";
@@ -43,13 +47,35 @@ describe("what a flag's variations send", () => {
     expect(variationInputs("string", [row("red", " Red ")])).toEqual([
       { key: "red", value: " Red " },
     ]);
-    expect(variationInputs("number", [row("low", " 0.5 "), row("high", "-3e2")])).toEqual([
-      { key: "low", value: 0.5 },
-      { key: "high", value: -300 },
-    ]);
+    expect(
+      stringifyLossless(variationInputs("number", [row("low", " 0.5 "), row("high", "-3e2")])),
+    ).toBe('[{"key":"low","value":0.5},{"key":"high","value":-3e2}]');
     expect(variationInputs("json", [row("on", '{"limit": 3, "tags": ["a"]}')])).toEqual([
       { key: "on", value: { limit: 3, tags: ["a"] } },
     ]);
+  });
+
+  it("sends a number as it was written, not as the nearest double", () => {
+    const sent = (type: "number" | "json", value: string) =>
+      stringifyLossless(variationInputs(type, [row("a", value)]));
+    expect(sent("number", "12345678901234567890")).toBe(
+      '[{"key":"a","value":12345678901234567890}]',
+    );
+    expect(sent("number", "1.0")).toBe('[{"key":"a","value":1.0}]');
+    expect(sent("json", '{ "account": 12345678901234567890, "ratio": 1.0 }')).toBe(
+      '[{"key":"a","value":{"account":12345678901234567890,"ratio":1.0}}]',
+    );
+  });
+
+  it("sends an untouched row back with the value the server holds", () => {
+    const held = parseLossless(
+      '[{"key":"a","value":{"id":12345678901234567890},"name":"A","description":""},{"key":"b","value":1.0,"name":"B","description":""}]',
+    ) as Variation[];
+    const rows = variationDrafts(held);
+    expect(stringifyLossless(variationInputs("json", [rows[0]!]))).toBe(
+      '[{"key":"a","value":{"id":12345678901234567890},"name":"A"}]',
+    );
+    expect(rows[1]!.value).toBe("1.0");
   });
 
   it("leaves out a blank name and description, so the name defaults to the key", () => {
@@ -72,6 +98,22 @@ describe("what is wrong with a flag's variations", () => {
   it("is nothing for rows that send as they are", () => {
     expect(messages(i18n, "number", [row("a", "1"), row("b", "2.5")])).toEqual([]);
     expect(messages(i18n, "boolean", [])).toEqual([]);
+  });
+
+  it("refuses a number that is not written in decimal", () => {
+    expect(
+      messages(i18n, "number", [
+        row("a", "0x10"),
+        row("b", "1e999"),
+        row("c", ".5"),
+        row("d", "1,5"),
+      ]),
+    ).toEqual([
+      ["0.value", "Enter a number."],
+      ["1.value", "Enter a number."],
+      ["2.value", "Enter a number."],
+      ["3.value", "Enter a number."],
+    ]);
   });
 
   it("names the row whose key repeats another's, not the first", () => {

@@ -10,6 +10,13 @@ import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
 import { flagViolationMessage } from "./flags";
+import {
+  isJsonNumber,
+  numberOf,
+  parseLossless,
+  RawNumber,
+  stringifyLossless,
+} from "./lossless-json";
 
 /**
  * One variation as a form edits it: every field as typed, the value as
@@ -48,7 +55,9 @@ export function startingVariations(): VariationDraft[] {
 
 /**
  * The rows of a flag's variations as it has them: a string as it is, a
- * number as JavaScript writes it, and JSON laid out two spaces a level.
+ * number as it was written, and JSON laid out two spaces a level with
+ * every number in it as it was written, so a row nobody touches is sent
+ * back with the value the server holds.
  */
 export function variationDrafts(variations: readonly Variation[]): VariationDraft[] {
   return variations.map((variation) => {
@@ -58,7 +67,9 @@ export function variationDrafts(variations: readonly Variation[]): VariationDraf
         ? variation.value
         : typeof variation.value === "number"
           ? String(variation.value)
-          : JSON.stringify(variation.value, null, 2);
+          : variation.value instanceof RawNumber
+            ? variation.value.source
+            : stringifyLossless(variation.value, 2);
     return { ...row, value, name: variation.name, description: variation.description };
   });
 }
@@ -75,19 +86,23 @@ type Parsed = { ok: true; value: unknown } | { ok: false };
 
 /**
  * A row's value as the flag's type reads it: a string as typed, a finite
- * number, or any JSON but null, which no variation may serve.
+ * number written in decimal (not `0x10`, `.5` or `Infinity`), or any JSON
+ * but null, which no variation may serve. A number keeps the text it was
+ * written as, so one beyond a double's precision is not changed.
  */
 function parseValue(type: FlagType, raw: string): Parsed {
   switch (type) {
     case "string":
       return { ok: true, value: raw };
     case "number": {
-      const value = raw.trim() === "" ? NaN : Number(raw);
-      return Number.isFinite(value) ? { ok: true, value } : { ok: false };
+      const token = raw.trim();
+      if (!isJsonNumber(token)) return { ok: false };
+      const value = numberOf(token);
+      return Number.isFinite(Number(value)) ? { ok: true, value } : { ok: false };
     }
     case "json":
       try {
-        const value: unknown = JSON.parse(raw);
+        const value = parseLossless(raw);
         return value === null ? { ok: false } : { ok: true, value };
       } catch {
         return { ok: false };
@@ -104,7 +119,7 @@ function parseValue(type: FlagType, raw: string): Parsed {
  */
 export function formatJson(raw: string): string {
   try {
-    return JSON.stringify(JSON.parse(raw), null, 2);
+    return stringifyLossless(parseLossless(raw), 2);
   } catch {
     return raw;
   }
