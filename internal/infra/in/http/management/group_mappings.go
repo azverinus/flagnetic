@@ -61,7 +61,7 @@ func (a *api) ReplaceAuthProviderGroupMappings(ctx context.Context, req ReplaceA
 		return nil, err
 	}
 	return ReplaceAuthProviderGroupMappings200JSONResponse{
-		Body: GroupMappingsRun{Granted: run.Granted, Revoked: run.Revoked, KeptInstanceAdmin: run.KeptInstanceAdmin},
+		Body:    GroupMappingsRun{Granted: run.Granted, Revoked: run.Revoked, KeptInstanceAdmin: run.KeptInstanceAdmin},
 		Headers: ReplaceAuthProviderGroupMappings200ResponseHeaders{ETag: etag(run.Version)},
 	}, nil
 }
