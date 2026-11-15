@@ -129,6 +129,9 @@ type Options struct {
 	// AuditExportMaxEntries is the most entries one download of the audit
 	// log may hold.
 	AuditExportMaxEntries int
+	// AuditExportMaxConcurrent is how many downloads of the audit log the
+	// replica serves at once.
+	AuditExportMaxConcurrent int
 	// DigestSlot is when the weekly stale-flag digest is sent.
 	DigestSlot governance.DigestSlot
 	// DefaultLocale is the language of a mail whose recipient has not chosen
@@ -727,7 +730,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 
 		ListAuditEntries:   appgovernance.NewListAuditEntries(auditLog),
 		GetAuditEntry:      appgovernance.NewGetAuditEntry(auditLog),
-		ExportAuditEntries: appgovernance.NewExportAuditEntries(tx, auditLog, o.AuditExportMaxEntries),
+		ExportAuditEntries: appgovernance.NewExportAuditEntries(auditLog, auditLog, o.AuditExportMaxEntries, o.AuditExportMaxConcurrent),
 		StreamChanges:      appgovernance.NewStreamChanges(changeHub, auditLog),
 
 		// A document holds what the workspace, flags and experiments

@@ -46,6 +46,11 @@ type Options struct {
 	// BodyReadTimeout bounds reading a request's body, except on stream
 	// routes; 0 sets none.
 	BodyReadTimeout time.Duration
+	// WriteTimeout bounds each write of a response, and each frame of a
+	// stream, to the client: a client that stops reading is dropped after it,
+	// so it cannot hold the handler, its connection and what the handler
+	// holds. It does not bound a response's length; 0 sets none.
+	WriteTimeout time.Duration
 	// MaxBodyBytes limits a request's body unless its route declares its own
 	// limit; 0 sets none.
 	MaxBodyBytes int64
@@ -61,6 +66,7 @@ func OptionsFrom(cfg config.Config) Options {
 		ReadHeaderTimeout: cfg.HTTPReadHeaderTimeout,
 		IdleTimeout:       cfg.HTTPIdleTimeout,
 		BodyReadTimeout:   cfg.HTTPBodyReadTimeout,
+		WriteTimeout:      cfg.HTTPWriteTimeout,
 		MaxBodyBytes:      cfg.HTTPMaxBodyBytes,
 	}
 }
@@ -236,7 +242,8 @@ func cleanPath(p string) string {
 }
 
 // HTTPServer returns an http.Server serving the edge with its connection
-// timeouts. It sets no write timeout, which would cut off streams. Its
+// timeouts. It sets no write timeout of the whole response, which would cut
+// off streams: the edge bounds each write instead. Its
 // shutdown drains the edge, so the streams still open end rather than hold
 // the shutdown until its grace period runs out.
 func (s *Server) HTTPServer() *http.Server {
@@ -283,14 +290,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.accessLog(r, st, rw, time.Since(start), false)
 	}()
 
+	// Bounded before the middlewares, so an answer one of them gives without
+	// reaching a route, such as a browser's preflight, is bounded too.
+	out, done := withWriteDeadline(w, rw, s.opts.WriteTimeout)
+	defer done()
 	route := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) { s.route(w, rw, r, st) })
 	for _, wr := range s.wraps {
 		if r.URL.Path == strings.TrimSuffix(wr.prefix, "/") || strings.HasPrefix(r.URL.Path, wr.prefix) {
-			wr.mw(route).ServeHTTP(rw, r)
+			wr.mw(route).ServeHTTP(out, r)
 			return
 		}
 	}
-	route.ServeHTTP(rw, r)
+	route.ServeHTTP(out, r)
 }
 
 // route serves r on rw by the route it matches. conn is the connection's

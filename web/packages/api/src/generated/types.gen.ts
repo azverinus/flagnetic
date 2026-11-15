@@ -12947,6 +12947,10 @@ export type ExportProjectAuditEntriesErrors = {
    * The request is well formed but breaks a rule; `errors` names each field to fix.
    */
   422: Problem;
+  /**
+   * `too_many_exports`: this replica serves the most audit downloads it allows at once; `Retry-After` gives the seconds to wait.
+   */
+  429: Problem;
 };
 
 export type ExportProjectAuditEntriesError =
@@ -15198,6 +15202,10 @@ export type ExportAuditEntriesErrors = {
    * The request is well formed but breaks a rule; `errors` names each field to fix.
    */
   422: Problem;
+  /**
+   * `too_many_exports`: this replica serves the most audit downloads it allows at once; `Retry-After` gives the seconds to wait.
+   */
+  429: Problem;
 };
 
 export type ExportAuditEntriesError = ExportAuditEntriesErrors[keyof ExportAuditEntriesErrors];

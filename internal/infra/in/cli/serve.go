@@ -114,7 +114,7 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		WebhookTargets: governance.TargetPolicy{
 			AllowHTTP: cfg.WebhookAllowHTTP, AllowPrivateNetworks: cfg.WebhookAllowPrivateNetworks,
 		},
-		AuditExportMaxEntries: cfg.AuditExportMaxEntries,
+		AuditExportMaxEntries: cfg.AuditExportMaxEntries, AuditExportMaxConcurrent: cfg.AuditExportMaxConcurrent,
 		WebhookTick:           cfg.WebhookTick,
 		SinkTick:              cfg.SinkTick,
 		SinkLagWarning:        cfg.SinkLagWarning,

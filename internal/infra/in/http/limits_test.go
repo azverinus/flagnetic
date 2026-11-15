@@ -306,3 +306,126 @@ func TestForwardedEntriesWithPortsAndAcrossHeaderLines(t *testing.T) {
 		t.Errorf("an IPv6 entry with a port: client_ip = %s", got)
 	}
 }
+
+// flood writes blocks until its client stops taking them, then reports how
+// long that took.
+func flood(took chan<- time.Duration) func(*flaghttp.Server) nethttp.Handler {
+	return func(*flaghttp.Server) nethttp.Handler {
+		return nethttp.HandlerFunc(func(w nethttp.ResponseWriter, _ *nethttp.Request) {
+			start := time.Now()
+			block := []byte(strings.Repeat("x", 1<<20))
+			rc := nethttp.NewResponseController(w)
+			for range 4096 {
+				if _, err := w.Write(block); err != nil {
+					break
+				}
+				if err := rc.Flush(); err != nil {
+					break
+				}
+			}
+			took <- time.Since(start)
+		})
+	}
+}
+
+// stalledGet sends GET path and reads the response's first line only.
+func stalledGet(t *testing.T, srv *testkit.Server, path string) {
+	t.Helper()
+	conn, err := net.Dial("tcp", strings.TrimPrefix(srv.URL, "http://"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	_ = conn.(*net.TCPConn).SetReadBuffer(1024)
+	_, _ = io.WriteString(conn, "GET "+path+" HTTP/1.1\r\nHost: x\r\n\r\n")
+	if _, err := bufio.NewReaderSize(conn, 64).ReadString('\n'); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAClientThatStopsReadingEndsTheHandlerOnAnyRoute(t *testing.T) {
+	plain, stream := make(chan time.Duration, 1), make(chan time.Duration, 1)
+	srv := testkit.StartServer(t,
+		testkit.WithEdge(func(o *flaghttp.Options) { o.WriteTimeout = 300 * time.Millisecond }),
+		testkit.WithRoute("GET /test/big", flood(plain)),
+		testkit.WithRoute("GET /test/stream", flood(stream), flaghttp.Stream()),
+	)
+	for path, took := range map[string]chan time.Duration{"/test/big": plain, "/test/stream": stream} {
+		stalledGet(t, srv, path)
+		select {
+		case d := <-took:
+			if d > 5*time.Second {
+				t.Errorf("%s: the handler took %s to learn its client stopped reading", path, d)
+			}
+		case <-time.After(15 * time.Second):
+			t.Errorf("%s: the handler was still writing to a client that stopped reading", path)
+		}
+	}
+}
+
+func TestAStreamWhoseFramesAreTakenOutlivesTheWriteTimeout(t *testing.T) {
+	srv := testkit.StartServer(t,
+		testkit.WithEdge(func(o *flaghttp.Options) { o.WriteTimeout = 300 * time.Millisecond }),
+		testkit.WithRoute("GET /test/ticks", func(*flaghttp.Server) nethttp.Handler {
+			return nethttp.HandlerFunc(func(w nethttp.ResponseWriter, _ *nethttp.Request) {
+				rc := nethttp.NewResponseController(w)
+				for range 8 {
+					_, _ = io.WriteString(w, "tick\n")
+					_ = rc.Flush()
+					time.Sleep(150 * time.Millisecond)
+				}
+			})
+		}, flaghttp.Stream()),
+	)
+	resp, err := nethttp.Get(srv.URL + "/test/ticks") //nolint:noctx // a local test server
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(string(body), "tick\n"); got != 8 {
+		t.Errorf("a stream living four timeouts delivered %d of 8 frames", got)
+	}
+}
+
+// TestAClientThatStopsReadingWhatAMiddlewareAnswersIsDropped pipelines
+// preflights, which the SDK API's middleware answers before any route is
+// reached, and stops reading their answers: the connection is dropped after
+// the write timeout rather than held for as long as the client likes.
+func TestAClientThatStopsReadingWhatAMiddlewareAnswersIsDropped(t *testing.T) {
+	srv := testkit.StartServer(t, testkit.WithEdge(func(o *flaghttp.Options) { o.WriteTimeout = 200 * time.Millisecond }))
+	conn, err := net.Dial("tcp", strings.TrimPrefix(srv.URL, "http://"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	_ = conn.(*net.TCPConn).SetReadBuffer(1024)
+	const sent = 20000
+	preflight := "OPTIONS /sdk/v1/ruleset HTTP/1.1\r\nHost: x\r\nOrigin: https://app.example.com\r\n" +
+		"Access-Control-Request-Method: GET\r\n\r\n"
+	go func() {
+		for range sent {
+			if _, err := io.WriteString(conn, preflight); err != nil {
+				return
+			}
+		}
+	}()
+	time.Sleep(1500 * time.Millisecond)
+
+	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	br := bufio.NewReader(conn)
+	answered := 0
+	for ; ; answered++ {
+		res, err := nethttp.ReadResponse(br, nil)
+		if err != nil {
+			break
+		}
+		_ = res.Body.Close()
+	}
+	if answered == sent {
+		t.Errorf("all %d preflights were answered: the connection was held while its client stopped reading", sent)
+	}
+}

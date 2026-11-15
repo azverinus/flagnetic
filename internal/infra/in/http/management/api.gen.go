@@ -7702,7 +7702,12 @@ type ClientInterface interface {
 	// The entries are counted first: a filter matching more than
 	// `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
 	// `export_too_large` before anything is sent; narrow it with `from` and
-	// `to`. The entries are then streamed from one snapshot of the log.
+	// `to`. The entries are then streamed a page at a time, newest first, from
+	// where the download started: an entry written meanwhile is not in it.
+	// A replica serves at most `FLAGNETIC_AUDIT_EXPORT_MAX_CONCURRENT` (4
+	// unless set) downloads at once; one asked beyond that is refused
+	// `too_many_exports` with `Retry-After`. A client that stops taking the
+	// download is dropped after `FLAGNETIC_HTTP_WRITE_TIMEOUT`.
 	//
 	// `project` narrows it to one project's entries.
 	//
@@ -9073,7 +9078,12 @@ type ClientInterface interface {
 	// The entries are counted first: a filter matching more than
 	// `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
 	// `export_too_large` before anything is sent; narrow it with `from` and
-	// `to`. The entries are then streamed from one snapshot of the log.
+	// `to`. The entries are then streamed a page at a time, newest first, from
+	// where the download started: an entry written meanwhile is not in it.
+	// A replica serves at most `FLAGNETIC_AUDIT_EXPORT_MAX_CONCURRENT` (4
+	// unless set) downloads at once; one asked beyond that is refused
+	// `too_many_exports` with `Retry-After`. A client that stops taking the
+	// download is dropped after `FLAGNETIC_HTTP_WRITE_TIMEOUT`.
 	//
 	// Corresponds with GET /projects/{project}/audit/export (the `ExportProjectAuditEntries` operationId).
 	ExportProjectAuditEntries(ctx context.Context, project ProjectKey, params *ExportProjectAuditEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -11840,7 +11850,12 @@ func (c *Client) ListAuditEntries(ctx context.Context, params *ListAuditEntriesP
 // The entries are counted first: a filter matching more than
 // `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
 // `export_too_large` before anything is sent; narrow it with `from` and
-// `to`. The entries are then streamed from one snapshot of the log.
+// `to`. The entries are then streamed a page at a time, newest first, from
+// where the download started: an entry written meanwhile is not in it.
+// A replica serves at most `FLAGNETIC_AUDIT_EXPORT_MAX_CONCURRENT` (4
+// unless set) downloads at once; one asked beyond that is refused
+// `too_many_exports` with `Retry-After`. A client that stops taking the
+// download is dropped after `FLAGNETIC_HTTP_WRITE_TIMEOUT`.
 //
 // `project` narrows it to one project's entries.
 //
@@ -14161,7 +14176,12 @@ func (c *Client) ListProjectAuditEntries(ctx context.Context, project ProjectKey
 // The entries are counted first: a filter matching more than
 // `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
 // `export_too_large` before anything is sent; narrow it with `from` and
-// `to`. The entries are then streamed from one snapshot of the log.
+// `to`. The entries are then streamed a page at a time, newest first, from
+// where the download started: an entry written meanwhile is not in it.
+// A replica serves at most `FLAGNETIC_AUDIT_EXPORT_MAX_CONCURRENT` (4
+// unless set) downloads at once; one asked beyond that is refused
+// `too_many_exports` with `Retry-After`. A client that stops taking the
+// download is dropped after `FLAGNETIC_HTTP_WRITE_TIMEOUT`.
 //
 // Corresponds with GET /projects/{project}/audit/export (the `ExportProjectAuditEntries` operationId).
 func (c *Client) ExportProjectAuditEntries(ctx context.Context, project ProjectKey, params *ExportProjectAuditEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -29479,7 +29499,12 @@ type ClientWithResponsesInterface interface {
 	// The entries are counted first: a filter matching more than
 	// `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
 	// `export_too_large` before anything is sent; narrow it with `from` and
-	// `to`. The entries are then streamed from one snapshot of the log.
+	// `to`. The entries are then streamed a page at a time, newest first, from
+	// where the download started: an entry written meanwhile is not in it.
+	// A replica serves at most `FLAGNETIC_AUDIT_EXPORT_MAX_CONCURRENT` (4
+	// unless set) downloads at once; one asked beyond that is refused
+	// `too_many_exports` with `Retry-After`. A client that stops taking the
+	// download is dropped after `FLAGNETIC_HTTP_WRITE_TIMEOUT`.
 	//
 	// `project` narrows it to one project's entries.
 	//
@@ -30954,7 +30979,12 @@ type ClientWithResponsesInterface interface {
 	// The entries are counted first: a filter matching more than
 	// `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
 	// `export_too_large` before anything is sent; narrow it with `from` and
-	// `to`. The entries are then streamed from one snapshot of the log.
+	// `to`. The entries are then streamed a page at a time, newest first, from
+	// where the download started: an entry written meanwhile is not in it.
+	// A replica serves at most `FLAGNETIC_AUDIT_EXPORT_MAX_CONCURRENT` (4
+	// unless set) downloads at once; one asked beyond that is refused
+	// `too_many_exports` with `Retry-After`. A client that stops taking the
+	// download is dropped after `FLAGNETIC_HTTP_WRITE_TIMEOUT`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -33953,6 +33983,11 @@ type ExportAuditEntriesResponse401Headers struct {
 	WWWAuthenticate *string
 }
 
+// ExportAuditEntriesResponse429Headers the declared response headers of an HTTP 429 response for ExportAuditEntries
+type ExportAuditEntriesResponse429Headers struct {
+	RetryAfter *int
+}
+
 type ExportAuditEntriesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -33966,10 +34001,14 @@ type ExportAuditEntriesResponse struct {
 	ApplicationproblemJSON404 *NotFound
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *Problem
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *ExportAuditEntriesResponse200Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *ExportAuditEntriesResponse401Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *ExportAuditEntriesResponse429Headers
 }
 
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
@@ -33995,6 +34034,11 @@ func (r ExportAuditEntriesResponse) GetApplicationproblemJSON404() *NotFound {
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
 func (r ExportAuditEntriesResponse) GetApplicationproblemJSON422() *Invalid {
 	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r ExportAuditEntriesResponse) GetApplicationproblemJSON429() *Problem {
+	return r.ApplicationproblemJSON429
 }
 
 // GetBody returns the raw response body bytes
@@ -39550,6 +39594,11 @@ type ExportProjectAuditEntriesResponse401Headers struct {
 	WWWAuthenticate *string
 }
 
+// ExportProjectAuditEntriesResponse429Headers the declared response headers of an HTTP 429 response for ExportProjectAuditEntries
+type ExportProjectAuditEntriesResponse429Headers struct {
+	RetryAfter *int
+}
+
 type ExportProjectAuditEntriesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -39563,10 +39612,14 @@ type ExportProjectAuditEntriesResponse struct {
 	ApplicationproblemJSON404 *NotFound
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *Problem
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *ExportProjectAuditEntriesResponse200Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *ExportProjectAuditEntriesResponse401Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *ExportProjectAuditEntriesResponse429Headers
 }
 
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
@@ -39592,6 +39645,11 @@ func (r ExportProjectAuditEntriesResponse) GetApplicationproblemJSON404() *NotFo
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
 func (r ExportProjectAuditEntriesResponse) GetApplicationproblemJSON422() *Invalid {
 	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r ExportProjectAuditEntriesResponse) GetApplicationproblemJSON429() *Problem {
+	return r.ApplicationproblemJSON429
 }
 
 // GetBody returns the raw response body bytes
@@ -50523,7 +50581,12 @@ func (c *ClientWithResponses) ListAuditEntriesWithResponse(ctx context.Context, 
 // The entries are counted first: a filter matching more than
 // `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
 // `export_too_large` before anything is sent; narrow it with `from` and
-// `to`. The entries are then streamed from one snapshot of the log.
+// `to`. The entries are then streamed a page at a time, newest first, from
+// where the download started: an entry written meanwhile is not in it.
+// A replica serves at most `FLAGNETIC_AUDIT_EXPORT_MAX_CONCURRENT` (4
+// unless set) downloads at once; one asked beyond that is refused
+// `too_many_exports` with `Retry-After`. A client that stops taking the
+// download is dropped after `FLAGNETIC_HTTP_WRITE_TIMEOUT`.
 //
 // `project` narrows it to one project's entries.
 //
@@ -52568,7 +52631,12 @@ func (c *ClientWithResponses) ListProjectAuditEntriesWithResponse(ctx context.Co
 // The entries are counted first: a filter matching more than
 // `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 unless set) is refused
 // `export_too_large` before anything is sent; narrow it with `from` and
-// `to`. The entries are then streamed from one snapshot of the log.
+// `to`. The entries are then streamed a page at a time, newest first, from
+// where the download started: an entry written meanwhile is not in it.
+// A replica serves at most `FLAGNETIC_AUDIT_EXPORT_MAX_CONCURRENT` (4
+// unless set) downloads at once; one asked beyond that is refused
+// `too_many_exports` with `Retry-After`. A client that stops taking the
+// download is dropped after `FLAGNETIC_HTTP_WRITE_TIMEOUT`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -56640,6 +56708,13 @@ func ParseExportAuditEntriesResponse(rsp *http.Response) (*ExportAuditEntriesRes
 		}
 		response.ApplicationproblemJSON422 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
 	}
 
 	switch {
@@ -56663,6 +56738,16 @@ func ParseExportAuditEntriesResponse(rsp *http.Response) (*ExportAuditEntriesRes
 			headers.WWWAuthenticate = &value
 		}
 		response.Headers401 = &headers
+	case rsp.StatusCode == 429:
+		var headers ExportAuditEntriesResponse429Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
 	}
 
 	return response, nil
@@ -61724,6 +61809,13 @@ func ParseExportProjectAuditEntriesResponse(rsp *http.Response) (*ExportProjectA
 		}
 		response.ApplicationproblemJSON422 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
 	}
 
 	switch {
@@ -61747,6 +61839,16 @@ func ParseExportProjectAuditEntriesResponse(rsp *http.Response) (*ExportProjectA
 			headers.WWWAuthenticate = &value
 		}
 		response.Headers401 = &headers
+	case rsp.StatusCode == 429:
+		var headers ExportProjectAuditEntriesResponse429Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
 	}
 
 	return response, nil
@@ -81550,6 +81652,30 @@ func (response ExportAuditEntries422ApplicationProblemPlusJSONResponse) VisitExp
 	return err
 }
 
+type ExportAuditEntries429ResponseHeaders struct {
+	RetryAfter *int
+}
+
+type ExportAuditEntries429ApplicationProblemPlusJSONResponse struct {
+	Body    Problem
+	Headers ExportAuditEntries429ResponseHeaders
+}
+
+func (response ExportAuditEntries429ApplicationProblemPlusJSONResponse) VisitExportAuditEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetInvitationRequestObject struct {
 	Secret string `json:"secret"`
 }
@@ -88132,6 +88258,30 @@ func (response ExportProjectAuditEntries422ApplicationProblemPlusJSONResponse) V
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportProjectAuditEntries429ResponseHeaders struct {
+	RetryAfter *int
+}
+
+type ExportProjectAuditEntries429ApplicationProblemPlusJSONResponse struct {
+	Body    Problem
+	Headers ExportProjectAuditEntries429ResponseHeaders
+}
+
+func (response ExportProjectAuditEntries429ApplicationProblemPlusJSONResponse) VisitExportProjectAuditEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
 	_, err := buf.WriteTo(w)
 	return err
 }

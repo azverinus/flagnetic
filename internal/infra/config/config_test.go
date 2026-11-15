@@ -109,6 +109,8 @@ func TestMalformedValuesAreRefusedNamingTheVariableAndAnExample(t *testing.T) {
 		{"FLAGNETIC_HTTP_READ_HEADER_TIMEOUT", "0s", "10s"},
 		{"FLAGNETIC_HTTP_IDLE_TIMEOUT", "forever", "120s"},
 		{"FLAGNETIC_HTTP_BODY_READ_TIMEOUT", "-1s", "30s"},
+		{"FLAGNETIC_HTTP_WRITE_TIMEOUT", "0s", "30s"},
+		{"FLAGNETIC_AUDIT_EXPORT_MAX_CONCURRENT", "0", "4"},
 		{"FLAGNETIC_HTTP_MAX_BODY_BYTES", "1MB", "1048576"},
 		{"FLAGNETIC_LOG_LEVEL", "loud", "debug"},
 		{"FLAGNETIC_LOG_FORMAT", "xml", "text"},
@@ -177,7 +179,7 @@ func TestHTTPLimitDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	if cfg.HTTPReadHeaderTimeout != 10*time.Second || cfg.HTTPIdleTimeout != 120*time.Second ||
-		cfg.HTTPBodyReadTimeout != 30*time.Second || cfg.HTTPMaxBodyBytes != 1<<20 || cfg.TrustedProxies != nil {
+		cfg.HTTPBodyReadTimeout != 30*time.Second || cfg.HTTPWriteTimeout != 30*time.Second || cfg.AuditExportMaxConcurrent != 4 || cfg.HTTPMaxBodyBytes != 1<<20 || cfg.TrustedProxies != nil {
 		t.Errorf("defaults = %+v", cfg)
 	}
 }

@@ -162,10 +162,11 @@ The public listener bounds what one client can hold:
 |---|---|---|
 | `FLAGNETIC_HTTP_READ_HEADER_TIMEOUT` | `10s` | Time to send the request headers. |
 | `FLAGNETIC_HTTP_BODY_READ_TIMEOUT` | `30s` | Time to send the request body; a body still arriving is answered 408. Long-lived streams are excepted. |
+| `FLAGNETIC_HTTP_WRITE_TIMEOUT` | `30s` | Time a client may take to accept each chunk of a response or each frame of a stream; a client that stops reading is dropped after it. It bounds a stalled reader, not the length of a response or of a stream. |
 | `FLAGNETIC_HTTP_IDLE_TIMEOUT` | `120s` | Time a keep-alive connection may stay idle. |
 | `FLAGNETIC_HTTP_MAX_BODY_BYTES` | `1048576` | Size of a request body; a larger one is answered 413. The few routes that take larger bodies declare their own limit, such as the uniformity check's 64 MiB. |
 
-There is no bound on the time to write a response, which would cut off streams; a proxy in front may add its own. A proxy in front must not buffer the [ruleset stream](sdks/stream.md) or the management change stream and must allow them a read timeout above their 15-second heartbeat; see [TLS and a reverse proxy](install.md#tls-and-a-reverse-proxy).
+The time to write a whole response is not bounded, which would cut off streams and large downloads; each write is, so a client that stops reading ends its request within `FLAGNETIC_HTTP_WRITE_TIMEOUT` instead of holding a goroutine and what it holds. A proxy in front may add its own bound. A proxy in front must not buffer the [ruleset stream](sdks/stream.md) or the management change stream and must allow them a read timeout above their 15-second heartbeat; see [TLS and a reverse proxy](install.md#tls-and-a-reverse-proxy).
 
 ## Delivery across replicas
 
@@ -309,7 +310,7 @@ Anyone who can read a project downloads its audit entries with `GET /api/v1/proj
 
 `format=jsonl` (the default) writes one entry per line, each exactly the entry as `GET /api/v1/projects/{project}/audit/{entry}` answers. `format=csv` writes a header row, then a row per entry: `id`, `occurred_at`, `project_id`, `environment_id`, `actor_kind`, `actor_id`, `actor_name`, `actor_member_id`, `request_id`, `change_request_id`, `kill_switch`, `action`, `entity_kind`, `entity_id`, `entity_key`, `before` and `after`, the last two as compact JSON. A cell that begins with `=`, `+`, `-`, `@`, a tab or a carriage return is prefixed with `'`, so a spreadsheet shows it as text instead of running it.
 
-The entries are counted first. A filter matching more than `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 by default) is answered `422 export_too_large` before anything is sent: narrow it with `from` and `to` and download the log in periods. Within the cap, the entries are streamed from one snapshot of the log, so an entry written meanwhile appears in no half of the download. If the connection breaks while streaming, the download ends incomplete rather than cleanly, and has to be asked for again.
+The entries are counted first. A filter matching more than `FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES` (100,000 by default) is answered `422 export_too_large` before anything is sent: narrow it with `from` and `to` and download the log in periods. Within the cap, the entries are streamed a page at a time, newest first, from where the download started, so an entry written meanwhile appears in no half of the download, and a download holds a database connection only while it reads a page. A replica serves at most `FLAGNETIC_AUDIT_EXPORT_MAX_CONCURRENT` (4 by default) downloads at once; one asked beyond that is answered `429 too_many_exports` with `Retry-After`. A client that stops taking the download is dropped after `FLAGNETIC_HTTP_WRITE_TIMEOUT`. If the connection breaks while streaming, the download ends incomplete rather than cleanly, and has to be asked for again.
 
 ## Deleting a project
 
