@@ -16,6 +16,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
+	"github.com/azverinus/flagnetic/internal/shared/text"
 )
 
 // MalformedError is input that is not a document in the format at all: text
@@ -55,6 +56,9 @@ func Decode(f Format, data []byte) (Document, error) {
 	}
 	if err = checkVersion(root); err != nil {
 		return Document{}, err
+	}
+	if found := text.InTree(root); len(found) > 0 {
+		return Document{}, apperrors.Invalid("invalid_document", "the project document is not valid", found...)
 	}
 	w := &walker{}
 	w.check("", root, reflect.TypeFor[Document]())

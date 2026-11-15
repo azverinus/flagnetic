@@ -5,8 +5,10 @@
 package management
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/netip"
 	"strings"
@@ -31,6 +33,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/precondition"
+	"github.com/azverinus/flagnetic/internal/shared/text"
 )
 
 // BaseURL is where the management API is served.
@@ -425,6 +428,9 @@ func (a *api) seam(op operations.Entry, next http.Handler) http.Handler {
 		if err == nil && (op.OpensSession || op.JSONOnly) && !isJSON(r) {
 			err = errNotJSON
 		}
+		if err == nil {
+			err = refuseControlCharacters(r)
+		}
 		if err != nil {
 			a.refuse(w, r, op.Operation, err)
 			return
@@ -542,4 +548,26 @@ func (a *api) refuse(w http.ResponseWriter, r *http.Request, op access.Operation
 		a.refusals.WithLabelValues(op.Name, e.Code).Inc()
 	}
 	a.edge.WriteError(w, r, err)
+}
+
+// refuseControlCharacters refuses a request whose path or query holds a
+// control character (400, as for any other value that is no value of the
+// parameter) or whose JSON body does (422, a violation per text by its
+// pointer), and leaves the body to be read again. PostgreSQL stores no
+// U+0000, so a text that reached it would be a 500 raised by any member at
+// will; checking here, once, covers every text of every operation, those
+// added later too.
+func refuseControlCharacters(r *http.Request) error {
+	if !text.AllowedURL(r.URL) {
+		return flaghttp.InvalidRequest("the path and query must not contain control characters")
+	}
+	if r.Body == nil || r.Body == http.NoBody || !isJSON(r) {
+		return nil
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	return text.Error(text.InJSON(body))
 }
