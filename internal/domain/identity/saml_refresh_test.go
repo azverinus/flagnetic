@@ -80,10 +80,6 @@ func TestNewCertificatesOrANewSSOURLAreAppliedAsAVersionOfTheProvider(t *testing
 		"a rotation that lists the old and the new certificate": func(m *identity.IDPMetadata) {
 			m.Certificates = append(m.Certificates, certificate(t, rotationNow.AddDate(2, 0, 0)))
 		},
-		"the old certificate dropped beside a kept one": func(m *identity.IDPMetadata) {
-			kept := m.Certificates[0]
-			m.Certificates = []string{kept, certificate(t, rotationNow.AddDate(2, 0, 0))}
-		},
 		"an added certificate": func(m *identity.IDPMetadata) {
 			m.Certificates = append(m.Certificates, certificate(t, rotationNow.AddDate(2, 0, 0)))
 		},
@@ -122,6 +118,23 @@ func TestAChangedEntityIDIsRefusedAndNothingIsApplied(t *testing.T) {
 	if got.SAML.IDP.EntityID != p.SAML.IDP.EntityID || got.SAML.IDP.Certificates[0] != p.SAML.IDP.Certificates[0] ||
 		!got.SAML.RefreshedAt.Equal(p.SAML.RefreshedAt) || got.Version != p.Version {
 		t.Errorf("a refused refresh changed the provider: %+v", got.SAML)
+	}
+}
+
+func TestARotationEndsWithTheOldCertificateDroppedAndTheNewOneKept(t *testing.T) {
+	p := samlProvider(t)
+	rotated := certificate(t, rotationNow.AddDate(2, 0, 0))
+	p.SAML.IDP.Certificates = append(p.SAML.IDP.Certificates, rotated)
+	offered := p.SAML.IDP
+	offered.Certificates = []string{rotated}
+
+	got, outcome := p.RefreshIDPMetadata(offered, p.SAML.RefreshedAt.Add(25*time.Hour))
+
+	if outcome != identity.RefreshChanged {
+		t.Fatalf("outcome = %v, want changed", outcome)
+	}
+	if len(got.SAML.IDP.Certificates) != 1 || got.SAML.IDP.Certificates[0] != rotated {
+		t.Errorf("certificates = %v, want the new one alone", got.SAML.IDP.Certificates)
 	}
 }
 
