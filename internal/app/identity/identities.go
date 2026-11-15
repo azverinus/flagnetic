@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -167,13 +168,22 @@ type UnlinkCommand struct {
 // email domain is enforced to is the only way in enforcement leaves them, and
 // is refused with the conflict provider_enforced. Unlinking what is no
 // usable way in, such as an identity at a disabled provider, never leaves a
-// member without one.
+// member without one. When no identity of the member remains at the provider,
+// what it brought them is taken back in the same unit of work, and
+// identity.unlinked records it: see takeBack.
 func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 	identityID, err := id.Parse[identity.Identity](cmd.Identity)
 	if err != nil {
 		return errIdentityNotFound
 	}
 	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
+		// Taking back what a provider brought may demote the member, which
+		// takes the instance admins' lock; it is taken before the member's,
+		// the order every change of access takes, so an unlink and a change
+		// to the same member made at once never deadlock.
+		if err := h.d.Members.LockInstanceAdmins(ctx); err != nil {
+			return err
+		}
 		m, found, err := h.d.Members.LockMember(ctx, cmd.Member)
 		if err != nil {
 			return err
@@ -212,6 +222,10 @@ func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 		if err = h.d.Identities.DeleteIdentity(ctx, identityID); err != nil {
 			return err
 		}
+		taken, err := h.takeBack(ctx, m.ID, held, unlinking, cmd.Request.ID)
+		if err != nil {
+			return err
+		}
 		now := h.d.now()
 		entry, err := governance.NewEntry(id.New[governance.Entry](h.d.IDs), now, cmd.Request, governance.Record{
 			Action: "identity.unlinked",
@@ -219,10 +233,73 @@ func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 			Before: map[string]any{
 				"provider": unlinking.ProviderSlug, "subject": unlinking.Subject, "member_id": m.ID.String(), "member_email": m.Email,
 			},
+			After: taken.values(),
 		})
 		if err != nil {
 			return err
 		}
 		return h.d.Audit.Record(ctx, entry)
 	})
+}
+
+// takenBack is what unlinking an identity took back from the member: what
+// the provider brought them that no identity of theirs there vouches for any
+// more.
+type takenBack struct {
+	// GroupClaimRemoved is whether the member had claimed groups at the
+	// provider.
+	GroupClaimRemoved bool
+	// AccessRevoked counts the grants and the instance admin the provider's
+	// mappings gave and no longer do; KeptInstanceAdmin is whether the member
+	// stayed instance admin as the last active one.
+	AccessRevoked     int
+	KeptInstanceAdmin bool
+	// SessionsRevoked counts the sessions opened through the provider.
+	SessionsRevoked int
+}
+
+// values is what the audit log records; nothing when nothing was taken back.
+func (t takenBack) values() map[string]any {
+	if t == (takenBack{}) {
+		return nil
+	}
+	return map[string]any{
+		"group_claim_removed": t.GroupClaimRemoved, "access_revoked": t.AccessRevoked,
+		"kept_instance_admin": t.KeptInstanceAdmin, "sessions_revoked": t.SessionsRevoked,
+	}
+}
+
+// takeBack takes back what the provider of the identity brought member when
+// no other identity of theirs remains there: the groups they claimed, the
+// access the provider's mappings gave them for those groups (what the
+// provider's SCIM groups give stays), and the sessions opened through it. It
+// does nothing while another identity of the member is at the provider, whose
+// identities the member held before the unlink.
+func (h *UnlinkIdentity) takeBack(ctx context.Context, member identity.MemberID, held []LinkedIdentity, unlinked *LinkedIdentity, requestID string) (takenBack, error) {
+	var taken takenBack
+	if slices.ContainsFunc(held, func(i LinkedIdentity) bool { return i.ID != unlinked.ID && i.Provider == unlinked.Provider }) {
+		return taken, nil
+	}
+	p, err := providerOf(ctx, h.d.Providers, unlinked.ProviderSlug)
+	if err != nil {
+		return taken, err
+	}
+	if taken.GroupClaimRemoved, err = h.d.Mappings.DeleteGroupClaim(ctx, p.ID, member); err != nil {
+		return taken, err
+	}
+	mappings, err := h.d.Mappings.GroupMappings(ctx, p.ID)
+	if err != nil {
+		return taken, err
+	}
+	groups, err := h.d.Mappings.GroupsOf(ctx, p.ID, member)
+	if err != nil {
+		return taken, err
+	}
+	change, err := GroupMappingDeps{Access: h.d.Access, Logger: h.d.Logger}.replaceAccess(ctx, p, member, mappings, groups, governance.Actor{}, requestID)
+	if err != nil {
+		return taken, err
+	}
+	taken.AccessRevoked, taken.KeptInstanceAdmin = change.Revoked, change.KeptInstanceAdmin
+	taken.SessionsRevoked, err = h.d.Members.RevokeProviderSessions(ctx, member, p.Slug)
+	return taken, err
 }

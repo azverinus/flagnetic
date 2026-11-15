@@ -682,3 +682,103 @@ func TestAProvisionedMembersIdentityAtTheirProviderIsNotUnlinked(t *testing.T) {
 		t.Errorf("unlinking an identity at another provider = %v, %v: %s", res.StatusCode(), err, res.Body)
 	}
 }
+
+func TestUnlinkingTheLastIdentityAtAProviderTakesBackWhatItBrought(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	slug := e.forged(t, idp, func(p *provider) { p.autoProvision, p.linkByEmail = false, true })
+	other := e.forged(t, idp, func(p *provider) { p.autoProvision, p.linkByEmail = false, true })
+	alpha, beta := e.project(t), e.project(t)
+	e.mapGroups(t, slug, projectMapping("eng", alpha, "developer"), adminMapping("it-admins"))
+	e.mapGroups(t, other, projectMapping("eng", beta, "viewer"))
+	m := e.passwordMember(t)
+	groups := map[string]any{"groups": []any{"eng", "it-admins"}}
+	viaProvider := e.forgedPerson(t, idp, slug, m.Email, groups)
+	viaOther := e.forgedPerson(t, idp, other, m.Email, groups)
+	mid := idOf(t, viaProvider)
+	e.wantGrants(t, alpha, mid, management.GrantSourceSso, slug, "developer")
+	e.wantGrants(t, beta, mid, management.GrantSourceSso, other, "viewer")
+	if !signedIn(t, viaProvider).Member.InstanceAdmin {
+		t.Fatal("the mapped group did not make the member an instance admin")
+	}
+	linked := identityAt(t, methodsOf(t, m.b), slug)
+
+	res, err := e.admin.UnlinkMemberIdentityWithResponse(t.Context(), m.ID.String(), linked.Id.String())
+
+	if err != nil || res.StatusCode() != http.StatusNoContent {
+		t.Fatalf("unlinking = %v, %v: %s", res.StatusCode(), err, res.Body)
+	}
+	e.wantGrants(t, alpha, mid, management.GrantSourceSso, slug)
+	e.wantGrants(t, beta, mid, management.GrantSourceSso, other, "viewer")
+	if signedIn(t, m.b).Member.InstanceAdmin {
+		t.Error("the member stays instance admin after the provider that made them was unlinked")
+	}
+	if me, err := viaProvider.GetMeWithResponse(t.Context()); err != nil || me.StatusCode() != http.StatusUnauthorized {
+		t.Errorf("a session opened through the unlinked provider = %v, %v", me.StatusCode(), err)
+	}
+	if me, err := viaOther.GetMeWithResponse(t.Context()); err != nil || me.StatusCode() != http.StatusOK {
+		t.Errorf("a session opened through another provider = %v, %v", me.StatusCode(), err)
+	}
+	// The claim is gone: running the mappings again grants nothing back.
+	if run := e.mapGroups(t, slug, projectMapping("eng", alpha, "developer"), adminMapping("it-admins")); run.Granted != 0 {
+		t.Errorf("replacing the mappings granted %d after the unlink", run.Granted)
+	}
+	e.wantGrants(t, alpha, mid, management.GrantSourceSso, slug)
+	entries := e.auditedBefore(t, "identity.unlinked", "member_email", m.Email)
+	if len(entries) != 1 {
+		t.Fatalf("identity.unlinked = %v", entries)
+	}
+	after := fieldsOf(t, e.unlinkedAfter(t, m.Email))
+	want := map[string]any{"group_claim_removed": true, "access_revoked": float64(2), "sessions_revoked": float64(1)}
+	for k, v := range want {
+		if after[k] != v {
+			t.Errorf("identity.unlinked after[%s] = %v, want %v (%v)", k, after[k], v, after)
+		}
+	}
+}
+
+// unlinkedAfter returns what the identity.unlinked entry of the member holding
+// email recorded as taken back.
+func (e env) unlinkedAfter(t *testing.T, email string) any {
+	t.Helper()
+	action := "identity.unlinked"
+	res, err := e.admin.ListAuditEntriesWithResponse(t.Context(), &management.ListAuditEntriesParams{Action: &action})
+	if err != nil || res.JSON200 == nil {
+		t.Fatalf("GET /audit = %v, %v", res.StatusCode(), err)
+	}
+	for _, entry := range res.JSON200.Items {
+		if before, _ := entry.Before.(map[string]any); before != nil && before["member_email"] == email {
+			return entry.After
+		}
+	}
+	t.Fatalf("no identity.unlinked entry for %s", email)
+	return nil
+}
+
+func TestUnlinkingOneOfTwoIdentitiesAtAProviderTakesBackNothing(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	slug := e.forged(t, idp, func(p *provider) { p.autoProvision, p.linkByEmail = false, true })
+	alpha := e.project(t)
+	e.mapGroups(t, slug, projectMapping("eng", alpha, "developer"))
+	m := e.passwordMember(t)
+	via := e.forgedPerson(t, idp, slug, m.Email, map[string]any{"groups": []any{"eng"}})
+	e.link(t, idp, m.b, slug, "second-subject", nil)
+	identities := methodsOf(t, m.b).Identities
+	if len(identities) != 2 {
+		t.Fatalf("%d identities at the provider, want 2", len(identities))
+	}
+
+	res, err := m.b.UnlinkMyIdentityWithResponse(t.Context(), identities[0].Id.String())
+
+	if err != nil || res.StatusCode() != http.StatusNoContent {
+		t.Fatalf("unlinking = %v, %v: %s", res.StatusCode(), err, res.Body)
+	}
+	e.wantGrants(t, alpha, idOf(t, via), management.GrantSourceSso, slug, "developer")
+	if me, err := via.GetMeWithResponse(t.Context()); err != nil || me.StatusCode() != http.StatusOK {
+		t.Errorf("a session opened through the provider = %v, %v", me.StatusCode(), err)
+	}
+	if after := e.unlinkedAfter(t, m.Email); after != nil {
+		t.Errorf("identity.unlinked after = %v, want none", after)
+	}
+}

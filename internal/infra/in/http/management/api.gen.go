@@ -8430,7 +8430,12 @@ type ClientInterface interface {
 	// identity that is no way in, such as one at a disabled auth provider,
 	// is always allowed. The identity at the auth provider the caller's
 	// email domain is enforced to is refused 409 `provider_enforced`. An identity of another member, or an identifier that names
-	// none, is not found. Recorded as `identity.unlinked`. Only a session
+	// none, is not found. When the last identity of the member at an auth provider goes,
+	// what the provider brought them goes too, in the same transaction: the
+	// groups they claimed there, the grants and instance admin its group
+	// mappings gave for them (what its SCIM groups give stays), and the
+	// sessions opened through it. `identity.unlinked` records what was taken
+	// back in `after`. Only a session
 	// may do this.
 	//
 	// Corresponds with DELETE /me/identities/{identity} (the `UnlinkMyIdentity` operationId).
@@ -8732,7 +8737,12 @@ type ClientInterface interface {
 	// member's last usable way in, except for a deactivated member, who
 	// signs in nowhere, and 409 `provider_enforced` for the identity at the
 	// auth provider the member's email domain is enforced to. An identity
-	// that does not belong to the member is not found. Recorded as `identity.unlinked` with the instance admin as
+	// that does not belong to the member is not found. When the last identity of the member at an auth provider goes,
+	// what the provider brought them goes too, in the same transaction: the
+	// groups they claimed there, the grants and instance admin its group
+	// mappings gave for them (what its SCIM groups give stays), and the
+	// sessions opened through it. `identity.unlinked` records what was taken
+	// back in `after`. The instance admin is
 	// its actor.
 	//
 	// Corresponds with DELETE /members/{member}/identities/{identity} (the `UnlinkMemberIdentity` operationId).
@@ -13046,7 +13056,12 @@ func (c *Client) ListMyIdentities(ctx context.Context, reqEditors ...RequestEdit
 // identity that is no way in, such as one at a disabled auth provider,
 // is always allowed. The identity at the auth provider the caller's
 // email domain is enforced to is refused 409 `provider_enforced`. An identity of another member, or an identifier that names
-// none, is not found. Recorded as `identity.unlinked`. Only a session
+// none, is not found. When the last identity of the member at an auth provider goes,
+// what the provider brought them goes too, in the same transaction: the
+// groups they claimed there, the grants and instance admin its group
+// mappings gave for them (what its SCIM groups give stays), and the
+// sessions opened through it. `identity.unlinked` records what was taken
+// back in `after`. Only a session
 // may do this.
 //
 // Corresponds with DELETE /me/identities/{identity} (the `UnlinkMyIdentity` operationId).
@@ -13558,7 +13573,12 @@ func (c *Client) ListMemberIdentities(ctx context.Context, member MemberID, reqE
 // member's last usable way in, except for a deactivated member, who
 // signs in nowhere, and 409 `provider_enforced` for the identity at the
 // auth provider the member's email domain is enforced to. An identity
-// that does not belong to the member is not found. Recorded as `identity.unlinked` with the instance admin as
+// that does not belong to the member is not found. When the last identity of the member at an auth provider goes,
+// what the provider brought them goes too, in the same transaction: the
+// groups they claimed there, the grants and instance admin its group
+// mappings gave for them (what its SCIM groups give stays), and the
+// sessions opened through it. `identity.unlinked` records what was taken
+// back in `after`. The instance admin is
 // its actor.
 //
 // Corresponds with DELETE /members/{member}/identities/{identity} (the `UnlinkMemberIdentity` operationId).
@@ -30309,7 +30329,12 @@ type ClientWithResponsesInterface interface {
 	// identity that is no way in, such as one at a disabled auth provider,
 	// is always allowed. The identity at the auth provider the caller's
 	// email domain is enforced to is refused 409 `provider_enforced`. An identity of another member, or an identifier that names
-	// none, is not found. Recorded as `identity.unlinked`. Only a session
+	// none, is not found. When the last identity of the member at an auth provider goes,
+	// what the provider brought them goes too, in the same transaction: the
+	// groups they claimed there, the grants and instance admin its group
+	// mappings gave for them (what its SCIM groups give stays), and the
+	// sessions opened through it. `identity.unlinked` records what was taken
+	// back in `after`. Only a session
 	// may do this.
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -30633,7 +30658,12 @@ type ClientWithResponsesInterface interface {
 	// member's last usable way in, except for a deactivated member, who
 	// signs in nowhere, and 409 `provider_enforced` for the identity at the
 	// auth provider the member's email domain is enforced to. An identity
-	// that does not belong to the member is not found. Recorded as `identity.unlinked` with the instance admin as
+	// that does not belong to the member is not found. When the last identity of the member at an auth provider goes,
+	// what the provider brought them goes too, in the same transaction: the
+	// groups they claimed there, the grants and instance admin its group
+	// mappings gave for them (what its SCIM groups give stays), and the
+	// sessions opened through it. `identity.unlinked` records what was taken
+	// back in `after`. The instance admin is
 	// its actor.
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -51679,7 +51709,12 @@ func (c *ClientWithResponses) ListMyIdentitiesWithResponse(ctx context.Context, 
 // identity that is no way in, such as one at a disabled auth provider,
 // is always allowed. The identity at the auth provider the caller's
 // email domain is enforced to is refused 409 `provider_enforced`. An identity of another member, or an identifier that names
-// none, is not found. Recorded as `identity.unlinked`. Only a session
+// none, is not found. When the last identity of the member at an auth provider goes,
+// what the provider brought them goes too, in the same transaction: the
+// groups they claimed there, the grants and instance admin its group
+// mappings gave for them (what its SCIM groups give stays), and the
+// sessions opened through it. `identity.unlinked` records what was taken
+// back in `after`. Only a session
 // may do this.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -52129,7 +52164,12 @@ func (c *ClientWithResponses) ListMemberIdentitiesWithResponse(ctx context.Conte
 // member's last usable way in, except for a deactivated member, who
 // signs in nowhere, and 409 `provider_enforced` for the identity at the
 // auth provider the member's email domain is enforced to. An identity
-// that does not belong to the member is not found. Recorded as `identity.unlinked` with the instance admin as
+// that does not belong to the member is not found. When the last identity of the member at an auth provider goes,
+// what the provider brought them goes too, in the same transaction: the
+// groups they claimed there, the grants and instance admin its group
+// mappings gave for them (what its SCIM groups give stays), and the
+// sessions opened through it. `identity.unlinked` records what was taken
+// back in `after`. The instance admin is
 // its actor.
 //
 // Returns a wrapper object for the known response body format(s).

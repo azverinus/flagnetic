@@ -76,6 +76,14 @@ func (a ssoMembers) OpenSession(ctx context.Context, s appidentity.SessionReques
 	})
 }
 
+func (a ssoMembers) LockInstanceAdmins(ctx context.Context) error {
+	return a.sso.LockInstanceAdmins(ctx)
+}
+
+func (a ssoMembers) RevokeProviderSessions(ctx context.Context, member identity.MemberID, provider string) (int, error) {
+	return a.sso.RevokeProviderSessions(ctx, id.FromBytes[access.Member](member.Bytes()), provider)
+}
+
 func (a ssoMembers) RecordFailedSignIn(ctx context.Context, member appidentity.MemberRecord, kind identity.Kind, provider, reason, requestID string) error {
 	return a.sso.RecordFailedSignIn(ctx, memberOf(member), access.SignInMethod(kind), provider, reason, requestID)
 }

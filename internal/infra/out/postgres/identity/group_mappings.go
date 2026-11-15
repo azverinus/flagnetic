@@ -90,6 +90,16 @@ func (s *Store) StoreGroupClaim(ctx context.Context, provider identity.ProviderI
 	return nil
 }
 
+// DeleteGroupClaim deletes what member last claimed at provider, and reports
+// whether they had claimed anything.
+func (s *Store) DeleteGroupClaim(ctx context.Context, provider identity.ProviderID, member identity.MemberID) (bool, error) {
+	tag, err := s.db(ctx).Exec(ctx, `DELETE FROM group_claims WHERE provider_id = $1 AND member_id = $2`, provider.Bytes(), member.Bytes())
+	if err != nil {
+		return false, fmt.Errorf("deleting a group claim: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
 // KnownGroups returns the groups of every member who claimed groups at the
 // provider or is in one of its SCIM groups, the union of both, ordered by
 // member. A member whose claim was empty is listed with no groups, so that
