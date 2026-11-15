@@ -106,6 +106,12 @@ const (
 	// RefreshRefused: the metadata names another entity than the provider's,
 	// which is a different identity provider and never applied silently.
 	RefreshRefused
+	// RefreshRefusedCertificates: the metadata names the provider's entity but
+	// holds none of the certificates the provider trusts now. The entity ID is
+	// public, so a document that shares no certificate with the trusted set
+	// does not show it comes from the identity provider; an instance admin
+	// settles it by editing the provider with the metadata.
+	RefreshRefusedCertificates
 )
 
 // MetadataDue reports whether p's metadata should be read again at now: p is an
@@ -119,11 +125,17 @@ func (p Provider) MetadataDue(now time.Time) bool {
 // RefreshIDPMetadata returns p with what fetched says, read at now. The
 // provider's certificates and single sign-on URL are replaced and its version
 // raised when they differ; when they do not, only the time of the refresh
-// moves. A different entity ID is RefreshRefused and p is returned as it was.
+// moves. A different entity ID is RefreshRefused, and a certificate set that
+// holds none of the certificates trusted now is RefreshRefusedCertificates; p
+// is returned as it was in both. A rotation therefore has to list an old
+// certificate beside the new one.
 func (p Provider) RefreshIDPMetadata(fetched IDPMetadata, now time.Time) (Provider, RefreshOutcome) {
 	current := p.SAML.IDP
 	if fetched.EntityID != current.EntityID {
 		return p, RefreshRefused
+	}
+	if !sharesCertificate(fetched.Certificates, current.Certificates) {
+		return p, RefreshRefusedCertificates
 	}
 	p = p.clone()
 	p.SAML.RefreshedAt = now
@@ -136,11 +148,24 @@ func (p Provider) RefreshIDPMetadata(fetched IDPMetadata, now time.Time) (Provid
 	return p, RefreshChanged
 }
 
+// fingerprints returns the fingerprints of the certificates of pems, sorted;
+// one that cannot be read has none.
+func fingerprints(pems []string) []string {
+	var out []string
+	for _, info := range (IDPMetadata{Certificates: pems}).CertificateInfos() {
+		out = append(out, info.SHA256)
+	}
+	slices.Sort(out)
+	return out
+}
+
 // sameCertificates reports whether a and b hold the same certificates, in any
-// order.
-func sameCertificates(a, b []string) bool {
-	a, b = slices.Clone(a), slices.Clone(b)
-	slices.Sort(a)
-	slices.Sort(b)
-	return slices.Equal(a, b)
+// order and whatever the whitespace of their PEM.
+func sameCertificates(a, b []string) bool { return slices.Equal(fingerprints(a), fingerprints(b)) }
+
+// sharesCertificate reports whether a and b hold at least one certificate in
+// common.
+func sharesCertificate(a, b []string) bool {
+	trusted := fingerprints(b)
+	return slices.ContainsFunc(fingerprints(a), func(f string) bool { return slices.Contains(trusted, f) })
 }

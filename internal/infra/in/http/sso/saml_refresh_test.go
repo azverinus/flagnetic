@@ -1,6 +1,8 @@
 package sso_test
 
 import (
+	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -67,7 +69,7 @@ func (e env) signsInThrough(t *testing.T, idp *testkit.ForgingSAMLIDP, slug stri
 func TestACertificateTheIdentityProviderRotatedIsAppliedAfterADayAndAudited(t *testing.T) {
 	e, c, idp := refreshEnv(t)
 	p := e.createSAML(t, idp, nil)
-	idp.RotateSigningKey(t, false)
+	idp.RotateSigningKey(t, true)
 	if e.signsInThrough(t, idp, p.Slug) {
 		t.Fatal("the instance accepted a signature by a certificate it has not read yet")
 	}
@@ -76,8 +78,8 @@ func TestACertificateTheIdentityProviderRotatedIsAppliedAfterADayAndAudited(t *t
 	e.refreshMetadata(t)
 
 	got := e.getProvider(t, p.Slug)
-	if want := certificateHashes(p); len(*got.IdpCertificates) != 1 || certificateHashes(got)[0] == want[0] {
-		t.Errorf("idp_certificates = %v, want the rotated one instead of %v", certificateHashes(got), want)
+	if want := certificateHashes(p); len(*got.IdpCertificates) != 2 || !slices.Contains(certificateHashes(got), want[0]) {
+		t.Errorf("idp_certificates = %v, want the rotated one beside %v", certificateHashes(got), want)
 	}
 	if got.IdpMetadataRefreshedAt == nil || !got.IdpMetadataRefreshedAt.Equal(c.Now()) || got.Version != p.Version+1 {
 		t.Errorf("refreshed at %v, version %d; want %s and %d", got.IdpMetadataRefreshedAt, got.Version, c.Now(), p.Version+1)
@@ -89,7 +91,7 @@ func TestACertificateTheIdentityProviderRotatedIsAppliedAfterADayAndAudited(t *t
 	if len(entries) != 1 {
 		t.Fatalf("%d metadata_refreshed entries, want one", len(entries))
 	}
-	for _, want := range []string{`"kind":"system"`, certificateHashes(p)[0], certificateHashes(got)[0]} {
+	for _, want := range append([]string{`"kind":"system"`}, certificateHashes(got)...) {
 		if !strings.Contains(entries[0], want) {
 			t.Errorf("the audit entry lacks %s: %s", want, entries[0])
 		}
@@ -183,10 +185,51 @@ func TestAChangedEntityIDIsRefusedLoggedAndAuditedEveryRound(t *testing.T) {
 	}
 }
 
-func TestAFetchThatFailsIsLoggedAndTriedAgainTheNextRound(t *testing.T) {
+func TestACertificateSetSharingNothingTrustedIsRefusedLoggedAndAuditedEveryRound(t *testing.T) {
 	e, c, idp := refreshEnv(t)
 	p := e.createSAML(t, idp, nil)
 	idp.RotateSigningKey(t, false)
+	c.Advance(25 * time.Hour)
+
+	e.refreshMetadata(t)
+	e.refreshMetadata(t)
+
+	got := e.getProvider(t, p.Slug)
+	if certificateHashes(got)[0] != certificateHashes(p)[0] || len(*got.IdpCertificates) != 1 || got.Version != p.Version ||
+		!got.IdpMetadataRefreshedAt.Equal(*p.IdpMetadataRefreshedAt) {
+		t.Errorf("a refused refresh changed the provider: certificates %v, version %d, refreshed at %v",
+			certificateHashes(got), got.Version, got.IdpMetadataRefreshedAt)
+	}
+	entries := e.auditJSON(t, "auth_provider.metadata_refresh_refused", p.Id.String())
+	if len(entries) != 2 {
+		t.Fatalf("%d metadata_refresh_refused entries after two rounds, want 2", len(entries))
+	}
+	for _, want := range []string{`"kind":"system"`, `no_trusted_certificate`} {
+		if !strings.Contains(entries[0], want) {
+			t.Errorf("the audit entry lacks %s: %s", want, entries[0])
+		}
+	}
+	if n := len(e.loggedAbout("none of the certificates", p.Slug)); n != 2 {
+		t.Errorf("%d log records about the refusal, want 2", n)
+	}
+	if e.signsInThrough(t, idp, p.Slug) {
+		t.Error("the instance accepted a signature by a certificate its trusted set did not vouch for")
+	}
+
+	// The admin settles it by editing the provider with the metadata.
+	if resp, err := e.admin.UpdateAuthProviderWithResponse(t.Context(), p.Slug, &management.UpdateAuthProviderParams{IfMatch: ptr(fmt.Sprintf(`"%d"`, p.Version))},
+		management.AuthProviderPatch{IdpMetadataUrl: ptr(*p.IdpMetadataUrl)}); err != nil || resp.JSON200 == nil {
+		t.Fatalf("editing the provider: %v, %v", resp.StatusCode(), err)
+	}
+	if !e.signsInThrough(t, idp, p.Slug) {
+		t.Error("a person signed by the new certificate could not sign in after the admin read the metadata")
+	}
+}
+
+func TestAFetchThatFailsIsLoggedAndTriedAgainTheNextRound(t *testing.T) {
+	e, c, idp := refreshEnv(t)
+	p := e.createSAML(t, idp, nil)
+	idp.RotateSigningKey(t, true)
 	idp.FailMetadata(503)
 	c.Advance(25 * time.Hour)
 
@@ -252,7 +295,7 @@ func TestTwoReplicasRefreshTheMetadataOnce(t *testing.T) {
 	// The identity provider answers slowly enough for the replicas' rounds to
 	// overlap: the one that finds the other refreshing leaves it the work.
 	idp.DelayMetadata(500 * time.Millisecond)
-	idp.RotateSigningKey(t, false)
+	idp.RotateSigningKey(t, true)
 	c.Advance(25 * time.Hour)
 
 	var wg sync.WaitGroup
