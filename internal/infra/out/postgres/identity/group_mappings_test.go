@@ -29,6 +29,9 @@ func TestGroupMappingStoreOperationsFailWhenTheDatabaseCannotBeReached(t *testin
 	if err := store.StoreGroupClaim(ctx, provider, member, nil, testkit.Start); err == nil {
 		t.Error("StoreGroupClaim succeeded")
 	}
+	if _, err := store.HasGroupClaim(ctx, provider, member); err == nil {
+		t.Error("HasGroupClaim succeeded")
+	}
 	if _, err := store.KnownGroups(ctx, provider); err == nil {
 		t.Error("KnownGroups succeeded")
 	}

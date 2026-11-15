@@ -29,6 +29,9 @@ type MappingStore interface {
 	// DeleteGroupClaim deletes what member last claimed at provider, and
 	// reports whether they had claimed anything.
 	DeleteGroupClaim(ctx context.Context, provider identity.ProviderID, member identity.MemberID) (bool, error)
+	// HasGroupClaim reports whether the provider ever stored a groups claim
+	// for member, an empty one included.
+	HasGroupClaim(ctx context.Context, provider identity.ProviderID, member identity.MemberID) (bool, error)
 	// KnownGroups returns the groups of every member who claimed groups at the
 	// provider or is a member of one of its SCIM groups: the union of both.
 	KnownGroups(ctx context.Context, provider identity.ProviderID) ([]GroupClaim, error)
