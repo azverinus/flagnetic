@@ -80,8 +80,9 @@ func (ck *check) chains(self string, c Configuration, reqs Requirements) {
 		return
 	}
 	up := graph.longestRequiring(self)
+	down := map[string][]string{}
 	for _, e := range edges {
-		path := append(slices.Clone(up), graph.longestRequired(e.flag, map[string]bool{})...)
+		path := append(slices.Clone(up), graph.longestRequired(e.flag, down)...)
 		if len(path)-1 > maxPrerequisiteDepth {
 			ck.add(e.pointer, "prerequisite_too_deep", "a chain of prerequisites has at most 5 steps",
 				map[string]any{"path": path, "max": maxPrerequisiteDepth})
@@ -109,24 +110,27 @@ func (g Requirements) path(from, to string, seen map[string]bool) []string {
 
 // longestRequired returns the longest chain of flag keys from from down its
 // requirements, from included; the first such chain in the order flags name
-// their requirements.
-func (g Requirements) longestRequired(from string, seen map[string]bool) []string {
-	if seen[from] {
-		return nil
+// their requirements. The graph must be acyclic. memo holds the chain found
+// for each flag already walked, so every flag is walked once however many
+// chains lead to it.
+func (g Requirements) longestRequired(from string, memo map[string][]string) []string {
+	if chain, ok := memo[from]; ok {
+		return chain
 	}
-	seen[from] = true
-	defer delete(seen, from)
 	var longest []string
 	for _, next := range g[from] {
-		if chain := g.longestRequired(next, seen); len(chain) > len(longest) {
+		if chain := g.longestRequired(next, memo); len(chain) > len(longest) {
 			longest = chain
 		}
 	}
-	return append([]string{from}, longest...)
+	chain := append([]string{from}, longest...)
+	memo[from] = chain
+	return chain
 }
 
 // longestRequiring returns the longest chain of flag keys requiring to, one
-// after the other, ending with to; the first such chain by flag key.
+// after the other, ending with to; the first such chain by flag key. The
+// graph must be acyclic; every flag is walked once.
 func (g Requirements) longestRequiring(to string) []string {
 	requiring := map[string][]string{}
 	keys := make([]string, 0, len(g))
@@ -139,22 +143,23 @@ func (g Requirements) longestRequiring(to string) []string {
 			requiring[req] = append(requiring[req], k)
 		}
 	}
-	var walk func(key string, seen map[string]bool) []string
-	walk = func(key string, seen map[string]bool) []string {
-		if seen[key] {
-			return nil
+	memo := map[string][]string{}
+	var walk func(key string) []string
+	walk = func(key string) []string {
+		if chain, ok := memo[key]; ok {
+			return chain
 		}
-		seen[key] = true
-		defer delete(seen, key)
 		var longest []string
 		for _, prev := range requiring[key] {
-			if chain := walk(prev, seen); len(chain) > len(longest) {
+			if chain := walk(prev); len(chain) > len(longest) {
 				longest = chain
 			}
 		}
-		return append(longest, key)
+		chain := append(slices.Clone(longest), key)
+		memo[key] = chain
+		return chain
 	}
-	return walk(to, map[string]bool{})
+	return walk(to)
 }
 
 // EnvironmentConfiguration is a flag's configuration with the key of its

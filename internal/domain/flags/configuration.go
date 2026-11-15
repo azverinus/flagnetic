@@ -124,6 +124,7 @@ const (
 const (
 	maxRules             = 50
 	maxOverrides         = 200
+	maxPrerequisites     = 50
 	maxNoteLength        = 200
 	maxPercentage        = 10_000
 	maxPrerequisiteDepth = 5
@@ -463,6 +464,10 @@ func (f Flag) hasVariation(key string) bool {
 // prerequisites checks a configuration's prerequisites, each naming a
 // different flag, and returns them, never nil.
 func (ck *check) prerequisites(in []Prerequisite, r Referents) []Prerequisite {
+	if len(in) > maxPrerequisites {
+		ck.add("/prerequisites", "too_many", "a configuration requires at most 50 flags", map[string]any{"max": maxPrerequisites})
+		return []Prerequisite{}
+	}
 	out := make([]Prerequisite, 0, len(in))
 	for i, p := range in {
 		pointer := "/prerequisites/" + strconv.Itoa(i)
