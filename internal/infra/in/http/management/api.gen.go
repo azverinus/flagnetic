@@ -11648,9 +11648,9 @@ type ClientInterface interface {
 	//
 	// Enables a subscription the platform disabled for failing
 	// persistently, or one a member disabled: its `disabled_reason` is
-	// cleared, `consecutive_failures` reset, and the day without a success
-	// that disables it again counts from now. Events are queued for it from
-	// here on; deliveries dropped when it was disabled stay dropped. An
+	// cleared, `consecutive_failures` reset, and the day of failures that
+	// disables it again counts from the next failed attempt. Events are queued
+	// for it from here on; deliveries dropped when it was disabled stay dropped. An
 	// enabled subscription is answered as it is, with no audit entry. It
 	// takes no `If-Match`: whatever the subscription became, the caller
 	// wants it sent events again.
@@ -18306,9 +18306,9 @@ func (c *Client) RedeliverWebhookDelivery(ctx context.Context, project ProjectKe
 //
 // Enables a subscription the platform disabled for failing
 // persistently, or one a member disabled: its `disabled_reason` is
-// cleared, `consecutive_failures` reset, and the day without a success
-// that disables it again counts from now. Events are queued for it from
-// here on; deliveries dropped when it was disabled stay dropped. An
+// cleared, `consecutive_failures` reset, and the day of failures that
+// disables it again counts from the next failed attempt. Events are queued
+// for it from here on; deliveries dropped when it was disabled stay dropped. An
 // enabled subscription is answered as it is, with no audit entry. It
 // takes no `If-Match`: whatever the subscription became, the caller
 // wants it sent events again.
@@ -33699,9 +33699,9 @@ type ClientWithResponsesInterface interface {
 	//
 	// Enables a subscription the platform disabled for failing
 	// persistently, or one a member disabled: its `disabled_reason` is
-	// cleared, `consecutive_failures` reset, and the day without a success
-	// that disables it again counts from now. Events are queued for it from
-	// here on; deliveries dropped when it was disabled stay dropped. An
+	// cleared, `consecutive_failures` reset, and the day of failures that
+	// disables it again counts from the next failed attempt. Events are queued
+	// for it from here on; deliveries dropped when it was disabled stay dropped. An
 	// enabled subscription is answered as it is, with no audit entry. It
 	// takes no `If-Match`: whatever the subscription became, the caller
 	// wants it sent events again.
@@ -56287,9 +56287,9 @@ func (c *ClientWithResponses) RedeliverWebhookDeliveryWithResponse(ctx context.C
 //
 // Enables a subscription the platform disabled for failing
 // persistently, or one a member disabled: its `disabled_reason` is
-// cleared, `consecutive_failures` reset, and the day without a success
-// that disables it again counts from now. Events are queued for it from
-// here on; deliveries dropped when it was disabled stay dropped. An
+// cleared, `consecutive_failures` reset, and the day of failures that
+// disables it again counts from the next failed attempt. Events are queued
+// for it from here on; deliveries dropped when it was disabled stay dropped. An
 // enabled subscription is answered as it is, with no audit entry. It
 // takes no `If-Match`: whatever the subscription became, the caller
 // wants it sent events again.

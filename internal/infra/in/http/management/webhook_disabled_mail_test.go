@@ -23,12 +23,14 @@ func failingReceiver(t *testing.T) *testkit.Receiver {
 }
 
 // disableByFailure makes the platform disable the project subscription
-// webhook: a day on, twenty-five attempts in a row fail.
+// webhook: twenty-five attempts in a row fail, and a day after the first
+// failure the next one fails too.
 func disableByFailure(t *testing.T, in smtpInstance, c *clock.Fake, dead *testkit.Receiver, project string, webhook openapi_types.UUID) {
 	t.Helper()
-	c.Advance(24 * time.Hour)
 	pings(t, in.admin, project, webhook, 25)
 	deliverAll(t, in.srv, dead, 25)
+	c.Advance(24 * time.Hour)
+	deliver(t, in.srv)
 	if w := subscription(t, in.admin, project, webhook); w.Enabled {
 		t.Fatalf("after twenty-five failures over a day the subscription is %+v, want it disabled", w)
 	}
@@ -37,13 +39,14 @@ func disableByFailure(t *testing.T, in smtpInstance, c *clock.Fake, dead *testki
 // disableInstanceByFailure is disableByFailure for an instance subscription.
 func disableInstanceByFailure(t *testing.T, in smtpInstance, c *clock.Fake, dead *testkit.Receiver, webhook openapi_types.UUID) {
 	t.Helper()
-	c.Advance(24 * time.Hour)
 	for range 25 {
 		if res := do(in.admin.TestInstanceWebhookWithResponse(t.Context(), webhook)); res.JSON202 == nil {
 			t.Fatalf("POST /webhooks/{webhook}/test = %d: %s", res.StatusCode(), res.Body)
 		}
 	}
 	deliverAll(t, in.srv, dead, 25)
+	c.Advance(24 * time.Hour)
+	deliver(t, in.srv)
 	if res := do(in.admin.GetInstanceWebhookWithResponse(t.Context(), webhook)); res.JSON200 == nil || res.JSON200.Enabled {
 		t.Fatalf("after twenty-five failures over a day the instance subscription is %s, want it disabled", res.Body)
 	}

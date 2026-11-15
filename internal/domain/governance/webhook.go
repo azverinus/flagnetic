@@ -126,8 +126,11 @@ type Webhook struct {
 	CreatedBy           *Author
 	LastSuccessAt       *time.Time
 	ConsecutiveFailures int
-	// EnabledAt is when the subscription was last enabled, from which its
-	// failures are judged.
+	// FailingSince is when the current streak of failures began: the time of
+	// its first failed attempt. Nil when the last attempt succeeded or the
+	// subscription was enabled since.
+	FailingSince *time.Time
+	// EnabledAt is when the subscription was last enabled.
 	EnabledAt time.Time
 	CreatedAt time.Time
 	UpdatedAt time.Time
