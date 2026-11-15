@@ -28,6 +28,9 @@ type SSOStore interface {
 	// LockMember returns the member, locked until the unit of work ends, and
 	// whether they hold a password; ErrNotFound when none has the identifier.
 	LockMember(ctx context.Context, member access.MemberID) (access.Member, bool, error)
+	// LockInstanceAdmins serializes, until the unit of work ends, every
+	// change that could leave the instance without an active instance admin.
+	LockInstanceAdmins(ctx context.Context) error
 	// PendingInvitation returns the latest invitation of member not consumed
 	// yet, expired or not, locked until the unit of work ends; ErrNotFound
 	// when the member has none.
@@ -212,6 +215,13 @@ func (s *SSO) OpenSession(ctx context.Context, in SSOSignIn) (secret.String, err
 	}
 	return cookie, s.record(ctx, now, governance.Request{Actor: memberActor(in.Member), ID: in.RequestID}, ssoRecord(
 		"auth.signed_in", in.Member, in.Method, in.Provider, nil))
+}
+
+// LockInstanceAdmins serializes, until the unit of work ends, every change
+// that could leave the instance without an active instance admin. It is
+// taken before a member's lock, the order every change of access takes.
+func (s *SSO) LockInstanceAdmins(ctx context.Context) error {
+	return s.store.LockInstanceAdmins(ctx)
 }
 
 // RevokeProviderSessions ends every session of member opened through the

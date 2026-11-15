@@ -185,6 +185,12 @@ type Members interface {
 	// the changes to their ways in are made one at a time; false when none has
 	// the identifier.
 	LockMember(ctx context.Context, member identity.MemberID) (MemberRecord, bool, error)
+	// LockInstanceAdmins serializes, until the unit of work ends, every
+	// change that could leave the instance without an active instance admin.
+	// A unit of work that may change a member's access takes it before the
+	// member's lock, the order every change of access takes, so two of them
+	// never wait on each other.
+	LockInstanceAdmins(ctx context.Context) error
 	// PasswordSetAt returns when the member set the password they hold, nil
 	// when they hold none.
 	PasswordSetAt(ctx context.Context, member identity.MemberID) (*time.Time, error)

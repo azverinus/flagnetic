@@ -177,6 +177,13 @@ func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 		return errIdentityNotFound
 	}
 	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
+		// Taking back what a provider brought may demote the member, which
+		// takes the instance admins' lock; it is taken before the member's,
+		// the order every change of access takes, so an unlink and a change
+		// to the same member made at once never deadlock.
+		if err := h.d.Members.LockInstanceAdmins(ctx); err != nil {
+			return err
+		}
 		m, found, err := h.d.Members.LockMember(ctx, cmd.Member)
 		if err != nil {
 			return err
