@@ -28,7 +28,11 @@ const saved: GroupMappings = {
 
 function routes(extra: Parameters<typeof fakeServer>[0] = {}) {
   return fakeServer({
-    "GET /instance/auth-providers/acme/group-mappings": { status: 200, body: saved },
+    "GET /instance/auth-providers/acme/group-mappings": {
+      status: 200,
+      body: saved,
+      headers: { ETag: '"1"' },
+    },
     "GET /projects": { status: 200, body: { items: projects } },
     "GET /roles": { status: 200, body: { items: roles } },
     ...extra,
@@ -107,6 +111,84 @@ describe("a provider's group mappings", () => {
     expect(sent).toEqual({ items: [{ group: "admins", instance_admin: true }] });
     // Saved: there is nothing left to save.
     expect(screen.getByRole("button", { name: "Save mappings" })).toBeDisabled();
+  });
+
+  it("names the version the rows were read at, and takes the new one from the answer", async () => {
+    const sent: (string | null)[] = [];
+    routes({
+      "PUT /instance/auth-providers/acme/group-mappings": (request) => {
+        sent.push(request.headers.get("If-Match"));
+        return {
+          status: 200,
+          body: { granted: 0, revoked: 0, kept_instance_admin: 0 },
+          headers: { ETag: '"2"' },
+        };
+      },
+    });
+    await render();
+    const user = userEvent.setup();
+
+    await user.type(group(1), "-leads");
+    await user.click(screen.getByRole("button", { name: "Save mappings" }));
+    await screen.findByRole("status");
+    await user.type(group(1), "-two");
+    await user.click(screen.getByRole("button", { name: "Save mappings" }));
+
+    await waitFor(() => expect(sent).toEqual(['"1"', '"2"']));
+  });
+
+  it("takes the mappings as they are now when someone changed them and the member has not edited", async () => {
+    let current: GroupMappings = saved;
+    let etag = '"1"';
+    routes({
+      "GET /instance/auth-providers/acme/group-mappings": () => ({
+        status: 200,
+        body: current,
+        headers: { ETag: etag },
+      }),
+    });
+    const { queryClient } = renderWithProviders(<GroupMappingsSection provider="acme" />);
+    expect(await screen.findByRole("group", { name: "Mapping 2" })).toBeVisible();
+
+    current = { items: [{ group: "admins", instance_admin: true }] };
+    etag = '"2"';
+    await queryClient.invalidateQueries();
+
+    await waitFor(() =>
+      expect(screen.queryByRole("group", { name: "Mapping 2" })).not.toBeInTheDocument(),
+    );
+    expect(group(1)).toHaveValue("admins");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps the member's edits and says so when someone changed the mappings meanwhile", async () => {
+    let current: GroupMappings = saved;
+    let etag = '"1"';
+    routes({
+      "GET /instance/auth-providers/acme/group-mappings": () => ({
+        status: 200,
+        body: current,
+        headers: { ETag: etag },
+      }),
+    });
+    const { queryClient } = renderWithProviders(<GroupMappingsSection provider="acme" />);
+    expect(await screen.findByRole("group", { name: "Mapping 2" })).toBeVisible();
+    const user = userEvent.setup();
+    await user.type(group(1), "-leads");
+
+    current = { items: [{ group: "admins", instance_admin: true }] };
+    etag = '"2"';
+    await queryClient.invalidateQueries();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "These mappings were changed by someone else after you opened them.",
+    );
+    expect(group(1)).toHaveValue("engineering-leads");
+    expect(screen.getByRole("button", { name: "Save mappings" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Show the current mappings" }));
+    expect(group(1)).toHaveValue("admins");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("reads the caller again after a save, as a mapping may have made or unmade them instance admin", async () => {

@@ -7176,6 +7176,10 @@ msgstr "Показать таблицей"
 msgid "Show flags stale for any of these reasons; none pressed shows every stale flag."
 msgstr "Показать флаги, устаревшие по любой из этих причин; если ни одна не выбрана, показываются все устаревшие флаги."
 
+#: src/components/group-mappings.tsx
+msgid "Show the current mappings"
+msgstr "Показать текущие сопоставления"
+
 #: src/components/app-shell.tsx
 msgid "Sidebar"
 msgstr "Боковая панель"
@@ -8782,6 +8786,10 @@ msgstr "Затем получила"
 #: src/components/not-found.tsx
 msgid "There is nothing at this address. The link may be old or mistyped."
 msgstr "По этому адресу ничего нет. Возможно, ссылка устарела или в ней опечатка."
+
+#: src/components/group-mappings.tsx
+msgid "These mappings were changed by someone else after you opened them. Saving would replace their change, so it is refused. Your edits are kept until you take the current mappings, which drops them."
+msgstr "Эти сопоставления изменил кто-то другой после того, как вы их открыли. Сохранение заменило бы его изменение, поэтому оно отклоняется. Ваши правки сохраняются, пока вы не возьмёте текущие сопоставления: тогда они пропадут."
 
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "They get a link to set their password, mailed to them when the instance can send mail and shown to you once otherwise. A role in a project, if you choose one, is granted when they accept."

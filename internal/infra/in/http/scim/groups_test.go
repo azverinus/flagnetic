@@ -96,11 +96,23 @@ func adminMapping(group string) management.GroupMapping {
 // mapGroups replaces the group mappings of provider.
 func (e env) mapGroups(t *testing.T, provider string, items ...management.GroupMapping) management.GroupMappingsRun {
 	t.Helper()
-	res, err := e.admin.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), provider, management.GroupMappings{Items: items})
+	res, err := e.admin.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), provider, &management.ReplaceAuthProviderGroupMappingsParams{IfMatch: e.mappingsVersion(t, provider)}, management.GroupMappings{Items: items})
 	if err != nil || res.JSON200 == nil {
 		t.Fatalf("replacing the group mappings of %s: %v, %d: %s", provider, err, res.StatusCode(), res.Body)
 	}
 	return *res.JSON200
+}
+
+// mappingsVersion returns the version of the provider's group mappings as an
+// If-Match value.
+func (e env) mappingsVersion(t *testing.T, provider string) *string {
+	t.Helper()
+	res, err := e.admin.GetAuthProviderGroupMappingsWithResponse(t.Context(), provider)
+	if err != nil || res.JSON200 == nil {
+		t.Fatalf("reading the group mappings of %s: %v, %d: %s", provider, err, res.StatusCode(), res.Body)
+	}
+	tag := res.HTTPResponse.Header.Get("ETag")
+	return &tag
 }
 
 // roles returns the roles member holds in project from source, sorted.

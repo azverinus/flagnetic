@@ -14511,6 +14511,17 @@ export type GetAuthProviderGroupMappingsResponse =
 
 export type ReplaceAuthProviderGroupMappingsData = {
   body: GroupMappings;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
   path: {
     /**
      * The auth provider's slug.
@@ -14552,9 +14563,17 @@ export type ReplaceAuthProviderGroupMappingsErrors = {
    */
   404: Problem;
   /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
    * The request is well formed but breaks a rule; `errors` names each field to fix.
    */
   422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
 };
 
 export type ReplaceAuthProviderGroupMappingsError =

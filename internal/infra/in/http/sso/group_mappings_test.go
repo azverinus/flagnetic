@@ -51,11 +51,71 @@ func mapGroupsAs(t *testing.T, c *management.ClientWithResponses, slug string, i
 	if items == nil {
 		items = []management.GroupMapping{}
 	}
-	res, err := c.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), slug, management.GroupMappings{Items: items})
+	res, err := c.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), slug,
+		&management.ReplaceAuthProviderGroupMappingsParams{IfMatch: mappingsVersion(t, c, slug)}, management.GroupMappings{Items: items})
 	if err != nil || res.JSON200 == nil {
 		t.Fatalf("replacing the group mappings of %s: %v, %d: %s", slug, err, res.StatusCode(), res.Body)
 	}
 	return *res.JSON200
+}
+
+// mappingsVersion returns the version of the provider's group mappings as an
+// If-Match value.
+func mappingsVersion(t *testing.T, c *management.ClientWithResponses, slug string) *string {
+	t.Helper()
+	res, err := c.GetAuthProviderGroupMappingsWithResponse(t.Context(), slug)
+	if err != nil || res.JSON200 == nil {
+		t.Fatalf("reading the group mappings of %s: %v, %d: %s", slug, err, res.StatusCode(), res.Body)
+	}
+	tag := res.HTTPResponse.Header.Get("ETag")
+	if tag == "" {
+		t.Fatalf("the group mappings of %s carry no ETag", slug)
+	}
+	return &tag
+}
+
+func TestAReplacementOfGroupMappingsNamesTheVersionItRead(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	slug := e.forged(t, idp, nil)
+	project := e.project(t)
+	put := func(ifMatch *string, items ...management.GroupMapping) *management.ReplaceAuthProviderGroupMappingsResponse {
+		t.Helper()
+		res, err := e.admin.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), slug,
+			&management.ReplaceAuthProviderGroupMappingsParams{IfMatch: ifMatch}, management.GroupMappings{Items: items})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+
+	// Two admins read the same list; the first replaces it.
+	stale := mappingsVersion(t, e.admin, slug)
+	first := put(stale, adminMapping("contractors"))
+	if first.JSON200 == nil {
+		t.Fatalf("the first replacement: %d: %s", first.StatusCode(), first.Body)
+	}
+	if got := first.HTTPResponse.Header.Get("ETag"); got == "" || got == *stale {
+		t.Errorf("a replacement that changed the list answers ETag %q, want a version after %s", got, *stale)
+	}
+
+	// The second, who read it before, is refused instead of putting back
+	// what the first removed.
+	second := put(stale, projectMapping("eng", project, "viewer"))
+	wantProblem(t, "a replacement on a stale version", second.StatusCode(), second.Body, http.StatusPreconditionFailed, "version_mismatch")
+	missing := put(nil)
+	wantProblem(t, "a replacement without a version", missing.StatusCode(), missing.Body, http.StatusPreconditionRequired, "precondition_required")
+	got, err := e.admin.GetAuthProviderGroupMappingsWithResponse(t.Context(), slug)
+	if err != nil || got.JSON200 == nil || len(got.JSON200.Items) != 1 || got.JSON200.Items[0].Group != "contractors" {
+		t.Fatalf("after the refusals: %v, %s", err, got.Body)
+	}
+
+	// A replacement that changes nothing leaves the version where it is.
+	current := mappingsVersion(t, e.admin, slug)
+	same := put(current, adminMapping("contractors"))
+	if same.JSON200 == nil || same.HTTPResponse.Header.Get("ETag") != *current {
+		t.Errorf("an unchanged replacement: %d, ETag %q, want %s", same.StatusCode(), same.HTTPResponse.Header.Get("ETag"), *current)
+	}
 }
 
 // grantsOf returns the grants member holds in project.
@@ -582,7 +642,8 @@ func TestGroupMappingsAreListedInOrderAndValidated(t *testing.T) {
 		"a blank group":                projectMapping("  ", alpha, "viewer"),
 	} {
 		t.Run(name, func(t *testing.T) {
-			res, err := e.admin.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), slug, management.GroupMappings{Items: []management.GroupMapping{m}})
+			res, err := e.admin.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), slug,
+				&management.ReplaceAuthProviderGroupMappingsParams{IfMatch: mappingsVersion(t, e.admin, slug)}, management.GroupMappings{Items: []management.GroupMapping{m}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -598,7 +659,7 @@ func TestGroupMappingsAreListedInOrderAndValidated(t *testing.T) {
 		if err != nil || res.StatusCode() != http.StatusNotFound {
 			t.Errorf("GET: %v, %d", err, res.StatusCode())
 		}
-		put, err := e.admin.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), "no-such-provider", management.GroupMappings{Items: []management.GroupMapping{}})
+		put, err := e.admin.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), "no-such-provider", &management.ReplaceAuthProviderGroupMappingsParams{}, management.GroupMappings{Items: []management.GroupMapping{}})
 		if err != nil || put.StatusCode() != http.StatusNotFound {
 			t.Errorf("PUT: %v, %d", err, put.StatusCode())
 		}
@@ -609,7 +670,7 @@ func TestGroupMappingsAreListedInOrderAndValidated(t *testing.T) {
 		if res, err := member.GetAuthProviderGroupMappingsWithResponse(t.Context(), slug); err != nil || res.StatusCode() != http.StatusForbidden {
 			t.Errorf("GET: %v, %d", err, res.StatusCode())
 		}
-		put, err := member.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), slug, management.GroupMappings{Items: []management.GroupMapping{}})
+		put, err := member.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), slug, &management.ReplaceAuthProviderGroupMappingsParams{}, management.GroupMappings{Items: []management.GroupMapping{}})
 		if err != nil || put.StatusCode() != http.StatusForbidden {
 			t.Errorf("PUT: %v, %d", err, put.StatusCode())
 		}

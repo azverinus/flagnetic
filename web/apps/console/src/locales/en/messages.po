@@ -7176,6 +7176,10 @@ msgstr "Show as table"
 msgid "Show flags stale for any of these reasons; none pressed shows every stale flag."
 msgstr "Show flags stale for any of these reasons; none pressed shows every stale flag."
 
+#: src/components/group-mappings.tsx
+msgid "Show the current mappings"
+msgstr "Show the current mappings"
+
 #: src/components/app-shell.tsx
 msgid "Sidebar"
 msgstr "Sidebar"
@@ -8782,6 +8786,10 @@ msgstr "Then exposed to"
 #: src/components/not-found.tsx
 msgid "There is nothing at this address. The link may be old or mistyped."
 msgstr "There is nothing at this address. The link may be old or mistyped."
+
+#: src/components/group-mappings.tsx
+msgid "These mappings were changed by someone else after you opened them. Saving would replace their change, so it is refused. Your edits are kept until you take the current mappings, which drops them."
+msgstr "These mappings were changed by someone else after you opened them. Saving would replace their change, so it is refused. Your edits are kept until you take the current mappings, which drops them."
 
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "They get a link to set their password, mailed to them when the instance can send mail and shown to you once otherwise. A role in a project, if you choose one, is granted when they accept."

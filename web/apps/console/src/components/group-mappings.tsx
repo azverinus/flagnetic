@@ -25,6 +25,7 @@ import {
   replaceGroupMappings,
   type RowErrors,
   runSummary,
+  type SavedMappings,
   sameMappings,
 } from "@/lib/group-mappings";
 import { formRefusal } from "@/lib/problem-messages";
@@ -79,23 +80,40 @@ function GroupMappingsForm({
   roles,
 }: {
   provider: string;
-  saved: GroupMappings;
+  saved: SavedMappings;
   projects: readonly Project[];
   roles: readonly Role[];
 }) {
   const { i18n, t } = useLingui();
   const queryClient = useQueryClient();
   const [rows, setRows] = useState<MappingRow[]>(() => mappingRows(saved.items));
+  // The list the rows were built from: a save names its version, so a list
+  // that changed meanwhile is refused instead of put back as the member saw it.
+  const [base, setBase] = useState(saved);
+  const edited = !sameMappings(rows, base.items);
+  const moved = saved.etag !== base.etag;
+  if (moved && (!edited || sameMappings(rows, saved.items))) {
+    // Nothing of the member's is lost by taking the list as it is now.
+    setBase(saved);
+    if (edited === false) setRows(mappingRows(saved.items));
+  }
+  const changedMeanwhile = moved && edited && !sameMappings(rows, saved.items);
   // What the form found wrong, once a save was tried.
   const [errors, setErrors] = useState<(RowErrors | undefined)[]>();
   const [summary, setSummary] = useState<string>();
   const dirty = !sameMappings(rows, saved.items);
 
   const save = useMutation({
-    mutationFn: (body: GroupMappings) => replaceGroupMappings(provider, body),
+    mutationFn: (body: GroupMappings) => replaceGroupMappings(provider, body, base.etag),
     meta: { toast: false },
-    onSuccess: (run, body) => {
-      queryClient.setQueryData(groupMappingsQuery(provider).queryKey, body);
+    onError: () => {
+      // A refusal may be the list having moved on: read it, so the form can say so.
+      void queryClient.invalidateQueries({ queryKey: groupMappingsQuery(provider).queryKey });
+    },
+    onSuccess: ({ run, etag }, body) => {
+      const next = { items: body.items, etag };
+      queryClient.setQueryData(groupMappingsQuery(provider).queryKey, next);
+      setBase(next);
       // Members' grants changed under every project.
       void queryClient.invalidateQueries({ queryKey: projectsQuery.queryKey });
       void queryClient.invalidateQueries({ queryKey: ["members"] });
@@ -173,6 +191,28 @@ function GroupMappingsForm({
           demoted this way.
         </Trans>
       </p>
+      {changedMeanwhile ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
+        >
+          <Trans>
+            These mappings were changed by someone else after you opened them. Saving would replace
+            their change, so it is refused. Your edits are kept until you take the current
+            mappings, which drops them.
+          </Trans>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setBase(saved);
+              edit(mappingRows(saved.items));
+            }}
+          >
+            <Trans>Show the current mappings</Trans>
+          </Button>
+        </div>
+      ) : null}
       <FormRefusal refusal={formRefusal(save.error, pointers)} />
       {summary ? (
         <p role="status" className="rounded-md border bg-muted p-3 text-sm">
@@ -181,8 +221,15 @@ function GroupMappingsForm({
       ) : null}
       <FormActions
         submitLabel={save.isPending ? <Trans>Saving…</Trans> : <Trans>Save mappings</Trans>}
-        pending={save.isPending || !dirty}
-        onCancel={dirty ? () => edit(mappingRows(saved.items)) : undefined}
+        pending={save.isPending || !dirty || changedMeanwhile}
+        onCancel={
+          dirty
+            ? () => {
+                setBase(saved);
+                edit(mappingRows(saved.items));
+              }
+            : undefined
+        }
       />
     </form>
   );
