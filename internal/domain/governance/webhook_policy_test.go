@@ -11,37 +11,36 @@ import (
 
 var someWebhook = id.MustParse[governance.Webhook]("0190d2a0-0000-7000-8000-0000000000f5")
 
-// failing returns an enabled subscription enabled at occurred that has
-// failed failures times in a row since.
+// failing returns an enabled subscription enabled at occurred whose current
+// streak of failures started then and has failed failures times in a row.
 func failing(failures int) governance.Webhook {
-	return governance.Webhook{
+	w := governance.Webhook{
 		ID: someWebhook, Project: someProject,
 		WebhookInput:        governance.WebhookInput{Name: "SIEM", URL: "https://receiver.example/hook", Events: []string{"*"}, Enabled: true},
 		ConsecutiveFailures: failures, EnabledAt: occurred, CreatedAt: occurred, UpdatedAt: occurred, Version: 3,
 	}
+	if failures > 0 {
+		started := occurred
+		w.FailingSince = &started
+	}
+	return w
 }
 
-func TestASubscriptionFailingTwentyFiveTimesWithNoSuccessForADayIsPersistentlyFailing(t *testing.T) {
+func TestASubscriptionFailingTwentyFiveTimesForADayIsPersistentlyFailing(t *testing.T) {
 	day := 24 * time.Hour
-	success := occurred.Add(2 * time.Hour)
 	for _, c := range []struct {
-		name        string
-		failures    int
-		lastSuccess *time.Time
-		at          time.Time
-		want        bool
+		name     string
+		failures int
+		at       time.Time
+		want     bool
 	}{
-		{"both reached", 25, nil, occurred.Add(day), true},
-		{"more failures, longer", 40, nil, occurred.Add(3 * day), true},
-		{"one failure short", 24, nil, occurred.Add(3 * day), false},
-		{"a day not yet over since the enable", 25, nil, occurred.Add(day - time.Second), false},
-		{"a success within the day", 25, &success, occurred.Add(day), false},
-		{"a day since the last success", 25, &success, success.Add(day), true},
+		{"both reached", 25, occurred.Add(day), true},
+		{"more failures, longer", 40, occurred.Add(3 * day), true},
+		{"one failure short", 24, occurred.Add(3 * day), false},
+		{"a day not yet over since the first failure", 25, occurred.Add(day - time.Second), false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			w := failing(c.failures)
-			w.LastSuccessAt = c.lastSuccess
-			if got := w.PersistentlyFailing(c.at); got != c.want {
+			if got := failing(c.failures).PersistentlyFailing(c.at); got != c.want {
 				t.Errorf("PersistentlyFailing = %v, want %v", got, c.want)
 			}
 		})
@@ -50,6 +49,29 @@ func TestASubscriptionFailingTwentyFiveTimesWithNoSuccessForADayIsPersistentlyFa
 	disabled.Enabled = false
 	if disabled.PersistentlyFailing(occurred.Add(2 * day)) {
 		t.Error("a disabled subscription is judged persistently failing again")
+	}
+	noStreak := failing(30)
+	noStreak.FailingSince = nil
+	if noStreak.PersistentlyFailing(occurred.Add(2 * day)) {
+		t.Error("a subscription with no streak start is judged persistently failing")
+	}
+}
+
+// A subscription that had no event for days (a security channel, an audit
+// archive) has had no success for long, yet a receiver down for ten minutes
+// is an outage, not a dead receiver.
+func TestAQuietSubscriptionIsNotDisabledByAShortOutage(t *testing.T) {
+	quietFor := 5 * 24 * time.Hour
+	outage := occurred.Add(quietFor)
+	success := occurred.Add(time.Hour)
+	w := failing(25)
+	w.LastSuccessAt = &success
+	w.FailingSince = &outage
+	if w.PersistentlyFailing(outage.Add(10 * time.Minute)) {
+		t.Error("a ten-minute outage of a quiet subscription disables it")
+	}
+	if !w.PersistentlyFailing(outage.Add(24 * time.Hour)) {
+		t.Error("a day of failures does not disable it")
 	}
 }
 
@@ -67,7 +89,7 @@ func TestThePlatformDisablesASubscriptionWithItsReason(t *testing.T) {
 func TestEnablingClearsTheReasonAndStartsTheWindowAgain(t *testing.T) {
 	at := occurred.Add(48 * time.Hour)
 	got, changed := failing(25).DisableForFailure(occurred.Add(25 * time.Hour)).Enable(at)
-	if !changed || !got.Enabled || got.DisabledReason != "" || got.ConsecutiveFailures != 0 || !got.EnabledAt.Equal(at) {
+	if !changed || !got.Enabled || got.DisabledReason != "" || got.ConsecutiveFailures != 0 || got.FailingSince != nil || !got.EnabledAt.Equal(at) {
 		t.Errorf("enabled %+v", got)
 	}
 	if got.Version != 5 || !got.UpdatedAt.Equal(at) {

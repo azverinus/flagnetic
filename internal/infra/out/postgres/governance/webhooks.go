@@ -78,7 +78,7 @@ func (s *Webhooks) EnvironmentKeys(ctx context.Context, project workspace.Projec
 const webhookColumns = `w.id, w.project_id, w.name, w.url, w.events, w.environments, w.enabled, w.disabled_reason,
 	w.secret_sealed, w.previous_secret_sealed, w.previous_secret_expires_at, w.created_by_member_id,
 	w.created_by_token_id, coalesce(m.display_name, t.name, ''), w.last_success_at, w.consecutive_failures,
-	w.enabled_at, w.created_at, w.updated_at, w.version`
+	w.failing_since, w.enabled_at, w.created_at, w.updated_at, w.version`
 
 const webhookFrom = ` FROM webhook_subscriptions w
 	LEFT JOIN members m ON m.id = w.created_by_member_id
@@ -86,15 +86,15 @@ const webhookFrom = ` FROM webhook_subscriptions w
 
 func scanWebhook(row pgx.Row) (governance.Webhook, error) {
 	var (
-		w                        governance.Webhook
-		wk                       [16]byte
-		pk, member, token        *[16]byte
-		reason, previous         *string
-		creatorName              string
-		previousExpires, success *time.Time
+		w                                      governance.Webhook
+		wk                                     [16]byte
+		pk, member, token                      *[16]byte
+		reason, previous                       *string
+		creatorName                            string
+		previousExpires, success, failingSince *time.Time
 	)
 	if err := row.Scan(&wk, &pk, &w.Name, &w.URL, &w.Events, &w.Environments, &w.Enabled, &reason, &w.SealedSecret,
-		&previous, &previousExpires, &member, &token, &creatorName, &success, &w.ConsecutiveFailures, &w.EnabledAt,
+		&previous, &previousExpires, &member, &token, &creatorName, &success, &w.ConsecutiveFailures, &failingSince, &w.EnabledAt,
 		&w.CreatedAt, &w.UpdatedAt, &w.Version); err != nil {
 		return w, err
 	}
@@ -116,7 +116,7 @@ func scanWebhook(row pgx.Row) (governance.Webhook, error) {
 		t := id.FromBytes[access.APIToken](*token)
 		w.CreatedBy = &governance.Author{Token: &t, Name: creatorName}
 	}
-	w.PreviousSecretExpiresAt, w.LastSuccessAt = utc(previousExpires), utc(success)
+	w.PreviousSecretExpiresAt, w.LastSuccessAt, w.FailingSince = utc(previousExpires), utc(success), utc(failingSince)
 	w.EnabledAt, w.CreatedAt, w.UpdatedAt = w.EnabledAt.UTC(), w.CreatedAt.UTC(), w.UpdatedAt.UTC()
 	return w, nil
 }
@@ -230,9 +230,10 @@ func (s *Webhooks) DeleteWebhook(ctx context.Context, project workspace.ProjectI
 func (s *Webhooks) EnableWebhook(ctx context.Context, w governance.Webhook) error {
 	_, err := s.db(ctx).Exec(ctx, `
 		UPDATE webhook_subscriptions
-		SET enabled = $3, disabled_reason = $4, consecutive_failures = $5, enabled_at = $6, updated_at = $7, version = $8
+		SET enabled = $3, disabled_reason = $4, consecutive_failures = $5, failing_since = $6, enabled_at = $7,
+		    updated_at = $8, version = $9
 		WHERE `+ofScope("project_id")+` AND id = $2`,
-		optional(w.Project), w.ID.Bytes(), w.Enabled, reasonOf(w), w.ConsecutiveFailures, w.EnabledAt, w.UpdatedAt, w.Version)
+		optional(w.Project), w.ID.Bytes(), w.Enabled, reasonOf(w), w.ConsecutiveFailures, w.FailingSince, w.EnabledAt, w.UpdatedAt, w.Version)
 	if err != nil {
 		return fmt.Errorf("enabling a webhook subscription: %w", err)
 	}

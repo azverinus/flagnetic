@@ -177,13 +177,18 @@ func (s *Deliveries) RecordAttempt(ctx context.Context, delivery governance.Deli
 
 // CountAttempt moves the subscription's counters by an attempt made at at.
 func (s *Deliveries) CountAttempt(ctx context.Context, webhook governance.WebhookID, succeeded bool, at time.Time) error {
-	query := `UPDATE webhook_subscriptions SET consecutive_failures = consecutive_failures + 1 WHERE id = $1`
-	args := []any{webhook.Bytes()}
+	// The first failure of a streak starts it; a success ends it. A streak
+	// starts on a count of zero even when failing_since is still set, and a
+	// count with no failing_since gets one: an earlier version counted and
+	// reset failures without writing it.
+	query := `UPDATE webhook_subscriptions
+		SET consecutive_failures = consecutive_failures + 1,
+		    failing_since = CASE WHEN consecutive_failures = 0 THEN $2 ELSE coalesce(failing_since, $2) END
+		WHERE id = $1`
 	if succeeded {
-		query = `UPDATE webhook_subscriptions SET last_success_at = $2, consecutive_failures = 0 WHERE id = $1`
-		args = append(args, at)
+		query = `UPDATE webhook_subscriptions SET last_success_at = $2, consecutive_failures = 0, failing_since = NULL WHERE id = $1`
 	}
-	if _, err := s.db(ctx).Exec(ctx, query, args...); err != nil {
+	if _, err := s.db(ctx).Exec(ctx, query, webhook.Bytes(), at); err != nil {
 		return fmt.Errorf("counting a delivery attempt: %w", err)
 	}
 	return nil

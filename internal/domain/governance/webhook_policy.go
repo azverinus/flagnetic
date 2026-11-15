@@ -12,11 +12,13 @@ const (
 	// DisableAfterFailures is how many attempts in a row must fail before
 	// the platform disables a subscription.
 	DisableAfterFailures = 25
-	// DisableAfterSilence is how long a subscription must have gone without
-	// a success, counted from its last success or its last enable, before
-	// the platform disables it. Twenty-five failures come fast when a busy
-	// project's receiver is down for minutes; a day without one success is
-	// what tells a dead receiver from an outage.
+	// DisableAfterSilence is how long a subscription must have been failing,
+	// counted from the first failed attempt of its current streak, before the
+	// platform disables it. Twenty-five failures come fast when a busy
+	// project's receiver is down for minutes; a day of failures with no
+	// success between is what tells a dead receiver from an outage. It is not
+	// counted from the last success: a subscription with no event for a day
+	// would be disabled by the first outage.
 	DisableAfterSilence = 24 * time.Hour
 	// DeliveryRetention is how long a delivery that is no longer pending is
 	// kept in its subscription's log.
@@ -44,14 +46,11 @@ var ErrPlatformDisabled = apperrors.Conflict("webhook_disabled",
 	"the platform disabled the webhook subscription for failing persistently; enable it with POST .../enable")
 
 // PersistentlyFailing reports whether the platform disables w at now: it is
-// enabled, its last DisableAfterFailures attempts or more failed, and it has
-// had no success for DisableAfterSilence since it was last enabled.
+// enabled, its last DisableAfterFailures attempts or more failed, and the
+// streak of failures began DisableAfterSilence ago or more.
 func (w Webhook) PersistentlyFailing(now time.Time) bool {
-	alive := w.EnabledAt
-	if w.LastSuccessAt != nil && w.LastSuccessAt.After(alive) {
-		alive = *w.LastSuccessAt
-	}
-	return w.Enabled && w.ConsecutiveFailures >= DisableAfterFailures && now.Sub(alive) >= DisableAfterSilence
+	return w.Enabled && w.ConsecutiveFailures >= DisableAfterFailures && w.FailingSince != nil &&
+		now.Sub(*w.FailingSince) >= DisableAfterSilence
 }
 
 // DisableForFailure returns w disabled by the platform at now, as its next
@@ -62,14 +61,14 @@ func (w Webhook) DisableForFailure(now time.Time) Webhook {
 	return w
 }
 
-// Enable returns w enabled at now, with no reason, no failures and its
-// window starting again, and whether that changed it: an enabled
+// Enable returns w enabled at now, with no reason, no failures and no streak
+// of them, and whether that changed it: an enabled
 // subscription is left as it is.
 func (w Webhook) Enable(now time.Time) (Webhook, bool) {
 	if w.Enabled {
 		return w, false
 	}
-	w.Enabled, w.DisabledReason, w.ConsecutiveFailures, w.EnabledAt = true, "", 0, now
+	w.Enabled, w.DisabledReason, w.ConsecutiveFailures, w.FailingSince, w.EnabledAt = true, "", 0, nil, now
 	w.UpdatedAt, w.Version = now, w.Version+1
 	return w, true
 }

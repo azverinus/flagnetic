@@ -66,11 +66,7 @@ func TestAPersistentlyFailingSubscriptionIsDisabledAndEnabledAgain(t *testing.T)
 	srv := testkit.StartServer(t, reachable, testkit.WithClock(c))
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
-	replies := make([]testkit.Reply, 25, 26)
-	for i := range replies {
-		replies[i] = testkit.Reply{Status: http.StatusInternalServerError, Body: "down"}
-	}
-	dead := testkit.StartReceiver(t, append(replies, testkit.Reply{})...)
+	dead := failingReceiver(t)
 	failing := receiving(t, admin, p.Key, dead, "flag.created")
 	watcher := testkit.StartReceiver(t)
 	watching := receiving(t, admin, p.Key, watcher, "webhook.disabled")
@@ -83,23 +79,31 @@ func TestAPersistentlyFailingSubscriptionIsDisabledAndEnabledAgain(t *testing.T)
 		t.Fatalf("PATCH enabled false = %d: %s", res.StatusCode(), res.Body)
 	}
 
-	// A day on, twenty-five attempts in a row fail.
-	c.Advance(24 * time.Hour)
+	// A subscription quiet for days is not disabled by a receiver that is
+	// down for minutes: twenty-five attempts fail and it stays enabled.
+	c.Advance(5 * 24 * time.Hour)
 	queued := pings(t, admin, p.Key, failing.Id, 25)
 	deliverAll(t, srv, dead, 25)
+	c.Advance(10 * time.Minute)
+	if w := subscription(t, admin, p.Key, failing.Id); !w.Enabled || w.ConsecutiveFailures != 25 {
+		t.Fatalf("after a ten-minute outage the subscription is %+v, want enabled with twenty-five failures", w)
+	}
+	// A day after the first failure, the next attempt fails again.
+	c.Advance(24 * time.Hour)
+	deliver(t, srv)
 
 	disabled := subscription(t, admin, p.Key, failing.Id)
 	if disabled.Enabled || disabled.DisabledReason == nil || *disabled.DisabledReason != management.WebhookDisabledReasonPersistentFailure ||
-		disabled.ConsecutiveFailures != 25 {
-		t.Fatalf("after twenty-five failures over a day the subscription is %+v", disabled)
+		disabled.ConsecutiveFailures <= 25 {
+		t.Fatalf("after failing for a day the subscription is %+v", disabled)
 	}
 	if disabled.Version != 2 {
 		t.Errorf("the disabled subscription is at version %d, want 2", disabled.Version)
 	}
 	for _, d := range queued {
 		if got := deliveryOf(t, admin, p.Key, failing.Id, d.Id); got.Status != management.WebhookDeliveryStatusDropped ||
-			got.NextAttemptAt != nil || len(got.Attempts) != 1 {
-			t.Errorf("a pending ping is %+v, want dropped after its one attempt", got)
+			got.NextAttemptAt != nil || len(got.Attempts) == 0 {
+			t.Errorf("a pending ping is %+v, want dropped after its attempts", got)
 		}
 	}
 
@@ -128,8 +132,10 @@ func TestAPersistentlyFailingSubscriptionIsDisabledAndEnabledAgain(t *testing.T)
 	if body := string(calls[0].Body); strings.Contains(body, dead.URL) || strings.Contains(body, failing.Secret) {
 		t.Errorf("webhook.disabled tells the other subscription the target or the secret: %s", body)
 	}
-	if n := len(dead.Calls()); n != 25 {
-		t.Errorf("the disabled subscription was called %d times, want its twenty-five attempts", n)
+	callsAtDisable := len(dead.Calls())
+	deliver(t, srv)
+	if n := len(dead.Calls()); n != callsAtDisable {
+		t.Errorf("the disabled subscription was called %d more times", n-callsAtDisable)
 	}
 	if log := deliveredTypes(t, admin, p.Key, failing.Id); slices.Contains(log, "flag.created") {
 		t.Errorf("the disabled subscription was queued %v", log)
@@ -162,8 +168,13 @@ func TestAPersistentlyFailingSubscriptionIsDisabledAndEnabledAgain(t *testing.T)
 	}
 	webhookEntry(t, srv, "webhook.enabled", failing)
 
-	// The receiver is back: what is queued from now on reaches it, and the
-	// dropped pings stay dropped.
+	// The receiver is back, at another address: what is queued from now on
+	// reaches it, and the dropped pings stay dropped.
+	back := testkit.StartReceiver(t)
+	if res := do(admin.UpdateWebhookWithResponse(t.Context(), p.Key, failing.Id,
+		&management.UpdateWebhookParams{IfMatch: ifMatch(enabled.Version)}, management.WebhookPatch{Url: &back.URL})); res.JSON200 == nil {
+		t.Fatalf("PATCH url = %d: %s", res.StatusCode(), res.Body)
+	}
 	resumed := ping(t, admin, p.Key, failing.Id)
 	deliver(t, srv)
 	if got := deliveryOf(t, admin, p.Key, failing.Id, resumed.Id); got.Status != management.WebhookDeliveryStatusSucceeded {
@@ -218,10 +229,9 @@ func TestAMemberDisabledSubscriptionIsRotatedAndEnabledWithItsWindowStartingAgai
 	}
 }
 
-// Twenty-five failures alone disable nothing: a success, or the enable,
-// within the day says the receiver is alive, however many attempts failed
-// since.
-func TestASubscriptionIsNotDisabledWithinADayOfItsEnable(t *testing.T) {
+// Twenty-five failures alone disable nothing: they must have gone on for a
+// day since the first of them, however many attempts failed meanwhile.
+func TestASubscriptionIsNotDisabledWithinADayOfItsFirstFailure(t *testing.T) {
 	c := clock.NewFake(time.Now().UTC())
 	srv := testkit.StartServer(t, reachable, testkit.WithClock(c))
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
@@ -236,10 +246,16 @@ func TestASubscriptionIsNotDisabledWithinADayOfItsEnable(t *testing.T) {
 		t.Fatalf("within the day the subscription is %+v, want enabled with twenty-five failures", still)
 	}
 
-	c.Advance(23 * time.Hour)
-	deliverAll(t, srv, r, 50)
+	c.Advance(24*time.Hour - time.Minute)
+	deliver(t, srv)
+	if still := subscription(t, admin, p.Key, created.Id); !still.Enabled {
+		t.Fatalf("a minute short of a day after its first failure the subscription is %+v, want enabled", still)
+	}
+
+	c.Advance(time.Minute)
+	deliver(t, srv)
 	if disabled := subscription(t, admin, p.Key, created.Id); disabled.Enabled || disabled.DisabledReason == nil {
-		t.Errorf("a day after its enable the subscription is %+v, want disabled", disabled)
+		t.Errorf("a day after its first failure the subscription is %+v, want disabled", disabled)
 	}
 }
 
