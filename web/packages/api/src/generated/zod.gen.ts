@@ -1966,7 +1966,7 @@ export const zFlagConfigurationPut = z.object({
   on: z.boolean(),
   off_variation: z.string(),
   fallthrough: z.string(),
-  prerequisites: z.array(zPrerequisite).optional(),
+  prerequisites: z.array(zPrerequisite).max(50).optional(),
   overrides: z.array(zOverrideInput).max(200).optional(),
   rules: z.array(zRuleInput).max(50).optional(),
 });

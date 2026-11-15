@@ -11030,6 +11030,7 @@ components:
           type: string
         prerequisites:
           type: array
+          maxItems: 50
           items:
             $ref: "#/components/schemas/Prerequisite"
         overrides:

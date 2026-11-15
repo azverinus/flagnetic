@@ -717,3 +717,121 @@ func TestApplyingAProposalKeepsTheSaltItGaveARuleItMadeARollout(t *testing.T) {
 		t.Errorf("applied = %+v, %v; want the rule with the salt it was proposed with %q", applied.Rules, err, proposed.Rules[0].Serve.Salt)
 	}
 }
+
+// layered returns the flags of layers layers of width flags each, keyed
+// "l<layer>_<n>", and the requirements in which every flag of a layer
+// requires the whole next layer.
+func layered(layers, width int) ([]flags.Flag, flags.Requirements) {
+	key := func(l, n int) string { return fmt.Sprintf("l%d_%d", l, n) }
+	var fs []flags.Flag
+	reqs := flags.Requirements{}
+	for l := 1; l <= layers; l++ {
+		for n := 0; n < width; n++ {
+			fs = append(fs, mustFlag(input(key(l, n), flags.TypeBoolean)))
+			if l < layers {
+				for m := 0; m < width; m++ {
+					reqs[key(l, n)] = append(reqs[key(l, n)], key(l+1, m))
+				}
+			}
+		}
+	}
+	return fs, reqs
+}
+
+func requireLayer(layer, width int) []flags.Prerequisite {
+	var out []flags.Prerequisite
+	for n := 0; n < width; n++ {
+		out = append(out, flags.Prerequisite{Flag: fmt.Sprintf("l%d_%d", layer, n), Variation: "true"})
+	}
+	return out
+}
+
+func TestAWideLayeredGraphOfPrerequisitesIsCheckedInLinearTime(t *testing.T) {
+	for name, tc := range map[string]struct {
+		layers  int
+		tooDeep bool
+	}{
+		"five layers of fifty fit":     {5, false},
+		"six layers of fifty are deep": {6, true},
+	} {
+		fs, reqs := layered(tc.layers, 50)
+		r := referents(reqs)
+		r.Flags = append(r.Flags, fs...)
+		in := base()
+		in.Prerequisites = requireLayer(1, 50)
+
+		start := time.Now()
+		_, _, err := initial().Replace(copyFlag, in, r, mint, flags.Write{By: &bob, Now: now})
+		if took := time.Since(start); took > 2*time.Second {
+			t.Errorf("%s: the check took %v, want well under 2s", name, took)
+		}
+		if !tc.tooDeep {
+			if err != nil {
+				t.Errorf("%s: %v", name, err)
+			}
+			continue
+		}
+		got := chainViolations(t, err)
+		if len(got) != 50 || !strings.Contains(got[0], "prerequisite_too_deep") {
+			t.Errorf("%s: violations = %v, want 50 prerequisite_too_deep", name, got)
+		}
+	}
+}
+
+func TestTheFlagAtTheBottomOfAWideLayeredGraphIsCheckedInLinearTime(t *testing.T) {
+	for name, tc := range map[string]struct {
+		layers  int
+		tooDeep bool
+	}{
+		"under four layers of fifty it fits":    {4, false},
+		"under five layers of fifty it is deep": {5, true},
+	} {
+		fs, reqs := layered(tc.layers, 50)
+		for n := 0; n < 50; n++ {
+			last := fmt.Sprintf("l%d_%d", tc.layers, n)
+			reqs[last] = append(reqs[last], copyFlag.Key)
+		}
+		r := referents(reqs)
+		r.Flags = append(r.Flags, fs...)
+		in := base()
+		in.Prerequisites = []flags.Prerequisite{{Flag: gateFlag.Key, Variation: "true"}}
+
+		start := time.Now()
+		_, _, err := initial().Replace(copyFlag, in, r, mint, flags.Write{By: &bob, Now: now})
+		if took := time.Since(start); took > 2*time.Second {
+			t.Errorf("%s: the check took %v, want well under 2s", name, took)
+		}
+		if !tc.tooDeep {
+			if err != nil {
+				t.Errorf("%s: %v", name, err)
+			}
+			continue
+		}
+		got := chainViolations(t, err)
+		if len(got) != 1 || !strings.Contains(got[0], "prerequisite_too_deep") {
+			t.Errorf("%s: violations = %v, want one prerequisite_too_deep", name, got)
+		}
+	}
+}
+
+func TestAConfigurationRequiresAtMostFiftyFlags(t *testing.T) {
+	fs, _ := layered(1, 51)
+	r := referents(nil)
+	r.Flags = append(r.Flags, fs...)
+	write := func(n int) error {
+		in := base()
+		in.Prerequisites = requireLayer(1, n)
+		_, _, err := initial().Replace(copyFlag, in, r, mint, flags.Write{By: &bob, Now: now})
+		return err
+	}
+	if err := write(50); err != nil {
+		t.Errorf("fifty prerequisites: %v", err)
+	}
+	e, ok := apperrors.From(write(51))
+	if !ok || len(e.Violations) != 1 {
+		t.Fatalf("fifty-one prerequisites: %v", e)
+	}
+	if v := e.Violations[0]; v.Pointer != "/prerequisites" || v.Code != "too_many" || v.Params["max"] != 50 {
+		t.Errorf("violation = %+v, want /prerequisites too_many max 50", v)
+	}
+}
