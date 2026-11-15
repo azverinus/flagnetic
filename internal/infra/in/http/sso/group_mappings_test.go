@@ -416,7 +416,7 @@ func TestTwoProvidersKeepTheirOwnGrants(t *testing.T) {
 	e.wantGrants(t, alpha, member, management.GrantSourceSso, okta, "developer")
 }
 
-func TestAMissingGroupsClaimCountsAsEmptyForAMemberLinkedAgainByEmail(t *testing.T) {
+func TestAMissingGroupsClaimAfterUnlinkingAnIdentityHasNothingLeftToClear(t *testing.T) {
 	idp := testkit.StartForgingIDP(t)
 	e := start(t)
 	okta := e.forged(t, idp, nil)
@@ -434,12 +434,14 @@ func TestAMissingGroupsClaimCountsAsEmptyForAMemberLinkedAgainByEmail(t *testing
 		t.Fatalf("unlinking the identity = %v, %v: %s", res.StatusCode(), err, res.Body)
 	}
 
+	// Unlinking took the stored claim and its grants with it, so the member
+	// linked again by email is one the provider has not claimed for.
 	e.forgedPerson(t, idp, azure, email, map[string]any{"sub": "azure-sub"})
 
 	e.wantGrants(t, alpha, member, management.GrantSourceSso, azure)
 	recorded := e.audited(t, "auth.groups_claim_missing", "member_email", email)
-	if len(recorded) != 1 || recorded[0]["treated_as_empty"] != true {
-		t.Errorf("auth.groups_claim_missing = %v, want one entry treating the claim as empty", recorded)
+	if len(recorded) != 1 || recorded[0]["treated_as_empty"] != false {
+		t.Errorf("auth.groups_claim_missing = %v, want one entry that kept the access", recorded)
 	}
 }
 
