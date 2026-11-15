@@ -619,21 +619,6 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 			member, in.Linked = m, &m.KnownMember
 		}
 	}
-	// A sign-in without a groups claim of a member the provider claimed groups
-	// for before stores an empty claim, so it holds the provider like one that
-	// stores a claim does.
-	claimedBefore := false
-	if !claims.HasGroups && in.Linked != nil {
-		var claimErr error
-		if claimedBefore, claimErr = h.d.Mappings.HasGroupClaim(ctx, p.ID, member.ID); claimErr != nil {
-			return secret.String{}, claimErr
-		}
-		if claimedBefore {
-			if _, claimErr = h.d.Providers.LockProvider(ctx, p.Slug); claimErr != nil {
-				return secret.String{}, claimErr
-			}
-		}
-	}
 	if in.Linked == nil && claims.Subject != "" {
 		m, ok, memberErr := h.d.Members.MemberByExternalID(ctx, p.Slug, claims.Subject)
 		if memberErr != nil {
@@ -666,6 +651,22 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 	if err != nil {
 		known := in.Linked != nil || in.Provisioned != nil || (in.ByEmail != nil && p.Vouches(claims))
 		return secret.String{}, &unresolved{err: err, member: member, known: known}
+	}
+	// A sign-in without a groups claim of a member the provider claimed groups
+	// for before stores an empty claim, so it holds the provider like one that
+	// stores a claim does, still before anything is written. The member is
+	// asked whichever way they were found: one whose identity was unlinked and
+	// who is linked again by email keeps the claim stored before.
+	claimedBefore := false
+	if !claims.HasGroups && (in.Linked != nil || in.Provisioned != nil || in.ByEmail != nil) {
+		if claimedBefore, err = h.d.Mappings.HasGroupClaim(ctx, p.ID, member.ID); err != nil {
+			return secret.String{}, err
+		}
+		if claimedBefore {
+			if _, err = h.d.Providers.LockProvider(ctx, p.Slug); err != nil {
+				return secret.String{}, err
+			}
+		}
 	}
 	now := h.d.now()
 	switch res.Action {

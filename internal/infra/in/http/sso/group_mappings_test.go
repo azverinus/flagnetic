@@ -416,6 +416,33 @@ func TestTwoProvidersKeepTheirOwnGrants(t *testing.T) {
 	e.wantGrants(t, alpha, member, management.GrantSourceSso, okta, "developer")
 }
 
+func TestAMissingGroupsClaimCountsAsEmptyForAMemberLinkedAgainByEmail(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	okta := e.forged(t, idp, nil)
+	azure := e.forged(t, idp, func(p *provider) { p.linkByEmail = true })
+	alpha := e.project(t)
+	e.mapGroups(t, azure, projectMapping("eng", alpha, "developer"))
+	email := uniqueEmail()
+	b := e.forgedPerson(t, idp, okta, email, nil)
+	member := idOf(t, b)
+	e.forgedPerson(t, idp, azure, email, map[string]any{"sub": "azure-sub", "groups": []any{"eng"}})
+	e.wantGrants(t, alpha, member, management.GrantSourceSso, azure, "developer")
+	linked := identityAt(t, methodsOf(t, b), azure)
+	if res, err := e.admin.UnlinkMemberIdentityWithResponse(t.Context(), member.String(), linked.Id.String()); err != nil ||
+		res.StatusCode() != http.StatusNoContent {
+		t.Fatalf("unlinking the identity = %v, %v: %s", res.StatusCode(), err, res.Body)
+	}
+
+	e.forgedPerson(t, idp, azure, email, map[string]any{"sub": "azure-sub"})
+
+	e.wantGrants(t, alpha, member, management.GrantSourceSso, azure)
+	recorded := e.audited(t, "auth.groups_claim_missing", "member_email", email)
+	if len(recorded) != 1 || recorded[0]["treated_as_empty"] != true {
+		t.Errorf("auth.groups_claim_missing = %v, want one entry treating the claim as empty", recorded)
+	}
+}
+
 func TestAnInstanceAdminAMappingMadeIsDemotedOnlyByThatProvider(t *testing.T) {
 	idp := testkit.StartForgingIDP(t)
 	e := start(t)
