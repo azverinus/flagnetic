@@ -250,6 +250,10 @@ describe("what a condition still needs", () => {
 
   it("checks a value by the attribute's type", () => {
     expect(issue(attribute({ attribute: "build_number", text: "many" }))).toBe("Enter a number.");
+    for (const text of ["0x10", ".5", "+1", "5.", "Infinity", "1e400"]) {
+      expect(issue(attribute({ attribute: "build_number", text })), text).toBe("Enter a number.");
+    }
+    expect(issue(attribute({ attribute: "build_number", text: " -0.5e3 " }))).toBeUndefined();
     expect(issue(attribute({ attribute: "app_version", text: "2.0" }))).toBe(
       "Enter a full semantic version, such as 1.41.0.",
     );

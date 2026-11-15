@@ -16,8 +16,11 @@ export type ManagementFetchOptions = {
   onUnauthenticated: () => void;
 };
 
-/** The ruleset is saved as the server sent it, so its text is never rewritten. */
-const rulesetPath = /\/environments\/[^/]+\/ruleset$/;
+/**
+ * Answers saved as files, as the server sent them, so their text is never
+ * rewritten: the ruleset and the project and audit exports.
+ */
+const filePath = /(?:\/environments\/[^/]+\/ruleset|\/export)$/;
 
 /**
  * The answer with the numbers a double would change hidden in its text,
@@ -26,9 +29,12 @@ const rulesetPath = /\/environments\/[^/]+\/ruleset$/;
  */
 async function keepingNumbers(response: Response, url: string): Promise<Response> {
   const type = response.headers.get("content-type") ?? "";
+  // A refusal is parsed by the client without the transformer, so its
+  // text is left as it came.
   if (
+    !response.ok ||
     !/[/+]json\b/.test(type) ||
-    rulesetPath.test(new URL(url, "http://origin.invalid").pathname)
+    filePath.test(new URL(url, "http://origin.invalid").pathname)
   ) {
     return response;
   }

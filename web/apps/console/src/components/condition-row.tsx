@@ -12,6 +12,7 @@ import {
   type ConditionDraft,
   entryType,
   isFullSemver,
+  isNumberText,
   localDateTime,
   operatorLabel,
   operatorsByType,
@@ -353,7 +354,7 @@ export function ListValueInput({
   const add = () => {
     const entry = typed.trim();
     if (entry === "") return;
-    if (kind === "number" && !Number.isFinite(Number(entry))) {
+    if (kind === "number" && !isNumberText(entry)) {
       setRefused(t`${entry} is not a number.`);
       return;
     }

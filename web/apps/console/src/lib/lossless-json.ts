@@ -49,6 +49,14 @@ export function numberOf(token: string): number {
 }
 
 /**
+ * Whether a JSON string literal reads as a string starting with the mark,
+ * written as the character itself or as its escaped surrogate pair.
+ */
+function startsWithMark(literal: string): boolean {
+  return literal.startsWith(`"${mark}`) || /^"\\u[dD][bB][fF][fF]\\u[dD][fF][fF][fF]/.test(literal);
+}
+
+/**
  * The JSON text with every number a double cannot give back, and every
  * string starting with the mark, turned into a string starting with the
  * mark, so that `JSON.parse` keeps what it would lose. Text that is not
@@ -63,7 +71,7 @@ function hide(text: string): string {
       let end = at + 1;
       while (end < text.length && text[end] !== '"') end += text[end] === "\\" ? 2 : 1;
       const literal = text.slice(at, end + 1);
-      out += literal.startsWith(`"${mark}`) ? `"${mark}${literal.slice(1)}` : literal;
+      out += startsWithMark(literal) ? `"${mark}${literal.slice(1)}` : literal;
       at = end + 1;
     } else if (char === "-" || (char >= "0" && char <= "9")) {
       numberToken.lastIndex = at;
@@ -92,7 +100,13 @@ function reveal(value: unknown): unknown {
   }
   if (Array.isArray(value)) return value.map(reveal);
   if (value !== null && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, reveal(inner)]));
+    // A key is a string literal too, escaped by the same doubling.
+    return Object.fromEntries(
+      Object.entries(value).map(([key, inner]) => [
+        key.startsWith(mark) ? key.slice(mark.length) : key,
+        reveal(inner),
+      ]),
+    );
   }
   return value;
 }

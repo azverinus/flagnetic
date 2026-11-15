@@ -39,6 +39,13 @@ describe("JSON read and written without changing a number", () => {
     expect(stringifyLossless(value)).toBe(text);
   });
 
+  it("leaves the mark alone when it is escaped, or starts a key", () => {
+    const escaped = parseLossless('["\\udbff\\udfff12","\\uDBFF\\uDFFF"]');
+    expect(escaped).toEqual(["\u{10FFFF}12", "\u{10FFFF}"]);
+    const keyed = '{"\u{10FFFF}1.0":1.0,"a\\"b":"\\\\"}';
+    expect(stringifyLossless(parseLossless(keyed))).toBe(keyed);
+  });
+
   it("is undone by revealing what the client parsed from the hidden text", () => {
     const hidden = hideLossyNumbers('{"x":[1.0,7,"s"]}');
     const revealed = revealLossless(JSON.parse(hidden)) as { x: unknown[] };

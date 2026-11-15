@@ -84,6 +84,22 @@ describe("the fetch the generated client runs on", () => {
     expect(await response.text()).toBe(text);
   });
 
+  it("leaves an exported project's text as the server sent it, and a refusal's", async () => {
+    const text = '{"version":3,"ratio":1.0}';
+    const send = (status: number) =>
+      managementFetch({
+        fetch: async () =>
+          new Response(text, { status, headers: { "Content-Type": "application/json" } }),
+        onUnauthenticated: vi.fn(),
+      });
+
+    const exported = await send(200)("http://console.test/api/v1/projects/p/export?format=json");
+    const refused = await send(409)("http://console.test/api/v1/projects/p/flags/f");
+
+    expect(await exported.text()).toBe(text);
+    expect(await refused.text()).toBe(text);
+  });
+
   it("leaves the refusal for the caller to read", async () => {
     const send = managementFetch({
       fetch: async () => answer(401, { code: "unauthenticated", detail: "sign in" }),

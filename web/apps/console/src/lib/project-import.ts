@@ -12,6 +12,7 @@ import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
 import { unwrap } from "./errors";
+import { stringifyLossless } from "./lossless-json";
 
 /** How the document is applied to the project it is imported into. */
 export type ImportMode = "merge" | "replace";
@@ -211,7 +212,7 @@ const longestValue = 120;
 
 /** A value of a patch as one line of JSON, cut at a length a row can hold. */
 export function patchValue(value: unknown): string {
-  const text = JSON.stringify(value) ?? "null";
+  const text = stringifyLossless(value);
   return text.length > longestValue ? `${text.slice(0, longestValue - 1)}…` : text;
 }
 

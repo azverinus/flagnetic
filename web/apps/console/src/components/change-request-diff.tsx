@@ -21,6 +21,7 @@ import {
   ruleRewrites,
 } from "@/lib/change-requests";
 import { percentText } from "@/lib/experiments";
+import { stringifyLossless } from "@/lib/lossless-json";
 import { diffConfigurations, diffDefinitions, diffSegments } from "@/lib/structural-diff";
 
 /** What a change request proposes for: a configuration, a flag's definition or a segment's. */
@@ -188,7 +189,7 @@ function Value({ children }: { children: ReactNode }) {
 
 /** A value of a patch as compact JSON, the way the API writes it. */
 function json(value: unknown): string {
-  return JSON.stringify(value) ?? "null";
+  return stringifyLossless(value);
 }
 
 /** A change request's patch, one sentence per operation. */
