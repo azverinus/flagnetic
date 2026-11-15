@@ -110,8 +110,11 @@ function GroupMappingsForm({
       // A refusal may be the list having moved on: read it, so the form can say so.
       void queryClient.invalidateQueries({ queryKey: groupMappingsQuery(provider).queryKey });
     },
-    onSuccess: ({ run, etag }, body) => {
+    onSuccess: async ({ run, etag }, body) => {
       const next = { items: body.items, etag };
+      // A read started before the save would otherwise land after it and put
+      // the list from before the save back on screen.
+      await queryClient.cancelQueries({ queryKey: groupMappingsQuery(provider).queryKey });
       queryClient.setQueryData(groupMappingsQuery(provider).queryKey, next);
       setBase(next);
       // Members' grants changed under every project.

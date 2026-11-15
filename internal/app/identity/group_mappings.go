@@ -147,11 +147,16 @@ func (h *GetGroupMappings) Handle(ctx context.Context, slug string) (GroupMappin
 	if err != nil {
 		return GroupMappingsList{}, err
 	}
-	items, err := h.mappings.GroupMappings(ctx, p.ID)
+	// The version is read before the list, in separate statements: a
+	// replacement committing between them then pairs the new list with the
+	// old version, and a write based on it is refused as stale. Read the other
+	// way round, the old list would carry the new version and a write based
+	// on that old list would be accepted.
+	version, err := h.mappings.GroupMappingsVersion(ctx, p.ID)
 	if err != nil {
 		return GroupMappingsList{}, err
 	}
-	version, err := h.mappings.GroupMappingsVersion(ctx, p.ID)
+	items, err := h.mappings.GroupMappings(ctx, p.ID)
 	return GroupMappingsList{Items: items, Version: version}, err
 }
 
