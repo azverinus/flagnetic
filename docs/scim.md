@@ -73,9 +73,8 @@ A directory names only addresses its provider vouches for: the email of `POST /U
 
 ### Adoption
 
-An instance that already has members can switch SCIM on without duplicating them: `POST /Users` for an email a member already holds **adopts** that member when all of these hold, and is otherwise `409 uniqueness`:
+An instance that already has members can switch SCIM on without duplicating them: `POST /Users` for an email a member already holds, in one of the provider's [domains](#domains) (outside them it is `400 invalidValue`, whoever holds it), **adopts** that member when all of these hold, and is otherwise `409 uniqueness`:
 
-- the email is in one of the provider's [domains](sso.md#domains-linking-and-provisioning);
 - the member is **active** (an invited member has an invitation to accept, a deactivated one was offboarded by someone);
 - the member is **no instance admin**;
 - no provider provisions the member already.

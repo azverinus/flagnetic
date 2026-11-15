@@ -221,6 +221,33 @@ func TestADirectoryNamesOnlyAddressesItsProviderVouchesFor(t *testing.T) {
 	}
 }
 
+// The domains are checked against an email a write names anew, not against
+// the one a member holds: removing a domain from the provider must not leave
+// its directory unable to rename or offboard the members it already has.
+func TestADirectoryKeepsTheMembersOfADomainItNoLongerVouchesFor(t *testing.T) {
+	e := start(t)
+	slug := e.provider(t, "example.com")
+	token := e.token(t, slug)
+	member := e.mustCreate(t, token, userBody(email("example.com"), nil))
+
+	res, err := e.admin.UpdateAuthProviderWithResponse(t.Context(), slug, &management.UpdateAuthProviderParams{IfMatch: ptr(`"1"`)},
+		management.AuthProviderPatch{Domains: &[]string{"example.org"}})
+	if err != nil || res.StatusCode() != http.StatusOK {
+		t.Fatalf("moving the provider to another domain = %v, %d: %s", err, res.StatusCode(), res.Body)
+	}
+
+	assertScimError(t, "creating in the domain the provider left", e.create(t, token, userBody(email("example.com"), nil)), http.StatusBadRequest, "invalidValue")
+	if r := e.call(t, token, http.MethodPatch, "/Users/"+member, marshal(t, patch(op("replace", "displayName", "Renamed")))); r.status != http.StatusOK {
+		t.Errorf("renaming a member outside the domains = %d: %s", r.status, r.body)
+	}
+	if r := e.call(t, token, http.MethodPatch, "/Users/"+member, marshal(t, patch(op("replace", "active", false)))); r.status != http.StatusOK {
+		t.Errorf("deactivating a member outside the domains = %d: %s", r.status, r.body)
+	}
+	if got := e.member(t, member); got.DisplayName != "Renamed" || got.Status != management.MemberStatusDeactivated {
+		t.Errorf("member = %q, %s; want renamed and deactivated", got.DisplayName, got.Status)
+	}
+}
+
 func TestAMemberNoDirectoryMayTakeOverIsAUniquenessConflict(t *testing.T) {
 	e := start(t)
 	slug := e.provider(t)
