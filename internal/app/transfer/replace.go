@@ -72,8 +72,11 @@ func (r *mergeRun) deleteAbsent(ctx context.Context) error {
 		delete(r.environments, key)
 		delete(r.moved, key)
 	}
+	// A rule serving a draft that goes keeps it only when the flag the rule
+	// belongs to stays: a flag that goes takes the rule with it.
+	leaving := slices.DeleteFunc(slices.Clone(del.Flags), func(key string) bool { return held[key] })
 	for _, key := range del.Experiments {
-		if err := remove(key, func() error { return d.ExperimentsImport.DeleteExperiment(ctx, r.project.ID, key, r.req) },
+		if err := remove(key, func() error { return d.ExperimentsImport.DeleteExperiment(ctx, r.project.ID, key, leaving, r.req) },
 			&r.changes.Experiments.Deleted); err != nil {
 			return err
 		}

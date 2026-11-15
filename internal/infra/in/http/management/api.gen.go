@@ -10568,7 +10568,12 @@ type ClientInterface interface {
 	// smaller traffic allocation of a running experiment is 409
 	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
 	// the environments holding its rules and is recorded as
-	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// `experiment.traffic_allocation_changed`. A draft the document moves
+	// to another flag is 409 `in_use`, in a dry run too, while a
+	// configuration of another flag still has a rule serving it once the
+	// document is written, listing those configurations in `references`;
+	// a replace deletes an absent draft together with the absent flags
+	// whose rules serve it. A rule serving an archived
 	// experiment is accepted. No salt is shared by two experiments, or by an
 	// experiment and a rollout.
 	//
@@ -10659,7 +10664,12 @@ type ClientInterface interface {
 	// smaller traffic allocation of a running experiment is 409
 	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
 	// the environments holding its rules and is recorded as
-	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// `experiment.traffic_allocation_changed`. A draft the document moves
+	// to another flag is 409 `in_use`, in a dry run too, while a
+	// configuration of another flag still has a rule serving it once the
+	// document is written, listing those configurations in `references`;
+	// a replace deletes an absent draft together with the absent flags
+	// whose rules serve it. A rule serving an archived
 	// experiment is accepted. No salt is shared by two experiments, or by an
 	// experiment and a rollout.
 	//
@@ -16584,7 +16594,12 @@ func (c *Client) CheckHashUniformity(ctx context.Context, project ProjectKey, bo
 // smaller traffic allocation of a running experiment is 409
 // `traffic_allocation_decrease`. A larger one moves on the rulesets of
 // the environments holding its rules and is recorded as
-// `experiment.traffic_allocation_changed`. A rule serving an archived
+// `experiment.traffic_allocation_changed`. A draft the document moves
+// to another flag is 409 `in_use`, in a dry run too, while a
+// configuration of another flag still has a rule serving it once the
+// document is written, listing those configurations in `references`;
+// a replace deletes an absent draft together with the absent flags
+// whose rules serve it. A rule serving an archived
 // experiment is accepted. No salt is shared by two experiments, or by an
 // experiment and a rollout.
 //
@@ -16685,7 +16700,12 @@ func (c *Client) ImportProjectWithBody(ctx context.Context, project ProjectKey, 
 // smaller traffic allocation of a running experiment is 409
 // `traffic_allocation_decrease`. A larger one moves on the rulesets of
 // the environments holding its rules and is recorded as
-// `experiment.traffic_allocation_changed`. A rule serving an archived
+// `experiment.traffic_allocation_changed`. A draft the document moves
+// to another flag is 409 `in_use`, in a dry run too, while a
+// configuration of another flag still has a rule serving it once the
+// document is written, listing those configurations in `references`;
+// a replace deletes an absent draft together with the absent flags
+// whose rules serve it. A rule serving an archived
 // experiment is accepted. No salt is shared by two experiments, or by an
 // experiment and a rollout.
 //
@@ -32571,7 +32591,12 @@ type ClientWithResponsesInterface interface {
 	// smaller traffic allocation of a running experiment is 409
 	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
 	// the environments holding its rules and is recorded as
-	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// `experiment.traffic_allocation_changed`. A draft the document moves
+	// to another flag is 409 `in_use`, in a dry run too, while a
+	// configuration of another flag still has a rule serving it once the
+	// document is written, listing those configurations in `references`;
+	// a replace deletes an absent draft together with the absent flags
+	// whose rules serve it. A rule serving an archived
 	// experiment is accepted. No salt is shared by two experiments, or by an
 	// experiment and a rollout.
 	//
@@ -32662,7 +32687,12 @@ type ClientWithResponsesInterface interface {
 	// smaller traffic allocation of a running experiment is 409
 	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
 	// the environments holding its rules and is recorded as
-	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// `experiment.traffic_allocation_changed`. A draft the document moves
+	// to another flag is 409 `in_use`, in a dry run too, while a
+	// configuration of another flag still has a rule serving it once the
+	// document is written, listing those configurations in `references`;
+	// a replace deletes an absent draft together with the absent flags
+	// whose rules serve it. A rule serving an archived
 	// experiment is accepted. No salt is shared by two experiments, or by an
 	// experiment and a rollout.
 	//
@@ -54777,7 +54807,12 @@ func (c *ClientWithResponses) CheckHashUniformityWithResponse(ctx context.Contex
 // smaller traffic allocation of a running experiment is 409
 // `traffic_allocation_decrease`. A larger one moves on the rulesets of
 // the environments holding its rules and is recorded as
-// `experiment.traffic_allocation_changed`. A rule serving an archived
+// `experiment.traffic_allocation_changed`. A draft the document moves
+// to another flag is 409 `in_use`, in a dry run too, while a
+// configuration of another flag still has a rule serving it once the
+// document is written, listing those configurations in `references`;
+// a replace deletes an absent draft together with the absent flags
+// whose rules serve it. A rule serving an archived
 // experiment is accepted. No salt is shared by two experiments, or by an
 // experiment and a rollout.
 //
@@ -54874,7 +54909,12 @@ func (c *ClientWithResponses) ImportProjectWithBodyWithResponse(ctx context.Cont
 // smaller traffic allocation of a running experiment is 409
 // `traffic_allocation_decrease`. A larger one moves on the rulesets of
 // the environments holding its rules and is recorded as
-// `experiment.traffic_allocation_changed`. A rule serving an archived
+// `experiment.traffic_allocation_changed`. A draft the document moves
+// to another flag is 409 `in_use`, in a dry run too, while a
+// configuration of another flag still has a rule serving it once the
+// document is written, listing those configurations in `references`;
+// a replace deletes an absent draft together with the absent flags
+// whose rules serve it. A rule serving an archived
 // experiment is accepted. No salt is shared by two experiments, or by an
 // experiment and a rollout.
 //

@@ -200,8 +200,15 @@ type ExperimentsImport interface {
 	// every experiment is written: until then one may take a salt another
 	// gives up later in the same import.
 	CheckSalts(ctx context.Context) error
-	// DeleteExperiment deletes a draft experiment.
-	DeleteExperiment(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error
+	// CheckServed refuses with in_use the configurations that serve one of
+	// the experiments keyed keys while belonging to a flag other than the
+	// experiment's, once every configuration is written: a document may move
+	// a draft to another flag and drop the rules serving it together.
+	CheckServed(ctx context.Context, project workspace.ProjectID, keys []string) error
+	// DeleteExperiment deletes a draft experiment, which a rule serving it
+	// keeps unless the rule belongs to one of the flags keyed leaving, which
+	// the import deletes too.
+	DeleteExperiment(ctx context.Context, project workspace.ProjectID, key string, leaving []string, req governance.Request) error
 }
 
 // SDKKeys tells which SDK keys an environment holds, which keep an import from

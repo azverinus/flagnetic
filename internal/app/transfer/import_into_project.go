@@ -263,6 +263,11 @@ func (r *mergeRun) apply(ctx context.Context) (ImportResult, error) {
 			}
 		}
 	}
+	if moved := r.movedExperiments(); len(moved) > 0 {
+		if err := r.h.d.ExperimentsImport.CheckServed(ctx, r.project.ID, moved); err != nil {
+			return out, err
+		}
+	}
 	out.Project = transfer.Project{Key: r.project.Key, Name: r.project.Name, Description: r.project.Description}
 	r.listFlagUpdates()
 	out.Changes, out.Warnings = r.changes, r.warnings
@@ -731,6 +736,25 @@ func (r *mergeRun) writeExperiments(ctx context.Context) error {
 		return nil
 	}
 	return e.CheckSalts(ctx)
+}
+
+// movedExperiments returns the keys of the experiments the import gave
+// another flag, whose rules no configuration of the flag they left may still
+// hold once every configuration is written.
+func (r *mergeRun) movedExperiments() []string {
+	was := map[string]string{}
+	for _, e := range r.current.Experiments {
+		was[e.Key] = e.Flag
+	}
+	var moved []string
+	for _, u := range r.changes.Experiments.Updated {
+		for _, e := range r.eff.Experiments {
+			if e.Key == u.Key && e.Flag != was[e.Key] {
+				moved = append(moved, e.Key)
+			}
+		}
+	}
+	return moved
 }
 
 // moveEnvironments notes that the ruleset of each of the environments moves

@@ -130,7 +130,7 @@ func (s *Store) HoldingEnvironments(ctx context.Context, project workspace.Proje
 
 // HoldingConfigurations returns the configurations of project, one per flag
 // and environment, that have a rule serving the experiment keyed key, as
-// references ordered by flag key then environment key.
+// references ordered by flag key, then by the environments' order.
 func (s *Store) HoldingConfigurations(ctx context.Context, project workspace.ProjectID, key string) ([]flags.Reference, error) {
 	rows, err := s.db(ctx).Query(ctx, `
 		SELECT f.key, e.key
@@ -140,7 +140,7 @@ func (s *Store) HoldingConfigurations(ctx context.Context, project workspace.Pro
 		WHERE f.project_id = $1
 		  AND c.document @> jsonb_build_object('rules', jsonb_build_array(
 		      jsonb_build_object('serve', jsonb_build_object('kind', 'experiment', 'experiment', $2::text))))
-		ORDER BY f.key, e.key`,
+		ORDER BY f.key COLLATE "C", e.sort_order, e.key COLLATE "C"`,
 		project.Bytes(), key)
 	if err != nil {
 		return nil, fmt.Errorf("reading the configurations holding an experiment: %w", err)
