@@ -390,3 +390,42 @@ func TestAStreamWhoseFramesAreTakenOutlivesTheWriteTimeout(t *testing.T) {
 		t.Errorf("a stream living four timeouts delivered %d of 8 frames", got)
 	}
 }
+
+// TestAClientThatStopsReadingWhatAMiddlewareAnswersIsDropped pipelines
+// preflights, which the SDK API's middleware answers before any route is
+// reached, and stops reading their answers: the connection is dropped after
+// the write timeout rather than held for as long as the client likes.
+func TestAClientThatStopsReadingWhatAMiddlewareAnswersIsDropped(t *testing.T) {
+	srv := testkit.StartServer(t, testkit.WithEdge(func(o *flaghttp.Options) { o.WriteTimeout = 200 * time.Millisecond }))
+	conn, err := net.Dial("tcp", strings.TrimPrefix(srv.URL, "http://"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	_ = conn.(*net.TCPConn).SetReadBuffer(1024)
+	const sent = 20000
+	preflight := "OPTIONS /sdk/v1/ruleset HTTP/1.1\r\nHost: x\r\nOrigin: https://app.example.com\r\n" +
+		"Access-Control-Request-Method: GET\r\n\r\n"
+	go func() {
+		for range sent {
+			if _, err := io.WriteString(conn, preflight); err != nil {
+				return
+			}
+		}
+	}()
+	time.Sleep(1500 * time.Millisecond)
+
+	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	br := bufio.NewReader(conn)
+	answered := 0
+	for ; ; answered++ {
+		res, err := nethttp.ReadResponse(br, nil)
+		if err != nil {
+			break
+		}
+		_ = res.Body.Close()
+	}
+	if answered == sent {
+		t.Errorf("all %d preflights were answered: the connection was held while its client stopped reading", sent)
+	}
+}

@@ -267,6 +267,10 @@ func (d seededDownload) stalled(t *testing.T) net.Conn {
 func TestADownloadToAClientThatStopsReadingEndsAndReleasesItsConnection(t *testing.T) {
 	d := seedDownload(t, testkit.WithEdge(func(o *flaghttp.Options) { o.WriteTimeout = 300 * time.Millisecond }))
 	d.stalled(t)
+	// The head of the answer can reach the client while the download still
+	// reads its first page; well within the write timeout the buffers between
+	// them are full and the download waits on the client alone.
+	time.Sleep(100 * time.Millisecond)
 
 	deadline := time.Now().Add(10 * time.Second)
 	for len(d.srv.Logs.Find("audit download cut short")) == 0 {

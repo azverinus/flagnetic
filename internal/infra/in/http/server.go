@@ -290,21 +290,23 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.accessLog(r, st, rw, time.Since(start), false)
 	}()
 
+	// Bounded before the middlewares, so an answer one of them gives without
+	// reaching a route, such as a browser's preflight, is bounded too.
+	out, done := withWriteDeadline(w, rw, s.opts.WriteTimeout)
+	defer done()
 	route := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) { s.route(w, rw, r, st) })
 	for _, wr := range s.wraps {
 		if r.URL.Path == strings.TrimSuffix(wr.prefix, "/") || strings.HasPrefix(r.URL.Path, wr.prefix) {
-			wr.mw(route).ServeHTTP(rw, r)
+			wr.mw(route).ServeHTTP(out, r)
 			return
 		}
 	}
-	route.ServeHTTP(rw, r)
+	route.ServeHTTP(out, r)
 }
 
 // route serves r on rw by the route it matches. conn is the connection's
 // own writer, which body limits and deadlines act on.
 func (s *Server) route(conn, rw http.ResponseWriter, r *http.Request, st *requestState) {
-	rw, done := withWriteDeadline(conn, rw, s.opts.WriteTimeout)
-	defer done()
 	_, pattern := s.mux.Handler(r)
 	route, ok := s.patterns[pattern]
 	if !ok && s.servesConsole(r) {

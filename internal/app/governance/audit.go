@@ -99,14 +99,19 @@ func NewExportAuditEntries(counter AuditExporter, reader AuditReader, limit, con
 // entries matching f and refuses export_too_large above the cap. Otherwise it
 // calls begin once, so the caller can start its answer, then each with every
 // entry newest first, read a page at a time from the entry the last page
-// ended at. An entry written meanwhile is newer than where the download
-// started, so the entries streamed are the ones counted.
+// ended at. The newest entry is read before the count and the pages go on
+// below it, so an entry written meanwhile, newer than it, is in no page and
+// the entries streamed are at most the ones counted.
 func (h *ExportAuditEntries) Handle(ctx context.Context, f AuditFilter, begin func() error, each func(governance.Entry) error) error {
 	select {
 	case h.slots <- struct{}{}:
 		defer func() { <-h.slots }()
 	default:
 		return ErrTooManyExports
+	}
+	page, err := h.reader.Entries(ctx, f, governance.EntryID{}, 1)
+	if err != nil {
+		return err
 	}
 	n, err := h.counter.CountEntries(ctx, f, h.max+1)
 	if err != nil {
@@ -119,9 +124,15 @@ func (h *ExportAuditEntries) Handle(ctx context.Context, f AuditFilter, begin fu
 	if err := begin(); err != nil {
 		return err
 	}
-	var after governance.EntryID
+	if len(page) == 0 {
+		return nil
+	}
+	if err := each(page[0]); err != nil {
+		return err
+	}
+	after := page[0].ID
 	for {
-		page, err := h.reader.Entries(ctx, f, after, exportPageSize)
+		page, err = h.reader.Entries(ctx, f, after, exportPageSize)
 		if err != nil {
 			return err
 		}
