@@ -556,12 +556,15 @@ func (a *api) refuse(w http.ResponseWriter, r *http.Request, op access.Operation
 // pointer), and leaves the body to be read again. PostgreSQL stores no
 // U+0000, so a text that reached it would be a 500 raised by any member at
 // will; checking here, once, covers every text of every operation, those
-// added later too.
+// added later too. The body is checked whatever media type it claims: an
+// operation that is not JSON-only decodes its body as JSON under any
+// Content-Type, and a body that is no JSON (a YAML document) yields nothing
+// here and meets the same rule in its own decoder.
 func refuseControlCharacters(r *http.Request) error {
 	if !text.AllowedURL(r.URL) {
 		return flaghttp.InvalidRequest("the path and query must not contain control characters")
 	}
-	if r.Body == nil || r.Body == http.NoBody || !isJSON(r) {
+	if r.Body == nil || r.Body == http.NoBody {
 		return nil
 	}
 	body, err := io.ReadAll(r.Body)

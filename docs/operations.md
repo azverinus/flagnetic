@@ -170,7 +170,7 @@ The time to write a whole response is not bounded, which would cut off streams a
 
 ### Control characters
 
-PostgreSQL stores no U+0000, and no name, note or value means anything with a control character in it, so the management and SCIM APIs refuse any text that holds one other than a tab, a line feed or a carriage return. A JSON body with such a text, in a string or in a member name, is `422 invalid_character` with a violation per text, its `pointer` naming it; a path, query parameter or cursor that holds one is `400 invalid_request`. A SCIM request that holds one is `400 invalidValue`. A project document in YAML or JSON is `422 invalid_document` with the same violations.
+PostgreSQL stores no U+0000, and no name, note or value means anything with a control character in it, so the management and SCIM APIs refuse any text that holds one other than a tab, a line feed or a carriage return. A JSON body with such a text, in a string or in a member name, is `422 invalid_character` with a violation per text, its `pointer` naming it; a path, query parameter or cursor that holds one is `400 invalid_request`. A SCIM request that holds one is `400 invalidValue`. A JSON body is checked whatever `Content-Type` it is sent with. A project document in YAML is `422 invalid_document` with the same violations.
 
 ## Delivery across replicas
 

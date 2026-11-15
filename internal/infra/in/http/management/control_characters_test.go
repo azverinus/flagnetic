@@ -29,6 +29,31 @@ func TestATextHoldingNULIsRefusedWithItsPointer(t *testing.T) {
 	}
 }
 
+func TestAJSONBodyHoldingNULIsRefusedWhateverMediaTypeItClaims(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	token := testkit.InstanceAdminToken(t)
+	for _, media := range []string{"text/plain", ""} {
+		req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, srv.URL+management.BaseURL+"/projects/"+p.Key+"/flags",
+			strings.NewReader(`{"key":"checkout","type":"boolean","name":"Check\u0000out"}`))
+		req.Header.Set("Authorization", "Bearer "+token)
+		if media != "" {
+			req.Header.Set("Content-Type", media)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		got := violationsOf(t, "a body sent as "+media, resp.StatusCode, body, "invalid_character")
+		if want := []string{"/name invalid_character"}; !slices.Equal(got, want) {
+			t.Errorf("%q: violations = %q, want %q", media, got, want)
+		}
+	}
+}
+
 func TestATextWithLineBreaksAndTabsIsKept(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
