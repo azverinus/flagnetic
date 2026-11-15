@@ -13,6 +13,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/shared/text"
 )
 
 // The bounds of a page of experiments.
@@ -70,7 +71,7 @@ func encodeKeyCursor(key string) string {
 // decodeKeyCursor reads cursor, refusing one this API did not return.
 func decodeKeyCursor(cursor string) (string, error) {
 	b, err := base64.RawURLEncoding.DecodeString(cursor)
-	if err != nil || len(b) == 0 || !utf8.Valid(b) {
+	if err != nil || len(b) == 0 || !utf8.Valid(b) || !text.Allowed(string(b)) {
 		return "", flaghttp.InvalidRequest("cursor is not a next_cursor this API returned")
 	}
 	return string(b), nil

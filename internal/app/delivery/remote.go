@@ -103,7 +103,7 @@ func (h *EvaluateRemotely) Handle(ctx context.Context, key delivery.SDKKey, q Re
 		out.Results[k] = r.Result
 	}
 	appVersion, _ := q.Context.Attributes[appVersionAttribute].(string)
-	h.counts.Add(delivery.RemoteEvaluator{Key: key, SDK: q.SDK, AppVersion: appVersion}, rs.Version, counted)
+	h.counts.Add(delivery.NewRemoteEvaluator(key, q.SDK, appVersion), rs.Version, counted)
 	h.discoveries.Note(key.Project, h.clock.Now(), delivery.ObserveUndeclared(evaluable, q.Context.Attributes))
 	return out, nil
 }

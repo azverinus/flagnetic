@@ -717,3 +717,15 @@ func patch(ops ...map[string]any) map[string]any {
 }
 
 var _ = scim.BaseURL
+
+func TestAControlCharacterInAProvisioningRequestIsRefused(t *testing.T) {
+	e := start(t)
+	token := e.token(t, e.provider(t))
+	assertScimError(t, "a name with NUL", e.create(t, token, userBody(email("example.com"), map[string]any{"displayName": "Jo\x00"})),
+		http.StatusBadRequest, "invalidValue")
+	assertScimError(t, "a filter with NUL", e.call(t, token, http.MethodGet, "/Users?filter=userName%20eq%20%22a%00%22", ""),
+		http.StatusBadRequest, "invalidValue")
+	id := e.mustCreate(t, token, userBody(email("example.com"), nil))
+	r := e.call(t, token, http.MethodPatch, "/Users/"+id, marshal(t, patch(op("replace", "displayName", "x\x00"))))
+	assertScimError(t, "a patched name with NUL", r, http.StatusBadRequest, "invalidValue")
+}

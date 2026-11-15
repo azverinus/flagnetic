@@ -168,6 +168,10 @@ The public listener bounds what one client can hold:
 
 The time to write a whole response is not bounded, which would cut off streams and large downloads; each write is, so a client that stops reading ends its request within `FLAGNETIC_HTTP_WRITE_TIMEOUT` instead of holding a goroutine and what it holds. A proxy in front may add its own bound. A proxy in front must not buffer the [ruleset stream](sdks/stream.md) or the management change stream and must allow them a read timeout above their 15-second heartbeat; see [TLS and a reverse proxy](install.md#tls-and-a-reverse-proxy).
 
+### Control characters
+
+PostgreSQL stores no U+0000, and no name, note or value means anything with a control character in it, so the management and SCIM APIs refuse any text that holds one other than a tab, a line feed or a carriage return. A JSON body with such a text, in a string or in a member name, is `422 invalid_character` with a violation per text, its `pointer` naming it; a path, query parameter or cursor that holds one is `400 invalid_request`. A SCIM request that holds one is `400 invalidValue`. A JSON body is checked whatever `Content-Type` it is sent with. A project document in YAML is `422 invalid_document` with the same violations.
+
 ## Delivery across replicas
 
 Any replica serves any SDK: it can download its environment's [ruleset](sdks/ruleset.md) from one replica, hold its [ruleset stream](sdks/stream.md) on another and post [events](sdks/events.md) to a third, so a load balancer needs no sticky sessions. Replicas share nothing but PostgreSQL. Each keeps two caches in memory and learns through PostgreSQL notifications when what they hold changed:

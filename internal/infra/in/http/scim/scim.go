@@ -18,6 +18,7 @@ import (
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
+	"github.com/azverinus/flagnetic/internal/shared/text"
 )
 
 // BaseURL is where the SCIM API is served.
@@ -94,6 +95,10 @@ func (a *api) guard(mux *http.ServeMux) http.Handler {
 		}
 		caller, ok := a.authenticate(w, r)
 		if !ok {
+			return
+		}
+		if !text.AllowedURL(r.URL) {
+			writeError(w, http.StatusBadRequest, "invalidValue", "the request holds a control character")
 			return
 		}
 		mux.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), callerKey{}, caller)))
@@ -249,6 +254,9 @@ func readBody(r *http.Request) ([]byte, error) {
 			return nil, err
 		}
 		return nil, &identity.ScimError{Type: "invalidSyntax", Detail: "the body could not be read"}
+	}
+	if found := text.InJSON(raw); len(found) > 0 {
+		return nil, &identity.ScimError{Type: "invalidValue", Detail: "the body holds a control character at " + found[0].Pointer}
 	}
 	return raw, nil
 }

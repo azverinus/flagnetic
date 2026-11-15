@@ -138,6 +138,14 @@ type RemoteEvaluator struct {
 	AppVersion string
 }
 
+// NewRemoteEvaluator returns who asked for remote evaluations, the app
+// version cut like every other text a client sends that is kept in a count:
+// one value PostgreSQL refuses would lose the counts of every project that
+// replica holds.
+func NewRemoteEvaluator(key SDKKey, sdk SDKIdentity, appVersion string) RemoteEvaluator {
+	return RemoteEvaluator{Key: key, SDK: sdk, AppVersion: cut(appVersion)}
+}
+
 // remoteGroup is what the remote evaluation counts are kept apart by.
 type remoteGroup struct {
 	key        SDKKeyID

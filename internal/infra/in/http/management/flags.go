@@ -16,6 +16,7 @@ import (
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/precondition"
+	"github.com/azverinus/flagnetic/internal/shared/text"
 )
 
 // The bounds of a page of flags.
@@ -133,7 +134,7 @@ func decodeFlagCursor(sort appflags.FlagSort, cursor string) (appflags.FlagCurso
 		return appflags.FlagCursor{}, refused
 	}
 	var fc flagCursor
-	if json.Unmarshal(b, &fc) != nil || fc.Sort != sort || fc.Key == "" || (sort == appflags.SortByUpdated) != (fc.UpdatedAt != nil) {
+	if json.Unmarshal(b, &fc) != nil || fc.Sort != sort || fc.Key == "" || !text.Allowed(fc.Key) || !text.Allowed(fc.Name) || (sort == appflags.SortByUpdated) != (fc.UpdatedAt != nil) {
 		return appflags.FlagCursor{}, refused
 	}
 	out := appflags.FlagCursor{Key: fc.Key, Name: fc.Name}

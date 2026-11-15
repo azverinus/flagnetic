@@ -3,6 +3,7 @@ package sdk_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"testing"
 
@@ -75,6 +76,27 @@ func TestRemoteEvaluationsAreCountedByTheirTrueReason(t *testing.T) {
 	}
 	if again := remoteCounts(t, p); len(again) != 4 {
 		t.Errorf("after an empty round = %d rows, want still 4", len(again))
+	}
+}
+
+func TestRemoteEvaluationOfAnAppVersionHoldingNULDoesNotHoldBackAnotherProjectsCounts(t *testing.T) {
+	srv := testkit.StartServer(t)
+	hostile, other := newProject(t, srv), newProject(t, srv)
+	hostile.flag(t, "checkout")
+	other.flag(t, "checkout")
+	_, hostileKey := hostile.sdkKey(t, "production", management.SdkKeyKindClient)
+	_, otherKey := other.sdkKey(t, "production", management.SdkKeyKindClient)
+	agent := []string{"User-Agent", "flagnetic-js/1.2.0 (web)"}
+	evaluationWith(t, srv, hostileKey, `{"context":{"units":{"user":"u-1"},"attributes":{"app_version":"3.1\u00000"}}}`, agent...)
+	evaluationWith(t, srv, otherKey, `{"context":{"units":{"user":"u-1"},"attributes":{"app_version":"3.1.0"}}}`, agent...)
+	if err := srv.Tick(t, worker.RemoteEvaluationCountsName); err != nil {
+		t.Fatal(err)
+	}
+	if c := remoteCounts(t, other)["checkout flagnetic-js"]; c.Row.Count != 1 || c.AppVersion != "3.1.0" {
+		t.Errorf("the other project's count = %+v, want 1 of 3.1.0", c)
+	}
+	if c := remoteCounts(t, hostile)["checkout flagnetic-js"]; c.Row.Count != 1 || strings.ContainsRune(c.AppVersion, 0) {
+		t.Errorf("the hostile project's count = %+v, want 1 with no NUL in its app version", c)
 	}
 }
 
