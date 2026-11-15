@@ -121,13 +121,13 @@ func (h *ExportAuditEntries) Handle(ctx context.Context, f AuditFilter, begin fu
 		return apperrors.Invalid("export_too_large", fmt.Sprintf(
 			"the filters match more than %d entries, the most one download holds; narrow them with from and to", h.max))
 	}
-	if err := begin(); err != nil {
+	if err = begin(); err != nil {
 		return err
 	}
 	if len(page) == 0 {
 		return nil
 	}
-	if err := each(page[0]); err != nil {
+	if err = each(page[0]); err != nil {
 		return err
 	}
 	after := page[0].ID
@@ -137,7 +137,7 @@ func (h *ExportAuditEntries) Handle(ctx context.Context, f AuditFilter, begin fu
 			return err
 		}
 		for _, e := range page {
-			if err := each(e); err != nil {
+			if err = each(e); err != nil {
 				return err
 			}
 		}

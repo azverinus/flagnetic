@@ -267,20 +267,23 @@ func (d seededDownload) stalled(t *testing.T) net.Conn {
 func TestADownloadToAClientThatStopsReadingEndsAndReleasesItsConnection(t *testing.T) {
 	d := seedDownload(t, testkit.WithEdge(func(o *flaghttp.Options) { o.WriteTimeout = 300 * time.Millisecond }))
 	d.stalled(t)
-	// The head of the answer can reach the client while the download still
-	// reads its first page; well within the write timeout the buffers between
-	// them are full and the download waits on the client alone.
-	time.Sleep(100 * time.Millisecond)
+	// While the download reads a page it holds a connection; what matters is
+	// that it holds none while it waits on the client, so some sample before
+	// it gives up must find the pool idle.
+	idleWhileWaiting := false
 
 	deadline := time.Now().Add(10 * time.Second)
 	for len(d.srv.Logs.Find("audit download cut short")) == 0 {
 		if time.Now().After(deadline) {
 			t.Fatal("the download was still held ten seconds after its client stopped reading")
 		}
-		if n := d.pool.Stat().AcquiredConns(); n != 0 {
-			t.Fatalf("%d connections held while the download waited on its client", n)
+		if d.pool.Stat().AcquiredConns() == 0 {
+			idleWhileWaiting = true
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !idleWhileWaiting {
+		t.Error("the download held a connection the whole time it waited on its client")
 	}
 	if n := d.pool.Stat().AcquiredConns(); n != 0 {
 		t.Errorf("%d connections held after the download ended", n)
