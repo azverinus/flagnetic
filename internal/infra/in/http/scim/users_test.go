@@ -194,11 +194,65 @@ func TestAnExistingMemberInTheProvidersDomainsIsAdopted(t *testing.T) {
 	}
 }
 
+func TestADirectoryNamesOnlyAddressesItsProviderVouchesFor(t *testing.T) {
+	e := start(t)
+	slug := e.provider(t, "example.com")
+	token := e.token(t, slug)
+	outside := email("example.net")
+
+	assertScimError(t, "creating an address of another domain", e.create(t, token, userBody(outside, nil)), http.StatusBadRequest, "invalidValue")
+	if r := e.call(t, token, http.MethodGet, "/Users?filter="+escape(`userName eq "`+outside+`"`), ""); r.json(t)["totalResults"] != float64(0) {
+		t.Errorf("a refused create left a member: %s", r.body)
+	}
+
+	member := e.mustCreate(t, token, userBody(email("example.com"), nil))
+	assertScimError(t, "replacing the email with another domain's",
+		e.call(t, token, http.MethodPut, "/Users/"+member, marshal(t, userBody(outside, nil))), http.StatusBadRequest, "invalidValue")
+	assertScimError(t, "patching the email to another domain's",
+		e.call(t, token, http.MethodPatch, "/Users/"+member, marshal(t, patch(op("replace", "userName", outside)))), http.StatusBadRequest, "invalidValue")
+	if got := e.member(t, member); strings.HasSuffix(got.Email, "@example.net") {
+		t.Errorf("member email = %s after refused changes, want it kept", got.Email)
+	}
+
+	// A provider whose domains hold none of the address provisions nobody.
+	none := e.token(t, e.provider(t, "example.org"))
+	if r := e.call(t, none, http.MethodPost, "/Users", marshal(t, userBody(email("example.com"), nil))); r.status != http.StatusBadRequest {
+		t.Errorf("a provider vouching for no such domain created a member: %d %s", r.status, r.body)
+	}
+}
+
+// The domains are checked against an email a write names anew, not against
+// the one a member holds: removing a domain from the provider must not leave
+// its directory unable to rename or offboard the members it already has.
+func TestADirectoryKeepsTheMembersOfADomainItNoLongerVouchesFor(t *testing.T) {
+	e := start(t)
+	slug := e.provider(t, "example.com")
+	token := e.token(t, slug)
+	member := e.mustCreate(t, token, userBody(email("example.com"), nil))
+
+	res, err := e.admin.UpdateAuthProviderWithResponse(t.Context(), slug, &management.UpdateAuthProviderParams{IfMatch: ptr(`"1"`)},
+		management.AuthProviderPatch{Domains: &[]string{"example.org"}})
+	if err != nil || res.StatusCode() != http.StatusOK {
+		t.Fatalf("moving the provider to another domain = %v, %d: %s", err, res.StatusCode(), res.Body)
+	}
+
+	assertScimError(t, "creating in the domain the provider left", e.create(t, token, userBody(email("example.com"), nil)), http.StatusBadRequest, "invalidValue")
+	if r := e.call(t, token, http.MethodPatch, "/Users/"+member, marshal(t, patch(op("replace", "displayName", "Renamed")))); r.status != http.StatusOK {
+		t.Errorf("renaming a member outside the domains = %d: %s", r.status, r.body)
+	}
+	if r := e.call(t, token, http.MethodPatch, "/Users/"+member, marshal(t, patch(op("replace", "active", false)))); r.status != http.StatusOK {
+		t.Errorf("deactivating a member outside the domains = %d: %s", r.status, r.body)
+	}
+	if got := e.member(t, member); got.DisplayName != "Renamed" || got.Status != management.MemberStatusDeactivated {
+		t.Errorf("member = %q, %s; want renamed and deactivated", got.DisplayName, got.Status)
+	}
+}
+
 func TestAMemberNoDirectoryMayTakeOverIsAUniquenessConflict(t *testing.T) {
 	e := start(t)
 	slug := e.provider(t)
 	token := e.token(t, slug)
-	otherToken := e.token(t, e.provider(t, "example.net"))
+	otherToken := e.token(t, e.provider(t, "example.net", "example.com"))
 	pool := testkit.Pool(t)
 
 	elsewhere := testkit.NewMember(t, pool, testkit.WithEmail(email("example.net")))
@@ -206,17 +260,17 @@ func TestAMemberNoDirectoryMayTakeOverIsAUniquenessConflict(t *testing.T) {
 	invited := testkit.NewMember(t, pool, testkit.WithStatus(access.MemberInvited), testkit.WithEmail(email("example.com")))
 	deactivated := testkit.NewMember(t, pool, testkit.WithStatus(access.MemberDeactivated), testkit.WithEmail(email("example.com")))
 	provisioned := email("example.com")
-	e.mustCreate(t, otherToken, userBody(provisioned, nil)) // another provider's, and not in its domains: created, not adopted
+	e.mustCreate(t, otherToken, userBody(provisioned, nil)) // another provider's, in both providers' domains
 
 	for name, address := range map[string]string{
-		"an email outside the provider's domains": elsewhere.Email,
-		"an instance admin":                       admin.Email,
-		"an invited member":                       invited.Email,
-		"a deactivated member":                    deactivated.Email,
-		"a member another provider provisions":    provisioned,
+		"an instance admin":                    admin.Email,
+		"an invited member":                    invited.Email,
+		"a deactivated member":                 deactivated.Email,
+		"a member another provider provisions": provisioned,
 	} {
 		assertScimError(t, name, e.create(t, token, userBody(address, nil)), http.StatusConflict, "uniqueness")
 	}
+	assertScimError(t, "an email outside the provider's domains", e.create(t, token, userBody(elsewhere.Email, nil)), http.StatusBadRequest, "invalidValue")
 	for _, m := range []testkit.Member{elsewhere, admin, invited, deactivated} {
 		if got := e.member(t, m.ID.String()); got.Provider != nil {
 			t.Errorf("member %s was provisioned (%v) by a refused request", got.Email, *got.Provider)
@@ -409,7 +463,7 @@ func TestPatchingAUserAddsReplacesAndRemoves(t *testing.T) {
 // signing in at the identity provider.
 func TestADirectoryChangingAMembersEmailEndsTheirPasswordAndResets(t *testing.T) {
 	e := start(t)
-	slug := e.provider(t, "example.com")
+	slug := e.provider(t, "example.com", "elsewhere.example")
 	token := e.createToken(t, management.ScimTokenCreate{Provider: slug}).Value
 	existing := testkit.NewMember(t, testkit.Pool(t), testkit.WithEmail(email("example.com")))
 	member := e.mustCreate(t, token, userBody(existing.Email, nil))
