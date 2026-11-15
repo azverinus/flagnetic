@@ -58,8 +58,9 @@ func NewRefreshMetadata(d MetadataRefreshDeps) *RefreshMetadata { return &Refres
 // and was read a day ago or more, under a lock only one replica holds: another
 // replica's round does nothing. A provider whose metadata cannot be fetched or
 // read keeps what it has, is logged, and is tried again in the next round. A
-// provider whose metadata names another entity is refused: logged, and recorded
-// as auth_provider.metadata_refresh_refused, every round until an instance
+// provider whose metadata names another entity, or holds none of the
+// certificates it trusts, is refused: logged, and recorded as
+// auth_provider.metadata_refresh_refused, every round until an instance
 // admin deals with it. New certificates or a new single sign-on address are
 // applied and recorded as auth_provider.metadata_refreshed; metadata that says
 // what the provider holds only moves the time it was read.
@@ -127,7 +128,7 @@ func (h *RefreshMetadata) refresh(ctx context.Context, p identity.Provider) (ref
 		return outcomeFailed, nil
 	}
 	now := d.now()
-	outcome := outcomeSkipped
+	outcome, refusal := outcomeSkipped, identity.RefreshUnchanged
 	err = d.Tx.Within(ctx, func(ctx context.Context) error {
 		before, lockErr := lockProvider(ctx, d.Store, p.Slug)
 		if errors.Is(lockErr, errProviderNotFound) {
@@ -144,9 +145,9 @@ func (h *RefreshMetadata) refresh(ctx context.Context, p identity.Provider) (ref
 		after, result := before.RefreshIDPMetadata(fetched, now)
 		req := governance.Request{Actor: metadataRefreshActor}
 		switch result {
-		case identity.RefreshRefused:
-			outcome = outcomeRefused
-			return d.recordRefusedRefresh(ctx, now, req, before, fetched.EntityID)
+		case identity.RefreshRefused, identity.RefreshRefusedCertificates:
+			outcome, refusal = outcomeRefused, result
+			return d.recordRefusedRefresh(ctx, now, req, before, fetched, result)
 		case identity.RefreshChanged:
 			outcome = outcomeChanged
 			if storeErr := h.d.Store.UpdateIDPMetadata(ctx, after); storeErr != nil {
@@ -161,7 +162,12 @@ func (h *RefreshMetadata) refresh(ctx context.Context, p identity.Provider) (ref
 	if err != nil {
 		return outcomeFailed, err
 	}
-	if outcome == outcomeRefused {
+	switch {
+	case outcome == outcomeRefused && refusal == identity.RefreshRefusedCertificates:
+		h.d.Logger.WarnContext(ctx, "the identity provider's metadata holds none of the certificates the provider trusts, so it was not applied; "+
+			"an instance admin decides whether the identity provider replaced every certificate at once or its metadata address is wrong",
+			"provider", p.Slug, "entity_id", p.SAML.IDP.EntityID)
+	case outcome == outcomeRefused:
 		h.d.Logger.WarnContext(ctx, "the identity provider's metadata names another entity than the provider's, so it was not applied; "+
 			"an instance admin decides whether the provider moved or its metadata address is wrong",
 			"provider", p.Slug, "entity_id", p.SAML.IDP.EntityID, "offered_entity_id", fetched.EntityID)
@@ -169,14 +175,21 @@ func (h *RefreshMetadata) refresh(ctx context.Context, p identity.Provider) (ref
 	return outcome, nil
 }
 
-// recordRefusedRefresh records that offered, the entity the metadata named, was
-// not applied to p.
-func (d ProviderDeps) recordRefusedRefresh(ctx context.Context, now time.Time, req governance.Request, p identity.Provider, offered string) error {
+// recordRefusedRefresh records that the metadata offered was not applied to p,
+// and why: it named another entity, or it shared no certificate with the ones p
+// trusts.
+func (d ProviderDeps) recordRefusedRefresh(ctx context.Context, now time.Time, req governance.Request, p identity.Provider, offered identity.IDPMetadata, why identity.RefreshOutcome) error {
+	reason := "entity_changed"
+	if why == identity.RefreshRefusedCertificates {
+		reason = "no_trusted_certificate"
+	}
 	entry, err := governance.NewEntry(id.New[governance.Entry](d.IDs), now, req, governance.Record{
 		Action: "auth_provider.metadata_refresh_refused",
 		Entity: governance.Entity{Kind: "auth_provider", ID: p.ID.String(), Key: p.Slug},
 		Before: map[string]any{"idp_entity_id": p.SAML.IDP.EntityID},
-		After:  map[string]any{"idp_entity_id": p.SAML.IDP.EntityID, "refused_idp_entity_id": offered},
+		After: map[string]any{
+			"idp_entity_id": p.SAML.IDP.EntityID, "refused_idp_entity_id": offered.EntityID, "refused_reason": reason,
+		},
 	})
 	if err != nil {
 		return err

@@ -1,6 +1,7 @@
 package identity_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -76,7 +77,9 @@ func TestTheOrderOfTheCertificatesIsNotAChange(t *testing.T) {
 func TestNewCertificatesOrANewSSOURLAreAppliedAsAVersionOfTheProvider(t *testing.T) {
 	later := samlProvider(t).SAML.RefreshedAt.Add(25 * time.Hour)
 	for name, change := range map[string]func(*identity.IDPMetadata){
-		"a rotated certificate": func(m *identity.IDPMetadata) { m.Certificates = []string{certificate(t, rotationNow.AddDate(2, 0, 0))} },
+		"a rotation that lists the old and the new certificate": func(m *identity.IDPMetadata) {
+			m.Certificates = append(m.Certificates, certificate(t, rotationNow.AddDate(2, 0, 0)))
+		},
 		"an added certificate": func(m *identity.IDPMetadata) {
 			m.Certificates = append(m.Certificates, certificate(t, rotationNow.AddDate(2, 0, 0)))
 		},
@@ -115,5 +118,58 @@ func TestAChangedEntityIDIsRefusedAndNothingIsApplied(t *testing.T) {
 	if got.SAML.IDP.EntityID != p.SAML.IDP.EntityID || got.SAML.IDP.Certificates[0] != p.SAML.IDP.Certificates[0] ||
 		!got.SAML.RefreshedAt.Equal(p.SAML.RefreshedAt) || got.Version != p.Version {
 		t.Errorf("a refused refresh changed the provider: %+v", got.SAML)
+	}
+}
+
+func TestARotationEndsWithTheOldCertificateDroppedAndTheNewOneKept(t *testing.T) {
+	p := samlProvider(t)
+	rotated := certificate(t, rotationNow.AddDate(2, 0, 0))
+	p.SAML.IDP.Certificates = append(p.SAML.IDP.Certificates, rotated)
+	offered := p.SAML.IDP
+	offered.Certificates = []string{rotated}
+
+	got, outcome := p.RefreshIDPMetadata(offered, p.SAML.RefreshedAt.Add(25*time.Hour))
+
+	if outcome != identity.RefreshChanged {
+		t.Fatalf("outcome = %v, want changed", outcome)
+	}
+	if len(got.SAML.IDP.Certificates) != 1 || got.SAML.IDP.Certificates[0] != rotated {
+		t.Errorf("certificates = %v, want the new one alone", got.SAML.IDP.Certificates)
+	}
+}
+
+func TestACertificateSetSharingNothingTrustedIsRefusedAndNothingIsApplied(t *testing.T) {
+	for name, fetched := range map[string][]string{
+		"every certificate replaced": {certificate(t, rotationNow.AddDate(2, 0, 0))},
+		"no certificate":             nil,
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := samlProvider(t)
+			offered := p.SAML.IDP
+			offered.Certificates = fetched
+			offered.SSOURL = "https://attacker.example.com/sso"
+
+			got, outcome := p.RefreshIDPMetadata(offered, p.SAML.RefreshedAt.Add(25*time.Hour))
+
+			if outcome != identity.RefreshRefusedCertificates {
+				t.Fatalf("outcome = %v, want refused for its certificates", outcome)
+			}
+			if got.SAML.IDP.SSOURL != p.SAML.IDP.SSOURL || got.SAML.IDP.Certificates[0] != p.SAML.IDP.Certificates[0] ||
+				!got.SAML.RefreshedAt.Equal(p.SAML.RefreshedAt) || got.Version != p.Version {
+				t.Errorf("a refused refresh changed the provider: %+v", got.SAML)
+			}
+		})
+	}
+}
+
+func TestACertificateIsTheSameWhateverTheWhitespaceOfItsPEM(t *testing.T) {
+	p := samlProvider(t)
+	offered := p.SAML.IDP
+	offered.Certificates = []string{strings.TrimSpace(p.SAML.IDP.Certificates[0]) + "\n\n"}
+
+	_, outcome := p.RefreshIDPMetadata(offered, p.SAML.RefreshedAt.Add(25*time.Hour))
+
+	if outcome != identity.RefreshUnchanged {
+		t.Errorf("outcome = %v, want unchanged", outcome)
 	}
 }
