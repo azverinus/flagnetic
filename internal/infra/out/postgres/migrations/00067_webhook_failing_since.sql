@@ -13,6 +13,6 @@ UPDATE webhook_subscriptions
 SET failing_since = greatest(enabled_at, coalesce(last_success_at, enabled_at))
 WHERE consecutive_failures > 0;
 
-ALTER TABLE webhook_subscriptions
-    ADD CONSTRAINT webhook_subscriptions_failing_since_streak
-    CHECK ((failing_since IS NULL) = (consecutive_failures = 0));
+-- No constraint ties failing_since to consecutive_failures: the version
+-- running while this one rolls out counts failures and enables subscriptions
+-- without writing failing_since, and must not be refused for it.
