@@ -125,10 +125,10 @@ type committedVersionsKey struct{}
 // transaction does not hold their project's row, or when the write changes
 // the ruleset of one of them that is protected and not bypassed.
 func (g *ProtectionGuard) judge(ctx context.Context, where string, arg [16]byte) error {
-	// The transaction holds the project row when it locked it FOR UPDATE,
+	// The transaction holds the project row when it locked it FOR NO KEY UPDATE,
 	// which the lock records (package projectrow), or when the row is its
-	// own: it inserted or updated it, and keeps every other write's FOR
-	// UPDATE out until it ends. The row's xmax cannot tell: inserting a row
+	// own: it inserted or updated it, and keeps every other write's
+	// FOR NO KEY UPDATE out until it ends. The row's xmax cannot tell: inserting a row
 	// that references the project leaves the transaction's id there too,
 	// through a key share lock that keeps no write out.
 	rows, err := pgxtx.Querier(ctx, g.d.Pool).Query(ctx, `

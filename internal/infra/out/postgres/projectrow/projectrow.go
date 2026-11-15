@@ -1,5 +1,5 @@
 // Package projectrow records, for the life of a transaction, the projects
-// whose row it locked FOR UPDATE, the lock every write of a project takes so
+// whose row it locked FOR NO KEY UPDATE, the lock every write of a project takes so
 // that the project's writes run one at a time. The row itself cannot tell:
 // a transaction that only inserted a row referencing the project leaves its
 // id in the project row through the key share lock of the foreign key
@@ -20,7 +20,7 @@ func held(ctx context.Context) (map[workspace.ProjectID]bool, bool) {
 }
 
 // MarkHeld records that the transaction ctx carries has locked project's
-// row FOR UPDATE. Outside a transaction a lock ends with its statement, and
+// row FOR NO KEY UPDATE. Outside a transaction a lock ends with its statement, and
 // nothing is recorded.
 func MarkHeld(ctx context.Context, project workspace.ProjectID) {
 	if h, ok := held(ctx); ok {
@@ -29,7 +29,7 @@ func MarkHeld(ctx context.Context, project workspace.ProjectID) {
 }
 
 // Held reports whether the transaction ctx carries has locked project's row
-// FOR UPDATE.
+// FOR NO KEY UPDATE.
 func Held(ctx context.Context, project workspace.ProjectID) bool {
 	h, _ := held(ctx)
 	return h[project]

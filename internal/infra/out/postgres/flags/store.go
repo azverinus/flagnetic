@@ -35,7 +35,7 @@ func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 // appflags.ErrNotFound when there is none.
 func (s *Store) LockProject(ctx context.Context, project workspace.ProjectID) error {
 	var one int
-	err := s.db(ctx).QueryRow(ctx, `SELECT 1 FROM projects WHERE id = $1 FOR UPDATE`, project.Bytes()).Scan(&one)
+	err := s.db(ctx).QueryRow(ctx, `SELECT 1 FROM projects WHERE id = $1 FOR NO KEY UPDATE`, project.Bytes()).Scan(&one)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return appflags.ErrNotFound
 	}

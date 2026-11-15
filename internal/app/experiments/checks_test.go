@@ -83,3 +83,71 @@ func TestAnExperimentWhoseChecksFailRollsBackAlone(t *testing.T) {
 		t.Errorf("the other experiment's sample-ratio check is missing, want it checked")
 	}
 }
+
+// probingExposures answers like the events store, and while the final check
+// counts an environment's exposures it takes the project's lock from another
+// unit of work, as a write of the project would.
+type probingExposures struct {
+	*pgevents.Store
+	probe  func(ctx context.Context) error
+	probed []error
+}
+
+func (p *probingExposures) FirstExposureCountsReceivedBy(ctx context.Context, env workspace.EnvironmentID,
+	e experiments.ExperimentID, by time.Time,
+) (map[string]int64, error) {
+	p.probed = append(p.probed, p.probe(ctx))
+	return p.Store.FirstExposureCountsReceivedBy(ctx, env, e, by)
+}
+
+// The final check counts the stopped experiment's exposures without holding
+// its project's lock, so a write of the project goes through meanwhile, and
+// stores the counts made once it holds the lock.
+func TestTheFinalCheckCountsWithoutHoldingTheProjectsWrites(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := setUp(t, admin)
+	if res, err := admin.StartExperimentWithResponse(t.Context(), p.Key, "title_test",
+		&management.StartExperimentParams{IfMatch: ptr(`"1"`)}); err != nil || res.JSON200 == nil {
+		t.Fatalf("start: %v", err)
+	}
+	if res, err := admin.StopExperimentWithResponse(t.Context(), p.Key, "title_test",
+		&management.StopExperimentParams{IfMatch: ptr(`"2"`)}, management.ExperimentStop{Outcome: "removed"}); err != nil || res.JSON200 == nil {
+		t.Fatalf("stop: %v", err)
+	}
+
+	pool := testkit.Pool(t)
+	c := clock.NewFake(time.Now().Add(2 * time.Minute))
+	tx := postgres.NewTransactor(pool)
+	store, flagStore := pgexperiments.NewStore(pool), pgflags.NewStore(pool)
+	project := id.FromBytes[workspace.Project](p.Id)
+	final := &probingExposures{Store: pgevents.NewStore(pool), probe: func(context.Context) error {
+		ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+		defer cancel()
+		return tx.Within(ctx, func(ctx context.Context) error { return flagStore.LockProject(ctx, project) })
+	}}
+	err := appexperiments.NewRunChecks(appexperiments.RunChecksDeps{
+		Tx: tx, Lock: store, Running: store, Pending: store, Final: final, Retention: 30 * 24 * time.Hour, Projects: store, Store: store, Holders: flagStore,
+		FirstExposures: final.Store, Exposures: final.Store, Checks: store,
+		Recorder: appexperiments.NewRecorder(testkit.Record(pool), c, id.NewSource(c)),
+	}).Handle(t.Context())
+	if err != nil {
+		t.Fatalf("round: %v", err)
+	}
+	if len(final.probed) == 0 {
+		t.Fatal("the final check counted nothing from the raw exposures")
+	}
+	for _, err := range final.probed {
+		if err != nil {
+			t.Errorf("a write of the project while the final check counted = %v, want it through", err)
+		}
+	}
+	res, err := admin.GetExperimentExposuresWithResponse(t.Context(), p.Key, "title_test",
+		&management.GetExperimentExposuresParams{Environment: "staging"})
+	if err != nil || res.JSON200 == nil {
+		t.Fatalf("exposures: %v", err)
+	}
+	if srm := res.JSON200.SampleRatio; srm == nil || !srm.Final {
+		t.Errorf("sample_ratio = %+v, want final", srm)
+	}
+}

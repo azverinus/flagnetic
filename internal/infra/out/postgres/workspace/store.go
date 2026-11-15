@@ -81,7 +81,7 @@ func (s *Store) ProjectByKey(ctx context.Context, key string) (workspace.Project
 // the unit of work ends, so changes to the project and to what it holds are
 // made one at a time.
 func (s *Store) LockProject(ctx context.Context, projectID workspace.ProjectID) (workspace.Project, error) {
-	p, err := s.oneProject(ctx, `SELECT `+projectColumns+` FROM projects WHERE id = $1 FOR UPDATE`, projectID.Bytes())
+	p, err := s.oneProject(ctx, `SELECT `+projectColumns+` FROM projects WHERE id = $1 FOR NO KEY UPDATE`, projectID.Bytes())
 	if err == nil {
 		projectrow.MarkHeld(ctx, projectID)
 	}

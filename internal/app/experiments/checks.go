@@ -465,20 +465,57 @@ func (h *RunChecks) one(ctx context.Context, check checker, listed experiments.E
 }
 
 // final completes the sample-ratio check of the stopped experiment listed,
-// under its project's row lock, once finalCheckDelay has passed since the stop
-// and the exposure rollup has read every exposure received at or before it.
-// The check runs over exactly those exposures, read from the raw rows: the
-// rollup's aggregates also hold what was received after the stop by now,
-// which stays out. An experiment started before the raw rows' retention may
-// have lost some of them, which would leave units out and shift others to a
-// later exposure, so it takes the rollup's aggregates instead. It runs in the
-// environments the stop checked, is stored final at the round's time, and
-// raises or clears the sample-ratio alert as a running check does. Before
-// then the stop's result stays as it is, for the next round.
+// once finalCheckDelay has passed since the stop and the exposure rollup has
+// read every exposure received at or before it. The check runs over exactly
+// those exposures, read from the raw rows: the rollup's aggregates also hold
+// what was received after the stop by now, which stays out. An experiment
+// started before the raw rows' retention may have lost some of them, which
+// would leave units out and shift others to a later exposure, so it takes the
+// rollup's aggregates instead. It runs in the environments the stop checked,
+// is stored final at the round's time, and raises or clears the sample-ratio
+// alert as a running check does. Before then the stop's result stays as it
+// is, for the next round.
+//
+// Counting walks every raw exposure of the experiment, which can take long,
+// so it runs before the project's row lock is taken: held across it, the
+// lock would stall every write of the project. Under the lock the experiment
+// and its pending environments are read again, and only the environments
+// still pending are stored, from the counts already made.
 func (h *RunChecks) final(ctx context.Context, check checker, listed experiments.Experiment) error {
 	ctx, cancel := context.WithTimeout(ctx, experimentCheckTimeout)
 	defer cancel()
 	now := h.d.Recorder.now()
+
+	e, err := h.d.Store.ExperimentByKey(ctx, listed.Project, listed.Key)
+	if errors.Is(err, ErrNotFound) || (err == nil && !finalDue(e, listed, now)) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	envs, err := h.d.Pending.PendingFinalEnvironments(ctx, e.ID)
+	if err != nil || len(envs) == 0 {
+		return err
+	}
+	read, err := h.d.Final.ExposuresReadThrough(ctx, *e.StoppedAt)
+	if err != nil || !read {
+		return err
+	}
+	rawKept := e.StartedAt != nil && !e.StartedAt.Before(now.Add(-h.d.Retention))
+	counted := make(map[workspace.EnvironmentID]map[string]int64, len(envs))
+	for _, env := range envs {
+		var first map[string]int64
+		if rawKept {
+			first, err = h.d.Final.FirstExposureCountsReceivedBy(ctx, env, e.ID, *e.StoppedAt)
+		} else {
+			first, err = check.counts.FirstExposureCounts(ctx, env, e.ID)
+		}
+		if err != nil {
+			return err
+		}
+		counted[env] = first
+	}
+
 	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		err := h.d.Projects.LockProject(ctx, listed.Project)
 		if errors.Is(err, ErrNotFound) {
@@ -487,31 +524,34 @@ func (h *RunChecks) final(ctx context.Context, check checker, listed experiments
 		if err != nil {
 			return err
 		}
-		e, err := h.d.Store.ExperimentByKey(ctx, listed.Project, listed.Key)
-		if errors.Is(err, ErrNotFound) || (err == nil && (e.ID != listed.ID || e.StoppedAt == nil)) {
+		locked, err := h.d.Store.ExperimentByKey(ctx, listed.Project, listed.Key)
+		if errors.Is(err, ErrNotFound) || (err == nil && (!finalDue(locked, listed, now))) {
 			return nil
 		}
 		if err != nil {
 			return err
 		}
-		if now.Before(e.StoppedAt.Add(finalCheckDelay)) {
+		pending, err := h.d.Pending.PendingFinalEnvironments(ctx, locked.ID)
+		if err != nil {
+			return err
+		}
+		var todo []workspace.EnvironmentID
+		for _, env := range pending {
+			if _, ok := counted[env]; ok {
+				todo = append(todo, env)
+			}
+		}
+		if len(todo) == 0 {
 			return nil
 		}
-		envs, err := h.d.Pending.PendingFinalEnvironments(ctx, e.ID)
-		if err != nil || len(envs) == 0 {
-			return err
-		}
-		read, err := h.d.Final.ExposuresReadThrough(ctx, *e.StoppedAt)
-		if err != nil || !read {
-			return err
-		}
-		rawKept := e.StartedAt != nil && !e.StartedAt.Before(now.Add(-h.d.Retention))
-		counts := func(env workspace.EnvironmentID) (map[string]int64, error) {
-			if !rawKept {
-				return check.counts.FirstExposureCounts(ctx, env, e.ID)
-			}
-			return h.d.Final.FirstExposureCountsReceivedBy(ctx, env, e.ID, *e.StoppedAt)
-		}
-		return check.sampleRatio(ctx, e, envs, now, true, counts, governance.Request{})
+		return check.sampleRatio(ctx, locked, todo, now, true, func(env workspace.EnvironmentID) (map[string]int64, error) {
+			return counted[env], nil
+		}, governance.Request{})
 	})
+}
+
+// finalDue reports whether e is the stopped experiment listed and its final
+// check's delay has passed at now.
+func finalDue(e, listed experiments.Experiment, now time.Time) bool {
+	return e.ID == listed.ID && e.StoppedAt != nil && !now.Before(e.StoppedAt.Add(finalCheckDelay))
 }
