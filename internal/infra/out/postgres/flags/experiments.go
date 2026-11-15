@@ -127,3 +127,31 @@ func (s *Store) HoldingEnvironments(ctx context.Context, project workspace.Proje
 	}
 	return envs, nil
 }
+
+// HoldingConfigurations returns the configurations of project, one per flag
+// and environment, that have a rule serving the experiment keyed key, as
+// references ordered by flag key, then by the environments' order.
+func (s *Store) HoldingConfigurations(ctx context.Context, project workspace.ProjectID, key string) ([]flags.Reference, error) {
+	rows, err := s.db(ctx).Query(ctx, `
+		SELECT f.key, e.key
+		FROM flag_configurations c
+		JOIN flags f ON f.id = c.flag_id
+		JOIN environments e ON e.id = c.environment_id
+		WHERE f.project_id = $1
+		  AND c.document @> jsonb_build_object('rules', jsonb_build_array(
+		      jsonb_build_object('serve', jsonb_build_object('kind', 'experiment', 'experiment', $2::text))))
+		ORDER BY f.key COLLATE "C", e.sort_order, e.key COLLATE "C"`,
+		project.Bytes(), key)
+	if err != nil {
+		return nil, fmt.Errorf("reading the configurations holding an experiment: %w", err)
+	}
+	refs, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (flags.Reference, error) {
+		r := flags.Reference{Kind: "flag"}
+		scanErr := row.Scan(&r.Key, &r.Environment)
+		return r, scanErr
+	})
+	if err != nil {
+		return nil, fmt.Errorf("reading the configurations holding an experiment: %w", err)
+	}
+	return refs, nil
+}

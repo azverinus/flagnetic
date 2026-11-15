@@ -1598,7 +1598,12 @@ export const exportProject = <ThrowOnError extends boolean = false>(
  * smaller traffic allocation of a running experiment is 409
  * `traffic_allocation_decrease`. A larger one moves on the rulesets of
  * the environments holding its rules and is recorded as
- * `experiment.traffic_allocation_changed`. A rule serving an archived
+ * `experiment.traffic_allocation_changed`. A draft the document moves
+ * to another flag is 409 `in_use`, in a dry run too, while a
+ * configuration of another flag still has a rule serving it once the
+ * document is written, listing those configurations in `references`;
+ * a replace deletes an absent draft together with the absent flags
+ * whose rules serve it. A rule serving an archived
  * experiment is accepted. No salt is shared by two experiments, or by an
  * experiment and a rollout.
  *
@@ -2998,7 +3003,9 @@ export const createExperiment = <ThrowOnError extends boolean = false>(
  *
  * Deletes the experiment. Only a draft is deleted (`not_draft`;
  * `archived` for an archived one): once started, an experiment keeps
- * its history.
+ * its history. A draft that a rule of an environment's configuration
+ * serves is `in_use` (409), listing those configurations in
+ * `references`.
  *
  */
 export const deleteExperiment = <ThrowOnError extends boolean = false>(
@@ -3047,7 +3054,10 @@ export const getExperiment = <ThrowOnError extends boolean = false>(
  *
  * Changes any of the name, hypothesis, owner, tags, flag, unit type,
  * variations, traffic allocation or expected end date of a draft, as a
- * create judges them; the key never changes (`immutable`). A running
+ * create judges them; the key never changes (`immutable`). Moving a
+ * draft to another flag is `in_use` (409) while a rule of an
+ * environment's configuration serves it, listing those
+ * configurations in `references`. A running
  * experiment changes its name, hypothesis (never to an empty one,
  * `required` on `/hypothesis`), owner, tags and expected end date, and
  * grows its traffic allocation: a change to its flag,

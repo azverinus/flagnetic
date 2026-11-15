@@ -124,8 +124,11 @@ func flagOf(f flags.Flag, c flags.Configuration, experiments map[string]flags.Ex
 		case flags.ServeRollout:
 			serve.UnitType, serve.Percentage, serve.Salt = r.Serve.UnitType, r.Serve.Percentage, r.Serve.Salt
 		case flags.ServeExperiment:
+			// A rule names its experiment by key alone; one that compares
+			// another flag has weights naming that flag's variations, which
+			// this flag's evaluation could not resolve.
 			e, ok := experiments[r.Serve.Experiment]
-			if !ok || e.Status != flags.ExperimentRunning {
+			if !ok || e.Status != flags.ExperimentRunning || e.Flag != f.ID {
 				continue
 			}
 			serve = experimentServe(e)

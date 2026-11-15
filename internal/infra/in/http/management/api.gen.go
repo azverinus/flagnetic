@@ -9666,7 +9666,9 @@ type ClientInterface interface {
 	//
 	// Deletes the experiment. Only a draft is deleted (`not_draft`;
 	// `archived` for an archived one): once started, an experiment keeps
-	// its history.
+	// its history. A draft that a rule of an environment's configuration
+	// serves is `in_use` (409), listing those configurations in
+	// `references`.
 	//
 	// Corresponds with DELETE /projects/{project}/experiments/{experiment} (the `DeleteExperiment` operationId).
 	DeleteExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *DeleteExperimentParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -9682,7 +9684,10 @@ type ClientInterface interface {
 	//
 	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
 	// variations, traffic allocation or expected end date of a draft, as a
-	// create judges them; the key never changes (`immutable`). A running
+	// create judges them; the key never changes (`immutable`). Moving a
+	// draft to another flag is `in_use` (409) while a rule of an
+	// environment's configuration serves it, listing those
+	// configurations in `references`. A running
 	// experiment changes its name, hypothesis (never to an empty one,
 	// `required` on `/hypothesis`), owner, tags and expected end date, and
 	// grows its traffic allocation: a change to its flag,
@@ -9707,7 +9712,10 @@ type ClientInterface interface {
 	//
 	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
 	// variations, traffic allocation or expected end date of a draft, as a
-	// create judges them; the key never changes (`immutable`). A running
+	// create judges them; the key never changes (`immutable`). Moving a
+	// draft to another flag is `in_use` (409) while a rule of an
+	// environment's configuration serves it, listing those
+	// configurations in `references`. A running
 	// experiment changes its name, hypothesis (never to an empty one,
 	// `required` on `/hypothesis`), owner, tags and expected end date, and
 	// grows its traffic allocation: a change to its flag,
@@ -10560,7 +10568,12 @@ type ClientInterface interface {
 	// smaller traffic allocation of a running experiment is 409
 	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
 	// the environments holding its rules and is recorded as
-	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// `experiment.traffic_allocation_changed`. A draft the document moves
+	// to another flag is 409 `in_use`, in a dry run too, while a
+	// configuration of another flag still has a rule serving it once the
+	// document is written, listing those configurations in `references`;
+	// a replace deletes an absent draft together with the absent flags
+	// whose rules serve it. A rule serving an archived
 	// experiment is accepted. No salt is shared by two experiments, or by an
 	// experiment and a rollout.
 	//
@@ -10651,7 +10664,12 @@ type ClientInterface interface {
 	// smaller traffic allocation of a running experiment is 409
 	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
 	// the environments holding its rules and is recorded as
-	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// `experiment.traffic_allocation_changed`. A draft the document moves
+	// to another flag is 409 `in_use`, in a dry run too, while a
+	// configuration of another flag still has a rule serving it once the
+	// document is written, listing those configurations in `references`;
+	// a replace deletes an absent draft together with the absent flags
+	// whose rules serve it. A rule serving an archived
 	// experiment is accepted. No salt is shared by two experiments, or by an
 	// experiment and a rollout.
 	//
@@ -15184,7 +15202,9 @@ func (c *Client) CreateExperiment(ctx context.Context, project ProjectKey, body 
 //
 // Deletes the experiment. Only a draft is deleted (`not_draft`;
 // `archived` for an archived one): once started, an experiment keeps
-// its history.
+// its history. A draft that a rule of an environment's configuration
+// serves is `in_use` (409), listing those configurations in
+// `references`.
 //
 // Corresponds with DELETE /projects/{project}/experiments/{experiment} (the `DeleteExperiment` operationId).
 func (c *Client) DeleteExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *DeleteExperimentParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -15220,7 +15240,10 @@ func (c *Client) GetExperiment(ctx context.Context, project ProjectKey, experime
 //
 // Changes any of the name, hypothesis, owner, tags, flag, unit type,
 // variations, traffic allocation or expected end date of a draft, as a
-// create judges them; the key never changes (`immutable`). A running
+// create judges them; the key never changes (`immutable`). Moving a
+// draft to another flag is `in_use` (409) while a rule of an
+// environment's configuration serves it, listing those
+// configurations in `references`. A running
 // experiment changes its name, hypothesis (never to an empty one,
 // `required` on `/hypothesis`), owner, tags and expected end date, and
 // grows its traffic allocation: a change to its flag,
@@ -15255,7 +15278,10 @@ func (c *Client) UpdateExperimentWithBody(ctx context.Context, project ProjectKe
 //
 // Changes any of the name, hypothesis, owner, tags, flag, unit type,
 // variations, traffic allocation or expected end date of a draft, as a
-// create judges them; the key never changes (`immutable`). A running
+// create judges them; the key never changes (`immutable`). Moving a
+// draft to another flag is `in_use` (409) while a rule of an
+// environment's configuration serves it, listing those
+// configurations in `references`. A running
 // experiment changes its name, hypothesis (never to an empty one,
 // `required` on `/hypothesis`), owner, tags and expected end date, and
 // grows its traffic allocation: a change to its flag,
@@ -16568,7 +16594,12 @@ func (c *Client) CheckHashUniformity(ctx context.Context, project ProjectKey, bo
 // smaller traffic allocation of a running experiment is 409
 // `traffic_allocation_decrease`. A larger one moves on the rulesets of
 // the environments holding its rules and is recorded as
-// `experiment.traffic_allocation_changed`. A rule serving an archived
+// `experiment.traffic_allocation_changed`. A draft the document moves
+// to another flag is 409 `in_use`, in a dry run too, while a
+// configuration of another flag still has a rule serving it once the
+// document is written, listing those configurations in `references`;
+// a replace deletes an absent draft together with the absent flags
+// whose rules serve it. A rule serving an archived
 // experiment is accepted. No salt is shared by two experiments, or by an
 // experiment and a rollout.
 //
@@ -16669,7 +16700,12 @@ func (c *Client) ImportProjectWithBody(ctx context.Context, project ProjectKey, 
 // smaller traffic allocation of a running experiment is 409
 // `traffic_allocation_decrease`. A larger one moves on the rulesets of
 // the environments holding its rules and is recorded as
-// `experiment.traffic_allocation_changed`. A rule serving an archived
+// `experiment.traffic_allocation_changed`. A draft the document moves
+// to another flag is 409 `in_use`, in a dry run too, while a
+// configuration of another flag still has a rule serving it once the
+// document is written, listing those configurations in `references`;
+// a replace deletes an absent draft together with the absent flags
+// whose rules serve it. A rule serving an archived
 // experiment is accepted. No salt is shared by two experiments, or by an
 // experiment and a rollout.
 //
@@ -31607,7 +31643,9 @@ type ClientWithResponsesInterface interface {
 	//
 	// Deletes the experiment. Only a draft is deleted (`not_draft`;
 	// `archived` for an archived one): once started, an experiment keeps
-	// its history.
+	// its history. A draft that a rule of an environment's configuration
+	// serves is `in_use` (409), listing those configurations in
+	// `references`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -31627,7 +31665,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
 	// variations, traffic allocation or expected end date of a draft, as a
-	// create judges them; the key never changes (`immutable`). A running
+	// create judges them; the key never changes (`immutable`). Moving a
+	// draft to another flag is `in_use` (409) while a rule of an
+	// environment's configuration serves it, listing those
+	// configurations in `references`. A running
 	// experiment changes its name, hypothesis (never to an empty one,
 	// `required` on `/hypothesis`), owner, tags and expected end date, and
 	// grows its traffic allocation: a change to its flag,
@@ -31652,7 +31693,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
 	// variations, traffic allocation or expected end date of a draft, as a
-	// create judges them; the key never changes (`immutable`). A running
+	// create judges them; the key never changes (`immutable`). Moving a
+	// draft to another flag is `in_use` (409) while a rule of an
+	// environment's configuration serves it, listing those
+	// configurations in `references`. A running
 	// experiment changes its name, hypothesis (never to an empty one,
 	// `required` on `/hypothesis`), owner, tags and expected end date, and
 	// grows its traffic allocation: a change to its flag,
@@ -32547,7 +32591,12 @@ type ClientWithResponsesInterface interface {
 	// smaller traffic allocation of a running experiment is 409
 	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
 	// the environments holding its rules and is recorded as
-	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// `experiment.traffic_allocation_changed`. A draft the document moves
+	// to another flag is 409 `in_use`, in a dry run too, while a
+	// configuration of another flag still has a rule serving it once the
+	// document is written, listing those configurations in `references`;
+	// a replace deletes an absent draft together with the absent flags
+	// whose rules serve it. A rule serving an archived
 	// experiment is accepted. No salt is shared by two experiments, or by an
 	// experiment and a rollout.
 	//
@@ -32638,7 +32687,12 @@ type ClientWithResponsesInterface interface {
 	// smaller traffic allocation of a running experiment is 409
 	// `traffic_allocation_decrease`. A larger one moves on the rulesets of
 	// the environments holding its rules and is recorded as
-	// `experiment.traffic_allocation_changed`. A rule serving an archived
+	// `experiment.traffic_allocation_changed`. A draft the document moves
+	// to another flag is 409 `in_use`, in a dry run too, while a
+	// configuration of another flag still has a rule serving it once the
+	// document is written, listing those configurations in `references`;
+	// a replace deletes an absent draft together with the absent flags
+	// whose rules serve it. A rule serving an archived
 	// experiment is accepted. No salt is shared by two experiments, or by an
 	// experiment and a rollout.
 	//
@@ -53511,7 +53565,9 @@ func (c *ClientWithResponses) CreateExperimentWithResponse(ctx context.Context, 
 //
 // Deletes the experiment. Only a draft is deleted (`not_draft`;
 // `archived` for an archived one): once started, an experiment keeps
-// its history.
+// its history. A draft that a rule of an environment's configuration
+// serves is `in_use` (409), listing those configurations in
+// `references`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -53543,7 +53599,10 @@ func (c *ClientWithResponses) GetExperimentWithResponse(ctx context.Context, pro
 //
 // Changes any of the name, hypothesis, owner, tags, flag, unit type,
 // variations, traffic allocation or expected end date of a draft, as a
-// create judges them; the key never changes (`immutable`). A running
+// create judges them; the key never changes (`immutable`). Moving a
+// draft to another flag is `in_use` (409) while a rule of an
+// environment's configuration serves it, listing those
+// configurations in `references`. A running
 // experiment changes its name, hypothesis (never to an empty one,
 // `required` on `/hypothesis`), owner, tags and expected end date, and
 // grows its traffic allocation: a change to its flag,
@@ -53574,7 +53633,10 @@ func (c *ClientWithResponses) UpdateExperimentWithBodyWithResponse(ctx context.C
 //
 // Changes any of the name, hypothesis, owner, tags, flag, unit type,
 // variations, traffic allocation or expected end date of a draft, as a
-// create judges them; the key never changes (`immutable`). A running
+// create judges them; the key never changes (`immutable`). Moving a
+// draft to another flag is `in_use` (409) while a rule of an
+// environment's configuration serves it, listing those
+// configurations in `references`. A running
 // experiment changes its name, hypothesis (never to an empty one,
 // `required` on `/hypothesis`), owner, tags and expected end date, and
 // grows its traffic allocation: a change to its flag,
@@ -54745,7 +54807,12 @@ func (c *ClientWithResponses) CheckHashUniformityWithResponse(ctx context.Contex
 // smaller traffic allocation of a running experiment is 409
 // `traffic_allocation_decrease`. A larger one moves on the rulesets of
 // the environments holding its rules and is recorded as
-// `experiment.traffic_allocation_changed`. A rule serving an archived
+// `experiment.traffic_allocation_changed`. A draft the document moves
+// to another flag is 409 `in_use`, in a dry run too, while a
+// configuration of another flag still has a rule serving it once the
+// document is written, listing those configurations in `references`;
+// a replace deletes an absent draft together with the absent flags
+// whose rules serve it. A rule serving an archived
 // experiment is accepted. No salt is shared by two experiments, or by an
 // experiment and a rollout.
 //
@@ -54842,7 +54909,12 @@ func (c *ClientWithResponses) ImportProjectWithBodyWithResponse(ctx context.Cont
 // smaller traffic allocation of a running experiment is 409
 // `traffic_allocation_decrease`. A larger one moves on the rulesets of
 // the environments holding its rules and is recorded as
-// `experiment.traffic_allocation_changed`. A rule serving an archived
+// `experiment.traffic_allocation_changed`. A draft the document moves
+// to another flag is 409 `in_use`, in a dry run too, while a
+// configuration of another flag still has a rule serving it once the
+// document is written, listing those configurations in `references`;
+// a replace deletes an absent draft together with the absent flags
+// whose rules serve it. A rule serving an archived
 // experiment is accepted. No salt is shared by two experiments, or by an
 // experiment and a rollout.
 //

@@ -29,6 +29,7 @@ type DeleteExperimentDeps struct {
 	Tx       Transactor
 	Projects ProjectLocker
 	Store    ExperimentDeleter
+	Holders  Holders
 	Recorder Recorder
 }
 
@@ -39,9 +40,17 @@ type DeleteExperiment struct{ d DeleteExperimentDeps }
 func NewDeleteExperiment(d DeleteExperimentDeps) *DeleteExperiment { return &DeleteExperiment{d: d} }
 
 // Handle deletes the experiment, recording it as it was. A draft is in no
-// ruleset, so no ruleset moves; the change requests proposing to start it
-// are superseded by the deletion.
+// ruleset, so no ruleset moves, but a rule of a flag may serve it by its
+// key, and deleting it is refused while one does; the change requests
+// proposing to start it are superseded by the deletion.
 func (h *DeleteExperiment) Handle(ctx context.Context, cmd ExperimentCommand) error {
+	return h.handle(ctx, cmd)
+}
+
+// handle deletes the experiment as Handle does, except that a rule serving it
+// in a configuration of one of the flags keyed leaving does not keep it: an
+// import deleting those flags too takes the rule away with them.
+func (h *DeleteExperiment) handle(ctx context.Context, cmd ExperimentCommand, leaving ...string) error {
 	now := h.d.Recorder.now()
 	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		if err := lockProject(ctx, h.d.Projects, cmd.Project); err != nil {
@@ -55,6 +64,9 @@ func (h *DeleteExperiment) Handle(ctx context.Context, cmd ExperimentCommand) er
 			return err
 		}
 		if err = e.CanDelete(); err != nil {
+			return err
+		}
+		if err = refuseWhileServed(ctx, h.d.Holders, cmd.Project, e.Key, leaving...); err != nil {
 			return err
 		}
 		// The entry is recorded before the row goes, so the change requests

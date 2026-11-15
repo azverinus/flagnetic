@@ -126,8 +126,14 @@ func (e transferExperiments) UpdateExperiment(ctx context.Context, in apptransfe
 
 func (e transferExperiments) CheckSalts(ctx context.Context) error { return e.importer.CheckSalts(ctx) }
 
-func (e transferExperiments) DeleteExperiment(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error {
-	return e.importer.DeleteExperiment(ctx, project, key, req)
+func (e transferExperiments) CheckServed(ctx context.Context, project workspace.ProjectID, keys []string) error {
+	return e.importer.CheckServed(ctx, project, keys)
+}
+
+func (e transferExperiments) DeleteExperiment(ctx context.Context, project workspace.ProjectID, key string, leaving []string,
+	req governance.Request,
+) error {
+	return e.importer.DeleteExperiment(ctx, project, key, leaving, req)
 }
 
 // transferSDKKeys gives the transfer context the SDK keys of the delivery

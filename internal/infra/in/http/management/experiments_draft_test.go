@@ -416,3 +416,116 @@ func TestListingExperimentsFiltersByStatusFlagOwnerTagAndArchived(t *testing.T) 
 	res := do(f.admin.ListExperimentsWithResponse(t.Context(), f.project.Key, &management.ListExperimentsParams{Status: &bad}))
 	assertProblem(t, "an unknown status", res.StatusCode(), res.Body, http.StatusBadRequest, "invalid_request")
 }
+
+// A rule of a flag serves a draft by its key, so the draft stays comparing
+// that flag for as long as an environment holds the rule: moved to another
+// flag, or deleted and created again under the same key on another flag, it
+// would put weights naming the other flag's variations in the first flag's
+// ruleset when it starts.
+func TestADraftAnEnvironmentServesKeepsItsFlagAndIsNotDeleted(t *testing.T) {
+	f := startExperiments(t)
+	stringFlag(t, f.admin, f.project.Key, "other_title")
+	createExperiment(t, f.admin, f.project.Key, validExperiment("title_test"))
+	mustPut(t, f.admin, f.project.Key, "checkout_title", "staging", 1, management.FlagConfigurationPut{
+		OffVariation: "a", Fallthrough: "a", Rules: &[]management.RuleInput{{Serve: serveExperiment("title_test")}},
+	})
+
+	moved := patchExperiment(t, f.admin, f.project.Key, "title_test", 1, management.ExperimentPatch{Flag: ptr("other_title")})
+	if got := referencesOf(t, "moving a served draft", moved.StatusCode(), moved.Body); !slices.Equal(got, []string{"checkout_title staging"}) {
+		t.Errorf("move references = %v, want the configuration serving it", got)
+	}
+	deleted := do(f.admin.DeleteExperimentWithResponse(t.Context(), f.project.Key, "title_test", &management.DeleteExperimentParams{IfMatch: ifMatch(1)}))
+	if got := referencesOf(t, "deleting a served draft", deleted.StatusCode(), deleted.Body); !slices.Equal(got, []string{"checkout_title staging"}) {
+		t.Errorf("delete references = %v, want the configuration serving it", got)
+	}
+
+	// Naming the flag it already compares is no move, and any other edit is
+	// allowed.
+	same := patchExperiment(t, f.admin, f.project.Key, "title_test", 1, management.ExperimentPatch{Flag: ptr("checkout_title")})
+	if same.StatusCode() != http.StatusOK {
+		t.Fatalf("PATCH keeping the flag = %d: %s", same.StatusCode(), same.Body)
+	}
+
+	// Once the rule is gone the draft moves and is deleted as any other.
+	mustPut(t, f.admin, f.project.Key, "checkout_title", "staging", 2, management.FlagConfigurationPut{OffVariation: "a", Fallthrough: "a"})
+	if res := patchExperiment(t, f.admin, f.project.Key, "title_test", 1, management.ExperimentPatch{Flag: ptr("other_title")}); res.StatusCode() != http.StatusOK {
+		t.Fatalf("PATCH after the rule went = %d: %s", res.StatusCode(), res.Body)
+	}
+	if res := do(f.admin.DeleteExperimentWithResponse(t.Context(), f.project.Key, "title_test", &management.DeleteExperimentParams{IfMatch: ifMatch(2)})); res.StatusCode() != http.StatusNoContent {
+		t.Fatalf("DELETE after the rule went = %d: %s", res.StatusCode(), res.Body)
+	}
+}
+
+// servedDraft builds a project whose flag checkout_title holds, in staging, a
+// rule serving the draft title_test, beside the flag other_title it may move
+// to.
+func servedDraft(t *testing.T) experimentFixture {
+	t.Helper()
+	f := startExperiments(t)
+	stringFlag(t, f.admin, f.project.Key, "other_title")
+	createExperiment(t, f.admin, f.project.Key, validExperiment("title_test"))
+	mustPut(t, f.admin, f.project.Key, "checkout_title", "staging", 1, management.FlagConfigurationPut{
+		OffVariation: "a", Fallthrough: "a", Rules: &[]management.RuleInput{{Serve: serveExperiment("title_test")}},
+	})
+	return f
+}
+
+// withExperimentFlag gives the experiment keyed key of d the flag flag.
+func withExperimentFlag(d map[string]any, key, flag string) {
+	for _, e := range d["experiments"].([]any) {
+		if e := e.(map[string]any); e["key"] == key {
+			e["flag"] = flag
+		}
+	}
+}
+
+// An import moves a draft to another flag only when no configuration of the
+// flag it leaves still serves it once the document is written; a document
+// that drops the rule along with the move is taken whole.
+func TestAnImportMovesAServedDraftOnlyWithTheRulesServingIt(t *testing.T) {
+	f := servedDraft(t)
+	k := f.project.Key
+
+	doc := exported(t, f.admin, k)
+	withExperimentFlag(doc, "title_test", "other_title")
+	for _, dry := range []bool{true, false} {
+		res := mergeInto(t, f.admin, k, doc, mergeOptions{dryRun: dry})
+		if got := referencesOf(t, "moving a served draft", res.StatusCode(), res.Body); !slices.Equal(got, []string{"checkout_title staging"}) {
+			t.Errorf("dry run %v: references = %v, want the configuration serving it", dry, got)
+		}
+	}
+	if got := do(f.admin.GetExperimentWithResponse(t.Context(), k, "title_test")); got.JSON200 == nil || got.JSON200.Flag != "checkout_title" {
+		t.Fatalf("after a refused import, GET title_test = %d: %s", got.StatusCode(), got.Body)
+	}
+
+	withoutRulesServing(doc, "title_test")
+	mustMerge(t, f.admin, k, doc)
+	if got := do(f.admin.GetExperimentWithResponse(t.Context(), k, "title_test")); got.JSON200 == nil || got.JSON200.Flag != "other_title" {
+		t.Fatalf("after the import, GET title_test = %d: %s", got.StatusCode(), got.Body)
+	}
+}
+
+// A replace that drops a served draft together with the flag serving it
+// deletes both: the rule goes with its flag.
+func TestAReplaceDeletesAServedDraftWithTheFlagServingIt(t *testing.T) {
+	f := servedDraft(t)
+	k := f.project.Key
+	doc := exported(t, f.admin, k)
+	without(doc, "flags", "checkout_title")
+	without(doc, "experiments", "title_test")
+
+	r := mustReplace(t, f.admin, k, doc)
+	assertJSON(t, "deleted", []any{r.Changes.Experiments.Deleted, r.Changes.Flags.Deleted}, `[["title_test"], ["checkout_title"]]`)
+	if res := do(f.admin.GetExperimentWithResponse(t.Context(), k, "title_test")); res.StatusCode() != http.StatusNotFound {
+		t.Errorf("GET title_test = %d: %s, want 404", res.StatusCode(), res.Body)
+	}
+
+	// Dropping the draft while the flag serving it stays is refused.
+	g := servedDraft(t)
+	doc = exported(t, g.admin, g.project.Key)
+	without(doc, "experiments", "title_test")
+	res := replaceInto(t, g.admin, g.project.Key, doc)
+	if got := referencesOf(t, "dropping a served draft", res.StatusCode(), res.Body); !slices.Equal(got, []string{"checkout_title staging"}) {
+		t.Errorf("references = %v, want the configuration serving it", got)
+	}
+}

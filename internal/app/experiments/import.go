@@ -7,6 +7,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
+	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -59,18 +60,50 @@ type Importer struct {
 // NewImporter returns the importer.
 func NewImporter(d ImporterDeps) *Importer {
 	return &Importer{d: d, deleteExperiment: NewDeleteExperiment(DeleteExperimentDeps{
-		Tx: d.Tx, Projects: d.Projects, Store: d.Store, Recorder: d.Recorder,
+		Tx: d.Tx, Projects: d.Projects, Store: d.Store, Holders: d.Holders, Recorder: d.Recorder,
 	})}
 }
 
 // DeleteExperiment deletes the draft experiment keyed key as an ordinary
-// request does, recorded as deleted; any other is not_draft or archived.
-func (i *Importer) DeleteExperiment(ctx context.Context, project workspace.ProjectID, key string, req governance.Request) error {
+// request does, recorded as deleted; any other is not_draft or archived. A
+// rule serving it in a configuration of one of the flags keyed leaving, which
+// the import deletes as well, does not keep it.
+func (i *Importer) DeleteExperiment(ctx context.Context, project workspace.ProjectID, key string, leaving []string, req governance.Request) error {
 	e, err := i.d.Store.ExperimentByKey(ctx, project, key)
 	if err != nil {
 		return experimentNotFound(err)
 	}
-	return i.deleteExperiment.Handle(ctx, ExperimentCommand{Project: project, Key: key, Expected: precondition.On(e.Version), Request: req})
+	return i.deleteExperiment.handle(ctx, ExperimentCommand{Project: project, Key: key, Expected: precondition.On(e.Version), Request: req}, leaving...)
+}
+
+// CheckServed refuses with in_use, naming them, the configurations that
+// serve one of the experiments keyed keys, once the import has written every
+// configuration, although they belong to a flag other than the experiment's:
+// an import may move a draft to another flag and drop the rules serving it in
+// the same document, which it writes experiments first.
+func (i *Importer) CheckServed(ctx context.Context, project workspace.ProjectID, keys []string) error {
+	return i.d.Tx.Within(ctx, func(ctx context.Context) error {
+		var refs []flags.Reference
+		for _, key := range keys {
+			e, err := i.d.Store.ExperimentByKey(ctx, project, key)
+			if err != nil {
+				return experimentNotFound(err)
+			}
+			held, err := i.d.Holders.HoldingConfigurations(ctx, project, key)
+			if err != nil {
+				return err
+			}
+			for _, r := range held {
+				if r.Key != e.FlagKey {
+					refs = append(refs, r)
+				}
+			}
+		}
+		if len(refs) > 0 {
+			return flags.ErrInUse(refs)
+		}
+		return nil
+	})
 }
 
 // ImportCommand is an experiment as a document gives it. Owner is the member

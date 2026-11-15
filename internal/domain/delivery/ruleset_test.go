@@ -296,3 +296,40 @@ func TestMaterializeLeavesOutRulesServingAnExperimentThatIsNotRunning(t *testing
 		t.Errorf("serve = %+v, want %+v", s, want)
 	}
 }
+
+// A rule names its experiment by key alone, so a running experiment that
+// compares another flag is no experiment of the rule's flag: serving its
+// weights would name variations the flag does not have.
+func TestARuleServingAnExperimentOfAnotherFlagIsLeftOut(t *testing.T) {
+	f := newFlag("banner", flags.TypeString, "a", `"A"`, "b", `"B"`)
+	other := newFlag("other", flags.TypeString, "x", `"X"`, "y", `"Y"`)
+	c := flags.InitialConfiguration(f, env, nil, now)
+	c.Rules = []flags.Rule{{ID: id.New[flags.Rule](ids), Conditions: []flags.Condition{},
+		Serve: flags.Serve{Kind: flags.ServeExperiment, Experiment: "title_test"}}}
+	ref := func(flag flags.FlagID) flags.ExperimentRef {
+		return flags.ExperimentRef{
+			Key: "title_test", Flag: flag, Status: flags.ExperimentRunning, UnitType: "user", TrafficAllocation: 10_000,
+			Weights: []flags.ExperimentWeight{{Variation: "x", Weight: 5000}, {Variation: "y", Weight: 5000}},
+		}
+	}
+	rulesOf := func(e flags.ExperimentRef) int {
+		doc, err := delivery.Materialize(delivery.Materials{
+			Environment: "staging", Version: 1, UnitTypes: unitTypes("user"), Flags: []flags.Flag{f},
+			Configurations: []flags.Configuration{c}, Experiments: []flags.ExperimentRef{e},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		rs, err := eval.Decode(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(rs.Flags[0].Rules)
+	}
+	if got := rulesOf(ref(other.ID)); got != 0 {
+		t.Errorf("rules with an experiment of another flag = %d, want none", got)
+	}
+	if got := rulesOf(ref(f.ID)); got != 1 {
+		t.Errorf("rules with an experiment of its flag = %d, want 1", got)
+	}
+}
