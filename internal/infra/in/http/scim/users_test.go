@@ -263,10 +263,10 @@ func TestAMemberNoDirectoryMayTakeOverIsAUniquenessConflict(t *testing.T) {
 	e.mustCreate(t, otherToken, userBody(provisioned, nil)) // another provider's, in both providers' domains
 
 	for name, address := range map[string]string{
-		"an instance admin":                       admin.Email,
-		"an invited member":                       invited.Email,
-		"a deactivated member":                    deactivated.Email,
-		"a member another provider provisions":    provisioned,
+		"an instance admin":                    admin.Email,
+		"an invited member":                    invited.Email,
+		"a deactivated member":                 deactivated.Email,
+		"a member another provider provisions": provisioned,
 	} {
 		assertScimError(t, name, e.create(t, token, userBody(address, nil)), http.StatusConflict, "uniqueness")
 	}
