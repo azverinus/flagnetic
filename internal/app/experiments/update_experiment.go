@@ -75,6 +75,11 @@ func (h *UpdateExperiment) Handle(ctx context.Context, cmd UpdateExperimentComma
 		if err != nil {
 			return err
 		}
+		if changed && after.FlagKey != before.FlagKey {
+			if err = refuseWhileServed(ctx, h.d.Holders, cmd.Project, before.Key); err != nil {
+				return err
+			}
+		}
 		if err = precondition.Check(cmd.Expected, before.Version); err != nil {
 			return err
 		}

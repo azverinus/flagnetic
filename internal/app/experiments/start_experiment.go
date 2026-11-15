@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
+	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/precondition"
@@ -15,6 +16,27 @@ type Holders interface {
 	// configuration of some flag has a rule serving the experiment keyed
 	// key.
 	HoldingEnvironments(ctx context.Context, project workspace.ProjectID, key string) ([]workspace.EnvironmentID, error)
+	// HoldingConfigurations returns, as references, the configurations of
+	// project, one per flag and environment, that have a rule serving the
+	// experiment keyed key, ordered by flag key then environment key.
+	HoldingConfigurations(ctx context.Context, project workspace.ProjectID, key string) ([]flags.Reference, error)
+}
+
+// refuseWhileServed refuses with in_use, naming them, when some environment
+// holds a rule serving the experiment keyed key. A rule names its experiment
+// by key alone and its flag must be the experiment's, so an experiment that
+// changes flag or is replaced by another of the same key would put weights
+// naming another flag's variations into the ruleset of the flag the rule
+// belongs to.
+func refuseWhileServed(ctx context.Context, holders Holders, project workspace.ProjectID, key string) error {
+	refs, err := holders.HoldingConfigurations(ctx, project, key)
+	if err != nil {
+		return err
+	}
+	if len(refs) > 0 {
+		return flags.ErrInUse(refs)
+	}
+	return nil
 }
 
 // Rulesets marks rulesets changed.

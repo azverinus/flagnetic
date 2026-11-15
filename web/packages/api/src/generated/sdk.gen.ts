@@ -2998,7 +2998,9 @@ export const createExperiment = <ThrowOnError extends boolean = false>(
  *
  * Deletes the experiment. Only a draft is deleted (`not_draft`;
  * `archived` for an archived one): once started, an experiment keeps
- * its history.
+ * its history. A draft that a rule of an environment's configuration
+ * serves is `in_use` (409), listing those configurations in
+ * `references`.
  *
  */
 export const deleteExperiment = <ThrowOnError extends boolean = false>(
@@ -3047,7 +3049,10 @@ export const getExperiment = <ThrowOnError extends boolean = false>(
  *
  * Changes any of the name, hypothesis, owner, tags, flag, unit type,
  * variations, traffic allocation or expected end date of a draft, as a
- * create judges them; the key never changes (`immutable`). A running
+ * create judges them; the key never changes (`immutable`). Moving a
+ * draft to another flag is `in_use` (409) while a rule of an
+ * environment's configuration serves it, listing those
+ * configurations in `references`. A running
  * experiment changes its name, hypothesis (never to an empty one,
  * `required` on `/hypothesis`), owner, tags and expected end date, and
  * grows its traffic allocation: a change to its flag,

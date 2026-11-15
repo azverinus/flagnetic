@@ -59,7 +59,7 @@ type Importer struct {
 // NewImporter returns the importer.
 func NewImporter(d ImporterDeps) *Importer {
 	return &Importer{d: d, deleteExperiment: NewDeleteExperiment(DeleteExperimentDeps{
-		Tx: d.Tx, Projects: d.Projects, Store: d.Store, Recorder: d.Recorder,
+		Tx: d.Tx, Projects: d.Projects, Store: d.Store, Holders: d.Holders, Recorder: d.Recorder,
 	})}
 }
 

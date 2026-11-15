@@ -649,7 +649,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Tx: tx, Projects: experimentStore, Store: experimentStore, Recorder: experimentRec,
 		}),
 		DeleteExperiment: appexperiments.NewDeleteExperiment(appexperiments.DeleteExperimentDeps{
-			Tx: tx, Projects: experimentStore, Store: experimentStore, Recorder: experimentRec,
+			Tx: tx, Projects: experimentStore, Store: experimentStore, Holders: flagStore, Recorder: experimentRec,
 		}),
 		RegenerateExperimentSalts: appexperiments.NewRegenerateSalts(appexperiments.RegenerateSaltsDeps{
 			Tx: tx, Projects: experimentStore, Store: experimentStore, Rollouts: flagStore, Recorder: experimentRec,
