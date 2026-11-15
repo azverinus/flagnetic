@@ -175,6 +175,9 @@ type Members interface {
 	// OpenSession opens a session of member signed in through provider and
 	// returns the value of its cookie.
 	OpenSession(ctx context.Context, s SessionRequest) (secret.String, error)
+	// RevokeProviderSessions ends every session of member opened through the
+	// provider with this slug, and returns how many it ended.
+	RevokeProviderSessions(ctx context.Context, member identity.MemberID, provider string) (int, error)
 	// RecordFailedSignIn records that member could not sign in through
 	// provider, and why.
 	RecordFailedSignIn(ctx context.Context, member MemberRecord, kind identity.Kind, provider, reason, requestID string) error

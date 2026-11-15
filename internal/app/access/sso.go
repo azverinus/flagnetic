@@ -40,6 +40,10 @@ type SSOStore interface {
 	RecordSignIn(ctx context.Context, member access.MemberID, at time.Time) error
 	knownSourceRecorder
 	CreateSession(ctx context.Context, s access.Session) error
+	// RevokeProviderSessions ends every session of member opened through the
+	// provider with this slug and not ended yet at at, and returns how many
+	// it ended.
+	RevokeProviderSessions(ctx context.Context, member access.MemberID, provider string, at time.Time) (int, error)
 }
 
 // SSO is what the identity context asks of the access context to sign a
@@ -208,6 +212,13 @@ func (s *SSO) OpenSession(ctx context.Context, in SSOSignIn) (secret.String, err
 	}
 	return cookie, s.record(ctx, now, governance.Request{Actor: memberActor(in.Member), ID: in.RequestID}, ssoRecord(
 		"auth.signed_in", in.Member, in.Method, in.Provider, nil))
+}
+
+// RevokeProviderSessions ends every session of member opened through the
+// provider with this slug, so a person who no longer has an identity there
+// does not stay signed in through it; it returns how many it ended.
+func (s *SSO) RevokeProviderSessions(ctx context.Context, member access.MemberID, provider string) (int, error) {
+	return s.store.RevokeProviderSessions(ctx, member, provider, s.clock.Now())
 }
 
 // EnforcedProvider returns the slug of the auth provider email's domain is

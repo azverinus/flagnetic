@@ -106,6 +106,18 @@ func (s *Store) MemberSessions(ctx context.Context, member access.MemberID) ([]a
 	return out, rows.Err()
 }
 
+// RevokeProviderSessions ends every session of member opened through the
+// provider with this slug and not ended yet at at, and returns how many it
+// ended.
+func (s *Store) RevokeProviderSessions(ctx context.Context, member access.MemberID, provider string, at time.Time) (int, error) {
+	tag, err := s.db(ctx).Exec(ctx, `
+		UPDATE sessions SET revoked_at = $3 WHERE member_id = $1 AND provider = $2 AND revoked_at IS NULL`, member.Bytes(), provider, at)
+	if err != nil {
+		return 0, fmt.Errorf("revoking the sessions opened through a provider: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
+}
+
 // RevokeSessions ends each of sessions not ended yet at at, and returns
 // those it ended.
 func (s *Store) RevokeSessions(ctx context.Context, sessions []access.SessionID, at time.Time) ([]access.SessionID, error) {
