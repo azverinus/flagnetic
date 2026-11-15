@@ -50,6 +50,28 @@ func (s *Store) GroupMappings(ctx context.Context, provider identity.ProviderID)
 		})
 }
 
+// GroupMappingsVersion returns the version of the provider's list.
+func (s *Store) GroupMappingsVersion(ctx context.Context, provider identity.ProviderID) (int64, error) {
+	var v int64
+	if err := s.db(ctx).QueryRow(ctx, `SELECT group_mappings_version FROM auth_providers WHERE id = $1`, provider.Bytes()).Scan(&v); err != nil {
+		return 0, fmt.Errorf("reading the version of group mappings: %w", err)
+	}
+	return v, nil
+}
+
+// AdvanceGroupMappingsVersion moves the version of the provider's list on and
+// returns the new one.
+func (s *Store) AdvanceGroupMappingsVersion(ctx context.Context, provider identity.ProviderID) (int64, error) {
+	var v int64
+	err := s.db(ctx).QueryRow(ctx, `
+		UPDATE auth_providers SET group_mappings_version = group_mappings_version + 1 WHERE id = $1
+		RETURNING group_mappings_version`, provider.Bytes()).Scan(&v)
+	if err != nil {
+		return 0, fmt.Errorf("advancing the version of group mappings: %w", err)
+	}
+	return v, nil
+}
+
 // ReplaceGroupMappings stores mappings as the provider's whole list, in one
 // statement for all the new rows.
 func (s *Store) ReplaceGroupMappings(ctx context.Context, provider identity.ProviderID, mappings []identity.GroupMapping) error {

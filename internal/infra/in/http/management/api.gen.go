@@ -5626,6 +5626,16 @@ type UpdateAuthProviderParams struct {
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
+// ReplaceAuthProviderGroupMappingsParams defines parameters for ReplaceAuthProviderGroupMappings.
+type ReplaceAuthProviderGroupMappingsParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
 // RevokeMySessionsParams defines parameters for RevokeMySessions.
 type RevokeMySessionsParams struct {
 	// IncludeCurrent Revoke the session this request is signed in to as well.
@@ -8105,7 +8115,8 @@ type ClientInterface interface {
 	// GetAuthProviderGroupMappings An auth provider's group mappings
 	//
 	// What the provider's directory groups grant, in order: a role in a
-	// project, or instance admin.
+	// project, or instance admin. The `ETag` is the version of the list, which
+	// a replacement names in `If-Match`.
 	//
 	// Corresponds with GET /instance/auth-providers/{provider}/group-mappings (the `GetAuthProviderGroupMappings` operationId).
 	GetAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8125,12 +8136,17 @@ type ClientInterface interface {
 	// exist, is 422 `invalid_group_mappings` naming each field and nothing
 	// changes. Audited `group_mappings.updated`, and each grant and promotion
 	// under the provider as the `sso` actor; a replacement that changes
-	// nothing is not.
+	// nothing is not. `If-Match` names the version of the list the write is
+	// based on, from the `ETag` of reading it: a replacement of a list that
+	// changed since is refused 412, so one who read the list before another
+	// changed it cannot put back a mapping that was removed or revoke what
+	// was just granted. The version moves on with each replacement that
+	// changes the list, and is apart from the version of the provider.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
-	ReplaceAuthProviderGroupMappingsWithBody(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ReplaceAuthProviderGroupMappingsWithBody(ctx context.Context, provider AuthProviderSlug, params *ReplaceAuthProviderGroupMappingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ReplaceAuthProviderGroupMappings Replace an auth provider's group mappings
 	//
@@ -8147,12 +8163,17 @@ type ClientInterface interface {
 	// exist, is 422 `invalid_group_mappings` naming each field and nothing
 	// changes. Audited `group_mappings.updated`, and each grant and promotion
 	// under the provider as the `sso` actor; a replacement that changes
-	// nothing is not.
+	// nothing is not. `If-Match` names the version of the list the write is
+	// based on, from the `ETag` of reading it: a replacement of a list that
+	// changed since is refused 412, so one who read the list before another
+	// changed it cannot put back a mapping that was removed or revoke what
+	// was just granted. The version moves on with each replacement that
+	// changes the list, and is apart from the version of the provider.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
-	ReplaceAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ReplaceAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, params *ReplaceAuthProviderGroupMappingsParams, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RotateAuthProviderCertificate Start rotating a SAML provider's SP certificate
 	//
@@ -12501,7 +12522,8 @@ func (c *Client) EnableAuthProvider(ctx context.Context, provider AuthProviderSl
 // GetAuthProviderGroupMappings An auth provider's group mappings
 //
 // What the provider's directory groups grant, in order: a role in a
-// project, or instance admin.
+// project, or instance admin. The `ETag` is the version of the list, which
+// a replacement names in `If-Match`.
 //
 // Corresponds with GET /instance/auth-providers/{provider}/group-mappings (the `GetAuthProviderGroupMappings` operationId).
 func (c *Client) GetAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -12531,13 +12553,18 @@ func (c *Client) GetAuthProviderGroupMappings(ctx context.Context, provider Auth
 // exist, is 422 `invalid_group_mappings` naming each field and nothing
 // changes. Audited `group_mappings.updated`, and each grant and promotion
 // under the provider as the `sso` actor; a replacement that changes
-// nothing is not.
+// nothing is not. `If-Match` names the version of the list the write is
+// based on, from the `ETag` of reading it: a replacement of a list that
+// changed since is refused 412, so one who read the list before another
+// changed it cannot put back a mapping that was removed or revoke what
+// was just granted. The version moves on with each replacement that
+// changes the list, and is apart from the version of the provider.
 //
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
-func (c *Client) ReplaceAuthProviderGroupMappingsWithBody(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewReplaceAuthProviderGroupMappingsRequestWithBody(c.Server, provider, contentType, body)
+func (c *Client) ReplaceAuthProviderGroupMappingsWithBody(ctx context.Context, provider AuthProviderSlug, params *ReplaceAuthProviderGroupMappingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaceAuthProviderGroupMappingsRequestWithBody(c.Server, provider, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -12563,13 +12590,18 @@ func (c *Client) ReplaceAuthProviderGroupMappingsWithBody(ctx context.Context, p
 // exist, is 422 `invalid_group_mappings` naming each field and nothing
 // changes. Audited `group_mappings.updated`, and each grant and promotion
 // under the provider as the `sso` actor; a replacement that changes
-// nothing is not.
+// nothing is not. `If-Match` names the version of the list the write is
+// based on, from the `ETag` of reading it: a replacement of a list that
+// changed since is refused 412, so one who read the list before another
+// changed it cannot put back a mapping that was removed or revoke what
+// was just granted. The version moves on with each replacement that
+// changes the list, and is apart from the version of the provider.
 //
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
-func (c *Client) ReplaceAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewReplaceAuthProviderGroupMappingsRequest(c.Server, provider, body)
+func (c *Client) ReplaceAuthProviderGroupMappings(ctx context.Context, provider AuthProviderSlug, params *ReplaceAuthProviderGroupMappingsParams, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaceAuthProviderGroupMappingsRequest(c.Server, provider, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -19742,18 +19774,18 @@ func NewGetAuthProviderGroupMappingsRequest(server string, provider AuthProvider
 }
 
 // NewReplaceAuthProviderGroupMappingsRequest calls the generic ReplaceAuthProviderGroupMappings builder with application/json body
-func NewReplaceAuthProviderGroupMappingsRequest(server string, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody) (*http.Request, error) {
+func NewReplaceAuthProviderGroupMappingsRequest(server string, provider AuthProviderSlug, params *ReplaceAuthProviderGroupMappingsParams, body ReplaceAuthProviderGroupMappingsJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewReplaceAuthProviderGroupMappingsRequestWithBody(server, provider, "application/json", bodyReader)
+	return NewReplaceAuthProviderGroupMappingsRequestWithBody(server, provider, params, "application/json", bodyReader)
 }
 
 // NewReplaceAuthProviderGroupMappingsRequestWithBody constructs an http.Request for the ReplaceAuthProviderGroupMappings method, with any body, and a specified content type
-func NewReplaceAuthProviderGroupMappingsRequestWithBody(server string, provider AuthProviderSlug, contentType string, body io.Reader) (*http.Request, error) {
+func NewReplaceAuthProviderGroupMappingsRequestWithBody(server string, provider AuthProviderSlug, params *ReplaceAuthProviderGroupMappingsParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -19784,6 +19816,21 @@ func NewReplaceAuthProviderGroupMappingsRequestWithBody(server string, provider 
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
 
 	return req, nil
 }
@@ -29978,7 +30025,8 @@ type ClientWithResponsesInterface interface {
 	// GetAuthProviderGroupMappingsWithResponse An auth provider's group mappings
 	//
 	// What the provider's directory groups grant, in order: a role in a
-	// project, or instance admin.
+	// project, or instance admin. The `ETag` is the version of the list, which
+	// a replacement names in `If-Match`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -30000,12 +30048,17 @@ type ClientWithResponsesInterface interface {
 	// exist, is 422 `invalid_group_mappings` naming each field and nothing
 	// changes. Audited `group_mappings.updated`, and each grant and promotion
 	// under the provider as the `sso` actor; a replacement that changes
-	// nothing is not.
+	// nothing is not. `If-Match` names the version of the list the write is
+	// based on, from the `ETag` of reading it: a replacement of a list that
+	// changed since is refused 412, so one who read the list before another
+	// changed it cannot put back a mapping that was removed or revoke what
+	// was just granted. The version moves on with each replacement that
+	// changes the list, and is apart from the version of the provider.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
-	ReplaceAuthProviderGroupMappingsWithBodyWithResponse(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error)
+	ReplaceAuthProviderGroupMappingsWithBodyWithResponse(ctx context.Context, provider AuthProviderSlug, params *ReplaceAuthProviderGroupMappingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error)
 
 	// ReplaceAuthProviderGroupMappingsWithResponse Replace an auth provider's group mappings
 	//
@@ -30022,12 +30075,17 @@ type ClientWithResponsesInterface interface {
 	// exist, is 422 `invalid_group_mappings` naming each field and nothing
 	// changes. Audited `group_mappings.updated`, and each grant and promotion
 	// under the provider as the `sso` actor; a replacement that changes
-	// nothing is not.
+	// nothing is not. `If-Match` names the version of the list the write is
+	// based on, from the `ETag` of reading it: a replacement of a list that
+	// changed since is refused 412, so one who read the list before another
+	// changed it cannot put back a mapping that was removed or revoke what
+	// was just granted. The version moves on with each replacement that
+	// changes the list, and is apart from the version of the provider.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
-	ReplaceAuthProviderGroupMappingsWithResponse(ctx context.Context, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error)
+	ReplaceAuthProviderGroupMappingsWithResponse(ctx context.Context, provider AuthProviderSlug, params *ReplaceAuthProviderGroupMappingsParams, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error)
 
 	// RotateAuthProviderCertificateWithResponse Start rotating a SAML provider's SP certificate
 	//
@@ -35434,6 +35492,11 @@ func (r EnableAuthProviderResponse) ContentType() string {
 	return ""
 }
 
+// GetAuthProviderGroupMappingsResponse200Headers the declared response headers of an HTTP 200 response for GetAuthProviderGroupMappings
+type GetAuthProviderGroupMappingsResponse200Headers struct {
+	ETag *string
+}
+
 // GetAuthProviderGroupMappingsResponse401Headers the declared response headers of an HTTP 401 response for GetAuthProviderGroupMappings
 type GetAuthProviderGroupMappingsResponse401Headers struct {
 	WWWAuthenticate *string
@@ -35450,6 +35513,8 @@ type GetAuthProviderGroupMappingsResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetAuthProviderGroupMappingsResponse200Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *GetAuthProviderGroupMappingsResponse401Headers
 }
@@ -35503,6 +35568,11 @@ func (r GetAuthProviderGroupMappingsResponse) ContentType() string {
 	return ""
 }
 
+// ReplaceAuthProviderGroupMappingsResponse200Headers the declared response headers of an HTTP 200 response for ReplaceAuthProviderGroupMappings
+type ReplaceAuthProviderGroupMappingsResponse200Headers struct {
+	ETag *string
+}
+
 // ReplaceAuthProviderGroupMappingsResponse401Headers the declared response headers of an HTTP 401 response for ReplaceAuthProviderGroupMappings
 type ReplaceAuthProviderGroupMappingsResponse401Headers struct {
 	WWWAuthenticate *string
@@ -35521,8 +35591,14 @@ type ReplaceAuthProviderGroupMappingsResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ReplaceAuthProviderGroupMappingsResponse200Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *ReplaceAuthProviderGroupMappingsResponse401Headers
 }
@@ -35552,9 +35628,19 @@ func (r ReplaceAuthProviderGroupMappingsResponse) GetApplicationproblemJSON404()
 	return r.ApplicationproblemJSON404
 }
 
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r ReplaceAuthProviderGroupMappingsResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
 func (r ReplaceAuthProviderGroupMappingsResponse) GetApplicationproblemJSON422() *Invalid {
 	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r ReplaceAuthProviderGroupMappingsResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
 }
 
 // GetBody returns the raw response body bytes
@@ -51220,7 +51306,8 @@ func (c *ClientWithResponses) EnableAuthProviderWithResponse(ctx context.Context
 // GetAuthProviderGroupMappingsWithResponse An auth provider's group mappings
 //
 // What the provider's directory groups grant, in order: a role in a
-// project, or instance admin.
+// project, or instance admin. The `ETag` is the version of the list, which
+// a replacement names in `If-Match`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -51248,13 +51335,18 @@ func (c *ClientWithResponses) GetAuthProviderGroupMappingsWithResponse(ctx conte
 // exist, is 422 `invalid_group_mappings` naming each field and nothing
 // changes. Audited `group_mappings.updated`, and each grant and promotion
 // under the provider as the `sso` actor; a replacement that changes
-// nothing is not.
+// nothing is not. `If-Match` names the version of the list the write is
+// based on, from the `ETag` of reading it: a replacement of a list that
+// changed since is refused 412, so one who read the list before another
+// changed it cannot put back a mapping that was removed or revoke what
+// was just granted. The version moves on with each replacement that
+// changes the list, and is apart from the version of the provider.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
-func (c *ClientWithResponses) ReplaceAuthProviderGroupMappingsWithBodyWithResponse(ctx context.Context, provider AuthProviderSlug, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error) {
-	rsp, err := c.ReplaceAuthProviderGroupMappingsWithBody(ctx, provider, contentType, body, reqEditors...)
+func (c *ClientWithResponses) ReplaceAuthProviderGroupMappingsWithBodyWithResponse(ctx context.Context, provider AuthProviderSlug, params *ReplaceAuthProviderGroupMappingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error) {
+	rsp, err := c.ReplaceAuthProviderGroupMappingsWithBody(ctx, provider, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -51276,13 +51368,18 @@ func (c *ClientWithResponses) ReplaceAuthProviderGroupMappingsWithBodyWithRespon
 // exist, is 422 `invalid_group_mappings` naming each field and nothing
 // changes. Audited `group_mappings.updated`, and each grant and promotion
 // under the provider as the `sso` actor; a replacement that changes
-// nothing is not.
+// nothing is not. `If-Match` names the version of the list the write is
+// based on, from the `ETag` of reading it: a replacement of a list that
+// changed since is refused 412, so one who read the list before another
+// changed it cannot put back a mapping that was removed or revoke what
+// was just granted. The version moves on with each replacement that
+// changes the list, and is apart from the version of the provider.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /instance/auth-providers/{provider}/group-mappings (the `ReplaceAuthProviderGroupMappings` operationId).
-func (c *ClientWithResponses) ReplaceAuthProviderGroupMappingsWithResponse(ctx context.Context, provider AuthProviderSlug, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error) {
-	rsp, err := c.ReplaceAuthProviderGroupMappings(ctx, provider, body, reqEditors...)
+func (c *ClientWithResponses) ReplaceAuthProviderGroupMappingsWithResponse(ctx context.Context, provider AuthProviderSlug, params *ReplaceAuthProviderGroupMappingsParams, body ReplaceAuthProviderGroupMappingsJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceAuthProviderGroupMappingsResponse, error) {
+	rsp, err := c.ReplaceAuthProviderGroupMappings(ctx, provider, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -58112,6 +58209,16 @@ func ParseGetAuthProviderGroupMappingsResponse(rsp *http.Response) (*GetAuthProv
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers GetAuthProviderGroupMappingsResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers GetAuthProviderGroupMappingsResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
@@ -58176,6 +58283,13 @@ func ParseReplaceAuthProviderGroupMappingsResponse(rsp *http.Response) (*Replace
 		}
 		response.ApplicationproblemJSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest Invalid
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -58183,9 +58297,26 @@ func ParseReplaceAuthProviderGroupMappingsResponse(rsp *http.Response) (*Replace
 		}
 		response.ApplicationproblemJSON422 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers ReplaceAuthProviderGroupMappingsResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers ReplaceAuthProviderGroupMappingsResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
@@ -71976,7 +72107,7 @@ type ServerInterface interface {
 	GetAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
 	// ReplaceAuthProviderGroupMappings Replace an auth provider's group mappings
 	// (PUT /instance/auth-providers/{provider}/group-mappings)
-	ReplaceAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
+	ReplaceAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug, params ReplaceAuthProviderGroupMappingsParams)
 	// RotateAuthProviderCertificate Start rotating a SAML provider's SP certificate
 	// (POST /instance/auth-providers/{provider}/rotate-certificate)
 	RotateAuthProviderCertificate(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug)
@@ -73336,8 +73467,32 @@ func (siw *ServerInterfaceWrapper) ReplaceAuthProviderGroupMappings(w http.Respo
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReplaceAuthProviderGroupMappingsParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ReplaceAuthProviderGroupMappings(w, r, provider)
+		siw.Handler.ReplaceAuthProviderGroupMappings(w, r, provider, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -83336,15 +83491,25 @@ type GetAuthProviderGroupMappingsResponseObject interface {
 	VisitGetAuthProviderGroupMappingsResponse(w http.ResponseWriter) error
 }
 
-type GetAuthProviderGroupMappings200JSONResponse GroupMappings
+type GetAuthProviderGroupMappings200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetAuthProviderGroupMappings200JSONResponse struct {
+	Body    GroupMappings
+	Headers GetAuthProviderGroupMappings200ResponseHeaders
+}
 
 func (response GetAuthProviderGroupMappings200JSONResponse) VisitGetAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
 	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
@@ -83403,6 +83568,7 @@ func (response GetAuthProviderGroupMappings404ApplicationProblemPlusJSONResponse
 
 type ReplaceAuthProviderGroupMappingsRequestObject struct {
 	Provider AuthProviderSlug `json:"provider"`
+	Params   ReplaceAuthProviderGroupMappingsParams
 	Body     *ReplaceAuthProviderGroupMappingsJSONRequestBody
 }
 
@@ -83410,15 +83576,25 @@ type ReplaceAuthProviderGroupMappingsResponseObject interface {
 	VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error
 }
 
-type ReplaceAuthProviderGroupMappings200JSONResponse GroupMappingsRun
+type ReplaceAuthProviderGroupMappings200ResponseHeaders struct {
+	ETag *string
+}
+
+type ReplaceAuthProviderGroupMappings200JSONResponse struct {
+	Body    GroupMappingsRun
+	Headers ReplaceAuthProviderGroupMappings200ResponseHeaders
+}
 
 func (response ReplaceAuthProviderGroupMappings200JSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
 	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
@@ -83491,6 +83667,22 @@ func (response ReplaceAuthProviderGroupMappings404ApplicationProblemPlusJSONResp
 	return err
 }
 
+type ReplaceAuthProviderGroupMappings412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaceAuthProviderGroupMappings412ApplicationProblemPlusJSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ReplaceAuthProviderGroupMappings422ApplicationProblemPlusJSONResponse struct {
 	InvalidApplicationProblemPlusJSONResponse
 }
@@ -83503,6 +83695,22 @@ func (response ReplaceAuthProviderGroupMappings422ApplicationProblemPlusJSONResp
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaceAuthProviderGroupMappings428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaceAuthProviderGroupMappings428ApplicationProblemPlusJSONResponse) VisitReplaceAuthProviderGroupMappingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -103435,10 +103643,11 @@ func (sh *strictHandler) GetAuthProviderGroupMappings(w http.ResponseWriter, r *
 }
 
 // ReplaceAuthProviderGroupMappings operation middleware
-func (sh *strictHandler) ReplaceAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug) {
+func (sh *strictHandler) ReplaceAuthProviderGroupMappings(w http.ResponseWriter, r *http.Request, provider AuthProviderSlug, params ReplaceAuthProviderGroupMappingsParams) {
 	var request ReplaceAuthProviderGroupMappingsRequestObject
 
 	request.Provider = provider
+	request.Params = params
 
 	var body ReplaceAuthProviderGroupMappingsJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

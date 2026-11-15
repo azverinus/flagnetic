@@ -188,13 +188,23 @@ test.describe("webhooks", () => {
       }),
     );
 
-    // Twenty-five failed calls and a day without a success disable it: the
-    // pings fail at once, and the clock stands a day and an hour ahead.
+    // Twenty-five failed calls, the first of them a day ago, disable it. The
+    // pings are sent by the delivery worker, so the first twenty-four are
+    // waited for before the clock moves a day and an hour ahead: a streak
+    // counts from its first failure, and the last one is what judges it.
+    const ping = () => testWebhook({ client, path: { project, webhook: created.id } });
+    const read = async () =>
+      must(
+        "reading the webhook",
+        await getWebhook({ client, path: { project, webhook: created.id } }),
+      );
+    for (let n = 0; n < 24; n++) await ping();
+    await expect
+      .poll(async () => (await read()).consecutive_failures, { timeout: 60_000 })
+      .toBeGreaterThanOrEqual(24);
     advanceClock("25h");
     try {
-      for (let ping = 0; ping < 25; ping++) {
-        await testWebhook({ client, path: { project, webhook: created.id } });
-      }
+      await ping();
       await expect
         .poll(
           async () =>
@@ -227,7 +237,9 @@ test.describe("webhooks", () => {
     await page.goto(`/projects/${project}/webhooks`);
     const row = webhookRow(page, "Release bot");
     await expect(row).toContainText("Disabled after persistent failure");
-    await expect(row).toContainText("25");
+    // The failures are listed too: the worker retries pings, so there are at
+    // least the twenty-five that disabled it.
+    await expect(row).toContainText(/Never\d{2,}/);
     await expectNoSeriousViolations(page, "the webhooks list with a disabled webhook");
 
     await row.getByRole("button", { name: "Re-enable Release bot" }).click();

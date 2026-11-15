@@ -5394,7 +5394,8 @@ export const completeAuthProviderCertificateRotation = <ThrowOnError extends boo
  * An auth provider's group mappings
  *
  * What the provider's directory groups grant, in order: a role in a
- * project, or instance admin.
+ * project, or instance admin. The `ETag` is the version of the list, which
+ * a replacement names in `If-Match`.
  *
  */
 export const getAuthProviderGroupMappings = <ThrowOnError extends boolean = false>(
@@ -5437,7 +5438,12 @@ export const getAuthProviderGroupMappings = <ThrowOnError extends boolean = fals
  * exist, is 422 `invalid_group_mappings` naming each field and nothing
  * changes. Audited `group_mappings.updated`, and each grant and promotion
  * under the provider as the `sso` actor; a replacement that changes
- * nothing is not.
+ * nothing is not. `If-Match` names the version of the list the write is
+ * based on, from the `ETag` of reading it: a replacement of a list that
+ * changed since is refused 412, so one who read the list before another
+ * changed it cannot put back a mapping that was removed or revoke what
+ * was just granted. The version moves on with each replacement that
+ * changes the list, and is apart from the version of the provider.
  *
  */
 export const replaceAuthProviderGroupMappings = <ThrowOnError extends boolean = false>(

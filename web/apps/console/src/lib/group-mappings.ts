@@ -14,17 +14,41 @@ import { formatNumber } from "@/i18n/format";
 import { unwrap } from "./errors";
 import { authProvidersKey } from "./auth-providers";
 
+/**
+ * A provider's group mappings with the version they were read at, which a
+ * replacement names so it is refused when the list moved on meanwhile.
+ */
+export type SavedMappings = { items: GroupMapping[]; etag: string };
+
 /** A provider's group mappings, in the order it evaluates them. */
 export function groupMappingsQuery(slug: string) {
-  return queryOptions<GroupMappings>({
+  return queryOptions<SavedMappings>({
     queryKey: [...authProvidersKey, slug, "group-mappings"],
-    queryFn: () => unwrap(getAuthProviderGroupMappings({ path: { provider: slug } })),
+    queryFn: async () => {
+      const settled = await getAuthProviderGroupMappings({ path: { provider: slug } });
+      const data = await unwrap(Promise.resolve(settled));
+      return { items: data.items, etag: settled.response?.headers.get("etag") ?? "" };
+    },
   });
 }
 
-/** Replaces the mappings, which the server runs at once for every member the provider knows. */
-export function replaceGroupMappings(slug: string, body: GroupMappings): Promise<GroupMappingsRun> {
-  return unwrap(replaceAuthProviderGroupMappings({ path: { provider: slug }, body }));
+/**
+ * Replaces the mappings, which the server runs at once for every member the
+ * provider knows. `etag` is the version the rows were based on, never a newer
+ * one read since: the server refuses the write when the list moved on.
+ */
+export async function replaceGroupMappings(
+  slug: string,
+  body: GroupMappings,
+  etag: string,
+): Promise<{ run: GroupMappingsRun; etag: string }> {
+  const settled = await replaceAuthProviderGroupMappings({
+    path: { provider: slug },
+    body,
+    headers: { "If-Match": etag },
+  });
+  const run = await unwrap(Promise.resolve(settled));
+  return { run, etag: settled.response?.headers.get("etag") ?? "" };
 }
 
 /** What a mapping grants: a role in a project, or instance admin. */

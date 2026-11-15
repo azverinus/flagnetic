@@ -4994,6 +4994,10 @@ export const zGetAuthProviderGroupMappingsResponse = zGroupMappings;
 
 export const zReplaceAuthProviderGroupMappingsBody = zGroupMappings;
 
+export const zReplaceAuthProviderGroupMappingsHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
 export const zReplaceAuthProviderGroupMappingsPath = z.object({
   provider: z.string(),
 });

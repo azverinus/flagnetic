@@ -7176,6 +7176,10 @@ msgstr ""
 msgid "Show flags stale for any of these reasons; none pressed shows every stale flag."
 msgstr ""
 
+#: src/components/group-mappings.tsx
+msgid "Show the current mappings"
+msgstr ""
+
 #: src/components/app-shell.tsx
 msgid "Sidebar"
 msgstr ""
@@ -8781,6 +8785,10 @@ msgstr ""
 
 #: src/components/not-found.tsx
 msgid "There is nothing at this address. The link may be old or mistyped."
+msgstr ""
+
+#: src/components/group-mappings.tsx
+msgid "These mappings were changed by someone else after you opened them. Saving would replace their change, so it is refused. Your edits are kept until you take the current mappings, which drops them."
 msgstr ""
 
 #: src/routes/_signed-in/admin/members/index.tsx

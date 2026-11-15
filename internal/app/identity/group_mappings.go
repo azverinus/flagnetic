@@ -12,6 +12,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
+	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
 // MappingStore keeps the group mappings of auth providers and the groups the
@@ -21,6 +22,12 @@ import (
 type MappingStore interface {
 	// GroupMappings returns the provider's mappings in order.
 	GroupMappings(ctx context.Context, provider identity.ProviderID) ([]identity.GroupMapping, error)
+	// GroupMappingsVersion returns the version of the provider's list, which
+	// starts at 1.
+	GroupMappingsVersion(ctx context.Context, provider identity.ProviderID) (int64, error)
+	// AdvanceGroupMappingsVersion moves the version of the provider's list on
+	// and returns the new one.
+	AdvanceGroupMappingsVersion(ctx context.Context, provider identity.ProviderID) (int64, error)
 	// ReplaceGroupMappings stores mappings as the provider's whole list.
 	ReplaceGroupMappings(ctx context.Context, provider identity.ProviderID, mappings []identity.GroupMapping) error
 	// StoreGroupClaim stores groups as what member claimed at provider at at,
@@ -126,14 +133,31 @@ func NewGetGroupMappings(providers ProviderStore, mappings MappingStore) *GetGro
 	return &GetGroupMappings{providers: providers, mappings: mappings}
 }
 
-// Handle returns the mappings of the provider with slug, in order; an unknown
-// provider is not found.
-func (h *GetGroupMappings) Handle(ctx context.Context, slug string) ([]identity.GroupMapping, error) {
+// GroupMappingsList is a provider's mappings in order, with the version of
+// the list a replacement names.
+type GroupMappingsList struct {
+	Items   []identity.GroupMapping
+	Version int64
+}
+
+// Handle returns the mappings of the provider with slug, in order, with their
+// version; an unknown provider is not found.
+func (h *GetGroupMappings) Handle(ctx context.Context, slug string) (GroupMappingsList, error) {
 	p, err := providerOf(ctx, h.providers, slug)
 	if err != nil {
-		return nil, err
+		return GroupMappingsList{}, err
 	}
-	return h.mappings.GroupMappings(ctx, p.ID)
+	// The version is read before the list, in separate statements: a
+	// replacement committing between them then pairs the new list with the
+	// old version, and a write based on it is refused as stale. Read the other
+	// way round, the old list would carry the new version and a write based
+	// on that old list would be accepted.
+	version, err := h.mappings.GroupMappingsVersion(ctx, p.ID)
+	if err != nil {
+		return GroupMappingsList{}, err
+	}
+	items, err := h.mappings.GroupMappings(ctx, p.ID)
+	return GroupMappingsList{Items: items, Version: version}, err
 }
 
 // ReplaceGroupMappings replaces a provider's group mappings.
@@ -147,9 +171,11 @@ func NewReplaceGroupMappings(d GroupMappingDeps) *ReplaceGroupMappings {
 // ReplaceGroupMappingsCommand replaces the mappings of the provider Slug with
 // Items.
 type ReplaceGroupMappingsCommand struct {
-	Slug    string
-	Items   []identity.GroupMappingInput
-	Request governance.Request
+	Slug  string
+	Items []identity.GroupMappingInput
+	// Expected is the version of the list the replacement is based on.
+	Expected precondition.Version
+	Request  governance.Request
 }
 
 // GroupMappingsRun is what replacing the mappings did to the members: the
@@ -157,13 +183,18 @@ type ReplaceGroupMappingsCommand struct {
 // they are the last active one.
 type GroupMappingsRun struct {
 	Granted, Revoked, KeptInstanceAdmin int
+	// Version is the version of the list after the replacement.
+	Version int64
 }
 
 // Handle replaces the provider's mappings and, in the same unit of work, runs
 // them again for every member who claimed groups at the provider or is in one
 // of its SCIM groups, so a mapping removed stops granting at once. An unknown provider is not found;
 // mappings that break a rule, or name a project no instance holds, are
-// invalid_group_mappings. It records group_mappings.updated unless nothing
+// invalid_group_mappings. A replacement that names no version is
+// precondition.ErrRequired, and one based on a version the list has moved on
+// from is version_mismatch: the list is then not stored and nothing runs.
+// It records group_mappings.updated and moves the version on unless nothing
 // changed.
 func (h *ReplaceGroupMappings) Handle(ctx context.Context, cmd ReplaceGroupMappingsCommand) (GroupMappingsRun, error) {
 	items, checkErr := identity.CheckGroupMappings(cmd.Items, h.d.Access.KnownRole)
@@ -176,6 +207,14 @@ func (h *ReplaceGroupMappings) Handle(ctx context.Context, cmd ReplaceGroupMappi
 		if err != nil {
 			return err
 		}
+		current, err := h.d.Mappings.GroupMappingsVersion(ctx, p.ID)
+		if err != nil {
+			return err
+		}
+		if err = precondition.Check(cmd.Expected, current); err != nil {
+			return err
+		}
+		run.Version = current
 		mappings, err := h.resolve(ctx, items)
 		if err != nil {
 			return err
@@ -202,8 +241,13 @@ func (h *ReplaceGroupMappings) Handle(ctx context.Context, cmd ReplaceGroupMappi
 				run.KeptInstanceAdmin++
 			}
 		}
-		if sameMappings(before, mappings) && run == (GroupMappingsRun{}) {
+		if sameMappings(before, mappings) && run == (GroupMappingsRun{Version: current}) {
 			return nil
+		}
+		if !sameMappings(before, mappings) {
+			if run.Version, err = h.d.Mappings.AdvanceGroupMappingsVersion(ctx, p.ID); err != nil {
+				return err
+			}
 		}
 		return h.record(ctx, p, before, mappings, run, cmd.Request)
 	})
