@@ -201,8 +201,8 @@ function GroupMappingsForm({
         >
           <Trans>
             These mappings were changed by someone else after you opened them. Saving would replace
-            their change, so it is refused. Your edits are kept until you take the current
-            mappings, which drops them.
+            their change, so it is refused. Your edits are kept until you take the current mappings,
+            which drops them.
           </Trans>
           <Button
             type="button"
