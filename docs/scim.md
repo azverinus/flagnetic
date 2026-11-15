@@ -69,7 +69,7 @@ A change that alters the member is audited `member.updated`, with what changed, 
 
 ### Domains
 
-A directory names only addresses its provider vouches for: the email of `POST /Users`, and an email that `PUT` or `PATCH` changes to another address, must be in one of the provider's [domains](sso.md#domains-linking-and-provisioning), or the write is `400 invalidValue`. Sign-in links a member to whoever signs in through a provider vouching for the member's email, so a directory naming an address of another provider's domain could own the account of the person who later signs in there, and hold addresses against their invitations. A provider with no domains provisions nobody. A member whose email is outside the domains now (the domains changed since) is still renamed, deactivated or reactivated: the check applies to an email that changes.
+A directory names only addresses its provider vouches for: the email of `POST /Users`, and an email that `PUT` or `PATCH` changes to another address, must be in one of the provider's [domains](sso.md#domains-linking-and-provisioning), or the write is `400 invalidValue`. Sign-in links a member to whoever signs in through a provider vouching for the member's email, so a directory naming an address of another provider's domain could own the account of the person who later signs in there, and hold addresses against their invitations. A member whose email is outside the domains now (the domains changed since) is still renamed, deactivated or reactivated: the check applies to an email that changes.
 
 ### Adoption
 
