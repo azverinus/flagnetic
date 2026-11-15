@@ -67,6 +67,10 @@ Okta deactivates a user with a patch that has no path (`{"op": "replace", "value
 
 A change that alters the member is audited `member.updated`, with what changed, and one that alters nothing is not. A change of the member's email to another address, not of its case alone, removes their password, if they hold one, and ends their open password resets (`password_removed: true` in the entry): a password proves its holder once held the old address, and a reset is mailed to whatever address the member has, so neither follows the member to an address the directory names. The provider is how its members sign in, so nobody is locked out. Every write names the SCIM token as its actor (`scim`, the token's id, its hint).
 
+### Domains
+
+A directory names only addresses its provider vouches for: the email of `POST /Users`, and an email that `PUT` or `PATCH` changes to another address, must be in one of the provider's [domains](sso.md#domains-linking-and-provisioning), or the write is `400 invalidValue`. Sign-in links a member to whoever signs in through a provider vouching for the member's email, so a directory naming an address of another provider's domain could own the account of the person who later signs in there, and hold addresses against their invitations. A provider with no domains provisions nobody. A member whose email is outside the domains now (the domains changed since) is still renamed, deactivated or reactivated: the check applies to an email that changes.
+
 ### Adoption
 
 An instance that already has members can switch SCIM on without duplicating them: `POST /Users` for an email a member already holds **adopts** that member when all of these hold, and is otherwise `409 uniqueness`:

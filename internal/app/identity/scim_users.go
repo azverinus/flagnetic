@@ -3,6 +3,7 @@ package identity
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -237,9 +238,9 @@ type CreateSCIMUser struct{ d SCIMUserDeps }
 // NewCreateSCIMUser returns the handler.
 func NewCreateSCIMUser(d SCIMUserDeps) *CreateSCIMUser { return &CreateSCIMUser{d: d} }
 
-// Handle creates the member, or adopts the one holding the email when it is in
-// the provider's domains, is no instance admin, is active, and nobody
-// provisions them; any other holder of the email is ErrEmailTaken. It records
+// Handle creates the member, or adopts the one holding the email, when the
+// email is in the provider's domains (otherwise invalidValue); the adopted one
+// is no instance admin, is active, and nobody provisions them; any other holder of the email is ErrEmailTaken. It records
 // member.provisioned or member.adopted, and, for a user stated inactive,
 // member.deactivated.
 func (h *CreateSCIMUser) Handle(ctx context.Context, req SCIMRequest, attrs identity.UserAttributes) (ProvisionedMember, error) {
@@ -266,9 +267,34 @@ func (h *CreateSCIMUser) Handle(ctx context.Context, req SCIMRequest, attrs iden
 	return h.d.answer(ctx, req.Caller, out, err)
 }
 
+// errEmailNotVouched refuses an email a SCIM write names that is outside the
+// provider's domains. Sign-in links a member to whoever signs in through a
+// provider vouching for the member's email, so a directory that could name an
+// address outside its domains could own the account of a person who later
+// signs in through the provider that does vouch for it, and could hold
+// addresses that are not its own against their invitations.
+var errEmailNotVouched = &identity.ScimError{Type: "invalidValue", Detail: "the email is not in one of the provider's domains"}
+
+// vouchedEmail is nil when email is in one of the caller's provider's
+// domains, and errEmailNotVouched when it is not.
+func (d SCIMUserDeps) vouchedEmail(ctx context.Context, caller SCIMCaller, email string) error {
+	p, err := providerOf(ctx, d.Providers, caller.ProviderSlug)
+	if err != nil {
+		return err
+	}
+	if !p.VouchesForEmail(email) {
+		return errEmailNotVouched
+	}
+	return nil
+}
+
 // provisionOrAdopt creates the member holding no email yet, and adopts the one
-// that does when the provider may take them over.
+// that does when the provider may take them over. An email outside the
+// provider's domains is named by neither.
 func (h *CreateSCIMUser) provisionOrAdopt(ctx context.Context, req SCIMRequest, attrs identity.UserAttributes, email, externalID string) (ProvisionedMember, error) {
+	if err := h.d.vouchedEmail(ctx, req.Caller, email); err != nil {
+		return ProvisionedMember{}, err
+	}
 	held, found, err := h.d.Members.ByEmail(ctx, email)
 	if err != nil {
 		return ProvisionedMember{}, err
@@ -277,13 +303,6 @@ func (h *CreateSCIMUser) provisionOrAdopt(ctx context.Context, req SCIMRequest, 
 		return h.d.Members.Provision(ctx, ProvisionUser{
 			Provider: req.provider(), Email: email, DisplayName: attrs.Name(email), ExternalID: externalID, Request: req.governance(),
 		})
-	}
-	p, err := providerOf(ctx, h.d.Providers, req.Caller.ProviderSlug)
-	if err != nil {
-		return ProvisionedMember{}, err
-	}
-	if !p.VouchesForEmail(email) {
-		return ProvisionedMember{}, ErrEmailTaken
 	}
 	return h.d.Members.Adopt(ctx, AdoptUser{
 		Provider: req.provider(), Member: held.ID, Email: email, DisplayName: attrs.Name(email), ExternalID: externalID, Request: req.governance(),
@@ -305,7 +324,8 @@ func NewReplaceSCIMUser(d SCIMUserDeps) *ReplaceSCIMUser { return &ReplaceSCIMUs
 
 // Handle replaces the member's email, name and, when stated, external ID with
 // the attributes', and deactivates or reactivates them when active is stated.
-// A member the caller's provider does not provision is not found.
+// A member the caller's provider does not provision is not found; an email
+// that is new to the member and outside the provider's domains is invalidValue.
 func (h *ReplaceSCIMUser) Handle(ctx context.Context, req SCIMRequest, member identity.MemberID, attrs identity.UserAttributes) (ProvisionedMember, error) {
 	email, ok := attrs.EmailAddress()
 	if !ok {
@@ -339,6 +359,9 @@ func applyUserChange(ctx context.Context, d SCIMUserDeps, req SCIMRequest, cmd U
 				return err
 			}
 		}
+		if err = d.vouchedChange(ctx, req.Caller, cmd); err != nil {
+			return err
+		}
 		if out, err = d.Members.Update(ctx, cmd); err != nil {
 			return err
 		}
@@ -348,6 +371,24 @@ func applyUserChange(ctx context.Context, d SCIMUserDeps, req SCIMRequest, cmd U
 		return err
 	})
 	return out, err
+}
+
+// vouchedChange refuses a change of the member's email to an address outside
+// the provider's domains. An email the member holds already is left alone
+// whatever the domains are now, so a directory still renames or deactivates a
+// member whose domain the provider no longer lists.
+func (d SCIMUserDeps) vouchedChange(ctx context.Context, caller SCIMCaller, cmd UpdateUser) error {
+	if cmd.Email == nil {
+		return nil
+	}
+	current, err := d.Members.Get(ctx, caller.ProviderSlug, cmd.Member)
+	if err != nil {
+		return err
+	}
+	if strings.EqualFold(current.Email, *cmd.Email) {
+		return nil
+	}
+	return d.vouchedEmail(ctx, caller, *cmd.Email)
 }
 
 // PatchSCIMUser applies a PatchOp to a member.
