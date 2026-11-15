@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ApiError, errorOf, unwrap } from "./errors";
 import { ifMatch, managementFetch } from "./http";
+import { revealLossless, stringifyLossless } from "./lossless-json";
 
 function answer(status: number, body?: unknown): Response {
   return new Response(body === undefined ? null : JSON.stringify(body), {
@@ -56,6 +57,31 @@ describe("the fetch the generated client runs on", () => {
     expect(response.status).toBe(403);
     expect(seen).toHaveLength(1);
     expect([...seen[0]!.headers.keys()]).toEqual(["content-type"]);
+  });
+
+  it("hands a number a double would change to the client's parse hidden, and gives it back", async () => {
+    const text = '{"value":{"account":12345678901234567890,"ratio":1.0},"version":3}';
+    const send = managementFetch({
+      fetch: async () => new Response(text, { headers: { "Content-Type": "application/json" } }),
+      onUnauthenticated: vi.fn(),
+    });
+
+    const response = await send("http://console.test/api/v1/projects/p/flags/f");
+    const parsed = revealLossless(JSON.parse(await response.text()));
+
+    expect(stringifyLossless(parsed)).toBe(text);
+  });
+
+  it("leaves a ruleset's text as the server sent it", async () => {
+    const text = '{"version":3,"ratio":1.0}';
+    const send = managementFetch({
+      fetch: async () => new Response(text, { headers: { "Content-Type": "application/json" } }),
+      onUnauthenticated: vi.fn(),
+    });
+
+    const response = await send("http://console.test/api/v1/projects/p/environments/e/ruleset");
+
+    expect(await response.text()).toBe(text);
   });
 
   it("leaves the refusal for the caller to read", async () => {

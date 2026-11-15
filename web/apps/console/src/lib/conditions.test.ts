@@ -3,6 +3,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { activateForTests } from "@/test/render";
 
+import { stringifyLossless } from "./lossless-json";
+
 import {
   attributeOptions,
   type ConditionDraft,
@@ -144,6 +146,15 @@ describe("values", () => {
       attribute: "country",
       op: "exists",
     });
+  });
+
+  it("sends a number as it was written and refuses one not written in decimal", () => {
+    const value = (text: string) =>
+      (conditionOf(attribute({ attribute: "build_number", text }), types) as { value: unknown })
+        .value;
+    expect(stringifyLossless(value("12345678901234567890"))).toBe("12345678901234567890");
+    expect(value("0x10")).toBe("0x10");
+    expect(value("")).toBe("");
   });
 
   it("reads a saved condition back to what it was", () => {

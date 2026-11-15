@@ -1,5 +1,7 @@
 import { client } from "@flagnetic/api";
 
+import { hideLossyNumbers, revealLossless, stringifyLossless } from "./lossless-json";
+
 /** Signing in is the one place a 401 means "wrong password", not "signed out". */
 const signInOperationPath = "/api/v1/auth/sign-in";
 
@@ -13,6 +15,35 @@ export type ManagementFetchOptions = {
    */
   onUnauthenticated: () => void;
 };
+
+/** The ruleset is saved as the server sent it, so its text is never rewritten. */
+const rulesetPath = /\/environments\/[^/]+\/ruleset$/;
+
+/**
+ * The answer with the numbers a double would change hidden in its text,
+ * for the generated client's own `JSON.parse`; the transformer set by
+ * {@link configureClient} gives them back as numbers that keep their text.
+ */
+async function keepingNumbers(response: Response, url: string): Promise<Response> {
+  const type = response.headers.get("content-type") ?? "";
+  if (
+    !/[/+]json\b/.test(type) ||
+    rulesetPath.test(new URL(url, "http://origin.invalid").pathname)
+  ) {
+    return response;
+  }
+  const text = await response.text();
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  return new Response(
+    response.status === 204 || response.status === 304 ? null : hideLossyNumbers(text),
+    {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    },
+  );
+}
 
 /**
  * The fetch the generated client runs on. The session cookie travels on
@@ -32,7 +63,7 @@ export function managementFetch(options: ManagementFetchOptions): typeof globalT
     ) {
       options.onUnauthenticated();
     }
-    return response;
+    return keepingNumbers(response, request.url);
   };
 }
 
@@ -45,6 +76,10 @@ export function configureClient(onUnauthenticated: () => void): void {
   client.setConfig({
     ...client.getConfig(),
     credentials: "same-origin",
+    // A value the server keeps byte for byte must go back as it came, not
+    // as the nearest double (see lossless-json).
+    bodySerializer: (body: unknown) => stringifyLossless(body),
+    responseTransformer: async (data: unknown) => revealLossless(data),
     fetch: managementFetch({ onUnauthenticated }),
   });
 }

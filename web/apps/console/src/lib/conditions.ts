@@ -4,6 +4,8 @@ import { msg } from "@lingui/core/macro";
 
 import { formatNumber } from "@/i18n/format";
 
+import { isJsonNumber, numberOf, stringifyLossless } from "./lossless-json";
+
 /** An operator of an attribute condition, as the API names it. */
 export type Operator =
   | "eq"
@@ -262,7 +264,7 @@ export function withOperator(
 }
 
 function textOf(raw: unknown): string {
-  return typeof raw === "string" ? raw : raw === undefined ? "" : JSON.stringify(raw);
+  return typeof raw === "string" ? raw : raw === undefined ? "" : stringifyLossless(raw);
 }
 
 /** A saved condition as the editor edits it. */
@@ -293,8 +295,10 @@ export function conditionDraft(condition: Condition, types: AttributeTypes): Con
 function parsed(type: AttributeType, raw: string): unknown {
   switch (entryType(type)) {
     case "number": {
-      const value = raw.trim() === "" ? NaN : Number(raw);
-      return Number.isFinite(value) ? value : raw;
+      const token = raw.trim();
+      if (!isJsonNumber(token)) return raw;
+      const value = numberOf(token);
+      return Number.isFinite(Number(value)) ? value : raw;
     }
     case "boolean":
       return raw === "true" ? true : raw === "false" ? false : raw;
