@@ -592,7 +592,7 @@ func TestSAMLProvidersAreOfferedOnTheSignInPage(t *testing.T) {
 	t.Errorf("providers = %+v, want %s among them", res.JSON200.Providers, p.Slug)
 }
 
-func TestSAMLGroupsMapToGrantsAndAnAbsentAttributeKeepsThem(t *testing.T) {
+func TestSAMLGroupsMapToGrantsAndAnAbsentAttributeCountsAsNoGroups(t *testing.T) {
 	idp := testkit.StartForgingSAMLIDP(t)
 	e := start(t)
 	p := e.createSAML(t, idp, nil)
@@ -615,8 +615,16 @@ func TestSAMLGroupsMapToGrantsAndAnAbsentAttributeKeepsThem(t *testing.T) {
 		t.Error("the mapped group did not make the member an instance admin")
 	}
 
-	// No attribute at all keeps everything.
-	e.samlSignIn(t, idp, p.Slug, "", person(nil))
+	// No attribute at all, from a person the provider claimed for before, is
+	// no group either.
+	b, _ = e.samlSignIn(t, idp, p.Slug, "", person(nil))
+	e.wantGrants(t, alpha, member, management.GrantSourceSso, p.Slug)
+	e.wantGrants(t, beta, member, management.GrantSourceSso, p.Slug)
+	if signedIn(t, b).Member.InstanceAdmin {
+		t.Error("an absent groups attribute left the member an instance admin")
+	}
+
+	e.samlSignIn(t, idp, p.Slug, "", person(map[string][]string{"groups": {"eng"}}))
 	e.wantGrants(t, alpha, member, management.GrantSourceSso, p.Slug, "maintainer")
 
 	// An attribute without a value is an empty list: the person is in no group.

@@ -100,6 +100,19 @@ func (s *Store) DeleteGroupClaim(ctx context.Context, provider identity.Provider
 	return tag.RowsAffected() > 0, nil
 }
 
+// HasGroupClaim reports whether a groups claim is stored for member at
+// provider.
+func (s *Store) HasGroupClaim(ctx context.Context, provider identity.ProviderID, member identity.MemberID) (bool, error) {
+	var has bool
+	err := s.db(ctx).QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM group_claims WHERE provider_id = $1 AND member_id = $2)`,
+		provider.Bytes(), member.Bytes()).Scan(&has)
+	if err != nil {
+		return false, fmt.Errorf("reading whether a member claimed groups: %w", err)
+	}
+	return has, nil
+}
+
 // KnownGroups returns the groups of every member who claimed groups at the
 // provider or is in one of its SCIM groups, the union of both, ordered by
 // member. A member whose claim was empty is listed with no groups, so that

@@ -385,6 +385,7 @@ var entryOnlyActions = []string{
 	"attribute.created",
 	"attribute.deleted",
 	"attribute.updated",
+	"auth.groups_claim_missing",
 	"auth.locked_out",
 	"auth.sign_in_failed",
 	"auth.signed_in",

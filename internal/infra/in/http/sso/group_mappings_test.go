@@ -262,15 +262,12 @@ func TestSigningInThroughDexGrantsWhatTheMappedGroupsMapTo(t *testing.T) {
 	})
 }
 
-func TestAGroupsClaimThatIsAbsentOrMalformedKeepsWhatTheProviderGranted(t *testing.T) {
+func TestAGroupsClaimThatIsAbsentOrMalformedCountsAsEmptyOnceTheProviderHasClaimedForTheMember(t *testing.T) {
 	idp := testkit.StartForgingIDP(t)
 	e := start(t)
 	slug := e.forged(t, idp, nil)
 	alpha := e.project(t)
 	e.mapGroups(t, slug, projectMapping("eng", alpha, "developer"))
-	email := uniqueEmail()
-	member := idOf(t, e.forgedPerson(t, idp, slug, email, map[string]any{"groups": []any{"eng"}}))
-	e.wantGrants(t, alpha, member, management.GrantSourceSso, slug, "developer")
 
 	for name, claim := range map[string]any{
 		"absent":                nil,
@@ -280,18 +277,49 @@ func TestAGroupsClaimThatIsAbsentOrMalformedKeepsWhatTheProviderGranted(t *testi
 		"a list holding a null": []any{"eng", nil},
 	} {
 		t.Run(name, func(t *testing.T) {
-			before := len(e.srv.Logs.Find(missingClaimLog))
-			e.forgedPerson(t, idp, slug, email, map[string]any{"groups": claim})
+			email := uniqueEmail()
+			member := idOf(t, e.forgedPerson(t, idp, slug, email, map[string]any{"groups": []any{"eng"}}))
 			e.wantGrants(t, alpha, member, management.GrantSourceSso, slug, "developer")
-			if len(e.srv.Logs.Find(missingClaimLog)) != before+1 {
-				t.Errorf("the claim was not logged as missing or malformed")
+			before := len(e.srv.Logs.Find(missingClaimLog))
+
+			e.forgedPerson(t, idp, slug, email, map[string]any{"groups": claim})
+
+			e.wantGrants(t, alpha, member, management.GrantSourceSso, slug)
+			if len(e.srv.Logs.Find(missingClaimLog)) != before {
+				t.Errorf("a member the provider had claimed for was logged as keeping their access")
+			}
+			recorded := e.audited(t, "auth.groups_claim_missing", "member_email", email)
+			if len(recorded) != 1 || recorded[0]["provider"] != slug || recorded[0]["treated_as_empty"] != true {
+				t.Errorf("auth.groups_claim_missing = %v, want one entry treating the claim as empty", recorded)
 			}
 		})
 	}
 
+	t.Run("a member the provider never claimed for keeps what they have and the sign-in is recorded", func(t *testing.T) {
+		email := uniqueEmail()
+		before := len(e.srv.Logs.Find(missingClaimLog))
+
+		member := idOf(t, e.forgedPerson(t, idp, slug, email, nil))
+		e.forgedPerson(t, idp, slug, email, nil)
+
+		e.wantGrants(t, alpha, member, management.GrantSourceSso, slug)
+		if len(e.srv.Logs.Find(missingClaimLog)) != before+2 {
+			t.Errorf("the missing claim was not logged twice")
+		}
+		recorded := e.audited(t, "auth.groups_claim_missing", "member_email", email)
+		if len(recorded) != 2 || recorded[0]["treated_as_empty"] != false {
+			t.Errorf("auth.groups_claim_missing = %v, want two entries that kept the access", recorded)
+		}
+	})
+
 	t.Run("an empty list is a claim: the person is in no group", func(t *testing.T) {
+		email := uniqueEmail()
+		member := idOf(t, e.forgedPerson(t, idp, slug, email, map[string]any{"groups": []any{"eng"}}))
 		e.forgedPerson(t, idp, slug, email, map[string]any{"groups": []any{}})
 		e.wantGrants(t, alpha, member, management.GrantSourceSso, slug)
+		if n := len(e.audited(t, "auth.groups_claim_missing", "member_email", email)); n != 0 {
+			t.Errorf("an empty claim recorded %d missing-claim entries", n)
+		}
 	})
 }
 
@@ -386,6 +414,35 @@ func TestTwoProvidersKeepTheirOwnGrants(t *testing.T) {
 	e.forgedPerson(t, idp, azure, email, map[string]any{"sub": "azure-sub", "groups": []any{}})
 
 	e.wantGrants(t, alpha, member, management.GrantSourceSso, okta, "developer")
+}
+
+func TestAMissingGroupsClaimAfterUnlinkingAnIdentityHasNothingLeftToClear(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	okta := e.forged(t, idp, nil)
+	azure := e.forged(t, idp, func(p *provider) { p.linkByEmail = true })
+	alpha := e.project(t)
+	e.mapGroups(t, azure, projectMapping("eng", alpha, "developer"))
+	email := uniqueEmail()
+	b := e.forgedPerson(t, idp, okta, email, nil)
+	member := idOf(t, b)
+	e.forgedPerson(t, idp, azure, email, map[string]any{"sub": "azure-sub", "groups": []any{"eng"}})
+	e.wantGrants(t, alpha, member, management.GrantSourceSso, azure, "developer")
+	linked := identityAt(t, methodsOf(t, b), azure)
+	if res, err := e.admin.UnlinkMemberIdentityWithResponse(t.Context(), member.String(), linked.Id.String()); err != nil ||
+		res.StatusCode() != http.StatusNoContent {
+		t.Fatalf("unlinking the identity = %v, %v: %s", res.StatusCode(), err, res.Body)
+	}
+
+	// Unlinking took the stored claim and its grants with it, so the member
+	// linked again by email is one the provider has not claimed for.
+	e.forgedPerson(t, idp, azure, email, map[string]any{"sub": "azure-sub"})
+
+	e.wantGrants(t, alpha, member, management.GrantSourceSso, azure)
+	recorded := e.audited(t, "auth.groups_claim_missing", "member_email", email)
+	if len(recorded) != 1 || recorded[0]["treated_as_empty"] != false {
+		t.Errorf("auth.groups_claim_missing = %v, want one entry that kept the access", recorded)
+	}
 }
 
 func TestAnInstanceAdminAMappingMadeIsDemotedOnlyByThatProvider(t *testing.T) {

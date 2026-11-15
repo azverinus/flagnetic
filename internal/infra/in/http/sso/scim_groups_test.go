@@ -75,11 +75,14 @@ func TestASignInAndTheProvidersSCIMGroupsKeepEachOthersGrants(t *testing.T) {
 	e.wantGrants(t, alpha, lee, management.GrantSourceSso, slug)
 	e.wantGrants(t, beta, lee, management.GrantSourceSso, slug, "viewer")
 
-	// A sign-in without a groups claim changes nothing; an empty claim keeps
-	// what the SCIM group grants and takes away what the claim did.
+	// A sign-in without a groups claim counts as an empty one for a member
+	// the provider claimed for before, and an empty claim keeps what the SCIM
+	// group grants and takes away what the claim did.
 	patchGroup(t, directory, eng, scim.PatchOperation{Op: "add", Path: ptr("members"), Value: membersValue(lee)})
 	signIn(nil)
 	e.wantGrants(t, alpha, lee, management.GrantSourceSso, slug, "developer")
+	e.wantGrants(t, beta, lee, management.GrantSourceSso, slug)
+	signIn(map[string]any{"groups": []string{"ops"}})
 	e.wantGrants(t, beta, lee, management.GrantSourceSso, slug, "viewer")
 	signIn(map[string]any{"groups": []string{}})
 	e.wantGrants(t, alpha, lee, management.GrantSourceSso, slug, "developer")

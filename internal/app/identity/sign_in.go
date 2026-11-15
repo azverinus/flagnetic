@@ -652,6 +652,22 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 		known := in.Linked != nil || in.Provisioned != nil || (in.ByEmail != nil && p.Vouches(claims))
 		return secret.String{}, &unresolved{err: err, member: member, known: known}
 	}
+	// A sign-in without a groups claim of a member the provider claimed groups
+	// for before stores an empty claim, so it holds the provider like one that
+	// stores a claim does, still before anything is written. The member is
+	// asked whichever way they were found: one whose identity was unlinked and
+	// who is linked again by email keeps the claim stored before.
+	claimedBefore := false
+	if !claims.HasGroups && (in.Linked != nil || in.Provisioned != nil || in.ByEmail != nil) {
+		if claimedBefore, err = h.d.Mappings.HasGroupClaim(ctx, p.ID, member.ID); err != nil {
+			return secret.String{}, err
+		}
+		if claimedBefore {
+			if _, err = h.d.Providers.LockProvider(ctx, p.Slug); err != nil {
+				return secret.String{}, err
+			}
+		}
+	}
 	now := h.d.now()
 	switch res.Action {
 	case identity.ActivateInvited, identity.ActivateLinked:
@@ -685,7 +701,7 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 	if err = h.d.Identities.RecordIdentitySignIn(ctx, linked.ID, now); err != nil {
 		return secret.String{}, err
 	}
-	if err = h.applyGroups(ctx, now, p, member, claims, cmd.RequestID); err != nil {
+	if err = h.applyGroups(ctx, now, p, member, claims, claimedBefore, cmd.RequestID); err != nil {
 		return secret.String{}, err
 	}
 	return h.d.Members.OpenSession(ctx, SessionRequest{
@@ -695,10 +711,16 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 
 // applyGroups stores the groups the person claimed and gives member what the
 // provider's mappings map them and the member's SCIM groups at the provider
-// to, replacing what the provider granted before. A claim that is absent or not a list of strings changes nothing: a
-// misconfigured identity provider cannot strip everyone of their access.
+// to, replacing what the provider granted before. A claim that is absent or
+// not a list of strings counts as an empty list for a member the provider
+// claimed groups for before (claimedBefore), because several providers leave
+// the claim out when a person is in none of the groups they send, so keeping
+// the stored one would keep a removed member's access for good. For a member
+// it never claimed for the sign-in changes nothing, so a misconfigured
+// identity provider cannot strip everyone of access they hold another way; the
+// audit log records it either way when the provider has mappings.
 func (h *CompleteSignIn) applyGroups(ctx context.Context, now time.Time, p identity.Provider, member MemberRecord,
-	claims identity.VerifiedClaims, requestID string,
+	claims identity.VerifiedClaims, claimedBefore bool, requestID string,
 ) error {
 	mappings, err := h.d.Mappings.GroupMappings(ctx, p.ID)
 	if err != nil {
@@ -706,10 +728,18 @@ func (h *CompleteSignIn) applyGroups(ctx context.Context, now time.Time, p ident
 	}
 	if !claims.HasGroups {
 		if len(mappings) > 0 {
-			h.d.Logger.WarnContext(ctx, "the groups claim is missing or is not a list of strings, so the member keeps the access the provider granted",
-				"provider", p.Slug, "member", member.ID.String())
+			if err = h.recordMissingClaim(ctx, now, p, member, claimedBefore, requestID); err != nil {
+				return err
+			}
 		}
-		return nil
+		if !claimedBefore {
+			if len(mappings) > 0 {
+				h.d.Logger.WarnContext(ctx, "the groups claim is missing or is not a list of strings, so the member keeps the access the provider granted",
+					"provider", p.Slug, "member", member.ID.String())
+			}
+			return nil
+		}
+		claims.Groups = []string{}
 	}
 	if err = h.d.Mappings.StoreGroupClaim(ctx, p.ID, member.ID, claims.Groups, now); err != nil {
 		return err
@@ -729,6 +759,26 @@ func (h *CompleteSignIn) applyGroups(ctx context.Context, now time.Time, p ident
 	deps := GroupMappingDeps{Access: h.d.Access, Logger: h.d.Logger}
 	_, err = deps.replaceAccess(ctx, p, member.ID, mappings, groups, governance.Actor{}, requestID)
 	return err
+}
+
+// recordMissingClaim records auth.groups_claim_missing: the member, as the
+// person who signed in, came back from a provider with mappings and no usable
+// groups claim; treated_as_empty says whether that took their provider-granted
+// access away or left it as it was.
+func (h *CompleteSignIn) recordMissingClaim(ctx context.Context, now time.Time, p identity.Provider, m MemberRecord, treatedAsEmpty bool, requestID string) error {
+	req := governance.Request{
+		Actor: governance.Actor{Kind: governance.ActorMember, ID: m.ID.String(), Name: m.DisplayName, MemberID: m.ID.String()},
+		ID:    requestID,
+	}
+	entry, err := governance.NewEntry(id.New[governance.Entry](h.d.IDs), now, req, governance.Record{
+		Action: "auth.groups_claim_missing",
+		Entity: governance.Entity{Kind: "member", ID: m.ID.String(), Key: m.Email},
+		After:  map[string]any{"provider": p.Slug, "member_email": m.Email, "treated_as_empty": treatedAsEmpty},
+	})
+	if err != nil {
+		return err
+	}
+	return h.d.Audit.Record(ctx, entry)
 }
 
 // recordLinked records identity.linked: the member, as the person who signed
