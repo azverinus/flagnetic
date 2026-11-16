@@ -163,15 +163,17 @@ func New(o Options) *Server {
 }
 
 // Drain makes readiness answer 503 from now on while every route is still
-// served, so load balancers route away from a replica about to stop.
+// served, except a new ruleset stream, which its handler refuses through
+// Draining, so load balancers route away from a replica about to stop.
 func (s *Server) Drain() {
 	s.draining.Store(true)
 	s.drainOnce.Do(func() { close(s.drained) })
 }
 
 // Draining is closed once the replica begins to drain: a stream ends then,
-// so that its client reconnects to a replica that stays, and the drain is
-// not held up by connections that never end on their own.
+// and a new ruleset stream is refused, so that its client reconnects to a
+// replica that stays, and the drain is not held up by connections that never
+// end on their own.
 func (s *Server) Draining() <-chan struct{} { return s.drained }
 
 // Handle mounts h on pattern, a ServeMux pattern with a method and a path.
