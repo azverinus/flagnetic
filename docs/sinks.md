@@ -109,6 +109,14 @@ A sink's rows carry the key of their environment, which is gone when the environ
 
 A **sink warning** is what the last test of the saved sink, or its enable, found that does not stop delivery. For ClickHouse it is an optional column of the export schema a table lacks, which inserts skip. The next test of the saved sink or enable replaces them all; a test of an unsaved configuration, or with a configuration in its body, answers its warnings without storing them, and among them a missing table it would create. A table without a required column, or a missing table when `create_tables` is false, is not a warning but a failure of the test, the enable and the insert, with the code `16` (`NO_SUCH_COLUMN_IN_TABLE`) or `60` (`UNKNOWN_TABLE`).
 
+## In the console
+
+Members holding `sink.manage` see **Sinks** in the project navigation; everything above is there.
+
+- **The list** shows each sink's kind, whether it is enabled, its health, its last delivery, its lag and whether it is at risk. **New sink** opens the form: the name, the kind, the kind's own fields, the event kinds and environments to export (tick none for all of them), the batch size and the flush interval. **Test connection** tests the configuration as it is written in the form and saves nothing. A secret is typed, never shown: editing a sink leaves it as stored unless you type a new one, and changing the target asks for it again. The signing secret of a webhook sink is shown once, when the sink is created and after **Rotate secret**.
+- **A sink's page** has **Enable** or **Disable**, **Send sample**, **Rotate secret** for a webhook sink, and **Delete**. Enabling asks where delivery starts: from now, or from a time still within retention. The **Settings** tab holds the warnings of the last check, the streams with their last delivery and last failure, and the form; **Dead letters** redelivers or discards each one; **Replay** takes the period and the event kinds; **Gaps** lists what retention dropped and dismisses each gap.
+- **A sink that needs attention**, because it is stopped, at risk or has a gap nobody dismissed, is named with its reasons in a banner above every screen of the project, and marks **Sinks** in the navigation. Its page says why, shows the last failure, and has **Resume** when the platform stopped it.
+
 ## Metrics
 
 | Metric | Labels | Meaning |
