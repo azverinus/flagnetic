@@ -1315,6 +1315,7 @@ msgstr ""
 msgid "Approve"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "approve and reject change requests"
 msgstr ""
@@ -1341,6 +1342,7 @@ msgstr ""
 msgid "Archive {key}"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "archive and delete flags"
 msgstr ""
@@ -1659,6 +1661,7 @@ msgstr ""
 msgid "Change experiments."
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "change flag configurations"
 msgstr ""
@@ -2521,6 +2524,7 @@ msgstr ""
 msgid "Delete attribute"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "delete draft experiments"
 msgstr ""
@@ -2550,6 +2554,7 @@ msgstr ""
 msgid "Delete segment"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "delete segments"
 msgstr ""
@@ -2559,6 +2564,7 @@ msgstr ""
 msgid "Delete sink"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "delete the project"
 msgstr ""
@@ -2851,6 +2857,7 @@ msgstr ""
 msgid "Edit {name} ({keyId})"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "edit and run experiments"
 msgstr ""
@@ -2860,6 +2867,7 @@ msgstr ""
 msgid "Edit definition"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "edit flags"
 msgstr ""
@@ -2872,6 +2880,7 @@ msgstr ""
 msgid "Edit note"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "edit segments"
 msgstr ""
@@ -2880,6 +2889,7 @@ msgstr ""
 msgid "Edit the change request"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "edit the project"
 msgstr ""
@@ -4113,6 +4123,7 @@ msgstr ""
 msgid "Import"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "import a project document into the project"
 msgstr ""
@@ -4761,30 +4772,37 @@ msgstr ""
 msgid "Make instance admin"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "manage environments"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "manage project tokens"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "manage SDK keys"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "manage sinks"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "manage unit types and attributes"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "manage webhook subscriptions"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "manage who has access"
 msgstr ""
@@ -6112,6 +6130,7 @@ msgstr ""
 msgid "Propose"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "propose changes as change requests"
 msgstr ""
@@ -6128,6 +6147,7 @@ msgstr ""
 msgid "Protect environment"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "protect environments"
 msgstr ""
@@ -6579,6 +6599,7 @@ msgstr ""
 msgid "Revert"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "revert flag configurations to earlier versions"
 msgstr ""
@@ -6892,11 +6913,15 @@ msgstr ""
 msgid "SCIM token"
 msgstr ""
 
-#. Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.
 #: src/components/navigation.tsx
 #: src/components/scim-tokens.tsx
-#: src/lib/problem-messages.ts
 #: src/routes/_signed-in/admin/scim-tokens.tsx
+msgid "SCIM tokens"
+msgstr ""
+
+#. Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.
+#: src/lib/problem-messages.ts
+msgctxt "an item of a list inside a sentence"
 msgid "SCIM tokens"
 msgstr ""
 
@@ -7570,6 +7595,7 @@ msgstr ""
 msgid "Superseded: what this change request was based on changed, so it can no longer be applied. Copy it to propose it again on the current configuration."
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "switch flags off with the kill switch"
 msgstr ""
@@ -8461,6 +8487,7 @@ msgstr ""
 msgid "The provider is still in use. Disable it instead: that stops its sign-ins and keeps its members, identities and grants."
 msgstr ""
 
+#. {uses} is a list of what still depends on the provider, joined as the language joins a list; its items are written in the nominative case, in lower case.
 #: src/lib/problem-messages.ts
 msgid "The provider is still used by {uses}. Disable it instead: that stops its sign-ins and keeps its members, identities and grants."
 msgstr ""
@@ -9471,6 +9498,7 @@ msgstr ""
 msgid "View the audit log"
 msgstr ""
 
+#. Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.
 #: src/lib/access-names.ts
 msgid "view the project"
 msgstr ""

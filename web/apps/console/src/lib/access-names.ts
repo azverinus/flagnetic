@@ -41,29 +41,121 @@ export type Permission =
 
 /** Each permission as what it lets a member do, to complete "the permission to …". */
 const permissionNames: Record<Permission, MessageDescriptor> = {
-  "project.read": msg`view the project`,
-  "project.update": msg`edit the project`,
-  "environment.manage": msg`manage environments`,
-  "environment.protect": msg`protect environments`,
-  "declaration.manage": msg`manage unit types and attributes`,
-  "grant.manage": msg`manage who has access`,
-  "project_token.manage": msg`manage project tokens`,
-  "flag.edit": msg`edit flags`,
-  "flag.archive": msg`archive and delete flags`,
-  "flag_configuration.update": msg`change flag configurations`,
-  "flag_configuration.kill": msg`switch flags off with the kill switch`,
-  "flag_configuration.revert": msg`revert flag configurations to earlier versions`,
-  "segment.edit": msg`edit segments`,
-  "segment.delete": msg`delete segments`,
-  "sdk_key.manage": msg`manage SDK keys`,
-  "experiment.edit": msg`edit and run experiments`,
-  "experiment.delete": msg`delete draft experiments`,
-  "change_request.propose": msg`propose changes as change requests`,
-  "change_request.approve": msg`approve and reject change requests`,
-  "webhook.manage": msg`manage webhook subscriptions`,
-  "sink.manage": msg`manage sinks`,
-  "project.delete": msg`delete the project`,
-  "project.import": msg`import a project document into the project`,
+  "project.read": msg({
+    message: "view the project",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "project.update": msg({
+    message: "edit the project",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "environment.manage": msg({
+    message: "manage environments",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "environment.protect": msg({
+    message: "protect environments",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "declaration.manage": msg({
+    message: "manage unit types and attributes",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "grant.manage": msg({
+    message: "manage who has access",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "project_token.manage": msg({
+    message: "manage project tokens",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "flag.edit": msg({
+    message: "edit flags",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "flag.archive": msg({
+    message: "archive and delete flags",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "flag_configuration.update": msg({
+    message: "change flag configurations",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "flag_configuration.kill": msg({
+    message: "switch flags off with the kill switch",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "flag_configuration.revert": msg({
+    message: "revert flag configurations to earlier versions",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "segment.edit": msg({
+    message: "edit segments",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "segment.delete": msg({
+    message: "delete segments",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "sdk_key.manage": msg({
+    message: "manage SDK keys",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "experiment.edit": msg({
+    message: "edit and run experiments",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "experiment.delete": msg({
+    message: "delete draft experiments",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "change_request.propose": msg({
+    message: "propose changes as change requests",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "change_request.approve": msg({
+    message: "approve and reject change requests",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "webhook.manage": msg({
+    message: "manage webhook subscriptions",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "sink.manage": msg({
+    message: "manage sinks",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "project.delete": msg({
+    message: "delete the project",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
+  "project.import": msg({
+    message: "import a project document into the project",
+    comment:
+      'Completes "the permission to …" and "Lets the holder …"; Russian writes it as an infinitive phrase, in lower case.',
+  }),
 };
 
 const roleNames: Record<string, MessageDescriptor> = {

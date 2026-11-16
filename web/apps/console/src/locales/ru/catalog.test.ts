@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
  * package's tests.
  */
 const retiredWords =
-  /экземпляр|экспозиц|сеанс|корзин|аварийн|сопровождающ|перебазир|ретеншен|вариаци|раскатк|переопредел|предуслов|набор\w* правил|\(а\)|единиц/i;
+  /экземпляр|экспозиц|сеанс|корзин|аварийн|сопровождающ|перебазир|ретеншен|вариаци|раскатк|переопредел|предуслов|набор[а-яё]* правил|\(а\)|единиц/i;
 
 /** «единица» is a unit of time in these messages and stays so. */
 const unitOfTimeMessages = new Set([
@@ -61,6 +61,19 @@ describe("the Russian catalog", () => {
       .filter((entry) => retiredWords.test(entry.translation))
       .map((entry) => entry.id);
     expect(offenders).toEqual([]);
+  });
+
+  it("catches a retired word in every case form", () => {
+    for (const text of [
+      "набор правил",
+      "из набора правил",
+      "наборы правил",
+      "с набором правил",
+      "Экземпляра",
+      "сеансы",
+    ]) {
+      expect(retiredWords.test(text), text).toBe(true);
+    }
   });
 
   it("keeps «единица» only for the three units of time", () => {
