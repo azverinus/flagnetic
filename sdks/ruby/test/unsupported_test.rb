@@ -67,7 +67,7 @@ class UnsupportedTest < Minitest::Test
   def test_a_stored_ruleset_is_reported_at_construction
     Dir.mktmpdir do |dir|
       path = File.join(dir, "ruleset.json")
-      File.write(path, JSON.generate(newer(5)))
+      store_file(path, JSON.generate(newer(5)))
       @server.on_ruleset { |_| [503, {}, ""] }
       client(store: path, stream: false).ready(timeout: 1)
       assert_equal unsupported_flags(newer(5)), logged(:rule_unsupported).map { |_, f| f[:flag] }.sort

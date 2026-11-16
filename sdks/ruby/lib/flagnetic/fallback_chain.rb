@@ -32,7 +32,8 @@ module Flagnetic
     end
 
     # load_store serves a persisted ruleset as last_good before any network
-    # call. A corrupt file leaves the stage built_in, with a log.
+    # call. A corrupt file, or one written under another key, leaves the stage
+    # built_in, with a log.
     def load_store
       json, received_at = @store.load
       return unless json
@@ -44,6 +45,8 @@ module Flagnetic
       end
 
       swap(ruleset, received_at: received_at, stage: :last_good, source: "store")
+    rescue FileStore::Refused => e
+      log(:error, :store_failed, path: @store.to_s, cause: e.message)
     rescue SystemCallError, IOError => e
       log(:error, :store_failed, path: @store.to_s, cause: "#{e.class}: #{e.message}")
     end
@@ -64,7 +67,9 @@ module Flagnetic
 
       Eval::Ruleset.decode(json)
     rescue JSON::ParserError, EncodingError => e
-      "parse: #{e.message.lines.first&.strip}"
+      # The parser quotes the bytes it stopped at, which need not be UTF-8:
+      # scrubbed, so building the cause never raises past the caller.
+      "parse: #{e.message.scrub.lines.first&.strip}"
     rescue Eval::DecodeError => e
       "parse: #{e.message}"
     end

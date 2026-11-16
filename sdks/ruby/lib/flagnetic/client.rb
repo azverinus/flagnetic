@@ -51,6 +51,8 @@ module Flagnetic
     #   call is ever made; the stage is fresh; reload re-reads the source.
     # - store: a file path holding the last good ruleset, loaded as
     #   last_good at construction and rewritten on every accepted ruleset.
+    #   The file belongs to the SDK key that wrote it: one written under
+    #   another key, or under none, is discarded with store_failed.
     # - logger: a callable receiving (level, event, fields), or a Logger.
     #   Default: warn and above to $stderr.
     # - stream: false disables the change stream; polling then runs every
@@ -335,7 +337,7 @@ module Flagnetic
       @transport = Transport.new(sdk_key: sdk_key, base_url: base_url, platform: platform,
                                  timeout: @timing.request_timeout)
       build_reporters(@transport, nil)
-      @store = store && FileStore.new(store)
+      @store = store && FileStore.new(store, sdk_key)
       load_store if @store
       @worker = Worker.new(self, @transport, @timing, stream: stream)
     end

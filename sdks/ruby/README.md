@@ -62,7 +62,7 @@ A client key (`fn_cli_...`) is refused at construction with an `ArgumentError`. 
 | `stream:` | `false` turns the change stream off; the ruleset is then polled every 30 s (default `true`). |
 | `poll_interval:` | Seconds between polls while the stream is up (default 300, at least 30). |
 | `request_timeout:` | Seconds per request (default 10). |
-| `store:` | Path of a file keeping the last good ruleset across restarts. It is read at construction and rewritten on every accepted ruleset. |
+| `store:` | Path of a file keeping the last good ruleset across restarts. It is read at construction and rewritten on every accepted ruleset. The file is headed by a digest of the SDK key: one written under another key (another environment's, say) or under none is discarded with `store_failed`. |
 | `logger:` | A callable receiving `(level, event, fields)`, or a standard `Logger`. Default: warnings and errors to `$stderr`. |
 | `platform:` | The platform in the `User-Agent` (`flagnetic-ruby/<version> (<platform>)`) and the events envelope, and an exposure's `platform` when the context names none (default `"server"`). |
 | `app_version:` | The application's version, sent with every evaluation summary and as an exposure's `app_version` when the context names none. |
