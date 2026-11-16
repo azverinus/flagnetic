@@ -50,7 +50,7 @@ The cases: an empty body, `{}`, truncated JSON, a `schema_version` above the one
 
 ## Scenarios
 
-`scenarios.json` holds `context`, `defaults`, `answers` (by document, and `built_in` for none: what every getter returns while that document serves) and `scenarios`; `versioning-scenarios.json` holds only `scenarios`. A scenario has a `mode` (`server`: the ruleset and local evaluation; `client`: remote evaluation), what it `covers`, what is `given` (`stored`: the last good document in the SDK's store at construction; `offline`: a document instead of a key; `options`) and `steps`, run in order.
+`scenarios.json` holds `context`, `defaults`, `answers` (by document, and `built_in` for none: what every getter returns while that document serves) and `scenarios`; `versioning-scenarios.json` holds only `scenarios`. A scenario has a `mode` (`server`: the ruleset and local evaluation; `client`: remote evaluation), what it `covers`, what is `given` (`stored`: the last good document in the SDK's store at construction, written as the SDK writes its store under the key the scenario builds the SDK with, since a store written under another key is discarded; `offline`: a document instead of a key; `options`) and `steps`, run in order.
 
 A mock server consumes the list like this:
 

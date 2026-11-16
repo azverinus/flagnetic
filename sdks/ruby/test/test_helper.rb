@@ -87,9 +87,16 @@ module ClientHelpers
     super
   end
 
+  KEY = "fn_srv_#{"a" * 40}".freeze
+
+  # store_file writes json to path as the SDK writes its store under KEY.
+  def store_file(path, json)
+    Flagnetic.const_get(:FileStore).new(path, KEY).save(json)
+  end
+
   def client(timing: {}, **)
-    c = Flagnetic::Client.new("fn_srv_#{"a" * 40}", base_url: @server.base_url, logger: method(:record),
-                                                    timing: FAST.merge(timing), **)
+    c = Flagnetic::Client.new(KEY, base_url: @server.base_url, logger: method(:record),
+                                   timing: FAST.merge(timing), **)
     @clients << c
     c
   end

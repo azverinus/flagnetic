@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "digest"
 require "tmpdir"
 
 # The public surface: getters, detail, local overrides, the store, the
@@ -179,7 +180,7 @@ class ClientTest < Minitest::Test
   def test_the_store_serves_last_good_before_any_network_call_and_persists_every_accepted_ruleset
     Dir.mktmpdir do |dir|
       path = File.join(dir, "ruleset.json")
-      File.write(path, JSON.generate(document(1, { "on" => true })))
+      store_file(path, JSON.generate(document(1, { "on" => true })))
       File.utime(Time.at(1_700_000_000), Time.at(1_700_000_000), path)
       @server.on_ruleset { |_| [503, {}, ""] }
 
@@ -195,8 +196,10 @@ class ClientTest < Minitest::Test
       eventually { c.stage == :fresh }
       # The stage turns fresh before the delivery thread writes the store,
       # which it does by rename, so the file is waited for whole.
-      eventually { File.read(path) == served }
-      assert_equal served, File.read(path)
+      eventually { File.binread(path).end_with?("\n#{served}") }
+      header = { "flagnetic_store" => 1, "key" => Digest::SHA256.hexdigest(KEY) }
+      assert_equal "#{JSON.generate(header)}\n#{served}", File.binread(path)
+      refute_includes File.binread(path), KEY
       assert_empty Dir.glob(File.join(dir, "*.tmp"))
     end
   end
@@ -204,11 +207,53 @@ class ClientTest < Minitest::Test
   def test_a_corrupt_store_starts_built_in_with_a_log
     Dir.mktmpdir do |dir|
       path = File.join(dir, "ruleset.json")
-      File.write(path, "{ not json")
+      store_file(path, "{ not json")
       @server.on_ruleset { |_| [503, {}, ""] }
       c = client(store: path)
       assert_equal :built_in, c.stage
       assert_equal path, logged(:store_failed).first[1][:path]
+    end
+  end
+
+  def test_a_store_written_under_another_key_is_discarded_and_the_right_ruleset_is_no_downgrade
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "ruleset.json")
+      # Another environment's ruleset, at a version higher than this one's.
+      Flagnetic.const_get(:FileStore).new(path, "fn_srv_another_environment")
+               .save(JSON.generate(document(99, { "on" => false })))
+      @server.publish(document(3, { "on" => true }))
+
+      c = client(store: path)
+      assert_equal :fresh, c.ready(timeout: 2)
+      assert_equal [true, 3], [c.bool("on", default: false), c.detail("on", default: false).ruleset_version]
+      failed = logged(:store_failed)
+      assert_equal(["the store was written under another key"], failed.map { |_, f| f[:cause] })
+      assert_nil @server.fetches.first["if-none-match"]
+      eventually { File.binread(path).start_with?(Flagnetic.const_get(:FileStore).new(path, KEY).send(:header)) }
+    end
+  end
+
+  def test_a_store_written_under_no_key_or_in_another_format_is_discarded
+    bare = JSON.generate(document(1, { "on" => true }))
+    header = JSON.generate({ "flagnetic_store" => 1, "key" => Digest::SHA256.hexdigest(KEY) })
+    {
+      "a bare document" => bare,
+      "a bare document on several lines" => JSON.pretty_generate(document(1, { "on" => true })),
+      "a bare document ending in a newline" => "#{bare}\n",
+      "a later format" => "#{header.sub('"flagnetic_store":1', '"flagnetic_store":2')}\n#{bare}",
+      "a format as a string" => "#{header.sub('"flagnetic_store":1', '"flagnetic_store":"1"')}\n#{bare}",
+      "a format as true" => "#{header.sub('"flagnetic_store":1', '"flagnetic_store":true')}\n#{bare}",
+      "a header that is no JSON" => "not a header\n#{bare}"
+    }.each do |name, content|
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "ruleset.json")
+        File.binwrite(path, content)
+        @server.on_ruleset { |_| [503, {}, ""] }
+        c = client(store: path)
+        assert_equal :built_in, c.stage, name
+        assert_equal 1, logged(:store_failed).size, name
+        @logged.clear
+      end
     end
   end
 
