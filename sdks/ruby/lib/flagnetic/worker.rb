@@ -215,11 +215,15 @@ module Flagnetic
       @next_fetch = now # versions may have been missed while down
     end
 
+    # close_stream forgets the stream's stability with it: a heartbeat on
+    # one stream says nothing of the next, so a failed reconnect after a
+    # stable stream still counts toward the backoff.
     def close_stream
       @head_pending = false
       @stream&.close
       @stream = nil
       @connected = false
+      @stable = false
     end
 
     # drop ends the stream and schedules a reconnect: 0 to close_jitter
