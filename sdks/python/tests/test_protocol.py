@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 
 import flagnetic
+from flagnetic import _delivery
 from mock_server import MockServer, Request, Response
 from protocol import (
     SDK_KEY,
@@ -25,6 +26,7 @@ from protocol import (
 
 FILES = read_json("scenarios.json")
 VERSIONING = read_json("versioning-scenarios.json")
+STABILITY = read_json("stream-stability-scenarios.json")
 EXPERIMENTS = read_json("experiment-scenarios.json")
 CONTEXT = flagnetic.Context(**FILES["context"])
 
@@ -41,6 +43,11 @@ DIVISORS = {
     "server: 45 seconds of silence reconnect the stream": 40,
     CATCH_UP: 40,
 }
+# The scenarios about how long a wait is. Every jitter is drawn at the top of its window, and time
+# is not compressed, so a reconnect that skips the backoff (the routine 0-2 s against the first
+# failure's 0-1 s) misses a window that the scheduling slack of a step does not widen to cover.
+WINDOW_TOP = {"server: a stream closed before its first heartbeat is retried with backoff": 1}
+DIVISORS.update(WINDOW_TOP)
 DEFAULT_DIVISOR = 50
 
 # Steps that wait for the server's answer to a flush need a fetch loop that is quiet meanwhile: these
@@ -50,7 +57,7 @@ DIVISORS["server: offline mode makes no request"] = 100
 
 
 def server_scenarios() -> list[dict[str, Any]]:
-    every = FILES["scenarios"] + VERSIONING["scenarios"] + EXPERIMENTS["scenarios"]
+    every = FILES["scenarios"] + VERSIONING["scenarios"] + STABILITY["scenarios"] + EXPERIMENTS["scenarios"]
     return [s for s in every if s["mode"] == "server"]
 
 
@@ -70,8 +77,10 @@ def scenario_report() -> Iterator[None]:
 
 
 @pytest.mark.parametrize("name", [s["name"] for s in server_scenarios()])
-def test_scenario(name: str) -> None:
+def test_scenario(name: str, monkeypatch: pytest.MonkeyPatch) -> None:
     scenario = next(s for s in server_scenarios() if s["name"] == name)
+    if name in WINDOW_TOP:
+        monkeypatch.setattr(_delivery, "full_jitter", lambda ceiling: ceiling)
     answers = {**FILES["answers"], **EXPERIMENTS["answers"]}
     errors = play(scenario, CONTEXT, answers, DIVISORS.get(name, DEFAULT_DIVISOR))
     assert not errors, "\n".join(errors)
