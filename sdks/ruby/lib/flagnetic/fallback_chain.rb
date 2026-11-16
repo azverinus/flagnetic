@@ -67,7 +67,9 @@ module Flagnetic
 
       Eval::Ruleset.decode(json)
     rescue JSON::ParserError, EncodingError => e
-      "parse: #{e.message.lines.first&.strip}"
+      # The parser quotes the bytes it stopped at, which need not be UTF-8:
+      # scrubbed, so building the cause never raises past the caller.
+      "parse: #{e.message.scrub.lines.first&.strip}"
     rescue Eval::DecodeError => e
       "parse: #{e.message}"
     end

@@ -243,7 +243,9 @@ class ClientTest < Minitest::Test
       "a later format" => "#{header.sub('"flagnetic_store":1', '"flagnetic_store":2')}\n#{bare}",
       "a format as a string" => "#{header.sub('"flagnetic_store":1', '"flagnetic_store":"1"')}\n#{bare}",
       "a format as true" => "#{header.sub('"flagnetic_store":1', '"flagnetic_store":true')}\n#{bare}",
-      "a header that is no JSON" => "not a header\n#{bare}"
+      "a header that is no JSON" => "not a header\n#{bare}",
+      "a header that is no UTF-8" => "{\"flagnetic_store\":1,\"key\":\"\xff\xfe\"}\n#{bare}".b,
+      "a document that is no UTF-8" => "#{header}\n\xff\xfe{}".b
     }.each do |name, content|
       Dir.mktmpdir do |dir|
         path = File.join(dir, "ruleset.json")
