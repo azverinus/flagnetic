@@ -274,9 +274,9 @@ def test_the_ruleset_is_persisted_and_serves_the_next_start_before_any_request(
     first = clients(serving(RULESET), store=store)
     assert first.ready(5) is flagnetic.Stage.FRESH
     assert stat.S_IMODE(os.stat(store).st_mode) == 0o600
-    header, _, document = store.read_bytes().partition(b"\n")
-    assert json.loads(header) == {"flagnetic_store": 1, "key": hashlib.sha256(SDK_KEY.encode()).hexdigest()}
-    assert document == RULESET
+    # Byte for byte what every server SDK writes, so a store moves between them.
+    digest = hashlib.sha256(SDK_KEY.encode()).hexdigest().encode()
+    assert store.read_bytes() == b'{"flagnetic_store":1,"key":"' + digest + b'"}\n' + RULESET
     assert SDK_KEY.encode() not in store.read_bytes()
     assert not [p for p in tmp_path.iterdir() if p != store]
 

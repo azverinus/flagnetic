@@ -144,8 +144,10 @@ class Client:
     ``store``
         A file path. Every accepted ruleset is written there, readable by its
         owner only, and loaded at construction as ``last_good`` before any
-        network call. A ruleset the store cannot load or save logs
-        ``store_failed``; a corrupt file leaves the client at ``built_in``.
+        network call. The file is headed by a SHA-256 digest of ``sdk_key``:
+        one written under another key, or under none, is discarded. A ruleset
+        the store cannot load or save logs ``store_failed``; a corrupt or
+        discarded file leaves the client at ``built_in``.
     ``logger``
         A hook called with ``(level, event, fields)`` for every log event, from
         any thread; the default sends them to the ``flagnetic`` logger of
