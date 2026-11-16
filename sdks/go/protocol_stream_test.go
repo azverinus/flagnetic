@@ -41,8 +41,10 @@ var windowTopScenarios = map[string]bool{
 }
 
 // windowTopSlack is what a request may come after the top of its window:
-// the time the reconnect itself takes, divided like every other duration.
-const windowTopSlack = 50 * time.Millisecond
+// the time the reconnect itself takes. It stays below the gap between the
+// first failure's window and the routine close's (100 ms against 200 ms on
+// the scaled clock), which is what tells the two rules apart.
+const windowTopSlack = 90 * time.Millisecond
 
 func TestProtocolStreamScenarios(t *testing.T) {
 	file := readScenarios(t)
