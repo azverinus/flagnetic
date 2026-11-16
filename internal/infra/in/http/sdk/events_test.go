@@ -379,6 +379,9 @@ func TestGzipBodyIsBoundedByItsCompressedSizeToo(t *testing.T) {
 	_ = zw.Close()
 	a := postEvents(t, srv, value, bytes.Repeat(empty.Bytes(), 100_000), "Content-Encoding", "gzip")
 	refused(t, "over 1 MiB compressed", a.status, a.body, 413, "request_too_large")
+	if p := problemOf(t, a.body); p.Detail == nil || !strings.Contains(*p.Detail, " 1048576 bytes") {
+		t.Errorf("detail = %v, want the route's limit of 1048576 bytes", p.Detail)
+	}
 }
 
 func TestEventsAreJudgedByTheServerClock(t *testing.T) {

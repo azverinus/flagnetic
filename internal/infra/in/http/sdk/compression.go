@@ -24,15 +24,16 @@ func compression(edge *flaghttp.Server) func(http.Handler) http.Handler {
 				switch coding := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Encoding"))); coding {
 				case "", "identity":
 				case "gzip":
-					src := r.Body
+					body := &gunzipBody{src: r.Body}
 					if limit := edge.BodyLimit(r); limit > 0 {
 						// The route's limit counts inflated bytes, which empty
 						// gzip members never add to, so the compressed body is
 						// bounded as well. The slack covers the framing that
 						// makes incompressible data a little larger than itself.
-						src = http.MaxBytesReader(w, src, limit+limit/100+64)
+						body.src = http.MaxBytesReader(w, body.src, limit+limit/100+64)
+						body.limit = limit
 					}
-					r.Body = &gunzipBody{src: src}
+					r.Body = body
 					// Unknown once decompressed, so the route's limit is
 					// judged on what is read, not on the compressed size.
 					r.ContentLength = -1
@@ -143,6 +144,10 @@ func (g *gzipWriter) close() {
 type gunzipBody struct {
 	src io.ReadCloser
 	zr  *gzip.Reader
+	// limit is the route's limit on the body, which a compressed body over
+	// its own bound is refused with: the slack added to that bound is the
+	// adapter's, not a limit the client is told about.
+	limit int64
 }
 
 func (b *gunzipBody) Read(p []byte) (int, error) {
@@ -165,6 +170,9 @@ func (b *gunzipBody) Read(p []byte) (int, error) {
 // else is gzip the adapter cannot decode.
 func (b *gunzipBody) fault(err error) error {
 	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) && b.limit > 0 {
+		return &http.MaxBytesError{Limit: b.limit}
+	}
 	if errors.Is(err, os.ErrDeadlineExceeded) || errors.As(err, &tooLarge) {
 		return err
 	}
