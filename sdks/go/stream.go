@@ -22,12 +22,10 @@ const (
 	heartbeatTimeout = 45 * time.Second
 	// streamRetryCap bounds the reconnect backoff after an error.
 	streamRetryCap = 30 * time.Second
-	// closeJitterCap bounds the wait after a server-side close, which is
-	// routine: the platform closes every stream after about an hour.
+	// closeJitterCap bounds the wait after a server-side close of a stable
+	// stream, which is routine: the platform closes every stream after
+	// about an hour.
 	closeJitterCap = 2 * time.Second
-	// stableFor is how long a connection must hold for the reconnect
-	// backoff to start from the base again.
-	stableFor = 60 * time.Second
 	// rulesetEvent is the only event the stream carries.
 	rulesetEvent = "ruleset"
 )
@@ -40,19 +38,24 @@ var catchUpDelays = []time.Duration{1 * time.Second, 2 * time.Second, 4 * time.S
 // Causes of an sse_dropped event.
 const (
 	causeServerClosed = "server_closed"
-	causeSilence      = "silence"
-	causeMalformed    = "malformed"
+	// causeClosedEarly is a stream the server closed before its first
+	// heartbeat, as a draining replica or a proxy that ends an event
+	// stream early does.
+	causeClosedEarly = "closed_early"
+	causeSilence     = "silence"
+	causeMalformed   = "malformed"
 )
 
 // streamOutcome is how one connection to the change stream ended.
 type streamOutcome int
 
 const (
-	// streamErrored: the connection never came up or broke; reconnect with
-	// exponential backoff.
+	// streamErrored: the connection never came up, broke, or was closed
+	// before it was stable; reconnect with exponential backoff.
 	streamErrored streamOutcome = iota
-	// streamClosed: the server ended a healthy stream, as it does about
-	// once an hour; reconnect after a short jitter.
+	// streamClosed: the server ended a stable stream, one that had
+	// delivered a heartbeat, as it does about once an hour; reconnect after
+	// a short jitter.
 	streamClosed
 	// streamStopped: the key was refused or the client is closing; the
 	// stream stays down and the fetch loop carries on alone.
@@ -65,13 +68,17 @@ const (
 func (c *Client) streamLoop(ctx context.Context) {
 	failures := 0
 	for {
-		started := time.Now()
-		outcome := c.streamOnce(ctx)
+		outcome, stable := c.streamOnce(ctx)
 		c.firstAttemptDone()
 		if outcome == streamStopped || ctx.Err() != nil {
 			return
 		}
-		if time.Since(started) >= c.wait.stableFor {
+		// A stream is stable once it has delivered a heartbeat: one that
+		// ends before that, however it was answered, is a failed
+		// connection, so a draining replica or a proxy that closes every
+		// stream at once is backed off from instead of reconnected to
+		// every other second.
+		if stable {
 			failures = 0
 		}
 		var wait time.Duration
@@ -93,14 +100,15 @@ func (c *Client) streamLoop(ctx context.Context) {
 	}
 }
 
-// streamOnce opens the change stream and reads it until it ends.
-func (c *Client) streamOnce(ctx context.Context) streamOutcome {
+// streamOnce opens the change stream and reads it until it ends, reporting
+// how it ended and whether it was stable, that is, delivered a heartbeat.
+func (c *Client) streamOnce(ctx context.Context) (outcome streamOutcome, stable bool) {
 	rctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	req, err := http.NewRequestWithContext(rctx, http.MethodGet, c.streamURL, nil)
 	if err != nil {
 		c.dropped(causeNetwork, err, 0)
-		return streamErrored
+		return streamErrored, false
 	}
 	req.Header.Set("Authorization", "Bearer "+c.sdkKey)
 	req.Header.Set("User-Agent", userAgent())
@@ -118,10 +126,10 @@ func (c *Client) streamOnce(ctx context.Context) streamOutcome {
 	c.firstAttemptDone()
 	if err != nil {
 		if ctx.Err() != nil {
-			return streamStopped
+			return streamStopped, false
 		}
 		c.dropped(transportCause(err), err, 0)
-		return streamErrored
+		return streamErrored, false
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -130,10 +138,10 @@ func (c *Client) streamOnce(ctx context.Context) streamOutcome {
 	case http.StatusUnauthorized, http.StatusForbidden:
 		c.keyRevoked(resp.StatusCode)
 		c.dropped(causeUnauthorized, fmt.Errorf("stream: %s", resp.Status), resp.StatusCode)
-		return streamStopped
+		return streamStopped, false
 	default:
 		c.dropped(causeHTTPStatus, fmt.Errorf("stream: %s", resp.Status), resp.StatusCode)
-		return streamErrored
+		return streamErrored, false
 	}
 
 	c.streamConnected.Store(true)
@@ -151,8 +159,8 @@ func (c *Client) streamOnce(ctx context.Context) streamOutcome {
 // heartbeat timeout, acting on every ruleset event. cancel is the
 // request's own: cancelling it is what unblocks a read of the body, so the
 // heartbeat watchdog needs it, while ctx says whether the client is
-// closing.
-func (c *Client) readStream(ctx context.Context, cancel context.CancelFunc, body io.Reader) streamOutcome {
+// closing. It reports whether a heartbeat arrived, with the outcome.
+func (c *Client) readStream(ctx context.Context, cancel context.CancelFunc, body io.Reader) (streamOutcome, bool) {
 	beat := make(chan struct{}, 1)
 	silent := make(chan struct{})
 	watching := make(chan struct{})
@@ -180,6 +188,7 @@ func (c *Client) readStream(ctx context.Context, cancel context.CancelFunc, body
 	}()
 
 	r := newSSEReader(body)
+	heartbeat := false
 	for {
 		frame, err := r.next()
 		c.retryHint = r.retry
@@ -187,24 +196,32 @@ func (c *Client) readStream(ctx context.Context, cancel context.CancelFunc, body
 			select {
 			case <-silent:
 				c.dropped(causeSilence, fmt.Errorf("no frame for %v", c.wait.heartbeat), 0)
-				return streamErrored
+				return streamErrored, heartbeat
 			default:
 			}
 			if ctx.Err() != nil {
-				return streamStopped
+				return streamStopped, heartbeat
 			}
 			if errors.Is(err, io.EOF) {
+				if !heartbeat {
+					c.dropped(causeClosedEarly, err, 0)
+					return streamErrored, false
+				}
 				c.dropped(causeServerClosed, err, 0)
-				return streamClosed
+				return streamClosed, true
 			}
 			c.dropped(transportCause(err), err, 0)
-			return streamErrored
+			return streamErrored, heartbeat
 		}
 		select {
 		case beat <- struct{}{}:
 		default:
 		}
-		if frame.Comment || frame.Event != rulesetEvent {
+		if frame.Comment {
+			heartbeat = true
+			continue
+		}
+		if frame.Event != rulesetEvent {
 			continue
 		}
 		var announced struct {
@@ -215,7 +232,7 @@ func (c *Client) readStream(ctx context.Context, cancel context.CancelFunc, body
 			// what it claims to be: drop it, and the fetch that follows the
 			// reconnect finds whatever was announced.
 			c.dropped(causeMalformed, err, 0)
-			return streamErrored
+			return streamErrored, heartbeat
 		}
 		if announced.Version > c.heldVersion() {
 			c.announce(announced.Version)

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -28,6 +29,10 @@ func event(version int64) string {
 func preamble(version int64) string {
 	return "retry: 3000\n\n" + event(version)
 }
+
+// heartbeat is the comment the endpoint writes every 15 seconds, by which a
+// stream proves itself stable.
+const heartbeat = ": hb\n\n"
 
 // killSwitch answers 200 with document at version v, greeting switched
 // off: what an operator's kill switch makes of it.
@@ -339,6 +344,95 @@ func TestEventAtOrBelowTheHeldVersionIsIgnored(t *testing.T) {
 	}
 }
 
+// jitterCeilings records the ceiling of every draw the SDK makes, answering
+// the lowest, so that a test reads the backoff the SDK asked for without
+// waiting it out.
+type jitterCeilings struct {
+	mu   sync.Mutex
+	seen []time.Duration
+}
+
+func (j *jitterCeilings) draw(ceiling time.Duration) time.Duration {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.seen = append(j.seen, ceiling)
+	return 0
+}
+
+func (j *jitterCeilings) ceilings() []time.Duration {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return append([]time.Duration(nil), j.seen...)
+}
+
+func TestStreamClosedBeforeItsFirstHeartbeatBacksOffAndAHeartbeatRestartsIt(t *testing.T) {
+	srv := newStreamServer(t, ruleset(7))
+	var j jitterCeilings
+	var l logs
+	c := newStreaming(t, srv.URL, flagnetic.WithJitter(j.draw), flagnetic.WithLogger(l.logger()))
+	readyNow(t, c)
+
+	// A draining replica or a proxy answers 200 and ends the stream at
+	// once: each of these closes is a failure, so the wait doubles.
+	for i := range 3 {
+		conn := srv.connect(t)
+		conn.send(t, preamble(7))
+		conn.close()
+		srv.streamRequest(t, i+1)
+	}
+	// A stream that heard a heartbeat is stable: its close is routine, and
+	// the failures before it are forgotten.
+	conn := srv.connect(t)
+	conn.send(t, heartbeat)
+	conn.close()
+	srv.streamRequest(t, 4)
+	conn = srv.connect(t)
+	conn.close()
+	srv.streamRequest(t, 5)
+
+	want := []time.Duration{time.Second, 2 * time.Second, 4 * time.Second, 2 * time.Second, time.Second}
+	if got := j.ceilings(); !slices.Equal(got, want) {
+		t.Errorf("waits before the reconnects drew from %v, want %v", got, want)
+	}
+	early := 0
+	for _, e := range l.named(flagnetic.EventSSEDropped) {
+		if e.Fields["cause"] == "closed_early" {
+			early++
+		}
+	}
+	if early != 4 {
+		t.Errorf("sse_dropped closed_early logged %d times, want 4", early)
+	}
+}
+
+func TestAStreamThatHeardAHeartbeatRestartsTheBackoffHoweverItEnds(t *testing.T) {
+	srv := newStreamServer(t, ruleset(7))
+	srv.streamStatuses = []int{http.StatusServiceUnavailable, http.StatusServiceUnavailable, http.StatusOK}
+	var j jitterCeilings
+	var l logs
+	c := newStreaming(t, srv.URL, flagnetic.WithJitter(j.draw), flagnetic.WithLogger(l.logger()))
+	readyNow(t, c)
+	// Two refusals grow the backoff; the stream that comes up next hears a
+	// heartbeat and then breaks on a malformed event. It was stable, so the
+	// wait after it starts from the base again instead of doubling.
+	conn := srv.connect(t)
+	conn.send(t, heartbeat)
+	conn.send(t, "event: ruleset\ndata: not json\n\n")
+	srv.streamRequest(t, 3)
+
+	want := []time.Duration{time.Second, 2 * time.Second, time.Second}
+	if got := j.ceilings(); len(got) < len(want) || !slices.Equal(got[:len(want)], want) {
+		t.Errorf("waits before the reconnects drew from %v, want %v first", got, want)
+	}
+	malformed := false
+	for _, e := range l.named(flagnetic.EventSSEDropped) {
+		malformed = malformed || e.Fields["cause"] == "malformed"
+	}
+	if !malformed {
+		t.Error("sse_dropped malformed was never logged")
+	}
+}
+
 func TestDroppedStreamReconnectsWithTheHeldVersionAndFetches(t *testing.T) {
 	srv := newStreamServer(t, ruleset(7), killSwitch(8))
 	var l logs
@@ -346,6 +440,7 @@ func TestDroppedStreamReconnectsWithTheHeldVersionAndFetches(t *testing.T) {
 	readyNow(t, c)
 	conn := srv.connect(t)
 	conn.send(t, preamble(7))
+	conn.send(t, heartbeat)
 	// The version is bumped while the stream is down, so only the fetch
 	// that follows the reconnect finds it.
 	conn.close()
