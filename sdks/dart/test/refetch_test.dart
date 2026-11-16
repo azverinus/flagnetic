@@ -7,6 +7,7 @@ library;
 // the protocol's divided by 1000, as in the other behaviour tests.
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flagnetic/flagnetic.dart';
 import 'package:flagnetic/src/client/options.dart';
@@ -458,6 +459,8 @@ void main() {
       final stream = await (await server.next()).respondStream();
       await (await server.next()).respondJson(evaluation);
       await eventually(() => client.stage == Stage.fresh);
+      // A heartbeat makes the stream stable, so its close is a routine one.
+      await stream.send(': hb\n\n');
       await stream.closeStream();
 
       final again = await server.next();
@@ -478,6 +481,110 @@ void main() {
       );
       expect(logs.count(LogEvents.sseDropped), 1);
       expect(logs.fieldsOf(LogEvents.sseDropped).single['cause'], 'closed');
+    });
+
+    test('a stream closed before its first heartbeat backs off like a '
+        'failure, and a heartbeat restarts the backoff', () async {
+      final server = await MockServer.start();
+      final logs = LogRecorder();
+      final client = Flagnetic.client(
+        clientKey,
+        baseUrl: server.url,
+        context: anonymous,
+        options: scaledOptions(
+          sse: true,
+          logger: logs.call,
+          pollInterval: const Duration(hours: 1),
+          streamSilenceTimeout: const Duration(seconds: 30),
+          // The top of every window, so each wait is the bound it was drawn
+          // from: 100 ms, 200 ms, 400 ms; the routine close waits 20 ms.
+          random: _TopRandom(),
+          streamBackoff: const Duration(milliseconds: 100),
+          streamBackoffCap: const Duration(seconds: 1),
+          streamCloseJitter: const Duration(milliseconds: 20),
+        ),
+      );
+      addTearDown(() async {
+        await client.close();
+        await server.close();
+      });
+      final stopwatch = Stopwatch()..start();
+      final opened = <Duration>[];
+      Future<ScriptedStream> open() async {
+        final stream = await (await server.next(
+          path: '/sdk/v1/stream',
+        )).respondStream();
+        opened.add(stopwatch.elapsed);
+        return stream;
+      }
+
+      var stream = await open();
+      await (await server.next(
+        path: '/sdk/v1/evaluate',
+      )).respondJson(evaluation);
+      await eventually(() => client.stage == Stage.fresh);
+      // A draining replica or a proxy answers 200 and ends the stream at
+      // once: each close is a failure, so the wait doubles.
+      for (var i = 0; i < 3; i++) {
+        await stream.closeStream();
+        stream = await open();
+        await (await server.next(
+          path: '/sdk/v1/evaluate',
+        )).respondJson(evaluation);
+      }
+      await stream.send(': hb\n\n');
+      await stream.closeStream();
+      stream = await open();
+      await (await server.next(
+        path: '/sdk/v1/evaluate',
+      )).respondJson(evaluation);
+      await stream.closeStream();
+      stream = await open();
+
+      final waits = [
+        for (var i = 1; i < opened.length; i++) opened[i] - opened[i - 1],
+      ];
+      expect(waits[1], greaterThanOrEqualTo(const Duration(milliseconds: 200)));
+      expect(waits[2], greaterThanOrEqualTo(const Duration(milliseconds: 400)));
+      expect(waits[3], lessThan(const Duration(milliseconds: 100)));
+      expect(waits[4], greaterThanOrEqualTo(const Duration(milliseconds: 100)));
+      expect(logs.fieldsOf(LogEvents.sseDropped).map((f) => f['cause']), [
+        'closed_early',
+        'closed_early',
+        'closed_early',
+        'closed',
+        'closed_early',
+      ]);
+    });
+
+    test('a 200 that is not an event stream is a failed connection', () async {
+      final server = await MockServer.start();
+      final logs = LogRecorder();
+      final client = Flagnetic.client(
+        clientKey,
+        baseUrl: server.url,
+        context: anonymous,
+        options: scaledOptions(
+          sse: true,
+          logger: logs.call,
+          pollInterval: const Duration(hours: 1),
+        ),
+      );
+      addTearDown(() async {
+        await client.close();
+        await server.close();
+      });
+      // A captive portal or a proxy's page answers the stream request 200.
+      await (await server.next()).respondStream(
+        headers: {'Content-Type': 'text/html'},
+      );
+      await eventually(() => logs.count(LogEvents.sseDropped) >= 1);
+      expect(logs.fieldsOf(LogEvents.sseDropped).first, {
+        'cause': 'content_type',
+        'detail': 'text/html',
+        'retry_in_ms': isA<int>(),
+      });
+      expect(logs.count(LogEvents.sseConnected), 0);
     });
 
     test('a stream line past the bound drops the connection and '
@@ -739,4 +846,16 @@ final class _ThrowingStore implements FlagneticStore {
 
   @override
   Never remove(String key) => throw StateError('no store');
+}
+
+/// Draws the top of every window, so a wait is the bound it was drawn from.
+final class _TopRandom implements Random {
+  @override
+  bool nextBool() => true;
+
+  @override
+  double nextDouble() => 1;
+
+  @override
+  int nextInt(int max) => max - 1;
 }

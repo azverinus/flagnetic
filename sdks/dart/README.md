@@ -56,7 +56,7 @@ Exposures and aliases are queued in the store, sent in batches and flushed every
 
 ## Staying fresh
 
-On iOS, Android and desktop the client holds the ruleset stream while the app is in the foreground and closes it in the background. When a change is announced it waits a random 0–3 seconds before evaluating, so the apps open at a kill switch do not all ask at once. A kill switch therefore reaches an open app within 5 seconds at the 99th percentile, and a backgrounded app at its next `foreground()`, which refetches unless the last attempt was less than 10 seconds ago. Pass `ClientOptions(sse: false)` to hold no connection: values then stay fresh within the 5 minute poll and at every `foreground()`. On the web the stream is opt-in (`sse: true`).
+On iOS, Android and desktop the client holds the ruleset stream while the app is in the foreground and closes it in the background. When a change is announced it waits a random 0–3 seconds before evaluating, so the apps open at a kill switch do not all ask at once. A stream is stable once it has delivered a heartbeat: one the server closes before that (a draining replica, a proxy that ends the stream early), or a 200 that is not `text/event-stream`, is a failure like any other, and the reconnect backs off; the close of a stable stream waits 0 to 2 seconds. A kill switch therefore reaches an open app within 5 seconds at the 99th percentile, and a backgrounded app at its next `foreground()`, which refetches unless the last attempt was less than 10 seconds ago. Pass `ClientOptions(sse: false)` to hold no connection: values then stay fresh within the 5 minute poll and at every `foreground()`. On the web the stream is opt-in (`sse: true`).
 
 | The app | A change reaches it |
 |---|---|

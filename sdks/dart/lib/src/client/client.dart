@@ -257,9 +257,9 @@ final class FlagneticClient {
         backoffCap: _options.streamBackoffCap,
         closeJitter: _options.streamCloseJitter,
         silenceTimeout: _options.streamSilenceTimeout,
-        stableAfter: _options.streamStableAfter,
       ),
       transport: _transport!,
+      random: _jitter,
       lastEventId: () => _values?.rulesetVersion.toString(),
       onRuleset: (version) {
         final held = _values?.rulesetVersion;

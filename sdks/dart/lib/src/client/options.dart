@@ -85,6 +85,9 @@ final class ClientOptions {
     this.streamBackoffCap = const Duration(seconds: 30),
     this.streamCloseJitter = const Duration(seconds: 2),
     this.streamSilenceTimeout = const Duration(seconds: 45),
+    @Deprecated(
+      'Ignored: a stream is stable once it has delivered a heartbeat.',
+    )
     this.streamStableAfter = const Duration(seconds: 60),
   });
 
@@ -202,9 +205,9 @@ final class ClientOptions {
   /// zero evaluates at once.
   final Duration rulesetEventJitter;
 
-  /// The source of the wait after a ruleset event and of the evaluate retry
-  /// backoff; a [Random] when null. A test injects a fixed one to pin a wait.
-  /// The stream's reconnect and the event flush draw their own.
+  /// The source of the wait after a ruleset event, of the evaluate retry
+  /// backoff and of the stream's reconnect waits; a [Random] when null. A
+  /// test injects a fixed one to pin a wait. The event flush draws its own.
   final Random? random;
 
   /// The time the minimum refetch gap is measured against; `DateTime.now`
@@ -219,15 +222,18 @@ final class ClientOptions {
   /// The largest reconnect bound after a stream error.
   final Duration streamBackoffCap;
 
-  /// The longest wait before reconnecting a stream the server closed or that
-  /// fell silent; the wait is a random time up to it.
+  /// The longest wait before reconnecting a stable stream the server closed
+  /// or one that fell silent; the wait is a random time up to it. A stream
+  /// the server closes before its first heartbeat backs off instead.
   final Duration streamCloseJitter;
 
   /// How long a stream may stay silent before it is reconnected: the server
   /// sends a heartbeat every 15 s.
   final Duration streamSilenceTimeout;
 
-  /// How long a connection must stay up before the reconnect backoff starts
-  /// from [streamBackoff] again.
+  /// Ignored. A stream is stable once it has delivered a heartbeat, which
+  /// is what restarts the reconnect backoff from [streamBackoff]; it no
+  /// longer depends on how long the connection stays up.
+  @Deprecated('Ignored: a stream is stable once it has delivered a heartbeat.')
   final Duration streamStableAfter;
 }

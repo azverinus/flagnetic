@@ -146,7 +146,10 @@ final class Exchange implements ScriptedExchange {
     head.write('\r\n');
     final open = OpenStream._(socket);
     socket.add(utf8.encode(head.toString()));
-    await open.send(': open\n\n');
+    // The head alone, flushed: a comment here would be taken for the
+    // heartbeat that makes a stream stable, which the server never sends
+    // before its first one 15 s in.
+    await socket.flush();
     return open;
   }
 
