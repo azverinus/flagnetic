@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.4](https://github.com/azverinus/flagnetic/compare/sdks/js/v0.1.3...sdks/js/v0.1.4) (2026-11-16)
+
+
+### Bug Fixes
+
+* **sdk-js:** back off from a stream closed before its first heartbeat ([#317](https://github.com/azverinus/flagnetic/issues/317)) ([375f049](https://github.com/azverinus/flagnetic/commit/375f049e781202030336512bf5dcf05ff8d99520))
+* **sdk-js:** bind the store file to the key it was received under ([#309](https://github.com/azverinus/flagnetic/issues/309)) ([78d53bd](https://github.com/azverinus/flagnetic/commit/78d53bd42dacc86f2876423689d0cc04e539c35b))
+* **sdk-js:** cap Retry-After on a ruleset fetch at the retry backoff cap ([#278](https://github.com/azverinus/flagnetic/issues/278)) ([e41a18a](https://github.com/azverinus/flagnetic/commit/e41a18a14645822803b1410c877a6bb95c6f3e71))
+
 ## [0.1.3](https://github.com/azverinus/flagnetic/compare/sdks/js/v0.1.2...sdks/js/v0.1.3) (2026-11-11)
 
 
