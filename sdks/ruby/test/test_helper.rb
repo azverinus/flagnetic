@@ -69,7 +69,7 @@ module ClientHelpers
 
   FAST = {
     request_timeout: 2, fetch_base: 0.05, fetch_cap: 0.2, unauthorized_cap: 0.4, stream_base: 0.05, stream_cap: 0.2,
-    stream_stable: 60, close_jitter: 0.05, silence: 45, poll_connected: 300, poll_down: 300,
+    worker_stable: 60, close_jitter: 0.05, silence: 45, poll_connected: 300, poll_down: 300,
     event_retries: [0.1, 0.2, 0.4]
   }.freeze
 

@@ -26,14 +26,15 @@ module Flagnetic
     include FallbackChain
 
     # Timing holds the delays and intervals of the background thread, in
-    # seconds. Only poll_interval and request_timeout are public options;
-    # the timing option exists for tests and is not part of the API.
+    # seconds, and the random source of the stream's waits (nil: Random.new).
+    # Only poll_interval and request_timeout are public options; the timing
+    # option exists for tests and is not part of the API.
     Timing = Struct.new(:request_timeout, :fetch_base, :fetch_cap, :unauthorized_cap, :stream_base, :stream_cap,
-                        :stream_stable, :close_jitter, :silence, :poll_connected, :poll_down, :event_retries,
-                        :exposure_flush, :summary_flush, keyword_init: true)
+                        :worker_stable, :close_jitter, :silence, :poll_connected, :poll_down, :event_retries,
+                        :exposure_flush, :summary_flush, :random, keyword_init: true)
     DEFAULT_TIMING = Timing.new(
       request_timeout: 10, fetch_base: 1, fetch_cap: 300, unauthorized_cap: 900, stream_base: 1, stream_cap: 30,
-      stream_stable: 60, close_jitter: 2, silence: 45, poll_connected: 300, poll_down: 30, event_retries: [1, 2, 4],
+      worker_stable: 60, close_jitter: 2, silence: 45, poll_connected: 300, poll_down: 30, event_retries: [1, 2, 4],
       exposure_flush: 2, summary_flush: 60
     ).freeze
     MIN_POLL_INTERVAL = 30

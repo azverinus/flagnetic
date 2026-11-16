@@ -37,7 +37,7 @@ A change saved in Flagnetic, a kill switch included, reaches a client holding th
 
 ## Client
 
-`Flagnetic::Client` is the server-mode client. It downloads the ruleset with the server key, holds it in memory, follows every change through the change stream (polling while the stream is down) and evaluates locally, so a getter never waits on the network and never raises.
+`Flagnetic::Client` is the server-mode client. It downloads the ruleset with the server key, holds it in memory, follows every change through the change stream (polling while the stream is down) and evaluates locally, so a getter never waits on the network and never raises. A stream is stable once it has delivered a heartbeat: one the server closes before that (a draining replica, a proxy that ends the stream early) is a failure like any other and the reconnect backs off, while the close of a stable stream waits 0 to 2 seconds.
 
 ```ruby
 require "flagnetic"
@@ -114,7 +114,7 @@ Log events have stable names (`Flagnetic::EVENTS`); alert on the name, never on 
 | `ruleset_loaded` | info | `source` (`fetch`, `store`, `offline`), `ruleset_version`, `flags` |
 | `fetch_failed` | warn (error offline) | `cause`, `stage` (`source` offline) |
 | `sse_connected` | info | |
-| `sse_dropped` | info after a server close, warn otherwise | `cause` |
+| `sse_dropped` | info after a server close of a stable stream, warn otherwise | `cause` |
 | `stage_changed` | info to `fresh`, warn otherwise | `from`, `to` |
 | `key_revoked` | error, once per source until it recovers | `status`, `source` (`fetch`, `stream`) |
 | `schema_unsupported` | error, once | `schema_version`, `supported` |

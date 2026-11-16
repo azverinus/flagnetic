@@ -19,6 +19,7 @@ module Flagnetic
       @client = client
       @transport = transport
       @timing = timing
+      @random = timing.random || Random.new
       @stream_enabled = stream
       @inbox = Queue.new
       @stop = false
@@ -84,7 +85,7 @@ module Flagnetic
           run
         rescue Exception => e # rubocop:disable Lint/RescueException
           @client.__send__(:log, :error, :worker_died, cause: "#{e.class}: #{e.message}")
-          deaths.reset if now - started >= @timing.stream_stable
+          deaths.reset if now - started >= @timing.worker_stable
           sleep deaths.next_delay unless @stop
         end
       end
@@ -92,11 +93,12 @@ module Flagnetic
 
     def run
       @fetch_backoff = Backoff.new(base: @timing.fetch_base, cap: @timing.fetch_cap)
-      @stream_backoff = Backoff.new(base: @timing.stream_base, cap: @timing.stream_cap)
+      @stream_backoff = Backoff.new(base: @timing.stream_base, cap: @timing.stream_cap, random: @random)
       @refused_backoff = Backoff.new(base: @timing.fetch_base, cap: @timing.unauthorized_cap)
       @next_fetch = now
       @stream_due = @stream_enabled ? now : nil
       @connected = false
+      @stable = false
       @want = nil
       @event_retry = 0
       step until @stop
@@ -208,26 +210,37 @@ module Flagnetic
     def connected
       @refused_backoff.reset
       @connected = true
-      @connected_at = now
+      @stable = false
       @client.__send__(:stream_connected)
       @next_fetch = now # versions may have been missed while down
     end
 
+    # close_stream forgets the stream's stability with it: a heartbeat on
+    # one stream says nothing of the next, so a failed reconnect after a
+    # stable stream still counts toward the backoff.
     def close_stream
       @head_pending = false
       @stream&.close
       @stream = nil
       @connected = false
+      @stable = false
     end
 
     # drop ends the stream and schedules a reconnect: 0 to close_jitter
-    # seconds after a server-side close, else the backoff, reset once a
-    # connection stayed up stream_stable seconds.
+    # seconds after a server-side close of a stable stream, else the backoff.
+    # A stream is stable once it has delivered a heartbeat, which restarts
+    # the backoff from its base; one the server closes before that is a
+    # failed connection however it was answered, so that a draining replica
+    # or a proxy that ends the stream at once is backed off from.
     def drop(cause, error:)
-      @stream_backoff.reset if @connected && now - @connected_at >= @timing.stream_stable
+      @stream_backoff.reset if @stable
+      if !error && !@stable
+        error = true
+        cause = "#{cause} before its first heartbeat"
+      end
       close_stream
       @client.__send__(:log, error ? :warn : :info, :sse_dropped, cause: cause)
-      delay = error ? @stream_backoff.next_delay : rand * @timing.close_jitter
+      delay = error ? @stream_backoff.next_delay : @random.rand * @timing.close_jitter
       @stream_due = now + delay
       @next_fetch = [@next_fetch, now + @timing.poll_down].min
     end
@@ -287,6 +300,7 @@ module Flagnetic
     end
 
     def frame(kind, value)
+      @stable = true if kind == :comment
       return unless kind == :event && value.type == "ruleset"
 
       version = begin
