@@ -696,6 +696,10 @@ class Delivery:
             self._stream_dropped(CAUSE_NETWORK, str(err) or type(err).__name__, errored=True)
             return
         if not data:
+            # stop() shuts the socket down, which reads as an EOF here: the SDK's own close is not
+            # a server close, and before a heartbeat it would otherwise be logged as closed_early.
+            if self._closing.is_set():
+                return
             self._stream_dropped(CAUSE_SERVER_CLOSED, "EOF", errored=False)
             return
         try:
