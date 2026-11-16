@@ -405,20 +405,31 @@ func TestStreamClosedBeforeItsFirstHeartbeatBacksOffAndAHeartbeatRestartsIt(t *t
 	}
 }
 
-func TestRefusedStreamsBackOffAndOneHeardHeartbeatRestartsIt(t *testing.T) {
+func TestAStreamThatHeardAHeartbeatRestartsTheBackoffHoweverItEnds(t *testing.T) {
 	srv := newStreamServer(t, ruleset(7))
-	srv.streamStatuses = []int{http.StatusServiceUnavailable, http.StatusServiceUnavailable, http.StatusOK, http.StatusOK}
+	srv.streamStatuses = []int{http.StatusServiceUnavailable, http.StatusServiceUnavailable, http.StatusOK}
 	var j jitterCeilings
-	c := newStreaming(t, srv.URL, flagnetic.WithJitter(j.draw))
+	var l logs
+	c := newStreaming(t, srv.URL, flagnetic.WithJitter(j.draw), flagnetic.WithLogger(l.logger()))
 	readyNow(t, c)
+	// Two refusals grow the backoff; the stream that comes up next hears a
+	// heartbeat and then breaks on a malformed event. It was stable, so the
+	// wait after it starts from the base again instead of doubling.
 	conn := srv.connect(t)
 	conn.send(t, heartbeat)
-	conn.close()
+	conn.send(t, "event: ruleset\ndata: not json\n\n")
 	srv.streamRequest(t, 3)
 
-	want := []time.Duration{time.Second, 2 * time.Second, 2 * time.Second}
-	if got := j.ceilings(); !slices.Equal(got[:3], want) {
-		t.Errorf("waits before the reconnects drew from %v, want %v", got, want)
+	want := []time.Duration{time.Second, 2 * time.Second, time.Second}
+	if got := j.ceilings(); len(got) < len(want) || !slices.Equal(got[:len(want)], want) {
+		t.Errorf("waits before the reconnects drew from %v, want %v first", got, want)
+	}
+	malformed := false
+	for _, e := range l.named(flagnetic.EventSSEDropped) {
+		malformed = malformed || e.Fields["cause"] == "malformed"
+	}
+	if !malformed {
+		t.Error("sse_dropped malformed was never logged")
 	}
 }
 
