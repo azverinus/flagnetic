@@ -81,3 +81,24 @@ def test_multiline_anchors() -> None:
     assert matches("(?m)^b$", "a\nb\nc")
     assert not matches("^b$", "a\nb\nc")
     assert not matches("a$", "a\n")
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        r"\p{Old_Italic}",
+        r"\p{old italic}",
+        r"\p{OLD-ITALIC}",
+        r"\p{OldItalic}",
+        r"\p{oLd_iTaLiC}",
+        r"[\p{Old_Italic}x]",
+    ],
+)
+def test_a_script_of_several_words_is_read_under_any_spelling_the_server_reads(pattern: str) -> None:
+    # Go 1.27 canonicalises script names like category aliases; the shared vectors
+    # leave these out because Go 1.26 refuses them.
+    assert matches(pattern, "\U00010300")
+    assert not matches(pattern, "a")
+    assert matches(r"(?i)\p{Old_Italic}", "\U00010300")
+    assert matches(r"\P{Old_Italic}", "a")
+    assert matches(r"\p{^Old_Italic}", "a")

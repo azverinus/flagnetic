@@ -301,6 +301,7 @@ module Flagnetic
       @overrides = {}.freeze
       @once = {}
       @unsupported_logged = {}
+      @invalid_logged = {}
       @pid = Process.pid
       @closed = false
     end

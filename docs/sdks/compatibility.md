@@ -70,6 +70,7 @@ Every SDK follows these rules, so an additive change never needs a new `schema_v
 |---|---|
 | Unknown field, at any level | Ignored. |
 | Unknown operator, condition kind or serve kind (an unsupported rule) | Logged as `rule_unsupported` once per flag and ruleset version; where evaluation reaches it, the getter serves the built-in default with reason `fallback` and `inconsistent_ruleset`. Every other flag evaluates normally. |
+| A condition the SDK's own evaluator cannot compile although the server accepted it (a pattern its regular expression engine refuses; Ruby and Python) | Logged as `condition_invalid` once per flag and ruleset version, when the ruleset loads; where evaluation reaches it, the getter serves the built-in default with reason `fallback` and `inconsistent_ruleset`. Every other flag evaluates normally. |
 | Experiment serve breaking its invariants (a missing key, unit type or salt; a traffic allocation outside 0 to 10000; fewer than two weights, a negative one, two naming the same variation or one naming a variation the flag lacks, or weights not summing to 10000) | Found when the document is decoded; where evaluation reaches it, the getter serves the built-in default with reason `fallback` and `inconsistent_ruleset`. Every other flag evaluates normally. |
 | Unknown flag type | The flag is absent. |
 | Unknown evaluation reason | Passed through with the served value. |

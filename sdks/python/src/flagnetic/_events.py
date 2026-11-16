@@ -37,6 +37,11 @@ SCHEMA_UNSUPPORTED = "schema_unsupported"
 #: does not know, typically because the server is newer; logged once per flag and ruleset version.
 #: Fields: flag, constructs (each as "<kind> <name>"), ruleset_version.
 RULE_UNSUPPORTED = "rule_unsupported"
+#: error: a flag of an accepted ruleset holds a condition this SDK cannot evaluate although the
+#: server accepted it, such as a pattern its regular expression engine refuses; the flag serves
+#: its default with inconsistent_ruleset in this SDK only. Logged once per flag and ruleset
+#: version. Fields: flag, conditions (the reason of each), ruleset_version.
+CONDITION_INVALID = "condition_invalid"
 #: warning: the store file could not be loaded or saved. Fields: path, op (load or save), cause.
 STORE_FAILED = "store_failed"
 #: warning: a getter asked for a type other than the flag's; logged once per flag key. Fields:

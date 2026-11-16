@@ -88,6 +88,15 @@ module Flagnetic
         @index.unsupported
       end
 
+      # invalid_conditions reports, by flag key, why conditions of each flag
+      # cannot be evaluated by this evaluator, apart from the unsupported
+      # constructs unsupported_rules reports: a pattern outside what it
+      # reads, an undeclared attribute, a value of the wrong type. Each
+      # reason comes once, in document order; a flag with none is absent.
+      def invalid_conditions
+        @index.invalid
+      end
+
       # evaluate computes one flag for a context. It never reads a clock,
       # never records an exposure and never fails: problems are results with
       # reason error.

@@ -91,7 +91,30 @@ module Flagnetic
         "xdigit" => [[0x30, 0x39], [0x41, 0x46], [0x61, 0x66]]
       }.freeze
       SIMPLE_ESCAPES = { "a" => 0x07, "f" => 0x0C, "n" => 0x0A, "r" => 0x0D, "t" => 0x09, "v" => 0x0B }.freeze
-      PROPERTY_NAMES = (["Any"] + UnicodeTables::PROPERTY_NAMES).to_h { |n| [n, true] }.freeze
+      # canonical_name is Go's canonical form of a \p name: the separators _,
+      # - and space dropped, the first remaining character upper-cased and the
+      # rest lower-cased, ASCII letters only.
+      def self.canonical_name(name)
+        out = +""
+        name.each_char do |c|
+          next if ["_", "-", " "].include?(c)
+
+          out << (out.empty? ? c.tr("a-z", "A-Z") : c.tr("A-Z", "a-z"))
+        end
+        out
+      end
+
+      # PROPERTIES maps what Go reads a \p name as, once canonical, to the
+      # name of the property in Ruby's engine and whether it is inverted:
+      # the category and script names, the long names of categories, and the
+      # three Go adds, Any, ASCII and Assigned (every code point but
+      # Unassigned).
+      PROPERTIES = begin
+        names = UnicodeTables::PROPERTY_NAMES.to_h { |n| [Regex.canonical_name(n), [n, false]] }
+        UnicodeTables::CATEGORY_ALIASES.each { |a, actual| names[Regex.canonical_name(a)] ||= [actual, false] }
+        names.merge!("Lc" => ["LC", false], "Any" => ["Any", false], "Ascii" => ["ASCII", false],
+                     "Assigned" => ["Cn", true]).freeze
+      end
       MAX_REPEAT = 1000
       MAX_DEPTH = 1000
       # Go's limit on the size of a compiled expression, in instructions.
@@ -507,9 +530,9 @@ module Flagnetic
             negated = !negated
             name = name[1..]
           end
-          raise Error, "invalid character class range" unless PROPERTY_NAMES.key?(name)
+          name, inverted = PROPERTIES.fetch(Regex.canonical_name(name)) { raise Error, "invalid character class range" }
 
-          [[], [Sets.property(name, negated, flags.anybits?(FOLD))]]
+          [[], [Sets.property(name, negated != inverted, flags.anybits?(FOLD))]]
         end
 
         # char_class reads a class after its [.

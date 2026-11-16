@@ -38,6 +38,11 @@ func main() {
 		names = append(names, n)
 	}
 	slices.Sort(names)
+	var aliases []string
+	for alias, actual := range unicode.CategoryAliases {
+		aliases = append(aliases, fmt.Sprintf("%q => %q,", alias, actual))
+	}
+	slices.Sort(aliases)
 
 	fmt.Printf(`# frozen_string_literal: true
 
@@ -57,10 +62,15 @@ module Flagnetic
       # PROPERTY_NAMES are the category and script names \p accepts besides Any.
       PROPERTY_NAMES = %%w[
 %s      ].freeze
+
+      # CATEGORY_ALIASES maps the long names of categories (Letter,
+      # Decimal_Number, cntrl) to the category they stand for.
+      CATEGORY_ALIASES = {
+%s      }.freeze
     end
   end
 end
-`, unicode.Version, wrap(orbits, ""), wrap(names, " "))
+`, unicode.Version, wrap(orbits, ""), wrap(names, " "), wrap(aliases, " "))
 }
 
 func wrap(words []string, sep string) string {

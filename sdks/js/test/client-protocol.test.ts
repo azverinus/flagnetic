@@ -117,6 +117,7 @@ const scenarios = JSON.parse(read("scenarios.json")) as {
 // What only the SDKs decide (versioning and compatibility), in the same
 // step language over the same server-produced documents.
 scenarios.scenarios.push(...(JSON.parse(read("versioning-scenarios.json")) as { scenarios: Scenario[] }).scenarios);
+scenarios.scenarios.push(...(JSON.parse(read("stream-stability-scenarios.json")) as { scenarios: Scenario[] }).scenarios);
 // Running experiments: their own answers join those of the scenarios above.
 const experiments = JSON.parse(read("experiment-scenarios.json")) as { answers: Record<string, Answer[]>; scenarios: Scenario[] };
 Object.assign(scenarios.answers, experiments.answers);
