@@ -168,7 +168,7 @@ func bootstrapToPipe(t *testing.T, env map[string]string, args ...string) (code 
 		return v, ok
 	}
 	code = cli.Main(append([]string{"admin", "bootstrap"}, args...), lookup, pw, &errBuf, make(chan os.Signal))
-	if err := pw.Close(); err != nil {
+	if err = pw.Close(); err != nil {
 		t.Fatal(err)
 	}
 	out, err := io.ReadAll(pr)
