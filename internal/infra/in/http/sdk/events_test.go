@@ -370,6 +370,17 @@ func TestBatchLimits(t *testing.T) {
 	}
 }
 
+// Empty gzip members inflate to nothing, so a count of inflated bytes alone
+// would let such a body run until the read timeout.
+func TestGzipBodyIsBoundedByItsCompressedSizeToo(t *testing.T) {
+	srv, _, value := eventsServer(t)
+	var empty bytes.Buffer
+	zw := gzip.NewWriter(&empty)
+	_ = zw.Close()
+	a := postEvents(t, srv, value, bytes.Repeat(empty.Bytes(), 100_000), "Content-Encoding", "gzip")
+	refused(t, "over 1 MiB compressed", a.status, a.body, 413, "request_too_large")
+}
+
 func TestEventsAreJudgedByTheServerClock(t *testing.T) {
 	srv, _, value := eventsServer(t)
 	old := protocolTime.Add(-31 * 24 * time.Hour)

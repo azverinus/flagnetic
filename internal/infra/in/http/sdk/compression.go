@@ -24,7 +24,15 @@ func compression(edge *flaghttp.Server) func(http.Handler) http.Handler {
 				switch coding := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Encoding"))); coding {
 				case "", "identity":
 				case "gzip":
-					r.Body = &gunzipBody{src: r.Body}
+					src := r.Body
+					if limit := edge.BodyLimit(r); limit > 0 {
+						// The route's limit counts inflated bytes, which empty
+						// gzip members never add to, so the compressed body is
+						// bounded as well. The slack covers the framing that
+						// makes incompressible data a little larger than itself.
+						src = http.MaxBytesReader(w, src, limit+limit/100+64)
+					}
+					r.Body = &gunzipBody{src: src}
 					// Unknown once decompressed, so the route's limit is
 					// judged on what is read, not on the compressed size.
 					r.ContentLength = -1
@@ -153,10 +161,11 @@ func (b *gunzipBody) Read(p []byte) (int, error) {
 }
 
 // fault returns err as the body's reader reports it: a body that stopped
-// arriving in time stays the edge's to judge, anything else is gzip the
-// adapter cannot decode.
+// arriving in time or ran over its limit stays the edge's to judge, anything
+// else is gzip the adapter cannot decode.
 func (b *gunzipBody) fault(err error) error {
-	if errors.Is(err, os.ErrDeadlineExceeded) {
+	var tooLarge *http.MaxBytesError
+	if errors.Is(err, os.ErrDeadlineExceeded) || errors.As(err, &tooLarge) {
 		return err
 	}
 	return flaghttp.InvalidRequest("the body is not valid gzip: " + err.Error())
