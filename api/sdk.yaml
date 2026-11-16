@@ -248,7 +248,9 @@ paths:
         stream from a dead one; on each the key is checked again, and a
         refused key ends the stream. The server closes a stream after about
         an hour (60 minutes plus up to 5 of jitter) and when it shuts down;
-        the SDK reconnects with `Last-Event-ID`.
+        the SDK reconnects with `Last-Event-ID`. A replica that is already
+        shutting down answers a new stream `503 unavailable` with
+        `Retry-After` rather than open it and close it at once.
       tags: [stream]
       parameters:
         - name: Last-Event-ID
@@ -529,7 +531,8 @@ components:
     Unavailable:
       description: |
         `ruleset_unavailable` (this replica cannot load the environment's
-        ruleset yet) or `unavailable` (the key could not be checked), with
+        ruleset yet) or `unavailable` (the key could not be checked, or this
+        replica is shutting down and takes no new stream), with
         `Retry-After`.
       headers:
         Retry-After:

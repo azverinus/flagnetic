@@ -3,6 +3,7 @@ package sdk_test
 import (
 	"bufio"
 	"context"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -387,6 +388,29 @@ func TestAStreamEndsWhenItsReplicaDrains(t *testing.T) {
 	srv.Drain()
 	if !s.ended(2 * time.Second) {
 		t.Error("the stream is still open 2 seconds after its replica began draining")
+	}
+}
+
+func TestADrainingReplicaRefusesANewStreamRatherThanOpenAndCloseIt(t *testing.T) {
+	srv := testkit.StartServer(t)
+	p := newProject(t, srv)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	srv.Drain()
+
+	s := openStream(t, srv, nil, bearer(value))
+	defer func() { _ = s.res.Body.Close() }()
+	body, err := io.ReadAll(s.res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	refused(t, "a stream opened while draining", s.res.StatusCode, body, http.StatusServiceUnavailable, "unavailable")
+	if got := s.res.Header.Get("Retry-After"); got != "2" {
+		t.Errorf("Retry-After = %q, want 2", got)
+	}
+	// The other routes stay served: an SDK that holds a stream elsewhere
+	// still fetches here until the load balancer has moved on.
+	if res := ruleset(t, srv, value); res.StatusCode() != http.StatusOK {
+		t.Errorf("ruleset while draining = %d, want 200", res.StatusCode())
 	}
 }
 

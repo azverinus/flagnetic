@@ -32,12 +32,27 @@ const (
 	streamJitter   = 5 * time.Minute
 )
 
+// errReplicaDraining answers a new stream on a replica that is shutting
+// down. Opening one only to close it at once would send an SDK that takes
+// such a close for a routine one into a reconnect loop on this replica for
+// as long as the load balancer still routes to it; a refusal is a failure
+// the SDK backs off from, and its retry lands on a replica that stays.
+var errReplicaDraining = apperrors.Unavailable("unavailable",
+	"this replica is shutting down; open the stream again").WithRetryAfter(appdelivery.SDKRetryAfter)
+
 // StreamRuleset holds the ruleset stream of the key's environment: each
 // version this replica loads above the last one sent, a heartbeat every
 // heartbeatInterval re-checking the key and catching up a version a failed
 // reload left unsent, until the stream's lifetime ends, the replica drains
-// or the client goes away.
+// or the client goes away. A replica that is already draining refuses the
+// stream instead.
 func (a *api) StreamRuleset(w http.ResponseWriter, r *http.Request, params StreamRulesetParams) {
+	select {
+	case <-a.edge.Draining():
+		a.writeError(w, r, errReplicaDraining)
+		return
+	default:
+	}
 	p := presentedOf(r.Context())
 	ctx, cancel := context.WithTimeout(r.Context(), appdelivery.RulesetWait)
 	sub, current, err := a.h.WatchRuleset.Open(ctx, p.key)

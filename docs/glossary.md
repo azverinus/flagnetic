@@ -17,7 +17,7 @@ Background work every replica runs in rounds, one round every interval, until th
 _Avoid_: job, cron, daemon, background task
 
 **Drain**:
-The window after a replica is told to stop in which it reports itself not ready, so that load balancers stop routing to it, while it still serves every request that reaches it. After the drain the replica stops accepting requests and shuts down.
+The window after a replica is told to stop in which it reports itself not ready, so that load balancers stop routing to it, while it still serves every request that reaches it except a new ruleset stream, which it refuses so that the SDK connects to a replica that stays. After the drain the replica stops accepting requests and shuts down.
 _Avoid_: grace period (the bound on in-flight requests after the drain), cooldown
 
 **Secret key**:
