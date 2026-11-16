@@ -267,8 +267,9 @@ func decisionOf(cr governance.ChangeRequest) (*governance.Decision, string) {
 }
 
 // changeRequestColumns are a change request's with the keys of the flag,
-// environment, segment and experiment it names and the names of its author, the member who created its author's token, of the member who
-// decided it and of whoever applied it as they are now.
+// environment, segment and experiment it names, the names of its author, of the member who
+// decided it and of whoever applied it as they are now, and the member who created its
+// author's token.
 const changeRequestColumns = `cr.id, cr.project_id, cr.kind, cr.flag_id, f.key, cr.environment_id, e.key, cr.state, cr.title,
 	cr.description, cr.base, cr.base_version, cr.proposed, cr.diff, cr.author_id, cr.author_token_id,
 	coalesce(m.display_name, t.name, ''), cr.decision, cr.decided_by, coalesce(dm.display_name, ''), cr.decided_at,
