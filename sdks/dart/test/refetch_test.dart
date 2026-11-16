@@ -546,7 +546,10 @@ void main() {
       ];
       expect(waits[1], greaterThanOrEqualTo(const Duration(milliseconds: 200)));
       expect(waits[2], greaterThanOrEqualTo(const Duration(milliseconds: 400)));
-      expect(waits[3], lessThan(const Duration(milliseconds: 100)));
+      // Bounded well below the 800 ms a backoff the heartbeat failed to
+      // restart would wait, and loose enough for a loaded machine; the
+      // drawn waits themselves are pinned through the log below.
+      expect(waits[3], lessThan(const Duration(milliseconds: 400)));
       expect(waits[4], greaterThanOrEqualTo(const Duration(milliseconds: 100)));
       expect(logs.fieldsOf(LogEvents.sseDropped).map((f) => f['cause']), [
         'closed_early',
@@ -554,6 +557,13 @@ void main() {
         'closed_early',
         'closed',
         'closed_early',
+      ]);
+      expect(logs.fieldsOf(LogEvents.sseDropped).map((f) => f['retry_in_ms']), [
+        100,
+        200,
+        400,
+        20,
+        100,
       ]);
     });
 

@@ -125,11 +125,9 @@ final class Exchange implements ScriptedExchange {
   /// Answers 200 with an open `text/event-stream` the test writes to: the
   /// change stream.
   ///
-  /// The stream opens with one comment line, because `dart:io` holds the
-  /// response head back until the body has bytes and the SDK must see the
-  /// head before anything is sent. An event-stream parser ignores comments,
-  /// exactly as it ignores the platform's `: hb` heartbeats, so a scripted
-  /// transcript still arrives as it was written.
+  /// The head is written to the detached socket and flushed on its own, so
+  /// the SDK sees it before anything is sent and no byte of the body is
+  /// sent that the scenario did not script.
   @override
   Future<OpenStream> respondStream({
     Map<String, String> headers = eventStreamHeaders,
