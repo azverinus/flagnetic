@@ -28,7 +28,8 @@ Commands:
       Create the first instance admin with a password and an API token.
       The password is FLAGNETIC_ADMIN_PASSWORD, or one generated and printed
       once on standard error. The token, carrying every scope and no expiry,
-      is printed on standard output, or written to the --token-file instead:
+      is printed on standard output, which must then be a terminal, or written
+      to the --token-file instead, which any other output requires:
       a new file of mode 0600, created before anything else, so a path that
       exists or cannot be created stops the command with nothing created.
       Refused once an instance admin exists; with --if-absent that is a
@@ -228,6 +229,14 @@ func adminBootstrap(ctx context.Context, cl commandLine, cfg config.Config, log 
 		fmt.Fprint(cl.stderr, "admin bootstrap: --email is required, and nothing else\n\n"+adminUsage)
 		return exitUsage
 	}
+	if *tokenFile == "" && !isTerminal(cl.stdout) {
+		// A token that never expires and carries every scope would land in
+		// whatever reads the output: a deploy log, a pipe to a log shipper.
+		// Refused before anything is created, so the command can be run again.
+		fmt.Fprint(cl.stderr, "admin bootstrap: standard output is not a terminal, and the API token would be printed there; "+
+			"use --token-file <path> to write it to a new file instead; nothing was created\n")
+		return exitUsage
+	}
 
 	pool, err := openDatabase(ctx, cfg, log, o)
 	if err != nil {
@@ -299,6 +308,19 @@ func adminBootstrap(ctx context.Context, cl commandLine, cfg config.Config, log 
 	fmt.Fprintln(cl.stderr, "Instance admin created. This API token is shown once; store it now:")
 	fmt.Fprintln(cl.stdout, res.Token.Reveal())
 	return exitOK
+}
+
+// isTerminal reports whether w is a terminal, so that what is printed to it
+// is read by the person who ran the command. A writer that is not a file of
+// the process, such as a buffer a caller reads itself, is not a way out of
+// the process and counts as one.
+func isTerminal(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return true
+	}
+	info, err := f.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }
 
 // describe returns an invalid input's detail with its violations; a
