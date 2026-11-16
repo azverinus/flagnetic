@@ -195,13 +195,7 @@ test.describe("the console in Russian", () => {
       "true",
     );
     const keys = page.getByRole("table", { name: "SDK-ключи" });
-    for (const header of [
-      "Название",
-      "Вид",
-      "ID ключа",
-      "Статус",
-      "Разрешённые источники",
-    ]) {
+    for (const header of ["Название", "Вид", "ID ключа", "Статус", "Разрешённые источники"]) {
       await expect(keys.getByRole("columnheader", { name: header })).toBeVisible();
     }
     await expect(keys.getByRole("row", { name: /бэкенд/ })).toContainText("Серверный");

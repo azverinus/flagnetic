@@ -191,7 +191,7 @@ test.describe("group mappings and where grants come from", () => {
       await page.goto(`/projects/${project}/members`);
       const row = memberRow(page, dexUsers.vera.name);
       await expect(row).toContainText(`SSO: ${dexGroupsSlug}`);
-      await expect(row).toContainText(`Выдана по соответствиям групп провайдера ${dexGroupsSlug}`);
+      await expect(row).toContainText(`Выдана по сопоставлениям групп провайдера ${dexGroupsSlug}`);
       await expect(
         row.getByRole("button", {
           name: `Отозвать роль «Разработчик» у участника ${dexUsers.vera.name}`,
