@@ -84,6 +84,13 @@ module Flagnetic
                                  events: group.map { |e| e["event_id"] }, status: result.status, error: result.error)
     end
 
+    # report_unserialisable logs an event pack left out because it does not
+    # encode. The fault is the error's class alone: its message can quote
+    # the value, and a unit ID is not logged.
+    def report_unserialisable(error)
+      log(:warn, :queue_dropped, kind: kind, cause: "not_serialisable", events: 1, fault: error.class.name)
+    end
+
     def log(level, event, **fields)
       @log.call(level, event, fields.compact)
     rescue StandardError

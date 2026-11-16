@@ -156,6 +156,69 @@ class ExposuresTest < Minitest::Test
     assert_equal [[:warn, {}]], logged(:exposures_disabled)
   end
 
+  # --- strings that are no UTF-8 ----------------------------------------
+
+  # A crafted cookie used as a unit ID must not cost the flush its other
+  # events: its invalid bytes become U+FFFD and the event is sent.
+  def test_an_alias_with_invalid_utf8_is_scrubbed_and_sent_with_the_rest
+    @server.publish(document(1))
+    c = client(flush_interval: 3600, stream: false)
+    c.ready(timeout: 2)
+    c.alias("anonymous", "d-1", "user", "u-1")
+    c.alias("anonymous", "d-\xFF\xFE", "user", "u-\xC3")
+    c.alias("anonymous", "d-3", "user", "u-3")
+    c.flush(timeout: 2)
+    events = @server.events_requests.flat_map(&:events)
+    assert_equal(["d-1", "d-\uFFFD\uFFFD", "d-3"], events.map { |e| e["from_unit_id"] })
+    assert_equal "u-\uFFFD", events[1]["to_unit_id"]
+    assert_empty logged(:queue_dropped)
+  end
+
+  # A Rack string arrives as binary: valid UTF-8 bytes in it are kept.
+  def test_a_binary_string_holding_utf8_is_sent_as_the_text_it_holds
+    @server.publish(document(1))
+    c = client(flush_interval: 3600, stream: false)
+    c.ready(timeout: 2)
+    c.alias("anonymous", "caf\xC3\xA9".b, "user", "u-\xFF".b)
+    c.flush(timeout: 2)
+    event = @server.events_requests.first.events.first
+    assert_equal ["caf\u00e9", "u-\uFFFD"], [event["from_unit_id"], event["to_unit_id"]]
+  end
+
+  def test_an_exposure_with_an_invalid_unit_id_is_scrubbed_and_sent
+    @server.publish(document(1))
+    c = client(flush_interval: 3600, stream: false)
+    c.ready(timeout: 2)
+    exposures = c.instance_variable_get(:@exposures)
+    record = Flagnetic.const_get(:Exposures)::ExposureRecord.new(
+      experiment: Struct.new(:key, :unit_type, :unit_id, :variation, :override)
+                        .new("checkout_v2", "anonymous", "u-\xFF", "control", false),
+      reason: :experiment, ruleset_version: 1
+    )
+    exposures.__send__(:emit, { units: { "anonymous" => "x" } }, "auto_on", record)
+    c.flush(timeout: 2)
+    assert_equal "u-\uFFFD", @server.events_requests.first.events.first["unit_id"]
+  end
+
+  # The guard: an event that still does not encode (whatever the reason) is
+  # dropped alone, counted, and named by its fault, not by its content.
+  def test_an_event_that_does_not_encode_is_dropped_alone_and_logged
+    @server.publish(document(1))
+    c = client(flush_interval: 3600, stream: false)
+    c.ready(timeout: 2)
+    c.alias("anonymous", "d-1", "user", "u-1")
+    c.instance_variable_get(:@exposures).__send__(
+      :enqueue, { "type" => "alias", "event_id" => "poison", "from_unit_id" => "secret-unit", "n" => Float::NAN }
+    )
+    c.alias("anonymous", "d-3", "user", "u-3")
+    c.flush(timeout: 2)
+    assert_equal(%w[d-1 d-3], @server.events_requests.flat_map(&:events).map { |e| e["from_unit_id"] })
+    level, fields = logged(:queue_dropped).first
+    assert_equal :warn, level
+    assert_equal({ kind: "exposure_or_alias", cause: "not_serialisable", events: 1, fault: "JSON::GeneratorError" },
+                 fields)
+  end
+
   # --- the queue (online) -------------------------------------------------
 
   def test_events_are_sent_gzipped_with_the_envelope_on_the_flush_interval
