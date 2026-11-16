@@ -23,7 +23,7 @@ module Flagnetic
       # constructs it holds.
       CompiledSegment = Struct.new(:conditions, :unsupported)
 
-      attr_reader :flags, :segments, :unsupported
+      attr_reader :flags, :segments, :unsupported, :invalid
 
       def initialize(ruleset)
         # A unit type named as an attribute is a string attribute holding
@@ -34,14 +34,24 @@ module Flagnetic
         @segments = ruleset.segments.to_h { |s| [s.key, compiler.segment(s)] }.freeze
         @flags = {}
         @unsupported = {}
-        ruleset.flags.each do |f|
-          @flags[f.key] = compiler.flag(f)
-          found = compiler.unsupported_in(f, @flags[f.key], @segments)
-          @unsupported[f.key] = found.freeze unless found.empty?
-        end
+        @invalid = {}
+        ruleset.flags.each { |f| index_flag(compiler, f) }
         @flags.freeze
         @unsupported.freeze
+        @invalid.freeze
         freeze
+      end
+
+      private
+
+      # index_flag compiles a flag and records what it holds that this
+      # evaluator does not know or cannot evaluate.
+      def index_flag(compiler, flag)
+        @flags[flag.key] = compiler.flag(flag)
+        found = compiler.unsupported_in(flag, @flags[flag.key], @segments)
+        @unsupported[flag.key] = found.freeze unless found.empty?
+        broken = compiler.invalid_in(flag, @flags[flag.key], @segments)
+        @invalid[flag.key] = broken.freeze unless broken.empty?
       end
     end
 
@@ -90,7 +100,28 @@ module Flagnetic
         found
       end
 
+      # invalid_in lists why the conditions of a compiled flag, and of the
+      # segments its rules name, cannot be evaluated by this evaluator, in
+      # document order, each once, apart from those that hold a construct it
+      # does not know (unsupported_in reports those). A server accepts only
+      # patterns and values its own evaluator reads, so one this evaluator
+      # refuses is a difference between the two.
+      def invalid_in(flag, compiled, segments)
+        found = []
+        flag.rules.each_index do |i|
+          compiled.rules[i].each do |c|
+            add_invalid(found, c)
+            segments[c.segment]&.conditions&.each { |sc| add_invalid(found, sc) } unless c.segment.to_s.empty?
+          end
+        end
+        found
+      end
+
       private
+
+      def add_invalid(found, compiled)
+        found << compiled.error if compiled.error && !compiled.unsupported && !found.include?(compiled.error)
+      end
 
       # valid_experiment? reports whether an experiment serve holds what
       # assigning a unit to a variation relies on: an experiment key, a unit

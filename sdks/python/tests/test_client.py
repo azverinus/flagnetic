@@ -22,6 +22,8 @@ from flagnetic import _delivery, _ingest
 from mock_server import MockServer, Request, Response
 from protocol import SDK_KEY, Logs, eventually, read, read_json
 
+from conformance import ROOT as CONFORMANCE
+
 RULESET = read("server/ruleset.json")
 AFTER_KILL_SWITCH = read("server/ruleset-after-kill-switch.json")
 CONTEXT = flagnetic.Context(**read_json("scenarios.json")["context"])
@@ -667,3 +669,50 @@ def test_a_key_the_http_library_refuses_never_reaches_the_log(
     logged = repr(logs.events) + caplog.text
     assert SDK_KEY not in logged
     assert logs.count("evaluation_failed") == 0
+
+
+INVALID = json.loads((CONFORMANCE / "fixtures" / "errors" / "codes.json").read_text(encoding="utf-8"))[
+    "ruleset"
+]
+
+
+def test_a_condition_the_evaluator_cannot_compile_is_logged_once_per_flag_at_load(clients: Any) -> None:
+    logs = Logs()
+    document = json.dumps({**INVALID, "version": 7}).encode()
+    client = clients(serving(document), logger=logs)
+    client.ready(5)
+    lines = logs.named("condition_invalid")
+    keys = [line["flag"] for line in lines]
+    assert keys == sorted(keys)
+    assert {"invalid_regex", "undeclared_attribute"} <= set(keys)
+    assert "fine" not in keys
+    assert all(line["ruleset_version"] == 7 and line["conditions"] for line in lines)
+    assert any(
+        "matches" in reason
+        for line in lines
+        if line["flag"] == "invalid_regex"
+        for reason in line["conditions"]
+    )
+    assert logs.count("rule_unsupported") == 0
+    # Evaluating, or receiving the same version again, logs nothing more.
+    for key in keys:
+        client.get_detail(CONTEXT, key, "d")
+    assert logs.count("condition_invalid") == len(keys)
+
+
+def test_a_new_ruleset_version_with_the_condition_is_logged_again(clients: Any) -> None:
+    logs = Logs()
+    served = [json.dumps({**INVALID, "version": 7}).encode()]
+
+    def handler(request: Request) -> Response:
+        if request.path.endswith("/stream"):
+            return Response(404)
+        return Response(200, {"Content-Type": "application/json"}, served[0])
+
+    client = clients(MockServer(handler), logger=logs, poll_interval=30, _time_divisor=1000)
+    client.ready(5)
+    once = logs.count("condition_invalid")
+    assert once
+    served[0] = json.dumps({**INVALID, "version": 8}).encode()
+    assert eventually(lambda: [] if logs.count("condition_invalid") == 2 * once else ["waiting"]) == []
+    assert sorted({line["ruleset_version"] for line in logs.named("condition_invalid")}) == [7, 8]

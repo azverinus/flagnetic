@@ -231,6 +231,7 @@ class Client:
         # version whose unsupported rules were last logged.
         self._mismatched: set[str] = set()
         self._unsupported_logged: dict[str, int] = {}
+        self._invalid_logged: dict[str, int] = {}
         self._platform = platform if platform is not None else _system()
         self._app_version = app_version or ""
         self._send_summaries = send_summaries
@@ -834,6 +835,7 @@ class Client:
             flags=len(ruleset.flags),
         )
         self._report_unsupported(ruleset)
+        self._report_invalid(ruleset)
         changed = changed_flags(None if previous is None else previous.document, raw)
         dropped = self._overrides._refuse(ruleset)
         return sorted(set(changed) | set(dropped)) if dropped else changed
@@ -856,6 +858,25 @@ class Client:
                 _events.RULE_UNSUPPORTED,
                 flag=key,
                 constructs=[f"{c.kind} {c.name}" for c in constructs],
+                ruleset_version=ruleset.version,
+            )
+
+    def _report_invalid(self, ruleset: Ruleset) -> None:
+        """Logs condition_invalid for every flag holding a condition this evaluator cannot evaluate.
+
+        Once per flag and ruleset version, when the ruleset loads: the flag
+        serves its default wherever evaluation reaches the condition, and
+        nothing else says why.
+        """
+        for key, reasons in sorted(ruleset.invalid_conditions().items()):
+            if self._invalid_logged.get(key) == ruleset.version:
+                continue
+            self._invalid_logged[key] = ruleset.version
+            self._log(
+                logging.ERROR,
+                _events.CONDITION_INVALID,
+                flag=key,
+                conditions=reasons,
                 ruleset_version=ruleset.version,
             )
 

@@ -184,6 +184,23 @@ module Flagnetic
         Tirhuta Todhri Tolong_Siki Toto Tulu_Tigalari Ugaritic Vai Vithkuqi Wancho Warang_Citi Yezidi Yi Z
         Zanabazar_Square Zl Zp Zs
       ].freeze
+
+      # CATEGORY_ALIASES maps the long names of categories (Letter,
+      # Decimal_Number, cntrl) to the category they stand for.
+      CATEGORY_ALIASES = {
+        "Cased_Letter" => "LC", "Close_Punctuation" => "Pe", "Combining_Mark" => "M",
+        "Connector_Punctuation" => "Pc", "Control" => "Cc", "Currency_Symbol" => "Sc",
+        "Dash_Punctuation" => "Pd", "Decimal_Number" => "Nd", "Enclosing_Mark" => "Me",
+        "Final_Punctuation" => "Pf", "Format" => "Cf", "Initial_Punctuation" => "Pi", "Letter" => "L",
+        "Letter_Number" => "Nl", "Line_Separator" => "Zl", "Lowercase_Letter" => "Ll", "Mark" => "M",
+        "Math_Symbol" => "Sm", "Modifier_Letter" => "Lm", "Modifier_Symbol" => "Sk",
+        "Nonspacing_Mark" => "Mn", "Number" => "N", "Open_Punctuation" => "Ps", "Other" => "C",
+        "Other_Letter" => "Lo", "Other_Number" => "No", "Other_Punctuation" => "Po", "Other_Symbol" => "So",
+        "Paragraph_Separator" => "Zp", "Private_Use" => "Co", "Punctuation" => "P", "Separator" => "Z",
+        "Space_Separator" => "Zs", "Spacing_Mark" => "Mc", "Surrogate" => "Cs", "Symbol" => "S",
+        "Titlecase_Letter" => "Lt", "Unassigned" => "Cn", "Uppercase_Letter" => "Lu", "cntrl" => "Cc",
+        "digit" => "Nd", "punct" => "P",
+      }.freeze
     end
   end
 end

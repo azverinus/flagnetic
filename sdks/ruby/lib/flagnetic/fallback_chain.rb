@@ -83,6 +83,7 @@ module Flagnetic
       end
       log(:info, :ruleset_loaded, source: source, ruleset_version: ruleset.version, flags: ruleset.flags.size)
       report_unsupported(ruleset)
+      report_invalid(ruleset)
       stage_changed(previous_stage, stage)
       (Changes.flags(previous&.ruleset, ruleset) | refuse_local_overrides(ruleset)).sort
     end
@@ -101,11 +102,24 @@ module Flagnetic
       end
     end
 
-    def first_report?(key, version)
-      @mutex.synchronize do
-        next false if @unsupported_logged[key] == version
+    # report_invalid logs condition_invalid for every flag of ruleset with
+    # a condition this evaluator cannot evaluate although the server
+    # accepted the ruleset, once per flag and ruleset version: the flag
+    # serves its default wherever evaluation reaches the condition, and
+    # nothing else says why.
+    def report_invalid(ruleset)
+      ruleset.invalid_conditions.sort.each do |key, reasons|
+        next unless first_report?(key, ruleset.version, @invalid_logged)
 
-        @unsupported_logged[key] = version
+        log(:error, :condition_invalid, flag: key, conditions: reasons, ruleset_version: ruleset.version)
+      end
+    end
+
+    def first_report?(key, version, logged = @unsupported_logged)
+      @mutex.synchronize do
+        next false if logged[key] == version
+
+        logged[key] = version
         true
       end
     end
