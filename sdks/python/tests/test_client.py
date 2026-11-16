@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 import http.client
 import json
 import logging
@@ -18,7 +19,7 @@ from typing import Any
 import pytest
 
 import flagnetic
-from flagnetic import _delivery, _ingest
+from flagnetic import _delivery, _ingest, _store
 from mock_server import MockServer, Request, Response
 from protocol import SDK_KEY, Logs, eventually, read, read_json
 
@@ -273,7 +274,10 @@ def test_the_ruleset_is_persisted_and_serves_the_next_start_before_any_request(
     first = clients(serving(RULESET), store=store)
     assert first.ready(5) is flagnetic.Stage.FRESH
     assert stat.S_IMODE(os.stat(store).st_mode) == 0o600
-    assert json.loads(store.read_bytes()) == json.loads(RULESET)
+    # Byte for byte what every server SDK writes, so a store moves between them.
+    digest = hashlib.sha256(SDK_KEY.encode()).hexdigest().encode()
+    assert store.read_bytes() == b'{"flagnetic_store":1,"key":"' + digest + b'"}\n' + RULESET
+    assert SDK_KEY.encode() not in store.read_bytes()
     assert not [p for p in tmp_path.iterdir() if p != store]
 
     # The server is down at the next start: the store serves.
@@ -291,6 +295,81 @@ def test_the_ruleset_is_persisted_and_serves_the_next_start_before_any_request(
 
 @pytest.mark.parametrize("content", [b"{not json", b"", RULESET.replace(b'"server"', b'"client"')])
 def test_a_store_that_cannot_be_loaded_is_reported_and_leaves_built_in(
+    tmp_path: Path, content: bytes
+) -> None:
+    store = tmp_path / "flagnetic.json"
+    store.write_bytes(_store.encode(SDK_KEY, content))
+    logs = Logs()
+    client = flagnetic.Client(
+        SDK_KEY, "http://127.0.0.1:1", stream=False, request_timeout=1, store=store, logger=logs
+    )
+    try:
+        assert client.stage is flagnetic.Stage.BUILT_IN
+        assert [f["op"] for f in logs.named("store_failed")] == ["load"]
+    finally:
+        client.close()
+
+
+def test_a_store_written_under_another_key_is_discarded_and_the_right_ruleset_is_no_downgrade(
+    tmp_path: Path,
+) -> None:
+    store = tmp_path / "flagnetic.json"
+    # Another environment's ruleset, at a version higher than this one's.
+    old_server = serving(with_version(RULESET, 99))
+    old = flagnetic.Client("fn_srv_another_environment", old_server.url, stream=False, store=store)
+    try:
+        assert old.ready(5) is flagnetic.Stage.FRESH
+    finally:
+        old.close()
+        old_server.close()
+
+    seen: list[Request] = []
+
+    def handler(request: Request) -> Response:
+        seen.append(request)
+        if request.path.endswith("/stream"):
+            return Response(404)
+        return Response(200, {"Content-Type": "application/json", "ETag": '"1"'}, RULESET)
+
+    server = MockServer(handler)
+    logs = Logs()
+    client = flagnetic.Client(SDK_KEY, server.url, stream=False, store=store, logger=logs)
+    try:
+        assert client.stage is flagnetic.Stage.BUILT_IN
+        assert client.ready(5) is flagnetic.Stage.FRESH
+        failed = logs.named("store_failed")
+        assert [(f["op"], f["cause"]) for f in failed] == [
+            ("load", "the store was written under another key")
+        ]
+        assert client.get_detail(CONTEXT, "checkout", False).ruleset_version == 1
+        assert "if-none-match" not in seen[0].headers
+    finally:
+        client.close()
+        server.close()
+    # The accepted ruleset rewrote the file under this key.
+    assert store.read_bytes() == _store.encode(SDK_KEY, RULESET)
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        RULESET,
+        RULESET + b"\n",
+        json.dumps(json.loads(RULESET), indent=2).encode(),
+        _store.encode(SDK_KEY, RULESET).replace(b'"flagnetic_store":1', b'"flagnetic_store":2'),
+        _store.encode(SDK_KEY, RULESET).replace(b'"flagnetic_store":1', b'"flagnetic_store":"1"'),
+        _store.encode(SDK_KEY, RULESET).replace(b'"flagnetic_store":1', b'"flagnetic_store":true'),
+    ],
+    ids=[
+        "bare",
+        "bare with newline",
+        "bare on several lines",
+        "later format",
+        "format as a string",
+        "format true",
+    ],
+)
+def test_a_store_written_under_no_key_or_in_another_format_is_discarded(
     tmp_path: Path, content: bytes
 ) -> None:
     store = tmp_path / "flagnetic.json"
