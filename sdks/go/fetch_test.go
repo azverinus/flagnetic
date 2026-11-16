@@ -861,6 +861,37 @@ func TestStoreWrittenUnderNoKeyIsDiscardedOnce(t *testing.T) {
 	}
 }
 
+func TestStoreWithAnUnknownHeaderIsDiscarded(t *testing.T) {
+	// The header names this client's key, but a format this client does not
+	// write: what follows it may not be a ruleset document as this client
+	// reads one.
+	current := string(flagnetic.StoreFile(serverKey, []byte(documentAt(7))))
+	for name, content := range map[string]string{
+		"later format":   strings.Replace(current, `"flagnetic_store":1`, `"flagnetic_store":2`, 1),
+		"no format":      strings.Replace(current, `"flagnetic_store":1,`, ``, 1),
+		"format as text": strings.Replace(current, `"flagnetic_store":1`, `"flagnetic_store":"1"`, 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if content == current {
+				t.Fatal("the header was not changed")
+			}
+			path := filepath.Join(t.TempDir(), "ruleset.json")
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			var l logs
+			srv := newMockServer(t, status(http.StatusInternalServerError))
+			c := newOnline(t, srv.URL, newSleeper().option(), flagnetic.WithStore(path), flagnetic.WithLogger(l.logger()))
+			if got := c.Stage(); got != flagnetic.StageBuiltIn {
+				t.Errorf("stage = %q, want built_in", got)
+			}
+			if got := l.named(flagnetic.EventStoreFailed); len(got) != 1 {
+				t.Errorf("store_failed = %+v, want one", got)
+			}
+		})
+	}
+}
+
 func TestCorruptStoreStartsBuiltIn(t *testing.T) {
 	for name, content := range map[string]string{
 		"corrupt json":       `{"schema_version": 1,`,

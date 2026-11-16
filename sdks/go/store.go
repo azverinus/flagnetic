@@ -27,6 +27,7 @@ type storeHeader struct {
 
 var (
 	errStoreNoKey    = errors.New("the store was written under no key")
+	errStoreFormat   = errors.New("the store was written in a format this client does not read")
 	errStoreOtherKey = errors.New("the store was written under another key")
 )
 
@@ -46,13 +47,17 @@ func encodeStore(sdkKey string, doc []byte) []byte {
 }
 
 // decodeStore returns the document a store file holds for sdkKey. A file
-// without a header, as written before stores were bound to a key, and one
-// written under another key are refused.
+// without a header, as written before stores were bound to a key, one in a
+// format this client does not write, and one written under another key are
+// refused.
 func decodeStore(sdkKey string, file []byte) ([]byte, error) {
 	line, doc, found := bytes.Cut(file, []byte{'\n'})
 	var header storeHeader
 	if !found || json.Unmarshal(line, &header) != nil || header.Format == nil {
 		return nil, errStoreNoKey
+	}
+	if *header.Format != storeFormat {
+		return nil, errStoreFormat
 	}
 	if header.Key != storeKeyDigest(sdkKey) {
 		return nil, errStoreOtherKey
