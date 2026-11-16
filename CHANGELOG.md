@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.4.0](https://github.com/azverinus/flagnetic/compare/v0.3.0...v0.4.0) (2026-11-15)
+
+
+### Features
+
+* **access:** offer an enforced domain's invitation only its provider ([#290](https://github.com/azverinus/flagnetic/issues/290)) ([a52eb97](https://github.com/azverinus/flagnetic/commit/a52eb97610d7c5969af6d4fe93a9613f38abe482))
+* **console:** add the Firebase Remote Config import wizard ([#293](https://github.com/azverinus/flagnetic/issues/293)) ([26ed25b](https://github.com/azverinus/flagnetic/commit/26ed25b18bfeabae40119a39ae76751e6e8c438c))
+* **console:** export the project document from an Import and export page ([#261](https://github.com/azverinus/flagnetic/issues/261)) ([0456401](https://github.com/azverinus/flagnetic/commit/045640121b817ab88ffc1a32f2e839e2a78b40e4))
+* **console:** import a project document with a dry run review ([#272](https://github.com/azverinus/flagnetic/issues/272)) ([818bc12](https://github.com/azverinus/flagnetic/commit/818bc12735972ae4c8687972b15c0c6d76a3f7a0))
+* **console:** list, create and edit a project's sinks ([#262](https://github.com/azverinus/flagnetic/issues/262)) ([c4007de](https://github.com/azverinus/flagnetic/commit/c4007def08f9baa2a5288c7f0e055eb1a4e69081))
+* **console:** recover a sink from its page and flag sinks that need attention ([#287](https://github.com/azverinus/flagnetic/issues/287)) ([1c8d0b5](https://github.com/azverinus/flagnetic/commit/1c8d0b53840f837d2fb48c4abe4872f6419ee247))
+* **console:** replace mode, create from a document and the export on project deletion ([#286](https://github.com/azverinus/flagnetic/issues/286)) ([29e34f3](https://github.com/azverinus/flagnetic/commit/29e34f3d74cf618c9c883745d6467431899619a8))
+* **console:** test, enable, disable and sample a sink from its page ([#274](https://github.com/azverinus/flagnetic/issues/274)) ([9c5d1e1](https://github.com/azverinus/flagnetic/commit/9c5d1e184e4a5a2c3182f0550e06a337d1be1cd1))
+* **sinks:** deliver batches to S3-compatible object storage ([#277](https://github.com/azverinus/flagnetic/issues/277)) ([752a92e](https://github.com/azverinus/flagnetic/commit/752a92e0fc6b31240405821996fc47b803714a87))
+* **sinks:** deliver events to ClickHouse over its HTTP interface ([#275](https://github.com/azverinus/flagnetic/issues/275)) ([4685e1d](https://github.com/azverinus/flagnetic/commit/4685e1d3d7d08042f460df938a5884120f36bd23))
+* **sinks:** flag a sink at risk before retention drops its undelivered rows ([#271](https://github.com/azverinus/flagnetic/issues/271)) ([3e349df](https://github.com/azverinus/flagnetic/commit/3e349df5dc18dc16aa119cbf1d626277aa7004d1))
+* **sinks:** record rows retention drops before a sink delivered them as gaps ([#267](https://github.com/azverinus/flagnetic/issues/267)) ([0e596cd](https://github.com/azverinus/flagnetic/commit/0e596cd1318e597b5b608119e433ce5167f1a486))
+* **transfer:** export and import a project from the command line ([#273](https://github.com/azverinus/flagnetic/issues/273)) ([a1d0ba8](https://github.com/azverinus/flagnetic/commit/a1d0ba8f8e6628b8882979ebf9c744e165cbceed))
+* **transfer:** import a Firebase Remote Config template into one environment ([#288](https://github.com/azverinus/flagnetic/issues/288)) ([0479ed3](https://github.com/azverinus/flagnetic/commit/0479ed3e633809bc485c1b0a04c40893bfa53d02))
+* **transfer:** replace a project's configuration with a document ([#268](https://github.com/azverinus/flagnetic/issues/268)) ([a58b09e](https://github.com/azverinus/flagnetic/commit/a58b09e6498b21a9f01563b16e85e026487fa468))
+* **transfer:** translate a Firebase Remote Config template into flags and rules ([#270](https://github.com/azverinus/flagnetic/issues/270)) ([d2bb558](https://github.com/azverinus/flagnetic/commit/d2bb5584966f9f9e1f6643f5ac99cf5d95198d71))
+
+
+### Bug Fixes
+
+* **console:** send a value as it was written ([#297](https://github.com/azverinus/flagnetic/issues/297)) ([f04349c](https://github.com/azverinus/flagnetic/commit/f04349c483197d8de92a0cb9a2bd90cf5a9434f0))
+* **events:** rollups do not hold a project's writes ([#301](https://github.com/azverinus/flagnetic/issues/301)) ([72316e4](https://github.com/azverinus/flagnetic/commit/72316e4f7a72d33931a7997ff8d5b858b03f1b6e))
+* **experiments:** keep the flag of a draft a rule serves ([#300](https://github.com/azverinus/flagnetic/issues/300)) ([d738a9a](https://github.com/azverinus/flagnetic/commit/d738a9a2e1db10f5cdf603a881d3db5ff02f290f))
+* **flags:** check prerequisite chains in linear time ([#295](https://github.com/azverinus/flagnetic/issues/295)) ([b3d1bad](https://github.com/azverinus/flagnetic/commit/b3d1badd18cee37f238983231f724e645ca21b9f))
+* **governance:** allow only global unicast webhook targets ([#260](https://github.com/azverinus/flagnetic/issues/260)) ([097567c](https://github.com/azverinus/flagnetic/commit/097567ceaf61d566e14a43b81f39df2cafef1277))
+* **governance:** disable a webhook after a day of failures, not a quiet day ([#299](https://github.com/azverinus/flagnetic/issues/299)) ([a85d9f8](https://github.com/azverinus/flagnetic/commit/a85d9f858c04a657e1b8c63756fd75f10666d0f5))
+* **http:** bound every write to a client and page the audit download ([#296](https://github.com/azverinus/flagnetic/issues/296)) ([8c77c5c](https://github.com/azverinus/flagnetic/commit/8c77c5c7c5d538e929261553c89fe3f76331d3cb))
+* **identity:** refresh SAML metadata only when it keeps a trusted certificate ([#298](https://github.com/azverinus/flagnetic/issues/298)) ([78e1c80](https://github.com/azverinus/flagnetic/commit/78e1c801602ce03d73d794edb3199cdb920f17fb))
+* **identity:** refuse a replacement of group mappings based on a stale list ([#305](https://github.com/azverinus/flagnetic/issues/305)) ([6851e8d](https://github.com/azverinus/flagnetic/commit/6851e8d9619a896b89d529c61993ac5abb4a05fe))
+* **identity:** SCIM names only addresses its provider vouches for ([#294](https://github.com/azverinus/flagnetic/issues/294)) ([fb69ca5](https://github.com/azverinus/flagnetic/commit/fb69ca5af7174af8d2649076111405a0e541581f))
+* **identity:** treat a missing groups claim as empty after a first claim ([#304](https://github.com/azverinus/flagnetic/issues/304)) ([c03b96b](https://github.com/azverinus/flagnetic/commit/c03b96b7c49cb5e17ca3a3676c2c82a9be20c344))
+* **identity:** unlinking the last identity at a provider takes back what it brought ([#302](https://github.com/azverinus/flagnetic/issues/302)) ([6a21a51](https://github.com/azverinus/flagnetic/commit/6a21a513b1cf7fda11f8d9e81b9818cf4e0cad78))
+* **sdk-api:** refuse exposures of a draft experiment ([#276](https://github.com/azverinus/flagnetic/issues/276)) ([de8dda8](https://github.com/azverinus/flagnetic/commit/de8dda8eec2d16ec32406160dfa0aa4dd76deff2))
+* **sdk-js:** cap Retry-After on a ruleset fetch at the retry backoff cap ([#278](https://github.com/azverinus/flagnetic/issues/278)) ([e41a18a](https://github.com/azverinus/flagnetic/commit/e41a18a14645822803b1410c877a6bb95c6f3e71))
+* **security:** refuse control characters in the text a client sends ([#303](https://github.com/azverinus/flagnetic/issues/303)) ([ba7e2ae](https://github.com/azverinus/flagnetic/commit/ba7e2aea0cf7f55a2f60d3d8a29f99f560f255bf))
+* **sinks:** give a replay a received-at floor of its own ([#291](https://github.com/azverinus/flagnetic/issues/291)) ([f1286c2](https://github.com/azverinus/flagnetic/commit/f1286c27df98f5ec0debba28f1f3179b6ba4d4d1))
+* **transfer:** refuse YAML anchors and aliases in a project document ([#264](https://github.com/azverinus/flagnetic/issues/264)) ([46b426c](https://github.com/azverinus/flagnetic/commit/46b426ceb12f8d78568befee10a3e714e6cf955e))
+
 ## [0.3.0](https://github.com/azverinus/flagnetic/compare/v0.2.0...v0.3.0) (2026-11-11)
 
 
