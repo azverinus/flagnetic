@@ -259,8 +259,12 @@ module Flagnetic
 
     # enqueue puts one event in the queue, dropping the oldest when the
     # queue is full, and wakes whatever is waiting for a longer deadline.
-    # An offline queue hands the event to the Recorder instead.
+    # An offline queue hands the event to the Recorder instead. Strings are
+    # scrubbed here, where the event is one among those being recorded, so
+    # a unit ID that is no UTF-8 is sent with U+FFFD in it instead of
+    # failing the flush that carries it.
     def enqueue(event)
+      event = EventBatch.scrub(event)
       if offline?
         @record.call(event)
         return
@@ -299,7 +303,7 @@ module Flagnetic
       events = take
       return true if events.empty?
 
-      batches = EventBatch.pack(events, @transport.identity)
+      batches = EventBatch.pack(events, @transport.identity) { |_, err| report_unserialisable(err) }
       batches.each_with_index do |group, i|
         result = attempt(group, deadline)
         case result.kind

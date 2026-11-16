@@ -195,6 +195,35 @@ class SummariesTest < Minitest::Test
     assert(eventually(0.8) { c.bool("on", default: false) })
   end
 
+  # A flag key a caller passed in is the one string of a summary that is
+  # not the ruleset's: invalid bytes in it must not lose the other rows.
+  def test_a_flag_key_with_invalid_utf8_is_scrubbed_and_the_other_rows_are_sent
+    @server.publish(document(1, { "on" => true }))
+    c = client(summary_interval: 3600, stream: false)
+    c.ready(timeout: 2)
+    c.bool("on", default: false)
+    c.bool("bad-\xFF", default: false)
+    c.flush(timeout: 2)
+    flags = summaries(@server.events_requests.first).flat_map { |s| s["counts"].map { |r| r["flag"] } }
+    assert_equal ["bad-\uFFFD", "on"], flags.sort
+    assert_empty logged(:queue_dropped)
+  end
+
+  def test_a_summary_row_that_does_not_encode_is_dropped_with_its_event_and_logged
+    @server.publish(document(1, { "on" => true }))
+    c = client(summary_interval: 3600, stream: false)
+    c.ready(timeout: 2)
+    c.bool("on", default: false)
+    summaries = c.instance_variable_get(:@summaries)
+    summaries.define_singleton_method(:wire) do |_|
+      { "type" => "evaluation_summary", "event_id" => "x", "n" => Float::NAN }
+    end
+    c.flush(timeout: 2)
+    assert_empty @server.events_requests
+    assert_equal [[:warn, { kind: "evaluation_summary", cause: "not_serialisable", events: 1,
+                            fault: "JSON::GeneratorError" }]], logged(:queue_dropped)
+  end
+
   def test_close_flushes_and_stops_within_its_one_timeout
     @server.publish(document(1, { "on" => true }))
     c = client(summary_interval: 3600, stream: false, timing: { poll_down: 0.05 })

@@ -34,7 +34,10 @@ module Flagnetic
     # endpoint accepts: at most 500 events, and under 1 MiB decoded
     # together with the envelope. An event too large on its own still
     # becomes a batch of one, which the platform answers 413 and the
-    # caller drops.
+    # caller drops. An event that does not encode (a value that is no JSON
+    # value, a string that survived scrubbing as invalid) is left out of
+    # every batch and handed to the block with the error, so it costs the
+    # flush that event alone and not every event packed with it.
     def pack(events, identity)
       budget = MAX_BATCH_BYTES - overhead(identity)
       batches = []
@@ -49,9 +52,38 @@ module Flagnetic
         end
         current << e
         size += cost
+      rescue StandardError => err
+        yield e, err if block_given?
       end
       batches << current if current.any?
       batches
+    end
+
+    # scrub returns value with every string, hash keys included, valid
+    # UTF-8: JSON.generate refuses any other, and a unit ID is whatever a
+    # caller took from a request (a crafted cookie, say). Invalid bytes
+    # become U+FFFD, as Go's encoder writes them. A binary string, which is
+    # how a Rack string arrives, is read as UTF-8 rather than refused for
+    # its encoding label; a string in another encoding is transcoded. The
+    # argument is never modified.
+    def scrub(value)
+      case value
+      when String then scrub_string(value)
+      when Hash then value.to_h { |k, v| [scrub(k), scrub(v)] }
+      when Array then value.map { |v| scrub(v) }
+      else value
+      end
+    end
+
+    def scrub_string(string)
+      case string.encoding
+      when Encoding::UTF_8 then string.valid_encoding? ? string : string.scrub
+      when Encoding::BINARY then string.dup.force_encoding(Encoding::UTF_8).scrub
+      else string.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+      end
+    rescue StandardError
+      # An encoding Ruby cannot convert from: nothing of it is worth sending.
+      ""
     end
 
     # send_batch posts one batch through transport, bounding the call by
