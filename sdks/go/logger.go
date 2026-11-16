@@ -22,10 +22,12 @@ const (
 	// EventSSEConnected (info): the change stream is open. Fields:
 	// last_event_id, the held version the stream resumes from, 0 for none.
 	EventSSEConnected Event = "sse_connected"
-	// EventSSEDropped (info for a server-side close, warn otherwise): the
-	// change stream ended. Fields: cause (server_closed, silence, timeout,
-	// network, http_status, unauthorized, malformed), error, reconnect
-	// (false where the stream stays down), and status for an HTTP status.
+	// EventSSEDropped (info for a server-side close of a stable stream, warn
+	// otherwise): the change stream ended. Fields: cause (server_closed,
+	// closed_early for a stream closed before its first heartbeat, silence,
+	// timeout, network, http_status, unauthorized, malformed), error,
+	// reconnect (false where the stream stays down), and status for an HTTP
+	// status.
 	EventSSEDropped Event = "sse_dropped"
 	// EventStageChanged (info to fresh, warn otherwise): the fallback chain
 	// moved. Fields: from, to.
