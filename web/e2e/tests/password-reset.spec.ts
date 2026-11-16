@@ -233,7 +233,7 @@ test.describe("resetting a forgotten password", () => {
     await expect(page.getByRole("heading", { name: "Забыли пароль?" })).toBeVisible();
     await page.getByLabel("Электронная почта").fill("nobody@flagnetic.test");
     await page.getByRole("button", { name: "Отправить ссылку для сброса пароля" }).click();
-    await expect(page.getByRole("status")).toContainText("ссылка для сброса уже в пути");
+    await expect(page.getByRole("status")).toContainText("на него отправлена ссылка для сброса");
     await expectNoSeriousViolations(page, "the forgotten-password page in Russian");
 
     await page.goto("/password-reset/not-a-secret-anyone-issued");
