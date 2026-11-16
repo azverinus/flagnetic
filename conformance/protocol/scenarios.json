@@ -1302,7 +1302,14 @@
           "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
         },
         {
-          "note": "closed by the server",
+          "advance_ms": 15000
+        },
+        {
+          "note": "a heartbeat: the stream is stable",
+          "stream_send": ": hb\n\n"
+        },
+        {
+          "note": "closed by the server after a heartbeat",
           "stream_close": true
         },
         {
@@ -1722,7 +1729,14 @@
           }
         },
         {
-          "note": "closed by the server",
+          "advance_ms": 15000
+        },
+        {
+          "note": "a heartbeat: the stream is stable",
+          "stream_send": ": hb\n\n"
+        },
+        {
+          "note": "closed by the server after a heartbeat",
           "stream_close": true
         },
         {
@@ -3498,7 +3512,14 @@
           "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
         },
         {
-          "note": "closed by the server",
+          "advance_ms": 15000
+        },
+        {
+          "note": "a heartbeat: the stream is stable",
+          "stream_send": ": hb\n\n"
+        },
+        {
+          "note": "closed by the server after a heartbeat",
           "stream_close": true
         },
         {
