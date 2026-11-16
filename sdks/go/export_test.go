@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+// StoreFile is the content of a store file holding doc, written by a client
+// holding sdkKey, so a test seeds a store without a first run.
+func StoreFile(sdkKey string, doc []byte) []byte { return encodeStore(sdkKey, doc) }
+
 // WithSleep replaces how the background loop waits between fetches, so a
 // test drives polling and backoff without real time passing. sleep returns
 // false when ctx is done first.
