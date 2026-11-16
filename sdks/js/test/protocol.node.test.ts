@@ -99,6 +99,7 @@ const scenarios = JSON.parse(read("scenarios.json")) as {
 // What only the SDKs decide (versioning and compatibility), in the same step
 // language over the same server-produced documents.
 scenarios.scenarios.push(...(JSON.parse(read("versioning-scenarios.json")) as { scenarios: Scenario[] }).scenarios);
+scenarios.scenarios.push(...(JSON.parse(read("stream-stability-scenarios.json")) as { scenarios: Scenario[] }).scenarios);
 // Running experiments: their own answers join those of the scenarios above.
 const experiments = JSON.parse(read("experiment-scenarios.json")) as { answers: Record<string, Answer[]>; scenarios: Scenario[] };
 Object.assign(scenarios.answers, experiments.answers);
@@ -201,7 +202,8 @@ class Runner {
 
   constructor(private readonly context: Context) {}
 
-  async start(given: Scenario["given"]): Promise<void> {
+  /** `windowTop` draws every jitter at the top of its window, for a scenario that is about how long a wait is. */
+  async start(given: Scenario["given"], windowTop = false): Promise<void> {
     await new Promise<void>((resolve) => this.server.listen(0, "127.0.0.1", resolve));
     this.baseUrl = `http://127.0.0.1:${(this.server.address() as AddressInfo).port}`;
     const o = given.options;
@@ -240,6 +242,9 @@ class Runner {
       },
       {
         clock: this.clock,
+        // Event IDs draw from the same source, so only the scenarios about
+        // the length of a wait take the top of every window.
+        ...(windowTop && { random: () => 0.999999 }),
         eventTiming,
         fetch: (input, init) => {
           this.started++;
@@ -541,10 +546,10 @@ afterEach(async () => {
   for (const r of runners.splice(0)) await r.stop();
 });
 
-async function runner(context: Context, given: Scenario["given"]): Promise<Runner> {
+async function runner(context: Context, given: Scenario["given"], windowTop = false): Promise<Runner> {
   const r = new Runner(context);
   runners.push(r);
-  await r.start(given);
+  await r.start(given, windowTop);
   return r;
 }
 
@@ -552,13 +557,17 @@ async function runner(context: Context, given: Scenario["given"]): Promise<Runne
 
 const serverScenarios = scenarios.scenarios.filter((s) => s.mode === "server");
 
+// The scenarios about how long a wait is: every jitter is drawn at the top of
+// its window, so a reconnect that skips the backoff misses the window.
+const windowTopScenarios = new Set(["server: a stream closed before its first heartbeat is retried with backoff"]);
+
 describe("protocol scenarios, server mode", () => {
   test("there are server-mode scenarios, and every one of them runs whole", () => {
     expect(serverScenarios.length).toBeGreaterThan(0);
   });
 
   test.each(serverScenarios.map((s) => [s.name, s] as const))("%s", async (_, s) => {
-    const r = await runner(scenarios.context, s.given);
+    const r = await runner(scenarios.context, s.given, windowTopScenarios.has(s.name));
     await r.run(s.steps);
   });
 });

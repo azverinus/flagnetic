@@ -23,8 +23,6 @@ export interface Timing {
   readonly unauthorizedMax: number;
   readonly streamRetryInitial: number;
   readonly streamRetryMax: number;
-  /** A connection this long resets the stream backoff. */
-  readonly streamStable: number;
   /** Silence after which the stream reconnects. */
   readonly streamSilence: number;
   /** The jitter before reconnecting after a server-side close. */
@@ -44,7 +42,6 @@ export const defaultTiming: Timing = {
   unauthorizedMax: 900_000,
   streamRetryInitial: 1_000,
   streamRetryMax: 30_000,
-  streamStable: 60_000,
   streamSilence: 45_000,
   streamCloseJitter: 2_000,
   catchUp: [1_000, 2_000, 4_000],
@@ -423,7 +420,9 @@ export class Delivery {
     const held = this.host.heldVersion();
     if (held !== undefined) headers["Last-Event-ID"] = String(held);
 
-    let connectedAt: number | undefined;
+    // A stream is stable once it has delivered a heartbeat; one the server
+    // ends before that is a failed connection however it was answered.
+    let stable = false;
     let cause: string;
     let clean = false;
     try {
@@ -443,7 +442,6 @@ export class Delivery {
         await res.body?.cancel();
         throw new Error(`status ${res.status} ${type}`.trim());
       }
-      connectedAt = this.clock.now();
       this.streamUp = true;
       this.host.log("info", "sse_connected", {});
       // Every (re)connect is followed by a fetch: versions may have been
@@ -459,15 +457,16 @@ export class Delivery {
         // A cancelled reader reads as done; it was us, not the server.
         if (abort.signal.aborted) throw abort.signal.reason;
         if (done) break;
-        if (this.clock.now() - connectedAt >= this.config.timing.streamStable) {
-          this.streamBackoff.reset();
-        }
         this.armSilence(abort);
         for (const e of parser.feed(value)) this.onEvent(e.event, e.data);
+        if (!stable && parser.comments > 0) {
+          stable = true;
+          this.streamBackoff.reset();
+        }
         this.trace({ kind: "stream_read", bytes: value.byteLength });
       }
-      cause = "closed by the server";
-      clean = true;
+      clean = stable;
+      cause = stable ? "closed by the server" : "closed by the server before its first heartbeat";
     } catch (e) {
       const reason: unknown = abort.signal.aborted ? abort.signal.reason : e;
       cause = reason instanceof AttemptFailed ? reason.message : causeOf(e);
@@ -486,10 +485,9 @@ export class Delivery {
       this.trace({ kind: "stream_ended" });
       return;
     }
-    const lasted = connectedAt === undefined ? 0 : this.clock.now() - connectedAt;
-    if (lasted >= this.config.timing.streamStable) this.streamBackoff.reset();
-    // After a server-side close only jitter spreads the reconnects; after
-    // an error the backoff does.
+    // After a server-side close of a stable stream only jitter spreads the
+    // reconnects; after an error, or a stream closed before it was stable,
+    // the backoff does.
     const delay = clean
       ? Math.floor(this.config.random() * this.config.timing.streamCloseJitter)
       : this.streamBackoff.next(this.config.timing.streamRetryMax);
