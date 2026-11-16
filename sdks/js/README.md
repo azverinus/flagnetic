@@ -45,7 +45,7 @@ await flagnetic.close(); // flushes what is queued, within 5 seconds
 
 `createServer` refuses a client key (`fn_cli_…`), which belongs to `flagnetic/client`; network trouble never makes it throw. A getter returns your built-in default instead of throwing whenever the flag is unknown, has another type or cannot be evaluated. The ruleset is downloaded with `If-None-Match`, the stream is held by default and a change reaches the client within 2 seconds at p99; with the stream down the client polls every 30 seconds, and with it up every 300. A `store` option names a file that keeps the last good ruleset across restarts.
 
-Options: `pollInterval`, `pollIntervalWithoutStream`, `stream`, `requestTimeout`, `store`, `logger`, `allowOverrides`, `sendSummaries`, `sendExposures`, `flushInterval`, `summaryInterval`, `platform`, `appVersion` and `offline`. Requests carry `User-Agent: flagnetic-js/<version> (<platform>)`.
+Options: `pollInterval`, `pollIntervalWithoutStream`, `stream`, `requestTimeout`, `store` (a file keeping the last good ruleset across restarts, headed by a digest of the SDK key: a file written under another key, such as another environment's, is discarded with `store_failed`), `logger`, `allowOverrides`, `sendSummaries`, `sendExposures`, `flushInterval`, `summaryInterval`, `platform`, `appVersion` and `offline`. Requests carry `User-Agent: flagnetic-js/<version> (<platform>)`.
 
 `onChange(listener)` and `onStage(listener)` return a function that removes the listener. `stage` and `status()` report where the fallback chain stands.
 

@@ -9,6 +9,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import type { Timing } from "../src/server/delivery.js";
 import { createServerWith } from "../src/server/client.js";
 import type { FlagneticServer, LogEvent, LogLevel, ServerOptions, Stage } from "../src/server.js";
+import { encodeStore } from "../src/server/store.js";
 import { VERSION } from "../src/version.js";
 import { MockPlatform, rulesetOf } from "./support/mock-platform.js";
 
@@ -493,7 +494,11 @@ describe("the store", () => {
     await first.client.ready(2000);
     await first.client.close();
     await eventually(async () => {
-      expect(JSON.parse(await readFile(store, "utf8"))).toMatchObject({ version: 3 });
+      const file = await readFile(store, "utf8");
+      const [header, document] = [file.slice(0, file.indexOf("\n")), file.slice(file.indexOf("\n") + 1)];
+      expect(JSON.parse(header)).toStrictEqual({ flagnetic_store: 1, key: expect.stringMatching(/^[0-9a-f]{64}$/) as unknown });
+      expect(JSON.parse(document)).toMatchObject({ version: 3 });
+      expect(file).not.toContain(key);
     });
 
     const down = await platform();
@@ -512,12 +517,67 @@ describe("the store", () => {
   test("a corrupt store file yields built_in and store_failed", async () => {
     const dir = await mkdtemp(join(tmpdir(), "flagnetic-"));
     const store = join(dir, "ruleset.json");
-    await writeFile(store, "{not json");
+    await writeFile(store, await encodeStore(key, "{not json"));
     const down = await platform();
     down.rulesetDefault = { kind: "status", status: 500 };
     const h = start(down, { store, stream: false }, { retryInitial: 5_000, retryMax: 5_000 });
     await down.until(() => down.rulesetRequests().length === 1);
     expect(h.client.stage).toBe("built_in");
     expect(h.events("store_failed")[0]?.fields).toMatchObject({ operation: "read" });
+  });
+
+  test("a store written under another key is discarded, and the right ruleset is no downgrade", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "flagnetic-"));
+    const store = join(dir, "ruleset.json");
+    // Another environment's ruleset, at a version higher than this one's.
+    const old = await platform(rulesetOf(9, { a: false }));
+    const first = createServerWith("fn_srv_ZyXwVuTs9876543210ZyXwVuTs9876543210", old.baseUrl, { store, stream: false }, { timing: fast });
+    cleanups.push(() => first.close());
+    await first.ready(2000);
+    await first.close();
+    await eventually(async () => {
+      expect(await readFile(store, "utf8")).toContain("flagnetic_store");
+    });
+
+    const p = await platform(rulesetOf(3, { a: true }));
+    const h = start(p, { store, stream: false });
+    expect(await h.client.ready(2000)).toBe("fresh");
+    expect(h.events("store_failed")[0]?.fields).toMatchObject({ operation: "read", cause: "the store was written under another key" });
+    expect(h.events("ruleset_loaded").map((e) => e.fields.source)).toStrictEqual(["network"]);
+    expect(h.client.getDetail(ctx, "a", false)).toMatchObject({ value: true, stage: "fresh", rulesetVersion: 3 });
+    expect(p.rulesetRequests()[0]?.headers["if-none-match"]).toBeUndefined();
+    await h.client.close();
+    // The accepted ruleset rewrote the file under this key.
+    await eventually(async () => {
+      const file = await readFile(store, "utf8");
+      expect(file.startsWith(await encodeStore(key, ""))).toBe(true);
+      expect(JSON.parse(file.slice(file.indexOf("\n") + 1))).toMatchObject({ version: 3 });
+    });
+  });
+
+  test("a store written under no key, or in another format, is discarded", async () => {
+    const stored = JSON.stringify(rulesetOf(7, { a: true }));
+    const noKey = "the store was written under no key";
+    const otherFormat = "the store was written in a format this client does not read";
+    const cases: Record<string, [string, string]> = {
+      "a bare document": [stored, noKey],
+      "a bare document on several lines": [JSON.stringify(rulesetOf(7, { a: true }), null, 2), noKey],
+      "a bare document ending in a newline": [`${stored}\n`, noKey],
+      "a later format": [(await encodeStore(key, stored)).replace('"flagnetic_store":1', '"flagnetic_store":2'), otherFormat],
+      "a format as a string": [(await encodeStore(key, stored)).replace('"flagnetic_store":1', '"flagnetic_store":"1"'), otherFormat],
+    };
+    for (const [name, [content, cause]] of Object.entries(cases)) {
+      const dir = await mkdtemp(join(tmpdir(), "flagnetic-"));
+      const store = join(dir, "ruleset.json");
+      await writeFile(store, content);
+      const down = await platform();
+      down.rulesetDefault = { kind: "status", status: 500 };
+      const h = start(down, { store, stream: false }, { retryInitial: 5_000, retryMax: 5_000 });
+      await down.until(() => down.rulesetRequests().length === 1);
+      expect(h.client.stage, name).toBe("built_in");
+      expect(h.events("store_failed"), name).toHaveLength(1);
+      expect(h.events("store_failed")[0]?.fields, name).toMatchObject({ operation: "read", cause });
+      expect(down.rulesetRequests()[0]?.headers["if-none-match"], name).toBeUndefined();
+    }
   });
 });
