@@ -311,8 +311,8 @@ function ScimTokenForm({
       <div className="flex flex-col gap-4">
         <p className="text-sm">
           <Trans>
-            A SCIM token belongs to an auth provider, and there is none yet. Add the provider of
-            your identity provider first.
+            A SCIM token belongs to an auth provider, and there is none yet. Add an auth provider
+            for your identity provider first.
           </Trans>
         </p>
         <Button asChild variant="outline">

@@ -162,7 +162,7 @@ describe("completing a password reset", () => {
       fakeServer({ "GET /auth/password-reset/s3cret": reset });
       await renderWithRouter(() => <PasswordResetCompletion secret="s3cret" onReset={() => {}} />);
 
-      expect(await screen.findByRole("heading", { name: "Выберите новый пароль" })).toBeVisible();
+      expect(await screen.findByRole("heading", { name: "Придумайте новый пароль" })).toBeVisible();
       expect(screen.getByLabelText("Новый пароль")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Сохранить пароль" })).toBeInTheDocument();
     } finally {

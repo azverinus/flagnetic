@@ -218,7 +218,7 @@ describe("an environment's exposures", () => {
       .map((term) => [term.textContent, term.nextElementSibling?.textContent]);
     expect(terms).toEqual([
       ["p-value", "< 0.0001"],
-      ["X²", "16.00"],
+      ["χ²", "16.00"],
       ["Units first exposed", "10,000"],
     ]);
     expect(within(region).getByText(/^Checked /)).toBeVisible();

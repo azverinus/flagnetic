@@ -766,8 +766,8 @@ msgid "A scheme, a host and a port, such as https://s3.example.com. Leave empty 
 msgstr "A scheme, a host and a port, such as https://s3.example.com. Leave empty for AWS S3."
 
 #: src/components/scim-tokens.tsx
-msgid "A SCIM token belongs to an auth provider, and there is none yet. Add the provider of your identity provider first."
-msgstr "A SCIM token belongs to an auth provider, and there is none yet. Add the provider of your identity provider first."
+msgid "A SCIM token belongs to an auth provider, and there is none yet. Add an auth provider for your identity provider first."
+msgstr "A SCIM token belongs to an auth provider, and there is none yet. Add an auth provider for your identity provider first."
 
 #: src/lib/problem-messages.ts
 msgid "A scope is a word without spaces."
@@ -1112,6 +1112,7 @@ msgstr "An attribute's type is fixed once it is declared."
 msgid "An auth provider's group mapping made this, so only the provider takes it away. An instance admin changes its group mappings on the provider's page."
 msgstr "An auth provider's group mapping made this, so only the provider takes it away. An instance admin changes its group mappings on the provider's page."
 
+#. Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.
 #: src/lib/problem-messages.ts
 msgid "an enforced domain"
 msgstr "an enforced domain"
@@ -3591,7 +3592,11 @@ msgid "Expires"
 msgstr "Expires"
 
 #: src/components/export-project.tsx
+msgid "Export"
+msgstr "Export"
+
 #: src/routes/_signed-in/projects/$project/import-export.tsx
+msgctxt "section title"
 msgid "Export"
 msgstr "Export"
 
@@ -3836,8 +3841,12 @@ msgstr "Follow the browser"
 msgid "Forgot your password?"
 msgstr "Forgot your password?"
 
-#: src/components/sink-editor.tsx
 #: src/components/variations-editor.tsx
+msgid "Format"
+msgstr "Format"
+
+#: src/components/sink-editor.tsx
+msgctxt "file format"
 msgid "Format"
 msgstr "Format"
 
@@ -3965,6 +3974,7 @@ msgstr "Granted {granted}, removed {revoked}."
 msgid "Grants"
 msgstr "Grants"
 
+#. Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.
 #: src/lib/problem-messages.ts
 msgid "grants made by its group mappings"
 msgstr "grants made by its group mappings"
@@ -4662,6 +4672,7 @@ msgstr "Link members by email"
 msgid "Linked"
 msgstr "Linked"
 
+#. Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.
 #: src/lib/problem-messages.ts
 msgid "linked identities"
 msgstr "linked identities"
@@ -6167,6 +6178,7 @@ msgstr "Provisioned by {provider}"
 msgid "Provisioned by {provider}: its directory decides their email, name and whether they are active."
 msgstr "Provisioned by {provider}: its directory decides their email, name and whether they are active."
 
+#. Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.
 #: src/lib/problem-messages.ts
 msgid "provisioned members"
 msgstr "provisioned members"
@@ -6880,6 +6892,7 @@ msgstr "SCIM groups"
 msgid "SCIM token"
 msgstr "SCIM token"
 
+#. Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.
 #: src/components/navigation.tsx
 #: src/components/scim-tokens.tsx
 #: src/lib/problem-messages.ts
@@ -9689,10 +9702,6 @@ msgstr "Writes a file per batch to an S3-compatible bucket, as JSON lines or Par
 msgid "Writes that would change what SDKs receive from {name} are refused until they come through an approved change request. SDKs ignore local overrides there."
 msgstr "Writes that would change what SDKs receive from {name} are refused until they come through an approved change request. SDKs ignore local overrides there."
 
-#: src/components/experiment-exposures.tsx
-msgid "X²"
-msgstr "X²"
-
 #: src/components/sink-list.tsx
 #: src/components/sink-screen.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
@@ -9860,3 +9869,7 @@ msgstr "Your profile is saved."
 #: src/lib/problem-messages.ts
 msgid "Your session has ended. Sign in again to continue."
 msgstr "Your session has ended. Sign in again to continue."
+
+#: src/components/experiment-exposures.tsx
+msgid "χ²"
+msgstr "χ²"

@@ -401,7 +401,7 @@ function SampleRatioResult({
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
             <dt className="text-muted-foreground">{t`p-value`}</dt>
             <dd className="tabular-nums">{pValueText(i18n, check.p_value)}</dd>
-            <dt className="text-muted-foreground">{t`X²`}</dt>
+            <dt className="text-muted-foreground">{t`χ²`}</dt>
             <dd className="tabular-nums">
               {new Intl.NumberFormat(i18n.locale, {
                 minimumFractionDigits: 2,

@@ -766,7 +766,7 @@ msgid "A scheme, a host and a port, such as https://s3.example.com. Leave empty 
 msgstr ""
 
 #: src/components/scim-tokens.tsx
-msgid "A SCIM token belongs to an auth provider, and there is none yet. Add the provider of your identity provider first."
+msgid "A SCIM token belongs to an auth provider, and there is none yet. Add an auth provider for your identity provider first."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -1112,6 +1112,7 @@ msgstr ""
 msgid "An auth provider's group mapping made this, so only the provider takes it away. An instance admin changes its group mappings on the provider's page."
 msgstr ""
 
+#. Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.
 #: src/lib/problem-messages.ts
 msgid "an enforced domain"
 msgstr ""
@@ -3591,7 +3592,11 @@ msgid "Expires"
 msgstr ""
 
 #: src/components/export-project.tsx
+msgid "Export"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/import-export.tsx
+msgctxt "section title"
 msgid "Export"
 msgstr ""
 
@@ -3836,8 +3841,12 @@ msgstr ""
 msgid "Forgot your password?"
 msgstr ""
 
-#: src/components/sink-editor.tsx
 #: src/components/variations-editor.tsx
+msgid "Format"
+msgstr ""
+
+#: src/components/sink-editor.tsx
+msgctxt "file format"
 msgid "Format"
 msgstr ""
 
@@ -3965,6 +3974,7 @@ msgstr ""
 msgid "Grants"
 msgstr ""
 
+#. Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.
 #: src/lib/problem-messages.ts
 msgid "grants made by its group mappings"
 msgstr ""
@@ -4662,6 +4672,7 @@ msgstr ""
 msgid "Linked"
 msgstr ""
 
+#. Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.
 #: src/lib/problem-messages.ts
 msgid "linked identities"
 msgstr ""
@@ -6167,6 +6178,7 @@ msgstr ""
 msgid "Provisioned by {provider}: its directory decides their email, name and whether they are active."
 msgstr ""
 
+#. Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.
 #: src/lib/problem-messages.ts
 msgid "provisioned members"
 msgstr ""
@@ -6880,6 +6892,7 @@ msgstr ""
 msgid "SCIM token"
 msgstr ""
 
+#. Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.
 #: src/components/navigation.tsx
 #: src/components/scim-tokens.tsx
 #: src/lib/problem-messages.ts
@@ -9689,10 +9702,6 @@ msgstr ""
 msgid "Writes that would change what SDKs receive from {name} are refused until they come through an approved change request. SDKs ignore local overrides there."
 msgstr ""
 
-#: src/components/experiment-exposures.tsx
-msgid "X²"
-msgstr ""
-
 #: src/components/sink-list.tsx
 #: src/components/sink-screen.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
@@ -9859,4 +9868,8 @@ msgstr ""
 #: src/components/sign-in-form.tsx
 #: src/lib/problem-messages.ts
 msgid "Your session has ended. Sign in again to continue."
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "χ²"
 msgstr ""
