@@ -14,7 +14,7 @@ class EventsTest < Minitest::Test
   # timing is the core client's option for its own tests.
   FAST = {
     request_timeout: 2, fetch_base: 0.05, fetch_cap: 0.2, unauthorized_cap: 0.2, stream_base: 0.05, stream_cap: 0.2,
-    stream_stable: 60, close_jitter: 0.05, silence: 45, poll_connected: 300, poll_down: 0.05,
+    close_jitter: 0.05, silence: 45, poll_connected: 300, poll_down: 0.05,
     event_retries: [0.1, 0.2, 0.4]
   }.freeze
 

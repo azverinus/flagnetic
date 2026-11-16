@@ -64,6 +64,7 @@ class ClientStreamTest < Minitest::Test
 
   def test_after_a_server_side_close_it_reconnects_with_last_event_id_and_catches_up
     c = connected_client
+    @server.heartbeat # a stream that heard one is stable: its close is routine
     @server.close_streams
     @server.publish(document(3, { "a" => false, "b" => "x" }), quiet: true) # bumped during the gap
 
@@ -73,6 +74,52 @@ class ClientStreamTest < Minitest::Test
     refute c.bool("a", default: true)
     assert_equal [[:info, { cause: "closed by the server" }]], logged(:sse_dropped)
     assert_equal 2, logged(:sse_connected).size
+  end
+
+  # TopRandom draws the top of every window, so that a wait is the ceiling
+  # it was asked for.
+  class TopRandom
+    def rand = 1.0
+  end
+
+  def test_a_stream_closed_before_its_first_heartbeat_backs_off_and_a_heartbeat_restarts_it
+    connected_client(timing: { random: TopRandom.new, stream_base: 0.05, stream_cap: 0.2, close_jitter: 0.01 })
+    # A draining replica or a proxy answers 200 and ends the stream at once:
+    # each close is a failure, so the wait doubles (0.05, 0.1, then the cap).
+    3.times do |i|
+      @server.close_streams
+      eventually { @server.stream_requests.size == i + 2 && @server.streams.size == 1 }
+    end
+    # A heartbeat makes the stream stable: its close is routine (0.01), and
+    # the failures before it are forgotten.
+    @server.heartbeat
+    @server.close_streams
+    eventually { @server.stream_requests.size == 5 && @server.streams.size == 1 }
+    @server.close_streams
+    eventually { @server.stream_requests.size == 6 && @server.streams.size == 1 }
+
+    gaps = @server.stream_requests.map(&:at).each_cons(2).map { |a, b| b - a }
+    assert_operator gaps[1], :>=, 0.1
+    assert_operator gaps[2], :>=, 0.2
+    assert_operator gaps[3], :<, 0.1
+    assert_operator gaps[4], :>=, 0.05
+    early = "closed by the server before its first heartbeat"
+    causes = logged(:sse_dropped).map { |_, fields| fields[:cause] }
+    assert_equal [early, early, early, "closed by the server", early], causes
+  end
+
+  def test_the_stability_of_a_closed_stream_does_not_carry_over_to_the_reconnects_after_it
+    connected_client(timing: { random: TopRandom.new, stream_base: 0.05, stream_cap: 0.2, close_jitter: 0.01 })
+    @server.heartbeat
+    # The stable stream's close is routine; every reconnect after it is
+    # refused with a 503, and those failures back off from the base up.
+    @server.on_stream { |_| [503, {}, ""] }
+    @server.close_streams
+    eventually { @server.stream_requests.size == 5 }
+
+    gaps = @server.stream_requests.map(&:at).each_cons(2).map { |a, b| b - a }
+    assert_operator gaps[2], :>=, 0.1
+    assert_operator gaps[3], :>=, 0.2
   end
 
   def test_after_a_broken_stream_it_reconnects_with_backoff_and_fetches
