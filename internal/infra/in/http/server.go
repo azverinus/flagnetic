@@ -306,6 +306,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	route.ServeHTTP(out, r)
 }
 
+// BodyLimit returns the limit on the body of a request to the route r
+// matches, or 0 when it has none. A wrapper that changes the body's coding
+// uses it to bound the body it receives, which the limit applied after the
+// wrapper cannot do.
+func (s *Server) BodyLimit(r *http.Request) int64 {
+	_, pattern := s.mux.Handler(r)
+	return s.patterns[pattern].maxBodyBytes
+}
+
 // route serves r on rw by the route it matches. conn is the connection's
 // own writer, which body limits and deadlines act on.
 func (s *Server) route(conn, rw http.ResponseWriter, r *http.Request, st *requestState) {
