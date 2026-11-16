@@ -158,7 +158,7 @@ func bootstrapToPipe(t *testing.T, env map[string]string, args ...string) (code 
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer pr.Close()
+	t.Cleanup(func() { _ = pr.Close() })
 	var errBuf bytes.Buffer
 	lookup := func(k string) (string, bool) {
 		v, ok := env[k]
@@ -168,7 +168,9 @@ func bootstrapToPipe(t *testing.T, env map[string]string, args ...string) (code 
 		return v, ok
 	}
 	code = cli.Main(append([]string{"admin", "bootstrap"}, args...), lookup, pw, &errBuf, make(chan os.Signal))
-	pw.Close()
+	if err := pw.Close(); err != nil {
+		t.Fatal(err)
+	}
 	out, err := io.ReadAll(pr)
 	if err != nil {
 		t.Fatal(err)
