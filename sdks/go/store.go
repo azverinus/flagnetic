@@ -40,10 +40,7 @@ func storeKeyDigest(sdkKey string) string {
 func encodeStore(sdkKey string, doc []byte) []byte {
 	format := storeFormat
 	header, _ := json.Marshal(storeHeader{Format: &format, Key: storeKeyDigest(sdkKey)})
-	out := make([]byte, 0, len(header)+1+len(doc))
-	out = append(out, header...)
-	out = append(out, '\n')
-	return append(out, doc...)
+	return append(append(header, '\n'), doc...)
 }
 
 // decodeStore returns the document a store file holds for sdkKey. A file
