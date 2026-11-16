@@ -386,15 +386,13 @@ type intervals struct {
 	poll     time.Duration
 	downPoll time.Duration
 	// retryBase, retryCap and unauthorizedCap bound the fetch backoff;
-	// streamRetryCap bounds the reconnect backoff, closeJitterCap the wait
-	// after a server-side close, and stableFor is how long a connection
-	// must hold for that backoff to start from retryBase again.
+	// streamRetryCap bounds the reconnect backoff and closeJitterCap the
+	// wait after a server-side close of a stable stream.
 	retryBase       time.Duration
 	retryCap        time.Duration
 	unauthorizedCap time.Duration
 	streamRetryCap  time.Duration
 	closeJitterCap  time.Duration
-	stableFor       time.Duration
 	// heartbeat is how long the change stream may stay silent.
 	heartbeat time.Duration
 	// catchUp are the waits before re-fetching while a replica is behind
@@ -416,7 +414,6 @@ func newIntervals(o options) intervals {
 		unauthorizedCap: defaultUnauthorizedCap / divisor,
 		streamRetryCap:  streamRetryCap / divisor,
 		closeJitterCap:  closeJitterCap / divisor,
-		stableFor:       stableFor / divisor,
 		heartbeat:       heartbeatTimeout / divisor,
 		catchUp:         make([]time.Duration, len(catchUpDelays)),
 	}

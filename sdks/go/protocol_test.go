@@ -199,21 +199,26 @@ type scenarioFile struct {
 // readScenarios is scenarios.json, which the server produces, with the
 // scenarios of versioning-scenarios.json appended: the same step language
 // over the same documents, for what only the SDKs decide (versioning and
-// compatibility); and those of experiment-scenarios.json, with the answers
-// of the experiment documents they name.
+// compatibility); those of stream-stability-scenarios.json, which pin when
+// the change stream counts as stable; and those of experiment-scenarios.json,
+// with the answers of the experiment documents they name.
 func readScenarios(t *testing.T) scenarioFile {
 	t.Helper()
-	var file, versioning, experiments scenarioFile
+	var file, versioning, stability, experiments scenarioFile
 	if err := json.Unmarshal(readProtocol(t, "scenarios.json"), &file); err != nil {
 		t.Fatal(err)
 	}
 	if err := json.Unmarshal(readProtocol(t, "versioning-scenarios.json"), &versioning); err != nil {
 		t.Fatal(err)
 	}
+	if err := json.Unmarshal(readProtocol(t, "stream-stability-scenarios.json"), &stability); err != nil {
+		t.Fatal(err)
+	}
 	if err := json.Unmarshal(readProtocol(t, "experiment-scenarios.json"), &experiments); err != nil {
 		t.Fatal(err)
 	}
 	file.Scenarios = append(file.Scenarios, versioning.Scenarios...)
+	file.Scenarios = append(file.Scenarios, stability.Scenarios...)
 	file.Scenarios = append(file.Scenarios, experiments.Scenarios...)
 	for doc, answers := range experiments.Answers {
 		if _, ok := file.Answers[doc]; ok {
