@@ -6,6 +6,7 @@
 // server, a browser against one in a hybrid isolate, cross-origin.
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flagnetic/flagnetic.dart';
 import 'package:test/test.dart';
@@ -14,6 +15,33 @@ import 'scripted.dart';
 
 /// Scenario durations in milliseconds become microseconds.
 Duration scaled(Object? ms) => Duration(microseconds: (ms! as num).toInt());
+
+/// Scenario durations at half their length: the scale of the scenarios about
+/// how long a wait is. The others are divided by 1000, which leaves a
+/// window narrower than the scheduling latency a run allows, so a reconnect
+/// that skips the backoff would still land inside it.
+Duration scaledHalf(Object? ms) =>
+    Duration(microseconds: (ms! as num).toInt() * 500);
+
+/// The scenarios about how long a wait is: they run at [scaledHalf] with the
+/// stream's own waits at that scale and every jitter drawn at the top of its
+/// window, so a reconnect that skips the backoff (the routine 0–2 s against
+/// the first failure's 0–1 s) misses a window the latency does not cover.
+const windowTopScenarios = {
+  'client: a stream closed before its first heartbeat is retried with backoff',
+};
+
+/// Draws the top of every window.
+final class _TopRandom implements Random {
+  @override
+  bool nextBool() => true;
+
+  @override
+  double nextDouble() => 1;
+
+  @override
+  int nextInt(int max) => max - 1;
+}
 
 /// The path of the ingest endpoint.
 const eventsPath = '/sdk/v1/events';
@@ -96,6 +124,7 @@ final class ProtocolSuite {
   /// The lists appended to scenarios.json.
   static const scenarioLists = [
     'versioning-scenarios.json',
+    'stream-stability-scenarios.json',
     'experiment-scenarios.json',
     'foreground-scenarios.json',
   ];
@@ -431,6 +460,8 @@ Future<void> _runScenario(
   void Function(Future<void> Function()) addTearDown,
 ) async {
   final fixtures = harness.fixtures;
+  final windowTop = windowTopScenarios.contains(scenario['name']);
+  final scale = windowTop ? scaledHalf : scaled;
   const sdkKey = clientKey;
   const fetchPath = evaluatePath;
   final given = scenario['given']! as Map<String, Object?>;
@@ -469,7 +500,7 @@ Future<void> _runScenario(
       : OfflineSource.document(fixtures.json(offline)! as Map<String, Object?>);
   final flushInterval = options['flush_interval_ms'] == null
       ? const Duration(hours: 1)
-      : scaled(options['flush_interval_ms']);
+      : scale(options['flush_interval_ms']);
   final Sdk sdk = ClientSdk(
     Flagnetic.client(
       clientKey,
@@ -478,10 +509,15 @@ Future<void> _runScenario(
       options: scaledOptions(
         store: store,
         logger: logs.call,
-        pollInterval: scaled(options['poll_interval_ms']),
+        pollInterval: scale(options['poll_interval_ms']),
         sse: options['sse'] as bool?,
         // The scenarios' 0–3 s wait, divided like every duration.
-        rulesetEventJitter: scaled(3000),
+        rulesetEventJitter: scale(3000),
+        random: windowTop ? _TopRandom() : null,
+        streamBackoff: scale(1000),
+        streamBackoffCap: scale(30000),
+        streamCloseJitter: scale(2000),
+        streamSilenceTimeout: scale(45000),
         // Time as the scenario counts it: it moves only by `advance_ms` and
         // `no_request`, so the 10 s minimum refetch gap is tested in the
         // protocol's own seconds.
@@ -513,7 +549,7 @@ Future<void> _runScenario(
     final label = 'step $i${step['note'] == null ? '' : ' (${step['note']})'}';
     if (step['request'] case final Map<String, Object?> request) {
       final window = request['delay_ms'] as Map<String, Object?>?;
-      final max = window == null ? Duration.zero : scaled(window['max']);
+      final max = window == null ? Duration.zero : scale(window['max']);
       final exchange = await server.next(
         path: request['path'] as String?,
         timeout: max + harness.latency * 10,
@@ -554,7 +590,7 @@ Future<void> _runScenario(
         expect(
           waited.inMicroseconds,
           inInclusiveRange(
-            (scaled(window['min']) - const Duration(milliseconds: 1))
+            (scale(window['min']) - const Duration(milliseconds: 1))
                 .inMicroseconds,
             (max + harness.latency).inMicroseconds,
           ),
@@ -637,7 +673,7 @@ Future<void> _runScenario(
     if (step['stream_closed'] case final Map<String, Object?> closed) {
       final open = stream ?? fail('$label: no stream is open');
       expect(
-        await open.closedBySdk(scaled(closed['within_ms']) + harness.latency),
+        await open.closedBySdk(scale(closed['within_ms']) + harness.latency),
         isTrue,
         reason: '$label: the SDK closes the stream',
       );
@@ -646,7 +682,7 @@ Future<void> _runScenario(
     }
     if (step['advance_ms'] case final int ms) {
       scenarioNow = scenarioNow.add(Duration(milliseconds: ms));
-      await Future<void>.delayed(scaled(ms));
+      await Future<void>.delayed(scale(ms));
       stepEnd = DateTime.now();
     }
     if (step['no_request'] case final Map<String, Object?> none) {
@@ -657,7 +693,7 @@ Future<void> _runScenario(
       scenarioNow = scenarioNow.add(
         Duration(milliseconds: none['for_ms']! as int),
       );
-      await Future<void>.delayed(scaled(none['for_ms']));
+      await Future<void>.delayed(scale(none['for_ms']));
       expect(
         await server.countReceived(path: path),
         before,

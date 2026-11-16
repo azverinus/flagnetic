@@ -32,7 +32,7 @@ data: {"version":1745040000000}
 
 ## How a stream ends
 
-The server closes a stream after 60 minutes plus up to 5 minutes chosen at random, so streams spread over the replicas as they come and go and do not all reconnect at once. It also closes every stream when the replica begins to drain on shutdown, and answers a new stream that arrives meanwhile `503 unavailable` with `Retry-After` rather than open it only to close it, so the SDK backs off and its next attempt reaches a replica that stays. The SDK reconnects with `Last-Event-ID` and loses nothing.
+The server closes a stream after 60 minutes plus up to 5 minutes chosen at random, so streams spread over the replicas as they come and go and do not all reconnect at once. It also closes every stream when the replica begins to drain on shutdown, and answers a new stream that arrives meanwhile `503 unavailable` with `Retry-After` rather than open it only to close it, so the SDK backs off and its next attempt reaches a replica that stays. The SDK reconnects with `Last-Event-ID` and loses nothing. It treats a stream as stable once it has delivered a heartbeat: a stream that ends before the first one (whatever answered it) is a failure like a refused connection and backs off, doubling from 1 s up to 30 s with full jitter, and only a stable stream's close waits the routine 0–2 s and restarts the backoff.
 
 Behind a reverse proxy, turn response buffering off for `/sdk/v1/stream` (the `X-Accel-Buffering: no` header does it for nginx) and give it a read timeout above the 15-second heartbeat.
 

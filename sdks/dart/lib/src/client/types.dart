@@ -303,8 +303,10 @@ abstract final class LogEvents {
   static const sseConnected = 'sse_connected';
 
   /// (warn) The ruleset stream ended or failed; it reconnects after the
-  /// delay in the fields. Fields: cause (`closed`, `silent`, `status`,
-  /// `network`), status where known, retry_in_ms.
+  /// delay in the fields. Fields: cause (`closed`, `closed_early` for a
+  /// stream the server closed before its first heartbeat, `silent`,
+  /// `status`, `network`, `parse`, `content_type` for a 200 that is not an
+  /// event stream), status and detail where known, retry_in_ms.
   static const sseDropped = 'sse_dropped';
 
   /// (error) A change or stage listener threw. Fields: cause.
