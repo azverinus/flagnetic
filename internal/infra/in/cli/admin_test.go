@@ -1,7 +1,9 @@
 package cli_test
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,6 +17,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/identity"
+	"github.com/azverinus/flagnetic/internal/infra/in/cli"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pgidentity "github.com/azverinus/flagnetic/internal/infra/out/postgres/identity"
@@ -142,6 +145,59 @@ func TestAdminBootstrapCreatesNothingWhenItCannotCreateTheTokenFile(t *testing.T
 	}
 	if r := bootstrap(env, "--email", "first@example.com"); r.code != 0 {
 		t.Errorf("a bootstrap after the refusals: exit code = %d, want 0 since nothing was created; stderr:\n%s", r.code, r.stderr)
+	}
+}
+
+// bootstrapToPipe runs bootstrap with a pipe as standard output, as a shell
+// does for `flagnetic admin bootstrap | tee log` or a redirect to a file in
+// a deploy log, and returns the exit code, what stderr said and what reached
+// the pipe.
+func bootstrapToPipe(t *testing.T, env map[string]string, args ...string) (code int, stderr, piped string) {
+	t.Helper()
+	pr, pw, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = pr.Close() })
+	var errBuf bytes.Buffer
+	lookup := func(k string) (string, bool) {
+		v, ok := env[k]
+		if !ok && k == "FLAGNETIC_SECRET_KEY" {
+			return secretKey, true
+		}
+		return v, ok
+	}
+	code = cli.Main(append([]string{"admin", "bootstrap"}, args...), lookup, pw, &errBuf, make(chan os.Signal))
+	if err = pw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	out, err := io.ReadAll(pr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recordSecrets(env, args, string(out)+errBuf.String())
+	return code, errBuf.String(), string(out)
+}
+
+func TestAdminBootstrapRefusesToPrintTheTokenToAStandardOutputThatIsNotATerminal(t *testing.T) {
+	env := map[string]string{"DATABASE_URL": testkit.EmptyDatabase(t), "FLAGNETIC_ADMIN_PASSWORD": "a long enough password"}
+	if r := migrate(env["DATABASE_URL"]); r.code != 0 {
+		t.Fatalf("migrate: %s", r.stderr)
+	}
+
+	code, stderr, piped := bootstrapToPipe(t, env, "--email", "first@example.com")
+	if code != 2 || piped != "" || strings.Contains(stderr, "fn_pat_") || !strings.Contains(stderr, "--token-file") {
+		t.Fatalf("exit code = %d, stdout = %q, stderr:\n%s\nwant 2, nothing on stdout and --token-file named", code, piped, stderr)
+	}
+
+	// Nothing was created, so the same command with a token file succeeds.
+	file := filepath.Join(t.TempDir(), "token")
+	code, stderr, piped = bootstrapToPipe(t, env, "--email", "first@example.com", "--token-file", file)
+	if code != 0 || piped != "" {
+		t.Fatalf("with --token-file: exit code = %d, stdout = %q, stderr:\n%s\nwant 0 and nothing on stdout", code, piped, stderr)
+	}
+	if written, _ := os.ReadFile(file); !tokenValue.MatchString(strings.TrimSpace(string(written))) {
+		t.Errorf("token file = %q, want the token", written)
 	}
 }
 

@@ -116,14 +116,19 @@ export async function build(): Promise<string> {
  */
 export async function bootstrap(binary: string): Promise<string> {
   await run(binary, ["migrate"], { env: environment(), cwd: repoRoot });
-  const { stdout } = await run(
+  // Bootstrap refuses to print the token to a standard output that is not a
+  // terminal, and execFile's is a pipe; the token file must not exist yet.
+  const tokenPath = resolve(workDir, "bootstrap-token");
+  rmSync(tokenPath, { force: true });
+  await run(
     binary,
-    ["admin", "bootstrap", "--email", admin.email, "--name", admin.name],
+    ["admin", "bootstrap", "--email", admin.email, "--name", admin.name, "--token-file", tokenPath],
     { env: environment({ FLAGNETIC_ADMIN_PASSWORD: admin.password }), cwd: repoRoot },
   );
-  const token = stdout.trim();
+  const token = readFileSync(tokenPath, "utf8").trim();
+  rmSync(tokenPath, { force: true });
   if (!token) {
-    throw new Error("admin bootstrap printed no API token; is the database empty?");
+    throw new Error("admin bootstrap wrote no API token; is the database empty?");
   }
   return token;
 }

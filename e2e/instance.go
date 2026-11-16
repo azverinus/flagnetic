@@ -89,11 +89,20 @@ func Migrate(ctx context.Context, binary, databaseURL string, logs io.Writer) er
 
 // BootstrapAdmin makes Admin the first instance admin of the database, or
 // does nothing when the database has one, so a rerun on the same database
-// succeeds. The token the bootstrap prints is not kept: the harness signs
-// in with the password, which works on every run.
+// succeeds. The token the bootstrap makes is not kept: it is written to a
+// file in a directory removed afterwards, since the command refuses to print
+// it to a standard output that is not a terminal, and the harness signs in
+// with the password, which works on every run.
 func BootstrapAdmin(ctx context.Context, binary, databaseURL string, logs io.Writer) error {
+	dir, err := os.MkdirTemp("", "flagnetic-e2e-token-")
+	if err != nil {
+		return fmt.Errorf("flagnetic admin bootstrap: %w", err)
+	}
+	// Best effort: the token is not used, so a directory that stays behind costs nothing.
+	defer func() { _ = os.RemoveAll(dir) }()
 	cmd := exec.CommandContext(ctx, binary, "admin", "bootstrap", //nolint:gosec // the binary the harness built
-		"--email", Admin.Email, "--name", Admin.Name, "--if-absent")
+		"--email", Admin.Email, "--name", Admin.Name, "--if-absent",
+		"--token-file", filepath.Join(dir, "token"))
 	cmd.Env = environment(databaseURL, "FLAGNETIC_ADMIN_PASSWORD="+Admin.Password)
 	cmd.Stdout, cmd.Stderr = io.Discard, logs
 	if err := cmd.Run(); err != nil {
