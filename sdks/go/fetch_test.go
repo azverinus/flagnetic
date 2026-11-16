@@ -706,8 +706,11 @@ func TestStorePersistsAndSeedsLastGood(t *testing.T) {
 	if err != nil {
 		t.Fatalf("store not written: %v", err)
 	}
-	if string(stored) != documentAt(7) {
-		t.Errorf("store = %s, want the accepted document", stored)
+	if want := flagnetic.StoreFile(serverKey, []byte(documentAt(7))); !bytes.Equal(stored, want) {
+		t.Errorf("store = %s, want the accepted document under the key", stored)
+	}
+	if bytes.Contains(stored, []byte(serverKey)) {
+		t.Error("the store holds the SDK key itself, want only a digest of it")
 	}
 	if info, statErr := os.Stat(path); statErr == nil && info.Mode().Perm()&0o077 != 0 {
 		t.Errorf("store mode = %v: private segments are readable by others", info.Mode().Perm())
@@ -759,8 +762,133 @@ func TestStorePersistsEveryAcceptedRuleset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(stored) != documentAt(8) {
-		t.Errorf("store = %s, want version 8", stored)
+	if want := flagnetic.StoreFile(serverKey, []byte(documentAt(8))); !bytes.Equal(stored, want) {
+		t.Errorf("store = %s, want version 8 under the key", stored)
+	}
+}
+
+// otherKey is the server key of another environment.
+const otherKey = "fn_srv_ZyXwVuTs9876543210ZyXwVuTs9876543210"
+
+func TestStoreWrittenUnderAnotherKeyIsDiscarded(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ruleset.json")
+	// The environment this process used to serve is at version 7.
+	srv := newMockServer(t, ruleset(7))
+	clk := newSleeper()
+	c := newOnline(t, srv.URL, clk.option(), flagnetic.WithStore(path))
+	clk.next(t)
+	_ = c.Close(context.Background())
+
+	// The same path now belongs to another environment, whose ruleset is at
+	// a lower version: the old one must never serve, and never be a
+	// downgrade the right ruleset is refused for.
+	var l logs
+	other := newMockServer(t, ruleset(3), ruleset(3))
+	clk2 := newSleeper()
+	c2, err := flagnetic.New(otherKey, other.URL, flagnetic.WithChangeStream(false), flagnetic.WithSummaries(false),
+		clk2.option(), flagnetic.WithStore(path), flagnetic.WithLogger(l.logger()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c2.Close(context.Background()) }()
+	if got := c2.Stage(); got != flagnetic.StageBuiltIn {
+		t.Errorf("stage right after New = %q, want built_in: the store belongs to another key", got)
+	}
+	if got := c2.Detail(context.Background(), linux, "new_checkout", false); got.RulesetVersion != 0 {
+		t.Errorf("detail served version %d from another environment's store", got.RulesetVersion)
+	}
+	failed := l.named(flagnetic.EventStoreFailed)
+	if len(failed) != 1 || failed[0].Fields["path"] != path || failed[0].Fields["op"] != "load" {
+		t.Errorf("store_failed = %+v, want one load naming the path", failed)
+	}
+	clk2.next(t)
+	if _, ok := other.request(t, 0)["If-None-Match"]; ok {
+		t.Error("a discarded store sent If-None-Match")
+	}
+	if got := readyNow(t, c2); got != flagnetic.StageFresh {
+		t.Errorf("Ready = %q, want fresh: version 3 is no downgrade of a discarded store", got)
+	}
+	if got := c2.Detail(context.Background(), linux, "new_checkout", false); got.RulesetVersion != 3 {
+		t.Errorf("version = %d, want 3", got.RulesetVersion)
+	}
+	stored, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := flagnetic.StoreFile(otherKey, []byte(documentAt(3))); !bytes.Equal(stored, want) {
+		t.Errorf("store = %s, want the new ruleset under the new key", stored)
+	}
+}
+
+func TestStoreWrittenUnderNoKeyIsDiscardedOnce(t *testing.T) {
+	// The bare document is what a store held before it was bound to a key.
+	for name, content := range map[string]string{
+		"pretty":                  documentAt(7),
+		"one line":                strings.Join(strings.Fields(documentAt(7)), " "),
+		"one line with a newline": strings.Join(strings.Fields(documentAt(7)), " ") + "\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "ruleset.json")
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			var l logs
+			srv := newMockServer(t, ruleset(7))
+			clk := newSleeper()
+			c := newOnline(t, srv.URL, clk.option(), flagnetic.WithStore(path), flagnetic.WithLogger(l.logger()))
+			if got := c.Stage(); got != flagnetic.StageBuiltIn {
+				t.Errorf("stage = %q, want built_in", got)
+			}
+			if got := l.named(flagnetic.EventStoreFailed); len(got) != 1 {
+				t.Errorf("store_failed = %+v, want one", got)
+			}
+			clk.next(t)
+			if got := readyNow(t, c); got != flagnetic.StageFresh {
+				t.Errorf("Ready = %q, want fresh", got)
+			}
+			// The first accepted ruleset rewrites the file under the key, so
+			// a restart serves it.
+			var l2 logs
+			down := newMockServer(t, status(http.StatusInternalServerError))
+			c2 := newOnline(t, down.URL, newSleeper().option(), flagnetic.WithStore(path), flagnetic.WithLogger(l2.logger()))
+			if got := c2.Stage(); got != flagnetic.StageLastGood {
+				t.Errorf("stage after the rewrite = %q, want last_good", got)
+			}
+			if got := l2.named(flagnetic.EventStoreFailed); len(got) != 0 {
+				t.Errorf("store_failed = %+v after the rewrite", got)
+			}
+		})
+	}
+}
+
+func TestStoreWithAnUnknownHeaderIsDiscarded(t *testing.T) {
+	// The header names this client's key, but a format this client does not
+	// write: what follows it may not be a ruleset document as this client
+	// reads one.
+	current := string(flagnetic.StoreFile(serverKey, []byte(documentAt(7))))
+	for name, content := range map[string]string{
+		"later format":   strings.Replace(current, `"flagnetic_store":1`, `"flagnetic_store":2`, 1),
+		"no format":      strings.Replace(current, `"flagnetic_store":1,`, ``, 1),
+		"format as text": strings.Replace(current, `"flagnetic_store":1`, `"flagnetic_store":"1"`, 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if content == current {
+				t.Fatal("the header was not changed")
+			}
+			path := filepath.Join(t.TempDir(), "ruleset.json")
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			var l logs
+			srv := newMockServer(t, status(http.StatusInternalServerError))
+			c := newOnline(t, srv.URL, newSleeper().option(), flagnetic.WithStore(path), flagnetic.WithLogger(l.logger()))
+			if got := c.Stage(); got != flagnetic.StageBuiltIn {
+				t.Errorf("stage = %q, want built_in", got)
+			}
+			if got := l.named(flagnetic.EventStoreFailed); len(got) != 1 {
+				t.Errorf("store_failed = %+v, want one", got)
+			}
+		})
 	}
 }
 
@@ -772,7 +900,7 @@ func TestCorruptStoreStartsBuiltIn(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "ruleset.json")
-			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			if err := os.WriteFile(path, flagnetic.StoreFile(serverKey, []byte(content)), 0o600); err != nil {
 				t.Fatal(err)
 			}
 			var l logs

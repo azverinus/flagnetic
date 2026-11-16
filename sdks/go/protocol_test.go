@@ -682,7 +682,7 @@ func TestProtocolScenarios(t *testing.T) {
 			}
 			if sc.Given.Stored != "" {
 				path := filepath.Join(t.TempDir(), "ruleset.json")
-				if err := os.WriteFile(path, readProtocol(t, sc.Given.Stored), 0o600); err != nil {
+				if err := os.WriteFile(path, flagnetic.StoreFile(serverKey, readProtocol(t, sc.Given.Stored)), 0o600); err != nil {
 					t.Fatal(err)
 				}
 				opts = append(opts, flagnetic.WithStore(path))

@@ -173,7 +173,8 @@ func WithLocalOverrides() Option {
 // WithStore persists every accepted ruleset to the file at path, readable
 // by its owner only, and loads it at construction as last_good before any
 // network call. A ruleset the store cannot load or save logs store_failed;
-// a corrupt file leaves the client at built_in.
+// a corrupt file, or one written under another SDK key, leaves the client
+// at built_in.
 func WithStore(path string) Option {
 	return func(o *options) { o.storePath = path }
 }
