@@ -13,6 +13,7 @@ import resource
 import stat
 import threading
 import time
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -574,6 +575,52 @@ def test_a_malformed_ruleset_event_drops_the_stream_and_it_reconnects(clients: A
     assert eventually(lambda: [] if len(streams) == 2 else ["no reconnect"]) == []
     assert [f["cause"] for f in logs.named("sse_dropped")] == ["malformed"]
     assert streams[1].headers["last-event-id"] == "1"
+
+
+def test_a_stream_closed_before_its_first_heartbeat_backs_off_and_a_heartbeat_restarts_it(
+    clients: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ceilings: list[float] = []
+
+    def record(ceiling: float) -> float:
+        ceilings.append(ceiling)
+        return 0.0
+
+    monkeypatch.setattr(_delivery, "full_jitter", record)
+    logs = Logs()
+    streams: list[Request] = []
+
+    def handler(request: Request) -> Response:
+        if request.path.endswith("/stream"):
+            streams.append(request)
+            return Response(200, {"Content-Type": "text/event-stream"}, stream=True)
+        return Response(200, JSON, RULESET)
+
+    server = MockServer(handler)
+    client = clients(server, stream=True, logger=logs, _time_divisor=100, poll_interval=3600)
+    assert client.ready(5) is flagnetic.Stage.FRESH
+    preamble = b'retry: 3000\n\nevent: ruleset\nid: 1\ndata: {"version":1}\n\n'
+
+    # A draining replica or a proxy answers 200 and ends the stream at once: each close is a
+    # failure, so the wait doubles. A heartbeat then makes the stream stable, its close routine,
+    # and the failures before it forgotten.
+    def opened(count: int) -> list[str]:
+        return [] if len(streams) == count else [f"{len(streams)} streams, want {count}"]
+
+    for n in (1, 2, 3):
+        assert eventually(partial(opened, n)) == []
+        server.stream_send(preamble)
+        server.stream_close()
+    assert eventually(partial(opened, 4)) == []
+    server.stream_send(b": hb\n\n")
+    server.stream_close()
+    assert eventually(partial(opened, 5)) == []
+    server.stream_close()
+    assert eventually(partial(opened, 6)) == []
+    # The waits are 1 s doubling, then the routine 0-2 s, then 1 s again, all divided by 100.
+    assert ceilings == pytest.approx([0.01, 0.02, 0.04, 0.02, 0.01])
+    early = "closed_early"
+    assert [f["cause"] for f in logs.named("sse_dropped")] == [early, early, early, "server_closed", early]
 
 
 def test_close_ends_the_thread_while_the_stream_waits_for_its_answer(clients: Any) -> None:

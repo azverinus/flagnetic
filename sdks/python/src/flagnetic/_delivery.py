@@ -45,9 +45,10 @@ UNAUTHORIZED_CAP = 900.0
 # The server sends a comment every 15 seconds, so three missed ones reconnect.
 HEARTBEAT_TIMEOUT = 45.0
 STREAM_RETRY_CAP = 30.0
-# A server-side close is routine: the platform closes every stream after about an hour.
+# The close of a stable stream (one that has delivered a heartbeat) is routine: the platform
+# closes every stream after about an hour.
 CLOSE_JITTER_CAP = 2.0
-# How long a connection must hold for the reconnect backoff to start from the base again.
+# How long the delivery loop must run for the backoff after a crash to start from the base again.
 STABLE_FOR = 60.0
 # The waits before re-fetching when the ruleset endpoint answered below the version an event
 # announced, a replica still behind. After the last one the safety poll takes over.
@@ -67,6 +68,9 @@ CAUSE_SCHEMA_UNSUPPORTED = "schema_unsupported"
 CAUSE_WRONG_SCOPE = "wrong_scope"
 CAUSE_VERSION_DOWNGRADE = "version_downgrade"
 CAUSE_SERVER_CLOSED = "server_closed"
+# A stream the server closed before its first heartbeat, as a draining replica or a proxy that
+# ends an event stream early does.
+CAUSE_CLOSED_EARLY = "closed_early"
 CAUSE_SILENCE = "silence"
 CAUSE_MALFORMED = "malformed"
 
@@ -280,7 +284,8 @@ class Delivery:
         self._stream_stopped = False
         self._stream_failures = 0
         self._next_stream = 0.0
-        self._stream_started = 0.0
+        # The stream has delivered a heartbeat, which is what makes it stable.
+        self._stream_stable = False
         self._last_data = 0.0
         self._first_attempt_done = not stream
         self._first_connect = True
@@ -658,7 +663,8 @@ class Delivery:
         self._parser = EventStreamParser()
         self._stream_connected = True
         now = time.monotonic()
-        self._stream_started = self._last_data = now
+        self._last_data = now
+        self._stream_stable = False
         host.log(logging.INFO, _events.SSE_CONNECTED, last_event_id=last_event_id)
         if not self._first_connect:
             # Versions may have been missed while the stream was down.
@@ -690,6 +696,10 @@ class Delivery:
             self._stream_dropped(CAUSE_NETWORK, str(err) or type(err).__name__, errored=True)
             return
         if not data:
+            # stop() shuts the socket down, which reads as an EOF here: the SDK's own close is not
+            # a server close, and before a heartbeat it would otherwise be logged as closed_early.
+            if self._closing.is_set():
+                return
             self._stream_dropped(CAUSE_SERVER_CLOSED, "EOF", errored=False)
             return
         try:
@@ -707,7 +717,10 @@ class Delivery:
 
     def _frame(self, frame: Frame) -> bool:
         """Acts on a frame; False when the stream was dropped over it."""
-        if frame.comment or frame.event != RULESET_EVENT:
+        if frame.comment:
+            self._stream_stable = True
+            return True
+        if frame.event != RULESET_EVENT:
             return True
         try:
             announced = json.loads(frame.data)
@@ -726,12 +739,16 @@ class Delivery:
 
     def _stream_dropped(self, cause: str, error: str, *, errored: bool) -> None:
         """Logs sse_dropped, closes the connection and schedules the reconnect."""
+        if cause == CAUSE_SERVER_CLOSED and not self._stream_stable:
+            # A stream is stable once it has delivered a heartbeat. One the server ends before
+            # that is a failed connection, so a draining replica or a proxy that closes every
+            # stream at once is backed off from instead of reconnected to every other second.
+            cause, errored = CAUSE_CLOSED_EARLY, True
         level = logging.WARNING if errored or cause != CAUSE_SERVER_CLOSED else logging.INFO
         self._host.log(level, _events.SSE_DROPPED, cause=cause, error=error, reconnect=True)
         now = time.monotonic()
-        held_for = now - self._stream_started
         self._drop_stream_connection()
-        if held_for >= self._waits.stable_for:
+        if self._stream_stable:
             self._stream_failures = 0
         if errored:
             self._stream_failures += 1
