@@ -17,10 +17,11 @@ class ProtocolTest < Minitest::Test
   def read(name) = self.class.read(name)
 
   # scenarios.json, with what only the SDKs decide (versioning and
-  # compatibility) and the running experiments appended: the same step
-  # language over the same documents.
+  # compatibility), when the change stream counts as stable, and the running
+  # experiments appended: the same step language over the same documents.
   SCENARIOS = JSON.parse(read("scenarios.json")).tap do |list|
     list["scenarios"] += JSON.parse(read("versioning-scenarios.json"))["scenarios"]
+    list["scenarios"] += JSON.parse(read("stream-stability-scenarios.json"))["scenarios"]
     experiments = JSON.parse(read("experiment-scenarios.json"))
     list["scenarios"] += experiments["scenarios"]
     list["answers"].merge!(experiments["answers"])
@@ -32,8 +33,20 @@ class ProtocolTest < Minitest::Test
   # 15-minute cap needs a larger one. SLACK is the test process's own
   # scheduling latency, in real seconds, allowed past a window's end.
   FACTOR = 50.0
-  FACTORS = { "server: a revoked key keeps the last good and retries at a capped backoff" => 2000.0 }.freeze
   SLACK = 0.3
+
+  # The scenarios about how long a wait is run on uncompressed time, with
+  # every jitter drawn at the top of its window: a reconnect that skips the
+  # backoff (the routine 0-2 s against the first failure's 0-1 s) then
+  # misses a window the scheduling slack does not widen to cover.
+  WINDOW_TOP = ["server: a stream closed before its first heartbeat is retried with backoff"].freeze
+  FACTORS = { "server: a revoked key keeps the last good and retries at a capped backoff" => 2000.0,
+              **WINDOW_TOP.to_h { |name| [name, 1.0] } }.freeze
+
+  # TopRandom draws the top of every window.
+  class TopRandom
+    def rand = 1.0
+  end
 
   def setup
     super
@@ -61,10 +74,11 @@ class ProtocolTest < Minitest::Test
     end
   end
 
-  def build(factor, options, stored: nil, offline: nil)
-    timing = Flagnetic::Client.const_get(:DEFAULT_TIMING).to_h.transform_values do |v|
+  def build(factor, options, stored: nil, offline: nil, window_top: false)
+    timing = Flagnetic::Client.const_get(:DEFAULT_TIMING).to_h.compact.transform_values do |v|
       v.is_a?(Array) ? v.map { |x| x / factor } : v / factor
     end
+    timing[:random] = TopRandom.new if window_top
     poll = options["poll_interval_ms"] / 1000.0 / factor
     flush = options["flush_interval_ms"] / 1000.0 / factor
     summary = options.fetch("summary_interval_ms", 3_600_000) / 1000.0 / factor
@@ -156,7 +170,8 @@ class ProtocolTest < Minitest::Test
   def run_scenario(scenario)
     factor = FACTORS.fetch(scenario["name"], FACTOR)
     given = scenario["given"]
-    build(factor, given["options"], stored: given["stored"], offline: given["offline"])
+    build(factor, given["options"], stored: given["stored"], offline: given["offline"],
+                                    window_top: WINDOW_TOP.include?(scenario["name"]))
     step_end = now
     scenario["steps"].each_with_index do |step, i|
       label = "#{scenario["name"]}, step #{i}#{" (#{step["note"]})" if step["note"]}"
