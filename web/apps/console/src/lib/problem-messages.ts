@@ -243,7 +243,11 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       const uses = providerUses(i18n, error);
       return uses
         ? i18n._(
-            msg`The provider is still used by ${uses}. Disable it instead: that stops its sign-ins and keeps its members, identities and grants.`,
+            msg({
+              message: `The provider is still used by ${uses}. Disable it instead: that stops its sign-ins and keeps its members, identities and grants.`,
+              comment:
+                "{uses} is a list of what still depends on the provider, joined as the language joins a list; its items are written in the nominative case, in lower case.",
+            }),
           )
         : i18n._(
             msg`The provider is still in use. Disable it instead: that stops its sign-ins and keeps its members, identities and grants.`,
@@ -339,15 +343,46 @@ function providerUses(i18n: I18n, error: ApiError): string | undefined {
   const named = uses.map((use) => {
     switch (use) {
       case "identities":
-        return i18n._(msg`linked identities`);
+        return i18n._(
+          msg({
+            message: "linked identities",
+            comment:
+              'Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.',
+          }),
+        );
       case "SCIM tokens":
-        return i18n._(msg`SCIM tokens`);
+        return i18n._(
+          msg({
+            message: "SCIM tokens",
+            context: "an item of a list inside a sentence",
+            comment:
+              'Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.',
+          }),
+        );
       case "provisioned members":
-        return i18n._(msg`provisioned members`);
+        return i18n._(
+          msg({
+            message: "provisioned members",
+            comment:
+              'Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.',
+          }),
+        );
       case "grants":
-        return i18n._(msg`grants made by its group mappings`);
+        return i18n._(
+          msg({
+            message: "grants made by its group mappings",
+            comment:
+              'Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.',
+          }),
+        );
       case "an enforced domain":
-        return i18n._(msg`an enforced domain`);
+        return i18n._(
+          msg({
+            message: "an enforced domain",
+            comment:
+              'Inserted into "The provider is still used by {uses}" as one item of a list; Russian writes it in the nominative case, in lower case.',
+          }),
+        );
       default:
         return String(use);
     }

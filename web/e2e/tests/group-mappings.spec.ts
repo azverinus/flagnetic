@@ -9,7 +9,7 @@ import { admin } from "../support/instance";
 const providerName = "Dex groups";
 const heading = (page: Page, name: string) => page.getByRole("heading", { level: 1, name });
 const mappings = (page: Page) =>
-  page.getByRole("region", { name: /Group mappings|Соответствия групп/ });
+  page.getByRole("region", { name: /Group mappings|Сопоставления групп/ });
 const memberRow = (page: Page, name: string) =>
   page
     .getByRole("table", { name: /Members of the project|Участники проекта/ })
@@ -178,12 +178,12 @@ test.describe("group mappings and where grants come from", () => {
       await signIn(page, admin, russian);
       await page.goto(`/admin/auth-providers/${dexGroupsSlug}`);
       await expect(
-        mappings(page).getByRole("heading", { name: "Соответствия групп" }),
+        mappings(page).getByRole("heading", { name: "Сопоставления групп" }),
       ).toBeVisible();
       await expect(page.getByLabel("Группа каталога")).toHaveValue(dexGroup);
 
-      await page.getByRole("button", { name: "Добавить соответствие" }).click();
-      await page.getByRole("button", { name: "Сохранить соответствия" }).click();
+      await page.getByRole("button", { name: "Добавить сопоставление" }).click();
+      await page.getByRole("button", { name: "Сохранить сопоставления" }).click();
       await expect(page.getByText("Укажите группу каталога.")).toBeVisible();
       await expect(page.getByText("Выберите проект.")).toBeVisible();
       await expectNoSeriousViolations(page, "group mappings with errors in Russian");
@@ -191,7 +191,7 @@ test.describe("group mappings and where grants come from", () => {
       await page.goto(`/projects/${project}/members`);
       const row = memberRow(page, dexUsers.vera.name);
       await expect(row).toContainText(`SSO: ${dexGroupsSlug}`);
-      await expect(row).toContainText(`Выдана по соответствиям групп провайдера ${dexGroupsSlug}`);
+      await expect(row).toContainText(`Выдана по сопоставлениям групп провайдера ${dexGroupsSlug}`);
       await expect(
         row.getByRole("button", {
           name: `Отозвать роль «Разработчик» у участника ${dexUsers.vera.name}`,

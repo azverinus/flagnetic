@@ -127,6 +127,19 @@ describe("a refusal in the member's language", () => {
       }),
     ).toBe("Не более 1 200 символов.");
   });
+
+  it("writes each use of a provider in Russian as an item inside the sentence", () => {
+    activateForTests("ru");
+
+    expect(
+      problemMessage(
+        i18n,
+        refusal(409, { code: "provider_in_use", used_by: ["identities", "SCIM tokens"] }),
+      ),
+    ).toBe(
+      "Провайдер всё ещё используется: привязанные учётные записи и токены SCIM. Отключите его: входы через него прекратятся, а участники, учётные записи и выданные роли сохранятся.",
+    );
+  });
 });
 
 describe("a field violation", () => {

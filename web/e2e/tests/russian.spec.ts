@@ -111,7 +111,7 @@ test.describe("the console in Russian", () => {
     const create = page.getByRole("button", { name: "Новое окружение" });
     await expect(create).toHaveAttribute("aria-disabled", "true");
     await expect(create).toHaveAccessibleDescription(
-      "Нужно право управлять окружениями, оно есть у ролей Владелец и Сопровождающий.",
+      "Нужно право управлять окружениями, оно есть у ролей Владелец и Мейнтейнер.",
     );
     await expectNoSeriousViolations(page, "the project shell in Russian");
   });
@@ -165,7 +165,7 @@ test.describe("the console in Russian", () => {
     const edit = page.getByRole("button", { name: "Изменить определение" });
     await expect(edit).toHaveAttribute("aria-disabled", "true");
     await expect(edit).toHaveAccessibleDescription(/Нужно право изменять флаги/);
-    await expect(page.getByRole("combobox", { name: "Вариант без совпадений" })).toBeDisabled();
+    await expect(page.getByRole("combobox", { name: "Вариант для остальных" })).toBeDisabled();
     await expect(page.getByRole("region", { name: "Правило 1", exact: true })).toBeVisible();
     await expectNoSeriousViolations(page, "the flag's page in Russian");
 
@@ -189,19 +189,13 @@ test.describe("the console in Russian", () => {
     await page.goto(`/projects/${project}/environments/staging`);
 
     await expect(page.getByRole("heading", { name: "staging", level: 1 })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Скачать набор правил" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Скачать ruleset" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "SDK-ключи", exact: true })).toHaveAttribute(
       "aria-selected",
       "true",
     );
     const keys = page.getByRole("table", { name: "SDK-ключи" });
-    for (const header of [
-      "Название",
-      "Вид",
-      "Идентификатор ключа",
-      "Статус",
-      "Разрешённые источники",
-    ]) {
+    for (const header of ["Название", "Вид", "ID ключа", "Статус", "Разрешённые источники"]) {
       await expect(keys.getByRole("columnheader", { name: header })).toBeVisible();
     }
     await expect(keys.getByRole("row", { name: /бэкенд/ })).toContainText("Серверный");
@@ -242,9 +236,9 @@ test.describe("the console in Russian", () => {
     await signIn(page, anna, russian);
     await page.goto(`/projects/${project}/flags/${flag}?environment=production`);
     await expect(page.getByRole("tab", { name: /Production\s+Защищено/ })).toBeVisible();
-    await page.getByRole("button", { name: "Аварийный выключатель" }).click();
+    await page.getByRole("button", { name: "Kill switch" }).click();
     const dialog = page.getByRole("dialog", {
-      name: `Аварийный выключатель: ${flag} в окружении Production`,
+      name: `Kill switch: ${flag} в окружении Production`,
     });
     await dialog.getByLabel("Причина").fill("Платежи не проходят у провайдера");
     const confirm = dialog.getByRole("button", { name: "Выключить" });
@@ -355,10 +349,10 @@ test.describe("the console in Russian", () => {
     await page.goto(`/projects/${project}/flags/checkout_promo?environment=production`);
     await expect(page.getByText(/Окружение защищено: изменения его конфигурации/)).toBeVisible();
 
-    await choose(page, "Вариант без совпадений", "treatment");
+    await choose(page, "Вариант для остальных", "treatment");
     await page.getByRole("button", { name: "Предложить", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Предложить изменение" });
-    await expect(dialog.getByLabel("Применить в")).toBeVisible();
+    await expect(dialog.getByLabel("Время применения")).toBeVisible();
     await expectNoSeriousViolations(page, "the propose dialog in Russian");
     await dialog.getByRole("button", { name: "Предложить", exact: true }).click();
     await expect(dialog.getByText("Введите заголовок.")).toBeVisible();
@@ -481,7 +475,7 @@ test.describe("the console in Russian", () => {
       .filter({ has: page.getByText("old_cleanup", { exact: true }) });
     await expect(row).toContainText("Пора удалить");
     const filter = page.getByRole("group", { name: "Причины устаревания" });
-    await filter.getByRole("button", { name: "Раскатка завершена" }).click();
+    await filter.getByRole("button", { name: "Rollout завершён" }).click();
     await expect(page.getByText("Флагов, устаревших по этим причинам, нет.")).toBeVisible();
     // The pressed toggle fades to its colour; axe reads it once it has.
     await page.waitForFunction(() => document.getAnimations().length === 0);
@@ -616,9 +610,9 @@ test.describe("the console in Russian", () => {
     await signIn(page, anna, russian);
     await page.goto(`/projects/${project}/sinks`);
 
-    await expect(page.getByRole("heading", { name: "Приёмники данных", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Приёмники", level: 1 })).toBeVisible();
     const row = page
-      .getByRole("table", { name: "Приёмники данных" })
+      .getByRole("table", { name: "Приёмники" })
       .getByRole("row", { name: /Хранилище аналитики/ });
     await expect(row).toContainText("ClickHouse");
     await expect(row).toContainText("Отключён");
@@ -627,7 +621,7 @@ test.describe("the console in Russian", () => {
 
     await page.getByRole("button", { name: "Новый приёмник" }).first().click();
     await expect(page.getByRole("radio", { name: /Объектное хранилище/ })).toBeVisible();
-    await expect(page.getByLabel("Размер пачки")).toHaveAttribute("placeholder", "5000");
+    await expect(page.getByLabel("Размер пакета")).toHaveAttribute("placeholder", "5000");
     await page.getByRole("button", { name: "Создать приёмник" }).click();
     await expect(page.getByText("Введите название.")).toBeVisible();
     await expectNoSeriousViolations(page, "the new sink form in Russian");
@@ -637,7 +631,7 @@ test.describe("the console in Russian", () => {
       page.getByRole("heading", { name: "Хранилище аналитики", level: 1 }),
     ).toBeVisible();
     await expect(page.getByLabel("Пароль")).toHaveAttribute("placeholder", "***");
-    await expect(page.getByText("Тип приёмника задаётся при создании.")).toBeVisible();
+    await expect(page.getByText("Вид приёмника задаётся при создании.")).toBeVisible();
     await expectNoSeriousViolations(page, "a sink's settings in Russian");
     for (const [tab, empty] of [
       ["Недоставленные пакеты", "Недоставленных пакетов нет."],
@@ -801,9 +795,9 @@ test.describe("the console in Russian", () => {
       page.getByRole("list", { name: "Сертификаты SP" }).getByRole("listitem").nth(1),
     ).toContainText("Следующий");
     // The provider is disabled, so the notice says to enable it first.
-    await expect(page.getByText(/Ротация начата/)).toContainText("Провайдер выключен");
+    await expect(page.getByText(/Ротация начата/)).toContainText("Провайдер отключён");
     await page.getByRole("button", { name: "Завершить ротацию" }).click();
-    const complete = page.getByRole("dialog", { name: "Завершение ротации сертификата" });
+    const complete = page.getByRole("dialog", { name: "Завершить ротацию сертификата" });
     await expect(complete).toContainText("старый ключ уничтожается");
     await expectNoSeriousViolations(page, "the completion of a certificate rotation in Russian");
   });
@@ -826,8 +820,8 @@ test.describe("the console in Russian", () => {
       await expectNoSeriousViolations(page, "the mail settings in Russian");
 
       await page.getByRole("button", { name: "Удалить", exact: true }).click();
-      const dialog = page.getByRole("dialog", { name: "Удаление SMTP-сервера" });
-      await expect(dialog).toContainText("Экземпляр перестанет отправлять почту");
+      const dialog = page.getByRole("dialog", { name: "Удалить SMTP-сервер" });
+      await expect(dialog).toContainText("Инстанс перестанет отправлять почту");
       await dialog.getByRole("button", { name: "Удалить SMTP-сервер" }).click();
       await expect(page.getByText(/SMTP-сервер не настроен/)).toBeVisible();
     } finally {
@@ -853,7 +847,7 @@ test.describe("the console in Russian", () => {
 
     const reveal = page.getByRole("dialog", { name: `Участник ${name} приглашён` });
     const link = (await reveal.locator("code").textContent()) ?? "";
-    await reveal.getByLabel("Я сохранил это в надёжном месте").check();
+    await reveal.getByLabel("Значение сохранено в надёжном месте").check();
     await reveal.getByRole("button", { name: "Закрыть" }).click();
     const invited = page.getByRole("table", { name: "Участники, приглашённые в проект" });
     await expect(invited.getByRole("row", { name: new RegExp(name) })).toContainText("Наблюдатель");
@@ -878,7 +872,7 @@ test.describe("the console in Russian", () => {
     await page.goto("/sign-in?error=member_not_found");
 
     await expect(page.getByRole("alert")).toHaveText(
-      "В этом экземпляре нет участника, соответствующего этой учётной записи. Попросите администратора экземпляра пригласить вас.",
+      "В этом инстансе нет участника, соответствующего этому аккаунту. Попросите администратора инстанса пригласить вас.",
     );
     await expectNoSeriousViolations(page, "the sign-in page with an error in Russian");
   });

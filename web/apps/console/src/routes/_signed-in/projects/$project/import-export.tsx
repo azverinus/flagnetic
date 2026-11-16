@@ -35,7 +35,7 @@ function ImportExport() {
         }
       />
       <SettingsSection
-        title={t`Export`}
+        title={t({ message: "Export", context: "section title" })}
         description={
           <Trans>
             Downloads the flags, segments, experiments, environments, unit types and attributes of

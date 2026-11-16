@@ -230,7 +230,7 @@ describe("Can", () => {
     const action = await screen.findByRole("button", { name: "New environment" });
     await waitFor(() =>
       expect(action).toHaveAccessibleDescription(
-        "Нужно право управлять окружениями, оно есть у ролей Владелец и Сопровождающий.",
+        "Нужно право управлять окружениями, оно есть у ролей Владелец и Мейнтейнер.",
       ),
     );
   });

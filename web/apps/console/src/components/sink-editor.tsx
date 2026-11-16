@@ -656,7 +656,7 @@ function ObjectStorageFields({ form, refusal, editing }: KindFieldsProps & { edi
         name="object_storage.format"
         render={({ field }) => (
           <Field
-            label={<Trans>Format</Trans>}
+            label={<Trans context="file format">Format</Trans>}
             hint={<Trans>One file per batch.</Trans>}
             refusal={refusal}
             pointer="/object_storage/format"

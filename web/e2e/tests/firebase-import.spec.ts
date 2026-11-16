@@ -214,7 +214,7 @@ test.describe("the Firebase wizard", () => {
       await expectNoSeriousViolations(page, "the Firebase wizard's parameters step in Russian");
 
       await page.getByRole("button", { name: /^Продолжить с 4 параметрами$/ }).click();
-      await page.getByRole("button", { name: "Предпросмотр импорта" }).click();
+      await page.getByRole("button", { name: "Просмотреть импорт" }).click();
       await expect(page.getByRole("region", { name: "Флаги и правила" })).toBeVisible();
       await expectNoSeriousViolations(page, "the Firebase wizard's preview in Russian");
     });
