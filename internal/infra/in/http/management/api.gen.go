@@ -9284,8 +9284,8 @@ type ClientInterface interface {
 	//
 	// A member holding `change_request.approve` approves an open change
 	// request (`invalid_state`) with an optional comment of at most 2,000
-	// characters, unless they are its author (`author_cannot_approve`); a
-	// project token never decides one (`token_cannot_approve`). When the
+	// characters, unless they are its author or created the project token
+	// that is (`author_cannot_approve`); a project token never decides one (`token_cannot_approve`). When the
 	// entity was written since the change request was based on it, what
 	// would be approved is no longer what was reviewed: the change request
 	// is superseded and the approval refused (`base_moved`). A definition's
@@ -9300,8 +9300,8 @@ type ClientInterface interface {
 	//
 	// A member holding `change_request.approve` approves an open change
 	// request (`invalid_state`) with an optional comment of at most 2,000
-	// characters, unless they are its author (`author_cannot_approve`); a
-	// project token never decides one (`token_cannot_approve`). When the
+	// characters, unless they are its author or created the project token
+	// that is (`author_cannot_approve`); a project token never decides one (`token_cannot_approve`). When the
 	// entity was written since the change request was based on it, what
 	// would be approved is no longer what was reviewed: the change request
 	// is superseded and the approval refused (`base_moved`). A definition's
@@ -9360,8 +9360,9 @@ type ClientInterface interface {
 	//
 	// A member holding `change_request.approve` rejects an open change
 	// request (`invalid_state`) with a comment telling its author why,
-	// required and at most 2,000 characters, unless they are its author
-	// (`author_cannot_approve`); a project token never decides one
+	// required and at most 2,000 characters, unless they are its author or
+	// created the project token that is (`author_cannot_approve`); a
+	// project token never decides one
 	// (`token_cannot_approve`). A rejected change request is final;
 	// copying it resumes its work.
 	//
@@ -9374,8 +9375,9 @@ type ClientInterface interface {
 	//
 	// A member holding `change_request.approve` rejects an open change
 	// request (`invalid_state`) with a comment telling its author why,
-	// required and at most 2,000 characters, unless they are its author
-	// (`author_cannot_approve`); a project token never decides one
+	// required and at most 2,000 characters, unless they are its author or
+	// created the project token that is (`author_cannot_approve`); a
+	// project token never decides one
 	// (`token_cannot_approve`). A rejected change request is final;
 	// copying it resumes its work.
 	//
@@ -14511,8 +14513,8 @@ func (c *Client) ApplyChangeRequest(ctx context.Context, project ProjectKey, cha
 //
 // A member holding `change_request.approve` approves an open change
 // request (`invalid_state`) with an optional comment of at most 2,000
-// characters, unless they are its author (`author_cannot_approve`); a
-// project token never decides one (`token_cannot_approve`). When the
+// characters, unless they are its author or created the project token
+// that is (`author_cannot_approve`); a project token never decides one (`token_cannot_approve`). When the
 // entity was written since the change request was based on it, what
 // would be approved is no longer what was reviewed: the change request
 // is superseded and the approval refused (`base_moved`). A definition's
@@ -14537,8 +14539,8 @@ func (c *Client) ApproveChangeRequestWithBody(ctx context.Context, project Proje
 //
 // A member holding `change_request.approve` approves an open change
 // request (`invalid_state`) with an optional comment of at most 2,000
-// characters, unless they are its author (`author_cannot_approve`); a
-// project token never decides one (`token_cannot_approve`). When the
+// characters, unless they are its author or created the project token
+// that is (`author_cannot_approve`); a project token never decides one (`token_cannot_approve`). When the
 // entity was written since the change request was based on it, what
 // would be approved is no longer what was reviewed: the change request
 // is superseded and the approval refused (`base_moved`). A definition's
@@ -14647,8 +14649,9 @@ func (c *Client) RebaseChangeRequest(ctx context.Context, project ProjectKey, ch
 //
 // A member holding `change_request.approve` rejects an open change
 // request (`invalid_state`) with a comment telling its author why,
-// required and at most 2,000 characters, unless they are its author
-// (`author_cannot_approve`); a project token never decides one
+// required and at most 2,000 characters, unless they are its author or
+// created the project token that is (`author_cannot_approve`); a
+// project token never decides one
 // (`token_cannot_approve`). A rejected change request is final;
 // copying it resumes its work.
 //
@@ -14671,8 +14674,9 @@ func (c *Client) RejectChangeRequestWithBody(ctx context.Context, project Projec
 //
 // A member holding `change_request.approve` rejects an open change
 // request (`invalid_state`) with a comment telling its author why,
-// required and at most 2,000 characters, unless they are its author
-// (`author_cannot_approve`); a project token never decides one
+// required and at most 2,000 characters, unless they are its author or
+// created the project token that is (`author_cannot_approve`); a
+// project token never decides one
 // (`token_cannot_approve`). A rejected change request is final;
 // copying it resumes its work.
 //
@@ -31288,8 +31292,8 @@ type ClientWithResponsesInterface interface {
 	//
 	// A member holding `change_request.approve` approves an open change
 	// request (`invalid_state`) with an optional comment of at most 2,000
-	// characters, unless they are its author (`author_cannot_approve`); a
-	// project token never decides one (`token_cannot_approve`). When the
+	// characters, unless they are its author or created the project token
+	// that is (`author_cannot_approve`); a project token never decides one (`token_cannot_approve`). When the
 	// entity was written since the change request was based on it, what
 	// would be approved is no longer what was reviewed: the change request
 	// is superseded and the approval refused (`base_moved`). A definition's
@@ -31304,8 +31308,8 @@ type ClientWithResponsesInterface interface {
 	//
 	// A member holding `change_request.approve` approves an open change
 	// request (`invalid_state`) with an optional comment of at most 2,000
-	// characters, unless they are its author (`author_cannot_approve`); a
-	// project token never decides one (`token_cannot_approve`). When the
+	// characters, unless they are its author or created the project token
+	// that is (`author_cannot_approve`); a project token never decides one (`token_cannot_approve`). When the
 	// entity was written since the change request was based on it, what
 	// would be approved is no longer what was reviewed: the change request
 	// is superseded and the approval refused (`base_moved`). A definition's
@@ -31372,8 +31376,9 @@ type ClientWithResponsesInterface interface {
 	//
 	// A member holding `change_request.approve` rejects an open change
 	// request (`invalid_state`) with a comment telling its author why,
-	// required and at most 2,000 characters, unless they are its author
-	// (`author_cannot_approve`); a project token never decides one
+	// required and at most 2,000 characters, unless they are its author or
+	// created the project token that is (`author_cannot_approve`); a
+	// project token never decides one
 	// (`token_cannot_approve`). A rejected change request is final;
 	// copying it resumes its work.
 	//
@@ -31386,8 +31391,9 @@ type ClientWithResponsesInterface interface {
 	//
 	// A member holding `change_request.approve` rejects an open change
 	// request (`invalid_state`) with a comment telling its author why,
-	// required and at most 2,000 characters, unless they are its author
-	// (`author_cannot_approve`); a project token never decides one
+	// required and at most 2,000 characters, unless they are its author or
+	// created the project token that is (`author_cannot_approve`); a
+	// project token never decides one
 	// (`token_cannot_approve`). A rejected change request is final;
 	// copying it resumes its work.
 	//
@@ -53061,8 +53067,8 @@ func (c *ClientWithResponses) ApplyChangeRequestWithResponse(ctx context.Context
 //
 // A member holding `change_request.approve` approves an open change
 // request (`invalid_state`) with an optional comment of at most 2,000
-// characters, unless they are its author (`author_cannot_approve`); a
-// project token never decides one (`token_cannot_approve`). When the
+// characters, unless they are its author or created the project token
+// that is (`author_cannot_approve`); a project token never decides one (`token_cannot_approve`). When the
 // entity was written since the change request was based on it, what
 // would be approved is no longer what was reviewed: the change request
 // is superseded and the approval refused (`base_moved`). A definition's
@@ -53083,8 +53089,8 @@ func (c *ClientWithResponses) ApproveChangeRequestWithBodyWithResponse(ctx conte
 //
 // A member holding `change_request.approve` approves an open change
 // request (`invalid_state`) with an optional comment of at most 2,000
-// characters, unless they are its author (`author_cannot_approve`); a
-// project token never decides one (`token_cannot_approve`). When the
+// characters, unless they are its author or created the project token
+// that is (`author_cannot_approve`); a project token never decides one (`token_cannot_approve`). When the
 // entity was written since the change request was based on it, what
 // would be approved is no longer what was reviewed: the change request
 // is superseded and the approval refused (`base_moved`). A definition's
@@ -53181,8 +53187,9 @@ func (c *ClientWithResponses) RebaseChangeRequestWithResponse(ctx context.Contex
 //
 // A member holding `change_request.approve` rejects an open change
 // request (`invalid_state`) with a comment telling its author why,
-// required and at most 2,000 characters, unless they are its author
-// (`author_cannot_approve`); a project token never decides one
+// required and at most 2,000 characters, unless they are its author or
+// created the project token that is (`author_cannot_approve`); a
+// project token never decides one
 // (`token_cannot_approve`). A rejected change request is final;
 // copying it resumes its work.
 //
@@ -53201,8 +53208,9 @@ func (c *ClientWithResponses) RejectChangeRequestWithBodyWithResponse(ctx contex
 //
 // A member holding `change_request.approve` rejects an open change
 // request (`invalid_state`) with a comment telling its author why,
-// required and at most 2,000 characters, unless they are its author
-// (`author_cannot_approve`); a project token never decides one
+// required and at most 2,000 characters, unless they are its author or
+// created the project token that is (`author_cannot_approve`); a
+// project token never decides one
 // (`token_cannot_approve`). A rejected change request is final;
 // copying it resumes its work.
 //

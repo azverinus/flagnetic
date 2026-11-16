@@ -3958,8 +3958,8 @@ export const copyChangeRequest = <ThrowOnError extends boolean = false>(
  *
  * A member holding `change_request.approve` approves an open change
  * request (`invalid_state`) with an optional comment of at most 2,000
- * characters, unless they are its author (`author_cannot_approve`); a
- * project token never decides one (`token_cannot_approve`). When the
+ * characters, unless they are its author or created the project token
+ * that is (`author_cannot_approve`); a project token never decides one (`token_cannot_approve`). When the
  * entity was written since the change request was based on it, what
  * would be approved is no longer what was reviewed: the change request
  * is superseded and the approval refused (`base_moved`). A definition's
@@ -3995,8 +3995,9 @@ export const approveChangeRequest = <ThrowOnError extends boolean = false>(
  *
  * A member holding `change_request.approve` rejects an open change
  * request (`invalid_state`) with a comment telling its author why,
- * required and at most 2,000 characters, unless they are its author
- * (`author_cannot_approve`); a project token never decides one
+ * required and at most 2,000 characters, unless they are its author or
+ * created the project token that is (`author_cannot_approve`); a
+ * project token never decides one
  * (`token_cannot_approve`). A rejected change request is final;
  * copying it resumes its work.
  *

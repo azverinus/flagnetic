@@ -267,8 +267,9 @@ func decisionOf(cr governance.ChangeRequest) (*governance.Decision, string) {
 }
 
 // changeRequestColumns are a change request's with the keys of the flag,
-// environment, segment and experiment it names and the names of its author, of the member who
-// decided it and of whoever applied it as they are now.
+// environment, segment and experiment it names, the names of its author, of the member who
+// decided it and of whoever applied it as they are now, and the member who created its
+// author's token.
 const changeRequestColumns = `cr.id, cr.project_id, cr.kind, cr.flag_id, f.key, cr.environment_id, e.key, cr.state, cr.title,
 	cr.description, cr.base, cr.base_version, cr.proposed, cr.diff, cr.author_id, cr.author_token_id,
 	coalesce(m.display_name, t.name, ''), cr.decision, cr.decided_by, coalesce(dm.display_name, ''), cr.decided_at,
@@ -276,7 +277,7 @@ const changeRequestColumns = `cr.id, cr.project_id, cr.kind, cr.flag_id, f.key, 
 	coalesce(am.display_name, ap.name, ''), cr.superseded_by, cr.created_at, cr.updated_at, cr.version, cr.segment_id,
 	s.key, cr.base_referrers, cr.approval_covers, cr.apply_at, cr.schedule_failed_at, cr.schedule_failure_code,
 	cr.schedule_failure_message, cr.schedule_failures, cr.schedule_stopped, cr.revert_to, cr.experiment_id, x.key,
-	cr.base_holders`
+	cr.base_holders, t.created_by`
 
 const changeRequestFrom = ` FROM change_requests cr
 	LEFT JOIN flags f ON f.id = cr.flag_id
@@ -294,6 +295,7 @@ func scanChangeRequest(row pgx.Row) (governance.ChangeRequest, error) {
 		cr                             governance.ChangeRequest
 		crk, pk                        [16]byte
 		fk, ek, member, token          *[16]byte
+		tokenCreator                   *[16]byte
 		flagKey, environmentKey        *string
 		kind, state                    string
 		base, proposed, diff           []byte
@@ -315,7 +317,7 @@ func scanChangeRequest(row pgx.Row) (governance.ChangeRequest, error) {
 		&cr.BaseVersion, &proposed, &diff, &member, &token, &cr.Author.Name, &decision, &decidedBy, &deciderName, &decidedAt,
 		&comment, &appliedAt, &appliedKind, &appliedBy, &appliedT, &applierName, &supersededBy, &cr.CreatedAt, &cr.UpdatedAt,
 		&cr.Version, &sk, &segmentKey, &referrers, &covers, &applyAt, &failedAt, &failureCode, &failureMessage, &failures,
-		&stopped, &cr.RevertTo, &xk, &experimentKey, &holders); err != nil {
+		&stopped, &cr.RevertTo, &xk, &experimentKey, &holders, &tokenCreator); err != nil {
 		return cr, err
 	}
 	if applyAt != nil {
@@ -385,6 +387,10 @@ func scanChangeRequest(row pgx.Row) (governance.ChangeRequest, error) {
 	if token != nil {
 		t := id.FromBytes[access.APIToken](*token)
 		cr.Author.Token = &t
+		if tokenCreator != nil {
+			c := id.FromBytes[access.Member](*tokenCreator)
+			cr.Author.TokenCreator = &c
+		}
 	}
 	if err := json.Unmarshal(base, &cr.Base); err != nil {
 		return cr, fmt.Errorf("decoding a change request's base: %w", err)
