@@ -30,7 +30,19 @@ var streamScenarios = map[string]bool{
 	"server: a dropped stream reconnects with Last-Event-ID and fetches":                                 true,
 	"server: 45 seconds of silence reconnect the stream":                                                 true,
 	"server: a fetch below the event's version is retried after 1, 2 and 4 seconds and never downgrades": true,
+	"server: a stream closed before its first heartbeat is retried with backoff":                         true,
 }
+
+// windowTopScenarios are the scenarios whose point is how long the SDK
+// waits, so the runner draws every jitter at the top of its window: a
+// reconnect that skips the backoff then misses the window it must meet.
+var windowTopScenarios = map[string]bool{
+	"server: a stream closed before its first heartbeat is retried with backoff": true,
+}
+
+// windowTopSlack is what a request may come after the top of its window:
+// the time the reconnect itself takes, divided like every other duration.
+const windowTopSlack = 50 * time.Millisecond
 
 func TestProtocolStreamScenarios(t *testing.T) {
 	file := readScenarios(t)
@@ -42,7 +54,7 @@ func TestProtocolStreamScenarios(t *testing.T) {
 		ran++
 		t.Run(sc.Name, func(t *testing.T) {
 			reportScenario(t, sc.Name)
-			runStreamScenario(t, file, sc.Given.Options.PollIntervalMS, sc.Steps)
+			runStreamScenario(t, file, sc.Given.Options.PollIntervalMS, sc.Steps, windowTopScenarios[sc.Name])
 		})
 	}
 	if ran != len(streamScenarios) {
@@ -144,22 +156,27 @@ func (s *scenarioServer) count(path string) int {
 	return s.counts[path]
 }
 
-func runStreamScenario(t *testing.T, file scenarioFile, pollIntervalMS int64, steps []protocolStep) {
+func runStreamScenario(t *testing.T, file scenarioFile, pollIntervalMS int64, steps []protocolStep, windowTop bool) {
 	var l logs
 	s := &scenarioServer{t: t, steps: steps, last: lastRequestStep(steps),
 		arrivals: map[int]time.Time{}, counts: map[string]int{}, conns: make(chan *streamConn, 8)}
 	srv := httptest.NewServer(http.HandlerFunc(s.handle))
 	defer srv.Close()
 
+	// Every backoff is full jitter, so the scenario's windows allow any
+	// draw; taking the shortest keeps the run deterministic, and the
+	// scenarios about the length of a wait take the longest.
+	jitter, slack := func(time.Duration) time.Duration { return 0 }, time.Duration(0)
+	if windowTop {
+		jitter, slack = func(ceiling time.Duration) time.Duration { return ceiling }, windowTopSlack
+	}
 	c, err := flagnetic.New(serverKey, srv.URL,
 		flagnetic.WithChangeStream(true),
 		// The stream's scenarios script the ruleset endpoint alone.
 		flagnetic.WithSummaries(false),
 		flagnetic.WithPollInterval(scaled(pollIntervalMS)),
 		flagnetic.WithTimeDivisor(streamTimeDivisor),
-		// Every backoff is full jitter, so the scenario's windows allow
-		// any draw; taking the shortest keeps the run deterministic.
-		flagnetic.WithJitter(func(time.Duration) time.Duration { return 0 }),
+		flagnetic.WithJitter(jitter),
 		flagnetic.WithLogger(l.logger()))
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -185,7 +202,7 @@ func runStreamScenario(t *testing.T, file scenarioFile, pollIntervalMS int64, st
 		case step.Request != nil:
 			at := s.arrival(t, i, note)
 			if w := step.Request.DelayMS; w != nil {
-				if d := at.Sub(ended); d < scaled(w.Min) || d > scaled(w.Max) {
+				if d := at.Sub(ended); d < scaled(w.Min) || d > scaled(w.Max)+slack {
 					t.Errorf("step %d %s: the request came %v after the previous step, want %v–%v",
 						i, note, d, scaled(w.Min), scaled(w.Max))
 				}
