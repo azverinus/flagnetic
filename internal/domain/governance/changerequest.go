@@ -70,6 +70,10 @@ const (
 type Author struct {
 	Member *access.MemberID
 	Token  *access.APITokenID
+	// TokenCreator is the member who created the token, set only for a token
+	// author and filled in when a change request is read: they hold the
+	// token, so deciding what it proposed would be approving their own change.
+	TokenCreator *access.MemberID
 	// Name is the member's display name or the token's name as it is now,
 	// filled in when a change request is read; it plays no part in who the
 	// author is.
@@ -85,6 +89,11 @@ func (a Author) Is(b Author) bool {
 		return *a.Token == *b.Token
 	}
 	return false
+}
+
+// createdBy reports whether b is the member who created a's token.
+func (a Author) createdBy(b Author) bool {
+	return a.TokenCreator != nil && b.Member != nil && *a.TokenCreator == *b.Member
 }
 
 // IsToken reports whether a is a project token.
@@ -381,8 +390,9 @@ const (
 	byAuthor who = iota
 	// byAuthorOrDecider: the author, or whoever may decide.
 	byAuthorOrDecider
-	// byDecider: a member who may decide and is not the author, so an
-	// approval is always a second person, and never a project token, so a
+	// byDecider: a member who may decide and is neither the author nor the
+	// creator of the author's token, so an approval is always a second
+	// person, and never a project token, so a
 	// pipeline proposes and a human decides.
 	byDecider
 	// byAuthorDeciderOrSystem: the author, the member who approved it,
@@ -460,7 +470,7 @@ func (w who) allows(cr ChangeRequest, by Taker) error {
 			return errSystemOnly
 		case by.As.IsToken():
 			return errTokenCannotApprove
-		case isAuthor:
+		case isAuthor, cr.Author.createdBy(by.As):
 			return errAuthorCannotApprove
 		case !by.MayDecide:
 			return errCannotDecide

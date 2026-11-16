@@ -414,6 +414,31 @@ func TestAnApprovedChangeRequestIsCancelledOrRefusedAtApplication(t *testing.T) 
 	}
 }
 
+// The member who created a project token holds it, so approving or
+// rejecting what the token proposed would be deciding their own change; any
+// other member who may decide still can.
+func TestTheCreatorOfAProjectTokenCannotDecideWhatItProposed(t *testing.T) {
+	f := startChangeRequests(t)
+	key := f.project.Key
+	creator, _ := grantedSession(t, f.srv, f.project, access.RoleOwner)
+	other, _ := grantedSession(t, f.srv, f.project, access.RoleMaintainer)
+	scopes := []management.Scope{management.ScopeFlagsWrite}
+	created := mustCreateProjectToken(t, creator, key, management.ProjectTokenCreate{Name: "ci", Role: "developer", Scopes: &scopes})
+	ci := testkit.Client(t, f.srv, created.Value)
+	cr := openedIn(t, ci, key, "production", proposedOn())
+
+	approved := approveChangeRequest(t, creator.ClientWithResponses, key, cr, nil)
+	assertProblem(t, "the token's creator approving", approved.StatusCode(), approved.Body, http.StatusForbidden, "author_cannot_approve")
+	rejected := rejectChangeRequest(t, creator.ClientWithResponses, key, cr, "no")
+	assertProblem(t, "the token's creator rejecting", rejected.StatusCode(), rejected.Body, http.StatusForbidden, "author_cannot_approve")
+	if got := getChangeRequest(t, f.admin, key, cr); got.State != management.ChangeRequestStateOpen {
+		t.Errorf("state = %s, want still open", got.State)
+	}
+	if got := mustApprove(t, other.ClientWithResponses, key, cr); got.State != management.ChangeRequestStateApproved {
+		t.Errorf("state after another member approves = %s, want approved", got.State)
+	}
+}
+
 // A project token proposes and applies its own change requests but never
 // decides one, whatever its role, and never applies another's: deciding
 // and acting on another's change request stay with members.

@@ -665,3 +665,23 @@ func TestARevertIsRebasedWithItsProposalFilledAgain(t *testing.T) {
 		t.Errorf("rebase by another = %v", err)
 	}
 }
+
+func TestTheMemberWhoCreatedTheAuthoringTokenCannotDecideItsChangeRequest(t *testing.T) {
+	cr := inState(t, governance.StateOpen)
+	cr.Author = governance.Author{Token: &pipeline, TokenCreator: &bob}
+
+	for name, tr := range map[string]governance.Transition{"approve": governance.TransitionApprove, "reject": governance.TransitionReject} {
+		if _, err := cr.Next(tr, byDecider); codeOf(err) != "author_cannot_approve" {
+			t.Errorf("%s by the token's creator = %q, want author_cannot_approve", name, codeOf(err))
+		}
+	}
+
+	other := governance.Taker{As: governance.Author{Member: &ada}, MayDecide: true}
+	if _, err := cr.Next(governance.TransitionApprove, other); err != nil {
+		t.Errorf("approve by another member = %v, want allowed", err)
+	}
+	// The creator still cancels or applies what their token proposed.
+	if _, err := cr.Next(governance.TransitionCancel, byDecider); err != nil {
+		t.Errorf("cancel by the token's creator = %v, want allowed", err)
+	}
+}

@@ -44,7 +44,7 @@ A write that changes no ruleset pays nothing. A write that changes a ruleset pay
 A change to a protected environment goes through a [change request](change-requests.md):
 
 1. A developer proposes the configuration as a change request (`change_request.propose`) and opens it for review; a flag's variations and automatic exposure, or a segment's conditions and private switch, are proposed as one change request covering every environment, and an experiment's start, stop or traffic allocation growth as one covering every environment holding its rule. The change request shows the diff from what the environment serves now.
-2. A maintainer or owner who is not the author approves it (`change_request.approve`), or rejects it with a comment. Approval always takes a second person: the author is refused (`author_cannot_approve`).
+2. A maintainer or owner who is not the author approves it (`change_request.approve`), or rejects it with a comment. Approval always takes a second person: the author, or for a token's change request the member who created the token, is refused (`author_cannot_approve`).
 3. The author, the approver or any member holding `change_request.approve` applies it. The application writes the configuration into the protected environment, past protection for that environment alone, and its audit entries carry the change request's identifier.
 
 A change request may instead name an apply time, `apply_at`, when it is proposed: once approved, the system applies it then, late rather than skipped when no replica was running, and once however many replicas run. A scheduled application that fails records why on the change request and is tried again, until the scheduler stops after five failures in a row. See [Scheduled changes](change-requests.md#scheduled-changes).
@@ -70,7 +70,7 @@ The change request answers `revert_to`, null for any other change request.
 
 ## Pipelines and change requests
 
-A project token proposes, edits, opens, cancels and applies its own change requests like a member of its role, so a pipeline holding a token with `flags:write` can propose a production change and apply it once approved. It never approves or rejects one, whatever its role (`403 token_cannot_approve`), and never cancels or applies another author's: deciding is a member's. A typical pipeline:
+A project token proposes, edits, opens, cancels and applies its own change requests like a member of its role, so a pipeline holding a token with `flags:write` can propose a production change and apply it once approved. It never approves or rejects one, whatever its role (`403 token_cannot_approve`), and never cancels or applies another author's: deciding is a member's, and never that of the member who created the token (`403 author_cannot_approve`). A typical pipeline:
 
 1. `POST /projects/{project}/change-requests` with `"open": true` and the configuration it wants, keeping the change request's `id` and `ETag`.
 2. Wait until a member approves it: poll `GET …/change-requests/{id}` until `state` is `approved` (or `rejected`, `superseded`, `cancelled`, which end the run).
