@@ -178,6 +178,9 @@ ClientOptions scaledOptions({
   Random? random,
   DateTime Function()? clock,
   Duration minimumRefetchGap = const Duration(milliseconds: 10),
+  Duration streamBackoff = const Duration(milliseconds: 1),
+  Duration streamBackoffCap = const Duration(milliseconds: 30),
+  Duration streamCloseJitter = const Duration(milliseconds: 2),
   Duration streamSilenceTimeout = const Duration(milliseconds: 45),
   Duration flushInterval = const Duration(hours: 1),
   Duration retryBackoff = const Duration(milliseconds: 2),
@@ -216,11 +219,10 @@ ClientOptions scaledOptions({
   rulesetEventJitter: rulesetEventJitter,
   random: random,
   clock: clock,
-  streamBackoff: const Duration(milliseconds: 1),
-  streamBackoffCap: const Duration(milliseconds: 30),
-  streamCloseJitter: const Duration(milliseconds: 2),
+  streamBackoff: streamBackoff,
+  streamBackoffCap: streamBackoffCap,
+  streamCloseJitter: streamCloseJitter,
   streamSilenceTimeout: streamSilenceTimeout,
-  streamStableAfter: const Duration(milliseconds: 60),
 );
 
 /// Reads a scenario context.

@@ -2,7 +2,7 @@
 
 Self-hosted, open-source feature flags and experiments. One Go binary with an embedded web console; PostgreSQL is the only thing it needs.
 
-> **Status: developer preview.** Version 0.3 is the third release: try it, build against its SDKs, and tell us what breaks, but do not run it where an outage would hurt. The SDK API and the ruleset format only grow from 0.1 on, and upgrades only migrate forward, without data loss; the management API and the console may still change in 0.x, each change marked in the release notes. See [what 0.x promises](docs/sdks/compatibility.md#what-0x-promises).
+> **Status: developer preview.** Version 0.4 is the fourth release: try it, build against its SDKs, and tell us what breaks, but do not run it where an outage would hurt. The SDK API and the ruleset format only grow from 0.1 on, and upgrades only migrate forward, without data loss; the management API and the console may still change in 0.x, each change marked in the release notes. See [what 0.x promises](docs/sdks/compatibility.md#what-0x-promises).
 
 ## Why
 
@@ -17,14 +17,15 @@ The open-source flag products keep a paid tier, and the features a real team nee
 - **Identity**: an SMTP server for mailed invitations, password resets and notices of a disabled webhook subscription, in English and Russian; invitations into a project with a grant; OIDC and SAML auth providers, each vouching for its own email domains, with identity linking, group mappings that turn directory groups into roles, and SSO enforcement per email domain; SCIM provisioning and deprovisioning of members and groups from Entra ID, Okta or any SCIM 2.0 client; and a command-line break-glass that restores password sign-in.
 - **Delivery to SDKs**: server and client SDK keys per environment, with rotation and an overlap, revocation and allowed origins; the ruleset with conditional requests; the ruleset stream, which brings a change, a kill switch included, to a server SDK within 2 seconds; remote evaluation for client keys, which learn served values only; the events SDKs post, kept and rolled up under a retention you set, with the event volume and any gap retention left; the attributes SDKs send that the project has not declared; and the SDKs seen using each environment.
 - **SDKs** for Go, JavaScript and TypeScript, Dart and Flutter, Ruby and Python, with OpenFeature providers for Go, JavaScript, Ruby and Python, listed below. Evaluation happens in a server SDK, so a flag check costs no network call and the SDK keeps serving its last good ruleset if the server goes away.
+- **Sinks**: a project's durable, at-least-once copy of its raw events (exposures, aliases and evaluation summaries) in ClickHouse, S3-compatible object storage as JSON Lines or Parquet, or a signed webhook, in a documented export schema that only grows. A sink is tested before it is enabled and can send sample rows; its health, failure classes, dead letters and replay are in the console and the API, and a sink is flagged at risk before retention drops rows it has not delivered, with a gap recorded when it does.
+- **Export and import**: a project's configuration as one document, YAML or JSON, to keep in git, copy to another instance or show an auditor. An import creates a project, merges into one or replaces its configuration, whole or not at all, after a dry run that shows what it would change; it works from the console, the API and the command line. A Firebase Remote Config template is translated into flags and rules of one environment, and a demo project is included.
 - **Operations**: any number of identical replicas on one PostgreSQL, with no sticky sessions; Prometheus metrics; a console in English and Russian covering all of the above; a Docker image for `linux/amd64` and `linux/arm64` with provenance and an SBOM.
 
 ## Not there yet
 
 Each arrives in a later release:
 
-- **Analysis** of an experiment's results: Flagnetic assigns units, records exposures and checks the sample ratio, and for now the metrics are read in your own warehouse.
-- **Export** of exposures and evaluation summaries to ClickHouse, object storage or a webhook.
+- **Analysis** of an experiment's results: Flagnetic assigns units, records exposures and checks the sample ratio, and for now the metrics are read in your own warehouse, from the events a sink delivers there.
 - A Helm chart.
 
 ## SDKs
@@ -56,7 +57,7 @@ This runs PostgreSQL, applies the migrations and starts the server on http://loc
 docker compose exec flagnetic flagnetic admin bootstrap --email you@example.com
 ```
 
-Then create a project, add an SDK key to one of its environments, and follow the [SDK](#sdks) for your language.
+Then create a project, or import the [demo project](docs/install.md#try-it-with-the-demo-project) to look around, add an SDK key to one of its environments, and follow the [SDK](#sdks) for your language.
 
 ## Documentation
 
@@ -64,6 +65,7 @@ Then create a project, add an SDK key to one of its environments, and follow the
 - [Operations](docs/operations.md) and the [configuration reference](docs/configuration.md).
 - [Flags](docs/flags.md), [segments](docs/segments.md), [targeting](docs/targeting.md) and [access](docs/access.md).
 - [Experiments](docs/experiments.md), [governance](docs/governance.md), [change requests](docs/change-requests.md) and [webhooks](docs/webhooks.md).
+- [Sinks](docs/sinks.md) and the [exported events](docs/exported-events.md) they write; [exporting and importing a project](docs/transfer.md), from Firebase Remote Config too.
 - [SDKs](docs/sdks/README.md), [SDK keys](docs/sdks/keys.md), the [ruleset stream](docs/sdks/stream.md) and [compatibility](docs/sdks/compatibility.md); [everything else](docs/README.md).
 
 ## Principles

@@ -43,8 +43,13 @@ final class SseParser {
   /// reconnect; null until an event carried one.
   String? get lastEventId => _id;
 
-  /// Reads [bytes], calling [onEvent] for every event they complete.
-  void add(List<int> bytes, void Function(SseEvent event) onEvent) {
+  /// Reads [bytes], calling [onEvent] for every event they complete and
+  /// [onComment] for every comment line, the heartbeat among them.
+  void add(
+    List<int> bytes,
+    void Function(SseEvent event) onEvent, {
+    void Function()? onComment,
+  }) {
     var from = 0;
     if (_skipLineFeed && bytes.isNotEmpty) {
       if (bytes.first == 0x0a) from = 1;
@@ -59,6 +64,7 @@ final class SseParser {
       _line(
         utf8.decode(_buffer.sublist(start, i), allowMalformed: true),
         onEvent,
+        onComment,
       );
       if (byte == 0x0d && i + 1 == _buffer.length) {
         _skipLineFeed = true;
@@ -90,9 +96,13 @@ final class SseParser {
     _buffer.removeRange(0, _bom.length);
   }
 
-  void _line(String line, void Function(SseEvent event) onEvent) {
+  void _line(
+    String line,
+    void Function(SseEvent event) onEvent,
+    void Function()? onComment,
+  ) {
     if (line.isEmpty) return _dispatch(onEvent);
-    if (line.startsWith(':')) return;
+    if (line.startsWith(':')) return onComment?.call();
     final colon = line.indexOf(':');
     final field = colon < 0 ? line : line.substring(0, colon);
     var value = colon < 0 ? '' : line.substring(colon + 1);
@@ -133,15 +143,12 @@ typedef StreamSettings = ({
   Duration backoff,
   Duration backoffCap,
 
-  /// The longest wait before reconnecting a stream the server closed or
-  /// that fell silent.
+  /// The longest wait before reconnecting a stable stream the server closed,
+  /// or one that fell silent.
   Duration closeJitter,
 
   /// How long a stream may stay silent before it is reconnected.
   Duration silenceTimeout,
-
-  /// How long a connection must stay up before the backoff starts over.
-  Duration stableAfter,
 });
 
 /// The ruleset stream of one environment: a long-lived `GET /sdk/v1/stream`
@@ -174,6 +181,7 @@ final class RulesetStream {
     )
     log,
     void Function()? onDropped,
+    Random? random,
   }) : _url = url,
        _sdkKey = sdkKey,
        _settings = settings,
@@ -184,6 +192,7 @@ final class RulesetStream {
        _onFailed = onFailed,
        _onRefused = onRefused,
        _onDropped = onDropped,
+       _jitter = random ?? Random(),
        _log = log;
 
   final Uri _url;
@@ -197,12 +206,16 @@ final class RulesetStream {
   final void Function(int status) _onRefused;
   final void Function()? _onDropped;
   final void Function(LogLevel, String, Map<String, Object?>) _log;
-  final Random _jitter = Random();
+  final Random _jitter;
 
   Timer? _reconnect;
   Timer? _silence;
   StreamSubscription<List<int>>? _body;
-  DateTime? _connectedAt;
+  // A stream is stable once it has delivered a heartbeat: one the server
+  // ends before that is a failed connection however it was answered, so a
+  // draining replica or a proxy that closes every stream at once is backed
+  // off from instead of reconnected to every other second.
+  bool _heard = false;
   int _failures = 0;
   bool _closed = false;
   bool _suspended = false;
@@ -296,15 +309,24 @@ final class RulesetStream {
       _retryAfterError({'cause': 'status', 'status': stream.status});
       return;
     }
-    _failures = 0;
-    _connectedAt = DateTime.now();
+    // Whatever answered 200 and is not an event stream, a captive portal or
+    // a proxy's error page, is no stream however long it stays open.
+    final type = stream.headers['content-type'] ?? '';
+    if (!type.toLowerCase().startsWith('text/event-stream')) {
+      _running = false;
+      unawaited(stream.body.listen(null).cancel().catchError((Object _) {}));
+      _onFailed();
+      _retryAfterError({'cause': 'content_type', 'detail': type});
+      return;
+    }
+    _heard = false;
     _log(LogLevel.info, LogEvents.sseConnected, {'last_event_id': id});
     final parser = SseParser();
     _body = stream.body.listen(
       (chunk) {
         _beat();
         try {
-          parser.add(chunk, _event);
+          parser.add(chunk, _event, onComment: _heartbeat);
         } on SseOverflow catch (e) {
           // Nothing more can be trusted on this connection.
           _running = false;
@@ -331,12 +353,23 @@ final class RulesetStream {
         _drop();
         if (_gone) return;
         _onDropped?.call();
-        _retryAfterClose('closed');
+        if (_heard) {
+          _retryAfterClose('closed');
+        } else {
+          _retryAfterError({'cause': 'closed_early'});
+        }
       },
       cancelOnError: true,
     );
     _beat();
     _onConnected();
+  }
+
+  /// A heartbeat makes the stream stable, and a stable stream restarts the
+  /// backoff from its base.
+  void _heartbeat() {
+    _heard = true;
+    _failures = 0;
   }
 
   void _event(SseEvent event) {
@@ -371,8 +404,9 @@ final class RulesetStream {
     if (body != null) unawaited(body.cancel());
   }
 
-  /// A stream the server closed, or one that fell silent, reconnects within
-  /// the close jitter: it is the platform draining, not an outage.
+  /// A stable stream the server closed, or one that fell silent, reconnects
+  /// within the close jitter: it is the platform's hourly close, not an
+  /// outage.
   void _retryAfterClose(String cause) {
     final delay = _settings.closeJitter * _jitter.nextDouble();
     _log(LogLevel.warn, LogEvents.sseDropped, {
@@ -383,7 +417,6 @@ final class RulesetStream {
   }
 
   void _retryAfterError(Map<String, Object?> fields) {
-    if (_stable) _failures = 0;
     _failures++;
     final delay = fullJitter(
       _failures,
@@ -398,19 +431,11 @@ final class RulesetStream {
     _schedule(delay);
   }
 
-  /// True when the last connection stayed up long enough to call the stream
-  /// healthy again, so the backoff starts from the bottom.
-  bool get _stable {
-    final at = _connectedAt;
-    return at != null && DateTime.now().difference(at) >= _settings.stableAfter;
-  }
-
   /// True while the stream must not reconnect: closed for good, or
   /// suspended because the app is in the background.
   bool get _gone => _closed || _suspended;
 
   void _schedule(Duration delay) {
-    _connectedAt = null;
     _reconnect?.cancel();
     _reconnect = Timer(delay, () {
       if (!_gone) unawaited(_connect());

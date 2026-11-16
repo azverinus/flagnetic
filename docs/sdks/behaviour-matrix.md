@@ -70,7 +70,7 @@ The Dart runner plays the device scenarios on the VM and the page scenarios in C
 | client: the network coming back refetches, at most once per 10 seconds | client |  |  | ✓ |  | ✓ |
 | client: a hidden or closing page hands its events to a beacon | client |  |  | ✓ |  | ✓ |
 | server: a stream closed before its first heartbeat is retried with backoff | server | ✓ | ✓ | ✓ | ✓ |  |
-| client: a stream closed before its first heartbeat is retried with backoff | client |  |  | ✓ |  |  |
+| client: a stream closed before its first heartbeat is retried with backoff | client |  |  | ✓ |  | ✓ |
 | server: a schema_version outside the supported range is a failure logged once | server | ✓ | ✓ | ✓ | ✓ |  |
 | client: a schema_version outside the supported range is a failure logged once | client |  |  | ✓ |  | ✓ |
 <!-- generated:matrix:end -->

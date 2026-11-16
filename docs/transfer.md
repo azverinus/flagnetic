@@ -15,6 +15,7 @@ Use it to keep a project's configuration in git, copy a project to another insta
 - [Protection, owners and permissions](#protection-owners-and-permissions)
 - [The audit trail](#the-audit-trail)
 - [Limits and refusals](#limits-and-refusals)
+- [In the console](#in-the-console)
 - [The CLI](#the-cli)
 - [Importing from Firebase Remote Config](#importing-from-firebase-remote-config)
 - [The demo project](#the-demo-project)
@@ -305,6 +306,15 @@ Every environment whose ruleset changed is bumped once, at the end of the import
 | Another `schema_version` | `422 schema_version_unsupported` with `supported_versions`. |
 | Unknown project | `404`. |
 | Entities | The ordinary limits: [rules, conditions, overrides and prerequisites](targeting.md#limits). |
+
+## In the console
+
+**Import and export** in the project navigation is open to everyone who can read the project.
+
+- **Export** downloads the project document as JSON or YAML. The dialog that deletes a project offers the same download, beside the audit log's, because the audit log does not hold the configuration.
+- **Import**, for owners, takes a `.json`, `.yaml` or `.yml` file and a mode, merge or replace. **Check what it would change** is the dry run: it lists what the import would create, update and delete, kind by kind, with the warnings, says how many entities a replace deletes, and names the protected environments it writes without a change request. **Apply** sends the dry run's `ETag` as `If-Match`, so when the project changed in between nothing is imported and the page offers to check again. A document the project already matches has nothing to apply.
+- **Import from Firebase**, for owners, walks through a [Remote Config template](#importing-from-firebase-remote-config): upload the template, tick the parameters to import, each shown with the flag key, type and tags it gets, read how each condition translates and which are skipped, choose the environment and the unit type percent rollouts use, then preview the flags, rules and attributes and apply, under the same `If-Match`.
+- **Create from a document** is on the instance's **Projects** page, for instance admins: a document, a key and a name, a check of what it would create, then the project.
 
 ## The CLI
 
