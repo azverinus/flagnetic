@@ -137,7 +137,8 @@ export class FlagneticServer {
   private readonly logger: Logger;
   private readonly source: (() => RulesetSource) | undefined;
   private readonly delivery: Delivery | undefined;
-  private readonly storePath: string | undefined;
+  /** The store file and the key its content belongs to. */
+  private readonly store: { readonly path: string; readonly sdkKey: string } | undefined;
   private storeWrites: Promise<void> = Promise.resolve();
   private readonly changeListeners = new Set<(keys: string[]) => void>();
   private readonly stageListeners = new Set<(stage: Stage) => void>();
@@ -204,7 +205,7 @@ export class FlagneticServer {
       ...(options.requestTimeout !== undefined && { requestTimeout: options.requestTimeout }),
       ...internals.timing,
     };
-    this.storePath = options.store;
+    this.store = options.store === undefined ? undefined : { path: options.store, sdkKey };
     this.delivery = new Delivery(
       {
         sdkKey,
@@ -295,9 +296,9 @@ export class FlagneticServer {
   }
 
   private async start(): Promise<void> {
-    if (this.storePath !== undefined) {
+    if (this.store !== undefined) {
       try {
-        const stored = await readStore(this.storePath);
+        const stored = await readStore(this.store.path, this.store.sdkKey);
         if (stored && !this.held && !this.closed) {
           const rs = decodeRuleset(stored.document);
           this.swap(rs, stored.receivedAt, "store");
@@ -312,11 +313,11 @@ export class FlagneticServer {
   }
 
   private persist(text: string): void {
-    const path = this.storePath;
-    if (path === undefined) return;
+    const store = this.store;
+    if (store === undefined) return;
     // One write at a time, in the order the rulesets were accepted.
     this.storeWrites = this.storeWrites
-      .then(() => writeStore(path, text))
+      .then(() => writeStore(store.path, store.sdkKey, text))
       .catch((e: unknown) => {
         this.log("warn", "store_failed", { operation: "write", cause: causeOf(e) });
       });
