@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/go/v0.1.0...sdks/go/v0.1.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* **sdk-go:** back off from a stream closed before its first heartbeat ([#316](https://github.com/azverinus/flagnetic/issues/316)) ([b5f62c3](https://github.com/azverinus/flagnetic/commit/b5f62c3e8b4f7dc48ab33d8d4b430a577884e4f6))
+* **sdk-go:** bind the store file to the key it was received under ([#306](https://github.com/azverinus/flagnetic/issues/306)) ([09565f3](https://github.com/azverinus/flagnetic/commit/09565f31a1eecbaeb8c5dc1b7abfc4486e42e7ca))
+
 ## 0.1.0 (2026-10-23)
 
 
