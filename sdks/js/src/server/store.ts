@@ -35,7 +35,7 @@ async function decodeStore(sdkKey: string, file: string): Promise<string> {
   }
   const fields = typeof header === "object" && header !== null ? (header as Record<string, unknown>) : undefined;
   if (fields === undefined || !("flagnetic_store" in fields)) throw new Error("the store was written under no key");
-  if (fields.flagnetic_store !== STORE_FORMAT) throw new Error("the store is in a format this client does not write");
+  if (fields.flagnetic_store !== STORE_FORMAT) throw new Error("the store was written in a format this client does not read");
   if (fields.key !== (await keyDigest(sdkKey))) throw new Error("the store was written under another key");
   return file.slice(newline + 1);
 }

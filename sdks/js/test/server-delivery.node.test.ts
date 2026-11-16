@@ -557,14 +557,16 @@ describe("the store", () => {
 
   test("a store written under no key, or in another format, is discarded", async () => {
     const stored = JSON.stringify(rulesetOf(7, { a: true }));
-    const cases: Record<string, string> = {
-      "a bare document": stored,
-      "a bare document on several lines": JSON.stringify(rulesetOf(7, { a: true }), null, 2),
-      "a bare document ending in a newline": `${stored}\n`,
-      "a later format": (await encodeStore(key, stored)).replace('"flagnetic_store":1', '"flagnetic_store":2'),
-      "a format as a string": (await encodeStore(key, stored)).replace('"flagnetic_store":1', '"flagnetic_store":"1"'),
+    const noKey = "the store was written under no key";
+    const otherFormat = "the store was written in a format this client does not read";
+    const cases: Record<string, [string, string]> = {
+      "a bare document": [stored, noKey],
+      "a bare document on several lines": [JSON.stringify(rulesetOf(7, { a: true }), null, 2), noKey],
+      "a bare document ending in a newline": [`${stored}\n`, noKey],
+      "a later format": [(await encodeStore(key, stored)).replace('"flagnetic_store":1', '"flagnetic_store":2'), otherFormat],
+      "a format as a string": [(await encodeStore(key, stored)).replace('"flagnetic_store":1', '"flagnetic_store":"1"'), otherFormat],
     };
-    for (const [name, content] of Object.entries(cases)) {
+    for (const [name, [content, cause]] of Object.entries(cases)) {
       const dir = await mkdtemp(join(tmpdir(), "flagnetic-"));
       const store = join(dir, "ruleset.json");
       await writeFile(store, content);
@@ -574,6 +576,7 @@ describe("the store", () => {
       await down.until(() => down.rulesetRequests().length === 1);
       expect(h.client.stage, name).toBe("built_in");
       expect(h.events("store_failed"), name).toHaveLength(1);
+      expect(h.events("store_failed")[0]?.fields, name).toMatchObject({ operation: "read", cause });
       expect(down.rulesetRequests()[0]?.headers["if-none-match"], name).toBeUndefined();
     }
   });
