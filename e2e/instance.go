@@ -98,7 +98,7 @@ func BootstrapAdmin(ctx context.Context, binary, databaseURL string, logs io.Wri
 	if err != nil {
 		return fmt.Errorf("flagnetic admin bootstrap: %w", err)
 	}
-	// A directory left behind holds no token, since the file is removed with it.
+	// Best effort: the token is not used, so a directory that stays behind costs nothing.
 	defer func() { _ = os.RemoveAll(dir) }()
 	cmd := exec.CommandContext(ctx, binary, "admin", "bootstrap", //nolint:gosec // the binary the harness built
 		"--email", Admin.Email, "--name", Admin.Name, "--if-absent",
