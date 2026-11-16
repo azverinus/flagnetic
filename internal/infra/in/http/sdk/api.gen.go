@@ -947,7 +947,9 @@ type ClientInterface interface {
 	// stream from a dead one; on each the key is checked again, and a
 	// refused key ends the stream. The server closes a stream after about
 	// an hour (60 minutes plus up to 5 of jitter) and when it shuts down;
-	// the SDK reconnects with `Last-Event-ID`.
+	// the SDK reconnects with `Last-Event-ID`. A replica that is already
+	// shutting down answers a new stream `503 unavailable` with
+	// `Retry-After` rather than open it and close it at once.
 	//
 	// Corresponds with GET /stream (the `StreamRuleset` operationId).
 	StreamRuleset(ctx context.Context, params *StreamRulesetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1332,7 +1334,9 @@ func (c *Client) GetRuleset(ctx context.Context, params *GetRulesetParams, reqEd
 // stream from a dead one; on each the key is checked again, and a
 // refused key ends the stream. The server closes a stream after about
 // an hour (60 minutes plus up to 5 of jitter) and when it shuts down;
-// the SDK reconnects with `Last-Event-ID`.
+// the SDK reconnects with `Last-Event-ID`. A replica that is already
+// shutting down answers a new stream `503 unavailable` with
+// `Retry-After` rather than open it and close it at once.
 //
 // Corresponds with GET /stream (the `StreamRuleset` operationId).
 func (c *Client) StreamRuleset(ctx context.Context, params *StreamRulesetParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2004,7 +2008,9 @@ type ClientWithResponsesInterface interface {
 	// stream from a dead one; on each the key is checked again, and a
 	// refused key ends the stream. The server closes a stream after about
 	// an hour (60 minutes plus up to 5 of jitter) and when it shuts down;
-	// the SDK reconnects with `Last-Event-ID`.
+	// the SDK reconnects with `Last-Event-ID`. A replica that is already
+	// shutting down answers a new stream `503 unavailable` with
+	// `Retry-After` rather than open it and close it at once.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2853,7 +2859,9 @@ func (c *ClientWithResponses) GetRulesetWithResponse(ctx context.Context, params
 // stream from a dead one; on each the key is checked again, and a
 // refused key ends the stream. The server closes a stream after about
 // an hour (60 minutes plus up to 5 of jitter) and when it shuts down;
-// the SDK reconnects with `Last-Event-ID`.
+// the SDK reconnects with `Last-Event-ID`. A replica that is already
+// shutting down answers a new stream `503 unavailable` with
+// `Retry-After` rather than open it and close it at once.
 //
 // Returns a wrapper object for the known response body format(s).
 //

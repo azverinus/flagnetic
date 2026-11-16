@@ -24,7 +24,6 @@ const fast: Timing = {
   unauthorizedMax: 160,
   streamRetryInitial: 40,
   streamRetryMax: 200,
-  streamStable: 1_000,
   streamSilence: 10_000,
   streamCloseJitter: 50,
   catchUp: [40, 80, 160],
@@ -374,6 +373,8 @@ describe("the ruleset stream", () => {
     await p.until(() => p.openStreams === 1);
     h.changes.length = 0;
     p.streamReplies.push({ kind: "status", status: 502 });
+    // A heartbeat makes the stream stable, so its close is a routine one.
+    p.write(": hb\n\n");
     p.closeStreams();
     p.setDocument(rulesetOf(2, { a: false }));
     await eventually(() => {
@@ -385,6 +386,29 @@ describe("the ruleset stream", () => {
     expect(h.events("sse_dropped").map((l) => l.fields.cause)).toStrictEqual(["closed by the server", "status 502 application/problem+json"]);
     expect(h.events("sse_connected")).toHaveLength(2);
     expect(h.client.getBool(ctx, "a", true)).toBe(false);
+  });
+
+  test("a stream closed before its first heartbeat backs off like a failure, and a heartbeat restarts the backoff", async () => {
+    const p = await platform(rulesetOf(1, { a: true }));
+    // Random at the top of every window: the backoff doubles from 40 ms, the
+    // jitter after a routine close is 50 ms.
+    const h = start(p, {}, {}, () => 1);
+    await expect(h.client.ready(2000)).resolves.toBe("fresh");
+    await p.until(() => p.openStreams === 1);
+    // A draining replica or a proxy answers 200 and ends the stream at once.
+    for (let n = 2; n <= 4; n++) {
+      p.closeStreams();
+      await p.until(() => p.streamRequests().length === n && p.openStreams === 1);
+    }
+    p.write(": hb\n\n");
+    p.closeStreams();
+    await p.until(() => p.streamRequests().length === 5 && p.openStreams === 1);
+    p.closeStreams();
+    await p.until(() => p.streamRequests().length === 6 && p.openStreams === 1);
+    const dropped = h.events("sse_dropped");
+    expect(dropped.map((l) => l.fields.retry_in_ms)).toStrictEqual([40, 80, 160, 50, 40]);
+    const early = "closed by the server before its first heartbeat";
+    expect(dropped.map((l) => l.fields.cause)).toStrictEqual([early, early, early, "closed by the server", early]);
   });
 
   test("a reconnect is always followed by a fetch", async () => {

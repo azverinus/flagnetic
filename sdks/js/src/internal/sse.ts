@@ -14,6 +14,12 @@ export interface SseEvent {
 export class SseParser {
   /** The reconnection delay the server asked for, in milliseconds. */
   retry: number | undefined;
+  /**
+   * The comment lines read so far. The server's heartbeat is one, and it is
+   * what makes a stream stable: a stream that ends before it has heard one
+   * is no better than a connection that failed.
+   */
+  comments = 0;
   private buffer = "";
   private pendingCR = false;
   private event = "";
@@ -61,7 +67,10 @@ export class SseParser {
       this.data = [];
       return;
     }
-    if (line.startsWith(":")) return;
+    if (line.startsWith(":")) {
+      this.comments++;
+      return;
+    }
     const colon = line.indexOf(":");
     const field = colon < 0 ? line : line.slice(0, colon);
     let value = colon < 0 ? "" : line.slice(colon + 1);

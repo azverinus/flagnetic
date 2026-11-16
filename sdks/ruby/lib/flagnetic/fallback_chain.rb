@@ -32,7 +32,8 @@ module Flagnetic
     end
 
     # load_store serves a persisted ruleset as last_good before any network
-    # call. A corrupt file leaves the stage built_in, with a log.
+    # call. A corrupt file, or one written under another key, leaves the stage
+    # built_in, with a log.
     def load_store
       json, received_at = @store.load
       return unless json
@@ -44,6 +45,8 @@ module Flagnetic
       end
 
       swap(ruleset, received_at: received_at, stage: :last_good, source: "store")
+    rescue FileStore::Refused => e
+      log(:error, :store_failed, path: @store.to_s, cause: e.message)
     rescue SystemCallError, IOError => e
       log(:error, :store_failed, path: @store.to_s, cause: "#{e.class}: #{e.message}")
     end
@@ -64,7 +67,9 @@ module Flagnetic
 
       Eval::Ruleset.decode(json)
     rescue JSON::ParserError, EncodingError => e
-      "parse: #{e.message.lines.first&.strip}"
+      # The parser quotes the bytes it stopped at, which need not be UTF-8:
+      # scrubbed, so building the cause never raises past the caller.
+      "parse: #{e.message.scrub.lines.first&.strip}"
     rescue Eval::DecodeError => e
       "parse: #{e.message}"
     end
@@ -83,6 +88,7 @@ module Flagnetic
       end
       log(:info, :ruleset_loaded, source: source, ruleset_version: ruleset.version, flags: ruleset.flags.size)
       report_unsupported(ruleset)
+      report_invalid(ruleset)
       stage_changed(previous_stage, stage)
       (Changes.flags(previous&.ruleset, ruleset) | refuse_local_overrides(ruleset)).sort
     end
@@ -101,11 +107,24 @@ module Flagnetic
       end
     end
 
-    def first_report?(key, version)
-      @mutex.synchronize do
-        next false if @unsupported_logged[key] == version
+    # report_invalid logs condition_invalid for every flag of ruleset with
+    # a condition this evaluator cannot evaluate although the server
+    # accepted the ruleset, once per flag and ruleset version: the flag
+    # serves its default wherever evaluation reaches the condition, and
+    # nothing else says why.
+    def report_invalid(ruleset)
+      ruleset.invalid_conditions.sort.each do |key, reasons|
+        next unless first_report?(key, ruleset.version, @invalid_logged)
 
-        @unsupported_logged[key] = version
+        log(:error, :condition_invalid, flag: key, conditions: reasons, ruleset_version: ruleset.version)
+      end
+    end
+
+    def first_report?(key, version, logged = @unsupported_logged)
+      @mutex.synchronize do
+        next false if logged[key] == version
+
+        logged[key] = version
         true
       end
     end

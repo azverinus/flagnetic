@@ -16,8 +16,6 @@ export interface StreamTiming {
   /** The first reconnect delay after an error; it doubles up to `retryMax`. */
   readonly retryInitial: number;
   readonly retryMax: number;
-  /** A connection this long resets the backoff. */
-  readonly stable: number;
   /** Silence after which the stream reconnects; the server sends a heartbeat every 15 s. */
   readonly silence: number;
   /** The most a reconnect after a server-side close waits, spreading reconnects out. */
@@ -27,7 +25,6 @@ export interface StreamTiming {
 export const defaultStreamTiming: StreamTiming = {
   retryInitial: 1_000,
   retryMax: 30_000,
-  stable: 60_000,
   silence: 45_000,
   closeJitter: 2_000,
 };
@@ -103,7 +100,9 @@ export class ChangeStream {
     const held = this.host.heldVersion();
     if (held !== undefined) headers["Last-Event-ID"] = String(held);
 
-    let connectedAt: number | undefined;
+    // A stream is stable once it has delivered a heartbeat; one the server
+    // ends before that is a failed connection however it was answered.
+    let stable = false;
     let clean = false;
     let cause: string;
     try {
@@ -125,7 +124,6 @@ export class ChangeStream {
         await res.body?.cancel().catch(() => undefined);
         throw new Error(`status ${res.status} ${type}`.trim());
       }
-      connectedAt = clock.now();
       this.host.log("info", "sse_connected", {});
       this.host.opened();
       const parser = new SseParser();
@@ -137,12 +135,15 @@ export class ChangeStream {
         if (abort.signal.aborted) throw abort.signal.reason;
         if (done) break;
         if (run !== this.run) return;
-        if (clock.now() - connectedAt >= timing.stable) this.backoff.reset();
         this.armSilence(abort);
         for (const e of parser.feed(value)) this.onEvent(e.event, e.data);
+        if (!stable && parser.comments > 0) {
+          stable = true;
+          this.backoff.reset();
+        }
       }
-      cause = "closed by the server";
-      clean = true;
+      clean = stable;
+      cause = stable ? "closed by the server" : "closed by the server before its first heartbeat";
     } catch (e) {
       const reason: unknown = abort.signal.aborted ? abort.signal.reason : e;
       cause = causeOf(reason);
@@ -150,9 +151,9 @@ export class ChangeStream {
     if (run !== this.run || !this.wanted) return;
     clock.clearTimeout(this.silenceTimer);
     this.reader = undefined;
-    if (connectedAt !== undefined && clock.now() - connectedAt >= timing.stable) this.backoff.reset();
-    // After a server-side close only jitter spreads the reconnects; after an
-    // error the backoff does.
+    // After a server-side close of a stable stream only jitter spreads the
+    // reconnects; after an error, or a stream closed before it was stable,
+    // the backoff does.
     const delay = clean ? Math.floor(this.config.random() * timing.closeJitter) : this.backoff.next(timing.retryMax);
     this.host.log("warn", "sse_dropped", { cause, retry_in_ms: delay });
     this.reconnectTimer = clock.setTimeout(() => {

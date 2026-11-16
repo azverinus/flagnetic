@@ -62,7 +62,7 @@ A client key (`fn_cli_...`) is refused at construction with an `ArgumentError`. 
 | `stream:` | `false` turns the change stream off; the ruleset is then polled every 30 s (default `true`). |
 | `poll_interval:` | Seconds between polls while the stream is up (default 300, at least 30). |
 | `request_timeout:` | Seconds per request (default 10). |
-| `store:` | Path of a file keeping the last good ruleset across restarts. It is read at construction and rewritten on every accepted ruleset. |
+| `store:` | Path of a file keeping the last good ruleset across restarts. It is read at construction and rewritten on every accepted ruleset. The file is headed by a digest of the SDK key: one written under another key (another environment's, say) or under none is discarded with `store_failed`. |
 | `logger:` | A callable receiving `(level, event, fields)`, or a standard `Logger`. Default: warnings and errors to `$stderr`. |
 | `platform:` | The platform in the `User-Agent` (`flagnetic-ruby/<version> (<platform>)`) and the events envelope, and an exposure's `platform` when the context names none (default `"server"`). |
 | `app_version:` | The application's version, sent with every evaluation summary and as an exposure's `app_version` when the context names none. |
@@ -119,6 +119,7 @@ Log events have stable names (`Flagnetic::EVENTS`); alert on the name, never on 
 | `key_revoked` | error, once per source until it recovers | `status`, `source` (`fetch`, `stream`) |
 | `schema_unsupported` | error, once | `schema_version`, `supported` |
 | `rule_unsupported` | error, once per flag and ruleset version | `flag`, `constructs`, `ruleset_version` |
+| `condition_invalid` | error, once per flag and ruleset version | `flag`, `conditions`, `ruleset_version` |
 | `override_set` | warn | `flag` |
 | `override_refused` | warn | `flag`, `reason` (`not_allowed`, `protected`), `environment` |
 | `local_overrides_allowed` | warn | |
@@ -134,6 +135,8 @@ Log events have stable names (`Flagnetic::EVENTS`); alert on the name, never on 
 | `queue_dropped` | warn | `kind` (`exposure_or_alias`, `evaluation_summary`), `cause` (`queue_full`, `not_serialisable`, `client_error`, `refused_by_the_platform`, `window_older_than_one_hour`) and what was dropped (`fault` for `not_serialisable`) |
 
 A ruleset from a newer server may hold constructs this SDK does not know. The client logs `rule_unsupported` once per flag and ruleset version, and the flag serves its default with the error code `inconsistent_ruleset`.
+
+A condition this SDK cannot evaluate although the server accepted it, such as a pattern its regular expression engine refuses, makes the flag serve its default with `inconsistent_ruleset` in this SDK only. The client logs `condition_invalid` once per flag and ruleset version when the ruleset loads, with the reason of each condition in `conditions`.
 
 ## Flagnetic.client
 

@@ -79,7 +79,7 @@ class ProtocolTest < Minitest::Test
     store = nil
     if stored
       store = File.join(Dir.mktmpdir, "ruleset.json")
-      File.binwrite(store, read(stored))
+      Flagnetic.const_get(:FileStore).new(store, SERVER_KEY).save(read(stored))
     end
     @client = Flagnetic::Client.new(SERVER_KEY, base_url: @server.base_url, stream: options["sse"], store: store,
                                                 **common)

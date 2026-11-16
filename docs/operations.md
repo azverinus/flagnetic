@@ -386,7 +386,7 @@ Each request is logged once when it completes, as a `request` record with `metho
 
 On SIGTERM or SIGINT a replica stops in three steps:
 
-1. **Drain** (`FLAGNETIC_SHUTDOWN_DRAIN`, 5 s by default): `/readyz` answers 503 at once, while every request that still arrives is served. Every [ruleset stream](sdks/stream.md) and management change stream the replica holds is closed, and its SDK or console reconnects, usually to another replica. This gives load balancers time to notice and route away, so stopping one replica of several never refuses a request. `0` skips the drain.
+1. **Drain** (`FLAGNETIC_SHUTDOWN_DRAIN`, 5 s by default): `/readyz` answers 503 at once, while every request that still arrives is served, except a new [ruleset stream](sdks/stream.md), which is refused `503 unavailable` with `Retry-After`. Every [ruleset stream](sdks/stream.md) and management change stream the replica holds is closed, and its SDK or console reconnects, usually to another replica. This gives load balancers time to notice and route away, so stopping one replica of several never refuses a request. `0` skips the drain.
 2. **Grace** (`FLAGNETIC_SHUTDOWN_GRACE`, 15 s by default): the replica stops accepting connections and lets requests in flight finish.
 3. **Cancel**: requests still running when the grace period ends are cancelled, background work is stopped, and the database pool closes.
 

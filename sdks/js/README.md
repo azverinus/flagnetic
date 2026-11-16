@@ -77,7 +77,7 @@ flagnetic.recorder.exposures();       // exposures and aliases that would have b
 
 ### Propagation
 
-A change made in Flagnetic reaches a server client within 2 seconds at p99 while the stream is up, and within the poll interval otherwise.
+A change made in Flagnetic reaches a server client within 2 seconds at p99 while the stream is up, and within the poll interval otherwise. The stream is stable once it has delivered a heartbeat: one the server closes before that (a draining replica, a proxy that ends the stream early) is a failure like any other and the reconnect backs off, while the close of a stable stream waits 0–2 s.
 
 ## Browser client
 
@@ -105,7 +105,7 @@ await flagnetic.setContext({ units: { anonymous: anonymousId(), user: "u-1001" }
 
 The last good values are kept in `localStorage` under the SDK key and the context's units (in memory where `localStorage` cannot be reached, or with `store: false`), so the next page load serves them before any request and two keys in one browser never see each other's values. A `bootstrap` option takes the document `values(context)` of `flagnetic/server` rendered into the page, served as `fresh`; an `offline` option takes a values document and makes no request at all, with `offline.set`, `offline.reload` and `offline.recorded()` for tests.
 
-The client refetches when the tab becomes visible or the network comes back, at most once every 10 seconds, and polls every 300 seconds while the tab is visible. With `stream: true` it also holds the change stream, read over `fetch` so that it can send its key and `Last-Event-ID` in headers and reconnect by itself; it is off by default, since every open tab holds one connection.
+The client refetches when the tab becomes visible or the network comes back, at most once every 10 seconds, and polls every 300 seconds while the tab is visible. With `stream: true` it also holds the change stream, read over `fetch` so that it can send its key and `Last-Event-ID` in headers and reconnect by itself; it is off by default, since every open tab holds one connection. A stream is stable once it has delivered a heartbeat: one the server closes before that (a draining replica, a proxy that ends the stream early) is a failure like any other and the reconnect backs off, while the close of a stable stream waits 0–2 s.
 
 `anonymousId(unitType = "anonymous")` gives this browser one ID per unit type: a random UUIDv7 minted on the first call and kept in `localStorage` for every later visit of the origin. It lives outside the key's storage, so a rotated or replaced client key keeps every anonymous visitor in the experiment arm their ID buckets into; where `localStorage` cannot be reached, the ID holds for the page. Pass the unit type your project declared for anonymous traffic, and keep the ID in the context's units after sign-in.
 
