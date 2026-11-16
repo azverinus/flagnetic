@@ -144,8 +144,10 @@ class Client:
     ``store``
         A file path. Every accepted ruleset is written there, readable by its
         owner only, and loaded at construction as ``last_good`` before any
-        network call. A ruleset the store cannot load or save logs
-        ``store_failed``; a corrupt file leaves the client at ``built_in``.
+        network call. The file is headed by a SHA-256 digest of ``sdk_key``:
+        one written under another key, or under none, is discarded. A ruleset
+        the store cannot load or save logs ``store_failed``; a corrupt or
+        discarded file leaves the client at ``built_in``.
     ``logger``
         A hook called with ``(level, event, fields)`` for every log event, from
         any thread; the default sends them to the ``flagnetic`` logger of
@@ -274,7 +276,7 @@ class Client:
 
         self._store_path = Path(store) if store is not None else None
         if self._store_path is not None:
-            self._load_store(self._store_path)
+            self._load_store(self._store_path, sdk_key)
         self._online = _Online(
             sdk_key=sdk_key,
             base_url=base_url,
@@ -880,19 +882,20 @@ class Client:
                 ruleset_version=ruleset.version,
             )
 
-    def _load_store(self, path: Path) -> None:
+    def _load_store(self, path: Path, sdk_key: str) -> None:
         """Seeds the client with the ruleset persisted at ``path`` as last_good.
 
-        An absent file is a first start; an unreadable or invalid one logs
-        store_failed and leaves the client at built_in.
+        An absent file is a first start; an unreadable or invalid one, or one
+        written under another key, logs store_failed and leaves the client at
+        built_in.
         """
         try:
-            found = _store.read(path)
+            found = _store.read(path, sdk_key)
             if found is None:
                 return
             document, written = found
             ruleset, raw = self._decode(document)
-        except (OSError, Rejected) as err:
+        except (OSError, Rejected, _store.StoreRefused) as err:
             self._log(logging.WARNING, _events.STORE_FAILED, path=str(path), op="load", cause=str(err))
             return
         # The file was written when the ruleset was received, so its age shows through received_at.
@@ -900,10 +903,11 @@ class Client:
         self._set_stage(Stage.LAST_GOOD)
 
     def _persist(self, document: bytes) -> None:
-        if self._store_path is None:
+        online = self._online
+        if self._store_path is None or online is None:
             return
         try:
-            _store.write(self._store_path, document)
+            _store.write(self._store_path, online.sdk_key, document)
         except OSError as err:
             self._log(
                 logging.WARNING, _events.STORE_FAILED, path=str(self._store_path), op="save", cause=str(err)

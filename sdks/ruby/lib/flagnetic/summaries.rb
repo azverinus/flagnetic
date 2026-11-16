@@ -155,7 +155,7 @@ module Flagnetic
       end
 
       wire_events = events.map { |e| wire(e) }
-      batches = EventBatch.pack(wire_events, @transport.identity)
+      batches = EventBatch.pack(wire_events, @transport.identity) { |_, err| report_unserialisable(err) }
       batches.each_with_index do |group, i|
         result = attempt(group, deadline)
         case result.kind
@@ -188,6 +188,8 @@ module Flagnetic
       events
     end
 
+    # wire scrubs the document because a flag key is whatever the caller
+    # passed to a getter, so it can be a string that is no UTF-8.
     def wire(event)
       doc = { "type" => "evaluation_summary", "event_id" => event.event_id,
               "interval_start" => EventBatch.format_time(event.interval_start),
@@ -197,7 +199,7 @@ module Flagnetic
                 { "flag" => r[:flag], "variation" => r[:variation], "reason" => r[:reason].to_s, "count" => r[:count] }
               end }
       doc["app_version"] = @app_version if @app_version
-      doc
+      EventBatch.scrub(doc)
     end
 
     def public_summary(event)

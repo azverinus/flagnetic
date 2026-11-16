@@ -121,7 +121,9 @@ export interface ServerOptions {
   readonly requestTimeout?: number;
   /**
    * A file path holding the last good ruleset: loaded as `last_good` before
-   * any network call, rewritten on every accepted ruleset.
+   * any network call, rewritten on every accepted ruleset. The file belongs
+   * to the SDK key that wrote it: one written under another key, or under
+   * none, is discarded with `store_failed`.
    */
   readonly store?: string;
   /** Reported in the User-Agent, in the events envelope and on every exposure: `node` by default. */

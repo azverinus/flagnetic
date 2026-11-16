@@ -373,7 +373,7 @@ func TestRefusedKeyClosesTheChangeStreamAndKeepsServing(t *testing.T) {
 	// The key was revoked while the service was down: the store holds the
 	// last good ruleset and every request, the stream included, is refused.
 	path := filepath.Join(t.TempDir(), "ruleset.json")
-	if err := os.WriteFile(path, []byte(documentAt(7)), 0o600); err != nil {
+	if err := os.WriteFile(path, flagnetic.StoreFile(serverKey, []byte(documentAt(7))), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

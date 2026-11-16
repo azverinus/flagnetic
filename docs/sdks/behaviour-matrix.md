@@ -1,6 +1,6 @@
 # SDK behaviour matrix
 
-Which protocol scenario each SDK passes. The scenarios are those of [`conformance/protocol`](../../conformance/protocol/README.md): `scenarios.json`, then `experiment-scenarios.json`, `foreground-scenarios.json`, `page-scenarios.json` and `versioning-scenarios.json`. A server-mode SDK runs every `server` scenario, a client-mode SDK every `client` scenario of where it runs, each with no skip list.
+Which protocol scenario each SDK passes. The scenarios are those of [`conformance/protocol`](../../conformance/protocol/README.md): `scenarios.json`, then `experiment-scenarios.json`, `foreground-scenarios.json`, `page-scenarios.json`, `stream-stability-scenarios.json` and `versioning-scenarios.json`. A server-mode SDK runs every `server` scenario, a client-mode SDK every `client` scenario of where it runs, each with no skip list.
 
 Each SDK's column is built from the report its own protocol runner writes: the scenarios that passed in that run, and nothing else. A scenario is never marked because of its mode or because a runner is meant to cover it, so the page can neither run ahead of the runners nor fall behind them. CI runs each runner with a report, rebuilds that SDK's column with `.github/scripts/behaviour-matrix.sh` and fails when the committed page differs.
 
@@ -69,6 +69,8 @@ The Dart runner plays the device scenarios on the VM and the page scenarios in C
 | client: a page made visible again refetches, at most once per 10 seconds | client |  |  | ✓ |  | ✓ |
 | client: the network coming back refetches, at most once per 10 seconds | client |  |  | ✓ |  | ✓ |
 | client: a hidden or closing page hands its events to a beacon | client |  |  | ✓ |  | ✓ |
+| server: a stream closed before its first heartbeat is retried with backoff | server |  |  |  |  |  |
+| client: a stream closed before its first heartbeat is retried with backoff | client |  |  |  |  |  |
 | server: a schema_version outside the supported range is a failure logged once | server | ✓ | ✓ | ✓ | ✓ |  |
 | client: a schema_version outside the supported range is a failure logged once | client |  |  | ✓ |  | ✓ |
 <!-- generated:matrix:end -->

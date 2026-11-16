@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import flagnetic
+from flagnetic import _store
 from mock_server import MockServer, Request, Response
 
 from conformance import ROOT, same_json
@@ -366,7 +367,7 @@ class Player:
             stored = self.scenario["given"].get("stored")
             if stored:
                 path = Path(tempfile.mkdtemp()) / "ruleset.json"
-                path.write_bytes(read(stored))
+                path.write_bytes(_store.encode(SDK_KEY, read(stored)))
                 kwargs["store"] = path
             self.script.last_end = time.monotonic()
             client = flagnetic.Client(SDK_KEY, server.url, **kwargs)

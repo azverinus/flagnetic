@@ -21,7 +21,7 @@ class MockServer
     def decoded_body
       return body unless self["content-encoding"].to_s.include?("gzip")
 
-      Zlib::GzipReader.new(StringIO.new(body)).read
+      Zlib::GzipReader.new(StringIO.new(body)).read.force_encoding(Encoding::UTF_8)
     end
 
     # events is the decoded body's events array, or [] for anything else.

@@ -17,7 +17,7 @@ npm install flagnetic
 
 ## Server mode
 
-`createServer(serverKey, baseUrl)` downloads the environment's [ruleset](ruleset.md), follows the [stream](stream.md) and evaluates every flag in the process, so a getter costs no request and stays under a millisecond at p99. `ready(timeout)` waits for the first ruleset and tells the stage reached (`fresh`, `last_good` from the `store` file, or `built_in`); it never rejects, and a getter serves your built-in default whenever it cannot evaluate. Exposures, aliases and evaluation summaries are queued and posted to [events](events.md); `close()` sends what is queued within 5 seconds, so call it when the process shuts down.
+`createServer(serverKey, baseUrl)` downloads the environment's [ruleset](ruleset.md), follows the [stream](stream.md) and evaluates every flag in the process, so a getter costs no request and stays under a millisecond at p99. `ready(timeout)` waits for the first ruleset and tells the stage reached (`fresh`, `last_good` from the `store` file, or `built_in`); it never rejects, and a getter serves your built-in default whenever it cannot evaluate. The `store` file is headed by a SHA-256 digest of the server key that wrote it: a file written under another key, such as another environment's, or by an SDK version that wrote no digest, is discarded with `store_failed` and rewritten on the next accepted ruleset. Exposures, aliases and evaluation summaries are queued and posted to [events](events.md); `close()` sends what is queued within 5 seconds, so call it when the process shuts down.
 
 ## Browser client
 

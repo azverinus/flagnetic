@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, test } from "vitest";
 import { createServerWith } from "../src/server/client.js";
+import { encodeStore } from "../src/server/store.js";
 import { VirtualClock } from "./support/virtual-clock.js";
 import type { TraceEvent } from "../src/server/delivery.js";
 import { LocalOverrideRefused, LocalOverridesNotAllowed, testServer } from "../src/server.js";
@@ -220,7 +221,7 @@ class Runner {
     let store: string | undefined;
     if (given.stored !== undefined) {
       store = join(await mkdtemp(join(tmpdir(), "flagnetic-protocol-")), "ruleset.json");
-      await writeFile(store, read(given.stored));
+      await writeFile(store, await encodeStore(key, read(given.stored)));
     }
     if (given.offline !== undefined) {
       // Offline makes no request and schedules nothing, so the public

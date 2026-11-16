@@ -31,7 +31,9 @@ client.close()
 The getters never block and never raise: they read the ruleset the client holds and serve the default you pass when
 they cannot serve the flag. One background thread fetches the ruleset with `If-None-Match`, holds the ruleset stream
 (a kill switch reaches the client within two seconds), polls every 30 seconds while the stream is down, and backs
-off with jitter. `store="/var/lib/app/flagnetic.json"` keeps the last good ruleset across restarts.
+off with jitter. `store="/var/lib/app/flagnetic.json"` keeps the last good ruleset across restarts. The file is headed
+by a digest of the SDK key, so one written under another key (another environment's, say) is discarded with
+`store_failed`.
 
 ## Experiments and events
 
