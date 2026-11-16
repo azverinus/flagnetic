@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/ruby/v0.1.1...sdks/ruby/v0.1.2) (2026-11-16)
+
+
+### Bug Fixes
+
+* **sdk-ruby:** back off from a stream closed before its first heartbeat ([#319](https://github.com/azverinus/flagnetic/issues/319)) ([51824cb](https://github.com/azverinus/flagnetic/commit/51824cb66f2e4aa41f1d15f4864935844a94a664))
+* **sdk-ruby:** bind the store file to the key it was received under ([#315](https://github.com/azverinus/flagnetic/issues/315)) ([56a2b99](https://github.com/azverinus/flagnetic/commit/56a2b99d010a4a3c6da6af938ac2512682d09c74))
+* **sdk-ruby:** match regular expressions in linear time ([#281](https://github.com/azverinus/flagnetic/issues/281)) ([b69c8f0](https://github.com/azverinus/flagnetic/commit/b69c8f0cbe03f3e2e6997c0fdace18658e1120d3))
+* **sdk-ruby:** read Unicode class names as the server does ([#310](https://github.com/azverinus/flagnetic/issues/310)) ([b1e3fa5](https://github.com/azverinus/flagnetic/commit/b1e3fa5781ff497d8cefced0b98f468aedcada83))
+* **sdk-ruby:** send a string that is no UTF-8 scrubbed, drop an unencodable event alone ([#307](https://github.com/azverinus/flagnetic/issues/307)) ([da7fe3f](https://github.com/azverinus/flagnetic/commit/da7fe3f36fde5fdaa649a45e4fe1eb9755d42540))
+
 ## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/ruby/v0.1.0...sdks/ruby/v0.1.1) (2026-11-11)
 
 
