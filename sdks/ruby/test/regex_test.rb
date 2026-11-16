@@ -26,6 +26,19 @@ class RegexTest < Minitest::Test
     end
   end
 
+  # Go 1.27 canonicalises script names as it does category aliases, so a
+  # script of several words is read under any spelling. The shared vectors
+  # leave these out because Go 1.26 refuses them.
+  def test_a_script_of_several_words_is_read_under_any_spelling_the_server_reads
+    ["\\p{Old_Italic}", "\\p{old italic}", "\\p{OLD-ITALIC}", "\\p{OldItalic}", "\\p{oLd_iTaLiC}",
+     "[\\p{Old_Italic}x]", "(?i)\\p{Old_Italic}"].each do |pattern|
+      assert matches(pattern, "\u{10300}"), "pattern #{pattern}"
+      assert_equal false, matches(pattern, "a"), "pattern #{pattern}"
+    end
+    assert_equal true, matches("\\P{Old_Italic}", "a")
+    assert_equal true, matches("\\p{^Old_Italic}", "a")
+  end
+
   # Each invalid byte is one U+FFFD, as Go decodes it, not one per
   # malformed sequence.
   def test_invalid_utf8_input_reads_as_replacement_characters

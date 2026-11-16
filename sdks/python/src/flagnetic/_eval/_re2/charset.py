@@ -121,8 +121,14 @@ def canonical_name(name: str) -> str:
 
 
 @cache
-def _aliases() -> dict[str, str]:
+def _category_aliases() -> dict[str, str]:
     return {canonical_name(alias): actual for alias, actual in tables.CATEGORY_ALIASES.items()}
+
+
+@cache
+def _script_names() -> dict[str, str]:
+    """Go's aliases.scripts: a script by its canonical name, so Old_Italic is read as OldItalic."""
+    return {canonical_name(name): name for name in tables.SCRIPTS}
 
 
 def _lookup(name: str) -> tuple[Ranges, Ranges, int] | None:
@@ -143,11 +149,18 @@ def _lookup(name: str) -> tuple[Ranges, Ranges, int] | None:
     ):
         if name in table:
             return _decode(table[name]), _decode(folds[name]) if name in folds else [], 1
-    actual = _aliases().get(name)
+    actual = _category_aliases().get(name)
     if actual is not None:
         return (
             _decode(tables.CATEGORIES[actual]),
             _decode(tables.FOLD_CATEGORIES[actual]) if actual in tables.FOLD_CATEGORIES else [],
+            1,
+        )
+    script = _script_names().get(name)
+    if script is not None:
+        return (
+            _decode(tables.SCRIPTS[script]),
+            _decode(tables.FOLD_SCRIPTS[script]) if script in tables.FOLD_SCRIPTS else [],
             1,
         )
     return None

@@ -119,6 +119,7 @@ Log events have stable names (`Flagnetic::EVENTS`); alert on the name, never on 
 | `key_revoked` | error, once per source until it recovers | `status`, `source` (`fetch`, `stream`) |
 | `schema_unsupported` | error, once | `schema_version`, `supported` |
 | `rule_unsupported` | error, once per flag and ruleset version | `flag`, `constructs`, `ruleset_version` |
+| `condition_invalid` | error, once per flag and ruleset version | `flag`, `conditions`, `ruleset_version` |
 | `override_set` | warn | `flag` |
 | `override_refused` | warn | `flag`, `reason` (`not_allowed`, `protected`), `environment` |
 | `local_overrides_allowed` | warn | |
@@ -134,6 +135,8 @@ Log events have stable names (`Flagnetic::EVENTS`); alert on the name, never on 
 | `queue_dropped` | warn | `kind` (`exposure_or_alias`, `evaluation_summary`), `cause` (`queue_full`, `not_serialisable`, `client_error`, `refused_by_the_platform`, `window_older_than_one_hour`) and what was dropped (`fault` for `not_serialisable`) |
 
 A ruleset from a newer server may hold constructs this SDK does not know. The client logs `rule_unsupported` once per flag and ruleset version, and the flag serves its default with the error code `inconsistent_ruleset`.
+
+A condition this SDK cannot evaluate although the server accepted it, such as a pattern its regular expression engine refuses, makes the flag serve its default with `inconsistent_ruleset` in this SDK only. The client logs `condition_invalid` once per flag and ruleset version when the ruleset loads, with the reason of each condition in `conditions`.
 
 ## Flagnetic.client
 

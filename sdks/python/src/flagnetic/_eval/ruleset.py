@@ -41,6 +41,7 @@ class Condition:
     __slots__ = (
         "attribute",
         "broken",
+        "error",
         "flag",
         "kind",
         "match",
@@ -53,6 +54,9 @@ class Condition:
     def __init__(self, kind: str) -> None:
         self.kind = kind
         self.broken = False
+        # Why the condition cannot be evaluated, set beside broken when the
+        # cause is not an unknown construct.
+        self.error = ""
         # Set beside broken when the condition holds an operator or condition
         # kind this evaluator does not know.
         self.unsupported: Construct | None = None
@@ -138,7 +142,16 @@ class Ruleset:
     so any number of threads read it at once without a lock.
     """
 
-    __slots__ = ("environment_key", "flags", "keys", "protected", "segments", "unsupported", "version")
+    __slots__ = (
+        "environment_key",
+        "flags",
+        "invalid",
+        "keys",
+        "protected",
+        "segments",
+        "unsupported",
+        "version",
+    )
 
     version: int
     environment_key: str
@@ -147,6 +160,7 @@ class Ruleset:
     segments: dict[str, Segment]
     keys: tuple[str, ...]
     unsupported: dict[str, list[Construct]]
+    invalid: dict[str, list[str]]
 
     def flag(self, key: str) -> Flag | None:
         """The flag with key, as the document has it, or None."""
@@ -160,6 +174,17 @@ class Ruleset:
         fully supports.
         """
         return {key: list(constructs) for key, constructs in self.unsupported.items()}
+
+    def invalid_conditions(self) -> dict[str, list[str]]:
+        """Why conditions of each flag cannot be evaluated by this evaluator, by flag key.
+
+        Apart from the unsupported constructs ``unsupported_rules`` reports: a
+        pattern outside what it reads, an undeclared attribute, a value of the
+        wrong type. Each reason comes once, in document order, for the
+        conditions of the flag's rules and of the segments they name. A flag
+        with none is absent.
+        """
+        return {key: list(reasons) for key, reasons in self.invalid.items()}
 
 
 # Go's int and int64, the widest integer a ruleset member holds: every
@@ -313,11 +338,13 @@ def _compile_condition(
         attribute_type = types.get(attribute)
         if attribute_type is None:
             cond.broken = True
+            cond.error = f"attribute {attribute!r} is not declared"
             return cond
         try:
             cond.match = compile_operator(attribute_type, op, raw.get("value"))
-        except OperatorError:
+        except OperatorError as err:
             cond.broken = True
+            cond.error = f"attribute {attribute!r}: {err}"
             return cond
         cond.attribute = attribute
         cond.unit = attribute in units
@@ -362,6 +389,11 @@ def _valid_experiment(serve: Serve, variations: Mapping[str, Any]) -> bool:
     return total == BUCKETS
 
 
+def _add_reason(reasons: list[str], cond: Condition) -> None:
+    if cond.error and not cond.unsupported and cond.error not in reasons:
+        reasons.append(cond.error)
+
+
 def _build(rs: Ruleset, top: Mapping[str, Any], types: dict[str, str], units: set[str]) -> None:
     rs.segments = {}
     for raw in _objects(top, "segments", "the document"):
@@ -379,6 +411,8 @@ def _build(rs: Ruleset, top: Mapping[str, Any], types: dict[str, str], units: se
                 conditions.append(broken)
                 if kind not in _CONDITION_KINDS:
                     _add(found, _unsupported("condition_kind", kind))
+                else:
+                    broken.error = f"segment {key!r} has a {kind!r} condition"
                 continue
             cond = _compile_condition(c, types, units, f"segment {key!r}")
             conditions.append(cond)
@@ -387,6 +421,7 @@ def _build(rs: Ruleset, top: Mapping[str, Any], types: dict[str, str], units: se
 
     rs.flags = {}
     rs.unsupported = {}
+    rs.invalid = {}
     keys: list[str] = []
     for raw in _objects(top, "flags", "the document"):
         f = Flag()
@@ -410,6 +445,7 @@ def _build(rs: Ruleset, top: Mapping[str, Any], types: dict[str, str], units: se
         )
         rules: list[Rule] = []
         found = []
+        reasons: list[str] = []
         for r in _objects(raw, "rules", where):
             rule_where = f"{where} rule {_string(r, 'id', where)!r}"
             conditions = []
@@ -417,10 +453,13 @@ def _build(rs: Ruleset, top: Mapping[str, Any], types: dict[str, str], units: se
                 cond = _compile_condition(c, types, units, rule_where)
                 conditions.append(cond)
                 _add(found, cond.unsupported)
+                _add_reason(reasons, cond)
                 segment = rs.segments.get(cond.segment) if cond.segment else None
                 if segment is not None:
                     for construct in segment.unsupported:
                         _add(found, construct)
+                    for member in segment.conditions:
+                        _add_reason(reasons, member)
             serve = Serve(_object(r.get("serve"), f"{rule_where}.serve"), rule_where)
             invalid = serve.kind == SERVE_EXPERIMENT and not _valid_experiment(serve, f.variations)
             if serve.kind not in _SERVE_KINDS:
@@ -429,6 +468,8 @@ def _build(rs: Ruleset, top: Mapping[str, Any], types: dict[str, str], units: se
         f.rules = tuple(rules)
         if found:
             rs.unsupported[f.key] = found
+        if reasons:
+            rs.invalid[f.key] = reasons
         rs.flags[f.key] = f
         keys.append(f.key)
     rs.keys = tuple(keys)
