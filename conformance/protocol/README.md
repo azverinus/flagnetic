@@ -75,7 +75,7 @@ Where the protocol leaves a choice, the scenarios decide, and every SDK must agr
 - A stream is stable once it has delivered a heartbeat; one closed before that, answered 200 or not, is a failed connection, and consecutive ones back off from 1 s to 30 s. A stream closed after a heartbeat is a routine close: the wait is 0–2 s and the backoff starts from its base again.
 - Scenarios about the stream set `poll_interval_ms` to an hour, so no safety poll interleaves with their requests.
 
-Durations are in the SDK's clock. A test that injects a clock advances it; one on real time may divide every duration of a scenario, options and windows alike, by one factor. Windows already allow a second of scheduling latency where a timer fires at a fixed time; backoff windows are full jitter, 0 up to the doubling bound: fetch retries from 1 s in server mode and 2 s in client mode to 5 minutes, 15 minutes while the key is refused; stream reconnects from 1 s to 30 s, 0–2 s after a server-side close.
+Durations are in the SDK's clock. A test that injects a clock advances it; one on real time may divide every duration of a scenario, options and windows alike, by one factor. Windows already allow a second of scheduling latency where a timer fires at a fixed time; backoff windows are full jitter, 0 up to the doubling bound: fetch retries from 1 s in server mode and 2 s in client mode to 5 minutes, 15 minutes while the key is refused; stream reconnects from 1 s to 30 s, 0–2 s after a server-side close of a stream that delivered a heartbeat.
 
 ## Not covered by documents
 
