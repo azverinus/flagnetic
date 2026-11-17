@@ -129,44 +129,57 @@ func NewRunDigestRound(d DigestDeps, slot governance.DigestSlot) *RunDigestRound
 // project that has not handled it, and records the slot for each, a project
 // with nothing stale included so that its slot is not reconsidered at the
 // next round. Outside the hour it does nothing: a slot missed while no
-// replica ran is skipped, not sent late. The whole round is one transaction
-// under a try lock and each slot is recorded in the transaction that queues
-// its event, so two replicas never send one slot twice, and a round that
-// fails is rolled back whole and tried again within the hour. A project
-// that no subscription asks the digest of is recorded without its report
-// being read.
+// replica ran is skipped, not sent late. Each project is handled in a
+// transaction of its own under a try lock, with its slot recorded in the
+// transaction that queues its event, so two replicas never send one slot
+// twice and no transaction outlives one project's report: a round over every
+// project in one transaction would hold the snapshot horizon back, and with
+// it every rollup and sink, for as long as the round takes. A project that
+// fails is rolled back alone and tried again at the next round within the
+// hour; the others are kept. A project that no subscription asks the digest
+// of is recorded without its report being read.
 func (h *RunDigestRound) Handle(ctx context.Context) error {
 	now := h.d.Clock.Now().UTC().Truncate(time.Microsecond)
 	slot, due := h.slot.Current(now)
 	if !due {
 		return nil
 	}
+	var projects []DigestProject
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		held, err := h.d.Store.TryLockDigest(ctx)
-		if err != nil {
+		if err := h.d.Store.PruneDigestSlots(ctx, slot.Add(-governance.DigestSlotsKept)); err != nil {
 			return err
 		}
-		if !held {
-			return errDigestElsewhere
+		var err error
+		projects, err = h.d.Store.ProjectsAwaitingDigest(ctx, slot)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	var failures []error
+	for _, p := range projects {
+		if err = ctx.Err(); err != nil {
+			return errors.Join(append(failures, err)...)
 		}
-		if err = h.d.Store.PruneDigestSlots(ctx, slot.Add(-governance.DigestSlotsKept)); err != nil {
-			return err
-		}
-		projects, err := h.d.Store.ProjectsAwaitingDigest(ctx, slot)
-		if err != nil {
-			return err
-		}
-		for _, p := range projects {
-			if err = h.send(ctx, p, slot, now); err != nil {
+		err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
+			held, err := h.d.Store.TryLockDigest(ctx)
+			if err != nil {
 				return err
 			}
+			if !held {
+				return errDigestElsewhere
+			}
+			return h.send(ctx, p, slot, now)
+		})
+		if errors.Is(err, errDigestElsewhere) {
+			// Another replica is on the round; it handles the rest.
+			break
 		}
-		return nil
-	})
-	if errors.Is(err, errDigestElsewhere) {
-		return nil
+		if err != nil {
+			failures = append(failures, err)
+		}
 	}
-	return err
+	return errors.Join(failures...)
 }
 
 // send handles slot for p.
