@@ -45,7 +45,7 @@ export type Problem = {
    */
   used_by?: Array<string>;
   /**
-   * Why a system the server asked did not answer as needed, for `provider_unreachable`; for `smtp_failed` the step that failed, `connection`, `tls`, `authentication` or `rejected`; for `sink_not_ready` the failure class of the target's check, such as `connect` or `status`.
+   * Why a system the server asked did not answer as needed, for `provider_unreachable`; for `sink_not_ready` the failure class of the target's check, such as `connect` or `status`.
    */
   failure?: string;
   /**
@@ -5372,7 +5372,7 @@ export type LinkMyIdentityErrors = {
    */
   422: Problem;
   /**
-   * `provider_unreachable` or `smtp_failed`: a system the server asked, such as an identity provider or the SMTP server, did not answer as needed; `failure` says why.
+   * `provider_unreachable` or `smtp_failed`: a system the server asked, such as an identity provider or the SMTP server, did not answer as needed; for `provider_unreachable` `failure` says why.
    */
   502: Problem;
 };
@@ -14681,7 +14681,7 @@ export type TestAuthProviderErrors = {
    */
   404: Problem;
   /**
-   * `provider_unreachable` or `smtp_failed`: a system the server asked, such as an identity provider or the SMTP server, did not answer as needed; `failure` says why.
+   * `provider_unreachable` or `smtp_failed`: a system the server asked, such as an identity provider or the SMTP server, did not answer as needed; for `provider_unreachable` `failure` says why.
    */
   502: Problem;
 };
@@ -15010,7 +15010,7 @@ export type SendTestMailErrors = {
    */
   409: Problem;
   /**
-   * `provider_unreachable` or `smtp_failed`: a system the server asked, such as an identity provider or the SMTP server, did not answer as needed; `failure` says why.
+   * `provider_unreachable` or `smtp_failed`: a system the server asked, such as an identity provider or the SMTP server, did not answer as needed; for `provider_unreachable` `failure` says why.
    */
   502: Problem;
 };
