@@ -40,7 +40,7 @@ func objectStorageSink() management.SinkCreate {
 func webhookSink() management.SinkCreate {
 	return management.SinkCreate{
 		Name: "Ingest", Kind: "webhook",
-		Webhook: &management.SinkWebhookInput{Url: ptr("https://receiver.example/sink")},
+		Webhook: &management.SinkWebhookInput{Url: ptr("https://receiver.example/sink/s3cret-path?token=s3cret-query")},
 	}
 }
 
@@ -162,6 +162,9 @@ func TestCreatingASinkOfEachKindSealsItsSecretMasksItAndStartsDisabled(t *testin
 		field := map[string]string{"clickhouse": "password", "object_storage": "secret_access_key", "webhook": "secret"}[tc.body.Kind]
 		if entries[0].Entity.Kind != "sink" || entries[0].Before != nil || sub[field] != "[redacted]" || strings.Contains(string(raw), tc.plaintext) {
 			t.Errorf("%s: audit entry %s", name, raw)
+		}
+		if strings.Contains(string(raw), "s3cret") {
+			t.Errorf("%s: audit entry records a target URL path or query: %s", name, raw)
 		}
 	}
 

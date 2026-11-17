@@ -428,3 +428,16 @@ func NewWebhookSecret(random io.Reader) (secret.String, error) {
 	}
 	return secret.New(base64.RawURLEncoding.EncodeToString(b)), nil
 }
+
+// TargetOrigin returns the scheme and host (with its port) of a target URL
+// and nothing else: the path, query, fragment and credentials of a webhook
+// URL commonly carry a secret, such as a Slack-style token, while the audit
+// log is readable by anyone who can read the project. Anything that does not
+// parse to an absolute URL with a host yields the empty string.
+func TargetOrigin(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
+}
