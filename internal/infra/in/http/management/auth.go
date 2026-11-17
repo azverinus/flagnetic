@@ -17,8 +17,27 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
-// SessionCookie is the name of the cookie a session is referred to by.
-const SessionCookie = "flagnetic_session"
+const (
+	// SessionCookie is the name of the cookie a session is referred to by where
+	// cookies cannot be Secure: on localhost, or when an operator allowed
+	// insecure cookies for a trial, since a browser refuses a __Host- cookie
+	// without Secure.
+	SessionCookie = "flagnetic_session"
+	// SecureSessionCookie is its name wherever cookies are Secure: the __Host-
+	// prefix makes a browser refuse one set by a sibling subdomain or without
+	// Secure, so another site of the domain cannot toss in a session of its own
+	// for the member to act in. Only this name is read there.
+	SecureSessionCookie = "__Host-flagnetic_session"
+)
+
+// SessionCookieName is the name of the session cookie where cookies are, or
+// are not, Secure.
+func SessionCookieName(secure bool) string {
+	if secure {
+		return SecureSessionCookie
+	}
+	return SessionCookie
+}
 
 // Options are how the management API treats browsers.
 type Options struct {
@@ -129,7 +148,7 @@ func sessionCookie(ctx context.Context, value string) string {
 // trial without TLS.
 func SessionCookieHeader(value string, secure bool) string {
 	c := http.Cookie{ //nolint:gosec // see above
-		Name: SessionCookie, Value: value, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode,
+		Name: SessionCookieName(secure), Value: value, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode,
 		Secure: secure,
 	}
 	if value == "" {

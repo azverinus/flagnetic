@@ -142,6 +142,17 @@ describe("a refusal in the member's language", () => {
   });
 });
 
+describe("a refusal to change who an identity is, or to link without a recent sign-in", () => {
+  it("is explained from its code", () => {
+    expect(problemMessage(i18n, refusal(409, { code: "provider_identities_linked" }))).toContain(
+      "Unlink those identities first",
+    );
+    expect(problemMessage(i18n, refusal(403, { code: "recent_sign_in_required" }))).toBe(
+      "Sign out and sign in again, then link the provider.",
+    );
+  });
+});
+
 describe("a field violation", () => {
   it("is explained from its code and params", () => {
     expect(

@@ -27,9 +27,13 @@ const (
 var ErrTooLarge = errors.New("the identity provider's answer is larger than 1 MiB")
 
 // NewClient returns a client whose requests time out, follow a few redirects
-// at most, never downgrade to plain http away from a loopback address, and
-// read no more than a megabyte of an answer. It connects to private networks:
-// only an instance admin names a provider.
+// at most, only on the host first asked, never downgrade to plain http away
+// from a loopback address, and read no more than a megabyte of an answer. A
+// redirect to another host is refused because the address an administrator
+// named is the only one they vouched for: a provider, or whatever answers in
+// its place, must not steer the instance to a host of its choosing inside the
+// network. It connects to private networks: only an instance admin names a
+// provider.
 func NewClient() *http.Client {
 	return &http.Client{
 		Timeout: timeout,
@@ -39,6 +43,9 @@ func NewClient() *http.Client {
 			}
 			if req.URL.Scheme != "https" && !identity.IsLoopbackHost(req.URL.Hostname()) {
 				return errors.New("the identity provider redirected to a plain http address")
+			}
+			if req.URL.Host != via[0].URL.Host {
+				return errors.New("the identity provider redirected to another host")
 			}
 			return nil
 		},
@@ -73,4 +80,26 @@ func (b *limitedBody) Read(p []byte) (int, error) {
 	n, err := b.ReadCloser.Read(p)
 	b.left -= int64(n)
 	return n, err
+}
+
+// WithoutErrorBodies returns a copy of c whose answers other than a success
+// carry no body. A failure that is shown to a person, such as the result of
+// testing a provider, then says what status the address answered with and
+// never hands on what an arbitrary address on the network returned.
+func WithoutErrorBodies(c *http.Client) *http.Client {
+	out := *c
+	out.Transport = bodiless{c.Transport}
+	return &out
+}
+
+type bodiless struct{ http.RoundTripper }
+
+func (b bodiless) RoundTrip(req *http.Request) (*http.Response, error) {
+	res, err := b.RoundTripper.RoundTrip(req)
+	if err != nil || (res.StatusCode >= 200 && res.StatusCode < 300) {
+		return res, err
+	}
+	_ = res.Body.Close()
+	res.Body = http.NoBody
+	return res, nil
 }

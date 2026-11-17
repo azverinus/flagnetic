@@ -15,6 +15,7 @@ import (
 	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
 	"github.com/azverinus/flagnetic/internal/domain/identity"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 )
 
@@ -51,17 +52,21 @@ type Options struct {
 	// SessionCookie returns the Set-Cookie value that carries a session
 	// cookie's value.
 	SessionCookie func(value string, secure bool) string
-	// SessionCookieName is the name of the session cookie, which a link
-	// completes in.
-	SessionCookieName string
+	// SessionCookieName returns the name of the session cookie, which a link
+	// completes in; secure says whether cookies set to the request are Secure.
+	SessionCookieName func(secure bool) string
 	// Metrics counts sign-ins; nil counts none.
 	Metrics *Metrics
+	// Clock times the limit on the sign-ins one address starts; nil for the
+	// system's.
+	Clock clock.Clock
 }
 
 type edge struct {
 	*flaghttp.Server
-	h Handlers
-	o Options
+	h      Handlers
+	o      Options
+	starts *startThrottle
 }
 
 // Mount serves the single sign-on addresses on s:
@@ -72,7 +77,7 @@ type edge struct {
 //	GET /sso/{provider}/metadata           serves the instance's SAML metadata
 //	GET /sso/complete/{attempt}            completes the sign-in in the browser that started it
 func Mount(s *flaghttp.Server, h Handlers, o Options) {
-	e := &edge{Server: s, h: h, o: o}
+	e := &edge{Server: s, h: h, o: o, starts: newStartThrottle(o.Clock)}
 	// One pattern serves them all: /sso/{provider}/start and
 	// /sso/complete/{attempt} overlap on /sso/complete/start, which the router
 	// cannot rank. The attempt in the address is a secret, never logged.
@@ -131,6 +136,10 @@ func AttemptCookie(value string, lifetime time.Duration, secure bool) string {
 }
 
 func (e *edge) start(w http.ResponseWriter, r *http.Request, slug string) {
+	if err := e.starts.allow(clientIP(r)); err != nil {
+		e.WriteError(w, r, err)
+		return
+	}
 	res, err := e.h.Start.Handle(r.Context(), appidentity.StartCommand{Slug: slug, ReturnTo: r.URL.Query().Get("return_to")})
 	if err != nil {
 		e.refuse(w, r, err)
@@ -196,7 +205,7 @@ func (e *edge) complete(w http.ResponseWriter, r *http.Request, token string) {
 		Name: name, Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
 	})
 	var session string
-	if c, err := r.Cookie(e.o.SessionCookieName); err == nil {
+	if c, err := r.Cookie(e.o.SessionCookieName(secure)); err == nil {
 		session = c.Value
 	}
 	res, err := e.h.Complete.Handle(r.Context(), appidentity.CompleteCommand{

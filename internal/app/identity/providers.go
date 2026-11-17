@@ -69,6 +69,9 @@ type ProviderStore interface {
 	// SetProviderEnabled stores p's enabled flag, update time and version.
 	SetProviderEnabled(ctx context.Context, p identity.Provider) error
 	DeleteProvider(ctx context.Context, provider identity.ProviderID) error
+	// HasIdentities reports whether any identity is linked through provider,
+	// reading in the unit of work ctx carries.
+	HasIdentities(ctx context.Context, provider identity.ProviderID) (bool, error)
 }
 
 // ProviderReference is something that depends on an auth provider, such as
@@ -129,6 +132,23 @@ const (
 	usedByEnforcedDomains = "enforced domains"
 	usedByOnlyWayIn       = "only way in"
 )
+
+var errIdentitiesLinked = apperrors.Conflict("provider_identities_linked",
+	"members have identities linked at this provider, whose subjects the new issuer or entity ID could repeat for other people: unlink them first, or create a new provider")
+
+// movesSubjects reports whether the edit from before to after, reading meta
+// as the identity provider's metadata, changes who the subjects of the
+// provider's identities are: the issuer of an OIDC provider, the entity ID of
+// a SAML one.
+func movesSubjects(before, after identity.Provider, meta *identity.IDPMetadata) bool {
+	switch {
+	case before.OIDC != nil && after.OIDC != nil:
+		return before.OIDC.Issuer != after.OIDC.Issuer
+	case before.SAML != nil && meta != nil:
+		return before.SAML.IDP.EntityID != meta.EntityID
+	}
+	return false
+}
 
 func providerInUse(detail string, uses []string) error {
 	return apperrors.Conflict("provider_in_use", detail).WithExtension("used_by", uses)
@@ -416,6 +436,18 @@ func (h *UpdateProvider) Handle(ctx context.Context, cmd UpdateProviderCommand) 
 			if !slices.Contains(after.Domains, d) {
 				return providerInUse("an enforced domain names this provider, which would no longer vouch for it; lift the enforcement first",
 					[]string{usedByEnforcedDomains})
+			}
+		}
+		if movesSubjects(before, after, meta) {
+			// An identity is its subject at the provider, which names a person
+			// only within one issuer or entity: a subject of the new one equal to
+			// a linked subject would sign in as the member who linked it.
+			linked, linkedErr := h.d.Store.HasIdentities(ctx, before.ID)
+			if linkedErr != nil {
+				return linkedErr
+			}
+			if linked {
+				return errIdentitiesLinked
 			}
 		}
 		if meta != nil && after.SAML != nil {

@@ -4916,6 +4916,10 @@ msgstr ""
 msgid "Members can no longer sign in through it. A provider that members have signed in through, or that granted access through its group mappings, cannot be deleted; disable it instead. This cannot be undone."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "Members have identities linked at this provider. Changing its issuer or entity ID could let another person sign in as one of them. Unlink those identities first, or create a new provider."
+msgstr ""
+
 #: src/components/project-invitations.tsx
 msgid "Members invited to the project"
 msgstr ""
@@ -7252,6 +7256,10 @@ msgstr ""
 
 #: src/components/personal-menu.tsx
 msgid "Sign out"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Sign out and sign in again, then link the provider."
 msgstr ""
 
 #: src/components/saml-provider-form.tsx

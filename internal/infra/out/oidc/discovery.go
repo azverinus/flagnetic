@@ -18,8 +18,11 @@ type Discoverer struct{ client *http.Client }
 
 var _ appidentity.OIDCDiscoverer = (*Discoverer)(nil)
 
-// NewDiscoverer returns a discoverer that fetches as idphttp's client does.
-func NewDiscoverer() *Discoverer { return &Discoverer{client: idphttp.NewClient()} }
+// NewDiscoverer returns a discoverer that fetches as idphttp's client does, and
+// reports an answer that is not a success by its status alone.
+func NewDiscoverer() *Discoverer {
+	return &Discoverer{client: idphttp.WithoutErrorBodies(idphttp.NewClient())}
+}
 
 // Discover fetches the discovery document of issuer and checks it names
 // issuer itself.

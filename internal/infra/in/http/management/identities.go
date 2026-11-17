@@ -73,6 +73,7 @@ func (a *api) LinkMyIdentity(ctx context.Context, req LinkMyIdentityRequestObjec
 	started, err := a.h.StartLink.Handle(ctx, appidentity.StartLinkCommand{
 		Slug: req.Provider, ReturnTo: returnTo,
 		Member: identityMemberOf(c.Member.ID), Session: id.FromBytes[identity.Session](c.Session.ID.Bytes()),
+		SessionOpenedAt: c.Session.CreatedAt,
 	})
 	if err != nil {
 		return nil, err

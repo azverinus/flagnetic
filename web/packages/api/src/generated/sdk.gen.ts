@@ -1038,7 +1038,9 @@ export const listMyIdentities = <ThrowOnError extends boolean = false>(
  * member nothing is linked and the browser lands on the settings page
  * with `error=identity_linked`; any other failure lands there with its
  * sign-in code. A disabled or unknown provider is not found. Only a
- * session may do this.
+ * session may do this, and only one that signed in in the last 15
+ * minutes: an older one is refused 403 `recent_sign_in_required`, and
+ * the member signs in again first.
  *
  */
 export const linkMyIdentity = <ThrowOnError extends boolean = false>(
@@ -5232,7 +5234,13 @@ export const getAuthProvider = <ThrowOnError extends boolean = false>(
  * is changed with `enable` and `disable`. Refused as a creation is, and
  * 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
  * drops a domain enforced to the provider: lift the enforcement first.
- * Audited `auth_provider.updated`; an edit that changes nothing is not.
+ * Changing the `issuer` of an OIDC provider, or the identity provider
+ * whose entity ID differs in new SAML metadata, while members have
+ * identities linked at it is 409 `provider_identities_linked`: a subject
+ * of the new issuer equal to a linked one would sign in as the member who
+ * linked it, so the identities are unlinked first or a new provider is
+ * created. Audited `auth_provider.updated`; an edit that changes nothing
+ * is not.
  *
  */
 export const updateAuthProvider = <ThrowOnError extends boolean = false>(
