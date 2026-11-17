@@ -2,6 +2,7 @@ package sdk_test
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"net/netip"
 	"strconv"
@@ -386,28 +387,33 @@ func TestRefusedKeysFromOneIPv6_64AreCountedTogether(t *testing.T) {
 
 func TestAReplicaHoldsAtMostItsClientStreamsWhateverTheirKeysAndIPs(t *testing.T) {
 	srv := testkit.StartServer(t, behindAProxy(), limits(func(l *config.RateLimits) {
-		l.ClientStreamsPerReplica, l.ClientConcurrentStreams = 2, 0
+		l.ClientStreamsPerReplica, l.ClientConcurrentStreams = 4, 0
 	}))
 	p := newProject(t, srv)
-	_, one := p.sdkKey(t, "production", management.SdkKeyKindClient)
-	_, two := p.sdkKey(t, "production", management.SdkKeyKindClient)
+	var values []string
+	for range 5 {
+		_, v := p.sdkKey(t, "production", management.SdkKeyKindClient)
+		values = append(values, v)
+	}
 	_, serverKey := p.sdkKey(t, "production", management.SdkKeyKindServer)
 
-	first := openStream(t, srv, &sdk.StreamRulesetParams{SdkKey: &one}, fromIP("192.0.2.1"))
+	first := openStream(t, srv, &sdk.StreamRulesetParams{SdkKey: &values[0]}, fromIP("192.0.2.1"))
 	first.started(t)
-	openStream(t, srv, &sdk.StreamRulesetParams{SdkKey: &two}, fromIP("192.0.2.2")).started(t)
-	res := do(client(t, srv).StreamRulesetWithResponse(t.Context(), &sdk.StreamRulesetParams{SdkKey: &one}, fromIP("192.0.2.3")))
-	rateLimited(t, "a third client stream on the replica", res.StatusCode(), res.HTTPResponse.Header, res.Body, 2)
+	for i, value := range values[1:4] {
+		openStream(t, srv, &sdk.StreamRulesetParams{SdkKey: &value}, fromIP(fmt.Sprintf("192.0.2.%d", i+2))).started(t)
+	}
+	res := do(client(t, srv).StreamRulesetWithResponse(t.Context(), &sdk.StreamRulesetParams{SdkKey: &values[4]}, fromIP("192.0.2.9")))
+	rateLimited(t, "a fifth client stream on the replica", res.StatusCode(), res.HTTPResponse.Header, res.Body, 4)
 	if got := testkit.Metric(t, srv.Scrape(t), `flagnetic_sdk_rate_limited_total{endpoint="stream",kind="client"}`); got != 1 {
 		t.Errorf("client stream refusals counted = %v, want 1", got)
 	}
 	// A server key's streams are bounded by their own limit alone.
-	openStream(t, srv, nil, bearer(serverKey), fromIP("192.0.2.4")).started(t)
+	openStream(t, srv, nil, bearer(serverKey), fromIP("192.0.2.10")).started(t)
 
 	// A client stream that ends gives its place back.
 	_ = first.res.Body.Close()
 	if !eventually(5*time.Second, func() bool {
-		s := openStream(t, srv, &sdk.StreamRulesetParams{SdkKey: &two}, fromIP("192.0.2.5"))
+		s := openStream(t, srv, &sdk.StreamRulesetParams{SdkKey: &values[4]}, fromIP("192.0.2.11"))
 		defer func() { _ = s.res.Body.Close() }()
 		return s.res.StatusCode == http.StatusOK
 	}) {
@@ -415,9 +421,9 @@ func TestAReplicaHoldsAtMostItsClientStreamsWhateverTheirKeysAndIPs(t *testing.T
 	}
 }
 
-func TestAClientStreamPastBothItsKeysAndTheReplicasLimitIsRefusedByItsKeys(t *testing.T) {
+func TestAClientStreamPastBothItsKeysLimitAndItsKeysShareIsRefusedByItsKeyLimit(t *testing.T) {
 	srv := testkit.StartServer(t, behindAProxy(), limits(func(l *config.RateLimits) {
-		l.ClientStreamsPerReplica, l.ClientConcurrentStreams = 3, 1
+		l.ClientStreamsPerReplica, l.ClientConcurrentStreams = 12, 1
 	}))
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindClient)
@@ -429,5 +435,38 @@ func TestAClientStreamPastBothItsKeysAndTheReplicasLimitIsRefusedByItsKeys(t *te
 	res := do(client(t, srv).StreamRulesetWithResponse(t.Context(), params, fromIP("192.0.2.1")))
 	rateLimited(t, "a second stream of one key and IP on a full replica", res.StatusCode(), res.HTTPResponse.Header, res.Body, 1)
 	res = do(client(t, srv).StreamRulesetWithResponse(t.Context(), params, fromIP("192.0.2.4")))
-	rateLimited(t, "a first stream of another IP on a full replica", res.StatusCode(), res.HTTPResponse.Header, res.Body, 3)
+	rateLimited(t, "a first stream of another IP past the key's share", res.StatusCode(), res.HTTPResponse.Header, res.Body, 3)
+}
+
+func TestOneClientKeyHoldsAQuarterOfTheClientStreamsOfAReplicaAtMost(t *testing.T) {
+	srv := testkit.StartServer(t, behindAProxy(), limits(func(l *config.RateLimits) {
+		l.ClientStreamsPerReplica, l.ClientConcurrentStreams = 8, 0
+	}))
+	p := newProject(t, srv)
+	_, noisy := p.sdkKey(t, "production", management.SdkKeyKindClient)
+	_, quiet := p.sdkKey(t, "production", management.SdkKeyKindClient)
+
+	var held []*stream
+	for _, ip := range []string{"192.0.2.1", "192.0.2.2"} {
+		s := openStream(t, srv, &sdk.StreamRulesetParams{SdkKey: &noisy}, fromIP(ip))
+		s.started(t)
+		held = append(held, s)
+	}
+	res := do(client(t, srv).StreamRulesetWithResponse(t.Context(), &sdk.StreamRulesetParams{SdkKey: &noisy}, fromIP("192.0.2.3")))
+	rateLimited(t, "a third stream of one key on a replica of eight", res.StatusCode(), res.HTTPResponse.Header, res.Body, 2)
+
+	// The other keys keep their places.
+	for _, ip := range []string{"192.0.2.4", "192.0.2.5"} {
+		openStream(t, srv, &sdk.StreamRulesetParams{SdkKey: &quiet}, fromIP(ip)).started(t)
+	}
+
+	// A stream of the key that ends gives its place back to the key.
+	_ = held[0].res.Body.Close()
+	if !eventually(5*time.Second, func() bool {
+		s := openStream(t, srv, &sdk.StreamRulesetParams{SdkKey: &noisy}, fromIP("192.0.2.6"))
+		defer func() { _ = s.res.Body.Close() }()
+		return s.res.StatusCode == http.StatusOK
+	}) {
+		t.Error("the place of the stream of the key that ended was never given back")
+	}
 }

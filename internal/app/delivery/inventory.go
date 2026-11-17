@@ -3,7 +3,6 @@ package delivery
 import (
 	"context"
 	"errors"
-	"slices"
 	"sync"
 	"time"
 
@@ -17,8 +16,9 @@ type InventoryStore interface {
 	// LockSDKInventory holds, until the unit of work ends, the right to add
 	// rows of key to the inventory.
 	LockSDKInventory(ctx context.Context, key delivery.SDKKeyID) error
-	// InventoryOfKey returns the identities of the rows key holds.
-	InventoryOfKey(ctx context.Context, key delivery.SDKKeyID) ([]delivery.InventoryIdentity, error)
+	// TrimInventory deletes the rows of key beyond the newest max by last
+	// time seen, the oldest first, and returns how many.
+	TrimInventory(ctx context.Context, key delivery.SDKKeyID, max int) (int, error)
 	// RecordInventory records a sighting of an SDK: a new row, or the row's
 	// last time and ruleset version moved on, unless the row was seen less
 	// than delivery.InventoryInterval before with the same ruleset version,
@@ -37,14 +37,21 @@ type InventoryStore interface {
 // request.
 const maxPendingInventory = 1024
 
+// maxPendingInventoryPerKey bounds the rows of one key a replica holds
+// between two rounds, a sixteenth of the queue: any caller of a client key
+// sets its own User-Agent, so without a share of its own a handful of
+// requests would take every place and the SDKs of every other key would go
+// unrecorded.
+const maxPendingInventoryPerKey = 64
+
 // InventoryDrops counts the sightings a replica dropped since the last
 // round, by why.
 type InventoryDrops struct {
 	// QueueFull counts sightings of a new row that found every place of the
 	// replica's queue taken.
 	QueueFull int
-	// KeyFull counts sightings of a new row whose key held
-	// delivery.MaxInventoryRowsPerKey rows already.
+	// KeyFull counts sightings of a new row whose key held its share of the
+	// replica's queue already.
 	KeyFull int
 	// WriteFailed counts sightings held but lost because writing their
 	// key's failed.
@@ -64,12 +71,14 @@ type SDKInventory struct {
 
 	mu      sync.Mutex
 	pending map[delivery.InventoryIdentity]delivery.InventorySighting
+	// perKey counts the rows of pending by key.
+	perKey  map[delivery.SDKKeyID]int
 	dropped InventoryDrops
 }
 
 // NewSDKInventory returns the replica's gatherer of the SDK inventory.
 func NewSDKInventory(tx Transactor, store InventoryStore, c clock.Clock) *SDKInventory {
-	return &SDKInventory{tx: tx, store: store, clock: c, pending: map[delivery.InventoryIdentity]delivery.InventorySighting{}}
+	return &SDKInventory{tx: tx, store: store, clock: c, pending: map[delivery.InventoryIdentity]delivery.InventorySighting{}, perKey: map[delivery.SDKKeyID]int{}}
 }
 
 // Note keeps a request of key's SDK, naming the app version its context
@@ -90,6 +99,11 @@ func (i *SDKInventory) Note(key delivery.SDKKey, sdk delivery.SDKIdentity, appVe
 		i.dropped.QueueFull++
 		return
 	}
+	if i.perKey[s.Key] >= maxPendingInventoryPerKey {
+		i.dropped.KeyFull++
+		return
+	}
+	i.perKey[s.Key]++
 	i.pending[s.InventoryIdentity] = s
 }
 
@@ -111,6 +125,7 @@ func (i *SDKInventory) Flush(ctx context.Context) error {
 	i.mu.Lock()
 	pending := i.pending
 	i.pending = map[delivery.InventoryIdentity]delivery.InventorySighting{}
+	i.perKey = map[delivery.SDKKeyID]int{}
 	i.mu.Unlock()
 	byKey := map[delivery.SDKKeyID][]delivery.InventorySighting{}
 	for _, s := range pending {
@@ -118,14 +133,12 @@ func (i *SDKInventory) Flush(ctx context.Context) error {
 	}
 	var first error
 	for key, seen := range byKey {
-		full, err := i.write(ctx, key, seen)
-		i.mu.Lock()
+		err := i.write(ctx, key, seen)
 		if err != nil {
+			i.mu.Lock()
 			i.dropped.WriteFailed += len(seen)
-		} else {
-			i.dropped.KeyFull += full
+			i.mu.Unlock()
 		}
-		i.mu.Unlock()
 		if err != nil && first == nil {
 			first = err
 		}
@@ -133,46 +146,24 @@ func (i *SDKInventory) Flush(ctx context.Context) error {
 	return first
 }
 
-// write records the sightings of key: a row the key holds is updated, and a
-// new row added while the key holds fewer than
-// delivery.MaxInventoryRowsPerKey, in identity order so that which rows are
-// kept does not depend on chance. The key is locked for the unit of work so
-// that replicas writing at once never take it past its bound. It returns
-// how many sightings were not recorded because the key was full.
-func (i *SDKInventory) write(ctx context.Context, key delivery.SDKKeyID, seen []delivery.InventorySighting) (int, error) {
-	slices.SortFunc(seen, func(a, b delivery.InventorySighting) int {
-		return delivery.CompareInventoryIdentities(a.InventoryIdentity, b.InventoryIdentity)
-	})
-	var full int
-	err := i.tx.Within(ctx, func(ctx context.Context) error {
-		full = 0
+// write records the sightings of key, then drops the rows beyond the
+// delivery.MaxInventoryRowsPerKey it may hold, the oldest seen first: the
+// SDKs in use stay listed and the ones that stopped make room. The key is
+// locked for the unit of work so that replicas writing at once never take
+// it past its bound.
+func (i *SDKInventory) write(ctx context.Context, key delivery.SDKKeyID, seen []delivery.InventorySighting) error {
+	return i.tx.Within(ctx, func(ctx context.Context) error {
 		if err := i.store.LockSDKInventory(ctx, key); err != nil {
 			return err
 		}
-		stored, err := i.store.InventoryOfKey(ctx, key)
-		if err != nil {
-			return err
-		}
-		known := make(map[delivery.InventoryIdentity]bool, len(stored))
-		for _, id := range stored {
-			known[id] = true
-		}
-		count := len(stored)
 		for _, s := range seen {
-			if !known[s.InventoryIdentity] {
-				if count >= delivery.MaxInventoryRowsPerKey {
-					full++
-					continue
-				}
-				count++
-			}
 			if err := i.store.RecordInventory(ctx, s); err != nil {
 				return err
 			}
 		}
-		return nil
+		_, err := i.store.TrimInventory(ctx, key, delivery.MaxInventoryRowsPerKey)
+		return err
 	})
-	return full, err
 }
 
 // ListSDKInventory answers a member which SDKs use an environment.

@@ -18,7 +18,7 @@ const SDKInventoryName = "sdk_inventory"
 // SDKInventory returns the worker writing the SDKs the replica saw making
 // requests, once a minute: a row is written at most that often anyway, and
 // no request waits on the write. The sightings the round dropped, because
-// the replica held too many, their key held as many rows as it may, or
+// the replica held too many, their key held its share of the replica's places already, or
 // writing them failed, are counted in flagnetic_sdk_inventory_dropped_total,
 // registered on reg, and logged as one warning with their count.
 func SDKInventory(i *appdelivery.SDKInventory, log *slog.Logger, reg prometheus.Registerer) Worker {

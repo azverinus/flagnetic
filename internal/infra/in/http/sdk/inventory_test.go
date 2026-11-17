@@ -164,7 +164,7 @@ func TestTheInventoryForgetsSDKsNotSeenForTheRetention(t *testing.T) {
 	}
 }
 
-func TestAKeyHoldsAtMost200InventoryRows(t *testing.T) {
+func TestAFullKeyEvictsItsOldestInventoryRowsForNewOnes(t *testing.T) {
 	start := time.Date(2026, 9, 19, 10, 0, 0, 0, time.UTC)
 	c := clock.NewFake(start)
 	srv := testkit.StartServer(t, testkit.WithClock(c))
@@ -178,12 +178,11 @@ func TestAKeyHoldsAtMost200InventoryRows(t *testing.T) {
 		}
 	}
 	version := func(n int) string { return fmt.Sprintf("1.0.%03d", n) }
-	for n := range 201 {
-		fetch(server, version(n))
-	}
-	fetch(other, version(0))
-	if err := srv.Tick(t, worker.SDKInventoryName); err != nil {
-		t.Fatal(err)
+	round := func() {
+		t.Helper()
+		if err := srv.Tick(t, worker.SDKInventoryName); err != nil {
+			t.Fatal(err)
+		}
 	}
 	rows := func() map[string][]string {
 		out := map[string][]string{}
@@ -192,42 +191,96 @@ func TestAKeyHoldsAtMost200InventoryRows(t *testing.T) {
 		}
 		return out
 	}
-	got := rows()
-	if len(got[otherKey.KeyId]) != 1 || len(got) != 2 {
+	// A replica holds 64 rows of a key between two rounds, so the key
+	// fills over several.
+	for from := 0; from < 200; from += 50 {
+		for n := from; n < from+50; n++ {
+			fetch(server, version(n))
+		}
+		round()
+		c.Advance(time.Second)
+	}
+	fetch(other, version(0))
+	round()
+	if got := rows(); len(got) != 2 || len(got[otherKey.KeyId]) != 1 {
 		t.Fatalf("keys = %d, other key's rows = %v, want each key bounded on its own", len(got), got[otherKey.KeyId])
 	}
+
+	// Ten new rows push out the ten oldest, not the newest ones away.
+	c.Advance(time.Minute)
+	for n := 200; n < 210; n++ {
+		fetch(server, version(n))
+	}
+	round()
+	got := rows()
 	var full []string
 	for k, versions := range got {
 		if k != otherKey.KeyId {
 			full = versions
 		}
 	}
-	if len(full) != 200 || slices.Contains(full, version(200)) {
-		t.Errorf("the key's rows = %d, holding %s: %t; want the first 200 in order", len(full), version(200), slices.Contains(full, version(200)))
+	if len(full) != 200 {
+		t.Fatalf("the key's rows = %d, want 200", len(full))
 	}
-	if n := testkit.Metric(t, srv.Scrape(t), `flagnetic_sdk_inventory_dropped_total{reason="key_full"}`); n != 1 {
-		t.Errorf("key_full drops = %v, want 1", n)
+	for n := range 210 {
+		if want := n >= 10; slices.Contains(full, version(n)) != want {
+			t.Errorf("row %s kept = %t, want %t: the ten oldest go first", version(n), !want, want)
+		}
 	}
-	warnings := srv.Logs.Find("SDK inventory sightings dropped")
-	if len(warnings) != 1 || warnings[0].Level != slog.LevelWarn || warnings[0].Attrs["dropped"] != int64(1) || warnings[0].Attrs["key_full"] != int64(1) {
-		t.Fatalf("warnings = %+v, want one counting the sighting beyond the key's 200 rows", warnings)
+	if len(got[otherKey.KeyId]) != 1 {
+		t.Errorf("another key's rows = %v, want them left alone", got[otherKey.KeyId])
 	}
 
-	c.Advance(2 * time.Minute)
-	fetch(server, version(5))
-	fetch(server, version(201))
+	// A row seen again is not the oldest any more.
+	c.Advance(time.Minute)
+	fetch(server, version(10))
+	round()
+	c.Advance(time.Minute)
+	fetch(server, version(210))
+	round()
+	for k, v := range rows() {
+		if k != otherKey.KeyId {
+			full = v
+		}
+	}
+	if !slices.Contains(full, version(10)) || slices.Contains(full, version(11)) || !slices.Contains(full, version(210)) {
+		t.Errorf("after one row was seen again and one added: holds 10 = %t, 11 = %t, 210 = %t; want true, false, true",
+			slices.Contains(full, version(10)), slices.Contains(full, version(11)), slices.Contains(full, version(210)))
+	}
+}
+
+func TestOneKeyCannotTakeTheWholeInventoryQueueOfAReplica(t *testing.T) {
+	srv := testkit.StartServer(t)
+	p := newProject(t, srv)
+	_, noisy := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	_, quiet := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	for n := range 70 {
+		if res := ruleset(t, srv, noisy, header("User-Agent", fmt.Sprintf("flagnetic-go/1.0.%03d (linux)", n))); res.StatusCode() != http.StatusOK {
+			t.Fatalf("ruleset = %d", res.StatusCode())
+		}
+	}
+	if res := ruleset(t, srv, quiet, header("User-Agent", "flagnetic-go/2.0.0 (linux)")); res.StatusCode() != http.StatusOK {
+		t.Fatalf("ruleset = %d", res.StatusCode())
+	}
 	if err := srv.Tick(t, worker.SDKInventoryName); err != nil {
 		t.Fatal(err)
 	}
+	var noisyRows, quietRows int
 	for _, r := range inventory(t, p.admin, p, "production") {
-		if r.SdkVersion == version(201) {
-			t.Errorf("a new row of a full key was recorded: %+v", r)
-		}
-		if r.SdkVersion == version(5) && !r.LastSeen.Equal(start.Add(2*time.Minute)) {
-			t.Errorf("a row the full key holds was not updated: last seen %v", r.LastSeen)
+		if r.SdkVersion == "2.0.0" {
+			quietRows++
+		} else {
+			noisyRows++
 		}
 	}
-	if n := testkit.Metric(t, srv.Scrape(t), `flagnetic_sdk_inventory_dropped_total{reason="key_full"}`); n != 2 {
-		t.Errorf("key_full drops = %v, want 2", n)
+	if noisyRows != 64 || quietRows != 1 {
+		t.Errorf("rows of the noisy key = %d, of the quiet key = %d; want 64 and 1", noisyRows, quietRows)
+	}
+	warnings := srv.Logs.Find("SDK inventory sightings dropped")
+	if len(warnings) != 1 || warnings[0].Level != slog.LevelWarn || warnings[0].Attrs["dropped"] != int64(6) || warnings[0].Attrs["key_full"] != int64(6) {
+		t.Fatalf("warnings = %+v, want one counting the six sightings beyond the key's 64", warnings)
+	}
+	if n := testkit.Metric(t, srv.Scrape(t), `flagnetic_sdk_inventory_dropped_total{reason="key_full"}`); n != 6 {
+		t.Errorf("key_full drops = %v, want 6", n)
 	}
 }
