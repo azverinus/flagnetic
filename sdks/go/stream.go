@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 	"time"
 )
 
@@ -120,10 +121,30 @@ func (c *Client) streamOnce(ctx context.Context) (outcome streamOutcome, stable 
 	if lastEventID > 0 {
 		req.Header.Set("Last-Event-ID", strconv.FormatInt(lastEventID, 10))
 	}
+	// The stream's client has no Timeout, so that an open stream may last
+	// an hour; the wait for the response to start is bounded like any other
+	// request, or a connection that is accepted and never answered would
+	// hold this attempt, and every reconnect after it, for good. The bound
+	// is stopped once the headers arrive: from then on the heartbeat
+	// timeout watches the stream.
+	var headersLate atomic.Bool
+	headerTimer := time.AfterFunc(c.wait.requestTimeout, func() {
+		headersLate.Store(true)
+		cancel()
+	})
 	resp, err := c.streamHTTP.Do(req)
+	// Stop reports false when the timer has fired, which may be just after
+	// the headers arrived: the request is cancelled either way.
+	timedOut := !headerTimer.Stop() && headersLate.Load()
 	// The first fetch waits for this attempt, so that the stream is open
 	// before it and no change falls between the two.
 	c.firstAttemptDone()
+	if timedOut {
+		if err == nil {
+			_ = resp.Body.Close()
+		}
+		err = fmt.Errorf("stream: no response within %v: %w", c.wait.requestTimeout, context.DeadlineExceeded)
+	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return streamStopped, false
