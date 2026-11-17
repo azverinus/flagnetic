@@ -57,10 +57,11 @@ This runs PostgreSQL, applies the migrations and starts the server on http://loc
 docker compose exec flagnetic flagnetic admin bootstrap --email you@example.com
 ```
 
-Then create a project, or import the [demo project](docs/install.md#try-it-with-the-demo-project) to look around, add an SDK key to one of its environments, and follow the [SDK](#sdks) for your language.
+[A first flag in ten minutes](docs/quickstart.md) goes on from here to a flag evaluated by the Go or JavaScript SDK, and changed while it runs. Or import the [demo project](docs/install.md#try-it-with-the-demo-project) to look around, add an SDK key to one of its environments, and follow the [SDK](#sdks) for your language.
 
 ## Documentation
 
+- [A first flag in ten minutes](docs/quickstart.md): compose up to a flag an SDK evaluates.
 - [Installing Flagnetic](docs/install.md): Docker Compose or the binary, TLS and a reverse proxy, PostgreSQL, upgrades.
 - [Operations](docs/operations.md) and the [configuration reference](docs/configuration.md).
 - [Flags](docs/flags.md), [segments](docs/segments.md), [targeting](docs/targeting.md) and [access](docs/access.md).
