@@ -1063,6 +1063,26 @@ void main() {
         ),
       ]);
     });
+
+    test('the offline document answers every context, so a context change '
+        'still records the exposure', () async {
+      final client = Flagnetic.client(
+        clientKey,
+        context: testContext,
+        options: ClientOptions(
+          offline: OfflineSource.document(experimentValues()),
+        ),
+      );
+      addTearDown(client.close);
+
+      await client.setContext(
+        const FlagneticContext(units: {'user': 'u-2002'}),
+      );
+      expect(client.getBool('checkout', false), isTrue);
+      client.exposure('checkout');
+
+      expect(client.offline!.recorded.map((e) => e['type']), ['exposure']);
+    });
   });
 }
 

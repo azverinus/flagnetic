@@ -368,8 +368,9 @@ export class FlagneticClient {
 
   /**
    * Replaces the context and evaluates it. The previous values keep serving
-   * until the response arrives, so signing in causes no flash of defaults;
-   * the promise resolves with the stage the new values reached (`fresh`
+   * until the response arrives, so signing in causes no flash of defaults,
+   * but record no exposure, since their assignments belong to the previous
+   * context; the promise resolves with the stage the new values reached (`fresh`
    * once they arrived, `last_good` when the request failed) and the change
    * listeners receive the keys whose value differs. Never rejects.
    */

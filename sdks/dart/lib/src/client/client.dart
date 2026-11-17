@@ -386,7 +386,9 @@ final class FlagneticClient {
   ///
   /// The values held keep serving until then, at stage `last_good`: they
   /// answer the previous context, so signing in causes no flash of built-in
-  /// defaults. When the answer arrives the stage is `fresh` again and the
+  /// defaults. Their experiment assignments belong to the previous context,
+  /// so no exposure, automatic or explicit, is recorded for them. When the
+  /// answer arrives the stage is `fresh` again and the
   /// change listeners receive the keys whose value differs. Keep the
   /// anonymous unit in [FlagneticContext.units] alongside the user unit so that a
   /// cross-sign-up experiment keeps its assignment.
@@ -401,7 +403,9 @@ final class FlagneticClient {
       // The details held answer the previous context; an exposure reports
       // the detail of the context the flag was evaluated for.
       _details.clear();
-      _valuesAnswerContext = false;
+      // An offline document is no context's answer: it serves every context
+      // alike, and no other answer will come to replace it.
+      _valuesAnswerContext = _offline != null && _values != null;
       if (_values != null) {
         // The held values answer the previous context, so they are stale
         // from here: last good, not fresh. No attempt failed, so this is
