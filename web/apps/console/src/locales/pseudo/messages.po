@@ -6142,6 +6142,10 @@ msgstr ""
 msgid "Project: {label}"
 msgstr ""
 
+#: src/components/project-switcher.tsx
+msgid "Project: {label} {shown}"
+msgstr ""
+
 #: src/components/area-screens.ts
 #: src/components/project-switcher.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx

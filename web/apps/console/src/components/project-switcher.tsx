@@ -50,7 +50,7 @@ export function ProjectSwitcher() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={t`Project: ${label}`}
+          aria-label={shown ? t`Project: ${label} ${shown}` : t`Project: ${label}`}
           className={cn(
             "flex h-12 w-full min-w-0 items-center gap-2.5 rounded-lg px-2 text-left text-sm transition-colors hover:bg-foreground/[0.06]",
             collapsed && "justify-center px-0",
@@ -64,7 +64,7 @@ export function ProjectSwitcher() {
           </span>
           {collapsed ? null : (
             <>
-              <span aria-hidden className="flex min-w-0 flex-1 flex-col">
+              <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate leading-4 font-medium">{label}</span>
                 {shown ? (
                   <span className="truncate font-mono text-xs text-muted-foreground">{shown}</span>

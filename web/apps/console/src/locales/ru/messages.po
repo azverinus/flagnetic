@@ -6142,6 +6142,10 @@ msgstr "Проект изменён"
 msgid "Project: {label}"
 msgstr "Проект: {label}"
 
+#: src/components/project-switcher.tsx
+msgid "Project: {label} {shown}"
+msgstr "Проект: {label} {shown}"
+
 #: src/components/area-screens.ts
 #: src/components/project-switcher.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx

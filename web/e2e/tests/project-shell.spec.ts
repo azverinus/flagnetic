@@ -204,7 +204,9 @@ test.describe("the sidebar", () => {
     await page.getByRole("link", { name: "Instance", exact: true }).click();
 
     await expect(page).toHaveURL(/\/admin\/projects$/);
-    await expect(switcher(page)).toHaveAccessibleName(`Project: ${seededProject.name}`);
+    await expect(switcher(page)).toHaveAccessibleName(
+      new RegExp(`^Project: ${seededProject.name}`),
+    );
     const flags = projectNavigation(page).getByRole("link", { name: "Flags", exact: true });
     await expect(flags).toBeVisible();
     await expect(projectNavigation(page).locator("[aria-current=page]")).toHaveCount(0);
@@ -615,7 +617,7 @@ test.describe("renaming a project", () => {
 
     await expect(page.getByText("The project is saved.")).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("After");
-    await expect(switcher(page)).toHaveAccessibleName("Project: After");
+    await expect(switcher(page)).toHaveAccessibleName(/^Project: After/);
   });
   test("shows who changed it meanwhile and what, and keeps the member's edits over it", async ({
     page,

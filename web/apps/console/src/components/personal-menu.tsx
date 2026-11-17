@@ -68,10 +68,8 @@ export function PersonalMenu({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        {/* The name is the button's accessible name, read out even where it is not shown. */}
         <button
           type="button"
-          aria-label={name}
           className={cn(
             "flex h-12 w-full min-w-0 items-center gap-2.5 rounded-lg px-2 text-left text-sm transition-colors hover:bg-foreground/[0.06]",
             collapsed && "justify-center px-0",
@@ -83,16 +81,12 @@ export function PersonalMenu({ collapsed = false }: { collapsed?: boolean }) {
           >
             {initialsOf(name, email)}
           </span>
+          {/* The name is the button's accessible name, read out even in the rail. */}
+          <span className={cn("min-w-0 flex-1 truncate font-medium", collapsed && "sr-only")}>
+            {name}
+          </span>
           {collapsed ? null : (
-            <>
-              <span aria-hidden className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate leading-4 font-medium">{name}</span>
-                {email && email !== name ? (
-                  <span className="truncate text-xs text-muted-foreground">{email}</span>
-                ) : null}
-              </span>
-              <ChevronsUpDownIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-            </>
+            <ChevronsUpDownIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
           )}
         </button>
       </DropdownMenuTrigger>
