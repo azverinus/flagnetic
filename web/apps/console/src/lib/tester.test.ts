@@ -50,6 +50,36 @@ describe("the tester's context", () => {
     });
   });
 
+  it("takes a unit type or an attribute named like a property every object has", () => {
+    const named = new Map<string, "string">([
+      ["constructor", "string"],
+      ["__proto__", "string"],
+    ]);
+    const built = buildContext(
+      i18n,
+      {
+        units: [
+          { unitType: "constructor", unitId: "u1" },
+          { unitType: "__proto__", unitId: "u2" },
+        ],
+        attributes: [
+          { attribute: "constructor", text: "x", list: [] },
+          { attribute: "__proto__", text: "y", list: [] },
+        ],
+      },
+      named as never,
+    );
+    expect(built.issues.size).toBe(0);
+    expect(Object.entries(built.context.units ?? {})).toEqual([
+      ["constructor", "u1"],
+      ["__proto__", "u2"],
+    ]);
+    expect(Object.entries(built.context.attributes ?? {})).toEqual([
+      ["constructor", "x"],
+      ["__proto__", "y"],
+    ]);
+  });
+
   it("refuses a unit type twice, a unit ID over 256 bytes and a value not of the attribute's type", () => {
     const built = buildContext(
       i18n,

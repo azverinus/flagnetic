@@ -3,6 +3,7 @@ import {
   type Flag,
   type FlagConfiguration,
   type Override,
+  putFlagConfiguration,
   putOverride,
   type UnitType,
 } from "@flagnetic/api";
@@ -21,7 +22,8 @@ import { Select, SelectItem } from "@/components/ui/select";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { useCan, useMissingPermissionReason } from "@/lib/access";
 import { ApiError, unwrap } from "@/lib/errors";
-import { configurationViolationMessage, overrideIssues } from "@/lib/flag-detail";
+import { configurationPut, configurationViolationMessage, overrideIssues } from "@/lib/flag-detail";
+import { ifMatch } from "@/lib/http";
 import { flagQuery } from "@/lib/queries";
 import { useConfigurationAnswer } from "@/lib/use-configuration-answer";
 
@@ -62,8 +64,28 @@ export function OverridesSection({
   const answered = useConfigurationAnswer(project, flag.key);
 
   const remove = useMutation({
-    mutationFn: (override: Override) =>
-      unwrap(
+    mutationFn: (override: Override) => {
+      // A unit ID of `.` or `..` is a dot segment, which every client and
+      // proxy resolves away before the request leaves, whatever its
+      // encoding, so the override's own address cannot be reached: the
+      // configuration is written without it instead.
+      if (override.unit_id === "." || override.unit_id === "..") {
+        const put = configurationPut(configuration);
+        return unwrap(
+          putFlagConfiguration({
+            path: { project, flag: flag.key, environment: configuration.environment },
+            body: {
+              ...put,
+              overrides: (put.overrides ?? []).filter(
+                (other) =>
+                  other.unit_type !== override.unit_type || other.unit_id !== override.unit_id,
+              ),
+            },
+            headers: ifMatch(configuration.version),
+          }),
+        );
+      }
+      return unwrap(
         deleteOverride({
           path: {
             project,
@@ -73,7 +95,8 @@ export function OverridesSection({
             unit_id: override.unit_id,
           },
         }),
-      ),
+      );
+    },
     meta: { toast: false },
     onSuccess: (next, override) => {
       answered(next);
@@ -81,8 +104,12 @@ export function OverridesSection({
       toast.success(t`The override of ${unit} is removed.`);
     },
     onError: (error) => {
-      // Someone removed it first: the list is read again to show so.
-      if (error instanceof ApiError && error.code === "not_found") {
+      // Someone removed it first, or changed the configuration a dot-segment
+      // override is removed with: the list is read again to show so.
+      if (
+        error instanceof ApiError &&
+        (error.code === "not_found" || error.code === "version_mismatch")
+      ) {
         void queryClient.invalidateQueries({ queryKey: flagQuery(project, flag.key).queryKey });
       }
     },

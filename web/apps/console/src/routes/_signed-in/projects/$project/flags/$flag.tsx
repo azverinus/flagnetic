@@ -4,14 +4,13 @@ import {
   type Environment,
   type Flag,
   type FlagConfiguration,
-  putFlagConfiguration,
   restoreFlag,
   type UnitType,
 } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArchiveIcon, FlaskConicalIcon, GitCompareArrowsIcon, OctagonXIcon } from "lucide-react";
+import { ArchiveIcon, FlaskConicalIcon, GitCompareArrowsIcon } from "lucide-react";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -21,31 +20,24 @@ import { ConfigurationEditor } from "@/components/configuration-editor";
 import { FlagDefinitionSheet } from "@/components/flag-definition-sheet";
 import { FlagEvaluations } from "@/components/flag-evaluations";
 import { FlagHistory } from "@/components/flag-history";
+import { FlagOnOff } from "@/components/flag-on-off";
 import { EnvironmentName } from "@/components/protected-mark";
-import { KillSwitchDialog } from "@/components/kill-switch-dialog";
 import { OverridesSection } from "@/components/overrides-section";
-import { type Proposal, ProposeDialog } from "@/components/propose-dialog";
 import { QueryError } from "@/components/query-error";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import { Tabs } from "@/components/ui/tabs";
 import { WaitingChangeRequests } from "@/components/waiting-change-requests";
 import { formatDateTime } from "@/i18n/format";
 import { cn } from "@/lib/cn";
 import { type DayRange, dayRangeOf, daysSearchOf } from "@/lib/daily-counts";
 import { ApiError, unwrap } from "@/lib/errors";
-import {
-  configurationPut,
-  type FlagDetailSearch,
-  validateFlagDetailSearch,
-} from "@/lib/flag-detail";
+import { type FlagDetailSearch, validateFlagDetailSearch } from "@/lib/flag-detail";
 import { flagTypeName } from "@/lib/flags";
 import { ifMatch } from "@/lib/http";
-import { problemMessage } from "@/lib/problem-messages";
 import { AccessContext, missingPermissionReason } from "@/lib/access";
 import { configurationEditing } from "@/lib/change-requests";
 import {
@@ -58,7 +50,6 @@ import {
   segmentsQuery,
   unitTypesQuery,
 } from "@/lib/queries";
-import { useConfigurationAnswer } from "@/lib/use-configuration-answer";
 import { useKnownMembers } from "@/lib/use-known-members";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/flags/$flag")({
@@ -208,6 +199,10 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
             flag={flag}
             configuration={configuration}
             environment={known}
+            environmentsRead={{
+              error: environments.error,
+              retry: () => void environments.refetch(),
+            }}
             unitTypes={unitTypes.data ?? []}
             nameOf={nameOf}
             tester={testerOpen ? { onClose: closeTester } : undefined}
@@ -490,6 +485,8 @@ type PanelProps = {
   configuration: FlagConfiguration;
   /** The environment, once the project's environments are read. */
   environment: Environment | undefined;
+  /** Reading the environments again, and why they could not be read. */
+  environmentsRead: { error: unknown; retry: () => void };
   unitTypes: readonly UnitType[];
   nameOf: (member: string) => string;
   /** The tester beside the configuration, while it is open. */
@@ -525,6 +522,7 @@ function EnvironmentPanel(props: PanelProps) {
   const experiments = useQuery(flagExperimentsQuery(project, flag.key));
   const reads = [attributes, segments, flags, experiments];
   const failed = reads.find((read) => read.isError);
+  const { environmentsRead } = props;
 
   return (
     <div className="flex flex-col gap-8">
@@ -549,7 +547,10 @@ function EnvironmentPanel(props: PanelProps) {
           </Trans>
         </p>
       ) : null}
-      <OnOff {...props} frozen={frozen !== undefined} />
+      <FlagOnOff {...props} frozen={frozen !== undefined} />
+      {!environment && environmentsRead.error ? (
+        <QueryError error={environmentsRead.error} onRetry={environmentsRead.retry} />
+      ) : null}
       {failed ? (
         <QueryError error={failed.error} onRetry={() => void failed.refetch()} />
       ) : environment && attributes.data && segments.data && flags.data && experiments.data ? (
@@ -586,125 +587,5 @@ function EnvironmentPanel(props: PanelProps) {
         onDays={props.evaluations.onDays}
       />
     </div>
-  );
-}
-
-/**
- * Switching the flag on or off in the environment, which is saved at
- * once, and the kill switch beside it while it is on.
- */
-function OnOff({
-  project,
-  flag,
-  configuration,
-  environment,
-  frozen,
-}: PanelProps & { frozen: boolean }) {
-  const { i18n, t } = useLingui();
-  const queryClient = useQueryClient();
-  const answered = useConfigurationAnswer(project, flag.key);
-  const [killing, setKilling] = useState(false);
-  const [proposing, setProposing] = useState<Proposal>();
-  const name = environment?.name ?? configuration.environment;
-  const key = flag.key;
-
-  const toggle = useMutation({
-    mutationFn: (on: boolean) =>
-      unwrap(
-        putFlagConfiguration({
-          path: { project, flag: flag.key, environment: configuration.environment },
-          body: { ...configurationPut(configuration), on },
-          headers: ifMatch(configuration.version),
-        }),
-      ),
-    meta: { toast: false },
-    onSuccess: (next) => {
-      answered(next);
-      toast.success(next.on ? t`${key} is on in ${name}.` : t`${key} is off in ${name}.`);
-    },
-    onError: (error, on) => {
-      if (error instanceof ApiError && error.code === "version_mismatch") {
-        void queryClient.invalidateQueries({ queryKey: flagQuery(project, flag.key).queryKey });
-        toast.error(
-          t`Someone changed this configuration a moment ago. It is read again: switch it once more if you still mean to.`,
-        );
-        return;
-      }
-      // A protected environment is switched through review: the same
-      // switch is offered as a change request.
-      if (error instanceof ApiError && error.code === "change_request_required") {
-        setProposing({
-          kind: "flag_configuration",
-          flag: flag.key,
-          environment: configuration.environment,
-          proposed: { ...configurationPut(configuration), on },
-        });
-        return;
-      }
-      toast.error(error instanceof ApiError ? problemMessage(i18n, error) : String(error));
-    },
-  });
-
-  return (
-    <section className="flex flex-wrap items-center justify-between gap-4 rounded-md border p-4">
-      <div className="flex items-center gap-3">
-        <Can permission="flag_configuration.update" whenMissing="disable">
-          <Switch
-            checked={configuration.on}
-            disabled={frozen || toggle.isPending}
-            // One name whatever the state, which the switch announces itself.
-            aria-label={t`${key} on in ${name}`}
-            onCheckedChange={(on) => toggle.mutate(on)}
-          />
-        </Can>
-        <span className="text-sm font-medium">
-          {configuration.on ? <Trans>On</Trans> : <Trans>Off</Trans>}
-        </span>
-        <span className="text-sm text-muted-foreground">
-          {configuration.on ? (
-            <Trans>Contexts are served by the overrides, rules and fallthrough below.</Trans>
-          ) : (
-            <Trans>Every context receives the off variation.</Trans>
-          )}
-        </span>
-      </div>
-      {configuration.on && !frozen ? (
-        <>
-          <Can permission="flag_configuration.kill" whenMissing="disable">
-            <Button variant="destructive" onClick={() => setKilling(true)}>
-              <OctagonXIcon aria-hidden />
-              <Trans>Kill switch</Trans>
-            </Button>
-          </Can>
-          {environment ? (
-            <KillSwitchDialog
-              project={project}
-              flag={flag}
-              environment={environment}
-              open={killing}
-              onOpenChange={setKilling}
-            />
-          ) : null}
-        </>
-      ) : null}
-      <ProposeDialog
-        project={project}
-        proposal={proposing}
-        onOpenChange={(open) => !open && setProposing(undefined)}
-        onProposed={() => setProposing(undefined)}
-      >
-        <p className="text-sm">
-          {configuration.on ? (
-            <Trans>
-              {name} is protected: switching {key} off there goes through a change request.
-            </Trans>
-          ) : (
-            <Trans>
-              {name} is protected: switching {key} on there goes through a change request.
-            </Trans>
-          )}
-        </p>
-      </ProposeDialog>
-    </section>
   );
 }

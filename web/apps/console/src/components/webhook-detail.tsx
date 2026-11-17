@@ -141,8 +141,15 @@ function WebhookPage({
   const rotate = useListMutation(
     () => api.rotateSecret(webhook.id),
     webhookKey(scope, webhook.id),
-    () => undefined,
-    { secret: true },
+    ({ secret: issued, ...rotated }) => {
+      setRotating(false);
+      setSecret(issued);
+      // The secret lives in the dialog alone: not in the cache, and the
+      // finished mutation is reset as soon as it is delivered.
+      remember(rotated);
+    },
+    // The answer carries the new secret.
+    { reveals: true },
   );
   const remove = useMutation({
     mutationFn: () => api.remove(webhook.id),
@@ -276,18 +283,7 @@ function WebhookPage({
         confirmLabel={<Trans>Rotate secret</Trans>}
         pending={rotate.isPending}
         refusal={rotate.error}
-        onConfirm={() =>
-          rotate.mutate(undefined, {
-            onSuccess: ({ secret: issued, ...rotated }) => {
-              setRotating(false);
-              setSecret(issued);
-              // The secret lives in the dialog alone: not in the cache, and
-              // not in the finished mutation this screen would keep.
-              remember(rotated);
-              rotate.reset();
-            },
-          })
-        }
+        onConfirm={() => rotate.mutate()}
       >
         <p>
           <Trans>

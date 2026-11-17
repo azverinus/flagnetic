@@ -281,9 +281,9 @@ function ScimTokenForm({
         expires_at: expiresAt(values.expiry as ExpiryChoice, new Date(), { expiryRequired: false }),
       }),
     scimTokensKey,
-    () => undefined,
+    onCreated,
     // The answer carries the token's value.
-    { secret: true },
+    { reveals: true },
   );
   const { errors } = form.formState;
   const { i18n } = useLingui();
@@ -326,7 +326,7 @@ function ScimTokenForm({
 
   return (
     <DialogForm
-      onSubmit={form.handleSubmit((values) => create.mutate(values, { onSuccess: onCreated }))}
+      onSubmit={form.handleSubmit((values) => create.mutate(values))}
       onCancel={onCancel}
       submitLabel={<Trans>Create token</Trans>}
       pending={create.isPending}

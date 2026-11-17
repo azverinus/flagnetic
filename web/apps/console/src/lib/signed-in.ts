@@ -108,3 +108,58 @@ export function onSessionEnded(
     navigate(signInSearch(here, true));
   };
 }
+
+/** What one tab tells the others about the session they share. */
+export type SessionChange = "signed-in" | "signed-out";
+
+const sessionChannelName = "flagnetic-session";
+
+/**
+ * Tells the other tabs of this browser that a member signed in or out here.
+ * The session is one cookie shared by every tab, so a tab that does not
+ * hear of it keeps showing the member's data after they signed out, and
+ * keeps the first member's identity while the cookie is the second's.
+ * Nothing is sent where the browser has no broadcast channel; the other
+ * tabs then learn of it from their next refused request, as before.
+ */
+export function announceSessionChange(change: SessionChange): void {
+  if (typeof BroadcastChannel === "undefined") return;
+  const channel = new BroadcastChannel(sessionChannelName);
+  channel.postMessage(change);
+  channel.close();
+}
+
+/** Calls `onChange` when another tab announces a session change; returns how to stop. */
+export function listenForSessionChange(onChange: (change: SessionChange) => void): () => void {
+  if (typeof BroadcastChannel === "undefined") return () => undefined;
+  const channel = new BroadcastChannel(sessionChannelName);
+  channel.onmessage = (event: MessageEvent<unknown>) => {
+    if (event.data === "signed-in" || event.data === "signed-out") onChange(event.data);
+  };
+  return () => channel.close();
+}
+
+/**
+ * What this tab does when another tab changed the session. After a sign-out
+ * it goes to sign-in as it does when its own session ends, and shows nothing
+ * of the member's data. After a sign-in, which may be another member's, what
+ * it holds of the first member is dropped and read again under the cookie
+ * there now is, by `reload`. A tab that holds nobody has nothing to drop.
+ */
+export function onSessionChangedElsewhere(
+  queryClient: QueryClient,
+  where: () => Where,
+  navigate: (search: SignInSearch) => void,
+  reload: () => void,
+): (change: SessionChange) => void {
+  const ended = onSessionEnded(queryClient, where, navigate);
+  return (change) => {
+    if (change === "signed-out") {
+      ended();
+      return;
+    }
+    if (queryClient.getQueryData(meQuery.queryKey) === undefined) return;
+    queryClient.clear();
+    reload();
+  };
+}

@@ -65,7 +65,9 @@ export function buildContext(
   types: AttributeTypes,
 ): { context: EvaluationContext; issues: Map<string, string> } {
   const issues = new Map<string, string>();
-  const units: Record<string, string> = {};
+  // Without a prototype, so a unit type or an attribute named `constructor`
+  // or `__proto__` is a key like any other, not a property every object has.
+  const units: Record<string, string> = Object.create(null);
   draft.units.forEach((row, index) => {
     if (row.unitId === "" || row.unitType === "") return;
     if (row.unitType in units) {
@@ -77,7 +79,7 @@ export function buildContext(
       units[row.unitType] = row.unitId;
     }
   });
-  const attributes: Record<string, unknown> = {};
+  const attributes: Record<string, unknown> = Object.create(null);
   draft.attributes.forEach((row, index) => {
     if (row.attribute === "") return;
     const type = types.get(row.attribute);
@@ -95,9 +97,13 @@ export function buildContext(
       attributes[row.attribute] = typed.value;
     }
   });
+  // Plain objects again for whoever reads the context; copying defines each
+  // key as an own property, `__proto__` included.
   const context: EvaluationContext = {
-    ...(Object.keys(units).length > 0 ? { units } : {}),
-    ...(Object.keys(attributes).length > 0 ? { attributes } : {}),
+    ...(Object.keys(units).length > 0 ? { units: Object.fromEntries(Object.entries(units)) } : {}),
+    ...(Object.keys(attributes).length > 0
+      ? { attributes: Object.fromEntries(Object.entries(attributes)) }
+      : {}),
   };
   return { context, issues };
 }

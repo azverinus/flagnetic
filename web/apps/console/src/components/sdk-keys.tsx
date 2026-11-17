@@ -361,17 +361,15 @@ function CreateKey({
         }),
       ),
     sdkKeysQuery(project, environment).queryKey,
-    () => undefined,
+    ({ value }, values) => onCreated(value, values.kind),
     // The answer carries the key's value.
-    { secret: true },
+    { reveals: true },
   );
   const { errors } = form.formState;
 
   return (
     <DialogForm
-      onSubmit={form.handleSubmit((values) =>
-        create.mutate(values, { onSuccess: ({ value }) => onCreated(value, values.kind) }),
-      )}
+      onSubmit={form.handleSubmit((values) => create.mutate(values))}
       onCancel={onDone}
       submitLabel={<Trans>Create key</Trans>}
       pending={create.isPending}
@@ -527,16 +525,14 @@ function RotateKey({
         }),
       ),
     sdkKeysQuery(project, environment).queryKey,
-    () => undefined,
+    ({ value }) => onRotated(value),
     // The answer carries the replacement's value.
-    { secret: true },
+    { reveals: true },
   );
 
   return (
     <DialogForm
-      onSubmit={form.handleSubmit(({ overlap }) =>
-        rotate.mutate(overlap, { onSuccess: ({ value }) => onRotated(value) }),
-      )}
+      onSubmit={form.handleSubmit(({ overlap }) => rotate.mutate(overlap))}
       onCancel={onDone}
       submitLabel={<Trans>Rotate key</Trans>}
       pending={rotate.isPending}

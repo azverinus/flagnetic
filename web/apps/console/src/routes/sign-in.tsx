@@ -6,7 +6,7 @@ import { SignInForm } from "@/components/sign-in-form";
 import { SignedOutCard } from "@/components/signed-out-card";
 import { meQuery } from "@/lib/queries";
 import { safeReturnTo } from "@/lib/return-to";
-import { validateSignInSearch } from "@/lib/signed-in";
+import { announceSessionChange, validateSignInSearch } from "@/lib/signed-in";
 
 export const Route = createFileRoute("/sign-in")({
   validateSearch: validateSignInSearch,
@@ -38,6 +38,7 @@ function SignInPage() {
         errorProvider={provider}
         onSignedIn={(me) => {
           queryClient.setQueryData(meQuery.queryKey, me);
+          announceSessionChange("signed-in");
           void router.navigate({ href: safeReturnTo(returnTo), replace: true });
         }}
       />

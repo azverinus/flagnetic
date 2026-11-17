@@ -150,7 +150,9 @@ describe("the sign-in form", () => {
       expect(await screen.findByLabelText("Password")).toBeVisible();
       expect(screen.getByLabelText("Email")).toHaveAttribute("readonly");
       const asked = server.requests.find((r) => new URL(r.url).searchParams.has("email"))!;
-      expect(new URL(asked.url).searchParams.get("email")).toBe("ada@example.com");
+      // Only the domain is asked about: the address would reach a proxy's access log.
+      expect(new URL(asked.url).searchParams.get("email")).toBe("@example.com");
+      expect(asked.url).not.toContain("ada");
 
       await user.type(screen.getByLabelText("Password"), "correct horse battery");
       await user.click(screen.getByRole("button", { name: "Sign in" }));

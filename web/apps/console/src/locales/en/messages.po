@@ -208,16 +208,16 @@ msgstr "{inviter} invites you to the project {projectName} as {role}. Accepting 
 msgid "{inviter} invites you to this instance."
 msgstr "{inviter} invites you to this instance."
 
+#: src/components/flag-on-off.tsx
 #: src/components/kill-switch-dialog.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "{key} is off in {name}."
 msgstr "{key} is off in {name}."
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "{key} is on in {name}."
 msgstr "{key} is on in {name}."
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "{key} on in {name}"
 msgstr "{key} on in {name}"
 
@@ -341,11 +341,11 @@ msgstr "{name} is not signed in anywhere."
 msgid "{name} is protected, so reverting its configuration to version {proposedVersion} goes through a change request. What it proposes is that version, as it was; nobody edits it."
 msgstr "{name} is protected, so reverting its configuration to version {proposedVersion} goes through a change request. What it proposes is that version, as it was; nobody edits it."
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "{name} is protected: switching {key} off there goes through a change request."
 msgstr "{name} is protected: switching {key} off there goes through a change request."
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "{name} is protected: switching {key} on there goes through a change request."
 msgstr "{name} is protected: switching {key} on there goes through a change request."
 
@@ -2240,7 +2240,7 @@ msgstr "contains all of"
 msgid "contains any of"
 msgstr "contains any of"
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "Contexts are served by the overrides, rules and fallthrough below."
 msgstr "Contexts are served by the overrides, rules and fallthrough below."
 
@@ -3411,7 +3411,7 @@ msgstr "every context"
 msgid "Every context"
 msgstr "Every context"
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "Every context receives the off variation."
 msgstr "Every context receives the off variation."
 
@@ -4490,7 +4490,7 @@ msgstr "Key or name"
 msgid "Keys"
 msgstr "Keys"
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "Kill switch"
 msgstr "Kill switch"
 
@@ -5609,8 +5609,8 @@ msgid "Observed share"
 msgstr "Observed share"
 
 #: src/components/compare-environments.tsx
+#: src/components/flag-on-off.tsx
 #: src/components/tester-panel.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Off"
 msgstr "Off"
@@ -5635,7 +5635,7 @@ msgid "Older entries"
 msgstr "Older entries"
 
 #: src/components/compare-environments.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "On"
 msgstr "On"
@@ -7357,7 +7357,7 @@ msgstr "Some exposures were refused and are not counted above. An SDK sends expo
 msgid "Some fields need correcting."
 msgstr "Some fields need correcting."
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "Someone changed this configuration a moment ago. It is read again: switch it once more if you still mean to."
 msgstr "Someone changed this configuration a moment ago. It is read again: switch it once more if you still mean to."
 
