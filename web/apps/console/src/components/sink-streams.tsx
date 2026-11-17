@@ -43,7 +43,7 @@ export function SinkStreams({ sink }: { sink: Sink }) {
   );
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-lg font-medium">
+      <h2 className="text-base/6 font-medium">
         <Trans>Streams</Trans>
       </h2>
       {sink.streams.length === 0 ? (

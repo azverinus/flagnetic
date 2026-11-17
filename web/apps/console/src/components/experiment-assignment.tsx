@@ -44,7 +44,7 @@ export function ExperimentAssignmentLookup({
   return (
     <section aria-labelledby="experiment-assignment" className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <h2 id="experiment-assignment" className="text-lg font-medium">
+        <h2 id="experiment-assignment" className="text-base/6 font-medium">
           <Trans>Assignment lookup</Trans>
         </h2>
         <p className="max-w-prose text-sm text-muted-foreground">

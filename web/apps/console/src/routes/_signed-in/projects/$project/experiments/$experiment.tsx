@@ -251,7 +251,7 @@ function ExperimentPage({
       />
       <ExperimentAlertsSection project={project} experiment={base} />
       <ExperimentAssignmentLookup project={project} experiment={base} />
-      <h2 className="text-lg font-medium">
+      <h2 className="text-base/6 font-medium">
         <Trans>Definition</Trans>
       </h2>
       {canEdit ? null : (
