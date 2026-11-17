@@ -11,7 +11,7 @@ import { testServer } from "../src/server.js";
 import { ruleset } from "./support/flags-fixture.js";
 import { MemoryStore, StoreKeys } from "../src/client/storage.js";
 import type { Page, PageHandlers } from "../src/client/page.js";
-import type { ClientOptions, ClientStore, Context, LogEvent } from "../src/client/types.js";
+import { jsonEquals, type ClientOptions, type ClientStore, type Context, type JsonValue, type LogEvent } from "../src/client/types.js";
 import { MockNetwork, type Pending } from "./support/mock-network.js";
 import { VirtualClock } from "./support/virtual-clock.js";
 import { VERSION } from "../src/version.js";
@@ -413,6 +413,122 @@ describe("remote evaluation", () => {
     const ready = c.ready(1_000);
     await h.advance(1_000);
     expect(await ready).toBe("built_in");
+  });
+});
+
+describe("clearStored", () => {
+  test("removes this key's last good values and event queue, and leaves the values in memory and other keys alone", async () => {
+    const h = harness();
+    const store = new MemoryStore();
+    const other = new StoreKeys("fn_cli_9876543210zyxwvutsrqponmlkjihgfedcbaZYXW");
+    store.setItem(other.events, "[]");
+    store.setItem("unrelated", "kept");
+    const c = h.client({ store, pollInterval: 30_000, flushInterval: 3_600_000 });
+    await h.serve("/sdk/v1/evaluate", values(1, { checkout: boolFlag(true) }));
+    const switched = c.setContext({ units: { user: "u-1001" } });
+    await h.serve("/sdk/v1/evaluate", values(1, { checkout: boolFlag(true) }));
+    await switched;
+    c.getBool("checkout", false);
+    c.alias({ fromUnitType: "anonymous", fromUnitId: "d-8f1c", toUnitType: "user", toUnitId: "u-1001" });
+    const entries = [keys.lastGood(context.units ?? {}), keys.lastGood({ user: "u-1001" })];
+    for (const k of [keys.index, keys.events, ...entries]) expect(store.getItem(k), k).not.toBeNull();
+
+    c.clearStored();
+
+    for (const k of [keys.index, keys.events, ...entries]) expect(store.getItem(k), k).toBeNull();
+    expect(store.getItem(other.events), "another key's queue is not this client's").toBe("[]");
+    expect(store.getItem("unrelated")).toBe("kept");
+    // What was pending is gone: a flush sends nothing, and the summary of the
+    // evaluations before the call is not written back.
+    void c.flush();
+    await h.advance(1_000);
+    expect(h.net.waiting("/sdk/v1/events")).toHaveLength(0);
+    expect(store.getItem(keys.events)).toBeNull();
+    expect(c.getBool("checkout", false), "the values in memory keep serving").toBe(true);
+    expect(c.stage).toBe("fresh");
+  });
+
+  test("a batch in flight does not write the cleared queue back, whatever its answer", async () => {
+    const h = harness();
+    const store = new MemoryStore();
+    const c = h.client({ store, pollInterval: 3_600_000, flushInterval: 3_600_000, sendSummaries: false });
+    await h.serve("/sdk/v1/evaluate", values(1, {}));
+    c.alias({ fromUnitType: "anonymous", fromUnitId: "d-8f1c", toUnitType: "user", toUnitId: "u-1001" });
+    void c.flush();
+    const req = await h.waitFor("/sdk/v1/events");
+    c.clearStored();
+    req.answer({ status: 500 });
+    await h.advance(600_000);
+    expect(store.getItem(keys.events)).toBeNull();
+    expect(h.net.seen.filter((r) => r.path === "/sdk/v1/events"), "nothing is retried").toHaveLength(1);
+  });
+});
+
+describe("a value nested too deeply", () => {
+  const nested = (depth: number, leaf = "1"): string => "[".repeat(depth) + leaf + "]".repeat(depth);
+  const document = (version: number): string =>
+    `{"schema_version":1,"ruleset_version":${version},"flags":{
+      "deep":{"type":"json","value":${nested(100_000)},"variation":"a","reason":"targeting_match"},
+      "checkout":{"type":"boolean","value":true,"variation":"true","reason":"targeting_match"}}}`;
+
+  test("fails its one flag, the others serve, and the document is kept as last good", async () => {
+    const h = harness();
+    const store = new MemoryStore();
+    const c = h.client({ store, pollInterval: 30_000 });
+    const req = await h.waitFor("/sdk/v1/evaluate");
+    req.answer({ status: 200, headers: { "Content-Type": "application/json" }, body: document(3) });
+    await h.advance(0);
+    expect(c.stage).toBe("fresh");
+    expect(c.getJson("deep", { d: 0 })).toStrictEqual({ d: 0 });
+    expect(c.getDetail("deep", null)).toMatchObject({ reason: "fallback", errorCode: "inconsistent_ruleset" });
+    expect(c.getBool("checkout", false)).toBe(true);
+    expect(h.logs.filter((l) => l.event === "value_too_deep").map((l) => l.fields)).toStrictEqual([{ flag: "deep", max_depth: 32, ruleset_version: 3 }]);
+    expect(store.getItem(keys.lastGood(context.units ?? {})), "the rest of the document survives a reload").not.toBeNull();
+
+    // The same document again compares equal and changes nothing.
+    const changes: string[][] = [];
+    c.onChange((k) => changes.push(k));
+    await h.advance(30_000);
+    (await h.waitFor("/sdk/v1/evaluate")).answer({ status: 200, headers: { "Content-Type": "application/json" }, body: document(3) });
+    await h.advance(0);
+    expect(c.stage).toBe("fresh");
+    expect(changes).toStrictEqual([]);
+    expect(h.count("value_too_deep"), "logged once per flag").toBe(1);
+  });
+
+  test("a field this SDK does not read, nested too deeply to store, leaves the values serving", async () => {
+    const h = harness();
+    const c = h.client({ store: new MemoryStore() });
+    const req = await h.waitFor("/sdk/v1/evaluate");
+    const body = `{"schema_version":1,"ruleset_version":1,"future":${nested(100_000)},"flags":{"checkout":{"type":"boolean","value":true,"reason":"targeting_match"}}}`;
+    req.answer({ status: 200, headers: { "Content-Type": "application/json" }, body });
+    await h.advance(0);
+    expect(c.stage).toBe("fresh");
+    expect(c.getBool("checkout", false)).toBe(true);
+    expect(h.logs.filter((l) => l.event === "store_failed").map((l) => l.fields.operation)).toStrictEqual(["write"]);
+  });
+
+  test("in a bootstrap object, 32 levels serve and 33 do not", async () => {
+    const h = harness();
+    const doc = JSON.parse(`{"schema_version":1,"ruleset_version":1,"flags":{
+      "at_bound":{"type":"json","value":${nested(32)},"reason":"targeting_match"},
+      "past_bound":{"type":"json","value":${nested(33)},"reason":"targeting_match"}}}`) as object;
+    const c = h.client({ store: false, bootstrap: doc });
+    expect(c.getDetail("at_bound", null).reason).toBe("targeting_match");
+    expect(c.getDetail("past_bound", null)).toMatchObject({ reason: "fallback", errorCode: "inconsistent_ruleset" });
+    expect(JSON.stringify(doc), "the caller's document is left as it was").toContain(nested(33));
+    await h.waitFor("/sdk/v1/evaluate");
+  });
+});
+
+describe("jsonEquals", () => {
+  test("compares values a hundred thousand levels deep without overflowing the stack", () => {
+    const deep = (leaf: number): JsonValue => JSON.parse("[".repeat(100_000) + String(leaf) + "]".repeat(100_000)) as JsonValue;
+    expect(jsonEquals(deep(1), deep(1))).toBe(true);
+    expect(jsonEquals(deep(1), deep(2))).toBe(false);
+    expect(jsonEquals({ a: deep(1), b: [1, { c: 2 }] }, { b: [1, { c: 2 }], a: deep(1) })).toBe(true);
+    expect(jsonEquals({ a: 1 }, { a: 1, b: 2 })).toBe(false);
+    expect(jsonEquals([1, [2]], [1, { 0: 2 }])).toBe(false);
   });
 });
 

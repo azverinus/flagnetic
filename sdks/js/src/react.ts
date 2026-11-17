@@ -9,9 +9,13 @@
  * produced (`flagnetic/server`'s `values`) to the provider as `bootstrap`:
  * the hooks serve it while the page renders and hydrates, so the first
  * render in the browser is the one the server sent, and the provider's own
- * client takes over, and refetches, after hydration.
+ * client takes over, and refetches, after hydration. `FlagneticBootstrap`
+ * writes that document into the page, escaped so no flag value can end the
+ * script it sits in.
  */
 export { FlagneticProvider, type FlagneticProviderProps } from "./react/provider.js";
+export { FlagneticBootstrap, type FlagneticBootstrapProps } from "./react/bootstrap.js";
+export { serializeBootstrap } from "./internal/bootstrap.js";
 export { useFlag, useFlagDetail, useFlagnetic, useStage } from "./react/hooks.js";
 export type { FlagneticClient } from "./client/client.js";
 export type { ClientOptions, Context, Detail, JsonValue, Reason, Stage, ValuesSource } from "./client/types.js";

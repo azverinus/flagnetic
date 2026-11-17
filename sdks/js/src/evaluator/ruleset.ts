@@ -2,6 +2,7 @@
 // the ruleset endpoint; decoding follows Go's encoding/json as the eval
 // module uses it: unknown fields are ignored, null is the zero value, and a
 // known field of the wrong JSON type refuses the document.
+import { nestsTooDeep } from "../internal/json.js";
 
 /** The ruleset schema version this evaluator reads. */
 export const SCHEMA_VERSION = 1;
@@ -136,8 +137,11 @@ export class RulesetDecodeError extends Error {
  * value. Dangling references and invalid conditions do not fail decoding:
  * evaluating a flag that reaches one returns reason error with
  * inconsistent_ruleset, so one defective flag never takes the others down.
+ * So does a value nested deeper than the server stores: a flag with such a
+ * variation value keeps no variations, and a condition with such a value
+ * no operator. tooDeep, when given, receives the keys of those flags.
  */
-export function decodeDocument(input: unknown): RulesetDocument {
+export function decodeDocument(input: unknown, tooDeep?: string[]): RulesetDocument {
   let data = input;
   if (typeof input === "string" || input instanceof Uint8Array) {
     const text = typeof input === "string" ? input : new TextDecoder("utf-8", { ignoreBOM: true }).decode(input);
@@ -149,6 +153,7 @@ export function decodeDocument(input: unknown): RulesetDocument {
   }
   const d = new Decoder();
   const doc = d.ruleset(data);
+  tooDeep?.push(...d.tooDeep);
   if (doc.schema_version !== SCHEMA_VERSION) {
     throw new RulesetDecodeError(
       `decode ruleset: unsupported schema_version ${doc.schema_version}, this evaluator reads ${SCHEMA_VERSION}`,
@@ -167,6 +172,9 @@ type Obj = Record<string, unknown>;
 // Decoder mirrors encoding/json into the Go structs: each reader takes a
 // field value and returns its zero value for undefined or null.
 class Decoder {
+  /** The keys of the flags whose variations were dropped for a value nested too deeply. */
+  readonly tooDeep: string[] = [];
+
   ruleset(v: unknown): RulesetDocument {
     const o = this.object(v, "ruleset");
     const environment = o.environment == null ? undefined : this.environment(o.environment);
@@ -203,11 +211,15 @@ class Decoder {
 
   private condition(v: unknown, path: string): ConditionDocument {
     const o = this.object(v, path);
+    // A value nested too deeply is never copied: the condition keeps no
+    // operator, which makes it inconsistent wherever evaluation reaches it,
+    // and no value.
+    const tooDeep = nestsTooDeep(o.value);
     return {
       kind: this.string(o.kind, `${path}.kind`),
       attribute: this.string(o.attribute, `${path}.attribute`),
-      op: this.string(o.op, `${path}.op`),
-      value: this.anyValue(o.value, `${path}.value`),
+      op: tooDeep ? "" : this.string(o.op, `${path}.op`),
+      value: tooDeep ? null : this.anyValue(o.value, `${path}.value`),
       segment: this.string(o.segment, `${path}.segment`),
       flag: this.string(o.flag, `${path}.flag`),
       variation: this.string(o.variation, `${path}.variation`),
@@ -216,11 +228,18 @@ class Decoder {
 
   private flag(v: unknown, path: string): FlagDocument {
     const o = this.object(v, path);
+    const key = this.string(o.key, `${path}.key`);
+    const decoded = this.list(o.variations, `${path}.variations`, (e, p) => this.variation(e, p));
+    // A flag with a variation value nested too deeply keeps no variations:
+    // every serve then answers inconsistent_ruleset, so the flag fails as a
+    // whole instead of serving some contexts and not others.
+    const tooDeep = decoded.some((x) => x === undefined);
+    if (tooDeep) this.tooDeep.push(key);
     return {
-      key: this.string(o.key, `${path}.key`),
+      key,
       type: this.string(o.type, `${path}.type`),
       automatic_exposure: this.bool(o.automatic_exposure, `${path}.automatic_exposure`),
-      variations: this.list(o.variations, `${path}.variations`, (e, p) => this.variation(e, p)),
+      variations: tooDeep ? [] : (decoded as VariationDocument[]),
       on: this.bool(o.on, `${path}.on`),
       off_variation: this.string(o.off_variation, `${path}.off_variation`),
       fallthrough: this.string(o.fallthrough, `${path}.fallthrough`),
@@ -240,9 +259,11 @@ class Decoder {
     };
   }
 
-  private variation(v: unknown, path: string): VariationDocument {
+  // variation returns undefined for a value nested too deeply to copy.
+  private variation(v: unknown, path: string): VariationDocument | undefined {
     const o = this.object(v, path);
     const key = this.string(o.key, `${path}.key`);
+    if (nestsTooDeep(o.value)) return undefined;
     // A present null is a null value, as Go's json.RawMessage keeps it.
     return Object.hasOwn(o, "value") && o.value !== undefined ? { key, value: frozenCopy(o.value) as JsonValue } : { key };
   }
@@ -328,7 +349,8 @@ function wrongType(path: string, want: string): RulesetDecodeError {
 
 // frozenCopy deep-copies a JSON value and freezes the copy, so a served
 // value cannot be mutated through a result and change what later
-// evaluations serve, and the caller's own object is left untouched.
+// evaluations serve, and the caller's own object is left untouched. It
+// recurses, so it is only given values nestsTooDeep has bounded.
 function frozenCopy(v: unknown): unknown {
   if (typeof v !== "object" || v === null) return v;
   if (Array.isArray(v)) return Object.freeze((v as unknown[]).map(frozenCopy));

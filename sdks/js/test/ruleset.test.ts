@@ -260,3 +260,39 @@ test("a context with no units skips units, and an empty unit ID is absent", () =
     });
   }
 });
+
+describe("a value nested too deeply fails its one flag", () => {
+  const nested = (depth: number): string => "[".repeat(depth) + "1" + "]".repeat(depth);
+  const flags = (deepValue: string): string => `{"schema_version":1,"version":1,"scope":"server","flags":[
+    {"key":"deep","type":"json","on":true,"variations":[{"key":"a","value":${deepValue}},{"key":"b","value":[1]}],"off_variation":"b","fallthrough":"b"},
+    {"key":"fine","type":"number","on":false,"variations":[{"key":"a","value":2}],"off_variation":"a"}]}`;
+
+  test("a hundred thousand levels neither overflow the stack nor refuse the ruleset", () => {
+    const rs = decodeRuleset(flags(nested(100_000)));
+    // Every path of the flag ends in its variations, so none is served,
+    // the one not nested too deeply included.
+    expect(rs.evaluate("deep", {})).toMatchObject({ reason: "error", error_code: "inconsistent_ruleset" });
+    expect(rs.evaluate("fine", {})).toMatchObject({ value: 2, reason: "off" });
+    expect(rs.evaluateAll({}).get("fine")).toMatchObject({ value: 2 });
+  });
+
+  test("32 levels serve, as the server accepts them, and 33 do not", () => {
+    expect(decodeRuleset(flags(nested(32))).evaluate("deep", {})).toMatchObject({ reason: "fallthrough", variation: "b" });
+    expect(decodeRuleset(flags(nested(33))).evaluate("deep", {})).toMatchObject({ reason: "error", error_code: "inconsistent_ruleset" });
+  });
+
+  test("a condition value nested too deeply is an inconsistent condition, not a refused ruleset", () => {
+    const rs = decodeRuleset(`{"schema_version":1,"version":1,"scope":"server","attributes":[{"key":"c","type":"string"}],
+      "segments":[{"key":"s","conditions":[{"kind":"attribute","attribute":"c","op":"in","value":${nested(100_000)}}]}],
+      "flags":[
+        {"key":"by_rule","type":"number","on":true,"variations":[{"key":"a","value":1}],"fallthrough":"a",
+         "rules":[{"id":"r","conditions":[{"kind":"attribute","attribute":"c","op":"in","value":${nested(100_000)}}],"serve":{"kind":"variation","variation":"a"}}]},
+        {"key":"by_segment","type":"number","on":true,"variations":[{"key":"a","value":1}],"fallthrough":"a",
+         "rules":[{"id":"r","conditions":[{"kind":"in_segment","segment":"s"}],"serve":{"kind":"variation","variation":"a"}}]},
+        {"key":"fine","type":"number","on":true,"variations":[{"key":"a","value":2}],"fallthrough":"a"}]}`);
+    expect(rs.evaluate("by_rule", { attributes: { c: "x" } })).toMatchObject({ reason: "error", error_code: "inconsistent_ruleset" });
+    expect(rs.evaluate("by_segment", { attributes: { c: "x" } })).toMatchObject({ reason: "error", error_code: "inconsistent_ruleset" });
+    expect(rs.evaluate("fine", {})).toMatchObject({ value: 2, reason: "fallthrough" });
+    expect(rs.unsupportedRules().size, "a defect of the ruleset, not a construct to upgrade for").toBe(0);
+  });
+});

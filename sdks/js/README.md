@@ -62,6 +62,15 @@ flagnetic.overrides.set("new_checkout", true); // reads as reason "local_overrid
 
 `flagnetic.values(context, { flags? })` evaluates the flags for a context into the document a browser client takes as its `bootstrap`. It is masked as a client key's answer is: where targeting decided a value the reason is `targeting_match` and no rule is named, because the document is written into a page anyone can read.
 
+Write it into the page with `serializeBootstrap(doc)`, never with a bare `JSON.stringify`: a flag value is text, and one holding `</script>` or `<!--` would end the inline script and inject markup. `serializeBootstrap` writes `<`, `>`, `&`, U+2028 and U+2029 as `\u` escapes, which `JSON.parse` reads back to the same document.
+
+```ts
+import { serializeBootstrap } from "flagnetic/server";
+
+const doc = flagnetic.values(context); // undefined until the client holds a ruleset
+const script = doc ? `<script>window.__FLAGNETIC__ = ${serializeBootstrap(doc)};</script>` : "";
+```
+
 ### Tests
 
 ```ts
@@ -100,11 +109,21 @@ if (flagnetic.getBool("new_checkout", false)) {
 // previous values keep serving, so there is no flash of defaults. They
 // answer the previous context, so no exposure is recorded for them.
 await flagnetic.setContext({ units: { anonymous: anonymousId(), user: "u-1001" } });
+
+// After sign-out on a shared browser: send what is queued, switch to the
+// anonymous context, then forget what this key stored.
+await flagnetic.flush();
+await flagnetic.setContext({ units: { anonymous: anonymousId() } });
+flagnetic.clearStored();
 ```
 
 `createClient` refuses a server key (`fn_srv_…`), which must never ship in a bundle. The client asks the server to evaluate for its context and never contains the evaluator, so `flagnetic/client` stays within a gzip size budget checked in CI. It names itself to the server through the context's `sdk`, `sdk_version` and `platform` attributes, since a browser cannot set a `User-Agent`.
 
 The last good values are kept in `localStorage` under the SDK key and the context's units (in memory where `localStorage` cannot be reached, or with `store: false`), so the next page load serves them before any request and two keys in one browser never see each other's values. A `bootstrap` option takes the document `values(context)` of `flagnetic/server` rendered into the page, served as `fresh`; an `offline` option takes a values document and makes no request at all, with `offline.set`, `offline.reload` and `offline.recorded()` for tests.
+
+`clearStored()` removes what the key keeps in `localStorage`: the last good values of every unit set it stored, the signed-in user's among them, and the event queue, with the exposures and aliases not yet sent and the evaluation counts not yet summarized. Call it when a user signs out of a browser others may use, after `flush()` if what is queued should still be sent, and after `setContext` has resolved, since the answer of an evaluation still in flight is stored again. The values in memory keep serving, and what the client accepts from then on is stored as before; other keys' entries and the anonymous ID are left alone.
+
+A flag value nesting arrays and objects deeper than 32 levels, which the server refuses to store, fails that flag alone: its getters serve your default with `inconsistent_ruleset`, `value_too_deep` is logged once per flag and ruleset version, and every other flag serves. The same holds for a ruleset in server mode.
 
 The client refetches when the tab becomes visible or the network comes back, at most once every 10 seconds, and polls every 300 seconds while the tab is visible. With `stream: true` it also holds the change stream, read over `fetch` so that it can send its key and `Last-Event-ID` in headers and reconnect by itself; it is off by default, since every open tab holds one connection. A stream is stable once it has delivered a heartbeat: one the server closes before that (a draining replica, a proxy that ends the stream early) is a failure like any other and the reconnect backs off, while the close of a stable stream waits 0–2 s.
 
@@ -143,6 +162,25 @@ function Checkout() {
 The provider takes a client the application built with `createClient`, which it never closes, or `sdkKey`, `baseUrl`, `options` and `bootstrap` to build and own one. Those four are read once, when the provider mounts, so an object literal in JSX does not rebuild the client; give the provider a `key` to start over. The hooks subscribe through `useSyncExternalStore`: a change re-renders the components that read the changed flag and nothing else, and a hook outside a provider throws.
 
 To render on the server, pass the document `values(context)` of `flagnetic/server` produced as `bootstrap`, and write the same document into the page for the browser. The hooks serve it while the page renders on the server and while it hydrates, so the first render in the browser matches the HTML; the provider builds its client after hydration, from the same document, and the first remote evaluation happens then. Nothing is fetched while a page renders on the server. A `bootstrap` of `undefined`, what `values()` gives before the server mode has a ruleset, renders built-in defaults at stage `built_in` on both sides.
+
+Write the document into the page with `<FlagneticBootstrap bootstrap={doc} />`, or with `serializeBootstrap`, which `flagnetic/react` exports too, never with a bare `JSON.stringify`: a flag value holding `</script>` would end the script. The component renders `<script>window.__FLAGNETIC__ = …;</script>`; `variable` names another property of `window` (a JavaScript identifier, or it throws), `nonce` serves a Content Security Policy, and a `bootstrap` of `undefined` renders nothing.
+
+```tsx
+import { FlagneticBootstrap, FlagneticProvider } from "flagnetic/react";
+
+// On the server: the document serves the render and goes into the page's
+// head, outside the root the browser hydrates.
+const doc = flags.values(context);
+const head = renderToStaticMarkup(<FlagneticBootstrap bootstrap={doc} />);
+const body = renderToString(
+  <FlagneticProvider sdkKey="fn_cli_…" baseUrl="https://flags.example.com" options={{ context }} bootstrap={doc}>
+    <App />
+  </FlagneticProvider>,
+);
+
+// In the browser: the same document, read back from the page.
+hydrateRoot(root, <FlagneticProvider sdkKey="fn_cli_…" baseUrl="https://flags.example.com" options={{ context }} bootstrap={window.__FLAGNETIC__}>…</FlagneticProvider>);
+```
 
 ## OpenFeature
 

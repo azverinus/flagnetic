@@ -8,8 +8,8 @@
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test, vi } from "vitest";
-import { FlagneticProvider, useFlag, useFlagDetail, useFlagnetic, useStage } from "../src/react.js";
-import { createServer } from "../src/server.js";
+import { FlagneticBootstrap, FlagneticProvider, serializeBootstrap as serializeFromReact, useFlag, useFlagDetail, useFlagnetic, useStage } from "../src/react.js";
+import { createServer, serializeBootstrap } from "../src/server.js";
 import { ruleset } from "./support/flags-fixture.js";
 
 const user = { units: { user: "u-1" }, attributes: { country: "DE" } };
@@ -137,5 +137,55 @@ describe("server rendering", () => {
       }
       expect(() => renderToStaticMarkup(<Bare />)).toThrow(/needs a <FlagneticProvider>/);
     }
+  });
+});
+
+describe("writing the bootstrap document into the page", () => {
+  // A flag value is text an editor typed: it must not be able to close the
+  // inline script or open a comment that swallows the rest of the page.
+  const hostile = {
+    schema_version: 1,
+    ruleset_version: 3,
+    flags: {
+      banner: { type: "string", value: "</script><script>alert(1)</script><!-- & -->", reason: "targeting_match" },
+      separators: { type: "string", value: "a\u2028b\u2029c", reason: "targeting_match" },
+      "</script>": { type: "json", value: { "<!--": [">", "&amp;"] }, reason: "targeting_match" },
+    },
+  };
+
+  test("serializeBootstrap escapes what could end the script, and parses back to the same document", () => {
+    const text = serializeBootstrap(hostile);
+    expect(text).not.toMatch(/[<>&\u2028\u2029]/);
+    expect(JSON.parse(text)).toStrictEqual(hostile);
+    expect(serializeFromReact, "flagnetic/react exports the same helper").toBe(serializeBootstrap);
+  });
+
+  test("serializeBootstrap writes the document the server mode produced", () => {
+    const flags = createServer("", "", { offline: ruleset(), logger: () => undefined });
+    const doc = flags.values(user);
+    expect(doc).toBeDefined();
+    if (doc) expect(JSON.parse(serializeBootstrap(doc))).toStrictEqual(JSON.parse(JSON.stringify(doc)));
+  });
+
+  test("FlagneticBootstrap renders one script assigning the escaped document", () => {
+    const html = renderToStaticMarkup(<FlagneticBootstrap bootstrap={hostile} />);
+    const match = /^<script>window\.__FLAGNETIC__ = (.*);<\/script>$/s.exec(html);
+    expect(match, html).not.toBeNull();
+    expect(html.match(/<\/script>/g), "the only closing tag is the script's own").toHaveLength(1);
+    expect(html).not.toContain("<!--");
+    expect(JSON.parse(match?.[1] ?? "")).toStrictEqual(hostile);
+  });
+
+  test("FlagneticBootstrap takes another variable and a nonce", () => {
+    const html = renderToStaticMarkup(<FlagneticBootstrap bootstrap={{ schema_version: 1 }} variable="$flags_1" nonce="r4nd0m" />);
+    expect(html).toBe(`<script nonce="r4nd0m">window.$flags_1 = {"schema_version":1};</script>`);
+  });
+
+  test("FlagneticBootstrap renders nothing without a document", () => {
+    expect(renderToStaticMarkup(<FlagneticBootstrap bootstrap={undefined} />)).toBe("");
+  });
+
+  test.each(["", "1st", "a.b", "a-b", "x;alert(1)", "window[0]", "__proto__"])("FlagneticBootstrap refuses the variable %j", (variable) => {
+    expect(() => renderToStaticMarkup(<FlagneticBootstrap bootstrap={hostile} variable={variable} />)).toThrow(TypeError);
   });
 });

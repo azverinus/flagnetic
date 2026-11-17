@@ -45,12 +45,26 @@ export interface FlagneticProviderProps {
  * between.
  *
  * ```tsx
+ * // On the server, with doc = values(context) of flagnetic/server:
+ * <FlagneticProvider sdkKey="fn_cli_…" baseUrl="https://flags.example.com"
+ *                    options={{ context: { units: { user: id } } }}
+ *                    bootstrap={doc}>
+ *   <App />
+ * </FlagneticProvider>
+ * // and, in the page's head, outside the root the browser hydrates:
+ * <FlagneticBootstrap bootstrap={doc} />
+ *
+ * // In the browser, the same document read back from the page:
  * <FlagneticProvider sdkKey="fn_cli_…" baseUrl="https://flags.example.com"
  *                    options={{ context: { units: { user: id } } }}
  *                    bootstrap={window.__FLAGNETIC__}>
  *   <App />
  * </FlagneticProvider>
  * ```
+ *
+ * Write the document into the page with `FlagneticBootstrap` or
+ * `serializeBootstrap`, never with a bare `JSON.stringify`: a flag value
+ * holding `</script>` would end the inline script.
  *
  * `sdkKey`, `baseUrl`, `options` and `bootstrap` are read when the provider
  * mounts, so an object literal in JSX is safe; give the provider a `key` to

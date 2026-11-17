@@ -58,6 +58,7 @@ export type { LogLevel };
  * - `key_revoked` (error): 401 or 403, logged once until a fetch succeeds. Fields: status.
  * - `schema_unsupported` (error): a document's schema_version is not one this SDK reads, logged once. Fields: schema_version, supported.
  * - `rule_unsupported` (error): a flag of a loaded ruleset holds a construct the evaluator does not know and serves the fallback, logged once per flag and ruleset version. Fields: flag, constructs, ruleset_version.
+ * - `value_too_deep` (error): a flag of a loaded ruleset holds a variation value nesting arrays and objects deeper than the server stores (`max_depth`, 32) and serves the fallback, logged once per flag and ruleset version. Fields: flag, max_depth, ruleset_version.
  * - `store_failed` (warn): the store could not be read or written. Fields: operation, cause.
  * - `events_failed` (warn): an ingest batch failed and goes again with the same event IDs. Fields: cause, status?, events, retry_in_ms.
  * - `queue_dropped` (warn): events or summary rows were given up on. Fields: cause, plus what was dropped.
@@ -76,6 +77,7 @@ export type LogEvent =
   | "key_revoked"
   | "schema_unsupported"
   | "rule_unsupported"
+  | "value_too_deep"
   | "store_failed"
   | "events_failed"
   | "queue_dropped"
