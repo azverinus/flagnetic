@@ -209,6 +209,17 @@ type sinkRound struct {
 func (r *sinkRound) run(ctx context.Context, interval time.Duration) error {
 	until := time.Now().Add(sinkRoundFor)
 	for ctx.Err() == nil && time.Now().Before(until) {
+		// A replica holding as many sinks as it attempts at once claims no
+		// more until one finishes: a claimed sink waiting for a slot keeps
+		// its streams leased, and claiming on would take every sink due away
+		// from the other replicas.
+		if r.full() {
+			select {
+			case <-r.woken:
+			case <-ctx.Done():
+			}
+			continue
+		}
 		// Whether nothing was under way when the claim looked: a sink that
 		// finished meanwhile may have a stream due that the claim passed
 		// over because it was still busy, so only a claim made with every
@@ -233,6 +244,12 @@ func (r *sinkRound) run(ctx context.Context, interval time.Duration) error {
 		}
 	}
 	return ctx.Err()
+}
+
+func (r *sinkRound) full() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.busy) >= sinksAtOnce
 }
 
 func (r *sinkRound) idle() bool {

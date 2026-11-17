@@ -96,3 +96,58 @@ func TestOneProjectsSinksCannotTakeEveryAttemptOfAReplica(t *testing.T) {
 		t.Errorf("peak %d sinks of one project at once, want at most 4", h.peak[flooding])
 	}
 }
+
+// endlessSinks has a new batch of one project's sinks due at every claim until
+// stopped, and holds every attempt until released.
+type endlessSinks struct {
+	ids     *id.Source
+	project workspace.ProjectID
+	mu      sync.Mutex
+	stopped bool
+	claimed int
+	release chan struct{}
+}
+
+func (e *endlessSinks) Claim(context.Context, []sinks.ID) (appsinks.Claim, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.stopped {
+		return appsinks.Claim{}, nil
+	}
+	var c appsinks.Claim
+	for range 50 {
+		c.Sinks = append(c.Sinks, appsinks.ClaimedSink{Sink: sinks.Sink{ID: id.New[sinks.Sink](e.ids), Project: e.project}})
+	}
+	e.claimed += len(c.Sinks)
+	return c, nil
+}
+
+func (e *endlessSinks) AttemptSink(context.Context, appsinks.LeaseToken, appsinks.ClaimedSink,
+) (map[sinks.EventKind]appsinks.Result, error) {
+	<-e.release
+	return nil, nil
+}
+
+// A replica whose sinks all wait for a slot claims no more: every sink it
+// claimed and cannot start yet is leased away from the other replicas, which
+// would otherwise find nothing left to claim.
+func TestAReplicaClaimsNoMoreSinksWhileItCannotStartThose(t *testing.T) {
+	ids := testkit.IDs(testkit.Clock())
+	e := &endlessSinks{ids: ids, project: id.New[workspace.Project](ids), release: make(chan struct{})}
+	w := worker.SinkDelivery(e, noRisk{}, time.Minute, testkit.NewLogSink().Logger())
+
+	done := make(chan error, 1)
+	go func() { done <- w.Round(t.Context()) }()
+	time.Sleep(300 * time.Millisecond)
+	e.mu.Lock()
+	claimed := e.claimed
+	e.stopped = true
+	e.mu.Unlock()
+	close(e.release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if claimed > 50 {
+		t.Errorf("%d sinks claimed while none could start beyond the first claim, want at most 50", claimed)
+	}
+}
