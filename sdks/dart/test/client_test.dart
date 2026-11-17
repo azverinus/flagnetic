@@ -465,8 +465,17 @@ void main() {
         logs: logs,
         pollInterval: const Duration(milliseconds: 5),
       );
+      // A client key is answered an empty list, so the server's fixture is
+      // given the attributes a server key would be told.
+      final withIgnored = {
+        ...(evaluation as Map<String, Object?>),
+        'ignored_attributes': [
+          {'name': 'favourite_colour', 'code': 'undeclared'},
+          {'name': 'plan', 'code': 'type_mismatch'},
+        ],
+      };
       for (var i = 0; i < 3; i++) {
-        await (await server.next()).respondJson(evaluation);
+        await (await server.next()).respondJson(withIgnored);
       }
       await eventually(() => logs.count(LogEvents.valuesLoaded) == 3);
       expect(
