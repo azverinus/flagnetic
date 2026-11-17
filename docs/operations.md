@@ -46,7 +46,7 @@ With `FLAGNETIC_AUTO_MIGRATE=false`, `serve` compares the database's schema with
 
 **Keep the key for the life of the instance.** On its first start the instance stores a canary, a random value sealed under the key, and every replica opens it on every start. A replica given another key cannot open it and refuses to start, exit code 1, with a message naming `FLAGNETIC_SECRET_KEY`: a mistyped or rotated key stops the deploy instead of silently losing what the instance sealed. Start it again with the original key.
 
-Each sealed secret is also bound to the row that holds it (an SMTP password to the instance's SMTP settings, a webhook secret to its subscription, and so on), so a value copied into another row does not open there. Values sealed by an earlier version carry no such binding and keep opening; each is sealed again, bound, the next time its row is written.
+Each sealed secret is also bound to the row that holds it (an SMTP password to the instance's SMTP settings, a webhook secret to its subscription, and so on), so a value copied into another row does not open there. Values sealed by an earlier version carry no such binding and keep opening; each is sealed again, bound, the next time its row is stored with it: an edit of the SMTP settings, an auth provider or a sink, enabling a sink, or rotating a secret or a certificate. A SCIM token is never written again and keeps its earlier form until it expires or is revoked.
 
 ## The first instance admin
 
@@ -338,7 +338,7 @@ A webhook subscription's target is `https` on the public internet. A target over
 
 ## Metrics
 
-Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNETIC_METRICS_LISTEN_ADDR` (`127.0.0.1:9090` by default, so only this host reaches it; the container image listens on `:9090` and leaves what to publish to you), and never on the public listener. Keep the port inside your network. Setting the address empty switches metrics off and opens no port.
+Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNETIC_METRICS_LISTEN_ADDR` (`127.0.0.1:9090` by default, so only this host reaches it; the container image sets the variable to `:9090` and leaves what to publish to you; being a variable, it wins over `metrics_listen_addr` in a configuration file, so change it there with the variable), and never on the public listener. Keep the port inside your network. Setting the address empty switches metrics off and opens no port.
 
 | Metric | Labels | What it tells |
 |---|---|---|

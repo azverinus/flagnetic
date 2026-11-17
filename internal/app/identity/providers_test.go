@@ -2,7 +2,12 @@ package identity_test
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/hkdf"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"net/url"
 	"os"
@@ -131,4 +136,59 @@ func TestTwoEditsBasedOnTheSameVersionLeaveOneOfThem(t *testing.T) {
 	if !slices.Equal(codes, []string{"", "version_mismatch"}) {
 		t.Errorf("edits based on version 1 = %q, want one accepted and one version_mismatch", codes)
 	}
+}
+
+func TestAClientSecretSealedBeforeRowsWereBoundIsBoundByTheNextEditOfItsProvider(t *testing.T) {
+	d := deps(t)
+	keyring := secret.NewKeyring(secret.New(testkit.SecretKey))
+	in, err := identity.CheckProviderInput(input())
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := identity.New(id.New[identity.Provider](d.IDs), in, unboundSeal(t, secret.PurposeOIDCClientSecret, in.OIDC.ClientSecret.Reveal()), testkit.Start)
+	if err = d.Store.CreateProvider(t.Context(), p); err != nil {
+		t.Fatal(err)
+	}
+	name := "Renamed SSO"
+	if _, err = appidentity.NewUpdateProvider(d).Handle(t.Context(), appidentity.UpdateProviderCommand{
+		Slug: p.Slug, Change: identity.ProviderChange{DisplayName: &name}, Expected: precondition.On(p.Version), Request: admin,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := appidentity.NewGetProvider(d.Store).Handle(t.Context(), p.Slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealed := got.OIDC.SealedClientSecret
+	if !strings.HasPrefix(sealed, "v2:") {
+		t.Fatalf("stored client secret %q, want it sealed again, bound", sealed)
+	}
+	if plain, err := keyring.Open(secret.PurposeOIDCClientSecret, sealed, secret.Row("auth_providers", p.ID.String())); err != nil ||
+		string(plain) != in.OIDC.ClientSecret.Reveal() {
+		t.Errorf("the instance opens %q, %v; want the client secret", plain, err)
+	}
+	if _, err := keyring.Open(secret.PurposeOIDCClientSecret, sealed, secret.Row("auth_providers", "another")); err == nil {
+		t.Error("the rebound client secret opens for another provider")
+	}
+}
+
+// unboundSeal seals plaintext for purpose under the test secret key the way
+// values were sealed before they were bound to a row: "v1:" and AES-256-GCM
+// with no additional data.
+func unboundSeal(t *testing.T, purpose secret.Purpose, plaintext string) string {
+	t.Helper()
+	key, err := hkdf.Key(sha256.New, []byte(testkit.SecretKey), nil, "flagnetic secret v1 "+string(purpose), 32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	return "v1:" + base64.RawURLEncoding.EncodeToString(gcm.Seal(nonce, nonce, []byte(plaintext), nil))
 }

@@ -184,6 +184,9 @@ func (h *Update) update(ctx context.Context, cmd UpdateCommand, sealed string, n
 	if !draft.KeepsSecret {
 		after.SealedSecret = sealed
 	}
+	if after, err = rebind(h.d.Sealer, after); err != nil {
+		return before, err
+	}
 	after.UpdatedAt, after.Version = now, before.Version+1
 	if err = h.d.Store.Update(ctx, after); err != nil {
 		return after, err
@@ -297,7 +300,10 @@ func (h *RotateSecret) Handle(ctx context.Context, cmd RotateCommand) (Created, 
 		if before.Kind != sinks.KindWebhook {
 			return errNoSecretToRotate
 		}
-		after := before.RotateSecret(sealed, now, h.d.SecretOverlap)
+		after, txErr := rebind(h.d.Sealer, before.RotateSecret(sealed, now, h.d.SecretOverlap))
+		if txErr != nil {
+			return txErr
+		}
 		if txErr = h.d.Store.RotateSecret(ctx, after); txErr != nil {
 			return txErr
 		}

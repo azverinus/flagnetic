@@ -60,6 +60,9 @@ func webhookSecretBinding(w governance.WebhookID) secret.Binding {
 // Sealer seals a value under the instance's secret key.
 type Sealer interface {
 	Seal(purpose secret.Purpose, plaintext []byte, binding secret.Binding) (string, error)
+	// Rebind returns sealed bound to binding, sealing again a value sealed
+	// before rows were bound.
+	Rebind(purpose secret.Purpose, sealed string, binding secret.Binding) (string, error)
 }
 
 // WebhookDeps are what the webhook subscription use cases run on.
@@ -530,6 +533,12 @@ func (h *RotateWebhookSecret) Handle(ctx context.Context, cmd WebhookCommand) (C
 			return txErr
 		}
 		after := before.RotateSecret(sealed, now, h.d.SecretOverlap)
+		// The secret it replaces is written again, as the previous one: it
+		// leaves the write bound to the row, whenever it was sealed.
+		if after.PreviousSealedSecret, txErr = h.d.Sealer.Rebind(secret.PurposeWebhookSecret, after.PreviousSealedSecret,
+			webhookSecretBinding(after.ID)); txErr != nil {
+			return txErr
+		}
 		if txErr = h.d.Store.RotateWebhookSecret(ctx, after); txErr != nil {
 			return txErr
 		}

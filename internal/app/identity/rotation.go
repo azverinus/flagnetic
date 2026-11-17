@@ -47,6 +47,9 @@ func (h *RotateCertificate) Handle(ctx context.Context, cmd ProviderCommand) (id
 		if startErr != nil {
 			return startErr
 		}
+		if after, startErr = rebindProvider(h.d.Sealer, after); startErr != nil {
+			return startErr
+		}
 		if storeErr := h.d.Store.UpdateProvider(ctx, after); storeErr != nil {
 			return storeErr
 		}
@@ -79,6 +82,9 @@ func (h *CompleteCertificateRotation) Handle(ctx context.Context, cmd ProviderCo
 		}
 		after, err := before.CompleteRotation(now)
 		if err != nil {
+			return err
+		}
+		if after, err = rebindProvider(h.d.Sealer, after); err != nil {
 			return err
 		}
 		if err = h.d.Store.UpdateProvider(ctx, after); err != nil {

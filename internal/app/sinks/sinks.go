@@ -84,6 +84,21 @@ type Resolver interface {
 // Sealer seals a value under the instance's secret key.
 type Sealer interface {
 	Seal(purpose secret.Purpose, plaintext []byte, binding secret.Binding) (string, error)
+	// Rebind returns sealed bound to binding, sealing again a value sealed
+	// before rows were bound.
+	Rebind(purpose secret.Purpose, sealed string, binding secret.Binding) (string, error)
+}
+
+// rebind returns s with the secrets it holds bound to its row, so that a
+// write of the row leaves none sealed before rows were bound.
+func rebind(sealer Sealer, s sinks.Sink) (sinks.Sink, error) {
+	var err error
+	purpose, binding := s.Kind.SecretPurpose(), secretBinding(s.ID)
+	if s.SealedSecret, err = sealer.Rebind(purpose, s.SealedSecret, binding); err != nil {
+		return s, err
+	}
+	s.PreviousSealedSecret, err = sealer.Rebind(purpose, s.PreviousSealedSecret, binding)
+	return s, err
 }
 
 // Deps are what the sink use cases run on.

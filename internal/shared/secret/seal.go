@@ -161,6 +161,23 @@ func (k *Keyring) Open(purpose Purpose, sealed string, binding Binding) ([]byte,
 	return plaintext, nil
 }
 
+// Rebind returns sealed bound to binding: a value sealed before rows were
+// bound is opened and sealed again for binding, so that the write of its row
+// leaves it bound. A value already bound, an empty one and one that does not
+// open are returned as they are: rebinding never makes an unrelated write of
+// the row fail over a value that only its own use can judge.
+func (k *Keyring) Rebind(purpose Purpose, sealed string, binding Binding) (string, error) {
+	if !strings.HasPrefix(sealed, legacyVersion+":") {
+		return sealed, nil
+	}
+	plaintext, err := k.Open(purpose, sealed, binding)
+	if err != nil {
+		// It stays as stored, to fail where it is used.
+		return sealed, nil
+	}
+	return k.Seal(purpose, plaintext, binding)
+}
+
 // NewCanary returns a new canary: random bytes sealed under the secret key,
 // stored once by the instance and opened on every start.
 func (k *Keyring) NewCanary() (string, error) {

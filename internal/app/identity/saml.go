@@ -135,6 +135,32 @@ func providerSecretBinding(p identity.ProviderID) secret.Binding {
 	return secret.Row("auth_providers", p.String())
 }
 
+// rebindProvider returns p with the secrets it holds bound to its row, so
+// that a write of the row leaves none sealed before rows were bound.
+func rebindProvider(s Sealer, p identity.Provider) (identity.Provider, error) {
+	binding := providerSecretBinding(p.ID)
+	if p.OIDC != nil {
+		o := *p.OIDC
+		var err error
+		if o.SealedClientSecret, err = s.Rebind(secret.PurposeOIDCClientSecret, o.SealedClientSecret, binding); err != nil {
+			return p, err
+		}
+		p.OIDC = &o
+	}
+	if p.SAML != nil {
+		c := *p.SAML
+		var err error
+		if c.SealedSPKey, err = s.Rebind(secret.PurposeSAMLSPKey, c.SealedSPKey, binding); err != nil {
+			return p, err
+		}
+		if c.NextSealedSPKey, err = s.Rebind(secret.PurposeSAMLSPKey, c.NextSealedSPKey, binding); err != nil {
+			return p, err
+		}
+		p.SAML = &c
+	}
+	return p, nil
+}
+
 // sealSPKey generates the key pair the instance presents for a new SAML
 // provider and seals its private key.
 func sealSPKey(gen SPKeyGenerator, sealer Sealer, provider identity.ProviderID, now time.Time) (identity.SPKey, error) {

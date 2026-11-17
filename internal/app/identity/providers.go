@@ -46,6 +46,9 @@ type AuditLog interface {
 // Sealer seals a value under the instance's secret key.
 type Sealer interface {
 	Seal(purpose secret.Purpose, plaintext []byte, binding secret.Binding) (string, error)
+	// Rebind returns sealed bound to binding, sealing again a value sealed
+	// before rows were bound.
+	Rebind(purpose secret.Purpose, sealed string, binding secret.Binding) (string, error)
 }
 
 // ProviderStore keeps auth providers.
@@ -466,6 +469,9 @@ func (h *UpdateProvider) Handle(ctx context.Context, cmd UpdateProviderCommand) 
 		}
 		if sealed != "" {
 			after.OIDC.SealedClientSecret = sealed
+		}
+		if after, err = rebindProvider(h.d.Sealer, after); err != nil {
+			return err
 		}
 		after.UpdatedAt, after.Version = now, before.Version+1
 		if err = h.d.Store.UpdateProvider(ctx, after); err != nil {

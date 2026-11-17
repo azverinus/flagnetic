@@ -173,3 +173,35 @@ func legacyBody(t *testing.T, _ *secret.Keyring, p secret.Purpose, plaintext str
 	nonce := make([]byte, gcm.NonceSize())
 	return base64.RawURLEncoding.EncodeToString(gcm.Seal(nonce, nonce, []byte(plaintext), nil))
 }
+
+func TestRebindingBindsAValueSealedBeforeRowsWereBound(t *testing.T) {
+	legacy := "v1:" + legacyBody(t, keyring, purpose, "a client secret")
+	bound, err := keyring.Rebind(purpose, legacy, row)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(bound, "v2:") {
+		t.Fatalf("rebound value %q is not in the bound version", bound)
+	}
+	if got, err := keyring.Open(purpose, bound, row); err != nil || string(got) != "a client secret" {
+		t.Errorf("Open(rebound) = %q, %v", got, err)
+	}
+	if _, err := keyring.Open(purpose, bound, "another row"); !errors.Is(err, secret.ErrCannotOpen) {
+		t.Errorf("another row: err = %v, want ErrCannotOpen", err)
+	}
+}
+
+func TestRebindingLeavesOtherValuesAsTheyAre(t *testing.T) {
+	bound := seal(t, keyring, purpose, "a client secret")
+	for name, v := range map[string]string{
+		"already bound":   bound,
+		"empty":           "",
+		"does not open":   "v1:" + legacyBody(t, keyring, "other", "a client secret"),
+		"another version": "v9:abc",
+	} {
+		got, err := keyring.Rebind(purpose, v, row)
+		if err != nil || got != v {
+			t.Errorf("%s: Rebind = %q, %v, want it unchanged", name, got, err)
+		}
+	}
+}
