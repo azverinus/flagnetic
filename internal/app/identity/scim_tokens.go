@@ -40,9 +40,10 @@ type SCIMTokenStore interface {
 	// RevokeSCIMToken revokes the token at at and returns it; ErrNotFound
 	// unless it exists unrevoked.
 	RevokeSCIMToken(ctx context.Context, token identity.SCIMTokenID, at time.Time) (SCIMTokenRecord, error)
-	// UnrevokedSCIMTokens returns every token not revoked, with its sealed
+	// AuthenticableSCIMTokens returns every token not revoked, and those
+	// revoked at or after revokedSince, with its sealed
 	// hash: the few an instance holds, all of which authentication opens.
-	UnrevokedSCIMTokens(ctx context.Context) ([]SealedSCIMToken, error)
+	AuthenticableSCIMTokens(ctx context.Context, revokedSince time.Time) ([]SealedSCIMToken, error)
 	// RecordSCIMTokenUse records that token was presented at at, unless a use
 	// not before notBefore is recorded already, so replicas coalesce.
 	RecordSCIMTokenUse(ctx context.Context, token identity.SCIMTokenID, at, notBefore time.Time) error
@@ -215,27 +216,30 @@ type SCIMCaller struct {
 	ProviderSlug string
 }
 
-// Handle returns the caller presenting value from ip. Every value but a
-// token that matches counts as a failure of ip's source before it is
-// compared, and one that is refused as unknown, malformed, revoked, expired
-// or of a disabled provider alike is ErrInvalidSCIMToken; a throttled source
-// is refused rate_limited. A value that matches a live token proves its
-// presenter knows it, so a token that expired or lost its provider is
-// refused without counting. A token accepted has its use recorded, at most
-// once a minute.
+// presentableRevokedFor is how long a revoked token is still recognised when
+// presented, so a connector left on the token a rotation replaced is refused
+// without counting against the address the connector with the new one
+// shares.
+const presentableRevokedFor = 7 * 24 * time.Hour
+
+// Handle returns the caller presenting value from ip. The value is compared
+// with every token before anything is counted: one that matches a live
+// token is accepted whatever the source's failures, since it proves its
+// presenter knows it; one that matches a token that is revoked, expired or
+// of a disabled provider is refused ErrInvalidSCIMToken without counting,
+// since its presenter knew a token once. Every other value, unknown or
+// malformed, counts as a failure of ip's source and is refused
+// ErrInvalidSCIMToken, or rate_limited once the source is throttled. A
+// token accepted has its use recorded, at most once a minute.
 func (h *SCIMAuthenticator) Handle(ctx context.Context, value string, ip netip.Addr) (SCIMCaller, error) {
 	now := h.d.now()
-	release, err := h.throttle.Reserve(ctx, ip, now)
-	if err != nil {
-		return SCIMCaller{}, err
-	}
 	hash, err := identity.HashSCIMTokenValue(value)
 	if err != nil {
-		return SCIMCaller{}, err
+		return SCIMCaller{}, h.fail(ctx, ip, now, err)
 	}
-	tokens, err := h.d.Store.UnrevokedSCIMTokens(ctx)
+	tokens, err := h.d.Store.AuthenticableSCIMTokens(ctx, now.Add(-presentableRevokedFor))
 	if err != nil {
-		return SCIMCaller{}, errors.Join(err, release(context.WithoutCancel(ctx)))
+		return SCIMCaller{}, err
 	}
 	// Every token is opened and compared, whichever matches first, so the
 	// time taken does not tell how many tokens precede the match.
@@ -252,10 +256,7 @@ func (h *SCIMAuthenticator) Handle(ctx context.Context, value string, ip netip.A
 		}
 	}
 	if match == nil {
-		return SCIMCaller{}, identity.ErrInvalidSCIMToken
-	}
-	if err = release(context.WithoutCancel(ctx)); err != nil {
-		return SCIMCaller{}, err
+		return SCIMCaller{}, h.fail(ctx, ip, now, identity.ErrInvalidSCIMToken)
 	}
 	if !match.Usable(now, match.ProviderEnabled) {
 		return SCIMCaller{}, identity.ErrInvalidSCIMToken
@@ -267,4 +268,14 @@ func (h *SCIMAuthenticator) Handle(ctx context.Context, value string, ip netip.A
 		}
 	}
 	return SCIMCaller{Token: match.ID, Hint: match.Hint, Provider: match.Provider, ProviderSlug: match.ProviderSlug}, nil
+}
+
+// fail counts one failure of the source ip comes from and returns why the
+// attempt is refused: rate_limited once the source is throttled, else
+// refusal.
+func (h *SCIMAuthenticator) fail(ctx context.Context, ip netip.Addr, now time.Time, refusal error) error {
+	if _, err := h.throttle.Reserve(ctx, ip, now); err != nil {
+		return err
+	}
+	return refusal
 }
