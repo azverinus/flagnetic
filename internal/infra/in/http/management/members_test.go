@@ -450,6 +450,9 @@ func TestATokenCreatesNoAccessEvenFromAnInstanceAdmin(t *testing.T) {
 	invited := testkit.NewMember(t, pool, testkit.WithStatus(access.MemberInvited))
 	reissueRes := do(admin.ReissueInvitationWithResponse(t.Context(), invited.ID.String()))
 	assertProblem(t, "issuing an invitation again", reissueRes.StatusCode(), reissueRes.Body, http.StatusForbidden, "session_required")
+	projectInviteRes := do(admin.InviteProjectMemberWithResponse(t.Context(), p.Key, management.ProjectInvitationCreate{
+		Email: "project-" + nobody, DisplayName: "Nobody", Role: "viewer"}))
+	assertProblem(t, "inviting to a project", projectInviteRes.StatusCode(), projectInviteRes.Body, http.StatusForbidden, "session_required")
 	assertProblem(t, "granting", grantRes.StatusCode(), grantRes.Body, http.StatusForbidden, "session_required")
 	assertProblem(t, "inviting", inviteRes.StatusCode(), inviteRes.Body, http.StatusForbidden, "session_required")
 	assertProblem(t, "reactivating", reactivateRes.StatusCode(), reactivateRes.Body, http.StatusForbidden, "session_required")

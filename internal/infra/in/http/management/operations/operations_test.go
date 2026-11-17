@@ -147,7 +147,7 @@ func TestEveryWriteToMeAndEveryTokenCreationNeedsASession(t *testing.T) {
 // would leave behind access that outlives the token's own revocation, so each
 // operation that creates or changes who can sign in needs a session.
 func TestEveryOperationCreatingAccessNeedsASession(t *testing.T) {
-	for _, name := range []string{"createGrant", "inviteMember", "reactivateMember", "updateMember", "issuePasswordReset", "reissueInvitation"} {
+	for _, name := range []string{"createGrant", "inviteMember", "reactivateMember", "updateMember", "issuePasswordReset", "reissueInvitation", "inviteProjectMember"} {
 		found := false
 		for pattern, e := range Table {
 			if e.Name != name {

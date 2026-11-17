@@ -135,8 +135,7 @@ func TestWithSMTPAProjectInvitationIsMailedNamingTheProjectTheRoleAndTheInviter(
 	p := createProject(t, in.admin, projectKey())
 	owner := testkit.NewMember(t, in.pool, testkit.WithDisplayName("Katherine Johnson"))
 	testkit.Grant(t, in.pool, projectIDOf(p), owner.ID, access.RoleOwner)
-	ownerClient := testkit.Client(t, in.srv, testkit.PersonalToken(t, in.pool, owner.ID, "inviter",
-		access.ScopeRead, access.ScopeFlagsWrite, access.ScopeExperimentsWrite, access.ScopeProjectAdmin))
+	ownerClient := signedIn(t, in.srv, owner)
 	email := newEmail()
 
 	res := do(ownerClient.InviteProjectMemberWithResponse(t.Context(), p.Key,

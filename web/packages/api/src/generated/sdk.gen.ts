@@ -4376,7 +4376,8 @@ export const listProjectInvitations = <ThrowOnError extends boolean = false>(
  * deactivated before it is accepted; the audit log records
  * `invitation.grant_revoked` with the reason `inviter_lost_permission`
  * or `inviter_deactivated`. Only a member invites: a project token
- * never holds `grant.manage`.
+ * never holds `grant.manage`. Needs a signed-in session: an API token is
+ * refused `session_required`.
  *
  */
 export const inviteProjectMember = <ThrowOnError extends boolean = false>(

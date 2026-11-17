@@ -10874,7 +10874,8 @@ type ClientInterface interface {
 	// deactivated before it is accepted; the audit log records
 	// `invitation.grant_revoked` with the reason `inviter_lost_permission`
 	// or `inviter_deactivated`. Only a member invites: a project token
-	// never holds `grant.manage`.
+	// never holds `grant.manage`. Needs a signed-in session: an API token is
+	// refused `session_required`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10905,7 +10906,8 @@ type ClientInterface interface {
 	// deactivated before it is accepted; the audit log records
 	// `invitation.grant_revoked` with the reason `inviter_lost_permission`
 	// or `inviter_deactivated`. Only a member invites: a project token
-	// never holds `grant.manage`.
+	// never holds `grant.manage`. Needs a signed-in session: an API token is
+	// refused `session_required`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -17004,7 +17006,8 @@ func (c *Client) ListProjectInvitations(ctx context.Context, project ProjectKey,
 // deactivated before it is accepted; the audit log records
 // `invitation.grant_revoked` with the reason `inviter_lost_permission`
 // or `inviter_deactivated`. Only a member invites: a project token
-// never holds `grant.manage`.
+// never holds `grant.manage`. Needs a signed-in session: an API token is
+// refused `session_required`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -17045,7 +17048,8 @@ func (c *Client) InviteProjectMemberWithBody(ctx context.Context, project Projec
 // deactivated before it is accepted; the audit log records
 // `invitation.grant_revoked` with the reason `inviter_lost_permission`
 // or `inviter_deactivated`. Only a member invites: a project token
-// never holds `grant.manage`.
+// never holds `grant.manage`. Needs a signed-in session: an API token is
+// refused `session_required`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -33022,7 +33026,8 @@ type ClientWithResponsesInterface interface {
 	// deactivated before it is accepted; the audit log records
 	// `invitation.grant_revoked` with the reason `inviter_lost_permission`
 	// or `inviter_deactivated`. Only a member invites: a project token
-	// never holds `grant.manage`.
+	// never holds `grant.manage`. Needs a signed-in session: an API token is
+	// refused `session_required`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -33053,7 +33058,8 @@ type ClientWithResponsesInterface interface {
 	// deactivated before it is accepted; the audit log records
 	// `invitation.grant_revoked` with the reason `inviter_lost_permission`
 	// or `inviter_deactivated`. Only a member invites: a project token
-	// never holds `grant.manage`.
+	// never holds `grant.manage`. Needs a signed-in session: an API token is
+	// refused `session_required`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -55350,7 +55356,8 @@ func (c *ClientWithResponses) ListProjectInvitationsWithResponse(ctx context.Con
 // deactivated before it is accepted; the audit log records
 // `invitation.grant_revoked` with the reason `inviter_lost_permission`
 // or `inviter_deactivated`. Only a member invites: a project token
-// never holds `grant.manage`.
+// never holds `grant.manage`. Needs a signed-in session: an API token is
+// refused `session_required`.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -55387,7 +55394,8 @@ func (c *ClientWithResponses) InviteProjectMemberWithBodyWithResponse(ctx contex
 // deactivated before it is accepted; the audit log records
 // `invitation.grant_revoked` with the reason `inviter_lost_permission`
 // or `inviter_deactivated`. Only a member invites: a project token
-// never holds `grant.manage`.
+// never holds `grant.manage`. Needs a signed-in session: an API token is
+// refused `session_required`.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
