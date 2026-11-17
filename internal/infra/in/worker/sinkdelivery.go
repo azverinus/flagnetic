@@ -176,7 +176,7 @@ func SinkDelivery(d SinkDeliverer, risk AtRiskEvaluator, interval time.Duration,
 		// finish within the longest call a target allows.
 		Timeout: sinkRoundFor + 2*sinks.ObjectStorageCallTimeout,
 		Round: func(ctx context.Context) error {
-			r := &sinkRound{d: d, log: log, slots: make(chan struct{}, sinksAtOnce), busy: map[sinks.ID]bool{}, woken: make(chan struct{}, 1)}
+			r := &sinkRound{d: d, log: log, slots: make(chan struct{}, sinksAtOnce), perProject: newProjectSlots(attemptsPerProject), busy: map[sinks.ID]bool{}, woken: make(chan struct{}, 1)}
 			err := r.run(ctx, interval)
 			r.attempts.Wait()
 			// A sink is judged after the attempts of the round, so that one
@@ -198,6 +198,8 @@ type sinkRound struct {
 	log   *slog.Logger
 	slots chan struct{}
 	woken chan struct{}
+	// perProject shares the slots between projects.
+	perProject *projectSlots
 
 	attempts sync.WaitGroup
 	mu       sync.Mutex
@@ -253,11 +255,8 @@ func (r *sinkRound) claim(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	for _, s := range c.Sinks {
-		select {
-		case r.slots <- struct{}{}:
-		case <-ctx.Done():
-			return 0, ctx.Err()
-		}
+		// A claimed sink is busy from now on, so the next claim leaves it
+		// out, while it waits for its project's slot and the replica's.
 		r.mu.Lock()
 		r.busy[s.Sink.ID] = true
 		r.mu.Unlock()
@@ -266,12 +265,22 @@ func (r *sinkRound) claim(ctx context.Context) (int, error) {
 				r.mu.Lock()
 				delete(r.busy, s.Sink.ID)
 				r.mu.Unlock()
-				<-r.slots
 				select {
 				case r.woken <- struct{}{}:
 				default:
 				}
 			}()
+			release, err := r.perProject.acquire(ctx, s.Sink.Project)
+			if err != nil {
+				return
+			}
+			defer release()
+			select {
+			case r.slots <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
+			defer func() { <-r.slots }()
 			_ = safego.Call(ctx, SinkDeliveryName, r.log, func(ctx context.Context) error {
 				r.attempt(ctx, c.Token, s)
 				return nil

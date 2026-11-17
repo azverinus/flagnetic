@@ -80,6 +80,7 @@ func WebhookDelivery(d Deliverer, interval time.Duration, log *slog.Logger, reg 
 		Round: func(ctx context.Context) error {
 			until := time.Now().Add(deliveryRoundFor)
 			slots := make(chan struct{}, attemptsAtOnce)
+			perProject := newProjectSlots(attemptsPerProject)
 			var attempts sync.WaitGroup
 			defer attempts.Wait()
 			for ctx.Err() == nil && time.Now().Before(until) {
@@ -87,16 +88,24 @@ func WebhookDelivery(d Deliverer, interval time.Duration, log *slog.Logger, reg 
 				if err != nil || len(c.Deliveries) == 0 {
 					return err
 				}
-				for _, delivery := range c.Deliveries {
-					select {
-					case slots <- struct{}{}:
-					case <-ctx.Done():
-						return ctx.Err()
-					}
+				for _, claimed := range c.Deliveries {
+					// Each attempt waits for its project's slot, then the
+					// replica's, in a goroutine of its own, so a project at its
+					// allowance holds back its own deliveries and no other's.
 					attempts.Go(func() {
+						release, err := perProject.acquire(ctx, claimed.Project)
+						if err != nil {
+							return
+						}
+						defer release()
+						select {
+						case slots <- struct{}{}:
+						case <-ctx.Done():
+							return
+						}
 						defer func() { <-slots }()
 						_ = safego.Call(ctx, WebhookDeliveryName, log, func(ctx context.Context) error {
-							attempt(ctx, c.Token, delivery)
+							attempt(ctx, c.Token, claimed.ID)
 							return nil
 						})
 					})

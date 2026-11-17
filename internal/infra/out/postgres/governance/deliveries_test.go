@@ -9,8 +9,10 @@ import (
 
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
+	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -43,7 +45,7 @@ func pendingDeliveries(t *testing.T, pool *pgxpool.Pool, ids *id.Source, n int) 
 func claim(t *testing.T, pool *pgxpool.Pool, s *pggovernance.Deliveries, token appgovernance.LeaseToken, now time.Time,
 ) []governance.DeliveryID {
 	t.Helper()
-	var leased []governance.DeliveryID
+	var leased []appgovernance.ClaimedDelivery
 	err := postgres.NewTransactor(pool).Within(t.Context(), func(ctx context.Context) error {
 		var err error
 		leased, err = s.ClaimDeliveries(ctx, token, now, now.Add(time.Minute), 100)
@@ -52,7 +54,11 @@ func claim(t *testing.T, pool *pgxpool.Pool, s *pggovernance.Deliveries, token a
 	if err != nil {
 		t.Fatal(err)
 	}
-	return leased
+	ids := make([]governance.DeliveryID, len(leased))
+	for i, l := range leased {
+		ids[i] = l.ID
+	}
+	return ids
 }
 
 // A lease is the token's while it runs: no more than four of a
@@ -138,5 +144,48 @@ func TestADeliveryStoreThatCannotReachPostgreSQLFails(t *testing.T) {
 	}
 	if _, err := s.ForgetExpiredSecrets(ctx, now); err == nil {
 		t.Error("forgetting expired secrets succeeded")
+	}
+}
+
+// A claimed delivery names the project of its subscription, zero for an
+// instance's, which is what lets a replica share its attempts between
+// projects.
+func TestAClaimedDeliveryNamesTheProjectOfItsSubscription(t *testing.T) {
+	pool := testkit.FreshPool(t)
+	ids := testkit.IDs(testkit.Clock())
+	p, err := workspace.NewProject(id.New[workspace.Project](ids), "alpha", "Alpha", "", testkit.Start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = pgworkspace.NewStore(pool).CreateProject(t.Context(), p); err != nil {
+		t.Fatal(err)
+	}
+	w := governance.Webhook{
+		ID: id.New[governance.Webhook](ids), Project: p.ID, SealedSecret: "sealed", EnabledAt: testkit.Start,
+		CreatedAt: testkit.Start, UpdatedAt: testkit.Start, Version: 1,
+		WebhookInput: governance.WebhookInput{Name: "archive", URL: "https://receiver.example/hook",
+			Events: []string{governance.EventAuditEntry}, Environments: []string{}, Enabled: true},
+	}
+	if err = pggovernance.NewWebhooks(pool).CreateWebhook(t.Context(), w); err != nil {
+		t.Fatal(err)
+	}
+	d := governance.NewDelivery(id.New[governance.Delivery](ids), w.ID, governance.QueuedEvent{
+		ID: id.New[governance.Event](ids), Project: p.ID, Type: governance.EventAuditEntry, Envelope: []byte(`{}`),
+	}, testkit.Start)
+	if err = pggovernance.NewOutbox(pool).CreateDeliveries(t.Context(), []governance.Delivery{d}); err != nil {
+		t.Fatal(err)
+	}
+	var claimed []appgovernance.ClaimedDelivery
+	now := testkit.Start.Add(time.Second)
+	err = postgres.NewTransactor(pool).Within(t.Context(), func(ctx context.Context) error {
+		var err error
+		claimed, err = pggovernance.NewDeliveries(pool).ClaimDeliveries(ctx, id.New[appgovernance.Lease](ids), now, now.Add(time.Minute), 10)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(claimed) != 1 || claimed[0].ID != d.ID || claimed[0].Project != p.ID {
+		t.Errorf("claimed = %+v, want the delivery of project %s", claimed, p.ID)
 	}
 }

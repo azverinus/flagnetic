@@ -47,7 +47,7 @@ func (s *Deliveries) db(ctx context.Context) pgxtx.DB { return pgxtx.Querier(ctx
 // committed before them.
 func (s *Deliveries) ClaimDeliveries(ctx context.Context, token appgovernance.LeaseToken, now, until time.Time,
 	limit int,
-) ([]governance.DeliveryID, error) {
+) ([]appgovernance.ClaimedDelivery, error) {
 	rows, err := s.db(ctx).Query(ctx, `
 		WITH due AS (
 		    SELECT subscription_id, min(next_attempt_at) AS first FROM webhook_deliveries
@@ -86,18 +86,25 @@ func (s *Deliveries) ClaimDeliveries(ctx context.Context, token appgovernance.Le
 		)
 		UPDATE webhook_deliveries d SET lease_until = $5, lease_token = $6
 		FROM picked WHERE d.id = picked.id
-		RETURNING d.id`,
+		RETURNING d.id, (SELECT s.project_id FROM webhook_subscriptions s WHERE s.id = d.subscription_id)`,
 		subscriptions, now, governance.MaxDeliveriesInFlight, limit, until, token.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("leasing webhook deliveries: %w", err)
 	}
-	leased, err := pgx.CollectRows(rows, pgx.RowTo[[16]byte])
+	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (appgovernance.ClaimedDelivery, error) {
+		var delivery [16]byte
+		var project *[16]byte
+		if err := row.Scan(&delivery, &project); err != nil {
+			return appgovernance.ClaimedDelivery{}, err
+		}
+		c := appgovernance.ClaimedDelivery{ID: id.FromBytes[governance.Delivery](delivery)}
+		if project != nil {
+			c.Project = id.FromBytes[workspace.Project](*project)
+		}
+		return c, nil
+	})
 	if err != nil {
 		return nil, fmt.Errorf("leasing webhook deliveries: %w", err)
-	}
-	out := make([]governance.DeliveryID, len(leased))
-	for i, d := range leased {
-		out[i] = id.FromBytes[governance.Delivery](d)
 	}
 	return out, nil
 }
