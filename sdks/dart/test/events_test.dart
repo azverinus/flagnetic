@@ -68,6 +68,13 @@ void expose(FlagneticClient client) {
     ..exposure('checkout');
 }
 
+/// The batch a restarted client sent, with its logs and store.
+typedef Restarted = ({
+  List<Map<String, Object?>> events,
+  LogRecorder logs,
+  InMemoryStore store,
+});
+
 void main() {
   group('exposures', () {
     test('one carries the exposure fields and rides in the envelope '
@@ -1041,14 +1048,7 @@ void main() {
 
     /// A client started on a store holding [stored] under the event key,
     /// which records one exposure and flushes; the batch it sends.
-    Future<
-      ({
-        List<Map<String, Object?>> events,
-        LogRecorder logs,
-        InMemoryStore store,
-      })
-    >
-    restartOn(String stored) async {
+    Future<Restarted> restartOn(String stored) async {
       final store = InMemoryStore({clientKeys.events: stored});
       final run = await serving(
         experimentValues(),
@@ -1077,9 +1077,8 @@ void main() {
     ]) {
       test('$name is dropped whole and the client carries on', () async {
         final result = await restartOn(stored);
-        expect(result.events.map((e) => e['type']), [
-          'exposure',
-        ], reason: 'only what this run recorded');
+        final types = result.events.map((e) => e['type']).toList();
+        expect(types, ['exposure'], reason: 'only this run recorded');
         expect(
           result.events.single['event_id'],
           isNot(validExposure['event_id']),
@@ -1091,8 +1090,7 @@ void main() {
       });
     }
 
-    test('malformed rows are skipped and the well-formed ones still go '
-        'out', () async {
+    test('malformed rows are skipped, well-formed ones go out', () async {
       final now = DateTime.now().toUtc();
       final result = await restartOn(
         jsonEncode([
@@ -1138,8 +1136,7 @@ void main() {
       );
     });
 
-    test('a well-formed summary with a malformed row is skipped rather than '
-        'merged', () async {
+    test('a summary with a malformed row is skipped, not merged', () async {
       final now = DateTime.now().toUtc();
       final store = InMemoryStore({
         clientKeys.events: jsonEncode([

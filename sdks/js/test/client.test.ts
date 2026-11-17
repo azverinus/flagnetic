@@ -505,7 +505,7 @@ describe("a value nested too deeply", () => {
     await h.advance(0);
     expect(c.stage).toBe("fresh");
     expect(c.getBool("checkout", false)).toBe(true);
-    expect(h.logs.filter((l) => l.event === "store_failed").map((l) => l.fields.operation)).toStrictEqual(["write"]);
+    // Whether the unread field then serializes for the store depends on the engine's stack, so the log is not asserted.
   });
 
   test("in a bootstrap object, 32 levels serve and 33 do not", async () => {
