@@ -215,7 +215,7 @@ func TestACertificateRotationBindsTheKeysOfItsProvider(t *testing.T) {
 		EntityID: "https://idp.example.com", SSOURL: "https://idp.example.com/sso", Certificates: []string{"idp certificate"},
 	},
 		identity.SPKey{CertificatePEM: "current", SealedKey: unboundSeal(t, secret.PurposeSAMLSPKey, "current key")}, testkit.Start)
-	if err := d.Store.CreateProvider(t.Context(), p); err != nil {
+	if err = d.Store.CreateProvider(t.Context(), p); err != nil {
 		t.Fatal(err)
 	}
 	cmd := appidentity.ProviderCommand{Slug: p.Slug, Request: admin}
