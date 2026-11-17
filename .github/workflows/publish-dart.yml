@@ -47,14 +47,14 @@ jobs:
             echo "package=$package"
             echo "version=${REF#refs/tags/"$dir"/v}"
           } >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v7
-      - uses: dart-lang/setup-dart@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dart-lang/setup-dart@2286a0c042b44434fe26d292bbce8d34f7ec662b # v1
         if: steps.tag.outputs.dir == 'sdks/dart'
         with:
           sdk: stable
       # A Flutter package resolves and is scored with the Flutter SDK; the
       # flagnetic it requires is on pub.dev before it is released.
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         if: steps.tag.outputs.dir == 'sdks/flutter'
         with:
           channel: stable
@@ -96,7 +96,7 @@ jobs:
         run: |
           git archive --format=tar.gz --prefix="$PACKAGE-$VERSION/" -o "$RUNNER_TEMP/$PACKAGE-$VERSION.tar.gz" \
             "$GITHUB_REF:$DIR" ':(exclude)pubspec_overrides.yaml'
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: steps.pub.outputs.exists == 'false'
         with:
           name: ${{ steps.tag.outputs.package }}-${{ steps.tag.outputs.version }}
@@ -126,12 +126,12 @@ jobs:
       run:
         working-directory: ${{ needs.check.outputs.dir }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # setup-dart exchanges the job's OIDC token for a pub.dev credential.
-      - uses: dart-lang/setup-dart@v1
+      - uses: dart-lang/setup-dart@2286a0c042b44434fe26d292bbce8d34f7ec662b # v1
         with:
           sdk: stable
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         if: needs.check.outputs.dir == 'sdks/flutter'
         with:
           channel: stable

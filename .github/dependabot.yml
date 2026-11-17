@@ -93,6 +93,8 @@ updates:
       prefix: "deps(sdk-ruby-openfeature)"
     allow:
       - dependency-name: flagnetic
+  # Every action is pinned by commit, with its tag in a trailing comment;
+  # Dependabot moves the commit and the comment together.
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -102,7 +104,15 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+  # The base images are pinned by digest, and the tag beside the digest is
+  # what lets Dependabot propose the next one.
   - package-ecosystem: docker
+    directory: /deploy
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+  - package-ecosystem: docker-compose
     directory: /deploy
     schedule:
       interval: weekly

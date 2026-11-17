@@ -24,8 +24,8 @@ jobs:
       run:
         working-directory: sdks/dart
     steps:
-      - uses: actions/checkout@v7
-      - uses: dart-lang/setup-dart@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dart-lang/setup-dart@2286a0c042b44434fe26d292bbce8d34f7ec662b # v1
         with:
           sdk: ${{ matrix.sdk }}
       - name: Install
@@ -62,8 +62,8 @@ jobs:
     name: dart package
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: dart-lang/setup-dart@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dart-lang/setup-dart@2286a0c042b44434fe26d292bbce8d34f7ec662b # v1
         with:
           sdk: stable
       - name: Dry run and pana

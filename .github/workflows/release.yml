@@ -50,7 +50,7 @@ jobs:
       - name: App token
         id: app-token
         if: vars.RELEASE_APP_CLIENT_ID != ''
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -59,7 +59,7 @@ jobs:
           permission-issues: write
       - name: release-please
         id: release
-        uses: googleapis/release-please-action@v5
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
@@ -78,18 +78,18 @@ jobs:
     env:
       IMAGE: ghcr.io/${{ github.repository }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.release-please.outputs.server_tag }}
-      - uses: docker/setup-qemu-action@v4
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ env.IMAGE }}
           tags: |
@@ -97,7 +97,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},value=${{ needs.release-please.outputs.server_version }}
             type=raw,value=latest
       - id: push
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           file: deploy/Dockerfile
@@ -108,7 +108,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           sbom: true
           provenance: mode=max
-      - uses: actions/attest-build-provenance@v4
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.push.outputs.digest }}
@@ -123,10 +123,10 @@ jobs:
     if: needs.release-please.outputs.sdk_go_released == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.release-please.outputs.sdk_go_tag }}
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version: stable
       - name: Version equals the tag
@@ -155,13 +155,13 @@ jobs:
       run:
         working-directory: sdks/js
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.release-please.outputs.sdk_js_tag }}
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
         with:
           package_json_file: sdks/js/package.json
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
@@ -182,7 +182,7 @@ jobs:
         id: pack
         run: echo "tarball=$(npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP" | tail -n 1)" >> "$GITHUB_OUTPUT"
       - name: Keep the tarball
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: flagnetic-${{ needs.release-please.outputs.sdk_js_version }}
           path: ${{ runner.temp }}/${{ steps.pack.outputs.tarball }}
@@ -221,10 +221,10 @@ jobs:
       run:
         working-directory: sdks/python
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.release-please.outputs.sdk_python_tag }}
-      - uses: astral-sh/setup-uv@v10.3.3
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - name: Version equals the tag
         env:
           FLAGNETIC_RELEASE_VERSION: ${{ needs.release-please.outputs.sdk_python_version }}
@@ -237,7 +237,7 @@ jobs:
         run: |
           python3 scripts/check_dist.py dist
           uvx twine check --strict dist/*
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: flagnetic-python-${{ needs.release-please.outputs.sdk_python_version }}
           path: sdks/python/dist/
@@ -257,11 +257,11 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: flagnetic-python-${{ needs.release-please.outputs.sdk_python_version }}
           path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
         with:
           attestations: true
 
@@ -278,10 +278,10 @@ jobs:
       run:
         working-directory: sdks/ruby
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.release-please.outputs.sdk_ruby_tag }}
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1
         with:
           ruby-version: "4.0"
           bundler-cache: true
@@ -293,7 +293,7 @@ jobs:
       - name: Build and check the gem
         run: |
           "$GITHUB_WORKSPACE/.github/scripts/check-gem.sh" . flagnetic.gemspec "$RUNNER_TEMP/gem"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: flagnetic-ruby-${{ needs.release-please.outputs.sdk_ruby_version }}
           path: ${{ runner.temp }}/gem/
@@ -311,14 +311,14 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: flagnetic-ruby-${{ needs.release-please.outputs.sdk_ruby_version }}
           path: gem/
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1
         with:
           ruby-version: "4.0"
-      - uses: rubygems/configure-rubygems-credentials@v2.1.0
+      - uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a # v2.1.0
       - name: Publish
         env:
           VERSION: ${{ needs.release-please.outputs.sdk_ruby_version }}
@@ -335,10 +335,10 @@ jobs:
       run:
         working-directory: sdks/ruby-openfeature
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.release-please.outputs.sdk_ruby_openfeature_tag }}
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1
         with:
           ruby-version: "4.0"
           bundler-cache: true
@@ -350,7 +350,7 @@ jobs:
       - name: Build and check the gem
         run: |
           "$GITHUB_WORKSPACE/.github/scripts/check-gem.sh" . flagnetic-openfeature.gemspec "$RUNNER_TEMP/gem"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: flagnetic-openfeature-ruby-${{ needs.release-please.outputs.sdk_ruby_openfeature_version }}
           path: ${{ runner.temp }}/gem/
@@ -374,14 +374,14 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: flagnetic-openfeature-ruby-${{ needs.release-please.outputs.sdk_ruby_openfeature_version }}
           path: gem/
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1
         with:
           ruby-version: "4.0"
-      - uses: rubygems/configure-rubygems-credentials@v2.1.0
+      - uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a # v2.1.0
       - name: Publish
         env:
           VERSION: ${{ needs.release-please.outputs.sdk_ruby_openfeature_version }}
