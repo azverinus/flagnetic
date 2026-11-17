@@ -550,3 +550,39 @@ func TestAskingForAPasswordResetIsThrottledPerAddress(t *testing.T) {
 		t.Errorf("sign-in from the same address = %d %s, want 429 rate_limited: the throttle is shared", code, problem)
 	}
 }
+
+func TestAnEmailChangeEndsTheMembersOpenPasswordResetsAndInvitations(t *testing.T) {
+	srv := testkit.StartServer(t)
+	pool := testkit.Pool(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	m := testkit.NewMember(t, pool)
+	issued := issueReset(t, admin, m.ID)
+	// An invitation the member still holds: the store is the only way to
+	// see it, as no page opens an invitation of an active member.
+	store := pgaccess.NewStore(pool)
+	inv, _ := access.NewInvitation(id.New[access.Invitation](id.NewSource(testkit.Clock())), m.ID, testkit.Clock().Now(), rand.Reader)
+	if err := store.CreateInvitation(t.Context(), inv); err != nil {
+		t.Fatal(err)
+	}
+
+	// A change of the display name alone leaves both open.
+	if res := do(admin.UpdateMemberWithResponse(t.Context(), m.ID.String(), management.MemberPatch{DisplayName: ptr("Renamed")})); res.JSON200 == nil {
+		t.Fatalf("rename = %d: %s", res.StatusCode(), res.Body)
+	}
+	if got := resetOpened(t, srv, issued.Url); got.JSON200 == nil {
+		t.Fatalf("a rename ended the reset: %d: %s", got.StatusCode(), got.Body)
+	}
+
+	moved := "moved-" + strings.ToLower(rand.Text()[:10]) + "@example.com"
+	if res := do(admin.UpdateMemberWithResponse(t.Context(), m.ID.String(), management.MemberPatch{Email: ptr(moved)})); res.JSON200 == nil {
+		t.Fatalf("change the email = %d: %s", res.StatusCode(), res.Body)
+	}
+	wantResetGone(t, srv, issued.Url, "after an email change")
+	got, _, err := store.InvitationByHash(t.Context(), inv.Hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ConsumedAt == nil {
+		t.Error("the member's invitation is still open after an email change")
+	}
+}
