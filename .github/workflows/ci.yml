@@ -1,12 +1,17 @@
 name: ci
 
+# A run checks what its change can break and nothing else. The `plan` job
+# decides that from the changed paths with .github/scripts/ci-plan.sh, the
+# script `task pr:check` reads too, and every other job runs when the plan
+# asks for it. A pull request is checked against its own paths; main runs
+# everything when the server or the console changed, and nightly always.
 on:
   pull_request:
   push:
     branches: [main]
   schedule:
-    # The console end to end runs here too, so a change that broke it behind
-    # the path filter below is found within a day.
+    # Everything, so a change that broke a check its paths do not ask for is
+    # found within a day.
     - cron: '17 3 * * *'
 
 permissions:
@@ -19,12 +24,8 @@ concurrency:
 jobs:
   lint:
     name: golangci-lint
-    needs: changes
-    if: >-
-      always() && (
-        github.event_name != 'pull_request' ||
-        needs.changes.outputs.server == 'true'
-      )
+    needs: plan
+    if: needs.plan.outputs.server == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -36,21 +37,22 @@ jobs:
         with:
           version: v2.14.0
 
+  # The server's tests, under the race detector, in the jobs the plan splits
+  # them into: the packages that take minutes each have jobs of their own.
+  # A pull request runs the tests its change can reach, on the oldest
+  # supported PostgreSQL; main and the nightly run add the newest, so a
+  # feature newer than the minimum cannot slip in and neither can a
+  # behaviour the newest release changed.
   test:
-    name: go test (postgres ${{ matrix.postgres }})
-    needs: changes
-    if: >-
-      always() && (
-        github.event_name != 'pull_request' ||
-        needs.changes.outputs.server == 'true'
-      )
+    name: go test (${{ matrix.shard.id }}, postgres ${{ matrix.postgres }})
+    needs: plan
+    if: needs.plan.outputs.test_shards != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # The oldest and the newest supported PostgreSQL, so a feature newer
-        # than the minimum cannot slip in.
-        postgres: [16, 18]
+        postgres: ${{ fromJSON(needs.plan.outputs.postgres) }}
+        shard: ${{ fromJSON(needs.plan.outputs.test_shards) }}
     services:
       postgres:
         image: postgres:${{ matrix.postgres }}-alpine
@@ -70,16 +72,54 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - name: Build
-        run: go build ./...
       - name: Test with the race detector
-        run: go test -race -timeout 20m -coverpkg=./internal/... -coverprofile=coverage.out ./...
-      - name: Coverage by layer
         env:
-          POSTGRES: ${{ matrix.postgres }}
+          PACKAGES: ${{ matrix.shard.packages }}
+          FLAGS: ${{ matrix.shard.flags }}
+          COVER: ${{ needs.plan.outputs.cover_packages }}
+        run: |
+          # shellcheck disable=SC2086
+          go test -race -timeout 20m ${COVER:+-coverpkg="$COVER" -coverprofile=coverage.out} $FLAGS $PACKAGES
+      # One PostgreSQL is enough for coverage: the first of the plan's list.
+      - name: Keep the coverage profile
+        if: needs.plan.outputs.cover_packages != '' && matrix.postgres == fromJSON(needs.plan.outputs.postgres)[0]
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-${{ matrix.shard.id }}
+          path: coverage.out
+          retention-days: 1
+          # A job run again replaces the profile of its earlier attempt.
+          overwrite: true
+
+  # The coverage floors, over the profiles of the test jobs put together: a
+  # package is covered by the tests of the packages that depend on it, which
+  # run in other jobs than its own.
+  coverage:
+    name: coverage floors
+    needs: [plan, test]
+    if: needs.plan.outputs.cover_packages != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: coverage-*
+          path: profiles
+      - name: One profile from the test jobs
+        run: |
+          # A block is listed once per test binary; its count is their sum.
+          {
+            echo "mode: atomic"
+            cat profiles/*/coverage.out |
+              awk '!/^mode:/ { n[$1 " " $2] += $3 } END { for (b in n) print b, n[b] }' | sort
+          } > coverage.out
+      - name: Coverage by layer
         run: |
           {
-            echo "### Go coverage (PostgreSQL $POSTGRES)"
+            echo "### Go coverage"
             .github/scripts/coverage-by-layer.sh coverage.out
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Coverage floors
@@ -87,12 +127,8 @@ jobs:
 
   vuln:
     name: govulncheck
-    needs: changes
-    if: >-
-      always() && (
-        github.event_name != 'pull_request' ||
-        needs.changes.outputs.server == 'true'
-      )
+    needs: plan
+    if: needs.plan.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -130,12 +166,8 @@ jobs:
 
   tidy:
     name: go mod tidy and generate
-    needs: changes
-    if: >-
-      always() && (
-        github.event_name != 'pull_request' ||
-        needs.changes.outputs.server == 'true'
-      )
+    needs: plan
+    if: needs.plan.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -154,12 +186,8 @@ jobs:
   # the catalogs are what extraction gives, and it builds.
   console:
     name: console
-    needs: changes
-    if: >-
-      always() && (
-        github.event_name != 'pull_request' ||
-        needs.changes.outputs.server == 'true'
-      )
+    needs: plan
+    if: needs.plan.outputs.console == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -193,105 +221,94 @@ jobs:
       - name: Build
         run: pnpm build
 
-  # Whether a pull request touches what a conditional job exercises. For the
-  # end-to-end suite: the console, its handlers and the suite itself, with
-  # the generated client left out, as it changes with every edit of the
-  # management API; server changes behind it are covered by the runs on main,
-  # on release pull requests and nightly. For the Ruby gems: their
-  # directories, the conformance suite, the SDK contract, the pages their
-  # tests compare with, the scripts they run and their workflow.
-  changes:
-    name: what changed
+  # What this run checks. A pull request is compared with its base. A push
+  # to main is compared with the last commit of main whose run passed, not
+  # with the commit before it: a run that failed or was superseded leaves
+  # its changes to the next one, so nothing reaches main unchecked. Every
+  # other event, and a push with no earlier run to compare with, checks
+  # everything.
+  plan:
+    name: plan
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      actions: read
     outputs:
-      e2e: ${{ steps.diff.outputs.e2e }}
-      ruby: ${{ steps.diff.outputs.ruby }}
-      sdk-js: ${{ steps.sdk-js.outputs.run }}
-      python: ${{ steps.sdk-python.outputs.run }}
-      server: ${{ steps.server.outputs.run }}
+      go: ${{ steps.plan.outputs.go }}
+      server: ${{ steps.plan.outputs.server }}
+      console: ${{ steps.plan.outputs.console }}
+      console_e2e: ${{ steps.plan.outputs.console_e2e }}
+      docker: ${{ steps.plan.outputs.docker }}
+      sdk_e2e: ${{ steps.plan.outputs.sdk_e2e }}
+      sdk_js: ${{ steps.plan.outputs.sdk_js }}
+      sdk_python: ${{ steps.plan.outputs.sdk_python }}
+      sdk_ruby: ${{ steps.plan.outputs.sdk_ruby }}
+      dart: ${{ steps.plan.outputs.dart }}
+      flutter: ${{ steps.plan.outputs.flutter }}
+      workflows: ${{ steps.plan.outputs.workflows }}
+      modules: ${{ steps.plan.outputs.modules }}
+      test_shards: ${{ steps.plan.outputs.test_shards }}
+      cover_packages: ${{ steps.plan.outputs.cover_packages }}
+      postgres: ${{ steps.plan.outputs.postgres }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - id: diff
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - id: plan
         env:
+          EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.head_ref }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          if git diff --name-only "$BASE...HEAD" |
-            grep -vE '^web/packages/api/src/generated/' |
-            grep -qE '^(web/apps/|web/packages/|web/e2e/|web/pnpm-lock\.yaml$|internal/infra/in/http/console/|\.github/workflows/ci\.yml$)'; then
-            echo "e2e=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "e2e=false" >> "$GITHUB_OUTPUT"
-          fi
-          if git diff --name-only "$BASE...HEAD" |
-            grep -qE '^(sdks/ruby/|sdks/ruby-openfeature/|conformance/|api/sdk\.yaml$|go\.mod$|docs/sdks/(behaviour-matrix|compatibility)\.md$|\.github/scripts/(behaviour-matrix|check-gem)\.sh$|\.github/workflows/(ci|sdk-ruby)\.yml$)'; then
-            echo "ruby=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ruby=false" >> "$GITHUB_OUTPUT"
-          fi
-      # The server, the console and the Go modules: on every pull request
-      # except one whose every file belongs to an SDK that has a job of its
-      # own (or is the release manifest beside it). Such a change cannot
-      # alter what go test, the linters, the image or the console build, and
-      # running them there only gave their slow PostgreSQL suites another
-      # chance to fail on code nobody touched. An empty diff runs everything.
-      - id: server
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          files=$(git diff --name-only "$BASE...HEAD")
-          if [ -z "$files" ] ||
-            printf '%s\n' "$files" |
-            grep -qvE '^(sdks/(js|python|ruby|ruby-openfeature|dart|flutter)/|\.release-please-manifest\.json$)'; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
-      - id: sdk-js
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if git diff --name-only "$BASE...HEAD" |
-            grep -qE '^(sdks/js/|conformance/|api/sdk\.yaml$|go\.mod$|docs/sdks/behaviour-matrix\.md$|\.github/scripts/behaviour-matrix\.sh$|\.github/workflows/(ci|sdk-js)\.yml$)'; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
-      # The Python SDK: its sources, the conformance suite its evaluator must
-      # pass, the SDK contract, the Go release the Unicode tables come from,
-      # the pages its tests compare with, and the workflows that run it.
-      - id: sdk-python
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if git diff --name-only "$BASE...HEAD" |
-            grep -qE '^(sdks/python/|conformance/|api/sdk\.yaml$|go\.mod$|docs/sdks/(behaviour-matrix|compatibility)\.md$|\.github/scripts/behaviour-matrix\.sh$|\.github/workflows/(ci|sdk-python)\.yml$)'; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
+          case "$EVENT" in
+            pull_request)
+              set -- --mode pr --base "$BASE" --head-ref "$HEAD_REF" ;;
+            push)
+              green="$(gh run list --workflow ci.yml --branch main --event push --status success --limit 1 --json headSha --jq '.[0].headSha // empty' || true)"
+              if [ -n "$green" ]; then set -- --mode main --base "$green"; else set -- --mode full; fi ;;
+            *)
+              set -- --mode full ;;
+          esac
+          echo "ci-plan.sh $*"
+          .github/scripts/ci-plan.sh "$@" > "$RUNNER_TEMP/plan"
+          # Its last line: without it the plan is not whole, and the jobs
+          # it would have named must not be taken for unneeded.
+          grep -q '^postgres=\[' "$RUNNER_TEMP/plan"
+          cat "$RUNNER_TEMP/plan" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Plan (\`ci-plan.sh $*\`)"
+            echo '```'
+            cat "$RUNNER_TEMP/plan"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
-  # The console end to end: on a pull request that touches the console, on
-  # release pull requests, on main and nightly. Playwright builds the binary
+  # The console end to end: on a pull request that touches the console, its
+  # handlers or the suite; a change to the server behind it meets the suite
+  # on main, on the server's release pull request and nightly. Playwright builds the binary
   # with the console embedded, runs it against PostgreSQL under the test
   # clock, and drives it in Chromium. It runs on the runner itself, not in a
   # container: the identity providers the specs sign in through (Dex) are
   # started by the harness with Docker on a loopback address, which is the
   # only place the instance accepts an http issuer, so they must share the
   # network of the instance and the browser.
+  #
+  # The specs run one after another against one instance, so the suite is
+  # split by file over several jobs, each with an instance of its own.
   e2e:
-    name: console end to end
-    needs: [changes]
-    if: >-
-      always() && (
-        github.event_name != 'pull_request' ||
-        needs.changes.outputs.e2e == 'true' ||
-        startsWith(github.head_ref, 'release-please--')
-      )
+    name: console end to end (${{ matrix.shard }}/3)
+    needs: plan
+    if: needs.plan.outputs.console_e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     services:
       postgres:
         image: postgres:17-alpine
@@ -327,47 +344,39 @@ jobs:
       - name: Install Chromium
         run: pnpm e2e:install
       - name: Run the suite
-        run: pnpm e2e
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: pnpm --filter @flagnetic/e2e exec playwright test --shard="$SHARD/3"
       - name: Keep the report
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: web/e2e/playwright-report
           retention-days: 7
 
   # The Ruby gems: rubocop, the tests on every supported Ruby with the
   # conformance suite, the Unicode tables compared with Go's, and the
-  # OpenFeature provider against the working tree and the released core. On
-  # a pull request it runs when either gem, the conformance suite, the SDK
-  # contract or its workflow changes; on main, on release pull requests and
-  # nightly always.
+  # OpenFeature provider against the working tree and the released core,
+  # when either gem, the conformance suite, the SDK contract or its workflow
+  # changes.
   sdk-ruby:
     name: Ruby SDK
-    needs: changes
-    if: >-
-      always() && (
-        github.event_name != 'pull_request' ||
-        needs.changes.outputs.ruby == 'true' ||
-        startsWith(github.head_ref, 'release-please--')
-      )
+    needs: plan
+    if: needs.plan.outputs.sdk_ruby == 'true'
     uses: ./.github/workflows/sdk-ruby.yml
 
-  # The Python SDK, on a pull request that touches it or the conformance
-  # suite, on release pull requests, on main and nightly.
+  # The Python SDK, when it or the conformance suite changes.
   sdk-python:
     name: Python SDK
-    needs: changes
-    if: >-
-      always() && (
-        github.event_name != 'pull_request' ||
-        needs.changes.outputs.python == 'true' ||
-        startsWith(github.head_ref, 'release-please--')
-      )
+    needs: plan
+    if: needs.plan.outputs.sdk_python == 'true'
     uses: ./.github/workflows/sdk-python.yml
 
   workflows:
     name: actionlint
+    needs: plan
+    if: needs.plan.outputs.workflows == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -381,12 +390,8 @@ jobs:
 
   docker:
     name: docker build
-    needs: changes
-    if: >-
-      always() && (
-        github.event_name != 'pull_request' ||
-        needs.changes.outputs.server == 'true'
-      )
+    needs: plan
+    if: needs.plan.outputs.docker == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -400,26 +405,10 @@ jobs:
           build-args: VERSION=ci
 
   # The Go modules of go.work besides the root one (the evaluator and the
-  # SDKs). The list is read from go.work, so a module joins CI through its
-  # `use` line alone. The end-to-end harness is left out: it is published
-  # nowhere, builds the server, and runs in the sdk-e2e job.
-  modules:
-    name: list go modules
-    runs-on: ubuntu-latest
-    outputs:
-      dirs: ${{ steps.list.outputs.dirs }}
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: false
-      - id: list
-        run: |
-          dirs="$(go work edit -json | jq -c '[.Use[].DiskPath | ltrimstr("./") | select(. != "." and . != "e2e")]')"
-          echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
-          echo "Modules: $dirs"
-
+  # SDKs) that the change affects: a module joins CI through its `use` line
+  # alone. The end-to-end harness is left out: it is published nowhere,
+  # builds the server, and runs in the sdk-e2e job.
+  #
   # Each module is published on its own and promises to build with the oldest
   # Go release still supported, so it is checked on that release and on the
   # newest one, with the toolchain held to the one installed. The modules
@@ -427,13 +416,13 @@ jobs:
   # also holds the server, whose newer Go would refuse the oldest release.
   module:
     name: module ${{ matrix.dir }} (go ${{ matrix.go }})
-    needs: modules
-    if: needs.modules.outputs.dirs != '[]'
+    needs: plan
+    if: needs.plan.outputs.modules != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        dir: ${{ fromJSON(needs.modules.outputs.dirs) }}
+        dir: ${{ fromJSON(needs.plan.outputs.modules) }}
         go: [oldstable, stable]
     env:
       GOTOOLCHAIN: local
@@ -448,13 +437,13 @@ jobs:
           cache-dependency-path: ${{ matrix.dir }}/go.mod
       - name: Workspace of the published modules
         working-directory: .
-        env:
-          DIRS: ${{ needs.modules.outputs.dirs }}
         run: |
           echo "GOWORK=$RUNNER_TEMP/go.work" >> "$GITHUB_ENV"
           export GOWORK="$RUNNER_TEMP/go.work"
           go work init
-          for dir in $(jq -r '.[]' <<< "$DIRS"); do
+          # Every published module, not only the ones this run tests: they
+          # require each other.
+          for dir in $(go work edit -json "$GITHUB_WORKSPACE/go.work" | jq -r '.Use[].DiskPath | ltrimstr("./") | select(. != "." and . != "e2e")'); do
             go work use "$GITHUB_WORKSPACE/$dir"
           done
           # As in the committed go.work: v0.0.0, the version required before
@@ -522,13 +511,13 @@ jobs:
   # when that skip would hide a broken release.
   released:
     name: released requirements ${{ matrix.dir }}
-    needs: modules
-    if: needs.modules.outputs.dirs != '[]'
+    needs: plan
+    if: needs.plan.outputs.modules != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        dir: ${{ fromJSON(needs.modules.outputs.dirs) }}
+        dir: ${{ fromJSON(needs.plan.outputs.modules) }}
     env:
       GOWORK: "off"
     steps:
@@ -544,19 +533,18 @@ jobs:
         env:
           DIR: ${{ matrix.dir }}
 
-  # The SDK end to end, on every pull request: the real binary built from
-  # the checkout, two replicas on one PostgreSQL, a project seeded through
-  # the management API, and the Go SDK and its OpenFeature provider run
-  # against them; the kill-switch propagation it measures goes to the job
-  # summary. The harness module is linted, tidied and scanned here, since
-  # the module matrix leaves it out.
+  # The SDK end to end, when the server, a Go module, an SDK or the harness
+  # changes: the real binary built from the checkout, two replicas on one
+  # PostgreSQL, a project seeded through the management API, and the Go SDK
+  # and its OpenFeature provider run against them; the kill-switch
+  # propagation it measures goes to the job summary. The harness module is
+  # linted, tidied and scanned here, since the module matrix leaves it out.
   # The harness and the Go SDK on every run; each other SDK's smoke against
-  # the replicas `flagnetic-e2e up` brings up, when its tree changes and on
-  # every run that is not a pull request.
+  # the replicas `flagnetic-e2e up` brings up, when its paths changed.
   sdk-e2e:
     name: SDK end to end
-    needs: [changes, dart-changes]
-    if: always()
+    needs: plan
+    if: needs.plan.outputs.sdk_e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -574,10 +562,10 @@ jobs:
     env:
       DATABASE_URL: postgres://flagnetic:flagnetic@localhost:5432/flagnetic?sslmode=disable
       FLAGNETIC_E2E: "1"
-      RUBY_SMOKE: ${{ github.event_name != 'pull_request' || needs.changes.outputs.ruby == 'true' || startsWith(github.head_ref, 'release-please--') }}
-      SDK_JS: ${{ github.event_name != 'pull_request' || needs.changes.outputs.sdk-js == 'true' || startsWith(github.head_ref, 'release-please--') }}
-      SDK_PYTHON: ${{ github.event_name != 'pull_request' || needs.changes.outputs.python == 'true' || startsWith(github.head_ref, 'release-please--') }}
-      SDK_DART: ${{ github.event_name != 'pull_request' || needs.dart-changes.outputs.dart == 'true' }}
+      RUBY_SMOKE: ${{ needs.plan.outputs.sdk_ruby }}
+      SDK_JS: ${{ needs.plan.outputs.sdk_js }}
+      SDK_PYTHON: ${{ needs.plan.outputs.sdk_python }}
+      SDK_DART: ${{ needs.plan.outputs.dart }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -734,69 +722,26 @@ jobs:
             ${{ runner.temp }}/up*.log
           retention-days: 7
 
-  # Whether a pull request touches what the Dart SDK and the Flutter package
-  # are tested against; push, schedule and release runs always test them.
-  dart-changes:
-    name: dart changed
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    outputs:
-      dart: ${{ steps.diff.outputs.dart }}
-      flutter: ${{ steps.diff.outputs.flutter }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - id: diff
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if git diff --name-only "$BASE...HEAD" |
-            grep -qE '^(sdks/dart/|conformance/|api/sdk\.yaml$|docs/sdks/(behaviour-matrix|compatibility)\.md$|\.github/scripts/(behaviour-matrix|check-pub-package)\.sh$|\.github/workflows/(sdk-dart|ci)\.yml$)'; then
-            echo "dart=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "dart=false" >> "$GITHUB_OUTPUT"
-          fi
-          # The Flutter package resolves the Dart SDK from the working tree,
-          # so a change to either one tests it.
-          if git diff --name-only "$BASE...HEAD" |
-            grep -qE '^(sdks/dart/|sdks/flutter/|\.github/scripts/check-pub-package\.sh$|\.github/workflows/(sdk-flutter|ci)\.yml$)'; then
-            echo "flutter=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "flutter=false" >> "$GITHUB_OUTPUT"
-          fi
-
+  # The Dart SDK and the Flutter package, when what they are tested against
+  # changes. The Flutter package resolves the Dart SDK from the working tree,
+  # so a change to either one tests it.
   dart:
     name: dart
-    needs: dart-changes
-    if: >-
-      always() && (
-        github.event_name != 'pull_request' ||
-        needs.dart-changes.outputs.dart == 'true'
-      )
+    needs: plan
+    if: needs.plan.outputs.dart == 'true'
     uses: ./.github/workflows/sdk-dart.yml
 
   flutter:
     name: flutter
-    needs: dart-changes
-    if: >-
-      always() && (
-        github.event_name != 'pull_request' ||
-        needs.dart-changes.outputs.flutter == 'true'
-      )
+    needs: plan
+    if: needs.plan.outputs.flutter == 'true'
     uses: ./.github/workflows/sdk-flutter.yml
 
-  # The JavaScript SDK, on a pull request that touches it, the conformance
-  # suite or the SDK API, on release pull requests and on main.
+  # The JavaScript SDK, when it, the conformance suite or the SDK API changes.
   sdk-js:
     name: sdk-js
-    needs: changes
-    if: >-
-      always() && (
-        github.event_name != 'pull_request' ||
-        needs.changes.outputs.sdk-js == 'true' ||
-        startsWith(github.head_ref, 'release-please--')
-      )
+    needs: plan
+    if: needs.plan.outputs.sdk_js == 'true'
     uses: ./.github/workflows/sdk-js.yml
 
   # The one check branch protection requires. A job above may be skipped (a
@@ -804,7 +749,7 @@ jobs:
   # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
-    needs: [lint, test, vuln, npm-audit, tidy, console, changes, e2e, sdk-e2e, sdk-ruby, sdk-python, workflows, docker, modules, module, released, dart-changes, dart, flutter, sdk-js]
+    needs: [plan, lint, test, coverage, vuln, npm-audit, tidy, console, e2e, sdk-e2e, sdk-ruby, sdk-python, workflows, docker, module, released, dart, flutter, sdk-js]
     if: always()
     runs-on: ubuntu-latest
     steps:
