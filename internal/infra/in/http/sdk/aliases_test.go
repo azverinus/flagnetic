@@ -7,6 +7,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -108,5 +109,48 @@ func TestAnAliasLinksItsPairOnceKeepingTheEarliestTime(t *testing.T) {
 	}
 	if links := aliasLinks(t, p, "staging"); len(links) != 1 || !links[0].Alias.OccurredAt.Equal(protocolTime) {
 		t.Errorf("staging links = %+v, want its own", links)
+	}
+}
+
+func TestAnEnvironmentAtItsLimitOfAliasLinksRefusesNewPairsOnly(t *testing.T) {
+	srv := testkit.StartServer(t, testkit.WithClock(clock.NewFake(protocolTime)), testkit.WithEventLimits(2, 0))
+	p := newProject(t, srv)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindClient)
+	_, staging := p.sdkKey(t, "staging", management.SdkKeyKindClient)
+
+	if res := batchResult(t, srv, value, batch(
+		aliasOf(1, protocolTime, "anonymous", "d-1", "user", "u-1"),
+		aliasOf(2, protocolTime, "anonymous", "d-2", "user", "u-2"),
+	)); res.Accepted != 2 {
+		t.Fatalf("aliases up to the limit = %+v", res)
+	}
+	// The limit is reached: a pair already linked is still taken, with its
+	// earlier time, and a new one is refused, in the same batch.
+	earlier := protocolTime.Add(-time.Hour)
+	res := batchResult(t, srv, value, batch(
+		aliasOf(3, earlier, "anonymous", "d-1", "user", "u-1"),
+		aliasOf(4, protocolTime, "anonymous", "d-3", "user", "u-3"),
+	))
+	if res.Accepted != 1 || len(res.Rejected) != 1 || res.Rejected[0].Index != 1 || res.Rejected[0].Code != "quota_exceeded" {
+		t.Fatalf("aliases at the limit = %+v, want the new pair refused quota_exceeded", res)
+	}
+	links := aliasLinks(t, p, "production")
+	if len(links) != 2 {
+		t.Fatalf("links = %+v, want the two within the limit", links)
+	}
+	for _, l := range links {
+		if l.Alias.ToUnitID == "u-1" && !l.Alias.OccurredAt.Equal(earlier) {
+			t.Errorf("link of u-1 = %+v, want the earlier alias's time", l)
+		}
+	}
+	// A refused alias's ID is not claimed: it is refused again, not
+	// counted as received.
+	if again := batchResult(t, srv, value, batch(aliasOf(4, protocolTime, "anonymous", "d-3", "user", "u-3"))); again.Duplicates != 0 ||
+		len(again.Rejected) != 1 {
+		t.Errorf("refused alias sent again = %+v", again)
+	}
+	// Another environment counts its own links.
+	if res := batchResult(t, srv, staging, batch(aliasOf(5, protocolTime, "anonymous", "d-3", "user", "u-3"))); res.Accepted != 1 {
+		t.Errorf("staging alias = %+v, want accepted", res)
 	}
 }

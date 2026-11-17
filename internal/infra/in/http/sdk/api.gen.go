@@ -725,7 +725,9 @@ type ClientInterface interface {
 	// exposure naming a variation its experiment does not weigh; an
 	// exposure with `override` true may name any variation of the
 	// experiment's flag instead, since an override decides the variation
-	// whatever the weights are)
+	// whatever the weights are), `quota_exceeded` (an alias linking a
+	// new pair, or an exposure of a unit with no first exposure yet, past
+	// what the operator allows an environment or experiment to keep)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -800,7 +802,9 @@ type ClientInterface interface {
 	// exposure naming a variation its experiment does not weigh; an
 	// exposure with `override` true may name any variation of the
 	// experiment's flag instead, since an override decides the variation
-	// whatever the weights are)
+	// whatever the weights are), `quota_exceeded` (an alias linking a
+	// new pair, or an exposure of a unit with no first exposure yet, past
+	// what the operator allows an environment or experiment to keep)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -875,7 +879,9 @@ type ClientInterface interface {
 	// exposure naming a variation its experiment does not weigh; an
 	// exposure with `override` true may name any variation of the
 	// experiment's flag instead, since an override decides the variation
-	// whatever the weights are)
+	// whatever the weights are), `quota_exceeded` (an alias linking a
+	// new pair, or an exposure of a unit with no first exposure yet, past
+	// what the operator allows an environment or experiment to keep)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -1072,7 +1078,9 @@ func (c *Client) Evaluate(ctx context.Context, params *EvaluateParams, body Eval
 // exposure naming a variation its experiment does not weigh; an
 // exposure with `override` true may name any variation of the
 // experiment's flag instead, since an override decides the variation
-// whatever the weights are)
+// whatever the weights are), `quota_exceeded` (an alias linking a
+// new pair, or an exposure of a unit with no first exposure yet, past
+// what the operator allows an environment or experiment to keep)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
@@ -1157,7 +1165,9 @@ func (c *Client) PostEventsWithBody(ctx context.Context, params *PostEventsParam
 // exposure naming a variation its experiment does not weigh; an
 // exposure with `override` true may name any variation of the
 // experiment's flag instead, since an override decides the variation
-// whatever the weights are)
+// whatever the weights are), `quota_exceeded` (an alias linking a
+// new pair, or an exposure of a unit with no first exposure yet, past
+// what the operator allows an environment or experiment to keep)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
@@ -1242,7 +1252,9 @@ func (c *Client) PostEvents(ctx context.Context, params *PostEventsParams, body 
 // exposure naming a variation its experiment does not weigh; an
 // exposure with `override` true may name any variation of the
 // experiment's flag instead, since an override decides the variation
-// whatever the weights are)
+// whatever the weights are), `quota_exceeded` (an alias linking a
+// new pair, or an exposure of a unit with no first exposure yet, past
+// what the operator allows an environment or experiment to keep)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
@@ -1784,7 +1796,9 @@ type ClientWithResponsesInterface interface {
 	// exposure naming a variation its experiment does not weigh; an
 	// exposure with `override` true may name any variation of the
 	// experiment's flag instead, since an override decides the variation
-	// whatever the weights are)
+	// whatever the weights are), `quota_exceeded` (an alias linking a
+	// new pair, or an exposure of a unit with no first exposure yet, past
+	// what the operator allows an environment or experiment to keep)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -1859,7 +1873,9 @@ type ClientWithResponsesInterface interface {
 	// exposure naming a variation its experiment does not weigh; an
 	// exposure with `override` true may name any variation of the
 	// experiment's flag instead, since an override decides the variation
-	// whatever the weights are)
+	// whatever the weights are), `quota_exceeded` (an alias linking a
+	// new pair, or an exposure of a unit with no first exposure yet, past
+	// what the operator allows an environment or experiment to keep)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -1934,7 +1950,9 @@ type ClientWithResponsesInterface interface {
 	// exposure naming a variation its experiment does not weigh; an
 	// exposure with `override` true may name any variation of the
 	// experiment's flag instead, since an override decides the variation
-	// whatever the weights are)
+	// whatever the weights are), `quota_exceeded` (an alias linking a
+	// new pair, or an exposure of a unit with no first exposure yet, past
+	// what the operator allows an environment or experiment to keep)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -2611,7 +2629,9 @@ func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, params *
 // exposure naming a variation its experiment does not weigh; an
 // exposure with `override` true may name any variation of the
 // experiment's flag instead, since an override decides the variation
-// whatever the weights are)
+// whatever the weights are), `quota_exceeded` (an alias linking a
+// new pair, or an exposure of a unit with no first exposure yet, past
+// what the operator allows an environment or experiment to keep)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
@@ -2692,7 +2712,9 @@ func (c *ClientWithResponses) PostEventsWithBodyWithResponse(ctx context.Context
 // exposure naming a variation its experiment does not weigh; an
 // exposure with `override` true may name any variation of the
 // experiment's flag instead, since an override decides the variation
-// whatever the weights are)
+// whatever the weights are), `quota_exceeded` (an alias linking a
+// new pair, or an exposure of a unit with no first exposure yet, past
+// what the operator allows an environment or experiment to keep)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
@@ -2773,7 +2795,9 @@ func (c *ClientWithResponses) PostEventsWithResponse(ctx context.Context, params
 // exposure naming a variation its experiment does not weigh; an
 // exposure with `override` true may name any variation of the
 // experiment's flag instead, since an override decides the variation
-// whatever the weights are)
+// whatever the weights are), `quota_exceeded` (an alias linking a
+// new pair, or an exposure of a unit with no first exposure yet, past
+// what the operator allows an environment or experiment to keep)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused

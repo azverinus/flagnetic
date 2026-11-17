@@ -45,6 +45,7 @@ Otherwise each event is judged on its own and a refused one is listed in `reject
 | `undeclared_unit_type` | An alias names a unit type the project does not declare. |
 | `unknown_experiment` | An exposure names no experiment of the project, or a draft, which is served to no unit so no SDK holds an exposure of one. A started experiment of any status exists, a stopped one too, since a mobile app may flush its queue days after the exposure. |
 | `unit_type_mismatch` | An exposure's `unit_type` is not the unit type its experiment assigns. |
+| `quota_exceeded` | An alias would link a new pair in an environment that holds as many links as the operator allows (`FLAGNETIC_ALIAS_LINKS_LIMIT`), or an exposure would be the first of a new unit of an experiment that holds as many as the operator allows (`FLAGNETIC_FIRST_EXPOSURES_LIMIT`). An alias of a pair already linked and an exposure of a unit already counted are still accepted. Sending the event again does not help until the operator raises the limit. |
 | `unknown_variation` | An exposure names a variation its experiment does not weigh. An exposure with `override` true may name any variation of the experiment's flag instead, since an override decides the variation whatever the weights are. |
 
 An exposure carries what the evaluation that assigned the unit answered, so the server can check it against the experiment:
