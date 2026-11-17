@@ -9040,12 +9040,13 @@ type ClientInterface interface {
 	// ListDiscoveredAttributes Attributes SDKs sent that the project does not declare
 	//
 	// The attributes that contexts evaluated through the SDK API and the
-	// tester carried without the project declaring them, by key, with the
+	// tester (when its caller holds `declaration.manage`) carried without
+	// the project declaring them, by key, with the
 	// JSON types seen and when they were first and last seen. Only an
 	// attribute's key and type are recorded, never a value. A dismissed
 	// attribute is left out until it is seen with a type not seen before;
-	// an attribute declared since is left out. A project records at most
-	// 500, dismissed ones included.
+	// an attribute declared since is left out. A project lists at most
+	// 500; dismissed ones are not counted, so dismissing frees a place.
 	//
 	// Corresponds with GET /projects/{project}/attributes/discovered (the `ListDiscoveredAttributes` operationId).
 	ListDiscoveredAttributes(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -14105,12 +14106,13 @@ func (c *Client) CreateAttribute(ctx context.Context, project ProjectKey, body C
 // ListDiscoveredAttributes Attributes SDKs sent that the project does not declare
 //
 // The attributes that contexts evaluated through the SDK API and the
-// tester carried without the project declaring them, by key, with the
+// tester (when its caller holds `declaration.manage`) carried without
+// the project declaring them, by key, with the
 // JSON types seen and when they were first and last seen. Only an
 // attribute's key and type are recorded, never a value. A dismissed
 // attribute is left out until it is seen with a type not seen before;
-// an attribute declared since is left out. A project records at most
-// 500, dismissed ones included.
+// an attribute declared since is left out. A project lists at most
+// 500; dismissed ones are not counted, so dismissing frees a place.
 //
 // Corresponds with GET /projects/{project}/attributes/discovered (the `ListDiscoveredAttributes` operationId).
 func (c *Client) ListDiscoveredAttributes(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -31058,12 +31060,13 @@ type ClientWithResponsesInterface interface {
 	// ListDiscoveredAttributesWithResponse Attributes SDKs sent that the project does not declare
 	//
 	// The attributes that contexts evaluated through the SDK API and the
-	// tester carried without the project declaring them, by key, with the
+	// tester (when its caller holds `declaration.manage`) carried without
+	// the project declaring them, by key, with the
 	// JSON types seen and when they were first and last seen. Only an
 	// attribute's key and type are recorded, never a value. A dismissed
 	// attribute is left out until it is seen with a type not seen before;
-	// an attribute declared since is left out. A project records at most
-	// 500, dismissed ones included.
+	// an attribute declared since is left out. A project lists at most
+	// 500; dismissed ones are not counted, so dismissing frees a place.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -52741,12 +52744,13 @@ func (c *ClientWithResponses) CreateAttributeWithResponse(ctx context.Context, p
 // ListDiscoveredAttributesWithResponse Attributes SDKs sent that the project does not declare
 //
 // The attributes that contexts evaluated through the SDK API and the
-// tester carried without the project declaring them, by key, with the
+// tester (when its caller holds `declaration.manage`) carried without
+// the project declaring them, by key, with the
 // JSON types seen and when they were first and last seen. Only an
 // attribute's key and type are recorded, never a value. A dismissed
 // attribute is left out until it is seen with a type not seen before;
-// an attribute declared since is left out. A project records at most
-// 500, dismissed ones included.
+// an attribute declared since is left out. A project lists at most
+// 500; dismissed ones are not counted, so dismissing frees a place.
 //
 // Returns a wrapper object for the known response body format(s).
 //

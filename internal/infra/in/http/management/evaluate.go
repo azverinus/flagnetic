@@ -2,11 +2,13 @@ package management
 
 import (
 	"context"
+	"slices"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/azverinus/flagnetic/eval"
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
+	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
@@ -20,6 +22,9 @@ func (a *api) Evaluate(ctx context.Context, req EvaluateRequestObject) (Evaluate
 		Project: projectID(ctx), Environment: req.Environment,
 		Context: eval.Context{Units: valueOr(b.Context.Units, nil), Attributes: valueOr(b.Context.Attributes, nil)},
 		Flags:   valueOr(b.Flags, nil),
+		// A viewer's context is evaluated but never noted: a project.read
+		// request must not fill the project's discovered attributes.
+		NoteDiscoveries: slices.Contains(projectOf(ctx).permissions, access.PermDeclarationManage),
 	}
 	if b.Draft != nil {
 		q.Draft = &appdelivery.Draft{Flag: b.Draft.Flag, Configuration: configurationIn(b.Draft.Configuration)}

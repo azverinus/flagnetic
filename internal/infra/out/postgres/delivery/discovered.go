@@ -85,11 +85,12 @@ func (s *Store) DeclaredKeys(ctx context.Context, project workspace.ProjectID, k
 	return out, nil
 }
 
-// CountDiscoveredAttributes counts the discovered attributes of project,
-// dismissed ones included, that the project has not declared since.
+// CountDiscoveredAttributes counts the discovered attributes of project
+// that it has not declared since and a member has not dismissed.
 func (s *Store) CountDiscoveredAttributes(ctx context.Context, project workspace.ProjectID) (int, error) {
 	var n int
-	err := s.db(ctx).QueryRow(ctx, `SELECT count(*) FROM discovered_attributes d WHERE d.project_id = $1 AND `+undeclared,
+	err := s.db(ctx).QueryRow(ctx, `SELECT count(*) FROM discovered_attributes d
+		WHERE d.project_id = $1 AND NOT d.dismissed AND `+undeclared,
 		project.Bytes()).Scan(&n)
 	if err != nil {
 		return 0, fmt.Errorf("count discovered attributes: %w", err)
