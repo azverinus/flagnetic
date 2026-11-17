@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.4](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.1.3...sdks/python/v0.1.4) (2026-11-17)
+
+
+### Bug Fixes
+
+* **sdk-python:** back off from a stream closed before its first heartbeat ([#318](https://github.com/azverinus/flagnetic/issues/318)) ([fa832cf](https://github.com/azverinus/flagnetic/commit/fa832cfa0dd8f8912a23a89d5f69f42c5d8ced3b))
+* **sdk-python:** bind the store file to the key it was received under ([#314](https://github.com/azverinus/flagnetic/issues/314)) ([625c710](https://github.com/azverinus/flagnetic/commit/625c7100f1edb9f37fbf7b1effa97b550f63c2cc))
+* **sdk-python:** drop an event that does not serialise alone ([#279](https://github.com/azverinus/flagnetic/issues/279)) ([5197ea9](https://github.com/azverinus/flagnetic/commit/5197ea9c9d775a224e45c3aafdbfc443aaf1e1f6))
+* **sdk-ruby:** read Unicode class names as the server does ([#310](https://github.com/azverinus/flagnetic/issues/310)) ([b1e3fa5](https://github.com/azverinus/flagnetic/commit/b1e3fa5781ff497d8cefced0b98f468aedcada83))
+
 ## [0.1.3](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.1.2...sdks/python/v0.1.3) (2026-11-12)
 
 
