@@ -173,6 +173,11 @@ func (c *check) listAndEntries(pointer string, typ eval.AttributeType, value any
 	}
 	for _, e := range entries {
 		s, _ := e.(string)
+		if utf8.RuneCountInString(s) > maxEntryLength {
+			c.add(pointer, "too_long", "a string value, or an entry of a list, has at most 1,000 characters",
+				map[string]any{"max": maxEntryLength})
+			return
+		}
 		if _, ok := eval.ParseSemver(s); typ == eval.TypeSemver && !ok {
 			c.add(pointer, "invalid_value", "every version is a semantic version, such as 1.41.0", nil)
 			return

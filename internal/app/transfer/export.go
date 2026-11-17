@@ -101,6 +101,10 @@ func (h *ExportProject) read(ctx context.Context, project workspace.ProjectID, s
 		owners = append(owners, e.Owner)
 	}
 	var err error
-	s.Emails, err = h.d.Members.MemberEmails(ctx, owners)
+	// An address is written only for an owner holding a grant in the
+	// project: the export is a project.read answer, and an owner who holds
+	// none (an instance admin, a former member) is not among the members
+	// that reader sees, so the address stays out of the document.
+	s.Emails, err = h.d.Members.ProjectMemberEmails(ctx, project, owners)
 	return err
 }

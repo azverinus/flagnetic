@@ -12,6 +12,8 @@ import (
 // EnvironmentCreator stores a new environment after its project's others.
 type EnvironmentCreator interface {
 	ProjectLocker
+	// CountEnvironments returns how many environments project has.
+	CountEnvironments(ctx context.Context, project workspace.ProjectID) (int, error)
 	// NextSortOrder returns the sort order after the project's others.
 	NextSortOrder(ctx context.Context, project workspace.ProjectID) (int, error)
 	// CreateEnvironment refuses a key the project uses as already_exists.
@@ -59,6 +61,13 @@ func (h *CreateEnvironment) Handle(ctx context.Context, cmd CreateEnvironmentCom
 	var e workspace.Environment
 	err := h.tx.Within(ctx, func(ctx context.Context) error {
 		if _, err := h.store.LockProject(ctx, cmd.Project); err != nil {
+			return err
+		}
+		existing, err := h.store.CountEnvironments(ctx, cmd.Project)
+		if err != nil {
+			return err
+		}
+		if err := workspace.CheckEnvironmentCount(existing); err != nil {
 			return err
 		}
 		next, err := h.store.NextSortOrder(ctx, cmd.Project)

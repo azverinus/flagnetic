@@ -1511,8 +1511,9 @@ export const getProjectMe = <ThrowOnError extends boolean = false>(
  * type then unit identifier and prerequisites by flag, so that two
  * exports of an unchanged project are the same bytes. Rule identifiers and rollout
  * salts are in it, which keep every unit in its bucket in a copy; owners
- * are email addresses, and an override's note is in it and its author is
- * not.
+ * are email addresses, written only for an owner who holds a grant in
+ * the project and empty for any other, and an override's note is in it
+ * and its author is not.
  *
  * Members, grants, tokens, SDK keys, webhook subscriptions, change
  * requests, audit entries, events, the standard attributes and the
