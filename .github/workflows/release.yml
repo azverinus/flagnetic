@@ -261,7 +261,7 @@ jobs:
         with:
           name: flagnetic-python-${{ needs.release-please.outputs.sdk_python_version }}
           path: dist/
-      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           attestations: true
 
