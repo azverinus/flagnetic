@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.5.0](https://github.com/azverinus/flagnetic/compare/v0.4.0...v0.5.0) (2026-11-17)
+
+
+### Features
+
+* **api:** announce deprecated operations on the wire ([#334](https://github.com/azverinus/flagnetic/issues/334)) ([077720b](https://github.com/azverinus/flagnetic/commit/077720b28d8ed2ea89b2245a9f6599a2dde7c038))
+* **console:** one Russian rendering per term across the catalog and mail ([#326](https://github.com/azverinus/flagnetic/issues/326)) ([7a49fe1](https://github.com/azverinus/flagnetic/commit/7a49fe19d62a62ff44143e0d81d11abeae2cab81))
+
+
+### Bug Fixes
+
+* **access:** close the smaller access and SCIM findings ([#336](https://github.com/azverinus/flagnetic/issues/336)) ([907e747](https://github.com/azverinus/flagnetic/commit/907e74749d2138ee50b309e5ac04eab486990857))
+* **access:** mail a member whose display name holds a quote, backslash or line break ([#327](https://github.com/azverinus/flagnetic/issues/327)) ([8c4bf4b](https://github.com/azverinus/flagnetic/commit/8c4bf4b33be01026567e0172dcfebe5512d19cfb))
+* **access:** require a session to create or widen access ([#348](https://github.com/azverinus/flagnetic/issues/348)) ([ec3010e](https://github.com/azverinus/flagnetic/commit/ec3010ef554ba5b22de993bc464d5d9f3458a8a0))
+* **audit:** record webhook and sink targets as scheme and host only ([#328](https://github.com/azverinus/flagnetic/issues/328)) ([98ba158](https://github.com/azverinus/flagnetic/commit/98ba1580a2323eafa7520791149315c691c003b0))
+* **cli:** refuse the bootstrap token on a non-terminal stdout ([#325](https://github.com/azverinus/flagnetic/issues/325)) ([610627a](https://github.com/azverinus/flagnetic/commit/610627aebf933d39f665a11ba86905550fa80505))
+* **console:** close the smaller findings of the security review ([#329](https://github.com/azverinus/flagnetic/issues/329)) ([2bdb1be](https://github.com/azverinus/flagnetic/commit/2bdb1be81fdf1832077e99bc1d8eff13dd259a12))
+* **console:** forget the tester's recent contexts on sign-out ([#333](https://github.com/azverinus/flagnetic/issues/333)) ([92e6bee](https://github.com/azverinus/flagnetic/commit/92e6beecbcf0389767ee14c7f2c55091f6f88289))
+* **delivery:** end a ruleset stream whose origin its key no longer lists ([#343](https://github.com/azverinus/flagnetic/issues/343)) ([9cd5a17](https://github.com/azverinus/flagnetic/commit/9cd5a17aedaae6552a839c3b1f188593fd9aa9dc))
+* **delivery:** keep junk keys from exhausting a project's discovered attributes ([#332](https://github.com/azverinus/flagnetic/issues/332)) ([e2d2f29](https://github.com/azverinus/flagnetic/commit/e2d2f290e49a62d7350e0253c47e67333fc278c3))
+* **delivery:** narrow what a client key learns from answers and refusals ([#346](https://github.com/azverinus/flagnetic/issues/346)) ([f29ee44](https://github.com/azverinus/flagnetic/commit/f29ee44b01c8fdeafbcb9342ef062afdc6dd2453))
+* **events:** bound the alias links and first exposures a client key can add ([#335](https://github.com/azverinus/flagnetic/issues/335)) ([d836800](https://github.com/azverinus/flagnetic/commit/d836800794d2f0933e4a1f7f136326c1e311d9ff))
+* **experiments:** bound the hash check's list while reading it ([#350](https://github.com/azverinus/flagnetic/issues/350)) ([d6331a2](https://github.com/azverinus/flagnetic/commit/d6331a25306e85aa30d02c0f082f771f00ee6f4f))
+* **governance:** close the smaller governance and data findings ([#351](https://github.com/azverinus/flagnetic/issues/351)) ([50430b8](https://github.com/azverinus/flagnetic/commit/50430b824d328cfc0a50b4d8ede7ef86fd666bce))
+* **governance:** refuse the creator of a token as decider of its change requests ([#323](https://github.com/azverinus/flagnetic/issues/323)) ([1f5a341](https://github.com/azverinus/flagnetic/commit/1f5a34149bd60910a4126c0d4a77940d8b4931c5))
+* **hardening:** bind metrics to loopback and seal secrets to their row ([#352](https://github.com/azverinus/flagnetic/issues/352)) ([d13c351](https://github.com/azverinus/flagnetic/commit/d13c35198c12933b582fe9220237e131e1289f23))
+* **identity:** harden single sign-on sign-in, linking and provider edits ([#331](https://github.com/azverinus/flagnetic/issues/331)) ([7cc9af0](https://github.com/azverinus/flagnetic/commit/7cc9af0a0926f5b0d121cdc8c3f740f5786a62d6))
+* **management:** close the smaller management API findings ([#356](https://github.com/azverinus/flagnetic/issues/356)) ([28eb550](https://github.com/azverinus/flagnetic/commit/28eb550f25827f643f8f1cba195a525de0cfcc84))
+* **platform:** pin every released migration in released.sum ([#349](https://github.com/azverinus/flagnetic/issues/349)) ([7ba5f03](https://github.com/azverinus/flagnetic/commit/7ba5f03b9a242be853de8184b6e2e7b8c193ef2c))
+* **sdk-api:** refuse a new stream on a draining replica ([#313](https://github.com/azverinus/flagnetic/issues/313)) ([bbf6333](https://github.com/azverinus/flagnetic/commit/bbf63335f97ba87845d65b05f499f66639b4f598))
+* **sdk-dart:** back off from a stream closed before its first heartbeat ([#320](https://github.com/azverinus/flagnetic/issues/320)) ([7ee2316](https://github.com/azverinus/flagnetic/commit/7ee2316d3384b0a6c886e4a9db6789f2f5b8ef01))
+* **sdk-go:** back off from a stream closed before its first heartbeat ([#316](https://github.com/azverinus/flagnetic/issues/316)) ([b5f62c3](https://github.com/azverinus/flagnetic/commit/b5f62c3e8b4f7dc48ab33d8d4b430a577884e4f6))
+* **sdk-js:** back off from a stream closed before its first heartbeat ([#317](https://github.com/azverinus/flagnetic/issues/317)) ([375f049](https://github.com/azverinus/flagnetic/commit/375f049e781202030336512bf5dcf05ff8d99520))
+* **sdk-js:** bind the store file to the key it was received under ([#309](https://github.com/azverinus/flagnetic/issues/309)) ([78d53bd](https://github.com/azverinus/flagnetic/commit/78d53bd42dacc86f2876423689d0cc04e539c35b))
+* **sdk-python:** back off from a stream closed before its first heartbeat ([#318](https://github.com/azverinus/flagnetic/issues/318)) ([fa832cf](https://github.com/azverinus/flagnetic/commit/fa832cfa0dd8f8912a23a89d5f69f42c5d8ced3b))
+* **sdk-ruby:** back off from a stream closed before its first heartbeat ([#319](https://github.com/azverinus/flagnetic/issues/319)) ([51824cb](https://github.com/azverinus/flagnetic/commit/51824cb66f2e4aa41f1d15f4864935844a94a664))
+* **sdk-ruby:** read Unicode class names as the server does ([#310](https://github.com/azverinus/flagnetic/issues/310)) ([b1e3fa5](https://github.com/azverinus/flagnetic/commit/b1e3fa5781ff497d8cefced0b98f468aedcada83))
+* **sdk:** bound a gzip request body by its compressed size too ([#324](https://github.com/azverinus/flagnetic/issues/324)) ([9ce0280](https://github.com/azverinus/flagnetic/commit/9ce02809112e22ae33eaa6b9f8aba4d919a28af4))
+* **sdk:** give each key or project its own share of the replica's bounded queues ([#347](https://github.com/azverinus/flagnetic/issues/347)) ([6fabd4b](https://github.com/azverinus/flagnetic/commit/6fabd4b2f4e2afd6056841851b79c25c66c7c5ee))
+* **sdks:** bound stream lines, events, response bodies and the matched input ([#337](https://github.com/azverinus/flagnetic/issues/337)) ([695477d](https://github.com/azverinus/flagnetic/commit/695477d7d31700fe25b1458eefd315e733355b2a))
+
+
+### Dependencies
+
+* **console:** Bump the console group in /web with 13 updates ([#355](https://github.com/azverinus/flagnetic/issues/355)) ([1512e96](https://github.com/azverinus/flagnetic/commit/1512e96ab48b17b6ddc7f54c8c08bd15c600312e))
+
 ## [0.4.0](https://github.com/azverinus/flagnetic/compare/v0.3.0...v0.4.0) (2026-11-15)
 
 
