@@ -207,7 +207,13 @@ List<SummaryRow> rowsOf(QueuedEvent summary) => [
       if (row case {'flag': final String flag, 'reason': final String reason})
         (
           flag: flag,
-          variation: (row as Map<String, Object?>)['variation'] as String?,
+          // A row read back from storage may carry any type here; one that
+          // is not a variation key counts as no variation rather than
+          // throwing out of the merge.
+          variation: switch (row['variation']) {
+            final String key => key,
+            _ => null,
+          },
           reason: reason,
           count: switch (row['count']) {
             final int n => n,

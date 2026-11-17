@@ -24,9 +24,22 @@ final class FlagneticLifecycleObserver with WidgetsBindingObserver {
   final FlagneticClient client;
 
   /// Starts observing. Safe to call twice.
+  ///
+  /// A client created while the app is already in the background, by a
+  /// background task or a push handler, would otherwise keep its stream and
+  /// interval until the next lifecycle change, which may never come; so the
+  /// state the app is in now is applied as if it had just changed to it.
+  /// Only the background states are: a client starts in the foreground, and
+  /// foregrounding it again would evaluate for nothing.
   void attach() {
     final binding = WidgetsBinding.instance..removeObserver(this);
     binding.addObserver(this);
+    final state = binding.lifecycleState;
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      didChangeAppLifecycleState(state!);
+    }
   }
 
   /// Stops observing.

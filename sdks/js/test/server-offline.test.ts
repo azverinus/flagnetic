@@ -502,3 +502,20 @@ describe("test helpers", () => {
     expect(c.getBool({}, "a", false)).toBe(true);
   });
 });
+
+describe("a value nested too deeply", () => {
+  test("fails its one flag, logged once per flag and ruleset version, and the others serve", () => {
+    const { logger, events } = captureLogs();
+    const deep = "[".repeat(100_000) + "1" + "]".repeat(100_000);
+    const offline = `{"schema_version":1,"version":4,"scope":"server","flags":[
+      {"key":"deep","type":"json","on":false,"variations":[{"key":"a","value":${deep}}],"off_variation":"a"},
+      {"key":"fine","type":"number","on":false,"variations":[{"key":"a","value":2}],"off_variation":"a"}]}`;
+    const c = createServer("", "", { offline, logger });
+    expect(c.getJson(user, "deep", { d: 0 })).toStrictEqual({ d: 0 });
+    expect(c.getDetail(user, "deep", null)).toMatchObject({ reason: "fallback", errorCode: "inconsistent_ruleset" });
+    expect(c.getNumber(user, "fine", 0)).toBe(2);
+    expect(events("value_too_deep")).toStrictEqual([
+      { level: "error", event: "value_too_deep", fields: { flag: "deep", max_depth: 32, ruleset_version: 4 } },
+    ]);
+  });
+});

@@ -10,12 +10,32 @@ import (
 // summary a flush or the reporting interval would have sent, and every
 // exposure and alias the client recorded. It is safe for concurrent use,
 // and its methods are safe on a nil Recorder.
+//
+// An offline client records for as long as it lives, so the evaluation
+// summaries, the exposures and the aliases each hold at most 10,000 entries: once one is full, recording another
+// drops its oldest. The running counts of Summary are one row per flag,
+// variation and reason, and need no bound.
 type Recorder struct {
 	mu        sync.Mutex
 	counts    map[summaryKey]int64
 	summaries []EvaluationSummary
 	exposures []Exposure
 	aliases   []Alias
+}
+
+// recorderCap is how many entries each list of the Recorder holds before it
+// drops the oldest.
+const recorderCap = 10000
+
+// appendBounded appends v to list, dropping the oldest entry once list
+// holds recorderCap. Dropping reslices instead of copying the kept entries
+// down, so a full list costs no more per entry than a growing one: append
+// moves them to a fresh array only once the spare capacity runs out.
+func appendBounded[T any](list []T, v T) []T {
+	if len(list) >= recorderCap {
+		list = list[len(list)-recorderCap+1:]
+	}
+	return append(list, v)
 }
 
 // SummaryCount is one row of an evaluation summary: how often a flag served
@@ -78,7 +98,7 @@ func (r *Recorder) record(s EvaluationSummary) {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.summaries = append(r.summaries, s)
+	r.summaries = appendBounded(r.summaries, s)
 }
 
 // EvaluationSummaries returns the evaluation summaries the client would
@@ -106,9 +126,9 @@ func (r *Recorder) recordEvent(e event) {
 	defer r.mu.Unlock()
 	switch v := e.(type) {
 	case *exposureEvent:
-		r.exposures = append(r.exposures, v.public())
+		r.exposures = appendBounded(r.exposures, v.public())
 	case *aliasEvent:
-		r.aliases = append(r.aliases, v.public())
+		r.aliases = appendBounded(r.aliases, v.public())
 	}
 }
 

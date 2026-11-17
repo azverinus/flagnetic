@@ -40,6 +40,10 @@ replica, a proxy that ends the stream early) is a failure like any other and log
 by a digest of the SDK key, so one written under another key (another environment's, say) is discarded with
 `store_failed`.
 
+A flag value nesting arrays and objects deeper than 32 levels, which the server refuses to store, fails that flag
+alone: its getters serve your default with `inconsistent_ruleset`, `condition_invalid` names the variation once per
+flag and ruleset version, and every other flag of the ruleset serves.
+
 ## Experiments and events
 
 The same thread reports an evaluation summary every minute (counts per flag, variation and reason, never a unit ID or

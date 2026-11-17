@@ -200,10 +200,13 @@ class Ingest:
         """Lets go of a request's socket in a forked child.
 
         It is closed, never shut down: the parent shares it and keeps using it.
+        The lock is made anew rather than taken: a thread of the parent may have
+        held it at the fork, and that thread does not exist in the child to
+        release it. The child runs no other thread yet, so nothing races this.
         """
-        with self._lock:
-            sock = getattr(self._conn, "sock", None)
-            self._conn = None
+        self._lock = threading.Lock()
+        sock = getattr(self._conn, "sock", None)
+        self._conn = None
         if sock is not None:
             with contextlib.suppress(OSError):
                 sock.close()

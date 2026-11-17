@@ -48,6 +48,26 @@ class RailtieTest < Minitest::Test
                  logged(:client_not_configured).map { |e| e.slice("rails_env") })
   end
 
+  def test_without_a_key_a_production_boot_fails_naming_what_is_missing
+    out, err, status = Open3.capture3(env(RAILS_ENV: "production", FLAGNETIC_SDK_KEY: nil, FLAGNETIC_BASE_URL: nil),
+                                      "ruby", "-e", %(require "./config/environment"\nputs "booted"), chdir: APP)
+    refute status.success?
+    refute_includes out, "booted"
+    assert_includes err, "Flagnetic::NotConfigured"
+    %w[config.flagnetic.sdk_key config.flagnetic.base_url FLAGNETIC_SDK_KEY FLAGNETIC_BASE_URL
+       credentials].each { |hint| assert_includes err, hint }
+    assert_empty @server.requests
+    assert_empty logged(:client_not_configured)
+  end
+
+  def test_a_production_boot_names_only_the_missing_setting
+    _, err, status = Open3.capture3(env(RAILS_ENV: "production", FLAGNETIC_BASE_URL: nil),
+                                    "ruby", "-e", %(require "./config/environment"), chdir: APP)
+    refute status.success?
+    assert_includes err, "no base URL"
+    refute_includes err, "no SDK key"
+  end
+
   def test_local_overrides_are_allowed_outside_production
     out = ruby_app(<<~RUBY)
       Flagnetic.client.local_overrides.set("new_checkout", false)

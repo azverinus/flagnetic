@@ -154,9 +154,10 @@ export interface Ruleset {
  * flag surfaces as inconsistent_ruleset when that flag is evaluated.
  */
 export function decodeRuleset(document: unknown): Ruleset {
-  const doc = decodeDocument(document);
+  const tooDeep: string[] = [];
+  const doc = decodeDocument(document, tooDeep);
   const index = buildIndex(doc);
-  return Object.freeze({
+  const rs: Ruleset = Object.freeze({
     document: doc,
     version: doc.version,
     scope: doc.scope,
@@ -171,6 +172,19 @@ export function decodeRuleset(document: unknown): Ruleset {
       return out;
     },
   });
+  valuesTooDeep.set(rs, [...new Set(tooDeep)].sort());
+  return rs;
+}
+
+const valuesTooDeep = new WeakMap<Ruleset, readonly string[]>();
+
+/**
+ * @internal The keys of the flags of rs, sorted, that hold a variation value
+ * nested deeper than the server stores and so answer inconsistent_ruleset,
+ * for the clients to log once.
+ */
+export function flagsTooDeep(rs: Ruleset): readonly string[] {
+  return valuesTooDeep.get(rs) ?? [];
 }
 
 // ---------------------------------------------------------------- index

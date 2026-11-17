@@ -858,6 +858,24 @@ def test_a_condition_the_evaluator_cannot_compile_is_logged_once_per_flag_at_loa
     assert logs.count("condition_invalid") == len(keys)
 
 
+def test_a_value_nested_too_deep_fails_its_flag_and_the_others_load(clients: Any) -> None:
+    logs = Logs()
+    depth = 100_000
+    document = (
+        '{"schema_version": 1, "version": 3, "scope": "server", "flags": ['
+        '{"key": "deep", "type": "json", "on": true, "fallthrough": "v",'
+        f' "variations": [{{"key": "v", "value": {"[" * depth + "]" * depth}}}]}},'
+        ' {"key": "fine", "type": "string", "on": true, "fallthrough": "a",'
+        ' "variations": [{"key": "a", "value": "A"}]}]}'
+    ).encode()
+    client = clients(serving(document), logger=logs)
+    assert client.ready(5) == flagnetic.Stage.FRESH
+    assert client.get_string(CONTEXT, "fine", "d") == "A"
+    detail = client.get_detail(CONTEXT, "deep", ["d"])
+    assert (detail.value, detail.error_code) == (["d"], "inconsistent_ruleset")
+    assert [line["flag"] for line in logs.named("condition_invalid")] == ["deep"]
+
+
 def test_a_new_ruleset_version_with_the_condition_is_logged_again(clients: Any) -> None:
     logs = Logs()
     served = [json.dumps({**INVALID, "version": 7}).encode()]

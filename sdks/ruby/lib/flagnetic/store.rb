@@ -2,6 +2,7 @@
 
 require "digest"
 require "json"
+require "securerandom"
 
 module Flagnetic
   # FileStore keeps the last good ruleset in one file: a header line naming
@@ -35,15 +36,25 @@ module Flagnetic
       nil
     end
 
+    # save writes json under the header. The temporary file sits beside the
+    # target, so the rename stays on one file system, under a random name
+    # created exclusively: anyone else able to write to the directory can
+    # neither guess the name nor plant a file or symlink there for this
+    # write to follow, and O_EXCL refuses to open what already exists.
     def save(json)
-      tmp = "#{@path}.#{Process.pid}.#{Thread.current.object_id}.tmp"
+      tmp = "#{@path}.#{Process.pid}.#{SecureRandom.hex(8)}.tmp"
+      created = false
       # The server ruleset holds private segments: readable by the owner only.
-      File.open(tmp, File::WRONLY | File::CREAT | File::TRUNC | File::BINARY, 0o600) do |f|
+      File.open(tmp, File::WRONLY | File::CREAT | File::EXCL | File::BINARY, 0o600) do |f|
+        created = true
         f.write(header, "\n", json)
       end
       File.rename(tmp, @path)
+      created = false
     ensure
-      File.delete(tmp) if tmp && File.exist?(tmp)
+      # Only a file this call created is removed: after a failed exclusive
+      # open the name belongs to someone else.
+      File.delete(tmp) if created && File.exist?(tmp)
     end
 
     def to_s = @path

@@ -7,6 +7,7 @@
 import { Backoff } from "../internal/backoff.js";
 import { realClock, type Clock } from "../internal/clock.js";
 import { readBoundedText, trimTrailingSlashes } from "../internal/http.js";
+import { MAX_VALUE_DEPTH } from "../internal/json.js";
 import { causeOf, consoleLogger, safeLog, type LogLevel } from "../internal/logger.js";
 import { SDK_API_PATH, VERSION } from "../version.js";
 import { aliasEvent, exposureEvent, ExposureSuppressor, type AliasLink } from "../internal/events.js";
@@ -426,6 +427,40 @@ export class FlagneticClient {
   }
 
   /**
+   * Removes what this SDK key keeps in browser storage: the last good values
+   * of every unit set it stored and the event queue, with the exposures and
+   * aliases not yet sent and the evaluation counts not yet summarized, so
+   * nothing recorded before the call is sent or written back. For the
+   * sign-out path of a shared browser: `await flush()` first to send what is
+   * queued, and call it after `setContext` has resolved, since accepting the
+   * values of an evaluation still in flight stores them again. The values in
+   * memory keep serving; the client goes on storing what it accepts from
+   * here on. Never throws.
+   */
+  clearStored(): void {
+    try {
+      const index = this.store.get(this.keys.index);
+      if (index !== null) {
+        try {
+          const listed: unknown = JSON.parse(index);
+          if (Array.isArray(listed)) {
+            // Only this key's own entries: an index is in shared storage,
+            // where anything may have written it.
+            for (const k of listed) if (typeof k === "string" && k.startsWith(`${this.keys.index}.`)) this.store.remove(k);
+          }
+        } catch {
+          // A torn index lists nothing to remove; it goes below all the same.
+        }
+      }
+      this.store.remove(this.keys.index);
+      if (this.ingest) this.ingest.clear();
+      else this.store.remove(this.keys.events);
+    } catch (e) {
+      this.log("error", "evaluation_failed", { operation: "clear_stored", cause: causeOf(e) });
+    }
+  }
+
+  /**
    * Stops the timers and the change stream and flushes best effort within
    * the close timeout. Values keep serving afterwards.
    */
@@ -602,17 +637,20 @@ export class FlagneticClient {
    */
   private accept(source: unknown, from: string, anyVersion = false, answered?: Context): boolean {
     let doc: ValuesDocument;
+    let changed: string[];
     try {
       doc = ValuesDocument.parse(source);
       const held = this.values;
       if (!anyVersion && held && doc.rulesetVersion < held.rulesetVersion) {
         throw new Refused("version", `ruleset_version ${doc.rulesetVersion} is below the held ${held.rulesetVersion}`);
       }
+      // Comparing walks every served value: whatever it throws refuses the
+      // document like a parse failure, and the held values keep serving.
+      changed = ValuesDocument.changedKeys(held, doc);
     } catch (e) {
       this.refused(e, from);
       return false;
     }
-    const changed = ValuesDocument.changedKeys(this.values, doc);
     this.values = doc;
     // Set before the listeners run, so a getter they call already serves
     // the new context's assignments.
@@ -622,6 +660,13 @@ export class FlagneticClient {
     this.log("info", "values_loaded", { source: from, ruleset_version: doc.rulesetVersion, flags: doc.flags.size });
     for (const ignored of doc.ignoredAttributes) {
       this.once(`attr:${ignored.name}`, "warn", "attribute_ignored", { name: ignored.name, code: ignored.code });
+    }
+    for (const flag of doc.tooDeep) {
+      this.once(`deep:${flag}:${String(doc.rulesetVersion)}`, "error", "value_too_deep", {
+        flag,
+        max_depth: MAX_VALUE_DEPTH,
+        ruleset_version: doc.rulesetVersion,
+      });
     }
     const dropped = this.refuseLocalOverrides(doc);
     this.setStage("fresh");
@@ -901,10 +946,16 @@ export class FlagneticClient {
     const receivedAt = this.receivedAt;
     if (!values || !receivedAt) return;
     const key = this.keys.lastGood(units);
-    this.store.set(
-      key,
-      JSON.stringify({ units, ruleset_version: values.rulesetVersion, received_at: receivedAt.toISOString(), values: values.raw }),
-    );
+    let entry: string;
+    try {
+      entry = JSON.stringify({ units, ruleset_version: values.rulesetVersion, received_at: receivedAt.toISOString(), values: values.raw });
+    } catch (e) {
+      // A field this SDK does not read can still nest too deeply to
+      // serialize: the values serve, they only do not survive a reload.
+      this.log("warn", "store_failed", { operation: "write", key, cause: causeOf(e) });
+      return;
+    }
+    this.store.set(key, entry);
     let keys: string[] = [];
     const index = this.store.get(this.keys.index);
     if (index !== null) {

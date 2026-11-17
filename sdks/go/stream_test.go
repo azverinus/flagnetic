@@ -292,6 +292,69 @@ func TestAStreamThatNeverAnswersDoesNotHoldTheFirstFetch(t *testing.T) {
 	}
 }
 
+func TestAStreamWhoseHeadersNeverArriveTimesOutAndReconnects(t *testing.T) {
+	// The connection is accepted but the response never starts: without a
+	// bound on the headers the attempt would hang for good, silent, and
+	// the stream would never come back.
+	var mu sync.Mutex
+	attempts := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/sdk/v1/stream" {
+			mu.Lock()
+			attempts++
+			mu.Unlock()
+			<-r.Context().Done()
+			return
+		}
+		ruleset(7)(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	var j jitterCeilings
+	var l logs
+	newStreaming(t, srv.URL, flagnetic.WithRequestTimeout(50*time.Millisecond),
+		flagnetic.WithJitter(j.draw), flagnetic.WithLogger(l.logger()))
+
+	waitFor(t, func() (int, bool) {
+		mu.Lock()
+		defer mu.Unlock()
+		return attempts, attempts >= 3
+	}, "the reconnects after the header timeout")
+	timeouts := 0
+	for _, e := range l.named(flagnetic.EventSSEDropped) {
+		if e.Fields["cause"] == "timeout" && e.Fields["reconnect"] == true {
+			timeouts++
+		}
+	}
+	if timeouts < 2 {
+		t.Errorf("sse_dropped timeout logged %d times, want one per attempt", timeouts)
+	}
+	// Each timeout is a failed connection, so the reconnect backs off.
+	if got := j.ceilings(); len(got) < 2 || got[1] <= got[0] {
+		t.Errorf("waits before the reconnects drew from %v, want a growing backoff", got)
+	}
+}
+
+func TestAnIdleStreamOutlivesTheHeaderTimeout(t *testing.T) {
+	// The header bound covers only the wait for the response to start: an
+	// established stream quiet between heartbeats is not cut by it.
+	srv := newStreamServer(t, ruleset(7))
+	var l logs
+	c := newStreaming(t, srv.URL, flagnetic.WithRequestTimeout(50*time.Millisecond), flagnetic.WithLogger(l.logger()))
+	readyNow(t, c)
+	conn := srv.connect(t)
+	conn.send(t, heartbeat)
+	time.Sleep(300 * time.Millisecond)
+	if dropped := l.named(flagnetic.EventSSEDropped); len(dropped) != 0 {
+		t.Errorf("the idle stream was dropped: %+v", dropped)
+	}
+	srv.mu.Lock()
+	streams := len(srv.streams)
+	srv.mu.Unlock()
+	if streams != 1 {
+		t.Errorf("%d stream requests, want the one that stayed open", streams)
+	}
+}
+
 func TestEventAboveTheHeldVersionReachesTheChangeCallbackWithinTwoSeconds(t *testing.T) {
 	srv := newStreamServer(t, ruleset(7), killSwitch(8))
 	c := newStreaming(t, srv.URL)

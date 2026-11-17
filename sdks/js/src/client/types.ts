@@ -94,6 +94,10 @@ export interface Status {
  *   events. Fields: dropped, capacity.
  * - `events_failed` (warn): an ingest batch failed. Fields: cause, status?,
  *   retry_in_ms, events.
+ * - `value_too_deep` (error): a flag of an accepted document holds a value
+ *   nesting arrays and objects deeper than the server stores (`max_depth`,
+ *   32) and serves the fallback with `inconsistent_ruleset`, logged once per
+ *   flag and ruleset version. Fields: flag, max_depth, ruleset_version.
  * - `store_failed` (warn): browser storage could not be read or written; the
  *   client carries on in memory. Fields: operation, key, cause.
  * - `override_set`, `override_refused`, `local_overrides_allowed` (warn):
@@ -114,6 +118,7 @@ export type LogEvent =
   | "key_revoked"
   | "schema_unsupported"
   | "attribute_ignored"
+  | "value_too_deep"
   | "queue_dropped"
   | "events_failed"
   | "store_failed"
@@ -223,20 +228,34 @@ export function copyJson<T extends JsonValue>(value: T): T {
   return value;
 }
 
-/** Deep equality of decoded JSON values. */
+/**
+ * Deep equality of decoded JSON values. It walks both values with a stack of
+ * its own rather than recursing, so a value nested however deeply compares
+ * without overflowing the call stack.
+ */
 export function jsonEquals(a: JsonValue | undefined, b: JsonValue | undefined): boolean {
-  if (a === b) return true;
-  if (typeof a !== "object" || a === null || typeof b !== "object" || b === null) return false;
-  const listA = asList(a);
-  const listB = asList(b);
-  if (listA || listB) {
-    if (!listA || !listB || listA.length !== listB.length) return false;
-    return listA.every((v, i) => jsonEquals(v, listB[i]));
+  const pending: [JsonValue | undefined, JsonValue | undefined][] = [[a, b]];
+  for (let pair = pending.pop(); pair !== undefined; pair = pending.pop()) {
+    const [x, y] = pair;
+    if (x === y) continue;
+    if (typeof x !== "object" || x === null || typeof y !== "object" || y === null) return false;
+    const listX = asList(x);
+    const listY = asList(y);
+    if (listX || listY) {
+      if (!listX || !listY || listX.length !== listY.length) return false;
+      listX.forEach((v, i) => pending.push([v, listY[i]]));
+      continue;
+    }
+    const ox = x as Record<string, JsonValue>;
+    const oy = y as Record<string, JsonValue>;
+    const keys = Object.keys(ox);
+    if (keys.length !== Object.keys(oy).length) return false;
+    for (const k of keys) {
+      if (!Object.hasOwn(oy, k)) return false;
+      pending.push([ox[k], oy[k]]);
+    }
   }
-  const oa = a as Record<string, JsonValue>;
-  const ob = b as Record<string, JsonValue>;
-  const keys = Object.keys(oa);
-  return keys.length === Object.keys(ob).length && keys.every((k) => Object.hasOwn(ob, k) && jsonEquals(oa[k], ob[k]));
+  return true;
 }
 
 function asList(v: JsonValue): readonly JsonValue[] | undefined {
