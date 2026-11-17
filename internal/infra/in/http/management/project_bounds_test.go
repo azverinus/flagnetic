@@ -3,6 +3,7 @@ package management_test
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -46,5 +47,34 @@ func TestAConditionStringHasAtMostAThousandCharacters(t *testing.T) {
 	pr := assertProblem(t, "a long string", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid_segment")
 	if pr.Errors == nil || len(*pr.Errors) != 1 || (*pr.Errors)[0].Code != "too_long" {
 		t.Errorf("errors = %+v, want one too_long", pr.Errors)
+	}
+}
+
+// A document creates no more environments than a request does: the 21st is
+// refused at its pointer and the project is not created.
+func TestADocumentOfMoreThanTwentyEnvironmentsIsRefused(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	key := projectKey()
+	doc := mutate(documentFor(key), func(d map[string]any) {
+		envs := d["environments"].([]any)
+		for i := len(envs); i < 21; i++ {
+			envs = append(envs, map[string]any{"key": fmt.Sprintf("env%d", i), "name": fmt.Sprintf("Env %d", i), "protected": false})
+		}
+		d["environments"] = envs
+	})
+	res := importJSON(t, admin, management.ImportNewProjectParams{}, doc)
+	pr := assertProblem(t, "21 environments", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid_document")
+	var found []string
+	if pr.Errors != nil {
+		for _, v := range *pr.Errors {
+			found = append(found, v.Pointer+" "+v.Code)
+		}
+	}
+	if !slices.Equal(found, []string{"/environments/20/key too_many"}) {
+		t.Errorf("errors = %v, want /environments/20/key too_many", found)
+	}
+	if hasProject(t, admin, key) {
+		t.Error("a refused document created a project")
 	}
 }
