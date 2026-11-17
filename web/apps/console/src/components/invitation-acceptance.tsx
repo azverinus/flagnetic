@@ -84,7 +84,7 @@ function AcceptForm({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">
+      <h1 className="text-2xl/7 font-semibold">
         <Trans>Accept your invitation</Trans>
       </h1>
       <InvitedBy invitation={invitation} />
@@ -258,7 +258,7 @@ function InvitedBy({ invitation }: { invitation: Invitation }) {
 function InvitationGone() {
   return (
     <div className="flex flex-col gap-3">
-      <h1 className="text-xl font-semibold">
+      <h1 className="text-2xl/7 font-semibold">
         <Trans>This invitation no longer works</Trans>
       </h1>
       <p className="text-sm text-muted-foreground">

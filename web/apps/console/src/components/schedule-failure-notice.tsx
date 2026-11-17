@@ -33,7 +33,7 @@ export function ScheduleFailureNotice({
       aria-labelledby="schedule-failure"
       className="flex flex-col gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
     >
-      <h2 id="schedule-failure" className="flex items-center gap-2 text-base font-semibold">
+      <h2 id="schedule-failure" className="flex items-center gap-2 text-base font-medium">
         <CircleAlertIcon aria-hidden className="size-4 shrink-0 text-destructive" />
         <Trans>The scheduled application failed</Trans>
       </h2>

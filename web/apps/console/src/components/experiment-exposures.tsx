@@ -73,7 +73,7 @@ export function ExperimentExposuresSection({
   return (
     <section aria-labelledby="experiment-exposures" className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <h2 id="experiment-exposures" className="text-lg font-semibold">
+        <h2 id="experiment-exposures" className="text-lg font-medium">
           <Trans>Exposures</Trans>
         </h2>
         <p className="max-w-prose text-sm text-muted-foreground">

@@ -24,7 +24,7 @@ export function SignedOutCard({
       >
         <div className="flex items-center gap-2">
           <img src="/favicon.svg" alt="" className="size-7" />
-          <span className="text-lg font-semibold">Flagnetic</span>
+          <span className="text-lg font-medium">Flagnetic</span>
         </div>
         {children}
       </div>

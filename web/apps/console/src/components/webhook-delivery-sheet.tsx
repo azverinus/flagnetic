@@ -86,7 +86,7 @@ export function WebhookDeliverySheet({
             ) : null}
           </dl>
           <section aria-labelledby="attempts" className="flex flex-col gap-2">
-            <h3 id="attempts" className="text-sm font-semibold">
+            <h3 id="attempts" className="text-sm font-medium">
               <Trans>Attempts</Trans>
             </h3>
             {delivery.attempts.length === 0 ? (

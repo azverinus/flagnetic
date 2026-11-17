@@ -126,7 +126,7 @@ export function Gaps({ gaps }: { gaps: readonly EventGap[] }) {
   );
   return (
     <section aria-labelledby={heading} className="flex flex-col gap-2">
-      <h2 id={heading} className="text-base font-semibold">
+      <h2 id={heading} className="text-base font-medium">
         <Trans>Gaps</Trans>
       </h2>
       <p className="text-sm text-muted-foreground">

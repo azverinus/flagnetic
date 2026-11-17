@@ -381,7 +381,7 @@ function KindChanges({ name, changes }: { name: string; changes: ImportKindChang
   const { t } = useLingui();
   return (
     <section aria-label={name} className="flex flex-col gap-2">
-      <h3 className="text-sm font-semibold">{name}</h3>
+      <h3 className="text-sm font-medium">{name}</h3>
       <ul className="flex flex-col gap-2 text-sm">
         {changes.created.map((key) => (
           <li key={`created-${key}`} className="flex items-center gap-2">
@@ -472,7 +472,7 @@ export function ImportWarnings({ result }: { result: ImportResult }) {
   if (count === 0) return null;
   return (
     <section aria-label={t`Warnings`} className="flex flex-col gap-2">
-      <h3 className="text-sm font-semibold">
+      <h3 className="text-sm font-medium">
         <Plural value={count} one="# warning" other="# warnings" />
       </h3>
       <ul className="flex flex-col gap-1.5 text-sm">

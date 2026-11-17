@@ -15,7 +15,7 @@ export function SinkTestOutcome({ result }: { result: SinkTestResult }) {
     <div role="status" className="flex flex-col gap-2 rounded-md border p-3 text-sm">
       {result.ok ? (
         <p className="flex items-start gap-2">
-          <CircleCheckIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
+          <CircleCheckIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-primary-ink" />
           <Trans>The target answered and can take a batch.</Trans>
         </p>
       ) : (
@@ -54,7 +54,7 @@ export function SinkSampleOutcome({ results }: { results: SinkSampleKindResult[]
         return (
           <li key={result.event_kind} className="flex items-start gap-2">
             {result.ok ? (
-              <CircleCheckIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
+              <CircleCheckIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-primary-ink" />
             ) : (
               <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
             )}

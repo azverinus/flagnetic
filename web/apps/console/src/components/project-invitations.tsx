@@ -194,7 +194,7 @@ export function InvitedMembers({ project, names, namesPending, onReissued }: Inv
   const role = reissuing ? roleName(i18n, reissuing.role) : "";
   return (
     <section className="flex flex-col gap-3" aria-labelledby="invited-members">
-      <h2 id="invited-members" className="text-base font-semibold">
+      <h2 id="invited-members" className="text-base font-medium">
         <Trans>Invited members</Trans>
       </h2>
       <Table

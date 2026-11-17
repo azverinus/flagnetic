@@ -68,7 +68,7 @@ function EntryChanges({ children }: { children: ReactNode }) {
   const heading = useId();
   return (
     <section aria-labelledby={heading} className="flex flex-col gap-2 text-sm">
-      <h3 id={heading} className="font-semibold">
+      <h3 id={heading} className="font-medium">
         <Trans>Changes</Trans>
       </h3>
       {children}
@@ -150,7 +150,7 @@ function EntryDetail({
         ) : null}
       </dl>
       <section aria-labelledby={changeHeading} className="flex flex-col gap-2">
-        <h3 id={changeHeading} className="font-semibold">
+        <h3 id={changeHeading} className="font-medium">
           <Trans>Before and after</Trans>
         </h3>
         {rows.length === 0 ? (

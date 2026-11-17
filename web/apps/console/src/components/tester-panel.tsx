@@ -230,7 +230,7 @@ export function TesterPanel({
             ref={heading}
             id={headingId}
             tabIndex={-1}
-            className="text-base font-semibold outline-none"
+            className="text-base font-medium outline-none"
           >
             <Trans>Evaluate for context</Trans>
           </h2>

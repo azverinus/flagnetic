@@ -64,7 +64,7 @@ function AuthProviderNotFound() {
   const navigate = useNavigate();
   return (
     <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
-      <h1 className="text-xl font-semibold">
+      <h1 className="text-2xl/7 font-semibold">
         <Trans>Auth provider not found</Trans>
       </h1>
       <p className="text-sm text-muted-foreground">
@@ -172,7 +172,7 @@ function AuthProviderPage({
       )}
       {provider.kind === "oidc" ? (
         <section aria-labelledby="register" className="flex flex-col gap-3">
-          <h2 id="register" className="text-base font-semibold">
+          <h2 id="register" className="text-base font-medium">
             <Trans>Register the instance at the identity provider</Trans>
           </h2>
           {provider.redirect_uri ? (
@@ -210,7 +210,7 @@ function AuthProviderPage({
       ) : null}
       <ScimGroups provider={provider.slug} />
       <section aria-labelledby="settings" className="flex flex-col gap-4">
-        <h2 id="settings" className="text-base font-semibold">
+        <h2 id="settings" className="text-base font-medium">
           <Trans>Settings</Trans>
         </h2>
         {/* A new version starts the form over from what was saved. */}
@@ -299,8 +299,8 @@ function TestResult({
   if (result.idp_entity_id !== undefined) {
     return (
       <section aria-labelledby="test-result" className="flex flex-col gap-3">
-        <h2 id="test-result" className="flex items-center gap-2 text-base font-semibold">
-          <CircleCheckIcon aria-hidden className="size-4 text-primary" />
+        <h2 id="test-result" className="flex items-center gap-2 text-base font-medium">
+          <CircleCheckIcon aria-hidden className="size-4 text-primary-ink" />
           <Trans>The identity provider answered</Trans>
         </h2>
         <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
@@ -320,8 +320,8 @@ function TestResult({
   const lacksS256 = methods !== undefined && !methods.includes("S256");
   return (
     <section aria-labelledby="test-result" className="flex flex-col gap-3">
-      <h2 id="test-result" className="flex items-center gap-2 text-base font-semibold">
-        <CircleCheckIcon aria-hidden className="size-4 text-primary" />
+      <h2 id="test-result" className="flex items-center gap-2 text-base font-medium">
+        <CircleCheckIcon aria-hidden className="size-4 text-primary-ink" />
         <Trans>The identity provider answered</Trans>
       </h2>
       <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">

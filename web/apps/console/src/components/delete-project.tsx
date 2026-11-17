@@ -56,7 +56,7 @@ export function DeleteProject({ project }: { project: Project }) {
       aria-labelledby="delete-project"
       className="flex flex-col gap-3 rounded-lg border border-destructive/40 p-4"
     >
-      <h2 id="delete-project" className="text-base font-semibold">
+      <h2 id="delete-project" className="text-base font-medium">
         <Trans>Delete this project</Trans>
       </h2>
       <p className="text-sm text-muted-foreground">

@@ -86,7 +86,7 @@ function Confirmation({
           <Trans>Cancel</Trans>
         </Button>
         <Button
-          variant={destructive ? "destructive" : "default"}
+          variant={destructive ? "destructiveFilled" : "default"}
           onClick={onConfirm}
           disabled={pending || !ready}
         >

@@ -187,7 +187,7 @@ function SideBySide({
                 <span className="flex flex-col gap-1">
                   <PartName row={row} />
                   {row.differs ? (
-                    <span className="w-fit rounded-sm bg-primary/10 px-1 py-0.5 text-xs text-primary">
+                    <span className="w-fit rounded-sm bg-primary/10 px-1 py-0.5 text-xs text-primary-ink">
                       <Trans>Differs</Trans>
                     </span>
                   ) : null}

@@ -45,7 +45,7 @@ export function ScimGroups({ provider }: { provider: string }) {
   );
   return (
     <section aria-labelledby="scim-groups" className="flex flex-col gap-3">
-      <h2 id="scim-groups" className="text-base font-semibold">
+      <h2 id="scim-groups" className="text-base font-medium">
         <Trans>SCIM groups</Trans>
       </h2>
       <p className="text-sm text-muted-foreground">

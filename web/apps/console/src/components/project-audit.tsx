@@ -99,7 +99,7 @@ export function RecentActivity({ project }: { project: string }) {
   return (
     <section aria-labelledby={heading} className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-4">
-        <h2 id={heading} className="text-base font-semibold">
+        <h2 id={heading} className="text-base font-medium">
           <Trans>Recent activity</Trans>
         </h2>
         <Link

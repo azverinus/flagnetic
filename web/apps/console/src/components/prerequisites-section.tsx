@@ -36,7 +36,7 @@ export function PrerequisitesSection({
   return (
     <section aria-labelledby={heading} className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <h2 id={heading} className="text-base font-semibold">
+        <h2 id={heading} className="text-base font-medium">
           <Trans>Prerequisites</Trans>
         </h2>
         <p className="text-sm text-muted-foreground">

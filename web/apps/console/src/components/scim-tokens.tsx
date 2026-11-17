@@ -103,7 +103,7 @@ export function ScimTokensScreen() {
         }
       />
       <section aria-labelledby="scim-base-url" className="flex flex-col gap-2">
-        <h2 id="scim-base-url" className="text-base font-semibold">
+        <h2 id="scim-base-url" className="text-base font-medium">
           <Trans>Tell the identity provider</Trans>
         </h2>
         <p className="text-sm text-muted-foreground">

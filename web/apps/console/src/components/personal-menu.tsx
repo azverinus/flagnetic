@@ -71,7 +71,7 @@ export function PersonalMenu() {
         <Button variant="ghost" className="min-w-0 gap-2 px-2">
           <span
             aria-hidden
-            className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
+            className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground"
           >
             {initialsOf(name, email)}
           </span>

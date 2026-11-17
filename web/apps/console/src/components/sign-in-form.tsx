@@ -266,7 +266,7 @@ export function SignInForm({
           ) ? (
             <Link
               to="/forgot-password"
-              className="self-center text-sm text-primary underline-offset-4 hover:underline"
+              className="self-center text-sm text-primary-ink underline-offset-4 hover:underline"
             >
               <Trans>Forgot your password?</Trans>
             </Link>

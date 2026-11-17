@@ -28,7 +28,7 @@ function SignInPage() {
   const router = useRouter();
   return (
     <SignedOutCard className="max-w-sm">
-      <h1 className="text-xl font-semibold">
+      <h1 className="text-2xl/7 font-semibold">
         <Trans>Sign in</Trans>
       </h1>
       <SignInForm
