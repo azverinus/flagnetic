@@ -164,7 +164,7 @@ The public listener bounds what one client can hold:
 | `FLAGNETIC_HTTP_BODY_READ_TIMEOUT` | `30s` | Time to send the request body; a body still arriving is answered 408. Long-lived streams are excepted. |
 | `FLAGNETIC_HTTP_WRITE_TIMEOUT` | `30s` | Time a client may take to accept each chunk of a response or each frame of a stream; a client that stops reading is dropped after it. It bounds a stalled reader, not the length of a response or of a stream. |
 | `FLAGNETIC_HTTP_IDLE_TIMEOUT` | `120s` | Time a keep-alive connection may stay idle. |
-| `FLAGNETIC_HTTP_MAX_BODY_BYTES` | `1048576` | Size of a request body; a larger one is answered 413. The few routes that take larger bodies declare their own limit, such as the uniformity check's 64 MiB. |
+| `FLAGNETIC_HTTP_MAX_BODY_BYTES` | `1048576` | Size of a request body; a larger one is answered 413. The few routes that take larger bodies declare their own limit, such as the uniformity check's 50 MiB. |
 
 The time to write a whole response is not bounded, which would cut off streams and large downloads; each write is, so a client that stops reading ends its request within `FLAGNETIC_HTTP_WRITE_TIMEOUT` instead of holding a goroutine and what it holds. A proxy in front may add its own bound. A proxy in front must not buffer the [ruleset stream](sdks/stream.md) or the management change stream and must allow them a read timeout above their 15-second heartbeat; see [TLS and a reverse proxy](install.md#tls-and-a-reverse-proxy).
 

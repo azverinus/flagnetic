@@ -3443,8 +3443,10 @@ export const sendStaleFlagDigest = <ThrowOnError extends boolean = false>(
  * or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
  * only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
  * empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
- * Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
- * whatever the server's limit for other bodies.
+ * Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+ * whatever the server's limit for other bodies; the list is read
+ * entry by entry and cut one past the bound, so a longer one is refused
+ * without being held whole.
  *
  */
 export const checkHashUniformity = <ThrowOnError extends boolean = false>(
