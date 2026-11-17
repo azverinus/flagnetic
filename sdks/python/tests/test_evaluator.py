@@ -232,6 +232,41 @@ class TestDecode:
         assert (rs.environment_key, rs.protected) == ("prod", True)
         assert decode(self.DOCUMENT).protected is False
 
+    @staticmethod
+    def _with_value(value_text: str) -> str:
+        """A document with flag "deep" serving value_text and flag "fine" beside it."""
+        fine = {"key": "fine", "type": "string", "on": True, "variations": [{"key": "a", "value": "A"}]}
+        return (
+            '{"schema_version": 1, "version": 1, "scope": "server", "flags": ['
+            '{"key": "deep", "type": "json", "on": true, "fallthrough": "v",'
+            f' "variations": [{{"key": "v", "value": {value_text}}}]}},'
+            f" {json.dumps({**fine, 'fallthrough': 'a'})}]}}"
+        )
+
+    @pytest.mark.parametrize("depth", [33, 900, 100_000])
+    def test_a_value_nested_too_deep_breaks_only_its_flag(self, depth: int) -> None:
+        rs = decode(self._with_value("[" * depth + "]" * depth))
+        assert evaluate(rs, Context(), "fine").value == "A"
+        assert evaluate(rs, Context(), "deep").error_code == "inconsistent_ruleset"
+        assert rs.invalid_conditions() == {"deep": ["variation 'v' nests arrays and objects deeper than 32"]}
+
+    def test_a_value_nested_as_deep_as_the_bound_is_served(self) -> None:
+        value = "[" * 16 + '{"k": ' * 16 + "1" + "}" * 16 + "]" * 16
+        rs = decode(self._with_value(value))
+        assert evaluate(rs, Context(), "deep").value == json.loads(value)
+        assert rs.invalid_conditions() == {}
+
+    def test_a_deep_value_still_refuses_a_document_that_is_not_json(self) -> None:
+        deep = "[" * 100_000 + "]" * 100_000
+        for broken in (deep + ", NaN", deep[:-1], '"' + deep):
+            with pytest.raises(RulesetError):
+                decode(self._with_value(broken))
+
+    def test_a_deep_value_inside_a_string_is_only_text(self) -> None:
+        text = json.dumps("[" * 100_000 + '\\"{')
+        rs = decode(self._with_value(text))
+        assert evaluate(rs, Context(), "deep").value == json.loads(text)
+
     def test_an_invalid_pattern_breaks_only_its_flag(self) -> None:
         rs = ruleset("string", "matches", "(?=a)")
         assert evaluate(rs, Context(attributes={"x": "a"}), "f").error_code == "inconsistent_ruleset"

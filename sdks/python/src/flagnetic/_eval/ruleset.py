@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
+from itertools import accumulate
 from typing import Any
 
 from .model import Construct, ConstructKind
@@ -12,6 +14,12 @@ from .operators import OPERATORS, Matcher, OperatorError, compile_operator
 SCHEMA_VERSION = 1
 SCOPE_SERVER = "server"
 BUCKETS = 10_000
+
+# How deep a variation's value may nest arrays and objects: the bound the
+# server holds every value to. The SDK copies and compares a served value
+# recursively, so a deeper one would exhaust the stack; the flag holding it
+# answers inconsistent_ruleset instead, and every other flag still serves.
+MAX_VALUE_DEPTH = 32
 
 CONDITION_ATTRIBUTE = "attribute"
 CONDITION_IN_SEGMENT = "in_segment"
@@ -245,18 +253,122 @@ def _refuse_constant(name: str) -> Any:
     raise ValueError(f"{name} is not JSON")
 
 
+class _TooDeep(str):
+    """What stands in for a part of the document nested deeper than the parser is let to go.
+
+    A string, so that the document holding it still encodes as JSON where the
+    client compares rulesets; the value it is part of is too deep either way.
+    """
+
+    __slots__ = ()
+
+
+_TOO_DEEP = _TooDeep("nested too deep")
+
+# Where the text of a document is cut before it is parsed: well past any
+# member a ruleset nests, value bound included, and well short of the depth at
+# which Python's recursive parser, copier and encoder exhaust the stack. The
+# document would otherwise be refused whole, kill switches included, for one
+# value nobody may serve.
+_CUT_DEPTH = 128
+
+_STRING = re.compile(r'"[^"\\]*(?:\\.[^"\\]*)*"', re.DOTALL)
+_NOT_BRACKET = re.compile(r"[^\[\]{}]+")
+_STEP = {"[": 1, "{": 1, "]": -1, "}": -1}
+# A string whole, a bracket, an unterminated string's quote, or the first
+# letter of NaN or Infinity, the only capitals JSON text holds outside strings.
+_TOKEN = re.compile(r'"[^"\\]*(?:\\.[^"\\]*)*"|[\[\]{}"NI]', re.DOTALL)
+_CLOSER = {"[": "]", "{": "}"}
+
+
+def _deepest(document: str) -> int:
+    """How deep the document nests arrays and objects, its strings left out."""
+    brackets = _NOT_BRACKET.sub("", _STRING.sub("", document))
+    return max(accumulate(map(_STEP.__getitem__, brackets)), default=0)
+
+
+def _cut(document: str) -> str:
+    """The document with each array or object nested deeper than _CUT_DEPTH written as NaN.
+
+    No document holds NaN, so the parser reads each one as the cut part. The
+    text is still refused where a cut part would hide what makes it no JSON:
+    an unterminated string, NaN or Infinity, a bracket closed by the other
+    kind or never closed.
+    """
+    parts: list[str] = []
+    copied = 0
+    cut_from = 0
+    opened: list[str] = []
+    for token in _TOKEN.finditer(document):
+        text = token.group()
+        if text == '"':
+            raise RulesetError("decode ruleset: a string is not terminated")
+        if text in ("N", "I"):
+            raise RulesetError("decode ruleset: NaN and Infinity are not JSON")
+        if text in _CLOSER:
+            opened.append(_CLOSER[text])
+            if len(opened) == _CUT_DEPTH + 1:
+                cut_from = token.start()
+        elif text in ("]", "}"):
+            if not opened or opened.pop() != text:
+                raise RulesetError(f"decode ruleset: {text!r} closes nothing it opened")
+            if len(opened) == _CUT_DEPTH:
+                parts.append(document[copied:cut_from])
+                parts.append("NaN")
+                copied = token.end()
+    if opened:
+        raise RulesetError("decode ruleset: an array or object is not closed")
+    parts.append(document[copied:])
+    return "".join(parts)
+
+
+def _cut_constant(name: str) -> Any:
+    if name == "NaN":
+        return _TOO_DEEP
+    return _refuse_constant(name)
+
+
+def _too_deep(value: Any) -> bool:
+    """Whether value nests arrays and objects deeper than MAX_VALUE_DEPTH, or holds a cut part.
+
+    Walked without recursion, so that no value exhausts the stack.
+    """
+    pending: list[tuple[Any, int]] = [(value, 0)]
+    while pending:
+        item, depth = pending.pop()
+        if isinstance(item, _TooDeep):
+            return True
+        if isinstance(item, Mapping):
+            children: Any = item.values()
+        elif isinstance(item, (list, tuple)):
+            children = item
+        else:
+            continue
+        if depth == MAX_VALUE_DEPTH:
+            return True
+        pending.extend((child, depth + 1) for child in children)
+    return False
+
+
 def parse(document: str | bytes | bytearray) -> Any:
     """Reads the JSON text of a ruleset document, as Go's decoder reads it.
 
-    Raises RulesetError when the text is not JSON.
+    An array or object nested deeper than any ruleset member is read as a
+    placeholder that makes the value holding it too deep to serve, so the one
+    flag holding it fails rather than the document. Raises RulesetError when
+    the text is not JSON.
     """
     if not isinstance(document, str):
         # UTF-8 only, with no byte order mark and each invalid sequence
         # read as U+FFFD, as Go decodes a document; json.loads would
         # otherwise also guess UTF-16 and UTF-32 from the bytes.
         document = bytes(document).decode("utf-8", errors="replace")
+    constant = _refuse_constant
+    if _deepest(document) > _CUT_DEPTH:
+        document = _cut(document)
+        constant = _cut_constant
     try:
-        return json.loads(document, parse_constant=_refuse_constant)
+        return json.loads(document, parse_constant=constant)
     except (ValueError, RecursionError) as err:
         raise RulesetError(f"decode ruleset: {err}") from err
 
@@ -433,8 +545,16 @@ def _build(rs: Ruleset, top: Mapping[str, Any], types: dict[str, str], units: se
         f.off_variation = _string(raw, "off_variation", where)
         f.fallthrough = _string(raw, "fallthrough", where)
         f.variations = {}
+        reasons: list[str] = []
         for v in _objects(raw, "variations", where):
-            f.variations[_string(v, "key", where)] = v.get("value")
+            variation = _string(v, "key", where)
+            value = v.get("value")
+            if _too_deep(value):
+                reasons.append(
+                    f"variation {variation!r} nests arrays and objects deeper than {MAX_VALUE_DEPTH}"
+                )
+            f.variations[variation] = value
+        too_deep = bool(reasons)
         f.prerequisites = tuple(
             (_string(p, "flag", where), _string(p, "variation", where))
             for p in _objects(raw, "prerequisites", where)
@@ -445,7 +565,6 @@ def _build(rs: Ruleset, top: Mapping[str, Any], types: dict[str, str], units: se
         )
         rules: list[Rule] = []
         found = []
-        reasons: list[str] = []
         for r in _objects(raw, "rules", where):
             rule_where = f"{where} rule {_string(r, 'id', where)!r}"
             conditions = []
@@ -466,6 +585,11 @@ def _build(rs: Ruleset, top: Mapping[str, Any], types: dict[str, str], units: se
                 _add(found, _unsupported("serve_kind", serve.kind))
             rules.append(Rule(_string(r, "id", where), tuple(conditions), serve, invalid))
         f.rules = tuple(rules)
+        if too_deep:
+            # Without variations every path through the flag, and every
+            # prerequisite naming it, answers inconsistent_ruleset: no part of
+            # the flag serves a value the SDK cannot copy.
+            f.variations = {}
         if found:
             rs.unsupported[f.key] = found
         if reasons:
