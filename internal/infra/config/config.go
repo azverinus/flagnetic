@@ -765,7 +765,8 @@ func Settings() []Setting {
 			func(l *RateLimits) *int { return &l.ClientConcurrentStreams }),
 		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_STREAMS_PER_REPLICA", "10000", "streams",
 			"Ruleset streams all client keys together may hold open on one replica at once, whatever their keys and client IPs, "+
-				"which bounds the connections a public client key can hold the replica to.",
+				"which bounds the connections a public client key can hold the replica to. "+
+				"One client key may hold a quarter of them (at least one), and a stream beyond its share is refused with that share as `RateLimit-Limit`.",
 			func(l *RateLimits) *int { return &l.ClientStreamsPerReplica }),
 		rateLimit("FLAGNETIC_RATE_LIMIT_SERVER_RULESET", "600", "requests per minute",
 			"Ruleset downloads a server key may ask of one replica per minute, counted per key.",
