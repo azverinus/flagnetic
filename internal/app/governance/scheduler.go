@@ -96,6 +96,13 @@ func (h *RunScheduler) applyOne(ctx context.Context, due DueChangeRequest) error
 	if err == nil || ctx.Err() != nil {
 		return err
 	}
+	if retryable(err) {
+		// A deadlock or serialization failure is not the change request's
+		// fault and is not retried inside the transaction, so the next round
+		// tries again; counting it would stop a sound schedule for good after
+		// five collisions with other writers.
+		return fmt.Errorf("applying the scheduled change request %s: %w", due.ChangeRequest, err)
+	}
 	if recordErr := h.recordFailure(ctx, due, err); recordErr != nil {
 		return errors.Join(err, recordErr)
 	}
@@ -140,6 +147,13 @@ func (h *RunScheduler) recordFailure(ctx context.Context, due DueChangeRequest, 
 		}
 		return h.d.record(ctx, now, governance.Request{Actor: schedulerActor}, "change_request.schedule_failed", &cr, failed, nil)
 	})
+}
+
+// retryable reports whether err is a failure worth trying again later rather
+// than a verdict on the change request.
+func retryable(err error) bool {
+	e, ok := apperrors.From(err)
+	return ok && e.Kind == apperrors.KindUnavailable
 }
 
 // failureOf is the code and message a failed application is recorded with:
