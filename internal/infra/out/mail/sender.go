@@ -54,9 +54,14 @@ func (s *Sender) Send(ctx context.Context, server appaccess.MailServer, m appacc
 	if err = msg.From(server.From); err != nil {
 		return fmt.Errorf("the sender address: %w", err)
 	}
-	if err = msg.AddToFormat(m.To.Name, m.To.Email); err != nil {
+	// The header is built from the parts, never by writing the name between
+	// quotes: a name holding a quote, a backslash or a line break would not
+	// parse, and the address is encoded properly for any name.
+	to, err := netmail.ParseAddress((&netmail.Address{Name: m.To.Name, Address: m.To.Email}).String())
+	if err != nil {
 		return fmt.Errorf("the recipient address: %w", err)
 	}
+	msg.AddToMailAddress(to)
 	msg.Subject(rendered.Subject)
 	msg.SetDateWithValue(m.At)
 	msg.SetMessageID()
