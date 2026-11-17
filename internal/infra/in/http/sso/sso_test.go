@@ -4,9 +4,11 @@ import (
 	"cmp"
 	"crypto/rand"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -54,6 +56,8 @@ type provider struct {
 	requireVerifiedEmail           *bool
 	// scopes are the scopes asked of the provider; its default when empty.
 	scopes []string
+	// emailClaim is the claim the email is read from; "email" when empty.
+	emailClaim string
 }
 
 func (e env) create(t *testing.T, p provider) string {
@@ -66,6 +70,9 @@ func (e env) create(t *testing.T, p provider) string {
 	}
 	if len(p.scopes) > 0 {
 		body.Scopes = &p.scopes
+	}
+	if p.emailClaim != "" {
+		body.Claims = &management.AuthProviderClaimsPatch{Email: &p.emailClaim}
 	}
 	res, err := e.admin.CreateAuthProviderWithResponse(t.Context(), body)
 	if err != nil || res.JSON201 == nil {
@@ -509,6 +516,14 @@ func TestAnEmailIsLinkedToAnExistingMemberOnlyWhenTheProviderVouchesForIt(t *tes
 		{"a verification stated as a string", func(p *provider) { p.linkByEmail = true }, map[string]any{"email_verified": "true"}, nil, "member_not_found", ""},
 		{"an unverified email where verification is not required", func(p *provider) { p.linkByEmail, p.requireVerifiedEmail = true, ptr(false) },
 			map[string]any{"email_verified": false}, nil, "", ""},
+		// email_verified speaks of the standard email claim alone: with another
+		// claim as the email it would vouch for an address the person may have
+		// set themselves.
+		{"an email read from another claim than the verified one", func(p *provider) { p.linkByEmail, p.emailClaim = true, "upn" },
+			map[string]any{"email": nil, "upn": "{email}", "email_verified": true}, nil, "member_not_found", ""},
+		{"an email read from another claim where verification is not required",
+			func(p *provider) { p.linkByEmail, p.emailClaim, p.requireVerifiedEmail = true, "upn", ptr(false) },
+			map[string]any{"email": nil, "upn": "{email}"}, nil, "", ""},
 		{"an email outside the domains", func(p *provider) { p.linkByEmail, p.domains = true, []string{"corp.example.net"} }, nil, nil, "member_not_found", ""},
 		{"an email only UserInfo holds", func(p *provider) { p.linkByEmail = true }, map[string]any{"email": nil},
 			map[string]any{"sub": "subject-1", "email": "{email}", "email_verified": true}, "", ""},
@@ -522,6 +537,9 @@ func TestAnEmailIsLinkedToAnExistingMemberOnlyWhenTheProviderVouchesForIt(t *tes
 			m := testkit.NewMember(t, pool)
 			claims := map[string]any{"email": m.Email, "sub": "subject-" + m.Email}
 			for k, v := range tc.claims {
+				if v == "{email}" {
+					v = m.Email
+				}
 				claims[k] = v
 			}
 			if tc.userInfo != nil {
@@ -700,5 +718,60 @@ func TestTheAttemptCookieIsHostBoundWhereCookiesAreSecure(t *testing.T) {
 				t.Errorf("authorization request = %v", q)
 			}
 		})
+	}
+}
+
+// startOnly asks to start a sign-in at slug without following where it leads.
+func (e env) startOnly(t *testing.T, slug string) *http.Response {
+	t.Helper()
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	res, err := client.Get(e.srv.URL + "/sso/" + slug + "/start")
+	if err != nil {
+		t.Fatalf("GET /sso/%s/start: %v", slug, err)
+	}
+	_ = res.Body.Close()
+	return res
+}
+
+func TestStartingSignInsIsLimitedPerClientAddress(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	c := testkit.Clock()
+	e := start(t, testkit.WithClock(c))
+	slug := e.forged(t, idp, nil)
+
+	for i := range 60 {
+		if res := e.startOnly(t, slug); res.StatusCode != http.StatusFound {
+			t.Fatalf("start %d = %d, want the redirect to the provider", i+1, res.StatusCode)
+		}
+	}
+	res := e.startOnly(t, slug)
+	if res.StatusCode != http.StatusTooManyRequests || res.Header.Get("Retry-After") == "" {
+		t.Errorf("the 61st start in a minute = %d with Retry-After %q, want 429 with one", res.StatusCode, res.Header.Get("Retry-After"))
+	}
+
+	c.Advance(61 * time.Second)
+	if res := e.startOnly(t, slug); res.StatusCode != http.StatusFound {
+		t.Errorf("a start in the next window = %d, want the redirect to the provider", res.StatusCode)
+	}
+}
+
+func TestAProviderWhoseDiscoveryFailsIsAskedOnceWhileItKeepsFailing(t *testing.T) {
+	var asked atomic.Int32
+	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		asked.Add(1)
+		http.Error(w, "down", http.StatusInternalServerError)
+	}))
+	t.Cleanup(down.Close)
+	e := start(t)
+	slug := e.create(t, provider{issuer: down.URL, clientID: "c", clientSecret: "s", domains: []string{"example.com"}})
+
+	for range 5 {
+		res := e.startOnly(t, slug)
+		if loc := res.Header.Get("Location"); res.StatusCode != http.StatusSeeOther || !strings.Contains(loc, "error=sso_failed") {
+			t.Fatalf("a start at a provider that is down = %d to %q, want the sign-in page with sso_failed", res.StatusCode, loc)
+		}
+	}
+	if n := asked.Load(); n != 1 {
+		t.Errorf("the provider's discovery was fetched %d times for five starts, want one", n)
 	}
 }

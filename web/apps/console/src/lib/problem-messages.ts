@@ -253,6 +253,12 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
             msg`The provider is still in use. Disable it instead: that stops its sign-ins and keeps its members, identities and grants.`,
           );
     }
+    case "provider_identities_linked":
+      return i18n._(
+        msg`Members have identities linked at this provider. Changing its issuer or entity ID could let another person sign in as one of them. Unlink those identities first, or create a new provider.`,
+      );
+    case "recent_sign_in_required":
+      return i18n._(msg`Sign out and sign in again, then link the provider.`);
     case "sso_sourced":
       return i18n._(
         msg`An auth provider's group mapping made this, so only the provider takes it away. An instance admin changes its group mappings on the provider's page.`,

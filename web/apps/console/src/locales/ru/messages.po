@@ -4916,6 +4916,10 @@ msgstr "Участники больше не смогут входить чер�
 msgid "Members can no longer sign in through it. A provider that members have signed in through, or that granted access through its group mappings, cannot be deleted; disable it instead. This cannot be undone."
 msgstr "Участники больше не смогут входить через него. Провайдера, через которого участники уже входили или который выдавал доступ по сопоставлениям групп, удалить нельзя — отключите его. Это нельзя отменить."
 
+#: src/lib/problem-messages.ts
+msgid "Members have identities linked at this provider. Changing its issuer or entity ID could let another person sign in as one of them. Unlink those identities first, or create a new provider."
+msgstr "У участников есть учётные записи, привязанные к этому провайдеру. Если сменить его Issuer или Entity ID, другой человек сможет войти как один из них. Сначала отвяжите эти учётные записи или создайте нового провайдера."
+
 #: src/components/project-invitations.tsx
 msgid "Members invited to the project"
 msgstr "Участники, приглашённые в проект"
@@ -7253,6 +7257,10 @@ msgstr "Войти через провайдера"
 #: src/components/personal-menu.tsx
 msgid "Sign out"
 msgstr "Выйти"
+
+#: src/lib/problem-messages.ts
+msgid "Sign out and sign in again, then link the provider."
+msgstr "Выйдите и войдите снова, затем привяжите провайдера."
 
 #: src/components/saml-provider-form.tsx
 msgid "Sign the requests the instance sends with its current key, for an identity provider that checks them against the certificate in the SP metadata."

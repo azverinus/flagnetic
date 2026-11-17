@@ -20,29 +20,45 @@ var (
 		"the member is provisioned through this auth provider, which signs them in: change it in the directory")
 	errProviderEnforced = apperrors.Conflict("provider_enforced",
 		"the member's email domain is enforced to this identity's auth provider, their only way in: lift the enforcement first")
+	errRecentSignInRequired = apperrors.Forbidden("recent_sign_in_required",
+		"linking a sign-in method needs a session that signed in in the last 15 minutes: sign in again")
 	errProviderUnusable = apperrors.BadGateway("provider_unreachable", "the auth provider could not be reached to link an identity")
 )
 
 // StartLink begins linking an identity to the member signed in.
-type StartLink struct{ start *StartSignIn }
+type StartLink struct {
+	d     SignInDeps
+	start *StartSignIn
+}
 
 // NewStartLink returns the handler.
-func NewStartLink(d SignInDeps) *StartLink { return &StartLink{start: NewStartSignIn(d)} }
+func NewStartLink(d SignInDeps) *StartLink { return &StartLink{d: d, start: NewStartSignIn(d)} }
+
+// recentSignIn is how long after a session opened it may still link an
+// identity. A way in that outlives the session, and the member's password,
+// is not something an old session, which may have been hijacked, vouches for.
+const recentSignIn = 15 * time.Minute
 
 // StartLinkCommand asks to link an identity at the provider Slug to Member,
-// signed in in Session, and to return to ReturnTo afterwards.
+// signed in in Session, which opened at SessionOpenedAt, and to return to
+// ReturnTo afterwards.
 type StartLinkCommand struct {
-	Slug     string
-	ReturnTo string
-	Member   identity.MemberID
-	Session  identity.SessionID
+	Slug            string
+	ReturnTo        string
+	Member          identity.MemberID
+	Session         identity.SessionID
+	SessionOpenedAt time.Time
 }
 
 // Handle creates an attempt bound to the member, their session and a new
 // cookie, and answers the provider's authorization address. A disabled or
 // unknown provider is not found; one the instance cannot reach is 502
-// provider_unreachable.
+// provider_unreachable; a session that opened more than 15 minutes ago is
+// 403 recent_sign_in_required.
 func (h *StartLink) Handle(ctx context.Context, cmd StartLinkCommand) (Started, error) {
+	if h.d.now().Sub(cmd.SessionOpenedAt) > recentSignIn {
+		return Started{}, errRecentSignInRequired
+	}
 	started, err := h.start.start(ctx, cmd.Slug, cmd.ReturnTo, &linkBinding{member: cmd.Member, session: cmd.Session})
 	var failure *SignInFailure
 	if errors.As(err, &failure) {

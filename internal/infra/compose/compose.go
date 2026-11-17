@@ -431,8 +431,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Start: appidentity.NewStartSignIn(signIn), Callback: appidentity.NewCompleteCallback(signIn), ACS: appidentity.NewCompleteACS(signIn), Metadata: appidentity.NewServeMetadata(signIn),
 		Complete: appidentity.NewCompleteSignIn(signIn),
 	}, sso.Options{
-		SecureCookies: managementOptions.SecureCookies, SessionCookie: management.SessionCookieHeader, SessionCookieName: management.SessionCookie,
-		Metrics: sso.NewMetrics(reg),
+		SecureCookies: managementOptions.SecureCookies, SessionCookie: management.SessionCookieHeader, SessionCookieName: management.SessionCookieName,
+		Metrics: sso.NewMetrics(reg), Clock: d.Clock,
 	})
 	scimUsers := appidentity.SCIMUserDeps{
 		Tx: tx, Providers: identityStore, Members: scimMembers{svc: provisioning}, Groups: identityStore,

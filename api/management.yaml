@@ -97,7 +97,7 @@ paths:
           description: Signed in. The body is the caller, as `GET /me` answers it.
           headers:
             Set-Cookie:
-              description: The session cookie `flagnetic_session`, `HttpOnly; Path=/; SameSite=Lax`, `Secure` unless the console is served over plain HTTP on localhost or with `FLAGNETIC_INSECURE_COOKIES`.
+              description: The session cookie, `HttpOnly; Path=/; SameSite=Lax`, `Secure` and named `__Host-flagnetic_session` unless the console is served over plain HTTP on localhost or with `FLAGNETIC_INSECURE_COOKIES`, where it is named `flagnetic_session`.
               schema:
                 type: string
           content:
@@ -237,7 +237,7 @@ paths:
           description: Accepted and signed in. The body is the caller, as `GET /me` answers it.
           headers:
             Set-Cookie:
-              description: The session cookie `flagnetic_session`, as sign-in sets it.
+              description: The session cookie, as sign-in sets it.
               schema:
                 type: string
           content:
@@ -381,7 +381,7 @@ paths:
           description: Reset and signed in. The body is the caller, as `GET /me` answers it.
           headers:
             Set-Cookie:
-              description: The session cookie `flagnetic_session`, as sign-in sets it.
+              description: The session cookie, as sign-in sets it.
               schema:
                 type: string
           content:
@@ -566,7 +566,9 @@ paths:
         member nothing is linked and the browser lands on the settings page
         with `error=identity_linked`; any other failure lands there with its
         sign-in code. A disabled or unknown provider is not found. Only a
-        session may do this.
+        session may do this, and only one that signed in in the last 15
+        minutes: an older one is refused 403 `recent_sign_in_required`, and
+        the member signs in again first.
       x-permission: member
       x-session-required: true
       tags: [me]
@@ -5767,7 +5769,13 @@ paths:
         is changed with `enable` and `disable`. Refused as a creation is, and
         409 `provider_in_use` (`used_by` naming `enforced domains`) when it
         drops a domain enforced to the provider: lift the enforcement first.
-        Audited `auth_provider.updated`; an edit that changes nothing is not.
+        Changing the `issuer` of an OIDC provider, or the identity provider
+        whose entity ID differs in new SAML metadata, while members have
+        identities linked at it is 409 `provider_identities_linked`: a subject
+        of the new issuer equal to a linked one would sign in as the member who
+        linked it, so the identities are unlinked first or a new provider is
+        created. Audited `auth_provider.updated`; an edit that changes nothing
+        is not.
       x-permission: instance_admin
       tags: [instance]
       parameters:
@@ -8058,7 +8066,7 @@ components:
       type: apiKey
       in: cookie
       name: flagnetic_session
-      description: The session cookie `POST /auth/sign-in` sets, for the console. Ignored when an `Authorization` header is present.
+      description: The session cookie `POST /auth/sign-in` sets, for the console, named `__Host-flagnetic_session` where it is `Secure` and `flagnetic_session` otherwise. Ignored when an `Authorization` header is present.
   responses:
     BadRequest:
       description: "`invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return."

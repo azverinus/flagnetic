@@ -11,6 +11,7 @@ import (
 
 	gooidc "github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
+	"golang.org/x/sync/singleflight"
 
 	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
 	"github.com/azverinus/flagnetic/internal/domain/identity"
@@ -23,6 +24,12 @@ const (
 	// provider's change of keys or endpoints reaches the replica within a
 	// minute.
 	discoveryTTL = time.Minute
+	// failureTTL is how long a replica remembers that an issuer's discovery
+	// failed, answering the same failure meanwhile: a start of a sign-in costs
+	// the person nothing, so without it anybody could make the replica fetch
+	// from a provider that is down, or from a slow address, as often as they
+	// liked.
+	failureTTL = 15 * time.Second
 	// clockSkew is how far an ID token's times may be off the replica's clock.
 	clockSkew = 2 * time.Minute
 )
@@ -33,8 +40,12 @@ type Client struct {
 	http *http.Client
 	now  func() time.Time
 
-	mu    sync.Mutex
-	cache map[string]discovered
+	mu     sync.Mutex
+	cache  map[string]discovered
+	failed map[string]failure
+	// flight makes the requests for one issuer that arrive together share one
+	// fetch of its discovery document.
+	flight singleflight.Group
 }
 
 type discovered struct {
@@ -42,12 +53,18 @@ type discovered struct {
 	fetched  time.Time
 }
 
+// failure is a discovery that failed, and when.
+type failure struct {
+	err error
+	at  time.Time
+}
+
 var _ appidentity.OIDCClient = (*Client)(nil)
 
 // NewClient returns a client that makes its requests to providers as
 // idphttp's client does.
 func NewClient() *Client {
-	return &Client{http: idphttp.NewClient(), now: time.Now, cache: map[string]discovered{}}
+	return &Client{http: idphttp.NewClient(), now: time.Now, cache: map[string]discovered{}, failed: map[string]failure{}}
 }
 
 // provider returns the discovered provider of issuer, from the replica's
@@ -57,10 +74,41 @@ func NewClient() *Client {
 func (c *Client) provider(ctx context.Context, issuer string) (*gooidc.Provider, error) {
 	c.mu.Lock()
 	d, ok := c.cache[issuer]
+	f, failed := c.failed[issuer]
 	c.mu.Unlock()
 	if ok && c.now().Sub(d.fetched) < discoveryTTL {
 		return d.provider, nil
 	}
+	if failed && c.now().Sub(f.at) < failureTTL {
+		return nil, f.err
+	}
+	// The fetch is shared, so it must not end with the request that happened
+	// to start it; the client's own timeout bounds it.
+	fetched, err, _ := c.flight.Do(issuer, func() (any, error) {
+		return c.discover(context.WithoutCancel(ctx), issuer)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return fetched.(*gooidc.Provider), nil
+}
+
+// discover fetches and checks the discovery document of issuer, and keeps
+// the provider, or the failure, for the replica's other requests.
+func (c *Client) discover(ctx context.Context, issuer string) (*gooidc.Provider, error) {
+	p, err := c.fetch(ctx, issuer)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if err != nil {
+		c.failed[issuer] = failure{err: err, at: c.now()}
+		return nil, err
+	}
+	delete(c.failed, issuer)
+	c.cache[issuer] = discovered{provider: p, fetched: c.now()}
+	return p, nil
+}
+
+func (c *Client) fetch(ctx context.Context, issuer string) (*gooidc.Provider, error) {
 	p, err := gooidc.NewProvider(gooidc.ClientContext(ctx, c.http), issuer)
 	if err != nil {
 		return nil, fmt.Errorf("discovering %s: %w", issuer, err)
@@ -80,9 +128,6 @@ func (c *Client) provider(ctx context.Context, issuer string) (*gooidc.Provider,
 			return nil, err
 		}
 	}
-	c.mu.Lock()
-	c.cache[issuer] = discovered{provider: p, fetched: c.now()}
-	c.mu.Unlock()
 	return p, nil
 }
 
@@ -195,13 +240,15 @@ var identityClaims = identity.Claims{Email: "email", Name: "name"}
 // readClaims reads the email, its verification, the name and the groups from
 // claims under the names c gives. A verification counts only as the JSON
 // boolean true: a string, a number or a missing claim does not vouch for the
-// address. The groups count only as a list of strings; any other claim, or
+// address. email_verified speaks of the standard email claim alone, so it
+// vouches for nothing read from another claim, such as upn or a custom one,
+// which a person may be able to set to someone else's address. The groups count only as a list of strings; any other claim, or
 // none, leaves HasGroups false.
 func readClaims(claims map[string]any, c identity.Claims) identity.VerifiedClaims {
 	email, _ := claims[c.Email].(string)
 	name, _ := claims[c.Name].(string)
 	verified, _ := claims["email_verified"].(bool)
-	out := identity.VerifiedClaims{Email: email, EmailVerified: verified && email != "", Name: name}
+	out := identity.VerifiedClaims{Email: email, EmailVerified: verified && email != "" && c.Email == "email", Name: name}
 	if c.Groups != "" {
 		out.Groups, out.HasGroups = identity.ParseGroupsClaim(claims[c.Groups])
 	}

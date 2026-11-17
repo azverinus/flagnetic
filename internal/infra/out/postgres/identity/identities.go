@@ -102,6 +102,16 @@ func (s *Store) RecordIdentitySignIn(ctx context.Context, i identity.ID, at time
 	return nil
 }
 
+// HasIdentities reports whether any identity is linked through provider.
+func (s *Store) HasIdentities(ctx context.Context, provider identity.ProviderID) (bool, error) {
+	var found bool
+	err := s.db(ctx).QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identities WHERE provider_id = $1)`, provider.Bytes()).Scan(&found)
+	if err != nil {
+		return false, fmt.Errorf("looking for the identities of an auth provider: %w", err)
+	}
+	return found, nil
+}
+
 // ProviderUses names "identities" when any identity is linked through
 // provider, and "SCIM tokens" while it holds a token not revoked.
 func (s *Store) ProviderUses(ctx context.Context, provider identity.ProviderID) ([]string, error) {
