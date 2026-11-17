@@ -192,3 +192,56 @@ func unboundSeal(t *testing.T, purpose secret.Purpose, plaintext string) string 
 	nonce := make([]byte, gcm.NonceSize())
 	return "v1:" + base64.RawURLEncoding.EncodeToString(gcm.Seal(nonce, nonce, []byte(plaintext), nil))
 }
+
+type spKeys struct{}
+
+func (spKeys) GenerateSPKey(time.Time) (string, []byte, error) {
+	return "-----BEGIN CERTIFICATE-----\nfake\n-----END CERTIFICATE-----\n", []byte("private key " + rand.Text()), nil
+}
+
+func TestACertificateRotationBindsTheKeysOfItsProvider(t *testing.T) {
+	d := deps(t)
+	d.SPKeys = spKeys{}
+	keyring := secret.NewKeyring(secret.New(testkit.SecretKey))
+	raw := input()
+	raw.Kind, raw.OIDC = identity.KindSAML, identity.OIDCInput{}
+	raw.SAML = identity.SAMLInput{MetadataXML: "<EntityDescriptor/>", SignRequests: true}
+	in, err := identity.CheckProviderInput(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pid := id.New[identity.Provider](d.IDs)
+	p := identity.NewSAML(pid, in, identity.IDPMetadata{
+		EntityID: "https://idp.example.com", SSOURL: "https://idp.example.com/sso", Certificates: []string{"idp certificate"},
+	},
+		identity.SPKey{CertificatePEM: "current", SealedKey: unboundSeal(t, secret.PurposeSAMLSPKey, "current key")}, testkit.Start)
+	if err := d.Store.CreateProvider(t.Context(), p); err != nil {
+		t.Fatal(err)
+	}
+	cmd := appidentity.ProviderCommand{Slug: p.Slug, Request: admin}
+
+	started, err := appidentity.NewRotateCertificate(d).Handle(t.Context(), cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding := secret.Row("auth_providers", pid.String())
+	for name, sealed := range map[string]string{"current": started.SAML.SealedSPKey, "next": started.SAML.NextSealedSPKey} {
+		if !strings.HasPrefix(sealed, "v2:") {
+			t.Errorf("the %s key is %.3s, want it bound to its provider", name, sealed)
+		}
+		if _, err = keyring.Open(secret.PurposeSAMLSPKey, sealed, binding); err != nil {
+			t.Errorf("the %s key does not open for its provider: %v", name, err)
+		}
+	}
+
+	done, err := appidentity.NewCompleteCertificateRotation(d).Handle(t.Context(), cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, openErr := keyring.Open(secret.PurposeSAMLSPKey, done.SAML.SealedSPKey, binding); openErr != nil || !strings.HasPrefix(string(got), "private key ") {
+		t.Errorf("after completing, the current key opens as %q, %v, want the next key", got, openErr)
+	}
+	if _, err = appidentity.NewCompleteCertificateRotation(d).Handle(t.Context(), cmd); codeOf(err) != "no_rotation_pending" {
+		t.Errorf("completing again = %v, want no_rotation_pending", err)
+	}
+}
