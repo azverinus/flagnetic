@@ -71,7 +71,10 @@ var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 // differ: equal documents carry the same ruleset, and what else differs is
 // judged by the caller.
 func (s *Store) Flags(ctx context.Context, q appflags.FlagQuery, each func(appflags.QueriedFlag) bool) error {
-	sql, args := flagsQuery(q)
+	sql, args, err := flagsQuery(q)
+	if err != nil {
+		return err
+	}
 	rows, err := s.db(ctx).Query(ctx, sql, args...)
 	if err != nil {
 		return fmt.Errorf("listing flags: %w", err)
@@ -90,7 +93,17 @@ func (s *Store) Flags(ctx context.Context, q appflags.FlagQuery, each func(appfl
 }
 
 // flagsQuery returns the SQL listing what q asks for, and its arguments.
-func flagsQuery(q appflags.FlagQuery) (string, []any) {
+func flagsQuery(q appflags.FlagQuery) (string, []any, error) {
+	order, ok := flagOrders[q.Sort]
+	if !ok {
+		return "", nil, fmt.Errorf("listing flags: no order for sort %q", q.Sort)
+	}
+	var state string
+	if q.In != nil {
+		if state, ok = stateConditions[q.State]; !ok {
+			return "", nil, fmt.Errorf("listing flags: no condition for state %q", q.State)
+		}
+	}
 	args := []any{q.Project.Bytes(), q.Archived}
 	arg := func(v any) string {
 		args = append(args, v)
@@ -135,12 +148,11 @@ func flagsQuery(q appflags.FlagQuery) (string, []any) {
 	}
 	if q.In != nil {
 		sql.WriteString(` AND EXISTS (SELECT 1 FROM flag_configurations c WHERE c.flag_id = f.id AND c.environment_id = ` +
-			arg(q.In.Bytes()) + ` AND ` + stateConditions[q.State] + `)`)
+			arg(q.In.Bytes()) + ` AND ` + state + `)`)
 	}
 	if q.Compared != nil {
 		sql.WriteString(` AND a.document <> b.document`)
 	}
-	order := flagOrders[q.Sort]
 	if q.After != nil {
 		sql.WriteString(` AND ` + order.after(*q.After, arg))
 	}
@@ -149,7 +161,7 @@ func flagsQuery(q appflags.FlagQuery) (string, []any) {
 	if q.Limit > 0 {
 		sql.WriteString(` LIMIT ` + arg(q.Limit))
 	}
-	return sql.String(), args
+	return sql.String(), args, nil
 }
 
 // prefixed returns the comma-separated columns each prefixed by prefix.

@@ -225,9 +225,13 @@ type Targets interface {
 	For(kind sinks.Kind) (Target, bool)
 }
 
+// secretBinding is what a sink's sealed secrets are bound to, so one copied
+// into another sink's row does not open there.
+func secretBinding(s sinks.ID) secret.Binding { return secret.Row("sinks", s.String()) }
+
 // Opener opens a value sealed under the instance's secret key.
 type Opener interface {
-	Open(purpose secret.Purpose, sealed string) ([]byte, error)
+	Open(purpose secret.Purpose, sealed string, binding secret.Binding) ([]byte, error)
 }
 
 // The results of a batch, as the metric counts them.
@@ -472,13 +476,13 @@ func (h *Deliver) secrets(s sinks.Sink, now time.Time) ([]string, error) {
 
 func openSecrets(o Opener, s sinks.Sink, now time.Time) ([]string, error) {
 	purpose := s.Kind.SecretPurpose()
-	current, err := o.Open(purpose, s.SealedSecret)
+	current, err := o.Open(purpose, s.SealedSecret, secretBinding(s.ID))
 	if err != nil {
 		return nil, fmt.Errorf("opening the sink's secret: %w", err)
 	}
 	out := []string{string(current)}
 	if s.PreviousSealedSecret != "" && s.PreviousSecretExpiresAt != nil && now.Before(*s.PreviousSecretExpiresAt) {
-		previous, err := o.Open(purpose, s.PreviousSealedSecret)
+		previous, err := o.Open(purpose, s.PreviousSealedSecret, secretBinding(s.ID))
 		if err != nil {
 			return nil, fmt.Errorf("opening the sink's previous secret: %w", err)
 		}

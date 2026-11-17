@@ -73,7 +73,7 @@ func TestCreatingAWebhookSubscriptionShowsItsSecretOnceAndSealsIt(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	opened, err := secret.NewKeyring(secret.New(testkit.SecretKey)).Open(secret.PurposeWebhookSecret, stored.SealedSecret)
+	opened, err := secret.NewKeyring(secret.New(testkit.SecretKey)).Open(secret.PurposeWebhookSecret, stored.SealedSecret, secret.Row("webhook_subscriptions", stored.ID.String()))
 	if strings.Contains(stored.SealedSecret, created.Secret) || err != nil || string(opened) != created.Secret {
 		t.Errorf("stored %q, opening it = %q, %v", stored.SealedSecret, opened, err)
 	}

@@ -170,7 +170,7 @@ func (p *Postman) Deliver(ctx context.Context, m Mail) error {
 		Host: settings.Host, Port: settings.Port, Security: settings.Security, Username: settings.Username, From: settings.From,
 	}
 	if settings.PasswordSet() {
-		plain, err := p.d.Opener.Open(secret.PurposeSMTPPassword, settings.PasswordSealed)
+		plain, err := p.d.Opener.Open(secret.PurposeSMTPPassword, settings.PasswordSealed, smtpPasswordBinding)
 		if err != nil {
 			p.d.Counter.Count(m.Kind, mailError)
 			return fmt.Errorf("opening the SMTP password: %w", err)

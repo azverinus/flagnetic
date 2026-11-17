@@ -33,6 +33,9 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/flagnetic /usr/local/bin/flagnetic
 USER nonroot:nonroot
+# Inside a container the loopback address is unreachable from a published port,
+# so the image listens on every interface; the operator chooses what to publish.
+ENV FLAGNETIC_METRICS_LISTEN_ADDR=:9090
 ENTRYPOINT ["/usr/local/bin/flagnetic"]
 CMD ["serve"]
 # The public listener (FLAGNETIC_LISTEN_ADDR: APIs, console, probes) and the

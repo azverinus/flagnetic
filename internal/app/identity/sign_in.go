@@ -259,7 +259,7 @@ type OIDCClient interface {
 
 // Opener opens a value sealed under the instance's secret key.
 type Opener interface {
-	Open(purpose secret.Purpose, sealed string) ([]byte, error)
+	Open(purpose secret.Purpose, sealed string, binding secret.Binding) ([]byte, error)
 }
 
 // SignInDeps are what the sign-in use cases run on.
@@ -308,7 +308,7 @@ func (d SignInDeps) oidcConfig(p identity.Provider) (OIDCConfig, error) {
 	if d.BaseURL == nil {
 		return OIDCConfig{}, errors.New("the instance has no public URL")
 	}
-	plain, err := d.Opener.Open(secret.PurposeOIDCClientSecret, p.OIDC.SealedClientSecret)
+	plain, err := d.Opener.Open(secret.PurposeOIDCClientSecret, p.OIDC.SealedClientSecret, providerSecretBinding(p.ID))
 	if err != nil {
 		return OIDCConfig{}, fmt.Errorf("opening the client secret of %s: %w", p.Slug, err)
 	}

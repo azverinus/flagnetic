@@ -23,6 +23,12 @@ type SCIMTokenRecord struct {
 	ProviderSlug string
 }
 
+// scimTokenBinding is what a SCIM token's sealed hash is bound to, so one
+// copied into another token's row does not open there.
+func scimTokenBinding(t identity.SCIMTokenID) secret.Binding {
+	return secret.Row("scim_tokens", t.String())
+}
+
 // SealedSCIMToken is a live SCIM token as authentication reads it: its hash
 // still sealed, and whether its provider is enabled.
 type SealedSCIMToken struct {
@@ -137,7 +143,7 @@ func (h *CreateSCIMToken) Handle(ctx context.Context, cmd CreateSCIMTokenCommand
 		if err != nil {
 			return err
 		}
-		sealed, err := h.d.Sealer.Seal(secret.PurposeSCIMToken, token.Hash[:])
+		sealed, err := h.d.Sealer.Seal(secret.PurposeSCIMToken, token.Hash[:], scimTokenBinding(token.ID))
 		if err != nil {
 			return err
 		}
@@ -244,7 +250,7 @@ func (h *SCIMAuthenticator) Handle(ctx context.Context, value string, ip netip.A
 	// time taken does not tell how many tokens precede the match.
 	var match *SealedSCIMToken
 	for i := range tokens {
-		plain, openErr := h.opener.Open(secret.PurposeSCIMToken, tokens[i].SealedHash)
+		plain, openErr := h.opener.Open(secret.PurposeSCIMToken, tokens[i].SealedHash, scimTokenBinding(tokens[i].ID))
 		if openErr != nil || len(plain) != len(hash) {
 			continue
 		}

@@ -340,9 +340,9 @@ func Settings() []Setting {
 		{
 			Name:        "FLAGNETIC_METRICS_LISTEN_ADDR",
 			Key:         "metrics_listen_addr",
-			Default:     ":9090",
-			Description: "Address of the metrics listener, which serves Prometheus metrics on `/metrics` and nothing else. Keep it off the internet. Set it empty to switch metrics off and open no port.",
-			Example:     "127.0.0.1:9090",
+			Default:     "127.0.0.1:9090",
+			Description: "Address of the metrics listener, which serves Prometheus metrics on `/metrics` and nothing else. It listens on this host only by default; set an address on another interface for a scraper elsewhere, and keep it off the internet. Set it empty to switch metrics off and open no port.",
+			Example:     "10.0.0.5:9090",
 			apply: func(cfg *Config, v string) error {
 				if v != "" {
 					if err := checkAddr(v); err != nil {
