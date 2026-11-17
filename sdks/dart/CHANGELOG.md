@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.4](https://github.com/azverinus/flagnetic/compare/sdks/dart/v0.1.3...sdks/dart/v0.1.4) (2026-11-17)
+
+
+### Bug Fixes
+
+* **delivery:** narrow what a client key learns from answers and refusals ([#346](https://github.com/azverinus/flagnetic/issues/346)) ([f29ee44](https://github.com/azverinus/flagnetic/commit/f29ee44b01c8fdeafbcb9342ef062afdc6dd2453))
+* **sdks:** bound stream lines, events, response bodies and the matched input ([#337](https://github.com/azverinus/flagnetic/issues/337)) ([695477d](https://github.com/azverinus/flagnetic/commit/695477d7d31700fe25b1458eefd315e733355b2a))
+* **sdks:** harden the smaller SDK findings ([#353](https://github.com/azverinus/flagnetic/issues/353)) ([dfa56a4](https://github.com/azverinus/flagnetic/commit/dfa56a4bbbebb92c97d1f63810130c0ec2c45b0b))
+* **sdks:** record no exposure for the previous context's values ([#345](https://github.com/azverinus/flagnetic/issues/345)) ([b2a0899](https://github.com/azverinus/flagnetic/commit/b2a089971ebeaac8429b8b603dd519787fa62825))
+
 ## [0.1.3](https://github.com/azverinus/flagnetic/compare/sdks/dart/v0.1.2...sdks/dart/v0.1.3) (2026-11-16)
 
 
