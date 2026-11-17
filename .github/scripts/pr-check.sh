@@ -20,6 +20,8 @@
 #   server changed    build and golangci-lint
 #   a Go module       lint, tests with its coverage floors, when it or a module
 #                     it requires changed
+#   migrations changed  squawk on the migrations added since the merge base, and
+#                     on the bad fixture; not run without squawk installed
 #   console, the JavaScript, Python, Ruby, Dart and Flutter SDKs
 #                     the steps of their jobs, when their paths changed
 #   --full            the tests of the changed packages of the server, of
@@ -241,7 +243,7 @@ print_plan() {
     say "  server tests:     $(printf '%s\n' "$TEST_PKGS" | sed '/^$/d' | wc -l | tr -d ' ') packages, left to CI (--full runs them here)"
   fi
   for i in "${!MOD_PATH[@]}"; do [ "${MOD_RUN[$i]}" = 1 ] && say "  module checked:   ${MOD_REL[$i]}"; done
-  say "  console: $RUN_CONSOLE  sdk-js: $RUN_SDK_JS  python: $RUN_PYTHON  ruby: $RUN_RUBY  dart: $RUN_DART  flutter: $RUN_FLUTTER  workflows: $RUN_WORKFLOWS  playwright specs: $(printf '%s' "$SPECS" | tr '\n' ' ')"
+  say "  migrations: $RUN_MIGRATIONS  console: $RUN_CONSOLE  sdk-js: $RUN_SDK_JS  python: $RUN_PYTHON  ruby: $RUN_RUBY  dart: $RUN_DART  flutter: $RUN_FLUTTER  workflows: $RUN_WORKFLOWS  playwright specs: $(printf '%s' "$SPECS" | tr '\n' ' ')"
 }
 print_plan
 [ "$PLAN_ONLY" = 1 ] && exit 0
@@ -457,6 +459,12 @@ if [ -n "$SPECS" ]; then
     # shellcheck disable=SC2086
     js_step "console end to end (changed specs)" web/e2e "env -u DATABASE_URL pnpm test:local $(printf '%s ' $SPECS)"
   else not_run "console end to end" "pnpm and docker are needed"; fi
+fi
+if [ "$RUN_MIGRATIONS" = 1 ]; then
+  if need_tool "${SQUAWK:-squawk}"; then
+    step "migration lint" digest_tail "make the migration expand/contract (see CONTRIBUTING.md), or add a squawk-ignore with its reason on the line before" \
+      bash -c ".github/scripts/lint-migrations.sh --base '$BASE_REF' && .github/scripts/lint-migrations.sh --self-test"
+  else not_run "migration lint" "squawk is not installed (.github/scripts/install-squawk.sh DIR installs the pinned one)"; fi
 fi
 if [ "$RUN_SDK_JS" = 1 ]; then
   if need_tool pnpm; then step "sdk-js" digest_tail "fix what the output says" task sdk-js:check

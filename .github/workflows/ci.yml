@@ -246,6 +246,7 @@ jobs:
       dart: ${{ steps.plan.outputs.dart }}
       flutter: ${{ steps.plan.outputs.flutter }}
       workflows: ${{ steps.plan.outputs.workflows }}
+      migrations: ${{ steps.plan.outputs.migrations }}
       modules: ${{ steps.plan.outputs.modules }}
       test_shards: ${{ steps.plan.outputs.test_shards }}
       cover_packages: ${{ steps.plan.outputs.cover_packages }}
@@ -747,9 +748,36 @@ jobs:
   # The one check branch protection requires. A job above may be skipped (a
   # module matrix with nothing to run, a job behind a condition), which is
   # fine; a failed or cancelled one is not.
+  # The migrations a pull request adds, linted with squawk so that a replica of
+  # the previous minor keeps working against the new schema (expand/contract:
+  # no rename, no drop, no blocking index, no NOT NULL without a default).
+  # Released migrations are not linted. Other events only prove that the
+  # rules still catch the deliberately bad fixture, which is the case after a
+  # change to the rules or to the pinned squawk.
+  migrations:
+    name: migration lint
+    needs: plan
+    if: needs.plan.outputs.migrations == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install squawk
+        run: |
+          .github/scripts/install-squawk.sh "$RUNNER_TEMP/squawk"
+          echo "$RUNNER_TEMP/squawk" >> "$GITHUB_PATH"
+      - name: The rules catch the bad fixture
+        run: .github/scripts/lint-migrations.sh --self-test
+      - name: Lint the migrations the pull request adds
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: .github/scripts/lint-migrations.sh --base "$BASE"
+
   ci-ok:
     name: ci-ok
-    needs: [plan, lint, test, coverage, vuln, npm-audit, tidy, console, e2e, sdk-e2e, sdk-ruby, sdk-python, workflows, docker, module, released, dart, flutter, sdk-js]
+    needs: [plan, lint, test, coverage, vuln, npm-audit, tidy, console, e2e, sdk-e2e, sdk-ruby, sdk-python, workflows, migrations, docker, module, released, dart, flutter, sdk-js]
     if: always()
     runs-on: ubuntu-latest
     steps:

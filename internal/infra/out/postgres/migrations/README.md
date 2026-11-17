@@ -20,6 +20,8 @@ The schema of the server, applied in order by `flagnetic migrate`.
   the running version (renaming or dropping a column or table, tightening a
   constraint on existing rows) goes expand/contract: one release adds the new
   shape and writes both, a later one removes the old shape once nothing reads
-  it.
+  it, one minor after the code stops using it. squawk lints each added file
+  (`.squawk.toml`); an exception is a `-- squawk-ignore <rule>` line with its
+  reason in a comment on the line before.
 - Name an index `<table>_<what it serves>`, without an `_idx` suffix; the
   schema tests check it.
