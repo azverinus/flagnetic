@@ -1107,6 +1107,10 @@ func TestRecordingASinkFailureTakesTheProjectBeforeTheSink(t *testing.T) {
 	if _, err = holder.Exec(t.Context(), `SELECT 1 FROM projects WHERE key = $1 FOR NO KEY UPDATE`, f.p.key); err != nil {
 		t.Fatal(err)
 	}
+	var holderPID int
+	if err = holder.QueryRow(t.Context(), `SELECT pg_backend_pid()`).Scan(&holderPID); err != nil {
+		t.Fatal(err)
+	}
 	close(release)
 
 	// Once the failure waits for the project, the sink must still be free.
@@ -1114,7 +1118,7 @@ func TestRecordingASinkFailureTakesTheProjectBeforeTheSink(t *testing.T) {
 		if time.Now().After(deadline) {
 			t.Fatal("the failure never waited for the project")
 		}
-		if err = pool.QueryRow(t.Context(), `SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE wait_event_type = 'Lock')`).Scan(&waiting); err != nil {
+		if err = pool.QueryRow(t.Context(), `SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid)))`, holderPID).Scan(&waiting); err != nil {
 			t.Fatal(err)
 		}
 	}
