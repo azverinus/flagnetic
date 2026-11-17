@@ -514,3 +514,7 @@ _Avoid_: deprecation error, deprecation exception, deprecation notice
 **Supported version**:
 The latest minor release of the server, which alone receives fixes, security fixes included; they ship in its next patch or the next minor. An SDK's supported version is likewise its latest minor.
 _Avoid_: LTS, maintained branch, release branch
+
+**Migration**:
+One forward-only change of an instance's database schema, applied in order and once, under a lock that lets only one replica or job apply it. From 1.0 every migration expands before it contracts: it adds what the new release needs and removes only what the previous minor no longer uses, so replicas of the previous minor keep running on the migrated schema.
+_Avoid_: schema update, DDL, upgrade (that is the release's), import (that is a project document's)
