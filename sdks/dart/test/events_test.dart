@@ -1028,6 +1028,160 @@ void main() {
     });
   });
 
+  group('a corrupt stored queue', () {
+    const validExposure = {
+      'type': 'exposure',
+      'event_id': '0192a7c4-5b1e-7d3f-8e2a-1c4b6d9f0a01',
+      'flag_key': 'checkout',
+      'experiment_key': 'checkout-test',
+      'variation_key': 'treatment',
+      'unit_type': 'anonymous',
+      'unit_id': 'd-8f1c',
+    };
+
+    /// A client started on a store holding [stored] under the event key,
+    /// which records one exposure and flushes; the batch it sends.
+    Future<
+      ({
+        List<Map<String, Object?>> events,
+        LogRecorder logs,
+        InMemoryStore store,
+      })
+    >
+    restartOn(String stored) async {
+      final store = InMemoryStore({clientKeys.events: stored});
+      final run = await serving(
+        experimentValues(),
+        store: store,
+        sendSummaries: false,
+      );
+      addTearDown(() async {
+        await run.client.close();
+        await run.server.close();
+      });
+      expose(run.client);
+      final flushed = run.client.flush();
+      final exchange = await run.server.next();
+      final events = eventsOf(exchange);
+      await acceptBatch(exchange);
+      await flushed;
+      expect(run.logs.count(LogEvents.internalError), 0);
+      return (events: events, logs: run.logs, store: store);
+    }
+
+    for (final (name, stored) in [
+      ('a string that is not JSON', 'not json at all {'),
+      ('a JSON object', jsonEncode({'type': 'exposure'})),
+      ('a JSON string', jsonEncode('events')),
+      ('JSON null', 'null'),
+    ]) {
+      test('$name is dropped whole and the client carries on', () async {
+        final result = await restartOn(stored);
+        expect(result.events.map((e) => e['type']), [
+          'exposure',
+        ], reason: 'only what this run recorded');
+        expect(
+          result.events.single['event_id'],
+          isNot(validExposure['event_id']),
+        );
+        expect(
+          result.logs.fieldsOf(LogEvents.storeFailed),
+          contains(containsPair('operation', 'read')),
+        );
+      });
+    }
+
+    test('malformed rows are skipped and the well-formed ones still go '
+        'out', () async {
+      final now = DateTime.now().toUtc();
+      final result = await restartOn(
+        jsonEncode([
+          'a string row',
+          42,
+          null,
+          [validExposure],
+          {'event_id': 'no-type'},
+          {'type': 'exposure', 'event_id': 7},
+          {'type': 'exposure'},
+          {'type': 'unknown_kind', 'event_id': 'x'},
+          // A summary whose rows carry the wrong types would otherwise fail
+          // the merge into the next window.
+          {
+            'type': 'evaluation_summary',
+            'event_id': '0192a7c4-5b1e-7d3f-8e2a-1c4b6d9f0a02',
+            'interval_start': now.toIso8601String(),
+            'interval_end': now.toIso8601String(),
+            'counts': [
+              {'flag': 'checkout', 'variation': 5, 'reason': 'x', 'count': 1},
+            ],
+          },
+          {
+            'type': 'evaluation_summary',
+            'event_id': '0192a7c4-5b1e-7d3f-8e2a-1c4b6d9f0a03',
+            'interval_start': 12,
+            'interval_end': now.toIso8601String(),
+            'counts': 'many',
+          },
+          validExposure,
+        ]),
+      );
+      expect(
+        result.events.map((e) => e['event_id']),
+        contains(validExposure['event_id']),
+      );
+      expect(result.events, hasLength(2), reason: 'the stored one and the new');
+      expect(
+        result.logs.fieldsOf(LogEvents.storeFailed),
+        contains(
+          allOf(containsPair('operation', 'read'), containsPair('skipped', 10)),
+        ),
+      );
+    });
+
+    test('a well-formed summary with a malformed row is skipped rather than '
+        'merged', () async {
+      final now = DateTime.now().toUtc();
+      final store = InMemoryStore({
+        clientKeys.events: jsonEncode([
+          {
+            'type': 'evaluation_summary',
+            'event_id': '0192a7c4-5b1e-7d3f-8e2a-1c4b6d9f0a04',
+            'interval_start': now.toIso8601String(),
+            'interval_end': now.toIso8601String(),
+            'counts': [
+              {
+                'flag': 'checkout',
+                'variation': ['x'],
+                'reason': 'experiment',
+                'count': 'three',
+              },
+            ],
+          },
+        ]),
+      });
+      final run = await serving(experimentValues(), store: store);
+      addTearDown(() async {
+        await run.client.close();
+        await run.server.close();
+      });
+
+      run.client.getBool('checkout', false);
+      final flushed = run.client.flush();
+      final exchange = await run.server.next();
+      expect(eventsOf(exchange).single['counts'], [
+        {
+          'flag': 'checkout',
+          'variation': 'treatment',
+          'reason': 'experiment',
+          'count': 1,
+        },
+      ]);
+      await acceptBatch(exchange);
+      await flushed;
+      expect(run.logs.count(LogEvents.internalError), 0);
+    });
+  });
+
   group('offline mode', () {
     test('events are recorded and counted, and nothing is sent', () async {
       final client = Flagnetic.client(
