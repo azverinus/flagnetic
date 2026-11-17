@@ -495,9 +495,10 @@ export class FlagneticClient {
       // Until the new context's answer arrives the held values still answer
       // the previous one: their experiment blocks carry that context's unit
       // IDs, and an exposure for them would record a unit that is not here.
-      if (d.experiment && this.context === this.acceptedContext) this.served.set(key, d);
-      else this.served.delete(key);
-      if (d.experiment && this.served.has(key) && this.values?.flags.get(key)?.automaticExposure === true) this.emitExposure(key, d);
+      if (d.experiment && this.context === this.acceptedContext) {
+        this.served.set(key, d);
+        if (this.values?.flags.get(key)?.automaticExposure === true) this.emitExposure(key, d);
+      } else this.served.delete(key);
     } catch (e) {
       this.log("error", "evaluation_failed", { flag: key, cause: causeOf(e) });
     }
@@ -541,8 +542,7 @@ export class FlagneticClient {
       }
       const served = this.served.get(key);
       if (!served) {
-        const cause = !this.values ? "no_values" : this.context !== this.acceptedContext ? "previous_context" : "no_experiment";
-        this.log("debug", "exposure_skipped", { flag: key, cause });
+        this.log("debug", "exposure_skipped", { flag: key, cause: this.values ? (this.context === this.acceptedContext ? "no_experiment" : "previous_context") : "no_values" });
         return;
       }
       this.emitExposure(key, served);
