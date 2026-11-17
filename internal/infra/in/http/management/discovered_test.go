@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/testkit"
@@ -177,15 +178,35 @@ func TestDiscoveredAttributesAreCappedPerProject(t *testing.T) {
 	}
 	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"k1001":1,"k1600":"x"}`)})
 	got = discovered(t, srv, admin, p.Key)
-	if len(got) != 499 || got[0] != "k1001 string,number 2" || slices.Contains(got, "k1600 string 1") {
-		t.Errorf("at the cap, dismissed included: %d listed, first %q; want known keys merged and no new one", len(got), got[0])
+	if len(got) != 500 || got[0] != "k1001 string,number 2" || !slices.Contains(got, "k1600 string 1") {
+		t.Errorf("a dismissed key frees its place: %d listed, first %q; want k1001 merged and k1600 kept", len(got), got[0])
+	}
+	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"k1601":"x"}`)})
+	if got := discovered(t, srv, admin, p.Key); slices.Contains(got, "k1601 string 1") {
+		t.Errorf("at the cap again: k1601 listed")
 	}
 	if res := do(admin.DeclareDiscoveredAttributeWithResponse(t.Context(), p.Key, "k1002", management.DiscoveredAttributeDeclaration{Type: "string"})); res.JSON201 == nil {
 		t.Fatalf("declare = %d %s", res.StatusCode(), res.Body)
 	}
-	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"k1600":"x"}`)})
-	if got := discovered(t, srv, admin, p.Key); !slices.Contains(got, "k1600 string 1") {
-		t.Errorf("a declaration frees a place: k1600 not listed")
+	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"k1601":"x"}`)})
+	if got := discovered(t, srv, admin, p.Key); !slices.Contains(got, "k1601 string 1") {
+		t.Errorf("a declaration frees a place: k1601 not listed")
+	}
+}
+
+func TestTheTesterOfAViewerRecordsNoDiscoveredAttributes(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	viewer := testkit.Client(t, srv, testkit.GrantedToken(t, testkit.Pool(t), projectIDOf(p), access.RoleViewer))
+
+	mustEvaluate(t, viewer, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"junk":"x"}`)})
+	if got := discovered(t, srv, admin, p.Key); len(got) != 0 {
+		t.Errorf("a viewer's context recorded %v, want nothing", got)
+	}
+	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"real":"x"}`)})
+	if got := discovered(t, srv, admin, p.Key); !slices.Equal(got, []string{"real string 1"}) {
+		t.Errorf("a manager's context recorded %v, want real", got)
 	}
 }
 

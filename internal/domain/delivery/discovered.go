@@ -79,8 +79,9 @@ func observedType(value any) ObservedType {
 }
 
 // MaxDiscoveredAttributes is how many discovered attributes a project
-// keeps, dismissed ones included, so that contexts carrying ever new keys
-// cannot grow the table without bound. A new key beyond it is not kept.
+// lists, dismissed ones not counted: a member who dismisses junk keys
+// frees their places, so contexts carrying ever new keys cannot fill the
+// project for good. A new key beyond it is not kept.
 const MaxDiscoveredAttributes = 500
 
 // Sighting is what a replica saw of one undeclared attribute of a project

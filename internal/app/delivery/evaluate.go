@@ -85,6 +85,11 @@ type EvaluateQuery struct {
 	Context     eval.Context
 	Flags       []string
 	Draft       *Draft
+	// NoteDiscoveries lets the context's undeclared attributes be noted as
+	// discovered. The tester is open to whoever reads the project, who must
+	// not fill the project's discovered attributes with junk keys, so the
+	// caller sets it only for one who can declare attributes.
+	NoteDiscoveries bool
 }
 
 // Draft is an unsaved configuration of the flag keyed Flag.
@@ -110,7 +115,8 @@ var errEnvironmentNotFound = apperrors.NotFound("not_found", "the project has no
 // materializes the environment's ruleset from one snapshot, with the draft
 // in place of its flag's configuration once checked, and evaluates it. It
 // stores nothing, neither the draft nor an exposure; the context's
-// undeclared attributes, key and type only, are noted as discovered.
+// undeclared attributes, key and type only, are noted as discovered when q
+// allows it.
 func (h *Evaluate) Handle(ctx context.Context, q EvaluateQuery) (Evaluation, error) {
 	if err := delivery.CheckContext(q.Context); err != nil {
 		return Evaluation{}, err
@@ -141,7 +147,7 @@ func (h *Evaluate) Handle(ctx context.Context, q EvaluateQuery) (Evaluation, err
 		return Evaluation{}, err
 	}
 	results := delivery.Evaluate(rs, q.Context, q.Flags)
-	if h.d.Discoveries != nil {
+	if q.NoteDiscoveries && h.d.Discoveries != nil {
 		h.d.Discoveries.Note(q.Project, h.d.Clock.Now(), delivery.ObserveUndeclared(rs, q.Context.Attributes))
 	}
 	return Evaluation{RulesetVersion: m.Version, Results: results}, nil
