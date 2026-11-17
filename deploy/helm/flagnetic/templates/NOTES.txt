@@ -1,0 +1,17 @@
+Flagnetic {{ .Chart.AppVersion }} is installed as {{ include "flagnetic.fullname" . }}.
+
+Create the first instance admin once, from a running pod:
+
+  kubectl exec -n {{ .Release.Namespace }} deploy/{{ include "flagnetic.fullname" . }} -- flagnetic admin bootstrap --email you@example.com
+
+It prints a password once. Then open the console:
+
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "flagnetic.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+
+and visit http://localhost:{{ .Values.service.port }}. Set config.base_url to the address the console is reached at.
+
+Check the installation with: helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+{{- if not .Values.secrets.existingSecret }}
+
+The secret key and the database URL are in a Secret rendered from your values. Keep the secret key for the life of the instance: the server refuses to start under another one. An existing Secret (secrets.existingSecret) keeps them out of your values.
+{{- end }}

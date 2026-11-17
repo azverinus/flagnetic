@@ -1,0 +1,22 @@
+# Metrics name the instance's routes and environments, so they sit on a
+# Service of their own, ClusterIP only, that an Ingress never points at.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "flagnetic.fullname" . }}-metrics
+  labels:
+    {{- include "flagnetic.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics
+  {{- with .Values.service.metrics.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: {{ .Values.service.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    {{- include "flagnetic.selectorLabels" . | nindent 4 }}

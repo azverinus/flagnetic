@@ -1,0 +1,42 @@
+# A throwaway PostgreSQL for `ct install` in kind. It belongs to the chart's
+# tests: the chart installs no database, and this one keeps nothing.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine@sha256:a77aa70e641402a21411b92b721c58d10f23b50ae5fdd2333efd22d166e1e5f7
+          env:
+            - name: POSTGRES_DB
+              value: flagnetic
+            - name: POSTGRES_USER
+              value: flagnetic
+            - name: POSTGRES_PASSWORD
+              value: flagnetic
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "flagnetic", "-d", "flagnetic"]
+            periodSeconds: 2

@@ -247,6 +247,7 @@ jobs:
       flutter: ${{ steps.plan.outputs.flutter }}
       workflows: ${{ steps.plan.outputs.workflows }}
       migrations: ${{ steps.plan.outputs.migrations }}
+      helm: ${{ steps.plan.outputs.helm }}
       modules: ${{ steps.plan.outputs.modules }}
       test_shards: ${{ steps.plan.outputs.test_shards }}
       cover_packages: ${{ steps.plan.outputs.cover_packages }}
@@ -772,12 +773,55 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: .github/scripts/lint-migrations.sh --base "$BASE"
 
+  # The chart is checked without a cluster (lint, unit tests, kubeconform) with
+  # the oldest and the newest Helm it supports, then installed in kind against
+  # a test-only PostgreSQL: once with the migration hook, and with each of the
+  # other migration modes.
+  helm:
+    name: helm chart (helm ${{ matrix.helm }})
+    needs: plan
+    if: needs.plan.outputs.helm == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        helm: [v3.18.6, v4.3.2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: ${{ matrix.helm }}
+      - name: Install helm-unittest and kubeconform
+        env:
+          KUBECONFORM_VERSION: v0.8.0
+          UNITTEST_VERSION: v1.2.1
+        run: |
+          helm plugin install https://github.com/helm-unittest/helm-unittest --version "$UNITTEST_VERSION" --verify=false
+          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" | tar -xz -C "$RUNNER_TEMP" kubeconform
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Lint, unit tests and kubeconform
+        run: .github/scripts/check-helm.sh
+      - uses: helm/chart-testing-action@720270857a28afd41e2426521a7801db09e9b510 # v2.9.0
+      - name: ct lint
+        run: ct lint --config .github/ct.yaml --all
+      - uses: helm/kind-action@ea822c7bf1874f08e5a491df991c228edffc3376 # v1.15.2
+      - name: PostgreSQL for the install
+        run: |
+          kubectl apply -f deploy/helm/test/postgres.yaml
+          kubectl rollout status deployment/postgres --timeout=120s
+      # The chart's appVersion is the last release, whose image is published;
+      # ct installs the chart once per ci/*-values.yaml file and runs helm test.
+      - name: ct install
+        run: ct install --config .github/ct.yaml --all
+
   # The one check branch protection requires. A job above may be skipped (a
   # module matrix with nothing to run, a job behind a condition), which is
   # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
-    needs: [plan, lint, test, coverage, vuln, npm-audit, tidy, console, e2e, sdk-e2e, sdk-ruby, sdk-python, workflows, migrations, docker, module, released, dart, flutter, sdk-js]
+    needs: [plan, lint, test, coverage, vuln, npm-audit, tidy, console, e2e, sdk-e2e, sdk-ruby, sdk-python, workflows, migrations, helm, docker, module, released, dart, flutter, sdk-js]
     if: always()
     runs-on: ubuntu-latest
     steps:

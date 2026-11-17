@@ -26,6 +26,9 @@
       "component": "server",
       "include-component-in-tag": false,
       "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        { "type": "generic", "path": "deploy/helm/flagnetic/Chart.yaml" }
+      ],
       "exclude-paths": ["eval", "sdks", "conformance", "e2e"]
     },
     "eval": {

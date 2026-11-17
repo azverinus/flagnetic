@@ -39,7 +39,7 @@ RE_GO='\.go$|(^|/)go\.(mod|sum)$|^go\.work|^api/'
 # The server's lint and the tests that parse its source. The documentation is
 # not here: only the tests that read a page can be broken by it, and those
 # are found as guard tests below.
-RE_SERVER='^(internal|cmd|api|conformance|deploy)/|^go\.(mod|sum|work)|^web/apps/console/'
+RE_SERVER='^(internal|cmd|api|conformance)/|^deploy/[^/]+$|^go\.(mod|sum|work)|^web/apps/console/'
 RE_CONSOLE='^web/|^api/management\.yaml$|^internal/infra/in/http/console/'
 # The console end to end: the console, its handlers and the suite. The
 # generated client is left out, as it changes with every edit of the
@@ -61,6 +61,10 @@ RE_MODULES='^(conformance/|api/sdk\.yaml$)'
 # The migration lint: the migrations it reads, its settings and the scripts and
 # fixtures that run and test it.
 RE_MIGRATIONS='^internal/infra/out/postgres/migrations/.*\.sql$|^\.squawk\.toml$|^\.github/scripts/(lint-migrations|install-squawk)\.sh$|^\.github/scripts/testdata/migration-lint/'
+# The Helm chart: its templates, tests and values, the settings of chart-testing
+# and the script that checks it. The image it installs is the server's, so a
+# change to the server does not run these checks.
+RE_HELM='^deploy/helm/|^\.github/(ct\.yaml$|scripts/check-helm\.sh$)'
 RE_WORKFLOWS='^\.github/(workflows/|actionlint\.yaml$|scripts/check-ci-ok\.sh$)'
 
 # Merging the server's release pull request publishes the image, so it is
@@ -200,7 +204,7 @@ EOF
   CHANGED_ROOT_DIRS="$(printf '%s' "$CHANGED_ROOT_DIRS" | sort -u | sed '/^$/d')"
 
   ANY_GO=0; SERVER=0
-  RUN_CONSOLE=0; RUN_CONSOLE_E2E=0; RUN_SDK_JS=0; RUN_PYTHON=0; RUN_RUBY=0; RUN_DART=0; RUN_FLUTTER=0; RUN_WORKFLOWS=0; RUN_MIGRATIONS=0
+  RUN_CONSOLE=0; RUN_CONSOLE_E2E=0; RUN_SDK_JS=0; RUN_PYTHON=0; RUN_RUBY=0; RUN_DART=0; RUN_FLUTTER=0; RUN_WORKFLOWS=0; RUN_MIGRATIONS=0; RUN_HELM=0
   changed "$RE_GO" && ANY_GO=1
   changed "$RE_SERVER" && SERVER=1
   [ -n "$CHANGED_ROOT_DIRS" ] && SERVER=1
@@ -214,6 +218,7 @@ EOF
   changed "$RE_FLUTTER" && RUN_FLUTTER=1
   changed "$RE_WORKFLOWS" && RUN_WORKFLOWS=1
   changed "$RE_MIGRATIONS" && RUN_MIGRATIONS=1
+  changed "$RE_HELM" && RUN_HELM=1
 
   # The server's packages that can see a change: those that changed and those
   # whose tests depend on one, in the server or in a module it imports (their
@@ -240,7 +245,7 @@ EOF
   if [ "$PLAN_MODE" = main ] && { [ "$SERVER" = 1 ] || [ "$RUN_CONSOLE" = 1 ]; }; then FULL=1; fi
   if [ "$FULL" = 1 ]; then
     ANY_GO=1; SERVER=1; WIDE=1
-    RUN_CONSOLE=1; RUN_CONSOLE_E2E=1; RUN_SDK_JS=1; RUN_PYTHON=1; RUN_RUBY=1; RUN_DART=1; RUN_FLUTTER=1; RUN_WORKFLOWS=1; RUN_MIGRATIONS=1
+    RUN_CONSOLE=1; RUN_CONSOLE_E2E=1; RUN_SDK_JS=1; RUN_PYTHON=1; RUN_RUBY=1; RUN_DART=1; RUN_FLUTTER=1; RUN_WORKFLOWS=1; RUN_MIGRATIONS=1; RUN_HELM=1
   fi
 
   # The published Go modules (the end-to-end harness is published nowhere and
@@ -353,6 +358,7 @@ plan_print() {
   echo "flutter=$(bool "$RUN_FLUTTER")"
   echo "workflows=$(bool "$RUN_WORKFLOWS")"
   echo "migrations=$(bool "$RUN_MIGRATIONS")"
+  echo "helm=$(bool "$RUN_HELM")"
   echo "modules=$modules"
   echo "test_shards=$shards"
   echo "cover_packages=$COVER_PKGS"

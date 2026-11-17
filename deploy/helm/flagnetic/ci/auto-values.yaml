@@ -1,0 +1,5 @@
+migrations:
+  mode: auto
+secrets:
+  databaseUrl: postgres://flagnetic:flagnetic@postgres.default.svc:5432/flagnetic?sslmode=disable
+  secretKey: dGVzdC1vbmx5LXNlY3JldC1rZXktMzItYnl0ZXMtbG9uZyEh
