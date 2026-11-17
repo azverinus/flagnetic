@@ -462,6 +462,33 @@ func TestAnOriginRemovedFromAKeyHasItsStreamClosedOnTheNextHeartbeat(t *testing.
 	}
 }
 
+func TestAnOriginTheKeyStillListsKeepsItsStreamAcrossHeartbeats(t *testing.T) {
+	c := fakeClock()
+	srv := testkit.StartServer(t, testkit.WithClock(c))
+	p := newProject(t, srv)
+	k, value := p.clientKeyWithOrigins(t, "https://app.example.com")
+	origin := func(_ context.Context, req *http.Request) error {
+		req.Header.Set("Origin", "https://app.example.com")
+		return nil
+	}
+	s := openStream(t, srv, &sdk.StreamRulesetParams{SdkKey: &value}, origin)
+	s.started(t)
+	s.next(t) // the current version
+
+	res := do(p.admin.UpdateSdkKeyWithResponse(t.Context(), p.key, "production", k.Id.String(),
+		management.SdkKeyPatch{AllowedOrigins: []string{"https://app.example.com", "https://other.example.com"}}))
+	if res.JSON200 == nil {
+		t.Fatalf("PATCH …/sdk-keys = %d: %s", res.StatusCode(), res.Body)
+	}
+	// Heartbeats spread over longer than the replica takes to learn of
+	// the change, so the later ones judge the origin against the new list.
+	for range 8 {
+		time.Sleep(250 * time.Millisecond)
+		c.Advance(15 * time.Second)
+		heartbeat(t, s.next(t))
+	}
+}
+
 func TestAVersionMissedWhileTheListenerWasDeafIsStreamedOnceItListensAgain(t *testing.T) {
 	fault := &pglisten.Fault{}
 	a := testkit.StartServer(t)
