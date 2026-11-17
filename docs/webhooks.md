@@ -21,7 +21,7 @@ A webhook subscription is a project's standing request to be sent chosen events 
 
 The answer carries `secret`, 32 random bytes in base64url, which signs every call made under the subscription. It is shown this once: the platform stores it sealed under `FLAGNETIC_SECRET_KEY` and never answers it again, and audit entries record it as `[redacted]`. Keep it with the receiver.
 
-`GET …/webhooks` lists a project's subscriptions, the oldest first, and `GET …/webhooks/{webhook}` reads one; neither carries the secret. `PATCH …/webhooks/{webhook}` changes the properties it names, under `If-Match` on the subscription's version; `DELETE …/webhooks/{webhook}` removes it, with no `If-Match`. Each write is audited as `webhook.created`, `webhook.updated` or `webhook.deleted`.
+`GET …/webhooks` lists a project's subscriptions, the oldest first, and `GET …/webhooks/{webhook}` reads one; neither carries the secret. `PATCH …/webhooks/{webhook}` changes the properties it names, under `If-Match` on the subscription's version; `DELETE …/webhooks/{webhook}` removes it, with no `If-Match`. Each write is audited as `webhook.created`, `webhook.updated` or `webhook.deleted`. The audit entry records the target as its scheme and host only, since the path and query of a receiver's URL often carry a token and the audit log is readable without `webhook.manage`.
 
 ### Rotating the secret
 

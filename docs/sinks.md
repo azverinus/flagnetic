@@ -36,6 +36,7 @@ The platform makes the calls, so a sink could be pointed at the network the inst
 - A **ClickHouse or object storage sink** may reach loopback and private addresses, because a warehouse usually sits in the cluster's own network, but never a link-local address (where cloud metadata services answer); no setting lifts that.
 - No sink follows a redirect, and no unspecified or multicast address is ever called.
 - A target's own words never reach a reader: not in the API, not in the console, not in the logs, not in an audit entry or a webhook event. A failure is told by its **failure class**, the HTTP status when the target answered and the protocol's own error code when it speaks one (a ClickHouse exception code, an S3 error code).
+- An audit entry of a sink records its target (the webhook URL, the ClickHouse URL, the object storage endpoint) as its scheme and host only, since the path and query of a target often carry a token and the audit log is readable without `sink.manage`.
 
 ## Testing, enabling and sampling
 

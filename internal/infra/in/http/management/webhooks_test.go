@@ -18,7 +18,7 @@ import (
 )
 
 func siem() management.WebhookCreate {
-	return management.WebhookCreate{Name: "SIEM", Url: "https://receiver.example/hook", Events: []string{"flag.kill_switch"}}
+	return management.WebhookCreate{Name: "SIEM", Url: "https://receiver.example/hook/s3cret-token?key=s3cret-query", Events: []string{"flag.kill_switch"}}
 }
 
 func createWebhook(t *testing.T, c *management.ClientWithResponses, project string, body management.WebhookCreate) management.WebhookWithSecret {
@@ -89,7 +89,7 @@ func TestCreatingAWebhookSubscriptionShowsItsSecretOnceAndSealsIt(t *testing.T) 
 	}
 
 	e, before, after := webhookEntry(t, srv, "webhook.created", created)
-	if e.Entity.Kind != "webhook" || before != nil || after["secret"] != "[redacted]" || after["url"] != created.Url {
+	if e.Entity.Kind != "webhook" || before != nil || after["secret"] != "[redacted]" || after["url"] != "https://receiver.example" {
 		t.Errorf("audit entry %+v, after %v", e, after)
 	}
 }

@@ -179,7 +179,7 @@ func webhookValues(w governance.Webhook) map[string]any {
 		reason = string(w.DisabledReason)
 	}
 	return map[string]any{
-		"id": w.ID.String(), "name": w.Name, "url": w.URL, "events": w.Events, "environments": w.Environments,
+		"id": w.ID.String(), "name": w.Name, "url": governance.TargetOrigin(w.URL), "events": w.Events, "environments": w.Environments,
 		"enabled": w.Enabled, "disabled_reason": reason, "secret": redacted,
 	}
 }

@@ -238,3 +238,21 @@ func TestAnInstanceSubscriptionTakesAuditEntryAloneAndNoEnvironment(t *testing.T
 		t.Errorf("an environment: %s at %v, want invalid_webhook at /environments/0", code, pointers)
 	}
 }
+
+func TestTargetOrigin(t *testing.T) {
+	cases := map[string]string{
+		"https://hooks.example.com/services/T000/B000/XXXX":  "https://hooks.example.com",
+		"https://hooks.example.com:8443/path?token=abc#frag": "https://hooks.example.com:8443",
+		"https://user:pass@hooks.example.com/path":           "https://hooks.example.com",
+		"http://[2001:db8::1]:9000/x?k=v":                    "http://[2001:db8::1]:9000",
+		"":                                                   "",
+		"not a url":                                          "",
+		"https://":                                           "",
+		"/relative/path?token=abc":                           "",
+	}
+	for raw, want := range cases {
+		if got := governance.TargetOrigin(raw); got != want {
+			t.Errorf("TargetOrigin(%q) = %q, want %q", raw, got, want)
+		}
+	}
+}

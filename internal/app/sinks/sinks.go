@@ -244,14 +244,14 @@ func values(s sinks.Sink) map[string]any {
 			settings[k] = v
 		}
 		out["clickhouse"] = map[string]any{
-			"url": c.ClickHouse.URL, "database": c.ClickHouse.Database, "table_prefix": c.ClickHouse.TablePrefix,
+			"url": governance.TargetOrigin(c.ClickHouse.URL), "database": c.ClickHouse.Database, "table_prefix": c.ClickHouse.TablePrefix,
 			"username": c.ClickHouse.Username, "password": redacted, "tls_skip_verify": c.ClickHouse.TLSSkipVerify,
 			"create_tables": c.ClickHouse.CreateTables, "settings": settings,
 		}
 	case c.ObjectStorage != nil:
 		o := c.ObjectStorage
 		out["object_storage"] = map[string]any{
-			"endpoint": o.Endpoint, "region": o.Region, "bucket": o.Bucket, "prefix": o.Prefix,
+			"endpoint": governance.TargetOrigin(o.Endpoint), "region": o.Region, "bucket": o.Bucket, "prefix": o.Prefix,
 			"access_key_id": o.AccessKeyID, "secret_access_key": redacted, "path_style": o.PathStyle,
 			"format": o.Format, "compression": o.Compression,
 		}
@@ -260,7 +260,7 @@ func values(s sinks.Sink) map[string]any {
 		for k := range c.Webhook.Headers {
 			headers[k] = redacted
 		}
-		out["webhook"] = map[string]any{"url": c.Webhook.URL, "headers": headers, "secret": redacted}
+		out["webhook"] = map[string]any{"url": governance.TargetOrigin(c.Webhook.URL), "headers": headers, "secret": redacted}
 	}
 	return out
 }
