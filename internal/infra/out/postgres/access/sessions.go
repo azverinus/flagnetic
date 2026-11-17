@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -152,4 +153,52 @@ func (s *Store) TouchSession(ctx context.Context, session access.SessionID, at t
 func (s *Store) RevokeSession(ctx context.Context, session access.SessionID, at time.Time) error {
 	_, err := s.db(ctx).Exec(ctx, `UPDATE sessions SET revoked_at = $2 WHERE id = $1 AND revoked_at IS NULL`, session.Bytes(), at)
 	return err
+}
+
+// RevokeRefusedSessions ends, at at, every session not ended yet that the
+// auth settings no longer let sign its member in, and returns how many it
+// ended.
+func (s *Store) RevokeRefusedSessions(ctx context.Context, settings access.AuthSettings, at time.Time) (int, error) {
+	rows, err := s.db(ctx).Query(ctx, `
+		SELECT s.id, s.method, COALESCE(s.provider, ''), m.email
+		FROM sessions s JOIN members m ON m.id = s.member_id
+		WHERE s.revoked_at IS NULL`)
+	if err != nil {
+		return 0, fmt.Errorf("listing the live sessions: %w", err)
+	}
+	refused, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (access.SessionID, error) {
+		var (
+			b                [16]byte
+			method, provider string
+			email            string
+		)
+		if scanErr := row.Scan(&b, &method, &provider, &email); scanErr != nil {
+			return access.SessionID{}, scanErr
+		}
+		if settings.SessionRefusal(access.SignInMethod(method), provider, email) == nil {
+			return access.SessionID{}, nil
+		}
+		return id.FromBytes[access.Session](b), nil
+	})
+	if err != nil {
+		return 0, fmt.Errorf("reading the live sessions: %w", err)
+	}
+	refused = slices.DeleteFunc(refused, func(i access.SessionID) bool { return i.IsZero() })
+	if len(refused) == 0 {
+		return 0, nil
+	}
+	ended, err := s.RevokeSessions(ctx, refused, at)
+	return len(ended), err
+}
+
+// RevokeAllProviderSessions ends, at at, every session opened through the
+// provider with this slug and not ended yet, whoever holds it, and returns
+// how many it ended.
+func (s *Store) RevokeAllProviderSessions(ctx context.Context, provider string, at time.Time) (int, error) {
+	tag, err := s.db(ctx).Exec(ctx, `
+		UPDATE sessions SET revoked_at = $2 WHERE provider = $1 AND revoked_at IS NULL`, provider, at)
+	if err != nil {
+		return 0, fmt.Errorf("revoking every session opened through a provider: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
 }

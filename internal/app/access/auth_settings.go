@@ -26,6 +26,10 @@ type AuthSettingsStore interface {
 	// SaveAuthSettings stores the settings and announces the change to
 	// every replica once the transaction commits.
 	SaveAuthSettings(ctx context.Context, s access.AuthSettings) error
+	// RevokeRefusedSessions ends, at at, every session not ended yet that
+	// the settings s no longer let sign its member in (see
+	// AuthSettings.SessionRefusal), and returns how many it ended.
+	RevokeRefusedSessions(ctx context.Context, s access.AuthSettings, at time.Time) (int, error)
 }
 
 // AuthSettingsCache is a replica's copy of the settings.
@@ -104,7 +108,10 @@ type UpdateAuthSettingsCommand struct {
 // otherwise). Disabling local login is refused identity_required unless the
 // caller holds an identity at an enabled provider that the new settings'
 // enforcement still lets sign them in, so the instance admin who closes the
-// door keeps a way through it. Every replica applies a change
+// door keeps a way through it. Closing local login, or enforcing a domain,
+// ends the sessions the new settings would not let sign in, the caller's
+// own included, and records how many in sessions_revoked; personal access
+// tokens are not sign-ins and stay. Every replica applies a change
 // once the notification reaches it; this one at once.
 func (h *UpdateAuthSettings) Handle(ctx context.Context, cmd UpdateAuthSettingsCommand) (access.AuthSettings, error) {
 	s := cmd.Settings.Normalized()
@@ -135,16 +142,27 @@ func (h *UpdateAuthSettings) Handle(ctx context.Context, cmd UpdateAuthSettingsC
 			}
 		}
 		changed = true
-		entry, err := governance.NewEntry(id.New[governance.Entry](h.d.IDs), h.d.Clock.Now(), cmd.Request, governance.Record{
+		now := h.d.Clock.Now()
+		if err := h.d.Store.SaveAuthSettings(ctx, s); err != nil {
+			return err
+		}
+		after := authSettingsRecord(s)
+		if tightens(before, s) {
+			revoked, err := h.d.Store.RevokeRefusedSessions(ctx, s, now)
+			if err != nil {
+				return err
+			}
+			if revoked > 0 {
+				after["sessions_revoked"] = revoked
+			}
+		}
+		entry, err := governance.NewEntry(id.New[governance.Entry](h.d.IDs), now, cmd.Request, governance.Record{
 			Action: "auth_settings.updated",
 			Entity: authSettingsEntity,
 			Before: authSettingsRecord(before),
-			After:  authSettingsRecord(s),
+			After:  after,
 		})
 		if err != nil {
-			return err
-		}
-		if err := h.d.Store.SaveAuthSettings(ctx, s); err != nil {
 			return err
 		}
 		return h.d.Audit.Record(ctx, entry)
@@ -206,6 +224,12 @@ func (h *UpdateAuthSettings) requireIdentity(ctx context.Context, caller access.
 }
 
 // authSettingsRecord is s as audit entries show it, in the API's terms.
+// tightens reports whether after closes a way in before left open: local
+// login switched off, or the enforced domains changed.
+func tightens(before, after access.AuthSettings) bool {
+	return (before.LocalLoginEnabled && !after.LocalLoginEnabled) || !slices.Equal(before.SSOEnforcedDomains, after.SSOEnforcedDomains)
+}
+
 func authSettingsRecord(s access.AuthSettings) map[string]any {
 	return map[string]any{
 		"session_idle_timeout_seconds":     int64(s.SessionIdleTimeout / time.Second),
