@@ -1,5 +1,6 @@
 # Flagnetic documentation
 
+- [A first flag in ten minutes](quickstart.md): compose up, bootstrap, a project, a flag and an SDK key, evaluated from the Go or JavaScript SDK, then flipped and seen to change.
 - [Installing Flagnetic](install.md): Docker Compose or the binary, TLS and a reverse proxy, PostgreSQL connections, upgrades.
 - [Glossary](glossary.md): the vocabulary the code, the API, the docs and the console use.
 - [Access](access.md): permissions, roles, grants, scopes and API tokens.

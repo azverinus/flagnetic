@@ -46,7 +46,7 @@ _Avoid_: stage, tier, env
 
 **Protected environment**:
 An environment whose ruleset changes only through a change request, whatever entity a write touches; the kill switch and an import are the exceptions, and an import never changes whether an environment is protected. Production is protected by default.
-_Avoid_: locked environment, prod-only
+_Avoid_: locked environment, prod-only; not a GitHub environment with a required reviewer: call that a GitHub environment, never a protected one
 
 **Member**:
 A person who uses the management UI or API, working in each project through the grants they hold there. A member is invited until they set a password or sign in for the first time, active once they have, and deactivated when an instance admin offboards them; there is no deletion.
@@ -251,6 +251,10 @@ One declared kind of unit in a project.
 The stable identifier of one unit of a given type.
 _Avoid_: hash key, bucketing key, distinct id
 
+**Anonymous ID**:
+The unit ID a client SDK mints once per device (per origin in a browser) for an anonymous unit type and keeps across sessions and SDK key rotations, so an anonymous visitor stays in the same buckets. On Android, iOS and macOS it is kept where the platform excludes it from backups: it belongs to one device, never travels to a new phone by a restored backup, and is forgotten when the app is uninstalled.
+_Avoid_: device ID (unless the unit type is device), visitor ID, cookie ID
+
 **Alias**:
 A recorded link between two unit IDs that belong to the same person, typically an anonymous ID and a user ID after sign-up.
 _Avoid_: identify, merge, stitch, linking
@@ -345,6 +349,18 @@ _Avoid_: SSE, push channel, stream (reserved for a sink's cursor), change stream
 **SDK inventory**:
 The SDKs seen using an environment: their name, version, platform and application version, which key they used, and when each was first and last seen.
 _Avoid_: connected SDKs, clients, installations
+
+**Server SDK**:
+An SDK holding a server key: it downloads the ruleset and evaluates locally, in a backend. A package may offer both modes (the JavaScript one does); the mode, not the language, makes an SDK a server or a client SDK.
+_Avoid_: backend SDK, server-side client
+
+**Client SDK**:
+An SDK holding a client key, inside a browser or an app: it never holds a ruleset and asks the server to evaluate its context (remote evaluation), keeping the values it was last served.
+_Avoid_: frontend SDK, mobile SDK (both name a platform, not the mode)
+
+**Bootstrap**:
+Values for one context handed to a client SDK before its first remote evaluation, usually computed by a server SDK and rendered into a page. Shaped and masked exactly like the answer a client key receives.
+_Avoid_: initial state, hydration data, preload
 
 **Evaluation**:
 Computing the value of a flag for a context. Local evaluation happens inside the SDK from a ruleset; remote evaluation happens on the server.
@@ -477,6 +493,28 @@ _Avoid_: event (a webhook subscription's), notification (PostgreSQL's NOTIFY tha
 One event sent to one subscription, carrying a status and every attempt made at it with its time, status code, latency and response snippet. A delivery keeps its id across its attempts; a redelivery is a new delivery of the same event, same event id and body, under a new id. A sink's own signed HTTP call reuses the same wire header (`X-Flagnetic-Delivery`) and the same at-least-once shape, for the same batch across retries, but it is a stream's in-flight batch, not this entry.
 _Avoid_: send, call, dispatch, webhook (that is the subscription)
 
-**Capability**:
-One thing a caller may do, named after the action rather than after the role that allows it, and answered per project and per environment. Until capabilities are answered, the console reads the caller's permissions in a project from `GET /projects/{project}/me`, and never infers what to show from a role name.
-_Avoid_: permission (reserved for what a role allows), grant (a role held in a project), scope (reserved for an API token)
+## Releases and compatibility
+
+**External surface**:
+Anything outside an instance builds on: `/api/v1`, `/sdk/v1`, the SCIM API, the ruleset format, the project document, the export schema, webhook and sink payloads, the CLI's commands, flags and exit codes, configuration variables, metric names and labels, and each SDK's public API. The console's screens, log lines and the database's tables are not external surfaces. See [Compatibility and support](compatibility.md).
+_Avoid_: public API (one surface among them), contract (unless naming one surface's), interface
+
+**Compatibility promise**:
+What a release says its external surfaces keep. From 1.0 until 2.0 every external surface changes only additively: a field, operation, variable, metric or value is added, never renamed, retyped or removed, except where a surface documents a list as open. The SDKs' protocol and the ruleset format have kept it since 0.1.0. Until 1.0, `/api/v1` and the console could still break.
+_Avoid_: stability guarantee, backward compatibility (says one direction only), SLA, API versioning
+
+**Deprecation**:
+The announcement, in a minor release, that a part of an external surface will be removed in the next major. A deprecated operation is marked in its OpenAPI document and answers a `Deprecation` header, with a `Sunset` header when a removal date is set; it behaves exactly as before until the major removes it.
+_Avoid_: sunset (the date alone), obsolete, legacy, end of life (a version's, not an operation's)
+
+**Deprecation log**:
+The warning an SDK writes when an answer carries a `Deprecation` header: once per operation and process, naming the operation and the `Sunset` when present. The call itself proceeds.
+_Avoid_: deprecation error, deprecation exception, deprecation notice
+
+**Supported version**:
+The latest minor release of the server, which alone receives fixes, security fixes included; they ship in its next patch or the next minor. An SDK's supported version is likewise its latest minor.
+_Avoid_: LTS, maintained branch, release branch
+
+**Migration**:
+One forward-only change of an instance's database schema, applied in order and once, under a lock that lets only one replica or job apply it. From 1.0 every migration expands before it contracts: it adds what the new release needs and removes only what the previous minor no longer uses, so replicas of the previous minor keep running on the migrated schema.
+_Avoid_: schema update, DDL, upgrade (that is the release's), import (that is a project document's)
