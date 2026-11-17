@@ -1,9 +1,10 @@
 # Developer commands. Install Task (https://taskfile.dev), then `task` lists them.
 #
-# `task pr:check` runs locally the checks CI will run for the changes of your
-# branch, and is what to run before every push. `task check` runs every check
-# of CI on the whole repository: complete but slow, for changes that reach
-# everywhere. Tests start a PostgreSQL through testcontainers unless
+# `task pr:check` runs locally the checks of CI that answer in minutes for the
+# changes of your branch, and is what to run before every push; the server's
+# tests are left to CI unless you pass `-- --full`. `task check` runs every
+# check of CI on the whole repository: complete but slow, for changes that
+# reach everywhere. Tests start a PostgreSQL through testcontainers unless
 # DATABASE_URL is set; `task db:up` gives you a long-lived one instead (copy
 # .env.example to .env), and `task pr:check` shares one container between runs.
 version: "3"
@@ -148,7 +149,7 @@ tasks:
   # --- Checks (what CI runs) ---
 
   pr:check:
-    desc: Run the CI checks that apply to this branch's changes (--plan shows them without running; see .github/scripts/pr-check.sh)
+    desc: Run the quick CI checks that apply to this branch's changes (--full adds the server's tests, --plan shows them without running; see .github/scripts/pr-check.sh)
     env:
       GOLANGCI_LINT: '{{.GOLANGCI_LINT}}'
       GOVULNCHECK: '{{.GOVULNCHECK}}'

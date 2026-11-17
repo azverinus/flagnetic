@@ -15,11 +15,14 @@ You need:
 - Node.js 22 or newer and [pnpm](https://pnpm.io) (the version in `web/package.json`), for the console in `web/` and the JavaScript SDK in `sdks/js/` (`task sdk-js:check`)
 
 ```bash
-task pr:check   # the CI checks that apply to what your branch changes
-task check      # every CI check on the whole repository: complete but slow
+task pr:check             # the quick CI checks that apply to what your branch changes
+task pr:check -- --full   # the same with the server's tests and coverage floors
+task check                # every CI check on the whole repository: complete but slow
 ```
 
-`task pr:check` is what to run before pushing. It looks at the files changed since the merge base with `origin/main` and runs the checks CI runs for them: tidy `go.mod` and current generated code in every Go module, lint, the tests of the changed packages and of the packages depending on them (with the race detector), the guard tests (those that parse the server's Go source, and those that read a file under a directory you changed), the coverage floors, `govulncheck`, and the steps of the console and SDK jobs whose paths changed (`task pr:check -- --plan` lists them without running anything). It does not replace CI: CodeQL, the Docker build, the other PostgreSQL versions, the browser suites and the oldest Go release run there only. When several checkouts share a machine, the heavy steps wait for each other under one lock (`PR_CHECK_P` and `PR_CHECK_PARALLEL` set how many packages and tests run at once; the header of `.github/scripts/pr-check.sh` lists the settings), and the tests share one PostgreSQL container, `flagnetic-pr-check-postgres`, which `docker rm -f` removes.
+`task pr:check` is what to run before pushing. It looks at the files changed since the merge base with `origin/main` and runs the checks CI runs for them that answer in minutes: tidy `go.mod` and current generated code in every Go module, build and lint, the tests of the Go modules beside the server, `govulncheck`, and the steps of the console and SDK jobs whose paths changed (`task pr:check -- --plan` lists them without running anything). The server's tests are left to CI, which runs them in parallel jobs: the tests of the changed packages and of the packages depending on them (with the race detector), the guard tests (those that parse the server's Go source, and those that read a file under a directory you changed), and the coverage floors. `task pr:check -- --full` runs that selection on your machine, for reproducing a failure of CI. CodeQL, the Docker build, the other PostgreSQL versions, the browser suites and the oldest Go release run in CI only.
+
+CI checks what a change can break and nothing else: `.github/scripts/ci-plan.sh` maps the changed paths to the jobs of `ci.yml`, and `task pr:check` reads the same rules. A change to the documentation or to one SDK runs in minutes; a pull request to the server runs the tests its change can reach on the oldest supported PostgreSQL. A push to `main` that changes the server or the console runs everything, on the newest PostgreSQL too, and so does the nightly run. A check that must run for a new path gets its rule in `ci-plan.sh`. When several checkouts share a machine, the heavy steps wait for each other under one lock (`PR_CHECK_P` and `PR_CHECK_PARALLEL` set how many packages and tests run at once; the header of `.github/scripts/pr-check.sh` lists the settings), and the tests share one PostgreSQL container, `flagnetic-pr-check-postgres`, which `docker rm -f` removes.
 
 Set `DATABASE_URL` to an existing PostgreSQL to skip testcontainers.
 
@@ -61,7 +64,7 @@ A test package that needs PostgreSQL calls `testkit.Main` from its `TestMain`: i
 
 ## Commits
 
-- **Conventional Commits.** `type(scope): summary` in the imperative, under 72 characters. Types: `feat`, `fix`, `perf`, `deps`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `revert`. Scopes are the contexts (`flags`, `experiments`, `delivery`, `events`, `governance`, `access`, `workspace`, `integrations`), the SDKs (`sdk-go`, `sdk-go-openfeature`, `sdk-js`, `sdk-dart`, `sdk-flutter`, `sdk-ruby`, `sdk-ruby-openfeature`, `sdk-python`), and `api`, `eval`, `conformance`, `console`, `platform`, `release`, `ci`, `docs`.
+- **Conventional Commits.** `type(scope): summary` in the imperative, under 72 characters. Types: `feat`, `fix`, `perf`, `deps`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `revert`. Scopes are the contexts (`flags`, `experiments`, `delivery`, `events`, `governance`, `access`, `workspace`, `integrations`), the SDKs (`sdk-go`, `sdk-go-openfeature`, `sdk-js`, `sdk-dart`, `sdk-flutter`, `sdk-ruby`, `sdk-ruby-openfeature`, `sdk-python`, or `sdks` for a change to several of them), and `api`, `eval`, `conformance`, `console`, `platform`, `release`, `ci`, `docs`.
 - **Sign-off (DCO).** Every commit carries a `Signed-off-by:` line matching its author: `git commit -s`. By signing off you certify the [Developer Certificate of Origin](https://developercertificate.org/): that you wrote the change or otherwise have the right to submit it under the project's license. CI rejects commits without it.
 - Explain *why* in the body when the subject cannot. Keep commits self-contained; each one should build and pass tests.
 
@@ -69,13 +72,14 @@ A test package that needs PostgreSQL calls `testkit.Main` from its `TestMain`: i
 
 - Keep one concern per pull request. Large work is split into a **stack** of small pull requests, each based on the previous one; the maintainers use [git-spice](https://abhinav.github.io/git-spice/) (`gs branch create`, `gs stack submit`), but any tool or plain branches work.
 - Pull requests are **squash-merged**: the title becomes the single commit on `main`, so it must be a Conventional Commit subject (CI checks it). Mark breaking changes with `!` (`feat(api)!: ...`) and explain them in the description.
+- A fix that applies to several SDKs is one pull request with the scope `sdks`, not one per SDK: the checks of every SDK it touches run for it, and release-please lists it in the changelog of each.
 - `task pr:check` passes locally; CI must be green. The check to watch is **`ci-ok`**: it needs every job of the `ci` workflow and fails when any of them failed or was cancelled, while a job that was skipped does not hold it. A new job in `ci.yml` goes into the `needs` of `ci-ok` too; `task lint` and CI fail otherwise. The pull request title, sign-off and CodeQL checks run in their own workflows beside it.
 - Update `docs/` when users would notice the change. Do not edit `CHANGELOG.md`: it is generated.
 - API changes start in `api/*.yaml`, with the regenerated code committed alongside.
 
 ## Releases
 
-[release-please](https://github.com/googleapis/release-please) keeps one release pull request open per package, with its next version and changelog computed from the commits on `main` that touch it. Merging one tags the release and publishes it: the server image to `ghcr.io/azverinus/flagnetic`, each SDK to its registry. Until 1.0.0 a new feature or a breaking change bumps the minor version, a fix the patch version. A change to `conformance/` alone releases nothing: the release note goes with the evaluator or SDK change the fixture demands.
+[release-please](https://github.com/googleapis/release-please) keeps one release pull request open per package, with its next version and changelog computed from the commits on `main` that touch it. Merging one tags the release and publishes it: the server image to `ghcr.io/azverinus/flagnetic`, each SDK to its registry. The release pull request of an SDK runs that SDK's checks; the server's runs every check of CI, as the last point before the image is published. Every release pull request edits `.release-please-manifest.json`, so after one is merged the others conflict until release-please rewrites them, which it does on that push to `main`. Until 1.0.0 a new feature or a breaking change bumps the minor version, a fix the patch version. A change to `conformance/` alone releases nothing: the release note goes with the evaluator or SDK change the fixture demands.
 
 ### Go modules
 
