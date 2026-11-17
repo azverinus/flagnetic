@@ -296,12 +296,19 @@ jobs:
   # started by the harness with Docker on a loopback address, which is the
   # only place the instance accepts an http issuer, so they must share the
   # network of the instance and the browser.
+  #
+  # The specs run one after another against one instance, so the suite is
+  # split by file over several jobs, each with an instance of its own.
   e2e:
-    name: console end to end
+    name: console end to end (${{ matrix.shard }}/3)
     needs: plan
     if: needs.plan.outputs.console_e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     services:
       postgres:
         image: postgres:17-alpine
@@ -337,12 +344,14 @@ jobs:
       - name: Install Chromium
         run: pnpm e2e:install
       - name: Run the suite
-        run: pnpm e2e
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: pnpm --filter @flagnetic/e2e exec playwright test --shard="$SHARD/3"
       - name: Keep the report
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: web/e2e/playwright-report
           retention-days: 7
 
