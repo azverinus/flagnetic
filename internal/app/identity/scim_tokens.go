@@ -187,11 +187,10 @@ func (h *RevokeSCIMToken) Handle(ctx context.Context, token identity.SCIMTokenID
 // invitation acceptance and password reset, so that guessing at one cannot
 // be traded for guessing at another.
 type SourceThrottle interface {
-	// Reserve counts one failure of the source ip comes from at at, before
-	// what is presented is checked. A throttled source is refused
-	// rate_limited, its failure taken back. Otherwise it returns the function
-	// that takes the failure back, for an attempt that guessed nothing.
-	Reserve(ctx context.Context, ip netip.Addr, at time.Time) (release func(context.Context) error, err error)
+	// Reserve counts one failure of the source ip comes from at at, for a
+	// value that matched nothing. A throttled source is refused rate_limited,
+	// its failure taken back.
+	Reserve(ctx context.Context, ip netip.Addr, at time.Time) error
 }
 
 // SCIMAuthenticator resolves a bearer value presented to /scim/v2.
@@ -274,7 +273,7 @@ func (h *SCIMAuthenticator) Handle(ctx context.Context, value string, ip netip.A
 // attempt is refused: rate_limited once the source is throttled, else
 // refusal.
 func (h *SCIMAuthenticator) fail(ctx context.Context, ip netip.Addr, now time.Time, refusal error) error {
-	if _, err := h.throttle.Reserve(ctx, ip, now); err != nil {
+	if err := h.throttle.Reserve(ctx, ip, now); err != nil {
 		return err
 	}
 	return refusal
