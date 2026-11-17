@@ -9,7 +9,7 @@
 import { Backoff } from "../internal/backoff.js";
 import type { Clock } from "../internal/clock.js";
 import { causeOf, type LogLevel } from "../internal/logger.js";
-import { SseParser } from "../internal/sse.js";
+import { SseOverflow, SseParser } from "../internal/sse.js";
 import type { LogEvent } from "./types.js";
 
 export interface StreamTiming {
@@ -147,6 +147,8 @@ export class ChangeStream {
     } catch (e) {
       const reason: unknown = abort.signal.aborted ? abort.signal.reason : e;
       cause = causeOf(reason);
+      // The peer's bytes failed the stream: stop reading them.
+      if (e instanceof SseOverflow) this.end(e, abort);
     }
     if (run !== this.run || !this.wanted) return;
     clock.clearTimeout(this.silenceTimer);

@@ -52,13 +52,15 @@ typedef TransportStream = ({
 abstract interface class Transport {
   /// Posts [json] to [url] with [headers], answering within [timeout] or
   /// throwing a [TransportException]. The body is sent as it is; only the
-  /// answer is compressed.
+  /// answer is compressed. An answer that decompresses to more than
+  /// [maxBytes] is a [TransportException] too.
   Future<TransportResponse> postJson(
     Uri url,
     Map<String, String> headers,
     List<int> json,
-    Duration timeout,
-  );
+    Duration timeout, {
+    int maxBytes = maxResponseBytes,
+  });
 
   /// Opens [url] with [headers] and answers with the response head plus a
   /// body that stays open, for `text/event-stream`. The head must arrive

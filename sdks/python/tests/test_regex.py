@@ -102,3 +102,12 @@ def test_a_script_of_several_words_is_read_under_any_spelling_the_server_reads(p
     assert matches(r"(?i)\p{Old_Italic}", "\U00010300")
     assert matches(r"\P{Old_Italic}", "a")
     assert matches(r"\p{^Old_Italic}", "a")
+
+
+def test_input_over_64_kib_of_utf8_is_a_non_match() -> None:
+    match = compile_pattern("a")
+    assert match("a" * (64 << 10))
+    assert not match("a" * ((64 << 10) + 1))
+    # Three bytes each: 21846 characters are 65538 bytes.
+    assert match("€" * 21845 + "a")
+    assert not match("€" * 21846 + "a")

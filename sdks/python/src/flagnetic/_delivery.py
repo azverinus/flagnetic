@@ -568,7 +568,9 @@ class Delivery:
     def _read_body(resp: http.client.HTTPResponse, deadline: float) -> bytes:
         """The body, gunzipped when the server did, read in pieces so that a slow one meets the deadline."""
         gzipped = (resp.getheader("Content-Encoding") or "").lower() == "gzip"
+        decompressor = zlib.decompressobj(16 + zlib.MAX_WBITS) if gzipped else None
         parts: list[bytes] = []
+        wire = 0
         size = 0
         while True:
             if time.monotonic() > deadline:
@@ -576,20 +578,24 @@ class Delivery:
             piece = resp.read(1 << 16)
             if not piece:
                 break
-            parts.append(piece)
-            size += len(piece)
-            if not gzipped and size > MAX_RULESET_BYTES:
+            # The wire is bounded as well as the document: a gzipped body is otherwise held whole
+            # before anything is known about it.
+            wire += len(piece)
+            if wire > MAX_RULESET_BYTES:
                 raise ValueError(f"ruleset larger than {MAX_RULESET_BYTES} bytes")
-        body = b"".join(parts)
-        if not gzipped:
-            return body
-        decompressor = zlib.decompressobj(16 + zlib.MAX_WBITS)
-        out = decompressor.decompress(body, MAX_RULESET_BYTES + 1)
-        if len(out) > MAX_RULESET_BYTES:
-            raise ValueError(f"ruleset larger than {MAX_RULESET_BYTES} bytes")
-        if not decompressor.eof:
+            if decompressor is not None:
+                # Decompressed piece by piece, each capped at what the document may still grow
+                # by, so a small body that expands enormously is never held.
+                piece = decompressor.decompress(piece, MAX_RULESET_BYTES - size + 1)
+                if decompressor.unconsumed_tail:
+                    raise ValueError(f"ruleset larger than {MAX_RULESET_BYTES} bytes")
+            size += len(piece)
+            if size > MAX_RULESET_BYTES:
+                raise ValueError(f"ruleset larger than {MAX_RULESET_BYTES} bytes")
+            parts.append(piece)
+        if decompressor is not None and not decompressor.eof:
             raise EOFError("gzip stream ends early")
-        return out
+        return b"".join(parts)
 
     # -- the ruleset stream ------------------------------------------------
 

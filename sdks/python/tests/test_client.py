@@ -207,6 +207,38 @@ def test_a_truncated_gzip_body_is_a_failed_fetch(clients: Any) -> None:
     assert [f["cause"] for f in logs.named("fetch_failed")] == ["network"]
 
 
+def test_a_gzipped_ruleset_that_expands_past_the_cap_is_a_failed_fetch(
+    clients: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    logs = Logs()
+    monkeypatch.setattr(_delivery, "MAX_RULESET_BYTES", 1 << 20)
+    bomb = gzip.compress(b" " * (8 << 20))
+    assert len(bomb) < 1 << 20
+
+    def handler(_request: Request) -> Response:
+        return Response(200, {**JSON, "Content-Encoding": "gzip"}, bomb)
+
+    client = clients(MockServer(handler), logger=logs)
+    assert client.ready(5) is flagnetic.Stage.BUILT_IN
+    assert [f["cause"] for f in logs.named("fetch_failed")] == ["network"]
+
+
+def test_a_gzipped_ruleset_whose_wire_bytes_pass_the_cap_is_a_failed_fetch(
+    clients: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    logs = Logs()
+    monkeypatch.setattr(_delivery, "MAX_RULESET_BYTES", 1 << 16)
+    # Random bytes do not compress: the body is larger on the wire than the cap.
+    noise = gzip.compress(os.urandom(1 << 18))
+
+    def handler(_request: Request) -> Response:
+        return Response(200, {**JSON, "Content-Encoding": "gzip"}, noise)
+
+    client = clients(MockServer(handler), logger=logs)
+    assert client.ready(5) is flagnetic.Stage.BUILT_IN
+    assert [f["cause"] for f in logs.named("fetch_failed")] == ["network"]
+
+
 def test_getters_serve_each_type_and_the_detail_says_why(clients: Any) -> None:
     client = clients(serving(RULESET))
     assert client.ready(5) is flagnetic.Stage.FRESH

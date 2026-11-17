@@ -6,7 +6,7 @@
 // never imports the evaluator, which keeps it small in a bundle.
 import { Backoff } from "../internal/backoff.js";
 import { realClock, type Clock } from "../internal/clock.js";
-import { trimTrailingSlashes } from "../internal/http.js";
+import { readBoundedText, trimTrailingSlashes } from "../internal/http.js";
 import { causeOf, consoleLogger, safeLog, type LogLevel } from "../internal/logger.js";
 import { SDK_API_PATH, VERSION } from "../version.js";
 import { aliasEvent, exposureEvent, ExposureSuppressor, type AliasLink } from "../internal/events.js";
@@ -108,6 +108,9 @@ export function createClient(sdkKey: string, baseUrl: string, options: ClientOpt
 export function createClientWith(sdkKey: string, baseUrl: string, options: ClientOptions, internals: ClientInternals): FlagneticClient {
   return new FlagneticClient(sdkKey, baseUrl, options, internals);
 }
+
+/** The most an evaluate answer may hold, in bytes: a context's values are small, and this bounds what a faulty or hostile peer can make the page buffer. */
+const MAX_ANSWER_BYTES = 32 * 1024 * 1024;
 
 /**
  * A client-mode client. Every public member is total: an internal failure is
@@ -833,7 +836,14 @@ export class FlagneticClient {
         this.failed({ source: "network", cause: "status", status: res.status, trigger });
         return false;
       }
-      text = await res.text();
+      try {
+        text = await readBoundedText(res, MAX_ANSWER_BYTES);
+      } catch (e) {
+        if (this.closed) return false;
+        const reason: unknown = controller.signal.aborted ? (controller.signal.reason as unknown) : e;
+        this.failed({ source: "network", cause: "network", trigger, detail: causeOf(reason) });
+        return false;
+      }
     } finally {
       this.clock.clearTimeout(timer);
       this.abortInFlight = undefined;

@@ -259,7 +259,7 @@ Every other flag evaluates normally. The fix is to upgrade the SDK.
 
 ## Regular expressions
 
-A `matches` condition is RE2 syntax with RE2 semantics, as Go's `regexp` reads it, and not the dialect of Ruby's own engine. A pattern is parsed as RE2 and matched by an engine of its own that runs in time linear in the input, so a context value can never make a match slow or cut it off. `^` and `$` are not line anchors, `\s` is `[\t\n\f\r ]`, lookarounds and backreferences are refused and `(?i)` folds case by Go's rules, `\p{...}` included. A pattern RE2 refuses makes the condition `inconsistent_ruleset`.
+A `matches` condition is RE2 syntax with RE2 semantics, as Go's `regexp` reads it, and not the dialect of Ruby's own engine. A pattern is parsed as RE2 and matched by an engine of its own that runs in time linear in the input, so a context value can never make a match slow or cut it off. `^` and `$` are not line anchors, `\s` is `[\t\n\f\r ]`, lookarounds and backreferences are refused and `(?i)` folds case by Go's rules, `\p{...}` included. A pattern RE2 refuses makes the condition `inconsistent_ruleset`. A string longer than 64 KiB (in bytes) is not matched at all: the condition is false for it, without an error, because the cost of a match grows with the input.
 
 The case folding orbits and property names come from Go's `unicode` package, and `lib/flagnetic/eval/unicode_tables.rb` is generated from it:
 

@@ -12,15 +12,18 @@ module Flagnetic
     # last event ID seen, or nil.
     Event = Struct.new(:type, :data, :id, keyword_init: true)
 
-    # Error is a stream the parser refuses: a line longer than max_line.
+    # Error is a stream the parser refuses: a line longer than max_line, or
+    # an event whose data grows past max_event. A peer, or a proxy in
+    # between, controls the bytes, so neither may grow without bound.
     class Error < StandardError; end
 
     BOM = "\xEF\xBB\xBF".b.freeze
     LINE_END = /[\r\n]/n
     private_constant :BOM, :LINE_END
 
-    def initialize(max_line: 1 << 20)
+    def initialize(max_line: 64 << 10, max_event: 64 << 10)
       @max_line = max_line
+      @max_event = max_event
       @buffer = +"".b
       @skip_lf = false
       @started = false
@@ -40,14 +43,19 @@ module Flagnetic
       @buffer << bytes
       strip_bom
       while (i = @buffer.index(LINE_END))
+        # A line that arrives whole in one read is as long as one that
+        # arrives in pieces, so it is held to the same limit.
+        raise_line_too_long if i > @max_line
         line = @buffer.byteslice(0, i)
         @buffer = @buffer.byteslice((i + line_end_length(i))..)
         line(line.force_encoding(Encoding::UTF_8).scrub, &)
       end
-      raise Error, "an event-stream line exceeds #{@max_line} bytes" if @buffer.bytesize > @max_line
+      raise_line_too_long if @buffer.bytesize > @max_line
     end
 
     private
+
+    def raise_line_too_long = raise(Error, "an event-stream line exceeds #{@max_line} bytes")
 
     def strip_bom
       return if @started || @buffer.bytesize < BOM.bytesize
@@ -74,10 +82,17 @@ module Flagnetic
       value = value.to_s.delete_prefix(" ")
       case field
       when "event" then @type = value
-      when "data" then @data << value << "\n"
+      when "data" then append_data(value)
       when "id" then @id = value unless value.include?("\u0000")
       when "retry" then yield :retry, value.to_i if value.match?(/\A\d+\z/)
       end
+    end
+
+    # append_data adds one data line. Each line may be short and the
+    # event still never end, so the event's data is bounded as well.
+    def append_data(value)
+      @data << value << "\n"
+      raise Error, "an event-stream event exceeds #{@max_event} bytes" if @data.bytesize > @max_event
     end
 
     def dispatch

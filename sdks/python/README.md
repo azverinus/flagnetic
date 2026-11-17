@@ -13,6 +13,9 @@ supported upstream (a release reaching its end of life is dropped in a minor ver
 0.1.0 on ([compatibility](../../docs/sdks/compatibility.md)); [docs/sdks/python.md](../../docs/sdks/python.md) is how
 it is deployed and tested.
 
+Because that engine is pure Python, the `matches` operator treats a context value longer than 64 KiB of UTF-8 as a
+non-match, not an error: the cost of a match is the input times the pattern, and a caller chose the input.
+
 ## Quick start
 
 ```python

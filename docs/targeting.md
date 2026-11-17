@@ -50,6 +50,8 @@ A segment holds `attribute` conditions only.
 | list | `is_empty` | none |
 | every type | `exists`, `not_exists` | none |
 
+The JavaScript, Python and Ruby SDKs run their own regular-expression engine, whose cost grows with the length of the value times the size of the expression. So that an oversized attribute cannot stall an evaluation, they treat a value longer than 64 KiB (65,536 bytes of UTF-8) as not matching a `matches` condition, without an error. The server and the Go SDK match the whole value.
+
 How they compare:
 
 - An attribute the context lacks, `null`, or a value of the wrong type makes every operator false except `not_exists`, which is then true. Nothing is converted: `"5"` is not a number, and a semantic version or date that does not parse in a context is a value of the wrong type.

@@ -118,6 +118,27 @@ void main() {
     expect(e.detail, contains('larger than'));
   });
 
+  test('a post answer past its own cap is refused', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen((request) async {
+      request.response.add(List<int>.filled(2000, 0x20));
+      await request.response.close();
+    });
+    final url = Uri.parse('http://127.0.0.1:${server.port}/x');
+    final e = await failure(
+      transport.postJson(
+        url,
+        {},
+        [123],
+        const Duration(seconds: 5),
+        maxBytes: 1000,
+      ),
+    );
+    expect(e.kind, TransportFailure.network);
+    expect(e.detail, contains('larger than 1000 bytes'));
+  });
+
   test('a stream whose head never comes closes when it times out', () async {
     final (url, closed) = await rawServer(null);
     final e = await failure(
@@ -157,6 +178,25 @@ void main() {
       final line = 'data: ${'a' * 40000}\n'.codeUnits;
       parser.add(line, (_) {});
       expect(() => parser.add(line, (_) {}), throwsA(isA<SseOverflow>()));
+    });
+
+    test('a line fed in small pieces overflows', () {
+      final parser = SseParser();
+      expect(() {
+        for (var i = 0; i < 100000; i++) {
+          parser.add(List.filled(16, 0x61), (_) {});
+        }
+      }, throwsA(isA<SseOverflow>()));
+    });
+
+    test('endless short data lines overflow', () {
+      final parser = SseParser();
+      final line = 'data: ${'a' * 100}\n'.codeUnits;
+      expect(() {
+        for (var i = 0; i < 100000; i++) {
+          parser.add(line, (_) {});
+        }
+      }, throwsA(isA<SseOverflow>()));
     });
 
     test('lines within the bound still dispatch', () {

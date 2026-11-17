@@ -18,3 +18,50 @@ export function trimTrailingSlashes(url: string): string {
   while (end > 0 && url.charCodeAt(end - 1) === 0x2f) end--;
   return url.slice(0, end);
 }
+
+/** A response body that outgrew the cap its reader was given. */
+export class BodyTooLarge extends Error {
+  constructor(readonly limit: number) {
+    super(`response body over ${limit} bytes`);
+    this.name = "BodyTooLarge";
+  }
+}
+
+/**
+ * The body as text, read through a byte count: the stream is cancelled and
+ * BodyTooLarge thrown as soon as more than `limit` bytes have arrived, so a
+ * peer cannot make the process buffer an endless answer. The count is of
+ * the decoded bytes, as `fetch` decompresses transparently. A
+ * `Content-Length` over the cap fails before anything is read; the count
+ * still applies, as the header may be absent or wrong.
+ */
+export async function readBoundedText(res: Response, limit: number): Promise<string> {
+  const declared = Number(res.headers.get("Content-Length"));
+  if (Number.isFinite(declared) && declared > limit) {
+    await res.body?.cancel().catch(() => undefined);
+    throw new BodyTooLarge(limit);
+  }
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > limit) throw new BodyTooLarge(limit);
+      chunks.push(value);
+    }
+  } catch (e) {
+    await reader.cancel().catch(() => undefined);
+    throw e;
+  }
+  const all = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    all.set(c, at);
+    at += c.byteLength;
+  }
+  return new TextDecoder("utf-8").decode(all);
+}
