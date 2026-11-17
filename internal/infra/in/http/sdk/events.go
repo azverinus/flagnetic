@@ -219,13 +219,8 @@ func (a *api) PostEvents(w http.ResponseWriter, r *http.Request, params PostEven
 	a.events.observe(res)
 	a.h.Inventory.Note(keyOf(r.Context()), delivery.IdentifySDK(r.UserAgent(), b.SDK), "", 0)
 	out := EventBatchResult{
-		Accepted: res.AcceptedTotal(), Duplicates: res.Duplicates, DroppedRows: res.DroppedRows,
+		Accepted: res.AcceptedTotal(), Duplicates: res.Duplicates, DroppedRows: res.DroppedRowsTold(key.Kind),
 		Rejected: make([]EventRejection, 0, len(res.Rejected)),
-	}
-	if key.Kind == delivery.SDKKeyClient {
-		// Told to a client key, the count would say whether a flag key it
-		// guessed belongs to the project, an archived flag included.
-		out.DroppedRows = 0
 	}
 	for _, rj := range res.Rejected {
 		e := EventRejection{Index: rj.Index, Code: string(rj.Code), Detail: rj.Detail}

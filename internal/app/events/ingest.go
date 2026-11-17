@@ -138,6 +138,17 @@ type BatchResult struct {
 	Rejected []EventRejection
 }
 
+// DroppedRowsTold is the count of dropped rows a key of kind k is told: the
+// true count for a server key, 0 for a client key. Told to a client key, the
+// count would say whether a flag key it guessed belongs to the project, an
+// archived flag included. DroppedRows stays the true count for the metrics.
+func (r BatchResult) DroppedRowsTold(k delivery.SDKKeyKind) int {
+	if k == delivery.SDKKeyClient {
+		return 0
+	}
+	return r.DroppedRows
+}
+
 // AcceptedTotal is how many events were stored, whatever their type.
 func (r BatchResult) AcceptedTotal() int {
 	n := 0
@@ -152,9 +163,10 @@ func (r BatchResult) AcceptedTotal() int {
 // the SDK may drop the batch. An event whose ID was received before, in this
 // batch or for as long as event IDs are kept (see claimRetention), is a
 // duplicate and stored once. A summary row naming a flag the project does
-// not have is dropped: nobody could read it. An exposure is checked against the experiment it names;
-// the details of its refusal are specific to a server key and generic to a
-// client key.
+// not have is dropped: nobody could read it, and a client key is told none
+// were. An exposure is checked against the experiment it names; a server
+// key is told the check it failed, and a client key unknown_experiment for
+// every refusal, so that it learns nothing of the project's experiments.
 //
 // When the SDK's clock and the server's differ by more than a minute, every
 // time in the batch is shifted by the difference before it is judged, so a
