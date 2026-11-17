@@ -56,7 +56,7 @@ func rolesOf(grants []management.Grant) []string {
 func TestEveryRoleIsGrantedAndListed(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	adminID := me(t, srv, testkit.InstanceAdminToken(t)).Member.Id
 	p := createProject(t, admin, projectKey())
 	byRole := map[string]testkit.Member{}
@@ -98,7 +98,7 @@ func TestEveryRoleIsGrantedAndListed(t *testing.T) {
 func TestGrantingIsRefusedTwiceAndForUnknownMembersAndRoles(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
 	m := testkit.NewMember(t, pool)
 	grant(t, admin, p.Key, m.ID, "developer")
@@ -134,12 +134,14 @@ func TestGrantingIsRefusedTwiceAndForUnknownMembersAndRoles(t *testing.T) {
 func TestOnlyAnOwnerManagesGrantsAndEveryGrantHolderReadsThem(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p, other := createProject(t, admin, projectKey()), createProject(t, admin, projectKey())
 	target := testkit.NewMember(t, pool)
 
 	for _, role := range []access.RoleName{access.RoleViewer, access.RoleDeveloper, access.RoleMaintainer, access.RoleOwner} {
-		c := testkit.Client(t, srv, testkit.GrantedToken(t, pool, projectIDOf(p), role))
+		holder := testkit.NewMember(t, pool)
+		testkit.Grant(t, pool, projectIDOf(p), holder.ID, role)
+		c := signedIn(t, srv, holder).ClientWithResponses
 		if res := do(c.ListProjectMembersWithResponse(t.Context(), p.Key)); res.JSON200 == nil {
 			t.Errorf("%s listing members = %d: %s", role, res.StatusCode(), res.Body)
 		}
@@ -164,7 +166,9 @@ func TestOnlyAnOwnerManagesGrantsAndEveryGrantHolderReadsThem(t *testing.T) {
 		*pr.Permission != "project.read" {
 		t.Errorf("a stranger's refusal names %v, want project.read", pr.Permission)
 	}
-	elsewhere := testkit.Client(t, srv, testkit.GrantedToken(t, pool, projectIDOf(other), access.RoleOwner))
+	otherOwner := testkit.NewMember(t, pool)
+	testkit.Grant(t, pool, projectIDOf(other), otherOwner.ID, access.RoleOwner)
+	elsewhere := signedIn(t, srv, otherOwner).ClientWithResponses
 	cross := do(elsewhere.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: target.ID.Bytes(), Role: "viewer"}))
 	assertProblem(t, "the owner of another project", cross.StatusCode(), cross.Body, http.StatusForbidden, "forbidden")
 }
@@ -196,7 +200,7 @@ func TestAnInstanceAdminWithoutAGrantActsAsOwner(t *testing.T) {
 func TestAMembersPermissionsAreTheUnionOfTheirGrantsAndRemovingOneKeepsTheOthers(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
 	m := testkit.NewMember(t, pool)
 	mc := testkit.Client(t, srv, testkit.PersonalToken(t, pool, m.ID, "script", access.ScopeRead, access.ScopeFlagsWrite,
@@ -225,7 +229,7 @@ func TestAMembersPermissionsAreTheUnionOfTheirGrantsAndRemovingOneKeepsTheOthers
 func TestGrantWritesAreAudited(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	adminID := me(t, srv, testkit.InstanceAdminToken(t)).Member.Id
 	p := createProject(t, admin, projectKey())
 	m := testkit.NewMember(t, pool)
@@ -250,32 +254,5 @@ func TestGrantWritesAreAudited(t *testing.T) {
 			values["member"] != m.ID.String() || values["role"] != "developer" || values["source"] != "manual" {
 			t.Errorf("%s = %+v, want the grant in its project, by the instance admin", action, e)
 		}
-	}
-}
-
-// A credential cannot hand out what it does not hold: an owner's token
-// narrowed by its scopes is capped by what the scopes leave it.
-func TestAScopedTokenGrantsOnlyRolesWithinWhatItsScopesLeaveIt(t *testing.T) {
-	srv := testkit.StartServer(t)
-	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
-	p := createProject(t, admin, projectKey())
-	owner := testkit.NewMember(t, pool)
-	testkit.Grant(t, pool, projectIDOf(p), owner.ID, access.RoleOwner)
-	noFlags := testkit.Client(t, srv, testkit.PersonalToken(t, pool, owner.ID, "no flags", access.ScopeProjectAdmin))
-	m := testkit.NewMember(t, pool)
-
-	res := do(noFlags.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: m.ID.Bytes(), Role: "maintainer"}))
-	if pr := assertProblem(t, "maintainer without flags:write", res.StatusCode(), res.Body, http.StatusUnprocessableEntity,
-		"role_not_allowed"); pr.Permission == nil || *pr.Permission != "declaration.manage" {
-		t.Errorf("the refusal names %v, want declaration.manage", pr.Permission)
-	}
-	dev := do(noFlags.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: m.ID.Bytes(), Role: "developer"}))
-	if pr := assertProblem(t, "developer without flags:write", dev.StatusCode(), dev.Body, http.StatusUnprocessableEntity,
-		"role_not_allowed"); pr.Permission == nil || *pr.Permission != "flag.edit" {
-		t.Errorf("the refusal names %v, want flag.edit", pr.Permission)
-	}
-	if res := do(noFlags.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: m.ID.Bytes(), Role: "viewer"})); res.JSON201 == nil {
-		t.Errorf("viewer = %d: %s", res.StatusCode(), res.Body)
 	}
 }

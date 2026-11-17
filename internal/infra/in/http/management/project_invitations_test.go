@@ -21,18 +21,14 @@ type manager struct {
 	*management.ClientWithResponses
 }
 
-// memberIn creates a member holding role in project and returns them acting
-// through a token of the scopes a member who is no instance admin holds, or
-// of ss when given.
-func memberIn(t *testing.T, srv *testkit.Server, project management.Project, role access.RoleName, ss ...access.Scope) manager {
+// memberIn creates a member holding role in project and returns them signed
+// in, since inviting needs a session.
+func memberIn(t *testing.T, srv *testkit.Server, project management.Project, role access.RoleName) manager {
 	t.Helper()
 	pool := testkit.Pool(t)
 	m := testkit.NewMember(t, pool, testkit.WithDisplayName("Owner "+projectKey()))
 	testkit.Grant(t, pool, projectIDOf(project), m.ID, role)
-	if len(ss) == 0 {
-		ss = []access.Scope{access.ScopeRead, access.ScopeFlagsWrite, access.ScopeExperimentsWrite, access.ScopeProjectAdmin}
-	}
-	return manager{Member: m, ClientWithResponses: testkit.Client(t, srv, testkit.PersonalToken(t, pool, m.ID, "inviter", ss...))}
+	return manager{Member: m, ClientWithResponses: signedIn(t, srv, m).ClientWithResponses}
 }
 
 // inviteTo invites a new person to project with role through c and returns
@@ -161,7 +157,7 @@ func wantActiveWithoutGrant(t *testing.T, admin *management.ClientWithResponses,
 func TestAnOwnerInvitesToTheirProjectAndAcceptingGrantsTheRole(t *testing.T) {
 	c := testkit.Clock()
 	srv := testkit.StartServer(t, testkit.WithClock(c))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
 	owner := memberIn(t, srv, p, access.RoleOwner)
 
@@ -231,14 +227,14 @@ func TestAnOwnerInvitesToTheirProjectAndAcceptingGrantsTheRole(t *testing.T) {
 
 func TestAnInvitationOfTheInstanceAloneStillShowsNoProject(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	mi := invite(t, admin, "Instance Only")
 	wantShownWithoutProject(t, srv, *mi.Invitation.Url)
 }
 
 func TestAnInstanceAdminsInvitationMayCarryAGrant(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	adminID := me(t, srv, testkit.InstanceAdminToken(t)).Member.Id
 	p := createProject(t, admin, projectKey())
 
@@ -282,15 +278,14 @@ func TestAnInstanceAdminsInvitationMayCarryAGrant(t *testing.T) {
 
 func TestOnlyAnOwnerOfTheProjectInvitesToIt(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p, other := createProject(t, admin, projectKey()), createProject(t, admin, projectKey())
 	pool := testkit.Pool(t)
 
 	for name, c := range map[string]*management.ClientWithResponses{
 		"a maintainer":              memberIn(t, srv, p, access.RoleMaintainer).ClientWithResponses,
-		"a member holding no grant": testkit.Client(t, srv, testkit.MemberToken(t, pool, access.ScopeRead, access.ScopeProjectAdmin)),
+		"a member holding no grant": signedIn(t, srv, testkit.NewMember(t, pool)).ClientWithResponses,
 		"an owner of another":       memberIn(t, srv, other, access.RoleOwner).ClientWithResponses,
-		"an owner's project token":  pipeline(t, srv, p, "owner", management.ScopeProjectAdmin),
 	} {
 		email := newEmail()
 		res := do(c.InviteProjectMemberWithResponse(t.Context(), p.Key,
@@ -308,6 +303,11 @@ func TestOnlyAnOwnerOfTheProjectInvitesToIt(t *testing.T) {
 		}
 	}
 
+	// A project token never invites: only a signed-in member does.
+	byToken := do(pipeline(t, srv, p, "owner", management.ScopeProjectAdmin).InviteProjectMemberWithResponse(t.Context(), p.Key,
+		management.ProjectInvitationCreate{Email: newEmail(), DisplayName: "Refused", Role: "viewer"}))
+	assertProblem(t, "an owner's project token", byToken.StatusCode(), byToken.Body, http.StatusForbidden, "session_required")
+
 	res := do(admin.InviteProjectMemberWithResponse(t.Context(), "no-such-project",
 		management.ProjectInvitationCreate{Email: newEmail(), DisplayName: "Nowhere", Role: "viewer"}))
 	assertProblem(t, "an unknown project", res.StatusCode(), res.Body, http.StatusNotFound, "not_found")
@@ -320,38 +320,25 @@ func TestOnlyAnOwnerOfTheProjectInvitesToIt(t *testing.T) {
 	})
 }
 
-func TestAnInvitationNeverCarriesARoleItsInviterDoesNotHold(t *testing.T) {
+func TestAnInvitationRefusesAnUnknownRoleAndAMalformedEmail(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
-	// An owner whose token carries no flag scope holds no flag permission
-	// through it, so cannot hand out a role that has any.
-	narrow := memberIn(t, srv, p, access.RoleOwner, access.ScopeRead, access.ScopeProjectAdmin)
+	owner := memberIn(t, srv, p, access.RoleOwner)
+	mustInviteTo(t, owner.ClientWithResponses, p.Key, newEmail(), "viewer")
 
-	email := newEmail()
-	res := do(narrow.InviteProjectMemberWithResponse(t.Context(), p.Key,
-		management.ProjectInvitationCreate{Email: email, DisplayName: "Too Much", Role: "developer"}))
-	pr := assertProblem(t, "a role beyond the token", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "role_not_allowed")
-	if pr.Permission == nil {
-		t.Error("role_not_allowed does not name the permission lacking")
-	}
-	if got := listedEmails(t, admin, management.ListMembersParams{Q: &email}); len(got) != 0 {
-		t.Errorf("the refused invitation created %v", got)
-	}
-	mustInviteTo(t, narrow.ClientWithResponses, p.Key, newEmail(), "viewer")
-
-	unknown := do(narrow.InviteProjectMemberWithResponse(t.Context(), p.Key,
+	unknown := do(owner.InviteProjectMemberWithResponse(t.Context(), p.Key,
 		management.ProjectInvitationCreate{Email: newEmail(), DisplayName: "Admin?", Role: "admin"}))
 	assertProblem(t, "a role that is none of the built-in ones", unknown.StatusCode(), unknown.Body, http.StatusUnprocessableEntity, "invalid_grant")
 
-	invalid := do(narrow.InviteProjectMemberWithResponse(t.Context(), p.Key,
+	invalid := do(owner.InviteProjectMemberWithResponse(t.Context(), p.Key,
 		management.ProjectInvitationCreate{Email: "not-an-email", DisplayName: "Bad", Role: "viewer"}))
 	assertProblem(t, "a malformed email", invalid.StatusCode(), invalid.Body, http.StatusUnprocessableEntity, "invalid_member")
 }
 
 func TestInvitingAMemberTheInstanceHasIsRefusedAndPointsAtGranting(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p, other := createProject(t, admin, projectKey()), createProject(t, admin, projectKey())
 	owner := memberIn(t, srv, p, access.RoleOwner)
 
@@ -396,7 +383,7 @@ func TestInvitingAMemberTheInstanceHasIsRefusedAndPointsAtGranting(t *testing.T)
 func TestInvitingSomebodyToTheSameProjectAgainReplacesTheInvitation(t *testing.T) {
 	c := testkit.Clock()
 	srv := testkit.StartServer(t, testkit.WithClock(c))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
 	owner := memberIn(t, srv, p, access.RoleOwner)
 
@@ -438,7 +425,7 @@ func TestInvitingSomebodyToTheSameProjectAgainReplacesTheInvitation(t *testing.T
 
 func TestAnInstanceAdminsReissueKeepsTheGrantAndItsInviter(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
 	owner := memberIn(t, srv, p, access.RoleOwner)
 	mi, email := inviteTo(t, owner.ClientWithResponses, p.Key, "developer")
@@ -460,12 +447,13 @@ func TestAnInstanceAdminsReissueKeepsTheGrantAndItsInviter(t *testing.T) {
 func TestAnInvitationNoLongerAcceptableGrantsNothing(t *testing.T) {
 	c := testkit.Clock()
 	srv := testkit.StartServer(t, testkit.WithClock(c))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
 
 	t.Run("expired", func(t *testing.T) {
 		mi, email := inviteTo(t, admin, p.Key, "viewer")
 		c.Advance(7*24*time.Hour + time.Minute)
+		admin = testkit.InstanceAdminSession(t, srv) // the first one ended meanwhile
 		wantGone(t, srv, *mi.Invitation.Url, "an expired link")
 		if g := grantsOf(t, admin, p.Key, email); len(g) != 0 {
 			t.Errorf("an expired invitation granted %+v", g)
@@ -485,7 +473,7 @@ func TestAnInvitationNoLongerAcceptableGrantsNothing(t *testing.T) {
 
 func TestAnInvitationGrantsBesideWhatTheMemberWasGivenMeanwhile(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
 
 	// A member invited again after a deactivation holds what they held
@@ -513,7 +501,7 @@ func TestAnInvitationGrantsBesideWhatTheMemberWasGivenMeanwhile(t *testing.T) {
 
 func TestDeletingTheProjectDropsWhatItsInvitationsGranted(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
 	mi, email := inviteTo(t, admin, p.Key, "viewer")
 	// Deleting needs a session.
@@ -530,7 +518,7 @@ func TestDeletingTheProjectDropsWhatItsInvitationsGranted(t *testing.T) {
 
 func TestAnInvitationLosesItsGrantWhenItsInviterLosesGrantManage(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p, elsewhere := createProject(t, admin, projectKey()), createProject(t, admin, projectKey())
 	owner := memberIn(t, srv, p, access.RoleOwner)
 	testkit.Grant(t, testkit.Pool(t), projectIDOf(elsewhere), owner.ID, access.RoleOwner)
@@ -593,7 +581,7 @@ func ownerEmail(t *testing.T, admin *management.ClientWithResponses, m manager) 
 
 func TestAnInvitationLosesItsGrantWhenItsInviterIsDeactivated(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
 	owner := memberIn(t, srv, p, access.RoleOwner)
 	mi, email := inviteTo(t, owner.ClientWithResponses, p.Key, "developer")
@@ -621,11 +609,11 @@ func TestAnInvitationLosesItsGrantWhenItsInviterIsDeactivated(t *testing.T) {
 
 func TestAnInstanceAdminsInvitationOutlivesTheirGrants(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
 	pool := testkit.Pool(t)
-	inviter, token := testkit.NewInstanceAdmin(t, pool)
-	c := testkit.Client(t, srv, token)
+	inviter, _ := testkit.NewInstanceAdmin(t, pool)
+	c := signedIn(t, srv, inviter).ClientWithResponses
 	ownerGrant := grant(t, admin, p.Key, inviter.ID, "owner")
 
 	mi, email := inviteTo(t, c, p.Key, "developer")
@@ -650,12 +638,12 @@ func TestAnInstanceAdminsInvitationOutlivesTheirGrants(t *testing.T) {
 
 func TestDemotingAnInstanceAdminDropsTheGrantsOfInvitationsToProjectsTheyDoNotManage(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p, owned := createProject(t, admin, projectKey()), createProject(t, admin, projectKey())
 	pool := testkit.Pool(t)
-	inviter, token := testkit.NewInstanceAdmin(t, pool)
+	inviter, _ := testkit.NewInstanceAdmin(t, pool)
 	grant(t, admin, owned.Key, inviter.ID, "owner")
-	c := testkit.Client(t, srv, token)
+	c := signedIn(t, srv, inviter).ClientWithResponses
 
 	lost, lostEmail := inviteTo(t, c, p.Key, "viewer")
 	kept, keptEmail := inviteTo(t, c, owned.Key, "viewer")
@@ -687,7 +675,7 @@ func invitedIn(t *testing.T, c *management.ClientWithResponses, project string) 
 func TestAProjectListsTheMembersInvitedToItWithTheRoleTheirInvitationGrants(t *testing.T) {
 	c := testkit.Clock()
 	srv := testkit.StartServer(t, testkit.WithClock(c))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
 	elsewhere := createProject(t, admin, projectKey())
 	owner := memberIn(t, srv, p, access.RoleOwner)
@@ -740,7 +728,9 @@ func TestAProjectListsTheMembersInvitedToItWithTheRoleTheirInvitationGrants(t *t
 	}
 	check("while the links work")
 
-	// An expired link leaves the member invited, to be invited again.
+	// An expired link leaves the member invited, to be invited again. The
+	// owner signs in afresh, since their session ended meanwhile.
 	c.Advance(7*24*time.Hour + time.Minute)
+	owner.ClientWithResponses = signedIn(t, srv, testkit.Member{ID: owner.ID, Email: owner.Email, Password: owner.Password}).ClientWithResponses
 	check("once the links expired")
 }

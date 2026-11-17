@@ -328,7 +328,7 @@ func TestAResetAnInstanceAdminIssuedDoesNotDelayOneTheMemberAsksFor(t *testing.T
 	t.Parallel()
 	in := startResetInstance(t, testkit.MailpitOpen)
 	m := testkit.NewMember(t, in.pool)
-	adminLink := issueReset(t, in.admin, m.ID)
+	adminLink := issueReset(t, in.session(t), m.ID)
 
 	in.ask(t, m.Email)
 	linkIn(t, in.mp.AwaitMails(t, m.Email, 1)[0])

@@ -195,7 +195,7 @@ func TestAnInstanceSubscriptionReceivesTheEntriesThatNameNoProject(t *testing.T)
 	marker, _, _ := webhookEntry(t, srv, "webhook.created", created)
 
 	m := testkit.NewMember(t, testkit.Pool(t))
-	if res := do(admin.UpdateMemberWithResponse(t.Context(), m.ID.String(), management.MemberPatch{
+	if res := do(testkit.InstanceAdminSession(t, srv).UpdateMemberWithResponse(t.Context(), m.ID.String(), management.MemberPatch{
 		DisplayName: ptr("Renamed"),
 	})); res.StatusCode() != http.StatusOK {
 		t.Fatalf("PATCH member = %d: %s", res.StatusCode(), res.Body)

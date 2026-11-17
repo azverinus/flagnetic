@@ -4267,8 +4267,9 @@ export const listGrants = <ThrowOnError extends boolean = false>(
  * project is refused `role_not_allowed`, naming it in `permission`;
  * the same member and role twice `already_granted`; a deactivated
  * member `member_deactivated`; an unknown member or role
- * `invalid_grant`. Only a member grants: a project token never changes
- * who has access.
+ * `invalid_grant`. Only a member grants, signed in: an API token, a
+ * project token or a personal one, is refused `session_required`, so a
+ * leaked token cannot leave behind access that outlives it.
  *
  */
 export const createGrant = <ThrowOnError extends boolean = false>(
@@ -4375,7 +4376,8 @@ export const listProjectInvitations = <ThrowOnError extends boolean = false>(
  * deactivated before it is accepted; the audit log records
  * `invitation.grant_revoked` with the reason `inviter_lost_permission`
  * or `inviter_deactivated`. Only a member invites: a project token
- * never holds `grant.manage`.
+ * never holds `grant.manage`. Needs a signed-in session: an API token is
+ * refused `session_required`.
  *
  */
 export const inviteProjectMember = <ThrowOnError extends boolean = false>(
@@ -4673,7 +4675,8 @@ export const listMembers = <ThrowOnError extends boolean = false>(
  * once and never again. The link is `FLAGNETIC_BASE_URL`, or this
  * request's origin when it is not set, followed by
  * `/invitations/<secret>`; it expires after seven days. An email the
- * instance holds, whatever its case, is refused `already_exists`.
+ * instance holds, whatever its case, is refused `already_exists`. Needs
+ * a signed-in session: an API token is refused `session_required`.
  *
  * The invitation may carry a `grant` of a built-in role in a project,
  * which accepting it makes by hand, in the name of the instance admin
@@ -4732,7 +4735,10 @@ export const getMember = <ThrowOnError extends boolean = false>(
  * `last_instance_admin`, and demoting one an auth provider's group
  * mapping made `sso_sourced`: only the provider takes it away. Making a
  * member still invited an instance admin is refused `member_invited`:
- * they are made one once they have accepted their invitation.
+ * they are made one once they have accepted their invitation. Needs a
+ * signed-in session: an API token is refused `session_required`, so a
+ * leaked token cannot promote a member, or change a member's email to
+ * take their account over.
  *
  */
 export const updateMember = <ThrowOnError extends boolean = false>(
@@ -4791,7 +4797,8 @@ export const deactivateMember = <ThrowOnError extends boolean = false>(
  * invitation's one-time link, as on invitation. What their
  * deactivation revoked stays revoked: they sign in afresh and create
  * new tokens. Reactivating a member who is not deactivated changes
- * nothing.
+ * nothing. Needs a signed-in session: an API token is refused
+ * `session_required`.
  *
  */
 export const reactivateMember = <ThrowOnError extends boolean = false>(
@@ -4819,7 +4826,8 @@ export const reactivateMember = <ThrowOnError extends boolean = false>(
  * keeps the project and role of the one it replaces only while the
  * member who issued that one still holds `grant.manage` in the project;
  * otherwise it grants nothing, and the audit log records
- * `invitation.grant_revoked`.
+ * `invitation.grant_revoked`. Needs a signed-in session: an API token is
+ * refused `session_required`.
  *
  */
 export const reissueInvitation = <ThrowOnError extends boolean = false>(
@@ -4851,7 +4859,9 @@ export const reissueInvitation = <ThrowOnError extends boolean = false>(
  * `member_not_active`: issue their invitation again instead. A
  * deactivated member is refused `member_deactivated`. Earlier password
  * resets of the member stay open; completing one ends the others.
- * Recorded as `password.reset_issued`, without the link.
+ * Recorded as `password.reset_issued`, without the link. Needs a
+ * signed-in session: an API token is refused `session_required`, so a
+ * leaked token cannot take over a member's account.
  *
  */
 export const issuePasswordReset = <ThrowOnError extends boolean = false>(

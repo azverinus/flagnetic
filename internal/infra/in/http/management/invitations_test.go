@@ -85,7 +85,7 @@ const newPassword = "harbour-lantern-quiet-4410"
 func TestInviteThenSetAPasswordThenSignIn(t *testing.T) {
 	c := testkit.Clock()
 	srv := testkit.StartServer(t, testkit.WithClock(c))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 
 	mi := invite(t, admin, "Grace Hopper")
 	m := mi.Member
@@ -144,7 +144,7 @@ func TestInviteThenSetAPasswordThenSignIn(t *testing.T) {
 
 func TestAnInvitationLinkStartsWithTheBaseURL(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithBaseURL("https://flags.example.com/"))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	if link := *invite(t, admin, "Behind A Proxy").Invitation.Url; !strings.HasPrefix(link, "https://flags.example.com/invitations/") {
 		t.Errorf("link = %q, want it under the base URL", link)
 	}
@@ -153,7 +153,7 @@ func TestAnInvitationLinkStartsWithTheBaseURL(t *testing.T) {
 func TestAnInvitationExpiresAfterSevenDays(t *testing.T) {
 	c := testkit.Clock()
 	srv := testkit.StartServer(t, testkit.WithClock(c))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	mi := invite(t, admin, "Late Comer")
 
 	c.Advance(7*24*time.Hour - time.Minute)
@@ -162,6 +162,7 @@ func TestAnInvitationExpiresAfterSevenDays(t *testing.T) {
 	}
 	c.Advance(2 * time.Minute)
 	wantGone(t, srv, *mi.Invitation.Url, "an expired link")
+	admin = testkit.InstanceAdminSession(t, srv) // the first one ended meanwhile
 	if got := memberOf(t, admin, id.FromBytes[access.Member](mi.Member.Id)); got.Status != management.MemberStatusInvited {
 		t.Errorf("member = %s, want still invited", got.Status)
 	}
@@ -169,7 +170,7 @@ func TestAnInvitationExpiresAfterSevenDays(t *testing.T) {
 
 func TestReissuingAnInvitationInvalidatesTheOldLink(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	mi := invite(t, admin, "Second Chance")
 	fresh := reissue(t, admin, mi.Member)
 	if fresh == *mi.Invitation.Url {
@@ -188,7 +189,7 @@ func TestReissuingAnInvitationInvalidatesTheOldLink(t *testing.T) {
 func TestAnInvitationIsRefusedForAMemberWhoIsNotInvited(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	for _, s := range []access.MemberStatus{access.MemberActive, access.MemberDeactivated} {
 		m := testkit.NewMember(t, pool, testkit.WithStatus(s))
 		res := do(admin.ReissueInvitationWithResponse(t.Context(), m.ID.String()))
@@ -200,7 +201,7 @@ func TestAnInvitationIsRefusedForAMemberWhoIsNotInvited(t *testing.T) {
 
 func TestInvitingAnEmailTheInstanceAlreadyHolds(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	mi := invite(t, admin, "Only Once")
 	for _, email := range []string{mi.Member.Email, strings.ToUpper(mi.Member.Email), testkit.InstanceAdminEmail} {
 		res := do(admin.InviteMemberWithResponse(t.Context(), management.MemberInvite{Email: email, DisplayName: "Twice"}))
@@ -217,7 +218,7 @@ func TestInvitingAnEmailTheInstanceAlreadyHolds(t *testing.T) {
 
 func TestAcceptingAnInvitationAppliesThePasswordPolicy(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	mi := invite(t, admin, "Careful Chooser")
 	local, _, _ := strings.Cut(mi.Member.Email, "@")
 	for password, rule := range map[string]string{
@@ -254,7 +255,7 @@ func TestAnUnknownInvitationSecretIsGone(t *testing.T) {
 
 func TestAcceptingAnInvitationIsRefusedAsAForm(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	mi := invite(t, admin, "Form Filler")
 	b := testkit.NewBrowser(t, srv.URL)
 	b.Header.Set("Sec-Fetch-Site", "cross-site")
@@ -273,7 +274,7 @@ func TestAcceptingAnInvitationIsRefusedAsAForm(t *testing.T) {
 
 func TestAnInvitationSecretNeverReachesALogLine(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	mi := invite(t, admin, "Quiet One")
 	secret := secretOf(*mi.Invitation.Url)
 	opened(t, srv, *mi.Invitation.Url)
@@ -329,7 +330,7 @@ func TestThePublicOperationsAreTheOnesDeclaredPublic(t *testing.T) {
 
 func TestReactivatingAMemberWhoNeverSetAPasswordInvitesThemAgain(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	mi := invite(t, admin, "Back Again")
 	id := mi.Member.Id.String()
 	if res := do(admin.DeactivateMemberWithResponse(t.Context(), id)); res.StatusCode() != http.StatusOK {
@@ -362,7 +363,7 @@ func reissueStatus(t *testing.T, admin *management.ClientWithResponses, m manage
 func TestEveryInvitationOperationOfMembersNeedsAnInstanceAdmin(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	target := invite(t, admin, "Target").Member
 	caller := signedIn(t, srv, testkit.NewMember(t, pool))
 	if res := do(caller.InviteMemberWithResponse(t.Context(), management.MemberInvite{
@@ -377,7 +378,7 @@ func TestEveryInvitationOperationOfMembersNeedsAnInstanceAdmin(t *testing.T) {
 
 func TestThePerAddressThrottleCoversInvitationAcceptance(t *testing.T) {
 	srv := testkit.StartServer(t, trustLoopback())
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	mi := invite(t, admin, "Throttled Joiner")
 	b := fromAddress(t, srv, someAddress())
 	for i := range access.SourceFailureLimit - 1 {
@@ -400,7 +401,7 @@ func TestThePerAddressThrottleCoversInvitationAcceptance(t *testing.T) {
 
 func TestAnAcceptedInvitationCountsNoFailureOfItsAddress(t *testing.T) {
 	srv := testkit.StartServer(t, trustLoopback())
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	b := fromAddress(t, srv, someAddress())
 	for range access.SourceFailureLimit - 1 {
 		signInAs(t, b, "nobody-"+rand.Text()+"@example.com", "not-the-password-9")
@@ -420,7 +421,7 @@ func TestAnAcceptedInvitationCountsNoFailureOfItsAddress(t *testing.T) {
 func TestTheRetentionWorkerPurgesInvitationsLongPastUse(t *testing.T) {
 	c := testkit.Clock()
 	srv, pool := retentionServer(t, c)
-	admin := testkit.Client(t, srv, testkit.Bootstrap(t, pool))
+	admin := testkit.InstanceAdminSessionOn(t, srv, pool)
 
 	accepted := invite(t, admin, "Accepted")
 	c.Advance(time.Minute)
@@ -432,6 +433,7 @@ func TestTheRetentionWorkerPurgesInvitationsLongPastUse(t *testing.T) {
 	expiredLatest := reissue(t, admin, expired.Member)
 
 	c.Advance(7*24*time.Hour + 30*24*time.Hour + 24*time.Hour - 2*24*time.Hour)
+	admin = testkit.InstanceAdminSessionOn(t, srv, pool) // the first one ended meanwhile
 	recent := invite(t, admin, "Recently Replaced")
 	reissue(t, admin, recent.Member)
 	c.Advance(2 * 24 * time.Hour)

@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/testkit"
@@ -27,11 +29,19 @@ const publicURL = "http://localhost:8080"
 type env struct {
 	srv   *testkit.Server
 	admin *management.ClientWithResponses
+	// pool is the database the server runs on.
+	pool *pgxpool.Pool
 }
 
 func start(t *testing.T, opts ...testkit.ServerOption) env {
 	t.Helper()
-	srv := testkit.StartServer(t, append([]testkit.ServerOption{testkit.WithBaseURL(publicURL)}, opts...)...)
+	return startOn(t, testkit.Pool(t), opts...)
+}
+
+// startOn is start for a server running on pool.
+func startOn(t *testing.T, pool *pgxpool.Pool, opts ...testkit.ServerOption) env {
+	t.Helper()
+	srv := testkit.StartServer(t, append([]testkit.ServerOption{testkit.WithBaseURL(publicURL), testkit.WithPool(pool)}, opts...)...)
 	t.Cleanup(func() {
 		if t.Failed() {
 			for _, r := range srv.Logs.Find("single sign-on failed") {
@@ -39,7 +49,7 @@ func start(t *testing.T, opts ...testkit.ServerOption) env {
 			}
 		}
 	})
-	return env{srv: srv, admin: testkit.Client(t, srv, testkit.InstanceAdminToken(t))}
+	return env{srv: srv, pool: pool, admin: testkit.Client(t, srv, testkit.Bootstrap(t, pool))}
 }
 
 func ptr[T any](v T) *T { return &v }
@@ -685,7 +695,7 @@ func TestTheAttemptCookieIsHostBoundWhereCookiesAreSecure(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			srv := testkit.StartServer(t, append([]testkit.ServerOption{testkit.WithBaseURL(tc.baseURL)}, tc.options...)...)
-			e := env{srv: srv, admin: testkit.Client(t, srv, testkit.InstanceAdminToken(t))}
+			e := env{srv: srv, pool: testkit.Pool(t), admin: testkit.Client(t, srv, testkit.InstanceAdminToken(t))}
 			slug := e.forged(t, idp, nil)
 			client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/sso/"+slug+"/start", nil)
@@ -813,4 +823,13 @@ func TestSimultaneousStartsAtOneProviderShareOneDiscoveryFetch(t *testing.T) {
 	if n := asked.Load(); n != 1 {
 		t.Errorf("the provider's discovery was fetched %d times for five simultaneous starts, want one", n)
 	}
+}
+
+// session returns the instance admin signed in afresh, for the operations
+// that create access (inviting, granting, reactivating, promoting and issuing
+// a password reset) and refuse every API token. It is signed in at each call,
+// since a session ends with the idle timeout a test's clock may outrun.
+func (e env) session(t *testing.T) *management.ClientWithResponses {
+	t.Helper()
+	return testkit.InstanceAdminSessionOn(t, e.srv, e.pool)
 }

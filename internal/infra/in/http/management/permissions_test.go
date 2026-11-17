@@ -218,12 +218,16 @@ func TestThePermissionMatrixHoldsRowByRow(t *testing.T) {
 		"webhook.manage":            {access.RoleMaintainer, access.RoleOwner},
 		"sink.manage":               {access.RoleMaintainer, access.RoleOwner},
 	}
+	// Signed in, since granting needs a session and the rest of the matrix
+	// is judged the same for a session as for a token.
 	callers := map[string]*management.ClientWithResponses{
-		"instance admin": testkit.Client(t, srv, testkit.InstanceAdminToken(t)),
-		"no grant":       testkit.Client(t, srv, testkit.MemberToken(t, pool, access.ScopeRead, access.ScopeFlagsWrite, access.ScopeExperimentsWrite, access.ScopeProjectAdmin)),
+		"instance admin": testkit.InstanceAdminSession(t, srv),
+		"no grant":       signedIn(t, srv, testkit.NewMember(t, pool)).ClientWithResponses,
 	}
 	for _, r := range access.Roles() {
-		callers[string(r.Name)] = testkit.Client(t, srv, testkit.GrantedToken(t, pool, projectIDOf(p), r.Name))
+		m := testkit.NewMember(t, pool)
+		testkit.Grant(t, pool, projectIDOf(p), m.ID, r.Name)
+		callers[string(r.Name)] = signedIn(t, srv, m).ClientWithResponses
 	}
 
 	for _, row := range matrix(t) {

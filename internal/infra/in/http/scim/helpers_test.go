@@ -35,7 +35,8 @@ func email(domain string) string { return "u" + random() + "@" + domain }
 // providers and SCIM tokens the tests of a package share.
 type env struct {
 	srv *testkit.Server
-	// admin is the instance admin's token; browser is their session, the only
+	// admin is the bootstrap instance admin's session; browser is another
+	// instance admin's session, the only
 	// credential that creates a SCIM token.
 	admin   *management.ClientWithResponses
 	browser *testkit.Browser
@@ -44,7 +45,7 @@ type env struct {
 func start(t *testing.T, opts ...testkit.ServerOption) env {
 	t.Helper()
 	srv := testkit.StartServer(t, append([]testkit.ServerOption{testkit.WithBaseURL(publicURL)}, opts...)...)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	m := testkit.NewMember(t, testkit.Pool(t), testkit.AsInstanceAdmin())
 	b := testkit.NewBrowser(t, srv.URL)
 	b.SignIn(t, m.Email, m.Password)
