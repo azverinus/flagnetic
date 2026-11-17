@@ -35,6 +35,10 @@ Without an existing Secret, set `secrets.databaseUrl` and `secrets.secretKey`: t
 
 By default a Job runs `flagnetic migrate` before every install and upgrade (a Helm hook), and the Deployment starts with `FLAGNETIC_AUTO_MIGRATE=false`. A failed migration stops the upgrade before any pod is replaced, and the Job's log says why. Argo CD runs Helm hooks as PreSync on every sync, which is harmless because `migrate` is idempotent and takes a lock. Set `migrations.mode` to `initContainer` or `auto` for a tool that does not run hooks.
 
+## Uninstall
+
+The chart's own Secret, when you use one, is a Helm hook, so `helm uninstall` leaves it behind with the database URL and the secret key, and `helm rollback` does not restore an older one. Delete it yourself when the instance is gone, or keep the secrets in an `existingSecret` you manage.
+
 ## Rolling
 
 Pods are replaced one at a time behind a PodDisruptionBudget. A stopping pod keeps serving for `FLAGNETIC_SHUTDOWN_DRAIN` while `/readyz` answers 503, then finishes in-flight requests within `FLAGNETIC_SHUTDOWN_GRACE`; the 30 s grace period of the pod covers both.

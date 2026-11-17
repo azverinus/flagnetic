@@ -811,6 +811,9 @@ jobs:
       - name: ct lint
         run: ct lint --config .github/ct.yaml --all
       - uses: helm/kind-action@ea822c7bf1874f08e5a491df991c228edffc3376 # v1.15.2
+        with:
+          # The oldest Kubernetes minor the chart supports.
+          node_image: kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0
       - name: PostgreSQL for the install
         run: |
           kubectl apply -f deploy/helm/test/postgres.yaml

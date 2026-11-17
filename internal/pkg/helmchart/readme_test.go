@@ -37,7 +37,7 @@ func TestReadmeListsEveryValue(t *testing.T) {
 		t.Fatal(err)
 	}
 	var doc yaml.Node
-	if err := yaml.Unmarshal(raw, &doc); err != nil {
+	if err = yaml.Unmarshal(raw, &doc); err != nil {
 		t.Fatal(err)
 	}
 	var want []string
