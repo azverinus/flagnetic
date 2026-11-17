@@ -48,13 +48,13 @@ function InstanceProjects() {
         }
       />
       <section aria-labelledby={newProject} className="flex flex-col gap-4">
-        <h2 id={newProject} className="text-base font-semibold">
+        <h2 id={newProject} className="text-base font-medium">
           <Trans>New project</Trans>
         </h2>
         <CreateProject />
       </section>
       <section aria-labelledby={fromDocument} className="flex flex-col gap-4">
-        <h2 id={fromDocument} className="text-base font-semibold">
+        <h2 id={fromDocument} className="text-base font-medium">
           <Trans>Create from a document</Trans>
         </h2>
         <p className="text-sm text-muted-foreground">
@@ -67,7 +67,7 @@ function InstanceProjects() {
         <CreateFromDocument />
       </section>
       <section aria-labelledby={allProjects} className="flex flex-col gap-4">
-        <h2 id={allProjects} className="text-base font-semibold">
+        <h2 id={allProjects} className="text-base font-medium">
           <Trans>All projects</Trans>
         </h2>
         {projects.isError ? (

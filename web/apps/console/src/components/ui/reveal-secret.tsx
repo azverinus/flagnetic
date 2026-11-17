@@ -88,7 +88,7 @@ function Reveal({ value, kept, children, onClose }: Omit<RevealSecretProps, "ope
       </div>
       <p role="status" className="min-h-4 text-xs text-muted-foreground">
         {copy === "copied" ? (
-          <span className="inline-flex items-center gap-1 text-primary">
+          <span className="inline-flex items-center gap-1 text-primary-ink">
             <CheckIcon aria-hidden className="size-3" />
             <Trans>Copied to the clipboard.</Trans>
           </span>

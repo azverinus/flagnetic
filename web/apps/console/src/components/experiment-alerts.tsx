@@ -211,7 +211,7 @@ export function ExperimentAlertsSection({
   return (
     <section aria-labelledby="experiment-alerts" className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <h2 id="experiment-alerts" className="text-lg font-semibold">
+        <h2 id="experiment-alerts" className="text-base/6 font-medium">
           <Trans>Alerts</Trans>
         </h2>
         <p className="max-w-prose text-sm text-muted-foreground">

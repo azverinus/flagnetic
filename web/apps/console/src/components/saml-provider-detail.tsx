@@ -25,7 +25,7 @@ export function SamlRegistration({ provider }: { provider: AuthProvider }) {
   const { acs_url: acs, entity_id: entity, metadata_url: metadata } = provider;
   return (
     <section aria-labelledby="register" className="flex flex-col gap-3">
-      <h2 id="register" className="text-base font-semibold">
+      <h2 id="register" className="text-base font-medium">
         <Trans>Register the instance at the identity provider</Trans>
       </h2>
       {acs && entity && metadata ? (
@@ -83,7 +83,7 @@ export function SamlIdentityProvider({ provider }: { provider: AuthProvider }) {
   const read = provider.idp_metadata_refreshed_at;
   return (
     <section aria-labelledby="identity-provider" className="flex flex-col gap-3">
-      <h2 id="identity-provider" className="text-base font-semibold">
+      <h2 id="identity-provider" className="text-base font-medium">
         <Trans>Identity provider</Trans>
       </h2>
       <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
@@ -191,7 +191,7 @@ export function SamlCertificates({
 
   return (
     <section aria-labelledby="certificates" className="flex flex-col gap-3">
-      <h2 id="certificates" className="text-base font-semibold">
+      <h2 id="certificates" className="text-base font-medium">
         <Trans>Certificates</Trans>
       </h2>
       <p className="text-sm text-muted-foreground">

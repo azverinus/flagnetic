@@ -39,7 +39,7 @@ function Overview() {
       />
       <section aria-labelledby={environmentsHeading} className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-4">
-          <h2 id={environmentsHeading} className="text-base font-semibold">
+          <h2 id={environmentsHeading} className="text-base font-medium">
             <Trans>Environments</Trans>
           </h2>
           <Link

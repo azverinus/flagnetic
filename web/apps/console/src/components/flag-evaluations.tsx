@@ -72,7 +72,7 @@ export function FlagEvaluations({
     <section aria-labelledby={heading} className="flex flex-col gap-4 rounded-md border p-4">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h2 id={heading} className="text-base font-semibold">
+          <h2 id={heading} className="text-base font-medium">
             <Trans>Evaluations</Trans>
           </h2>
           <p className="text-sm text-muted-foreground">

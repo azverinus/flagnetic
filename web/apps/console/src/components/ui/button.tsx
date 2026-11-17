@@ -9,18 +9,24 @@ const button = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default: "bg-primary text-primary-foreground shadow-card hover:bg-primary/90",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        /** Outlined: a destructive action is not the loudest thing on the page. */
+        destructive:
+          "border border-destructive/50 bg-transparent text-destructive hover:bg-destructive/10",
+        /** Filled, for the confirm dialog that follows a destructive action. */
+        destructiveFilled: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        outline:
+          "border border-input bg-card shadow-card hover:bg-accent hover:text-accent-foreground",
         ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        link: "text-primary-ink underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3",
-        lg: "h-10 rounded-md px-6",
-        icon: "size-9",
+        // One height in headers and toolbars: default and sm are the same 32.
+        default: "h-8 px-3",
+        sm: "h-8 px-3",
+        lg: "h-10 px-6",
+        icon: "size-8",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

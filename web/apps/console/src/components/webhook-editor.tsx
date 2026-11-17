@@ -321,7 +321,7 @@ function EventPicker({
           </label>
           {eventGroups(catalogue).map((group) => (
             <fieldset key={group.entity} className="flex flex-col gap-1.5">
-              <legend className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              <legend className="text-xs font-medium text-muted-foreground">
                 {eventGroupName(i18n, group.entity)}
               </legend>
               {group.types.map((info) => (

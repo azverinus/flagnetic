@@ -92,7 +92,7 @@ function ResetForm({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">
+      <h1 className="text-2xl/7 font-semibold">
         <Trans>Choose a new password</Trans>
       </h1>
       <p className="text-sm text-muted-foreground">
@@ -147,7 +147,7 @@ function ResetForm({
 function ResetGone() {
   return (
     <div className="flex flex-col gap-3">
-      <h1 className="text-xl font-semibold">
+      <h1 className="text-2xl/7 font-semibold">
         <Trans>This password reset link no longer works</Trans>
       </h1>
       <p className="text-sm text-muted-foreground">

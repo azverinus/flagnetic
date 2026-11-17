@@ -37,7 +37,7 @@ export type TableProps<T extends RowData> = {
  * The first column held in view: above the scrolled cells, on the surface
  * they pass under.
  */
-const stickyClassName = "sticky left-0 z-[1] bg-background";
+const stickyClassName = "sticky left-0 z-[1] bg-inherit";
 
 /** How many placeholder rows a loading table shows. */
 const loadingRows = 3;
@@ -92,7 +92,10 @@ export function Table<T extends RowData>({
       className={cn("relative w-full max-w-full min-w-0 overflow-x-auto", className)}
       {...(scrolls ? { role: "region", tabIndex: 0, "aria-labelledby": captionId } : {})}
     >
-      <table aria-busy={loading || undefined} className="w-full border-collapse text-sm">
+      <table
+        aria-busy={loading || undefined}
+        className="w-full border-collapse text-sm tabular-nums"
+      >
         <caption
           id={captionId}
           className={cn("pb-2 text-left text-sm text-muted-foreground", hideCaption && "sr-only")}
@@ -101,13 +104,13 @@ export function Table<T extends RowData>({
         </caption>
         <thead>
           {table.getHeaderGroups().map((group) => (
-            <tr key={group.id} className="border-b">
+            <tr key={group.id} className="border-b bg-raised">
               {group.headers.map((header, index) => (
                 <th
                   key={header.id}
                   scope="col"
                   className={cn(
-                    "h-10 px-3 text-left align-middle font-medium whitespace-nowrap text-muted-foreground",
+                    "h-9 px-3 text-left align-middle text-[13px] font-medium whitespace-nowrap text-muted-foreground",
                     sticky(index),
                   )}
                 >
@@ -122,7 +125,7 @@ export function Table<T extends RowData>({
         <tbody>
           {loading ? (
             Array.from({ length: loadingRows }, (_, row) => (
-              <tr key={row} className="border-b">
+              <tr key={row} className="border-b bg-card">
                 {Array.from({ length: width }, (_, cell) => (
                   <td key={cell} className={cn("px-3 py-3", sticky(cell))}>
                     <Skeleton className="h-4 w-24" />
@@ -138,9 +141,9 @@ export function Table<T extends RowData>({
             </tr>
           ) : (
             table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="border-b hover:bg-muted/40">
+              <tr key={row.id} className="group/row border-b bg-card hover:bg-raised">
                 {row.getAllCells().map((cell, index) => (
-                  <td key={cell.id} className={cn("px-3 py-2 align-middle", sticky(index))}>
+                  <td key={cell.id} className={cn("h-11 px-3 py-2 align-middle", sticky(index))}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}

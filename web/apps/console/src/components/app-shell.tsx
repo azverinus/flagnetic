@@ -44,9 +44,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         <div className="flex h-14 items-center gap-2 border-b px-4">
           <img src="/favicon.svg" alt="" className="size-6 shrink-0" />
-          <span
-            className={cn("truncate font-semibold", collapsed ? "sr-only" : "hidden md:inline")}
-          >
+          <span className={cn("truncate font-medium", collapsed ? "sr-only" : "hidden md:inline")}>
             Flagnetic
           </span>
         </div>

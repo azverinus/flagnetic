@@ -59,7 +59,7 @@ function ChangeRequestDetail() {
 function ChangeRequestNotFound({ project }: { project: string }) {
   return (
     <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
-      <h1 className="text-xl font-semibold">
+      <h1 className="text-2xl/7 font-semibold">
         <Trans>Change request not found</Trans>
       </h1>
       <p className="text-sm text-muted-foreground">
@@ -276,7 +276,7 @@ function ChangeRequestPage({
 
       {approval || rejection ? (
         <section aria-labelledby="decisions" className="flex flex-col gap-2">
-          <h2 id="decisions" className="text-base font-semibold">
+          <h2 id="decisions" className="text-base font-medium">
             <Trans>Decision</Trans>
           </h2>
           {approval ? <Decision decision={approval} approved /> : null}
@@ -285,7 +285,7 @@ function ChangeRequestPage({
       ) : null}
 
       <section aria-labelledby="changes" className="flex flex-col gap-2">
-        <h2 id="changes" className="text-base font-semibold">
+        <h2 id="changes" className="text-base font-medium">
           <Trans>Changes</Trans>
         </h2>
         {changeRequest.kind === "experiment" ? (

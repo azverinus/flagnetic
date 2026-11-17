@@ -44,7 +44,7 @@ export function ExperimentAssignmentLookup({
   return (
     <section aria-labelledby="experiment-assignment" className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <h2 id="experiment-assignment" className="text-lg font-semibold">
+        <h2 id="experiment-assignment" className="text-base/6 font-medium">
           <Trans>Assignment lookup</Trans>
         </h2>
         <p className="max-w-prose text-sm text-muted-foreground">
@@ -183,7 +183,7 @@ function CopyableQuery({ sql }: { sql: string }) {
       </pre>
       <p role="status" className="min-h-4 text-xs text-muted-foreground">
         {copy === "copied" ? (
-          <span className="inline-flex items-center gap-1 text-primary">
+          <span className="inline-flex items-center gap-1 text-primary-ink">
             <CheckIcon aria-hidden className="size-3" />
             <Trans>Copied to the clipboard.</Trans>
           </span>

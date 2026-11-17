@@ -17,6 +17,16 @@ const rows: Row[] = [
 ];
 
 describe("a table", () => {
+  it("puts its header on the raised surface, sets figures tabular and keeps rows 44 px", () => {
+    renderWithProviders(<Table caption="Projects" columns={columns} data={rows} />);
+
+    const table = screen.getByRole("table", { name: "Projects" });
+    expect(table).toHaveClass("tabular-nums");
+    expect(within(table).getAllByRole("row")[0]).toHaveClass("bg-raised");
+    expect(within(table).getByRole("cell", { name: "Billing" })).toHaveClass("h-11");
+    expect(within(table).getAllByRole("row")[1]).toHaveClass("hover:bg-raised");
+  });
+
   it("is named by its caption, with column headers and one row per item", () => {
     renderWithProviders(<Table caption="Projects" columns={columns} data={rows} />);
 

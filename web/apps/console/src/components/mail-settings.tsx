@@ -388,7 +388,7 @@ function TestResult({
   if (sent) {
     return (
       <p role="status" className="flex items-start gap-2 rounded-md border p-3 text-sm">
-        <CircleCheckIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
+        <CircleCheckIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-primary-ink" />
         <span>
           <Trans>The SMTP server accepted a test mail to {recipient}. Check that it arrived.</Trans>
         </span>

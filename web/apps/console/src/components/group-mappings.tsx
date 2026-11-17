@@ -47,7 +47,7 @@ export function GroupMappingsSection({ provider }: { provider: string }) {
 
   return (
     <section aria-labelledby="group-mappings" className="flex flex-col gap-4">
-      <h2 id="group-mappings" className="text-base font-semibold">
+      <h2 id="group-mappings" className="text-base font-medium">
         <Trans>Group mappings</Trans>
       </h2>
       <p className="text-sm text-muted-foreground">

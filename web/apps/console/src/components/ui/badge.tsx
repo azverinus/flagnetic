@@ -7,7 +7,7 @@ const badge = cva("rounded-sm border px-1.5 py-0.5 text-xs", {
   variants: {
     variant: {
       /** Something to notice about a row, such as the device in use. */
-      default: "border-primary/40 text-primary",
+      default: "border-primary/40 text-primary-ink",
       /** A plain fact about a row, such as a standard attribute. */
       muted: "text-muted-foreground",
       /** Something that went wrong, such as a delivery that was given up. */

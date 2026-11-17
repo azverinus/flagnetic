@@ -34,6 +34,6 @@ describe("a page header", () => {
     expect(screen.getByRole("navigation", { name: "Breadcrumb" })).toBeInTheDocument();
     expect(screen.getByText("Where the project's flags are served.")).toBeInTheDocument();
     const actions = screen.getByRole("button", { name: "Export" }).parentElement!;
-    expect(actions).toHaveClass("flex-wrap", "[&>*]:h-9");
+    expect(actions).toHaveClass("flex-wrap", "[&>*]:h-8");
   });
 });

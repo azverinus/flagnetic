@@ -93,7 +93,7 @@ function ExperimentDetail() {
 function ExperimentNotFound({ project }: { project: string }) {
   return (
     <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
-      <h1 className="text-xl font-semibold">
+      <h1 className="text-2xl/7 font-semibold">
         <Trans>Experiment not found</Trans>
       </h1>
       <p className="text-sm text-muted-foreground">
@@ -251,7 +251,7 @@ function ExperimentPage({
       />
       <ExperimentAlertsSection project={project} experiment={base} />
       <ExperimentAssignmentLookup project={project} experiment={base} />
-      <h2 className="text-lg font-semibold">
+      <h2 className="text-base/6 font-medium">
         <Trans>Definition</Trans>
       </h2>
       {canEdit ? null : (

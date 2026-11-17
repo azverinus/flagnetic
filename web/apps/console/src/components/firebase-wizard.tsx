@@ -188,7 +188,7 @@ function StepList({ current }: { current: FirebaseStep }) {
         <li
           key={step}
           aria-current={step === current ? "step" : undefined}
-          className={step === current ? "font-semibold" : "text-muted-foreground"}
+          className={step === current ? "font-medium" : "text-muted-foreground"}
         >
           {index + 1}. {i18n._(stepNames[step])}
         </li>
@@ -307,7 +307,7 @@ function Parameters({
   return (
     <div className="flex flex-col gap-6">
       <section aria-labelledby="firebase-parameters" className="flex flex-col gap-2">
-        <h3 id="firebase-parameters" className="text-sm font-semibold">
+        <h3 id="firebase-parameters" className="text-sm font-medium">
           <Trans>Parameters as flags</Trans>
         </h3>
         <p className="text-sm text-muted-foreground">
@@ -371,7 +371,7 @@ function Parameters({
       </section>
 
       <section aria-labelledby="firebase-conditions" className="flex flex-col gap-2">
-        <h3 id="firebase-conditions" className="text-sm font-semibold">
+        <h3 id="firebase-conditions" className="text-sm font-medium">
           <Trans>Conditions</Trans>
         </h3>
         <p className="text-sm text-muted-foreground">
@@ -715,7 +715,7 @@ function Flags({ result, preview }: { result: FirebaseImportResult; preview?: bo
       aria-label={preview ? t`Flags and rules` : t`Imported flags`}
       className="flex flex-col gap-2"
     >
-      <h3 className="text-sm font-semibold">
+      <h3 className="text-sm font-medium">
         {preview ? <Trans>Flags and rules</Trans> : <Trans>Imported flags</Trans>}
       </h3>
       <ul className="flex flex-col gap-2">
@@ -765,7 +765,7 @@ function Attributes({ result, preview }: { result: FirebaseImportResult; preview
       aria-label={preview ? t`Attributes to declare` : t`Declared attributes`}
       className="flex flex-col gap-2"
     >
-      <h3 className="text-sm font-semibold">
+      <h3 className="text-sm font-medium">
         {preview ? <Trans>Attributes to declare</Trans> : <Trans>Declared attributes</Trans>}
       </h3>
       <ul className="flex flex-wrap gap-2 text-sm">
@@ -806,7 +806,7 @@ function Summary({
         <Trans>Imported into {name}.</Trans>
       </p>
       <section aria-label={t`Flags`} className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">
+        <h3 className="text-sm font-medium">
           <Trans>Flags</Trans>
         </h3>
         <ul className="flex flex-col gap-1 text-sm">

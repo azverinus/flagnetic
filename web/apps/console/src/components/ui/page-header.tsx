@@ -29,11 +29,11 @@ export function PageHeader({
     <header className={cn("flex min-w-0 flex-col gap-2", className)}>
       {breadcrumb}
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h1 className="min-w-0 flex-1 truncate text-xl font-semibold" title={title}>
+        <h1 className="min-w-0 flex-1 truncate text-2xl/7 font-semibold" title={title}>
           {title}
         </h1>
         {actions ? (
-          <div className="flex flex-wrap items-center gap-2 [&>*]:h-9">{actions}</div>
+          <div className="flex flex-wrap items-center gap-2 [&>*]:h-8">{actions}</div>
         ) : null}
       </div>
       {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}

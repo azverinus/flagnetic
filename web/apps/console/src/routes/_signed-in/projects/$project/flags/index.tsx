@@ -447,7 +447,7 @@ function StateCell({ state }: { state: FlagState | undefined }) {
       <span
         className={cn(
           "rounded-sm px-1.5 py-0.5 text-xs font-medium",
-          state.on ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+          state.on ? "bg-primary/10 text-primary-ink" : "bg-muted text-muted-foreground",
         )}
       >
         {state.on ? <Trans>On</Trans> : <Trans>Off</Trans>}

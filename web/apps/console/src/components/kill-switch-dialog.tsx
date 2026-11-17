@@ -169,7 +169,7 @@ function KillSwitch({
           <Trans>Cancel</Trans>
         </Button>
         <Button
-          variant="destructive"
+          variant="destructiveFilled"
           disabled={!killReasonReady(reason) || !keyTyped || kill.isPending}
           onClick={() => kill.mutate()}
         >

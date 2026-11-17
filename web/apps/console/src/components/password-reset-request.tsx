@@ -28,7 +28,7 @@ export function PasswordResetRequest() {
   const methods = useQuery(authMethodsQuery);
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">
+      <h1 className="text-2xl/7 font-semibold">
         <Trans>Forgot your password?</Trans>
       </h1>
       {methods.data === undefined && methods.isPending ? (

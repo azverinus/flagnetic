@@ -89,7 +89,7 @@ function ProjectLayout() {
 function ProjectNotFound() {
   return (
     <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
-      <h1 className="text-xl font-semibold">
+      <h1 className="text-2xl/7 font-semibold">
         <Trans>Project not found</Trans>
       </h1>
       <p className="text-sm text-muted-foreground">
@@ -105,7 +105,7 @@ function ProjectForbidden({ error }: { error: ApiError }) {
   const { i18n } = useLingui();
   return (
     <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
-      <h1 className="text-xl font-semibold">
+      <h1 className="text-2xl/7 font-semibold">
         <Trans>You cannot open this project</Trans>
       </h1>
       <p className="text-sm text-muted-foreground">{problemMessage(i18n, error)}</p>

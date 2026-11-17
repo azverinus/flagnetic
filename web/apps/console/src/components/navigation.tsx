@@ -338,7 +338,7 @@ export function InstanceNavigation({ collapsed }: { collapsed: boolean }) {
       <h2
         id={heading}
         className={cn(
-          "px-2.5 pt-2 text-xs font-medium tracking-wide text-muted-foreground uppercase",
+          "px-2.5 pt-2 text-xs font-medium text-muted-foreground",
           collapsed ? "sr-only" : "sr-only md:not-sr-only",
         )}
       >

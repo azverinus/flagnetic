@@ -21,6 +21,31 @@ import { Switch } from "./switch";
 import { Textarea } from "./textarea";
 
 describe("a button", () => {
+  it("has one height of 32 px in every size but the large one", () => {
+    renderWithProviders(
+      <>
+        <Button>Default</Button>
+        <Button size="sm">Small</Button>
+      </>,
+    );
+
+    expect(screen.getByRole("button", { name: "Default" })).toHaveClass("h-8");
+    expect(screen.getByRole("button", { name: "Small" })).toHaveClass("h-8");
+  });
+
+  it("is outlined when destructive and filled only in the confirmation's variant", () => {
+    renderWithProviders(
+      <>
+        <Button variant="destructive">Delete</Button>
+        <Button variant="destructiveFilled">Confirm</Button>
+      </>,
+    );
+
+    expect(screen.getByRole("button", { name: "Delete" })).toHaveClass("border", "bg-transparent");
+    expect(screen.getByRole("button", { name: "Delete" })).not.toHaveClass("bg-destructive");
+    expect(screen.getByRole("button", { name: "Confirm" })).toHaveClass("bg-destructive");
+  });
+
   it("is a button that is not a submit by accident only when told", async () => {
     const onClick = vi.fn();
     renderWithProviders(<Button onClick={onClick}>Save</Button>);
