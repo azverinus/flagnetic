@@ -162,9 +162,9 @@ func (h *RunDigestRound) Handle(ctx context.Context) error {
 			return errors.Join(append(failures, err)...)
 		}
 		err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
-			held, err := h.d.Store.TryLockDigest(ctx)
-			if err != nil {
-				return err
+			held, lockErr := h.d.Store.TryLockDigest(ctx)
+			if lockErr != nil {
+				return lockErr
 			}
 			if !held {
 				return errDigestElsewhere

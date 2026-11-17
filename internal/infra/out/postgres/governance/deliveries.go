@@ -94,8 +94,8 @@ func (s *Deliveries) ClaimDeliveries(ctx context.Context, token appgovernance.Le
 	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (appgovernance.ClaimedDelivery, error) {
 		var delivery [16]byte
 		var project *[16]byte
-		if err := row.Scan(&delivery, &project); err != nil {
-			return appgovernance.ClaimedDelivery{}, err
+		if scanErr := row.Scan(&delivery, &project); scanErr != nil {
+			return appgovernance.ClaimedDelivery{}, scanErr
 		}
 		c := appgovernance.ClaimedDelivery{ID: id.FromBytes[governance.Delivery](delivery)}
 		if project != nil {

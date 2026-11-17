@@ -178,9 +178,9 @@ func TestAClaimedDeliveryNamesTheProjectOfItsSubscription(t *testing.T) {
 	var claimed []appgovernance.ClaimedDelivery
 	now := testkit.Start.Add(time.Second)
 	err = postgres.NewTransactor(pool).Within(t.Context(), func(ctx context.Context) error {
-		var err error
-		claimed, err = pggovernance.NewDeliveries(pool).ClaimDeliveries(ctx, id.New[appgovernance.Lease](ids), now, now.Add(time.Minute), 10)
-		return err
+		var claimErr error
+		claimed, claimErr = pggovernance.NewDeliveries(pool).ClaimDeliveries(ctx, id.New[appgovernance.Lease](ids), now, now.Add(time.Minute), 10)
+		return claimErr
 	})
 	if err != nil {
 		t.Fatal(err)
