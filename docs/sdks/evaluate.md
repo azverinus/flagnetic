@@ -30,7 +30,7 @@ The answer carries `Cache-Control: no-store`: one context's values are never cac
 
 ## What each key learns
 
-A server key's answer carries the true reason and, for a rule, the `rule_id`. A client key's answer says that targeting decided a value but never how: `rule`, `rollout`, `fallthrough` and `prerequisite_failed` are all answered `targeting_match`, with no rule identifier, while `off`, `override`, `experiment`, `error` and the experiment block are answered as they are. See [what a client key can learn](compatibility.md).
+A server key's answer carries the true reason and, for a rule, the `rule_id`. A client key's answer says that targeting decided a value but never how: `rule`, `rollout`, `fallthrough` and `prerequisite_failed` are all answered `targeting_match`, with no rule identifier, and `override` too, with `override_influenced` false, so that a client key cannot tell which units have an override; `off`, `experiment`, `error` and the experiment block are answered as they are. Only where an override leads a unit into a running experiment does the answer keep reason `override`, `override_influenced` and the experiment block's `override`, which an exposure carries so that analysis leaves it out. See [what a client key can learn](compatibility.md).
 
 ## Attributes
 
@@ -40,7 +40,7 @@ Attributes are typed against the project's declarations, as an SDK's own evaluat
 - A value of the wrong type is left out and listed with `type_mismatch`. A `string` or `semver` attribute takes a string, a `number` a number, a `boolean` a boolean, a `date` an RFC 3339 string or Unix milliseconds, and a `list` a list of strings.
 - `null` is the attribute absent, never a mismatch.
 
-`ignored_attributes` is ordered by name, and empty when nothing was left out.
+`ignored_attributes` is ordered by name, and empty when nothing was left out. It is always empty for a client key, which would otherwise learn which attributes the project declares; the attributes are left out of its evaluation all the same.
 
 ## Limits
 

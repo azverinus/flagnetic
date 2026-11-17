@@ -132,7 +132,7 @@ type BatchResult struct {
 	// earlier one.
 	Duplicates int
 	// DroppedRows counts the summary rows naming a flag the project does
-	// not have.
+	// not have, or a variation the flag lacks.
 	DroppedRows int
 	// Rejected are the events refused, by index.
 	Rejected []EventRejection
@@ -180,6 +180,18 @@ func (h *IngestEvents) Handle(ctx context.Context, key delivery.SDKKey, b EventB
 		return err
 	})
 	return res, err
+}
+
+// rejectUndeclaredUnitType refuses an alias naming a unit type the project
+// does not declare. A client key ships inside apps and browsers, where
+// anyone can read it, and a code of its own would tell it which unit types
+// the project declares: it is answered the generic event_invalid, naming
+// nothing of the project.
+func rejectUndeclaredUnitType(e events.JudgedEvent, field, unitType string, detailed bool) events.JudgedEvent {
+	if !detailed {
+		return e.Reject(events.RejectEventInvalid, "the alias is not valid")
+	}
+	return e.Reject(events.RejectUndeclaredUnitType, fmt.Sprintf("%s %q is not a unit type of this project", field, unitType))
 }
 
 // write stores the events judged in the unit of work ctx carries.
@@ -232,12 +244,10 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 		if a := e.Alias; a != nil {
 			switch {
 			case !declared[a.FromUnitType]:
-				judged[i] = e.Reject(events.RejectUndeclaredUnitType,
-					fmt.Sprintf("from_unit_type %q is not a unit type of this project", a.FromUnitType))
+				judged[i] = rejectUndeclaredUnitType(e, "from_unit_type", a.FromUnitType, detailed)
 				continue
 			case !declared[a.ToUnitType]:
-				judged[i] = e.Reject(events.RejectUndeclaredUnitType,
-					fmt.Sprintf("to_unit_type %q is not a unit type of this project", a.ToUnitType))
+				judged[i] = rejectUndeclaredUnitType(e, "to_unit_type", a.ToUnitType, detailed)
 				continue
 			case !full.admitLink(a.Pair()):
 				judged[i] = e.Reject(events.RejectQuotaExceeded, "this environment holds as many alias links as it may keep")
@@ -250,8 +260,12 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 			if exists {
 				experiment = &facts
 			}
-			if rj := events.CheckExposure(*x, experiment, detailed); rj != nil {
-				judged[i] = e.Reject(rj.Code, rj.Detail)
+			if rj := events.CheckExposure(*x, experiment); rj != nil {
+				told := *rj
+				if !detailed {
+					told = rj.ForClient(x.ExperimentKey)
+				}
+				judged[i] = e.Reject(told.Code, told.Detail)
 				// Only a refusal for a started experiment is counted: a key
 				// nobody declared would let whoever holds a client key grow
 				// the table with keys of their own making, and a draft is

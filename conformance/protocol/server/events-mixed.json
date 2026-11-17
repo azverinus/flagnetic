@@ -1,6 +1,6 @@
 {
   "accepted": 3,
-  "dropped_rows": 1,
+  "dropped_rows": 0,
   "duplicates": 1,
   "rejected": [
     {
@@ -28,8 +28,8 @@
       "index": 6
     },
     {
-      "code": "undeclared_unit_type",
-      "detail": "from_unit_type \"device\" is not a unit type of this project",
+      "code": "event_invalid",
+      "detail": "the alias is not valid",
       "event_id": "01a0b91b-c500-7000-8000-000000000009",
       "index": 7
     },
@@ -40,14 +40,14 @@
       "index": 8
     },
     {
-      "code": "unit_type_mismatch",
-      "detail": "the unit type is not the experiment's",
+      "code": "unknown_experiment",
+      "detail": "no experiment is keyed \"banner_test\"",
       "event_id": "01a0b91b-c500-7000-8000-00000000000b",
       "index": 9
     },
     {
-      "code": "unknown_variation",
-      "detail": "the variation is not one of the experiment's",
+      "code": "unknown_experiment",
+      "detail": "no experiment is keyed \"banner_test\"",
       "event_id": "01a0b91b-c500-7000-8000-00000000000c",
       "index": 10
     }

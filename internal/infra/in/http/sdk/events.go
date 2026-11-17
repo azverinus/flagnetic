@@ -210,7 +210,8 @@ func (a *api) PostEvents(w http.ResponseWriter, r *http.Request, params PostEven
 		a.writeError(w, r, err)
 		return
 	}
-	res, err := a.h.Ingest.Handle(r.Context(), keyOf(r.Context()), b)
+	key := keyOf(r.Context())
+	res, err := a.h.Ingest.Handle(r.Context(), key, b)
 	if err != nil {
 		a.writeError(w, r, err)
 		return
@@ -220,6 +221,11 @@ func (a *api) PostEvents(w http.ResponseWriter, r *http.Request, params PostEven
 	out := EventBatchResult{
 		Accepted: res.AcceptedTotal(), Duplicates: res.Duplicates, DroppedRows: res.DroppedRows,
 		Rejected: make([]EventRejection, 0, len(res.Rejected)),
+	}
+	if key.Kind == delivery.SDKKeyClient {
+		// Told to a client key, the count would say whether a flag key it
+		// guessed belongs to the project, an archived flag included.
+		out.DroppedRows = 0
 	}
 	for _, rj := range res.Rejected {
 		e := EventRejection{Index: rj.Index, Code: string(rj.Code), Detail: rj.Detail}

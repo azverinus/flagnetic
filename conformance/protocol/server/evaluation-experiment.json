@@ -43,16 +43,7 @@
       "variation": "on"
     }
   },
-  "ignored_attributes": [
-    {
-      "code": "undeclared",
-      "name": "favourite_colour"
-    },
-    {
-      "code": "type_mismatch",
-      "name": "plan"
-    }
-  ],
+  "ignored_attributes": [],
   "ruleset_version": 3,
   "schema_version": 1
 }

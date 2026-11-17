@@ -164,7 +164,7 @@ func TestAClientKeyIsAnsweredServedValuesWithoutHowTheyWereReached(t *testing.T)
 		"private": `targeting_match "C"`,
 		"rolled":  `targeting_match "C"`,
 		"gated":   `targeting_match "C"`,
-		"pinned":  `override "B"`,
+		"pinned":  `targeting_match "B"`,
 	}
 	if got := results(ev); !reflect.DeepEqual(got, want) {
 		t.Errorf("client answer = %v\nwant %v", got, want)
@@ -177,8 +177,10 @@ func TestAClientKeyIsAnsweredServedValuesWithoutHowTheyWereReached(t *testing.T)
 	if got := a.header.Get("Cache-Control"); got != "no-store" {
 		t.Errorf("Cache-Control = %q, want no-store", got)
 	}
-	if !ev.Flags["pinned"].OverrideInfluenced || ev.Flags["plain"].OverrideInfluenced {
-		t.Errorf("override_influenced = %v, %v, want the override's only", ev.Flags["pinned"].OverrideInfluenced, ev.Flags["plain"].OverrideInfluenced)
+	// An override that reaches no experiment is told apart from targeting
+	// by nothing, so a client key cannot tell which units have one.
+	if ev.Flags["pinned"].OverrideInfluenced || ev.Flags["plain"].OverrideInfluenced {
+		t.Errorf("override_influenced = %v, %v, want neither", ev.Flags["pinned"].OverrideInfluenced, ev.Flags["plain"].OverrideInfluenced)
 	}
 	if f := ev.Flags["plain"]; f.Type != "string" || f.Variation == nil || *f.Variation != "b" || f.AutomaticExposure {
 		t.Errorf("plain = %+v, want its type and variation", f)
@@ -244,7 +246,7 @@ func TestRemoteEvaluationAnswersTheFlagsAskedForOnly(t *testing.T) {
 	}
 }
 
-func TestAttributesAreTypedAndTheIgnoredOnesListed(t *testing.T) {
+func TestAttributesAreTypedAndTheIgnoredOnesListedForAServerKeyOnly(t *testing.T) {
 	srv := testkit.StartServer(t)
 	p := newProject(t, srv)
 	p.stringFlag(t, "android_only", management.FlagConfigurationPut{On: true, OffVariation: "a", Fallthrough: "a",
@@ -252,9 +254,11 @@ func TestAttributesAreTypedAndTheIgnoredOnesListed(t *testing.T) {
 	p.stringFlag(t, "big_builds", management.FlagConfigurationPut{On: true, OffVariation: "a", Fallthrough: "a",
 		Rules: &[]management.RuleInput{{Conditions: &[]management.Condition{attribute("build_number", "gt", "100")}, Serve: variationServe("b")}}})
 	_, client := p.sdkKey(t, "production", management.SdkKeyKindClient)
+	_, server := p.sdkKey(t, "production", management.SdkKeyKindServer)
 
-	ev, _ := evaluation(t, srv, client, `{"context":{"units":{"user":"u-1"},"attributes":{
-		"os":"android","build_number":"500","favourite_colour":"green","user":"u-2","app_version":"1.2.3","locale":null}}}`)
+	attributes := `{"context":{"units":{"user":"u-1"},"attributes":{
+		"os":"android","build_number":"500","favourite_colour":"green","user":"u-2","app_version":"1.2.3","locale":null}}}`
+	ev, _ := evaluation(t, srv, server, attributes)
 	want := []sdk.IgnoredAttribute{
 		{Name: "build_number", Code: "type_mismatch"},
 		{Name: "favourite_colour", Code: "undeclared"},
@@ -263,8 +267,17 @@ func TestAttributesAreTypedAndTheIgnoredOnesListed(t *testing.T) {
 	if !reflect.DeepEqual(ev.IgnoredAttributes, want) {
 		t.Errorf("ignored_attributes = %v, want %v", ev.IgnoredAttributes, want)
 	}
-	if got := results(ev); got["android_only"] != `targeting_match "B"` || got["big_builds"] != `targeting_match "A"` {
+	if got := results(ev); got["android_only"] != `rule "B" `+got["android_only"][len(`rule "B" `):] || got["big_builds"] != `fallthrough "A"` {
 		t.Errorf("answer = %v, want the declared os to decide and the mistyped build number left out", got)
+	}
+	// A client key is told nothing of which attributes the project
+	// declares, though its context is typed alike.
+	forClient, a := evaluation(t, srv, client, attributes)
+	if len(forClient.IgnoredAttributes) != 0 || !bytes.Contains(a.body, []byte(`"ignored_attributes":[]`)) {
+		t.Errorf("a client key's ignored_attributes = %s, want an empty list", a.body)
+	}
+	if got := results(forClient); got["android_only"] != `targeting_match "B"` || got["big_builds"] != `targeting_match "A"` {
+		t.Errorf("client answer = %v, want the same decisions", got)
 	}
 }
 

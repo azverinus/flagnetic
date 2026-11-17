@@ -21,14 +21,27 @@ const ReasonTargetingMatch eval.Reason = "targeting_match"
 // the reasons rule, rollout, fallthrough and prerequisite_failed become
 // targeting_match, because telling them apart would reveal whether a rule
 // (and with it a private segment) matched the context; the rule, the failed
-// prerequisite and the rollout bucket are dropped. off, override, error and
+// prerequisite and the rollout bucket are dropped. off, error and
 // experiment pass, since the SDK acts on them, and so do the value, the
-// variation, the experiment block and override_influenced, which an
-// exposure carries.
+// variation and the experiment block.
+//
+// An override is told apart from targeting only where an exposure needs
+// it: override_influenced and the reason override mark an exposure that
+// analysis leaves out, so a result whose experiment block an override
+// reached keeps both. Any other result is answered as targeting would have
+// answered it, with override_influenced false, because otherwise anyone
+// holding a client key could tell which units have an override.
 func MaskForClient(r eval.Result) eval.Result {
 	switch r.Reason {
 	case eval.ReasonRule, eval.ReasonRollout, eval.ReasonFallthrough, eval.ReasonPrerequisiteFailed:
 		r.Reason = ReasonTargetingMatch
+	case eval.ReasonOverride:
+		if r.Experiment == nil {
+			r.Reason = ReasonTargetingMatch
+		}
+	}
+	if r.Experiment == nil {
+		r.OverrideInfluenced = false
 	}
 	r.RuleID = ""
 	r.Prerequisite = ""

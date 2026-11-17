@@ -351,7 +351,7 @@ Computing the value of a flag for a context. Local evaluation happens inside the
 _Avoid_: resolution, lookup, check
 
 **Evaluation reason**:
-Why a value was served: matched rule, rollout, experiment, override, prerequisite failed, off, fallthrough, error, local override, or fallback. The last two are produced only by SDKs. A client key sees targeting match in place of matched rule, rollout, fallthrough and prerequisite failed, which tells it only that targeting decided the value.
+Why a value was served: matched rule, rollout, experiment, override, prerequisite failed, off, fallthrough, error, local override, or fallback. The last two are produced only by SDKs. A client key sees targeting match in place of matched rule, rollout, fallthrough, prerequisite failed and override (unless the override leads the unit into a running experiment), which tells it only that targeting decided the value.
 _Avoid_: source, origin
 
 **Unsupported rule**:

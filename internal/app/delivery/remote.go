@@ -45,7 +45,9 @@ type RemoteEvaluation struct {
 	Protected      bool
 	// Results are by flag key, masked for a client key.
 	Results map[string]eval.Result
-	// Ignored are the attributes left out of the evaluation, by name.
+	// Ignored are the attributes left out of the evaluation, by name; always
+	// empty for a client key, which would otherwise learn which attributes
+	// the project declares.
 	Ignored []delivery.IgnoredAttribute
 }
 
@@ -74,6 +76,9 @@ func (h *EvaluateRemotely) Handle(ctx context.Context, key delivery.SDKKey, q Re
 		}
 	}
 	attributes, ignored := delivery.TypeAttributes(evaluable, q.Context.Attributes)
+	if key.Kind == delivery.SDKKeyClient {
+		ignored = nil
+	}
 	units := make(map[string]string, len(q.Context.Units))
 	for _, u := range q.Context.Units {
 		units[u.Type] = u.ID

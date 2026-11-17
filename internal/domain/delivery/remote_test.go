@@ -20,7 +20,7 @@ func TestAClientKeyLearnsThatTargetingDecidedButNotHow(t *testing.T) {
 		eval.ReasonFallthrough:        delivery.ReasonTargetingMatch,
 		eval.ReasonPrerequisiteFailed: delivery.ReasonTargetingMatch,
 		eval.ReasonOff:                eval.ReasonOff,
-		eval.ReasonOverride:           eval.ReasonOverride,
+		eval.ReasonOverride:           delivery.ReasonTargetingMatch,
 		eval.ReasonError:              eval.ReasonError,
 		eval.ReasonExperiment:         eval.ReasonExperiment,
 	}
@@ -37,6 +37,23 @@ func TestAClientKeyLearnsThatTargetingDecidedButNotHow(t *testing.T) {
 		if got.RuleID != "" || got.Prerequisite != "" || got.Bucket != nil {
 			t.Errorf("%s: masked result still says how it was reached: %+v", reason, got)
 		}
+	}
+}
+
+func TestAClientKeyLearnsOfAnOverrideOnlyWhereAnExposureNeedsIt(t *testing.T) {
+	plain := eval.Result{Type: "string", Variation: "b", Reason: eval.ReasonOverride, OverrideInfluenced: true}
+	got := delivery.MaskForClient(plain)
+	if got.Reason != delivery.ReasonTargetingMatch || got.OverrideInfluenced {
+		t.Errorf("an override with no experiment = %+v, want targeting_match, not override influenced", got)
+	}
+	viaPrerequisite := eval.Result{Type: "string", Variation: "a", Reason: eval.ReasonFallthrough, OverrideInfluenced: true}
+	if got = delivery.MaskForClient(viaPrerequisite); got.OverrideInfluenced {
+		t.Errorf("an override through a prerequisite = %+v, want not override influenced", got)
+	}
+	inExperiment := plain
+	inExperiment.Experiment = &eval.ExperimentDetail{Key: "exp", Variation: "b", UnitType: "user", UnitID: "u-1", Override: true}
+	if got = delivery.MaskForClient(inExperiment); got.Reason != eval.ReasonOverride || !got.OverrideInfluenced || !got.Experiment.Override {
+		t.Errorf("an override into an experiment = %+v, want the override kept for its exposure", got)
 	}
 }
 
@@ -78,7 +95,7 @@ func TestAMaskedAnswerNeverTellsHowAndNeverChangesWhat(t *testing.T) {
 			t.Fatalf("masked %+v has reason %q outside the client set", in, out.Reason)
 		}
 		if string(out.Value) != string(in.Value) || out.Variation != in.Variation || out.Type != in.Type ||
-			out.AutomaticExposure != in.AutomaticExposure || out.OverrideInfluenced != in.OverrideInfluenced ||
+			out.AutomaticExposure != in.AutomaticExposure ||
 			out.ErrorCode != in.ErrorCode || !reflect.DeepEqual(out.Experiment, in.Experiment) {
 			t.Fatalf("masking changed what was served: %+v became %+v", in, out)
 		}

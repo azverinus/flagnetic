@@ -213,9 +213,9 @@ A client key ships inside apps and browsers, where anyone can read it, so it nev
 
 - **The served values.** A client key may post any context, so posting contexts that differ in one attribute shows whether that attribute changes a flag's value, and a value that a rule on a private segment decides tells whether the posted unit is in that segment.
 - **An experiment block** on a value an experiment rule assigned, even behind a private segment: it tells that the context is in the experiment.
-- **The reason `override`**, which tells that the unit has an override on that flag.
+- **An override that leads a unit into a running experiment**: the answer keeps reason `override` and the experiment block's `override`, which tell that the unit has an override on that flag. Any other override is answered `targeting_match`.
 - **The environment's flags**: the key, type and served variation of every flag, the environment's key and its ruleset version, which moves on with every change.
-- **The declared attributes**: `ignored_attributes` tells which attribute names the project does not declare (`undeclared`) and which value types a declared one refuses (`type_mismatch`).
+- **The experiment block's salts and buckets**: with them, a client key can recover an experiment's traffic allocation and weights by bisecting unit IDs against its own bucket calculation, and so the allocation's exact shares.
 
 A client key can also **write**. It posts [exposures](experiments.md#exposures), and the server checks that an exposure names a started experiment, its unit type, a variation the experiment weighs and its flag, but never recomputes the unit's assignment, so an exposure from a client key is untrusted. Whoever holds the key can post exposures for any unit and any weighed variation at the rate limit below, which skews an experiment's shares, can raise or mask its sample-ratio alert, and, with a backdated `occurred_at` inside the retention window, replaces a unit's real first exposure and turns it into a conflict. Do not take an experiment's decision from exposures a client key alone vouches for when someone has reason to forge them: send them from a server key.
 
