@@ -80,14 +80,14 @@ func TestTheSMTPPasswordIsStoredSealedAndOnlyThisInstanceOpensIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !got.PasswordSet() || strings.Contains(got.PasswordSealed, password) || !strings.HasPrefix(got.PasswordSealed, "v1:") {
+	if !got.PasswordSet() || strings.Contains(got.PasswordSealed, password) || !strings.HasPrefix(got.PasswordSealed, "v2:") {
 		t.Errorf("stored password %q, want it sealed", got.PasswordSealed)
 	}
-	opened, err := keyring.Open(secret.PurposeSMTPPassword, got.PasswordSealed)
+	opened, err := keyring.Open(secret.PurposeSMTPPassword, got.PasswordSealed, "smtp_settings")
 	if err != nil || string(opened) != password {
 		t.Errorf("the instance opens %q, %v; want the password", opened, err)
 	}
-	if _, err := keyring.Open(secret.PurposeWebhookSecret, got.PasswordSealed); err == nil {
+	if _, err := keyring.Open(secret.PurposeWebhookSecret, got.PasswordSealed, "smtp_settings"); err == nil {
 		t.Error("the SMTP password opens as a webhook secret")
 	}
 }

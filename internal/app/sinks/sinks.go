@@ -83,7 +83,7 @@ type Resolver interface {
 
 // Sealer seals a value under the instance's secret key.
 type Sealer interface {
-	Seal(purpose secret.Purpose, plaintext []byte) (string, error)
+	Seal(purpose secret.Purpose, plaintext []byte, binding secret.Binding) (string, error)
 }
 
 // Deps are what the sink use cases run on.

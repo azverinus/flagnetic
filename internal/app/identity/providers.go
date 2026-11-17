@@ -45,7 +45,7 @@ type AuditLog interface {
 
 // Sealer seals a value under the instance's secret key.
 type Sealer interface {
-	Seal(purpose secret.Purpose, plaintext []byte) (string, error)
+	Seal(purpose secret.Purpose, plaintext []byte, binding secret.Binding) (string, error)
 }
 
 // ProviderStore keeps auth providers.
@@ -332,16 +332,17 @@ func (h *CreateProvider) Handle(ctx context.Context, cmd CreateProviderCommand) 
 	}
 	now := h.d.now()
 	var p identity.Provider
+	pid := id.New[identity.Provider](h.d.IDs)
 	if in.Kind == identity.KindSAML {
-		if p, err = h.newSAML(ctx, in, now); err != nil {
+		if p, err = h.newSAML(ctx, pid, in, now); err != nil {
 			return identity.Provider{}, err
 		}
 	} else {
-		sealed, sealErr := h.d.Sealer.Seal(secret.PurposeOIDCClientSecret, []byte(in.OIDC.ClientSecret.Reveal()))
+		sealed, sealErr := h.d.Sealer.Seal(secret.PurposeOIDCClientSecret, []byte(in.OIDC.ClientSecret.Reveal()), providerSecretBinding(pid))
 		if sealErr != nil {
 			return identity.Provider{}, sealErr
 		}
-		p = identity.New(id.New[identity.Provider](h.d.IDs), in, sealed, now)
+		p = identity.New(pid, in, sealed, now)
 	}
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		if txErr := h.d.Store.CreateProvider(ctx, p); txErr != nil {
@@ -354,16 +355,16 @@ func (h *CreateProvider) Handle(ctx context.Context, cmd CreateProviderCommand) 
 
 // newSAML returns the SAML provider in names: its identity provider's metadata
 // read, a key pair generated and its private key sealed.
-func (h *CreateProvider) newSAML(ctx context.Context, in identity.ProviderInput, now time.Time) (identity.Provider, error) {
+func (h *CreateProvider) newSAML(ctx context.Context, pid identity.ProviderID, in identity.ProviderInput, now time.Time) (identity.Provider, error) {
 	meta, err := readIDPMetadata(ctx, h.d.SAML, in.SAML.MetadataURL, in.SAML.MetadataXML)
 	if err != nil {
 		return identity.Provider{}, err
 	}
-	sp, err := sealSPKey(h.d.SPKeys, h.d.Sealer, now)
+	sp, err := sealSPKey(h.d.SPKeys, h.d.Sealer, pid, now)
 	if err != nil {
 		return identity.Provider{}, err
 	}
-	return identity.NewSAML(id.New[identity.Provider](h.d.IDs), in, meta, sp, now), nil
+	return identity.NewSAML(pid, in, meta, sp, now), nil
 }
 
 // UpdateProviderCommand is an edit of the provider Slug, based on its version
@@ -389,13 +390,8 @@ func (h *UpdateProvider) Handle(ctx context.Context, cmd UpdateProviderCommand) 
 	if err := h.d.requireBaseURL(); err != nil {
 		return identity.Provider{}, err
 	}
-	var sealed string
 	if cmd.Change.ClientSecret != nil {
 		if err := identity.CheckClientSecret(*cmd.Change.ClientSecret); err != nil {
-			return identity.Provider{}, err
-		}
-		var err error
-		if sealed, err = h.d.Sealer.Seal(secret.PurposeOIDCClientSecret, []byte(cmd.Change.ClientSecret.Reveal())); err != nil {
 			return identity.Provider{}, err
 		}
 	}
@@ -431,6 +427,14 @@ func (h *UpdateProvider) Handle(ctx context.Context, cmd UpdateProviderCommand) 
 		out = before
 		if err = precondition.Check(cmd.Expected, before.Version); err != nil {
 			return err
+		}
+		// Sealed once the provider is locked: the secret is bound to its row.
+		var sealed string
+		if cmd.Change.ClientSecret != nil {
+			if sealed, err = h.d.Sealer.Seal(secret.PurposeOIDCClientSecret, []byte(cmd.Change.ClientSecret.Reveal()),
+				providerSecretBinding(before.ID)); err != nil {
+				return err
+			}
 		}
 		after, err := before.CheckChange(cmd.Change)
 		if err != nil {

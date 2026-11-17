@@ -44,14 +44,18 @@ type SMTPCache interface {
 	Forget()
 }
 
+// smtpPasswordBinding is what the SMTP password is sealed to: the instance has
+// one row of SMTP settings, and the password belongs to no other.
+const smtpPasswordBinding secret.Binding = "smtp_settings"
+
 // Sealer seals a value under the instance's secret key.
 type Sealer interface {
-	Seal(purpose secret.Purpose, plaintext []byte) (string, error)
+	Seal(purpose secret.Purpose, plaintext []byte, binding secret.Binding) (string, error)
 }
 
 // Opener opens a value sealed under the instance's secret key.
 type Opener interface {
-	Open(purpose secret.Purpose, sealed string) ([]byte, error)
+	Open(purpose secret.Purpose, sealed string, binding secret.Binding) ([]byte, error)
 }
 
 // GetSMTP answers the SMTP settings in force.
@@ -121,7 +125,7 @@ func (h *ConfigureSMTP) Handle(ctx context.Context, change access.SMTPChange, re
 		default:
 			// Sealing draws a fresh nonce, so a supplied password always
 			// differs from the stored one.
-			if next.PasswordSealed, err = h.d.Sealer.Seal(secret.PurposeSMTPPassword, []byte(*checked.Password)); err != nil {
+			if next.PasswordSealed, err = h.d.Sealer.Seal(secret.PurposeSMTPPassword, []byte(*checked.Password), smtpPasswordBinding); err != nil {
 				return err
 			}
 		}

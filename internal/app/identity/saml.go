@@ -128,14 +128,21 @@ func readIDPMetadata(ctx context.Context, r SAMLMetadataReader, metadataURL, met
 	return meta, nil
 }
 
+// providerSecretBinding is what the secrets of an auth provider (its OIDC
+// client secret, its SAML private keys) are sealed to, so one copied into
+// another provider's row does not open there.
+func providerSecretBinding(p identity.ProviderID) secret.Binding {
+	return secret.Row("auth_providers", p.String())
+}
+
 // sealSPKey generates the key pair the instance presents for a new SAML
 // provider and seals its private key.
-func sealSPKey(gen SPKeyGenerator, sealer Sealer, now time.Time) (identity.SPKey, error) {
+func sealSPKey(gen SPKeyGenerator, sealer Sealer, provider identity.ProviderID, now time.Time) (identity.SPKey, error) {
 	cert, key, err := gen.GenerateSPKey(now)
 	if err != nil {
 		return identity.SPKey{}, fmt.Errorf("generating a key pair: %w", err)
 	}
-	sealed, err := sealer.Seal(secret.PurposeSAMLSPKey, key)
+	sealed, err := sealer.Seal(secret.PurposeSAMLSPKey, key, providerSecretBinding(provider))
 	if err != nil {
 		return identity.SPKey{}, err
 	}
@@ -147,7 +154,7 @@ func (d SignInDeps) samlConfig(p identity.Provider, now time.Time) (SAMLConfig, 
 	if d.BaseURL == nil {
 		return SAMLConfig{}, errors.New("the instance has no public URL")
 	}
-	key, err := d.Opener.Open(secret.PurposeSAMLSPKey, p.SAML.SealedSPKey)
+	key, err := d.Opener.Open(secret.PurposeSAMLSPKey, p.SAML.SealedSPKey, providerSecretBinding(p.ID))
 	if err != nil {
 		return SAMLConfig{}, fmt.Errorf("opening the key of %s: %w", p.Slug, err)
 	}
@@ -159,7 +166,7 @@ func (d SignInDeps) samlConfig(p identity.Provider, now time.Time) (SAMLConfig, 
 		SPCertificate: s.SPCertificate, SPKey: secret.New(string(key)), Now: now,
 	}
 	if s.RotationPending() {
-		next, err := d.Opener.Open(secret.PurposeSAMLSPKey, s.NextSealedSPKey)
+		next, err := d.Opener.Open(secret.PurposeSAMLSPKey, s.NextSealedSPKey, providerSecretBinding(p.ID))
 		if err != nil {
 			return SAMLConfig{}, fmt.Errorf("opening the next key of %s: %w", p.Slug, err)
 		}

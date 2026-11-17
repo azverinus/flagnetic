@@ -46,6 +46,8 @@ With `FLAGNETIC_AUTO_MIGRATE=false`, `serve` compares the database's schema with
 
 **Keep the key for the life of the instance.** On its first start the instance stores a canary, a random value sealed under the key, and every replica opens it on every start. A replica given another key cannot open it and refuses to start, exit code 1, with a message naming `FLAGNETIC_SECRET_KEY`: a mistyped or rotated key stops the deploy instead of silently losing what the instance sealed. Start it again with the original key.
 
+Each sealed secret is also bound to the row that holds it (an SMTP password to the instance's SMTP settings, a webhook secret to its subscription, and so on), so a value copied into another row does not open there. Values sealed by an earlier version carry no such binding and keep opening; each is sealed again, bound, the next time its row is written.
+
 ## The first instance admin
 
 A fresh instance has no one who can sign in. `flagnetic admin bootstrap` creates the first instance admin, with a password and an API token, from the command line and the database's own configuration:

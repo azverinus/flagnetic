@@ -54,7 +54,8 @@ func (h *Create) Handle(ctx context.Context, cmd CreateCommand) (Created, error)
 		}
 		plaintext = drawn.Reveal()
 	}
-	sealed, err := h.d.Sealer.Seal(draft.Kind.SecretPurpose(), []byte(plaintext))
+	sink := id.New[sinks.Sink](h.d.IDs)
+	sealed, err := h.d.Sealer.Seal(draft.Kind.SecretPurpose(), []byte(plaintext), secretBinding(sink))
 	if err != nil {
 		return Created{}, err
 	}
@@ -62,14 +63,14 @@ func (h *Create) Handle(ctx context.Context, cmd CreateCommand) (Created, error)
 	out := Created{Secret: drawn}
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		var txErr error
-		out.Sink, txErr = h.create(ctx, cmd, draft, sealed, now)
+		out.Sink, txErr = h.create(ctx, cmd, sink, draft, sealed, now)
 		return txErr
 	})
 	return out, err
 }
 
 // create stores the sink under the project's lock, and records it.
-func (h *Create) create(ctx context.Context, cmd CreateCommand, draft sinks.Draft, sealed string, now time.Time) (sinks.Sink, error) {
+func (h *Create) create(ctx context.Context, cmd CreateCommand, sink sinks.ID, draft sinks.Draft, sealed string, now time.Time) (sinks.Sink, error) {
 	if err := h.d.lockProject(ctx, cmd.Project); err != nil {
 		return sinks.Sink{}, err
 	}
@@ -79,7 +80,7 @@ func (h *Create) create(ctx context.Context, cmd CreateCommand, draft sinks.Draf
 		return sinks.Sink{}, err
 	}
 	s := sinks.Sink{
-		ID: id.New[sinks.Sink](h.d.IDs), Project: cmd.Project, Input: draft.Input, SealedSecret: sealed,
+		ID: sink, Project: cmd.Project, Input: draft.Input, SealedSecret: sealed,
 		Warnings: []string{}, CreatedBy: cmd.CreatedBy, CreatedAt: now, UpdatedAt: now, Version: 1,
 	}
 	// A sink starts disabled; enabling probes its target first.
@@ -132,7 +133,7 @@ func (h *Update) Handle(ctx context.Context, cmd UpdateCommand) (sinks.Sink, err
 	}
 	var sealed string
 	if !draft.KeepsSecret {
-		if sealed, err = h.d.Sealer.Seal(draft.Kind.SecretPurpose(), []byte(draft.Secret)); err != nil {
+		if sealed, err = h.d.Sealer.Seal(draft.Kind.SecretPurpose(), []byte(draft.Secret), secretBinding(seen.ID)); err != nil {
 			return seen, err
 		}
 	}
@@ -279,7 +280,7 @@ func (h *RotateSecret) Handle(ctx context.Context, cmd RotateCommand) (Created, 
 	if err != nil {
 		return Created{}, err
 	}
-	sealed, err := h.d.Sealer.Seal(sinks.KindWebhook.SecretPurpose(), []byte(value.Reveal()))
+	sealed, err := h.d.Sealer.Seal(sinks.KindWebhook.SecretPurpose(), []byte(value.Reveal()), secretBinding(cmd.Sink))
 	if err != nil {
 		return Created{}, err
 	}

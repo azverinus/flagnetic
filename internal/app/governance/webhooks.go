@@ -51,9 +51,15 @@ type Resolver interface {
 	LookupNetIP(ctx context.Context, network, host string) ([]netip.Addr, error)
 }
 
+// webhookSecretBinding is what a webhook subscription's sealed secrets are
+// bound to, so one copied into another subscription's row does not open.
+func webhookSecretBinding(w governance.WebhookID) secret.Binding {
+	return secret.Row("webhook_subscriptions", w.String())
+}
+
 // Sealer seals a value under the instance's secret key.
 type Sealer interface {
-	Seal(purpose secret.Purpose, plaintext []byte) (string, error)
+	Seal(purpose secret.Purpose, plaintext []byte, binding secret.Binding) (string, error)
 }
 
 // WebhookDeps are what the webhook subscription use cases run on.
@@ -290,14 +296,15 @@ func (h *CreateWebhook) Handle(ctx context.Context, cmd CreateWebhookCommand) (C
 	if err != nil {
 		return CreatedWebhook{}, err
 	}
-	sealed, err := h.d.Sealer.Seal(secret.PurposeWebhookSecret, []byte(value.Reveal()))
+	webhook := id.New[governance.Webhook](h.d.IDs)
+	sealed, err := h.d.Sealer.Seal(secret.PurposeWebhookSecret, []byte(value.Reveal()), webhookSecretBinding(webhook))
 	if err != nil {
 		return CreatedWebhook{}, err
 	}
 	now := h.d.now()
 	var out CreatedWebhook
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		w, txErr := h.create(ctx, cmd, in, sealed, now)
+		w, txErr := h.create(ctx, cmd, webhook, in, sealed, now)
 		out = CreatedWebhook{Webhook: w, Secret: value}
 		return txErr
 	})
@@ -306,7 +313,7 @@ func (h *CreateWebhook) Handle(ctx context.Context, cmd CreateWebhookCommand) (C
 
 // create stores the subscription in, under the project's lock, and records
 // it.
-func (h *CreateWebhook) create(ctx context.Context, cmd CreateWebhookCommand, in governance.WebhookInput, sealed string,
+func (h *CreateWebhook) create(ctx context.Context, cmd CreateWebhookCommand, webhook governance.WebhookID, in governance.WebhookInput, sealed string,
 	now time.Time,
 ) (governance.Webhook, error) {
 	if err := h.d.lockProject(ctx, cmd.Project); err != nil {
@@ -318,7 +325,7 @@ func (h *CreateWebhook) create(ctx context.Context, cmd CreateWebhookCommand, in
 		return governance.Webhook{}, err
 	}
 	w := governance.Webhook{
-		ID: id.New[governance.Webhook](h.d.IDs), Project: cmd.Project, WebhookInput: in, SealedSecret: sealed,
+		ID: webhook, Project: cmd.Project, WebhookInput: in, SealedSecret: sealed,
 		CreatedBy: cmd.CreatedBy, EnabledAt: now, CreatedAt: now, UpdatedAt: now, Version: 1,
 	}
 	if err = h.d.Store.CreateWebhook(ctx, w); err != nil {
@@ -508,7 +515,7 @@ func (h *RotateWebhookSecret) Handle(ctx context.Context, cmd WebhookCommand) (C
 	if err != nil {
 		return CreatedWebhook{}, err
 	}
-	sealed, err := h.d.Sealer.Seal(secret.PurposeWebhookSecret, []byte(value.Reveal()))
+	sealed, err := h.d.Sealer.Seal(secret.PurposeWebhookSecret, []byte(value.Reveal()), webhookSecretBinding(cmd.Webhook))
 	if err != nil {
 		return CreatedWebhook{}, err
 	}

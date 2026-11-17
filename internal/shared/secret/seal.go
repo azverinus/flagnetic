@@ -49,9 +49,29 @@ type Use string
 // UseSessionCookie keys the HMAC signing session cookies.
 const UseSessionCookie Use = "session cookie"
 
-// keyVersion prefixes every sealed value, so values sealed under a later
-// scheme or key can sit beside these and be told apart.
-const keyVersion = "v1"
+// Binding names the row a sealed value belongs to, so a sealed value copied
+// into another row, by whoever can write the database, does not open there.
+type Binding string
+
+// Row returns the binding of the row of table with identifier id.
+func Row(table, id string) Binding { return Binding(table + "/" + id) }
+
+// Sealed values begin with the version of their format, so values sealed
+// under a later scheme or key can sit beside these and be told apart. Both
+// versions seal under the same keys; version 2 also authenticates the
+// binding of the row, which version 1 values, sealed before rows were bound,
+// do not carry. A version 1 value opens whatever binding is given, and is
+// sealed in version 2 the next time its row is written.
+const (
+	legacyVersion = "v1"
+	sealVersion   = "v2"
+	// keyLabel is part of what each purpose's key is derived from. It is the
+	// label version 1 used and stays, so that both versions open under one key.
+	keyLabel = "v1"
+)
+
+// canaryBinding is the binding of the canary, which belongs to no row.
+const canaryBinding Binding = "canary"
 
 // canaryLength is the size of the canary's random plaintext.
 const canaryLength = 32
@@ -95,7 +115,7 @@ func (k *Keyring) derive(label string) []byte {
 func (k *Keyring) Key(use Use) []byte { return k.derive("flagnetic " + string(use)) }
 
 func (k *Keyring) aead(purpose Purpose) cipher.AEAD {
-	block, err := aes.NewCipher(k.derive("flagnetic secret " + keyVersion + " " + string(purpose)))
+	block, err := aes.NewCipher(k.derive("flagnetic secret " + keyLabel + " " + string(purpose)))
 	if err != nil {
 		panic("secret: " + err.Error()) // a 32-byte key is always valid
 	}
@@ -107,20 +127,26 @@ func (k *Keyring) aead(purpose Purpose) cipher.AEAD {
 }
 
 // Seal encrypts plaintext for purpose with AES-256-GCM under a fresh random
-// nonce, and returns "v1:" and the base64url of the nonce and the ciphertext.
-func (k *Keyring) Seal(purpose Purpose, plaintext []byte) (string, error) {
+// nonce, authenticating binding with it, and returns "v2:" and the base64url
+// of the nonce and the ciphertext.
+func (k *Keyring) Seal(purpose Purpose, plaintext []byte, binding Binding) (string, error) {
 	gcm := k.aead(purpose)
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err := rand.Read(nonce); err != nil {
 		return "", err
 	}
-	return keyVersion + ":" + base64.RawURLEncoding.EncodeToString(gcm.Seal(nonce, nonce, plaintext, nil)), nil
+	return sealVersion + ":" + base64.RawURLEncoding.EncodeToString(gcm.Seal(nonce, nonce, plaintext, []byte(binding))), nil
 }
 
-// Open returns the plaintext of a value sealed for purpose, or ErrCannotOpen.
-func (k *Keyring) Open(purpose Purpose, sealed string) ([]byte, error) {
-	body, ok := strings.CutPrefix(sealed, keyVersion+":")
-	if !ok {
+// Open returns the plaintext of a value sealed for purpose and binding, or
+// ErrCannotOpen. A value in the version before rows were bound opens whatever
+// the binding.
+func (k *Keyring) Open(purpose Purpose, sealed string, binding Binding) ([]byte, error) {
+	var aad []byte
+	body, ok := strings.CutPrefix(sealed, sealVersion+":")
+	if ok {
+		aad = []byte(binding)
+	} else if body, ok = strings.CutPrefix(sealed, legacyVersion+":"); !ok {
 		return nil, ErrCannotOpen
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(body)
@@ -128,7 +154,7 @@ func (k *Keyring) Open(purpose Purpose, sealed string) ([]byte, error) {
 	if err != nil || len(raw) < gcm.NonceSize() {
 		return nil, ErrCannotOpen
 	}
-	plaintext, err := gcm.Open(nil, raw[:gcm.NonceSize()], raw[gcm.NonceSize():], nil)
+	plaintext, err := gcm.Open(nil, raw[:gcm.NonceSize()], raw[gcm.NonceSize():], aad)
 	if err != nil {
 		return nil, ErrCannotOpen
 	}
@@ -142,13 +168,13 @@ func (k *Keyring) NewCanary() (string, error) {
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	return k.Seal(PurposeCanary, b)
+	return k.Seal(PurposeCanary, b, canaryBinding)
 }
 
 // CheckCanary returns ErrSecretKeyChanged unless the secret key opens
 // canary.
 func (k *Keyring) CheckCanary(canary string) error {
-	if _, err := k.Open(PurposeCanary, canary); err != nil {
+	if _, err := k.Open(PurposeCanary, canary, canaryBinding); err != nil {
 		return ErrSecretKeyChanged
 	}
 	return nil
