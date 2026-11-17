@@ -468,7 +468,7 @@ void main() {
       // A client key is answered an empty list, so the server's fixture is
       // given the attributes a server key would be told.
       final withIgnored = {
-        ...(evaluation as Map<String, Object?>),
+        ...evaluation,
         'ignored_attributes': [
           {'name': 'favourite_colour', 'code': 'undeclared'},
           {'name': 'plan', 'code': 'type_mismatch'},
