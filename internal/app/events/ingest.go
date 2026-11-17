@@ -239,7 +239,7 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 				judged[i] = e.Reject(events.RejectUndeclaredUnitType,
 					fmt.Sprintf("to_unit_type %q is not a unit type of this project", a.ToUnitType))
 				continue
-			case full.aliasLinks && !full.linked[a.Pair()]:
+			case !full.admitLink(a.Pair()):
 				judged[i] = e.Reject(events.RejectQuotaExceeded, "this environment holds as many alias links as it may keep")
 				continue
 			}
@@ -368,14 +368,34 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 // an experiment already keeps as much as the limit allows, and of that what
 // the batch's events would only update.
 type limitsReached struct {
-	// aliasLinks is whether the environment holds as many alias links as it
-	// may; linked holds the pairs of the batch it already has.
-	aliasLinks bool
+	// limitLinks is whether the batch's new pairs could take the
+	// environment past its limit of alias links; linked holds the pairs of
+	// the batch it already has, and linkRoom how many new pairs it may
+	// still take.
+	limitLinks bool
 	linked     map[events.AliasPair]bool
+	linkRoom   int64
+	// admitted holds the new pairs given room so far, so that every alias
+	// of one of them is taken alike.
+	admitted map[events.AliasPair]bool
 	// experiments are those holding as many first exposures as they may;
 	// exposed holds the units of the batch they already have.
 	experiments map[experiments.ExperimentID]bool
 	exposed     map[events.UnitKey]bool
+}
+
+// admitLink reports whether an alias of pair may be taken: its pair is
+// already linked, or the limit leaves room for one more, which it takes.
+func (l *limitsReached) admitLink(pair events.AliasPair) bool {
+	if !l.limitLinks || l.linked[pair] || l.admitted[pair] {
+		return true
+	}
+	if l.linkRoom == 0 {
+		return false
+	}
+	l.linkRoom--
+	l.admitted[pair] = true
+	return true
 }
 
 // atLimit reads what the batch's aliases and exposures add to, which is
@@ -408,10 +428,14 @@ func (h *IngestEvents) atLimit(ctx context.Context, key delivery.SDKKey, judged 
 		if err != nil {
 			return res, err
 		}
-		if res.aliasLinks = links >= int64(h.limits.AliasLinks); res.aliasLinks {
+		// Only a batch whose pairs could all be new and still overrun the
+		// limit reads which of them are linked: below that, every one fits.
+		if res.limitLinks = links+int64(len(pairs)) > int64(h.limits.AliasLinks); res.limitLinks {
 			if res.linked, err = h.store.LinkedPairs(ctx, key.Environment, pairs); err != nil {
 				return res, err
 			}
+			res.linkRoom = max(0, int64(h.limits.AliasLinks)-links)
+			res.admitted = map[events.AliasPair]bool{}
 		}
 	}
 	if len(exps) > 0 {

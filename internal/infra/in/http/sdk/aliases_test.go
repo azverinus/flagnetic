@@ -154,3 +154,24 @@ func TestAnEnvironmentAtItsLimitOfAliasLinksRefusesNewPairsOnly(t *testing.T) {
 		t.Errorf("staging alias = %+v, want accepted", res)
 	}
 }
+
+func TestABatchOfNewPairsTakesOnlyWhatTheLimitLeaves(t *testing.T) {
+	srv := testkit.StartServer(t, testkit.WithClock(clock.NewFake(protocolTime)), testkit.WithEventLimits(2, 0))
+	p := newProject(t, srv)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindClient)
+
+	// Three new pairs, one of them twice, against room for two: the pair
+	// sent twice takes one place, and the third pair is refused.
+	res := batchResult(t, srv, value, batch(
+		aliasOf(1, protocolTime, "anonymous", "d-1", "user", "u-1"),
+		aliasOf(2, protocolTime, "anonymous", "d-2", "user", "u-2"),
+		aliasOf(3, protocolTime.Add(-time.Hour), "anonymous", "d-1", "user", "u-1"),
+		aliasOf(4, protocolTime, "anonymous", "d-3", "user", "u-3"),
+	))
+	if res.Accepted != 3 || len(res.Rejected) != 1 || res.Rejected[0].Index != 3 || res.Rejected[0].Code != "quota_exceeded" {
+		t.Fatalf("batch past the limit = %+v, want the third pair refused quota_exceeded", res)
+	}
+	if links := aliasLinks(t, p, "production"); len(links) != 2 {
+		t.Errorf("links = %+v, want the two within the limit", links)
+	}
+}
