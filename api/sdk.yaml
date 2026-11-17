@@ -329,7 +329,9 @@ paths:
         exposure naming a variation its experiment does not weigh; an
         exposure with `override` true may name any variation of the
         experiment's flag instead, since an override decides the variation
-        whatever the weights are)
+        whatever the weights are), `quota_exceeded` (an alias linking a
+        new pair, or an exposure of a unit with no first exposure yet, past
+        what the operator allows an environment or experiment to keep)
         and, for an exposure naming another flag than its experiment's or an
         `evaluation_reason` other than `experiment` or `override`,
         `event_invalid`. An exposure is judged in that order and refused

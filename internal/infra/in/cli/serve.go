@@ -106,6 +106,7 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		EventsLossWarning:     time.Duration(cfg.EventsLossWarningHours) * time.Hour,
 		EventsPartitionsAhead: cfg.EventsPartitionsAhead,
 		SDKInventoryRetention: time.Duration(cfg.SDKInventoryRetentionDays) * 24 * time.Hour,
+		AliasLinksLimit:       cfg.AliasLinksLimit, FirstExposuresLimit: cfg.FirstExposuresLimit,
 		Schedule: compose.Schedule{
 			MinLead: cfg.ScheduleMinLead, Tick: cfg.ScheduleTick, MaxFailures: cfg.ScheduleMaxFailures,
 		},

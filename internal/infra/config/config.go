@@ -104,6 +104,11 @@ type Config struct {
 	// SDKInventoryRetentionDays is how many days a row of the SDK
 	// inventory is kept after its SDK was last seen.
 	SDKInventoryRetentionDays int
+	// AliasLinksLimit is the most alias links an environment keeps.
+	AliasLinksLimit int
+	// FirstExposuresLimit is the most first exposures an experiment keeps
+	// in an environment.
+	FirstExposuresLimit int
 	// WebhookAllowHTTP accepts plain http webhook targets.
 	WebhookAllowHTTP bool
 	// WebhookAllowPrivateNetworks accepts webhook targets on loopback,
@@ -555,6 +560,29 @@ func Settings() []Setting {
 				"An SDK seen again afterwards appears again, with a new first-seen time.",
 			Example: "90",
 			apply:   wholeNumber(func(c *Config, n int) { c.SDKInventoryRetentionDays = n }),
+		},
+		{
+			Name:    "FLAGNETIC_ALIAS_LINKS_LIMIT",
+			Key:     "alias_links_limit",
+			Default: "5000000",
+			Unit:    "links",
+			Description: "The most alias links an environment keeps. Links are kept as long as the environment exists, so the limit is what stops " +
+				"a client key from growing them without end. Once an environment holds this many, an alias linking a new pair is refused " +
+				"`quota_exceeded`, while one for a pair already linked is still accepted. The count is exact for batches one after another " +
+				"and may be exceeded by the batches in flight at the moment the limit is reached.",
+			Example: "5000000",
+			apply:   wholeNumber(func(c *Config, n int) { c.AliasLinksLimit = n }),
+		},
+		{
+			Name:    "FLAGNETIC_FIRST_EXPOSURES_LIMIT",
+			Key:     "first_exposures_limit",
+			Default: "10000000",
+			Unit:    "units",
+			Description: "The most units whose first exposure an experiment keeps in an environment. Once the rollup has counted this many, " +
+				"an exposure of another unit is refused `quota_exceeded`, while one of a unit already counted is still accepted. " +
+				"Exposures received before the rollup has counted them are not refused, so the limit is approximate by the rollup's lag.",
+			Example: "10000000",
+			apply:   wholeNumber(func(c *Config, n int) { c.FirstExposuresLimit = n }),
 		},
 		{
 			Name:    "FLAGNETIC_WEBHOOK_ALLOW_HTTP",

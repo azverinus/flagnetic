@@ -56,6 +56,10 @@ const (
 	RejectUnknownExperiment  RejectionCode = "unknown_experiment"
 	RejectUnitTypeMismatch   RejectionCode = "unit_type_mismatch"
 	RejectUnknownVariation   RejectionCode = "unknown_variation"
+	// RejectQuotaExceeded refuses an event that would add a row to what an
+	// environment keeps for good once it holds as many as the operator
+	// allows.
+	RejectQuotaExceeded RejectionCode = "quota_exceeded"
 )
 
 // Rejection is why one event was refused, for the SDK that sent it.
@@ -81,6 +85,17 @@ type Alias struct {
 	FromUnitID   string
 	ToUnitType   string
 	ToUnitID     string
+}
+
+// AliasPair is the two units an alias links, what an environment keeps one
+// link of.
+type AliasPair struct {
+	FromUnitType, FromUnitID, ToUnitType, ToUnitID string
+}
+
+// Pair is the pair of units a links.
+func (a Alias) Pair() AliasPair {
+	return AliasPair{a.FromUnitType, a.FromUnitID, a.ToUnitType, a.ToUnitID}
 }
 
 // Exposure is an exposure as an SDK reports it: a unit encountered behaviour

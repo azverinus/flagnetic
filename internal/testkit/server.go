@@ -135,6 +135,9 @@ type serverOptions struct {
 	targets governance.TargetPolicy
 	fault   *pgdelivery.RulesetLoadFault
 	limits  []func(*config.RateLimits)
+	// aliasLinksLimit and firstExposuresLimit are the limits of what an
+	// environment keeps of each; 0 keeps the configuration's.
+	aliasLinksLimit, firstExposuresLimit int
 	// auditExportMax is the most entries a download of the audit log holds,
 	// 0 for the configuration's default.
 	auditExportMax int
@@ -207,6 +210,13 @@ func WithRulesetLoadFault(f *pgdelivery.RulesetLoadFault) ServerOption {
 // defaults of the configuration.
 func WithRateLimits(change func(*config.RateLimits)) ServerOption {
 	return func(o *serverOptions) { o.limits = append(o.limits, change) }
+}
+
+// WithEventLimits serves with the most alias links an environment keeps and
+// the most first exposures an experiment keeps in one, instead of the
+// configuration's.
+func WithEventLimits(aliasLinks, firstExposures int) ServerOption {
+	return func(o *serverOptions) { o.aliasLinksLimit, o.firstExposuresLimit = aliasLinks, firstExposures }
 }
 
 // WithAuditExportMaxEntries serves with n as the most entries one download of
@@ -331,6 +341,8 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		EventsLossWarning:     time.Duration(cfg.EventsLossWarningHours) * time.Hour,
 		EventsPartitionsAhead: cfg.EventsPartitionsAhead,
 		SDKInventoryRetention: time.Duration(cfg.SDKInventoryRetentionDays) * 24 * time.Hour,
+		AliasLinksLimit:       cmp.Or(o.aliasLinksLimit, cfg.AliasLinksLimit),
+		FirstExposuresLimit:   cmp.Or(o.firstExposuresLimit, cfg.FirstExposuresLimit),
 		WebhookTargets:        o.targets,
 		WebhookTick:           cfg.WebhookTick,
 		SinkTick:              cfg.SinkTick,
