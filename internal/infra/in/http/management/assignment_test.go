@@ -11,6 +11,7 @@ import (
 	"github.com/azverinus/flagnetic/eval"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
+	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -178,13 +179,13 @@ func TestTheUniformityCheckRefusesWhatItCannotCheck(t *testing.T) {
 	}
 }
 
-// A body of 200,000 unit IDs is far over the server's limit for other
-// bodies; the check takes it.
+// A body of 200,000 unit IDs of the longest length a unit ID may have is far
+// over the server's limit for other bodies; the check's own limit takes it.
 func TestTheUniformityCheckTakesTheLargestList(t *testing.T) {
 	f := startExperiments(t)
 	ids := manyUnitIDs(200000)
 	for i := range ids {
-		ids[i] += strings.Repeat("-", 40)
+		ids[i] += strings.Repeat("-", flags.MaxUnitIDBytes-len(ids[i]))
 	}
 	res := hashCheck(t, f.admin, f.project.Key, management.HashCheckRequest{UnitIds: ids})
 	if res.JSON200 == nil || res.JSON200.Max < res.JSON200.Min || len(res.JSON200.Counts) != 100 {
