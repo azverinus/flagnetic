@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Can } from "@/components/can";
 import { KillSwitchDialog } from "@/components/kill-switch-dialog";
 import { type Proposal, ProposeDialog } from "@/components/propose-dialog";
+import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ApiError, unwrap } from "@/lib/errors";
@@ -92,71 +93,76 @@ export function FlagOnOff({
   });
 
   return (
-    <section className="flex flex-wrap items-center justify-between gap-4 rounded-md border p-4">
-      <div className="flex items-center gap-3">
-        <Can permission="flag_configuration.update" whenMissing="disable">
-          <Switch
-            checked={configuration.on}
-            disabled={frozen || toggle.isPending}
-            // One name whatever the state, which the switch announces itself.
-            aria-label={t`${key} on in ${name}`}
-            onCheckedChange={(on) => toggle.mutate(on)}
-          />
-        </Can>
-        <span className="text-sm font-medium">
-          {configuration.on ? <Trans>On</Trans> : <Trans>Off</Trans>}
-        </span>
-        <span className="text-sm text-muted-foreground">
-          {configuration.on ? (
-            <Trans>Contexts are served by the overrides, rules and fallthrough below.</Trans>
-          ) : (
-            <Trans>Every context receives the off variation.</Trans>
-          )}
-        </span>
-      </div>
-      {configuration.on && !frozen ? (
-        <>
-          {/* The dialog needs the environment, which is read apart: until it is, the button is disabled and says it is waiting, rather than doing nothing. */}
-          <Can permission="flag_configuration.kill" whenMissing="disable">
-            <Button
-              variant="destructive"
-              disabled={!environment}
-              aria-busy={!environment && !environmentsRead.error}
-              onClick={() => setKilling(true)}
-            >
-              <OctagonXIcon aria-hidden />
-              <Trans>Kill switch</Trans>
-            </Button>
-          </Can>
-          {environment ? (
-            <KillSwitchDialog
-              project={project}
-              flag={flag}
-              environment={environment}
-              open={killing}
-              onOpenChange={setKilling}
+    <>
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-md border p-4">
+        <div className="flex items-center gap-3">
+          <Can permission="flag_configuration.update" whenMissing="disable">
+            <Switch
+              checked={configuration.on}
+              disabled={frozen || toggle.isPending}
+              // One name whatever the state, which the switch announces itself.
+              aria-label={t`${key} on in ${name}`}
+              onCheckedChange={(on) => toggle.mutate(on)}
             />
-          ) : null}
-        </>
+          </Can>
+          <span className="text-sm font-medium">
+            {configuration.on ? <Trans>On</Trans> : <Trans>Off</Trans>}
+          </span>
+          <span className="text-sm text-muted-foreground">
+            {configuration.on ? (
+              <Trans>Contexts are served by the overrides, rules and fallthrough below.</Trans>
+            ) : (
+              <Trans>Every context receives the off variation.</Trans>
+            )}
+          </span>
+        </div>
+        {configuration.on && !frozen ? (
+          <>
+            {/* The dialog needs the environment, which is read apart: until it is, the button is disabled and says it is waiting, rather than doing nothing. */}
+            <Can permission="flag_configuration.kill" whenMissing="disable">
+              <Button
+                variant="destructive"
+                disabled={!environment}
+                aria-busy={!environment && !environmentsRead.error}
+                onClick={() => setKilling(true)}
+              >
+                <OctagonXIcon aria-hidden />
+                <Trans>Kill switch</Trans>
+              </Button>
+            </Can>
+            {environment ? (
+              <KillSwitchDialog
+                project={project}
+                flag={flag}
+                environment={environment}
+                open={killing}
+                onOpenChange={setKilling}
+              />
+            ) : null}
+          </>
+        ) : null}
+        <ProposeDialog
+          project={project}
+          proposal={proposing}
+          onOpenChange={(open) => !open && setProposing(undefined)}
+          onProposed={() => setProposing(undefined)}
+        >
+          <p className="text-sm">
+            {configuration.on ? (
+              <Trans>
+                {name} is protected: switching {key} off there goes through a change request.
+              </Trans>
+            ) : (
+              <Trans>
+                {name} is protected: switching {key} on there goes through a change request.
+              </Trans>
+            )}
+          </p>
+        </ProposeDialog>
+      </section>
+      {!environment && environmentsRead.error ? (
+        <QueryError error={environmentsRead.error} onRetry={environmentsRead.retry} />
       ) : null}
-      <ProposeDialog
-        project={project}
-        proposal={proposing}
-        onOpenChange={(open) => !open && setProposing(undefined)}
-        onProposed={() => setProposing(undefined)}
-      >
-        <p className="text-sm">
-          {configuration.on ? (
-            <Trans>
-              {name} is protected: switching {key} off there goes through a change request.
-            </Trans>
-          ) : (
-            <Trans>
-              {name} is protected: switching {key} on there goes through a change request.
-            </Trans>
-          )}
-        </p>
-      </ProposeDialog>
-    </section>
+    </>
   );
 }

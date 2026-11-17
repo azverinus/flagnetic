@@ -114,6 +114,18 @@ export type SessionChange = "signed-in" | "signed-out";
 
 const sessionChannelName = "flagnetic-session";
 
+// One channel per tab, both to announce and to listen on: a broadcast
+// channel delivers to every other channel of the same name, those of the
+// sending tab included, so a tab announcing on a second channel would hear
+// itself and drop the session it has just signed in with.
+let tabChannel: BroadcastChannel | undefined;
+
+function sessionChannel(): BroadcastChannel | undefined {
+  if (typeof BroadcastChannel === "undefined") return undefined;
+  tabChannel ??= new BroadcastChannel(sessionChannelName);
+  return tabChannel;
+}
+
 /**
  * Tells the other tabs of this browser that a member signed in or out here.
  * The session is one cookie shared by every tab, so a tab that does not
@@ -123,20 +135,20 @@ const sessionChannelName = "flagnetic-session";
  * tabs then learn of it from their next refused request, as before.
  */
 export function announceSessionChange(change: SessionChange): void {
-  if (typeof BroadcastChannel === "undefined") return;
-  const channel = new BroadcastChannel(sessionChannelName);
-  channel.postMessage(change);
-  channel.close();
+  sessionChannel()?.postMessage(change);
 }
 
 /** Calls `onChange` when another tab announces a session change; returns how to stop. */
 export function listenForSessionChange(onChange: (change: SessionChange) => void): () => void {
-  if (typeof BroadcastChannel === "undefined") return () => undefined;
-  const channel = new BroadcastChannel(sessionChannelName);
+  const channel = sessionChannel();
+  if (channel === undefined) return () => undefined;
   channel.onmessage = (event: MessageEvent<unknown>) => {
     if (event.data === "signed-in" || event.data === "signed-out") onChange(event.data);
   };
-  return () => channel.close();
+  return () => {
+    channel.close();
+    if (tabChannel === channel) tabChannel = undefined;
+  };
 }
 
 /**

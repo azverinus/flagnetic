@@ -522,7 +522,6 @@ function EnvironmentPanel(props: PanelProps) {
   const experiments = useQuery(flagExperimentsQuery(project, flag.key));
   const reads = [attributes, segments, flags, experiments];
   const failed = reads.find((read) => read.isError);
-  const { environmentsRead } = props;
 
   return (
     <div className="flex flex-col gap-8">
@@ -548,9 +547,6 @@ function EnvironmentPanel(props: PanelProps) {
         </p>
       ) : null}
       <FlagOnOff {...props} frozen={frozen !== undefined} />
-      {!environment && environmentsRead.error ? (
-        <QueryError error={environmentsRead.error} onRetry={environmentsRead.retry} />
-      ) : null}
       {failed ? (
         <QueryError error={failed.error} onRetry={() => void failed.refetch()} />
       ) : environment && attributes.data && segments.data && flags.data && experiments.data ? (

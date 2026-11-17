@@ -210,12 +210,21 @@ describe("telling the other tabs", () => {
     vi.stubGlobal("BroadcastChannel", FakeChannel);
     const heard = vi.fn();
     const stop = listenForSessionChange(heard);
+    const otherTab = new FakeChannel();
+    const otherTabHeard = vi.fn();
+    otherTab.onmessage = (event) => otherTabHeard(event.data);
 
-    announceSessionChange("signed-out");
-    for (const channel of open) channel.onmessage?.({ data: "something else" } as MessageEvent);
+    // What this tab announces reaches the other tab, never this tab's own listener.
+    announceSessionChange("signed-in");
+    expect(otherTabHeard).toHaveBeenCalledWith("signed-in");
+    expect(heard).not.toHaveBeenCalled();
+
+    otherTab.postMessage("signed-out");
+    otherTab.postMessage("something else");
 
     expect(heard).toHaveBeenCalledOnce();
     expect(heard).toHaveBeenCalledWith("signed-out");
+    otherTab.close();
     stop();
     expect(open.size).toBe(0);
   });

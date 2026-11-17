@@ -159,6 +159,21 @@ describe("the sign-in form", () => {
       await waitFor(() => expect(onSignedIn).toHaveBeenCalled());
     });
 
+    it("sends none of what was typed when it has no domain", async () => {
+      const server = fakeServer({ "GET /auth/methods": lookup({}) });
+      await renderWithRouter(() => <SignInForm onSignedIn={vi.fn()} />);
+
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText("Email"), "ada");
+      await user.click(screen.getByRole("button", { name: "Continue" }));
+
+      await waitFor(() =>
+        expect(server.requests.some((r) => new URL(r.url).searchParams.has("email"))).toBe(true),
+      );
+      const asked = server.requests.find((r) => new URL(r.url).searchParams.has("email"))!;
+      expect(new URL(asked.url).searchParams.get("email")).toBe("@");
+    });
+
     it("asks for the email before sending anything", async () => {
       const server = fakeServer({ "GET /auth/methods": withProviders });
       renderWithProviders(<SignInForm onSignedIn={vi.fn()} />);
