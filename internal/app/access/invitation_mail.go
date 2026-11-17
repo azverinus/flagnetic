@@ -90,6 +90,19 @@ func mailName(name string) string {
 // its secret.
 const invitationLinkPath = "/invitations/"
 
+// canMail reports whether an invitation issued now would be mailed.
+func (im *InvitationMailer) canMail(ctx context.Context) (bool, error) {
+	if im == nil || im.consoleURL == "" {
+		return false, nil
+	}
+	if _, err := im.smtp.SMTPSettings(ctx); errors.Is(err, ErrSMTPNotConfigured) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // mail queues the mail of issued to invitee, which leaves once the unit of
 // work ctx carries has committed, and returns issued as its issuer is
 // answered: mailed, without its secret, which only the mail carries. The mail
@@ -102,13 +115,10 @@ const invitationLinkPath = "/invitations/"
 // is sent later never undoes the invitation: a lost one is reissued.
 func (im *InvitationMailer) mail(ctx context.Context, invitee access.Member, issued IssuedInvitation, requestID string,
 ) (IssuedInvitation, error) {
-	if im == nil || im.consoleURL == "" {
-		return issued, nil
-	}
-	if _, err := im.smtp.SMTPSettings(ctx); errors.Is(err, ErrSMTPNotConfigured) {
-		return issued, nil
-	} else if err != nil {
+	if can, err := im.canMail(ctx); err != nil {
 		return IssuedInvitation{}, err
+	} else if !can {
+		return issued, nil
 	}
 	details, err := im.details.InvitationDetails(ctx, issued.ID)
 	if err != nil {

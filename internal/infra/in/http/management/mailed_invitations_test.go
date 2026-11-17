@@ -159,6 +159,12 @@ func TestWithSMTPAProjectInvitationIsMailedNamingTheProjectTheRoleAndTheInviter(
 		}
 	}
 
+	// Each invitation mails the address, so it is invited again only a
+	// minute after the last one.
+	hurried := do(ownerClient.InviteProjectMemberWithResponse(t.Context(), p.Key,
+		management.ProjectInvitationCreate{Email: email, DisplayName: "Ada Lovelace", Role: "viewer"}))
+	assertProblem(t, "inviting again at once", hurried.StatusCode(), hurried.Body, http.StatusTooManyRequests, "too_many_requests")
+
 	// Re-inviting to the same project reissues the invitation, mailed again
 	// with the new role, once a minute has passed.
 	c.Advance(time.Minute)

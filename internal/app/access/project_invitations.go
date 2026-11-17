@@ -87,7 +87,8 @@ type InviteToProjectCommand struct {
 // admin, who is invited again with the new role: a fresh invitation then
 // replaces theirs, recorded as member.invitation_reissued; inviting the
 // address again less than a minute after the last invitation is refused
-// too_many_requests, as each one mails it.
+// too_many_requests, as each one mails it; an instance that cannot mail has
+// no such interval.
 func (h *InviteToProject) Handle(ctx context.Context, cmd InviteToProjectCommand) (InvitedMember, error) {
 	grant, err := access.NewInvitationGrant(cmd.Project.ID, cmd.Role, "/role")
 	if err != nil {
@@ -164,7 +165,13 @@ func (h *InviteToProject) memberToInvite(ctx context.Context, invited access.Mem
 	if by := caller.Member; by == nil || (by.ID != pending.InvitedBy && !by.InstanceAdmin) {
 		return access.Member{}, "", errInvitedByAnother
 	}
-	if wait := reinviteInterval - now.Sub(pending.CreatedAt); wait > 0 {
+	// Only an invitation that is mailed needs spacing: one the instance
+	// cannot mail is shown to the member who issues it, and mails nobody.
+	mails, err := h.mailer.canMail(ctx)
+	if err != nil {
+		return access.Member{}, "", err
+	}
+	if wait := reinviteInterval - now.Sub(pending.CreatedAt); mails && wait > 0 {
 		return access.Member{}, "", apperrors.RateLimited("too_many_requests",
 			"this address was invited a moment ago; try again in a minute", wait.Truncate(time.Second)+time.Second)
 	}

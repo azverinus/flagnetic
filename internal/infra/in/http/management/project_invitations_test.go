@@ -401,14 +401,7 @@ func TestInvitingSomebodyToTheSameProjectAgainReplacesTheInvitation(t *testing.T
 	owner := memberIn(t, srv, p, access.RoleOwner)
 
 	first, email := inviteTo(t, owner.ClientWithResponses, p.Key, "viewer")
-	// An address is invited again only after a minute: each invitation mails it.
-	hurried := do(owner.InviteProjectMemberWithResponse(t.Context(), p.Key,
-		management.ProjectInvitationCreate{Email: email, DisplayName: "Invitee", Role: "viewer"}))
-	assertProblem(t, "inviting again at once", hurried.StatusCode(), hurried.Body, http.StatusTooManyRequests, "too_many_requests")
-	if got := opened(t, srv, *first.Invitation.Url); got.JSON200 == nil {
-		t.Fatalf("the first link after the refused invitation = %d: %s, want it to stand", got.StatusCode(), got.Body)
-	}
-	c.Advance(time.Minute)
+	// An instance that cannot mail invites again at once: nothing is mailed.
 	second := mustInviteTo(t, owner.ClientWithResponses, p.Key, strings.ToUpper(email), "maintainer")
 	if second.Member.Id != first.Member.Id {
 		t.Fatalf("the second invitation made member %s, want %s again", second.Member.Id, first.Member.Id)
