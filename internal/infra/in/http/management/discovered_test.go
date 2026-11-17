@@ -185,6 +185,10 @@ func TestDiscoveredAttributesAreCappedPerProject(t *testing.T) {
 	if got := discovered(t, srv, admin, p.Key); slices.Contains(got, "k1601 string 1") {
 		t.Errorf("at the cap again: k1601 listed")
 	}
+	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"k1000":1}`)})
+	if got := discovered(t, srv, admin, p.Key); len(got) != 500 || slices.ContainsFunc(got, func(s string) bool { return strings.HasPrefix(s, "k1000 ") }) {
+		t.Errorf("a dismissed key seen with a new type at the cap: %d listed, want 500 without k1000", len(got))
+	}
 	if res := do(admin.DeclareDiscoveredAttributeWithResponse(t.Context(), p.Key, "k1002", management.DiscoveredAttributeDeclaration{Type: "string"})); res.JSON201 == nil {
 		t.Fatalf("declare = %d %s", res.StatusCode(), res.Body)
 	}

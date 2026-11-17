@@ -154,8 +154,9 @@ func (d *Discoveries) Flush(ctx context.Context) error {
 
 // write merges the sightings of project into what is stored: a key the
 // project declares meanwhile is skipped, a known key merged, and a new key
-// kept while the project lists fewer than delivery.MaxDiscoveredAttributes
-// (dismissed ones are not listed), in key order so that which keys are kept does not depend on chance.
+// kept, or a dismissed key listed again, while the project lists fewer than
+// delivery.MaxDiscoveredAttributes (dismissed ones are not listed), in key
+// order so that which keys are kept does not depend on chance.
 func (d *Discoveries) write(ctx context.Context, project workspace.ProjectID, seen map[string]*delivery.Sighting) error {
 	keys := make([]string, 0, len(seen))
 	for k := range seen {
@@ -190,7 +191,18 @@ func (d *Discoveries) write(ctx context.Context, project workspace.ProjectID, se
 			a, ok := known[k]
 			switch {
 			case ok:
-				a = a.Seen(s)
+				b := a.Seen(s)
+				// A dismissed attribute seen with a new type is listed
+				// again, which takes a place like a new key: without the
+				// check, keys dismissed to free places could all come back
+				// and list more than the cap.
+				if a.Dismissed && !b.Dismissed {
+					if count >= delivery.MaxDiscoveredAttributes {
+						continue
+					}
+					count++
+				}
+				a = b
 			case count < delivery.MaxDiscoveredAttributes:
 				a = delivery.NewDiscoveredAttribute(project, s)
 				count++
