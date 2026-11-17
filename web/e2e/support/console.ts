@@ -242,3 +242,30 @@ export async function colleague(
   const context = await browser.newContext();
   return { page: await context.newPage(), who };
 }
+
+/**
+ * Opens one of a project's settings screens as a member does: the sidebar's
+ * "Project settings" link, then the screen in the area's list.
+ */
+export async function openProjectSetting(page: Page, screen: string): Promise<void> {
+  await page
+    .getByRole("navigation", { name: "Project" })
+    .getByRole("link", { name: "Project settings", exact: true })
+    .click();
+  await page
+    .getByRole("navigation", { name: "Settings", exact: true })
+    .getByRole("link", { name: screen, exact: true })
+    .click();
+}
+
+/**
+ * Opens one of the instance's screens as an instance admin does: the
+ * sidebar's "Instance" link, then the screen in the area's list.
+ */
+export async function openInstanceScreen(page: Page, screen: string): Promise<void> {
+  await page.getByRole("link", { name: "Instance", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "Instance", exact: true })
+    .getByRole("link", { name: screen, exact: true })
+    .click();
+}

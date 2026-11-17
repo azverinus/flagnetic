@@ -2,7 +2,14 @@ import { updateProject } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
-import { type Credentials, managementClient, must, seedProject, signIn } from "../support/console";
+import {
+  type Credentials,
+  managementClient,
+  must,
+  openProjectSetting,
+  seedProject,
+  signIn,
+} from "../support/console";
 import { admin, secondProject, seededProject, viewer } from "../support/instance";
 
 /** Signs in and lands on one project's overview. */
@@ -147,9 +154,10 @@ test.describe("the project shell", () => {
 
     await page.getByRole("button", { name: "Collapse the sidebar" }).click();
     // The screens keep their names for a screen reader, and lose them on screen.
-    const environments = projectNavigation(page).getByRole("link", { name: "Environments" });
-    await expect(environments).toBeVisible();
-    await expect(environments.getByText("Environments")).toHaveClass(/sr-only/);
+    const flags = projectNavigation(page).getByRole("link", { name: "Flags", exact: true });
+    await expect(flags).toBeVisible();
+    await expect(flags.getByText("Flags")).toHaveClass(/sr-only/);
+    expect((await flags.boundingBox())?.width).toBeLessThanOrEqual(48);
 
     await page.reload();
 
@@ -159,7 +167,7 @@ test.describe("the project shell", () => {
   test("names where the member is, from the route tree", async ({ page }) => {
     await openProject(page, seededProject);
 
-    await projectNavigation(page).getByRole("link", { name: "Environments" }).click();
+    await openProjectSetting(page, "Environments");
 
     const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
     await expect(breadcrumb).toContainText(seededProject.name);
@@ -187,20 +195,106 @@ test.describe("the project shell", () => {
   });
 });
 
+test.describe("the sidebar", () => {
+  test("keeps the last project's screens on the instance screens, none of them current", async ({
+    page,
+  }) => {
+    await openProject(page, seededProject);
+
+    await page.getByRole("link", { name: "Instance", exact: true }).click();
+
+    await expect(page).toHaveURL(/\/admin\/projects$/);
+    await expect(switcher(page)).toHaveAccessibleName(`Project: ${seededProject.name}`);
+    const flags = projectNavigation(page).getByRole("link", { name: "Flags", exact: true });
+    await expect(flags).toBeVisible();
+    await expect(projectNavigation(page).locator("[aria-current=page]")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Instance", exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(page.getByRole("navigation", { name: "Instance", exact: true })).toBeVisible();
+  });
+
+  test("invites a member with no remembered project to choose one", async ({ page }) => {
+    await signIn(page, viewer);
+    await page.evaluate(() => window.localStorage.removeItem("flagnetic.last-project"));
+
+    await page.goto("/?all=true");
+
+    await expect(switcher(page)).toHaveAccessibleName("Project: Choose a project");
+    await expect(projectNavigation(page)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: viewer.name, exact: true })).toBeVisible();
+  });
+
+  test("keeps the account in its foot, with the menu of today", async ({ page }) => {
+    await openProject(page, seededProject);
+
+    await page
+      .getByRole("complementary", { name: "Sidebar" })
+      .getByRole("button", { name: admin.name, exact: true })
+      .click();
+
+    await expect(page.getByRole("menuitem", { name: "Personal settings" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
+    await expect(page.getByRole("banner").getByRole("button", { name: admin.name })).toHaveCount(0);
+  });
+
+  test("is a drawer on a phone, closed by following a link", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openProject(page, seededProject);
+    await expect(page.getByRole("complementary", { name: "Sidebar" })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Open the sidebar" }).click();
+
+    const drawer = page.getByRole("dialog", { name: "Menu" });
+    await expect(drawer.getByRole("complementary", { name: "Sidebar" })).toBeVisible();
+    await drawer
+      .getByRole("navigation", { name: "Project" })
+      .getByRole("link", { name: "Flags", exact: true })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`/projects/${seededProject.key}/flags`));
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const wide = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    );
+    expect(wide).toBe(false);
+  });
+
+  test("keeps its header at 48 px", async ({ page }) => {
+    await openProject(page, seededProject);
+
+    const header = await page.getByRole("banner").boundingBox();
+
+    expect(header?.height).toBe(48);
+  });
+});
+
 test.describe("what a role may do", () => {
   test("hides the screens a viewer could obtain nothing from", async ({ page }) => {
     await openProject(page, seededProject, viewer);
-    const nav = projectNavigation(page);
 
-    await expect(nav.getByRole("link", { name: "Environments" })).toBeVisible();
-    await expect(nav.getByRole("link", { name: "Attributes" })).toBeVisible();
-    await expect(nav.getByRole("link", { name: "Settings" })).toHaveCount(0);
+    // The project's settings open at the first screen the viewer may open.
+    await projectNavigation(page).getByRole("link", { name: "Project settings" }).click();
+    await expect(page).toHaveURL(new RegExp(`/projects/${seededProject.key}/import-export$`));
+    const screens = page.getByRole("navigation", { name: "Settings", exact: true });
+    await expect(screens.getByRole("link", { name: "Environments" })).toBeVisible();
+    await expect(screens.getByRole("link", { name: "Attributes" })).toBeVisible();
+    await expect(screens.getByRole("link", { name: "General" })).toHaveCount(0);
+    await expect(screens.getByRole("link", { name: "Project tokens" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Instance", exact: true })).toHaveCount(0);
   });
 
   test("shows those screens to an instance admin", async ({ page }) => {
     await openProject(page, seededProject);
 
-    await expect(projectNavigation(page).getByRole("link", { name: "Settings" })).toBeVisible();
+    await projectNavigation(page).getByRole("link", { name: "Project settings" }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/projects/${seededProject.key}/settings$`));
+    await expect(
+      page
+        .getByRole("navigation", { name: "Settings", exact: true })
+        .getByRole("link", { name: "General" }),
+    ).toBeVisible();
   });
 
   test("disables an action a viewer cannot take and names what it needs", async ({ page }) => {
@@ -351,7 +445,9 @@ test.describe("the project navigation", () => {
     refuse = false;
     await navigation.getByRole("button", { name: "Try again" }).click();
 
-    await expect(projectNavigation(page).getByRole("link", { name: "Environments" })).toBeVisible();
+    await expect(
+      projectNavigation(page).getByRole("link", { name: "Flags", exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole("heading", { name: seededProject.name, level: 1 })).toBeVisible();
     await expect(page.getByRole("alert")).toHaveCount(0);
   });
@@ -510,7 +606,7 @@ test.describe("renaming a project", () => {
     await page.getByRole("button", { name: "Create project" }).click();
     await expect(page.getByRole("heading", { name: "Before", level: 1 })).toBeVisible();
 
-    await projectNavigation(page).getByRole("link", { name: "Settings" }).click();
+    await openProjectSetting(page, "General");
     await expect(page.getByLabel("Key")).toBeDisabled();
     await expect(page.getByLabel("Key")).toHaveValue(key);
     await page.getByLabel("Name").fill("After");

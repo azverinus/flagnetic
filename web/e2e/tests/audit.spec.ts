@@ -9,7 +9,13 @@ import { readFile } from "node:fs/promises";
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations } from "../support/axe";
-import { managementClient, must, seedProject, signIn } from "../support/console";
+import {
+  managementClient,
+  must,
+  openProjectSetting,
+  seedProject,
+  signIn,
+} from "../support/console";
 import { admin, seededProject, viewer } from "../support/instance";
 
 /**
@@ -182,8 +188,7 @@ test("the overview's recent activity shows a change made in the console, without
   // A reload would drop this mark.
   await page.evaluate(() => Object.assign(window, { sameDocument: true }));
 
-  const navigation = page.getByRole("navigation", { name: "Project" });
-  await navigation.getByRole("link", { name: "Environments" }).click();
+  await openProjectSetting(page, "Environments");
   const staging = page
     .getByRole("row")
     .filter({ has: page.getByRole("cell", { name: "staging", exact: true }) });

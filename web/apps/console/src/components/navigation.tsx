@@ -1,229 +1,38 @@
-import type { MessageDescriptor } from "@lingui/core";
-import { msg, plural } from "@lingui/core/macro";
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { Link, type LinkProps } from "@tanstack/react-router";
-import {
-  ActivityIcon,
-  ArrowLeftRightIcon,
-  BoxesIcon,
-  DatabaseZapIcon,
-  FlagIcon,
-  FlaskConicalIcon,
-  GitPullRequestArrowIcon,
-  HistoryIcon,
-  HourglassIcon,
-  LayersIcon,
-  KeyRoundIcon,
-  LayoutDashboardIcon,
-  type LucideIcon,
-  MailIcon,
-  RotateCwIcon,
-  ServerIcon,
-  ShieldCheckIcon,
-  SettingsIcon,
-  TagsIcon,
-  UserRoundCogIcon,
-  UsersIcon,
-  UsersRoundIcon,
-  WebhookIcon,
-} from "lucide-react";
-import { type ReactNode, useId } from "react";
+import { Link, useRouterState } from "@tanstack/react-router";
+import { RotateCwIcon, ServerCogIcon, SettingsIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
+import {
+  activityScreens,
+  dailyScreens,
+  isProjectSettingsPath,
+  openableSettingsScreens,
+  type ProjectScreen,
+} from "@/components/area-screens";
 import { SinkAttentionMarker } from "@/components/sink-banner";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Permission } from "@/lib/access-names";
+import {
+  SidebarGroup,
+  SidebarLinkLabel,
+  sidebarLinkClassName,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { WebhookAttentionMarker } from "@/components/webhook-disabled-banner";
 import { cn } from "@/lib/cn";
 import { ApiError } from "@/lib/errors";
 import { awaitingCountLimit, awaitingDecisionQuery, meQuery, projectMeQuery } from "@/lib/queries";
 
-type Screen = {
-  label: MessageDescriptor;
-  icon: LucideIcon;
-  exact?: boolean;
-};
-
-/** The routes of one project whose only parameter is the project's key. */
-type ProjectScreenRoute = Exclude<
-  Extract<NonNullable<LinkProps["to"]>, `/projects/$project${string}`>,
-  `/projects/$project${string}$${string}`
->;
-
-type ProjectScreen = Screen & {
-  /** A screen of the project, opened with the project's key alone. */
-  to: ProjectScreenRoute;
-  /** The permission the screen needs; the screen is listed only to a caller holding it. */
-  permission: Permission;
-};
-
-/** The screens of one project, in the order the sidebar lists them. */
-const projectScreens = [
-  {
-    to: "/projects/$project",
-    label: msg`Overview`,
-    icon: LayoutDashboardIcon,
-    permission: "project.read",
-    exact: true,
-  },
-  {
-    to: "/projects/$project/flags",
-    label: msg`Flags`,
-    icon: FlagIcon,
-    permission: "project.read",
-  },
-  {
-    to: "/projects/$project/experiments",
-    label: msg`Experiments`,
-    icon: FlaskConicalIcon,
-    permission: "project.read",
-  },
-  {
-    to: "/projects/$project/stale-flags",
-    label: msg`Stale flags`,
-    icon: HourglassIcon,
-    permission: "project.read",
-  },
-  {
-    to: "/projects/$project/segments",
-    label: msg`Segments`,
-    icon: UsersRoundIcon,
-    permission: "project.read",
-  },
-  {
-    to: "/projects/$project/change-requests",
-    label: msg`Change requests`,
-    icon: GitPullRequestArrowIcon,
-    permission: "project.read",
-  },
-  {
-    to: "/projects/$project/environments",
-    label: msg`Environments`,
-    icon: ServerIcon,
-    permission: "project.read",
-  },
-  {
-    to: "/projects/$project/unit-types",
-    label: msg`Unit types`,
-    icon: BoxesIcon,
-    permission: "project.read",
-  },
-  {
-    to: "/projects/$project/attributes",
-    label: msg`Attributes`,
-    icon: TagsIcon,
-    permission: "project.read",
-  },
-  {
-    to: "/projects/$project/members",
-    label: msg`Members`,
-    icon: UsersIcon,
-    permission: "project.read",
-  },
-  {
-    to: "/projects/$project/tokens",
-    label: msg`Project tokens`,
-    icon: KeyRoundIcon,
-    permission: "project_token.manage",
-  },
-  {
-    to: "/projects/$project/webhooks",
-    label: msg`Webhooks`,
-    icon: WebhookIcon,
-    permission: "webhook.manage",
-  },
-  {
-    to: "/projects/$project/sinks",
-    label: msg`Sinks`,
-    icon: DatabaseZapIcon,
-    permission: "sink.manage",
-  },
-  {
-    to: "/projects/$project/audit",
-    label: msg`Audit log`,
-    icon: HistoryIcon,
-    permission: "project.read",
-  },
-  {
-    to: "/projects/$project/event-volume",
-    label: msg`Event volume`,
-    icon: ActivityIcon,
-    permission: "project.read",
-  },
-  {
-    to: "/projects/$project/import-export",
-    label: msg`Import and export`,
-    icon: ArrowLeftRightIcon,
-    permission: "project.read",
-  },
-  {
-    to: "/projects/$project/settings",
-    label: msg`Settings`,
-    icon: SettingsIcon,
-    permission: "project.update",
-  },
-] satisfies ProjectScreen[];
-
-type InstanceScreen = Screen & {
-  to:
-    | "/admin/projects"
-    | "/admin/members"
-    | "/admin/auth-settings"
-    | "/admin/auth-providers"
-    | "/admin/scim-tokens"
-    | "/admin/mail"
-    | "/admin/audit"
-    | "/admin/webhooks";
-};
-
-/** The screens of the instance, listed to instance admins. */
-const instanceScreens: InstanceScreen[] = [
-  { to: "/admin/projects", label: msg`Projects`, icon: LayersIcon },
-  { to: "/admin/members", label: msg`Members`, icon: UsersIcon },
-  { to: "/admin/auth-settings", label: msg`Auth settings`, icon: KeyRoundIcon },
-  { to: "/admin/auth-providers", label: msg`Auth providers`, icon: ShieldCheckIcon },
-  { to: "/admin/scim-tokens", label: msg`SCIM tokens`, icon: UserRoundCogIcon },
-  { to: "/admin/mail", label: msg`Mail`, icon: MailIcon },
-  { to: "/admin/webhooks", label: msg`Webhooks`, icon: WebhookIcon },
-  { to: "/admin/audit", label: msg`Audit log`, icon: HistoryIcon },
-];
-
-const linkClassName =
-  "flex h-9 items-center gap-2 rounded-md px-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground data-[status=active]:bg-accent data-[status=active]:font-medium data-[status=active]:text-foreground";
-
-/**
- * What a screen's link shows: its icon, its name unless the sidebar is a
- * rail, and what waits there for the caller.
- */
-function ScreenLabel({
-  screen,
-  collapsed,
-  children,
-}: {
-  screen: Screen;
-  collapsed: boolean;
-  children?: ReactNode;
-}) {
-  const { i18n } = useLingui();
-  const Icon = screen.icon;
-  return (
-    <>
-      <Icon aria-hidden className="size-4 shrink-0" />
-      <span className={cn("truncate", collapsed ? "sr-only" : "sr-only md:not-sr-only")}>
-        {i18n._(screen.label)}
-      </span>
-      {children}
-    </>
-  );
-}
-
 /**
  * How many open change requests await the caller's decision, beside the
  * change requests screen; nothing when none does. Past the count it reads,
- * it says there are more.
+ * it says there are more. In the rail it is a dot on the icon.
  */
 function AwaitingDecisionCount({ project }: { project: string }) {
   const { t } = useLingui();
+  const { collapsed } = useSidebar();
   const awaiting = useQuery(awaitingDecisionQuery(project));
   const count = awaiting.data?.items.length ?? 0;
   if (count === 0) return null;
@@ -237,21 +46,103 @@ function AwaitingDecisionCount({ project }: { project: string }) {
       })}`;
   return (
     <span
-      className="ml-auto rounded-full bg-primary px-1.5 text-xs leading-5 font-medium text-primary-foreground"
+      className={cn(
+        "rounded-full bg-primary text-xs leading-5 font-medium text-primary-foreground tabular-nums",
+        collapsed ? "absolute top-0.5 right-0.5 size-2" : "ml-auto px-1.5",
+      )}
       title={label}
     >
-      <span aria-hidden>{shown}</span>
+      <span aria-hidden className={cn(collapsed && "sr-only")}>
+        {shown}
+      </span>
       <span className="sr-only">{label}</span>
     </span>
   );
 }
 
+/** Puts what waits at a link on its icon in the rail, and at its end in the column. */
+function Attention({ children }: { children: ReactNode }) {
+  const { collapsed } = useSidebar();
+  return <span className={cn(collapsed ? "absolute top-1 right-1" : "ml-auto")}>{children}</span>;
+}
+
+function ScreenLink({
+  screen,
+  project,
+  held,
+}: {
+  screen: ProjectScreen;
+  project: string;
+  held: ReadonlySet<string>;
+}) {
+  const { i18n } = useLingui();
+  const { collapsed } = useSidebar();
+  const Icon = screen.icon;
+  const name = i18n._(screen.label);
+  // A member who decides change requests is taken to those awaiting their
+  // decision, which the counter beside it counts.
+  const decides =
+    screen.to === "/projects/$project/change-requests" && held.has("change_request.approve");
+  return (
+    <Link
+      to={screen.to}
+      params={{ project }}
+      {...(decides ? { search: { tab: "awaiting" } } : {})}
+      activeOptions={{ exact: screen.exact ?? false, includeSearch: false }}
+      title={collapsed ? name : undefined}
+      className={sidebarLinkClassName(collapsed)}
+    >
+      <Icon aria-hidden />
+      <SidebarLinkLabel>{name}</SidebarLinkLabel>
+      {decides ? <AwaitingDecisionCount project={project} /> : null}
+    </Link>
+  );
+}
+
 /**
- * The screens of the open project the caller may obtain something from,
- * by the permissions the server answers for them there.
+ * The link to the project's settings: it opens the first of their screens
+ * the caller may open, and stays current on all of them. The attention of
+ * the sinks and the webhooks shows on it, since their screens are one
+ * level further in.
  */
-export function ProjectNavigation({ project, collapsed }: { project: string; collapsed: boolean }) {
+function ProjectSettingsLink({ project, held }: { project: string; held: ReadonlySet<string> }) {
   const { t } = useLingui();
+  const { collapsed } = useSidebar();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const first = openableSettingsScreens(held)[0];
+  if (first === undefined) return null;
+  const current = isProjectSettingsPath(project, pathname);
+  const name = t`Project settings`;
+  return (
+    <Link
+      to={first.to}
+      params={{ project }}
+      aria-current={current ? "page" : undefined}
+      title={collapsed ? name : undefined}
+      className={sidebarLinkClassName(collapsed)}
+    >
+      <SettingsIcon aria-hidden />
+      <SidebarLinkLabel>{name}</SidebarLinkLabel>
+      <Attention>
+        <span className="flex items-center gap-1">
+          {held.has("sink.manage") ? <SinkAttentionMarker project={project} /> : null}
+          {held.has("webhook.manage") ? <WebhookAttentionMarker project={project} /> : null}
+        </span>
+      </Attention>
+    </Link>
+  );
+}
+
+/**
+ * The screens of the project in the sidebar, by the permissions the server
+ * answers for them there: the daily ones, the activity ones, and at the
+ * foot the link to the project's settings. With no `current` project the
+ * screens are those of the project this browser showed last, none of them
+ * current.
+ */
+export function ProjectNavigation({ project }: { project: string }) {
+  const { t } = useLingui();
+  const { collapsed } = useSidebar();
   const me = useQuery(projectMeQuery(project));
   if (me.data === undefined) {
     // A first read that failed is announced by the page, with its own way
@@ -262,98 +153,67 @@ export function ProjectNavigation({ project, collapsed }: { project: string; col
     if (me.isError) {
       const refused =
         me.error instanceof ApiError && (me.error.status === 403 || me.error.status === 404);
-      if (refused) return null;
+      if (refused) return <div className="flex-1" />;
       return (
-        <nav aria-label={t`Project`} className="flex flex-col gap-1">
-          <p
-            className={cn(
-              "px-2.5 text-xs text-muted-foreground",
-              collapsed ? "sr-only" : "sr-only md:not-sr-only",
-            )}
-          >
+        <nav aria-label={t`Project`} className="flex flex-1 flex-col gap-1">
+          <p className={cn("px-2 text-xs text-muted-foreground", collapsed && "sr-only")}>
             {t`The project's screens could not be read.`}
           </p>
-          <Button
-            variant="ghost"
-            className="h-9 justify-start gap-2 px-2.5"
+          <button
+            type="button"
             title={t`Try again`}
             onClick={() => void me.refetch()}
+            className={sidebarLinkClassName(collapsed)}
           >
-            <RotateCwIcon aria-hidden className="size-4 shrink-0" />
-            <span
-              className={cn("truncate", collapsed ? "sr-only" : "sr-only md:not-sr-only")}
-            >{t`Try again`}</span>
-          </Button>
+            <RotateCwIcon aria-hidden />
+            <SidebarLinkLabel>{t`Try again`}</SidebarLinkLabel>
+          </button>
         </nav>
       );
     }
     return (
-      <div className="flex flex-col gap-1" aria-busy>
-        <Skeleton className="h-9 w-full" />
-        <Skeleton className="h-9 w-full" />
+      <div className="flex flex-1 flex-col gap-1 pt-2" aria-busy>
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-8 w-full" />
       </div>
     );
   }
   const held = new Set<string>(me.data.permissions);
+  const listed = (screens: ProjectScreen[]) =>
+    screens
+      .filter((screen) => held.has(screen.permission))
+      .map((screen) => (
+        <ScreenLink key={screen.to} screen={screen} project={project} held={held} />
+      ));
+  const activity = listed(activityScreens);
   return (
-    <nav aria-label={t`Project`} className="flex flex-col gap-1">
-      {projectScreens
-        .filter((screen) => held.has(screen.permission))
-        .map((screen) => {
-          // A member who decides change requests is taken to those
-          // awaiting their decision, which the counter beside it counts.
-          const decides =
-            screen.to === "/projects/$project/change-requests" &&
-            held.has("change_request.approve");
-          return (
-            <Link
-              key={screen.to}
-              to={screen.to}
-              params={{ project }}
-              {...(decides ? { search: { tab: "awaiting" } } : {})}
-              activeOptions={{ exact: screen.exact ?? false, includeSearch: false }}
-              className={linkClassName}
-            >
-              <ScreenLabel screen={screen} collapsed={collapsed}>
-                {decides ? <AwaitingDecisionCount project={project} /> : null}
-                {screen.to === "/projects/$project/sinks" ? (
-                  <SinkAttentionMarker project={project} />
-                ) : null}
-              </ScreenLabel>
-            </Link>
-          );
-        })}
+    <nav aria-label={t`Project`} className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+      <SidebarGroup className="pt-2">{listed(dailyScreens)}</SidebarGroup>
+      {activity.length > 0 ? <SidebarGroup label={t`Activity`}>{activity}</SidebarGroup> : null}
+      <SidebarGroup className="mt-auto pt-2">
+        <ProjectSettingsLink project={project} held={held} />
+      </SidebarGroup>
     </nav>
   );
 }
 
-/** The instance's screens, for an instance admin only. */
-export function InstanceNavigation({ collapsed }: { collapsed: boolean }) {
+/** The link to the instance's screens, for an instance admin only. */
+export function InstanceLink() {
   const { t } = useLingui();
-  const heading = useId();
+  const { collapsed } = useSidebar();
   const { data: me } = useSuspenseQuery(meQuery);
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   if (!me.member?.instance_admin) return null;
+  const name = t`Instance`;
   return (
-    <nav aria-labelledby={heading} className="flex flex-col gap-1">
-      <h2
-        id={heading}
-        className={cn(
-          "px-2.5 pt-2 text-xs font-medium text-muted-foreground",
-          collapsed ? "sr-only" : "sr-only md:not-sr-only",
-        )}
-      >
-        {t`Instance`}
-      </h2>
-      {instanceScreens.map((screen) => (
-        <Link
-          key={screen.to}
-          to={screen.to}
-          activeOptions={{ exact: screen.exact ?? false }}
-          className={linkClassName}
-        >
-          <ScreenLabel screen={screen} collapsed={collapsed} />
-        </Link>
-      ))}
-    </nav>
+    <Link
+      to="/admin/projects"
+      aria-current={pathname === "/admin" || pathname.startsWith("/admin/") ? "page" : undefined}
+      title={collapsed ? name : undefined}
+      className={sidebarLinkClassName(collapsed)}
+    >
+      <ServerCogIcon aria-hidden />
+      <SidebarLinkLabel>{name}</SidebarLinkLabel>
+    </Link>
   );
 }

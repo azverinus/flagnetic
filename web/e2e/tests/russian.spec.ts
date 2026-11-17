@@ -100,7 +100,7 @@ test.describe("the console in Russian", () => {
     await expect(page.getByRole("heading", { name: "Окружения", level: 1 })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", "ru");
     await expect(
-      page.getByRole("navigation", { name: "Проект" }).getByRole("link", { name: "Окружения" }),
+      page.getByRole("navigation", { name: "Настройки" }).getByRole("link", { name: "Окружения" }),
     ).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Навигационная цепочка" })).toContainText(
       "Окружения",

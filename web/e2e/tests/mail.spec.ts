@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations } from "../support/axe";
-import { signIn } from "../support/console";
+import { openInstanceScreen, signIn } from "../support/console";
 import { admin } from "../support/instance";
 import {
   awaitMailTo,
@@ -26,7 +26,7 @@ test.describe("mail settings", () => {
   test("configures Mailpit, saying a refused sender under its field", async ({ page }) => {
     const mailpit = readMailpit();
     await signIn(page);
-    await page.getByRole("link", { name: "Mail" }).click();
+    await openInstanceScreen(page, "Mail");
     await expect(heading(page)).toBeVisible();
     await expect(page.getByText(/No SMTP server is configured/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Send a test mail" })).toHaveCount(0);

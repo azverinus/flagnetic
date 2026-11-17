@@ -16,6 +16,27 @@ import {
 } from "@/lib/webhooks";
 
 /**
+ * The dot beside the Project settings link of the sidebar while the
+ * platform has disabled a webhook of the project, said to a screen reader
+ * too. It reads the list only for those who manage the webhooks.
+ */
+export function WebhookAttentionMarker({ project }: { project: string }) {
+  const { t } = useLingui();
+  const webhooks = useQuery({ ...webhooksQuery({ project }), refetchInterval: 60_000 });
+  const disabled = (webhooks.data ?? []).filter(isPlatformDisabled);
+  if (disabled.length === 0) return null;
+  const label = t`${plural(disabled.length, {
+    one: "# webhook needs your attention",
+    other: "# webhooks need your attention",
+  })}`;
+  return (
+    <span className="ml-auto size-2 shrink-0 rounded-full bg-destructive" title={label}>
+      <span className="sr-only">{label}</span>
+    </span>
+  );
+}
+
+/**
  * The banner above a project's screens for those who manage its webhooks,
  * naming each subscription the platform disabled for failing. Others see
  * nothing, and read nothing: the list is not theirs to ask for.

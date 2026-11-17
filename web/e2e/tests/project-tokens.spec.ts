@@ -100,7 +100,7 @@ test.describe("project tokens", () => {
   }) => {
     await signIn(page, viewer);
     await page.goto(`/projects/${seededProject.key}/members`);
-    const navigation = page.getByRole("navigation", { name: "Project" });
+    const navigation = page.getByRole("navigation", { name: "Settings", exact: true });
     await expect(navigation.getByRole("link", { name: "Members" })).toBeVisible();
     await expect(navigation.getByRole("link", { name: "Project tokens" })).toHaveCount(0);
 
