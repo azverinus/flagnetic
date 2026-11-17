@@ -745,14 +745,11 @@ jobs:
     if: needs.plan.outputs.sdk_js == 'true'
     uses: ./.github/workflows/sdk-js.yml
 
-  # The one check branch protection requires. A job above may be skipped (a
-  # module matrix with nothing to run, a job behind a condition), which is
-  # fine; a failed or cancelled one is not.
   # The migrations a pull request adds, linted with squawk so that a replica of
   # the previous minor keeps working against the new schema (expand/contract:
   # no rename, no drop, no blocking index, no NOT NULL without a default).
   # Released migrations are not linted. Other events only prove that the
-  # rules still catch the deliberately bad fixture, which is the case after a
+  # rules still catch each deliberately bad fixture, which is the case after a
   # change to the rules or to the pinned squawk.
   migrations:
     name: migration lint
@@ -767,7 +764,7 @@ jobs:
         run: |
           .github/scripts/install-squawk.sh "$RUNNER_TEMP/squawk"
           echo "$RUNNER_TEMP/squawk" >> "$GITHUB_PATH"
-      - name: The rules catch the bad fixture
+      - name: The rules catch the bad fixtures
         run: .github/scripts/lint-migrations.sh --self-test
       - name: Lint the migrations the pull request adds
         if: github.event_name == 'pull_request'
@@ -775,6 +772,9 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: .github/scripts/lint-migrations.sh --base "$BASE"
 
+  # The one check branch protection requires. A job above may be skipped (a
+  # module matrix with nothing to run, a job behind a condition), which is
+  # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
     needs: [plan, lint, test, coverage, vuln, npm-audit, tidy, console, e2e, sdk-e2e, sdk-ruby, sdk-python, workflows, migrations, docker, module, released, dart, flutter, sdk-js]

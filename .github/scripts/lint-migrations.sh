@@ -6,7 +6,7 @@
 #
 #   lint-migrations.sh --base REF   the migrations added since the merge base with REF
 #   lint-migrations.sh FILE...      those files
-#   lint-migrations.sh --self-test  the deliberately bad migration under
+#   lint-migrations.sh --self-test  each deliberately bad migration under
 #                                   .github/scripts/testdata/migration-lint must fail
 #
 # Only added files are linted: a released migration is never edited, and the

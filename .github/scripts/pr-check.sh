@@ -21,7 +21,7 @@
 #   a Go module       lint, tests with its coverage floors, when it or a module
 #                     it requires changed
 #   migrations changed  squawk on the migrations added since the merge base, and
-#                     on the bad fixture; not run without squawk installed
+#                     on the bad fixtures; not run without squawk installed
 #   console, the JavaScript, Python, Ruby, Dart and Flutter SDKs
 #                     the steps of their jobs, when their paths changed
 #   --full            the tests of the changed packages of the server, of
