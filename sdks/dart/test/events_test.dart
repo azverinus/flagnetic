@@ -252,6 +252,50 @@ void main() {
       await flushed;
     });
 
+    test('nothing is recorded while the held values answer the previous '
+        'context, and the new context\'s assignment once its answer '
+        'arrives', () async {
+      final run = await serving(
+        experimentValues(automaticExposure: true),
+        sendSummaries: false,
+      );
+      addTearDown(() async {
+        await run.client.close();
+        await run.server.close();
+      });
+
+      final settled = run.client.setContext(
+        const FlagneticContext(units: {'user': 'u-2002'}),
+      );
+      final pending = await run.server.next();
+      // The previous values keep serving, but they belong to the previous
+      // context: neither the automatic nor the explicit exposure records.
+      expect(run.client.getBool('checkout', false), isTrue);
+      run.client.exposure('checkout');
+      expect(run.logs.fieldsOf(LogEvents.exposureSkipped), [
+        {'flag': 'checkout', 'cause': 'previous_context'},
+      ]);
+
+      final answer = experimentValues(automaticExposure: true);
+      final experiment =
+          ((answer['flags']! as Map<String, Object?>)['checkout']!
+                  as Map<String, Object?>)['experiment']!
+              as Map<String, Object?>;
+      experiment['unit_type'] = 'user';
+      experiment['unit_id'] = 'u-2002';
+      await pending.respondJson(answer);
+      await settled;
+
+      expect(run.client.getBool('checkout', false), isTrue);
+      final flushed = run.client.flush();
+      final exchange = await run.server.next();
+      final event = eventsOf(exchange).single;
+      expect(event['type'], 'exposure');
+      expect(event['unit_id'], 'u-2002');
+      await acceptBatch(exchange);
+      await flushed;
+    });
+
     test('evaluation of a flag without automatic exposure records '
         'nothing', () async {
       final run = await serving(experimentValues(), sendSummaries: false);
@@ -1018,6 +1062,26 @@ void main() {
           count: 1,
         ),
       ]);
+    });
+
+    test('the offline document answers every context, so a context change '
+        'still records the exposure', () async {
+      final client = Flagnetic.client(
+        clientKey,
+        context: testContext,
+        options: ClientOptions(
+          offline: OfflineSource.document(experimentValues()),
+        ),
+      );
+      addTearDown(client.close);
+
+      await client.setContext(
+        const FlagneticContext(units: {'user': 'u-2002'}),
+      );
+      expect(client.getBool('checkout', false), isTrue);
+      client.exposure('checkout');
+
+      expect(client.offline!.recorded.map((e) => e['type']), ['exposure']);
     });
   });
 }

@@ -97,7 +97,8 @@ if (flagnetic.getBool("new_checkout", false)) {
 }
 
 // After sign-in: resolves once the new context's values arrived, while the
-// previous values keep serving, so there is no flash of defaults.
+// previous values keep serving, so there is no flash of defaults. They
+// answer the previous context, so no exposure is recorded for them.
 await flagnetic.setContext({ units: { anonymous: anonymousId(), user: "u-1001" } });
 ```
 

@@ -368,8 +368,9 @@ export class FlagneticClient {
 
   /**
    * Replaces the context and evaluates it. The previous values keep serving
-   * until the response arrives, so signing in causes no flash of defaults;
-   * the promise resolves with the stage the new values reached (`fresh`
+   * until the response arrives, so signing in causes no flash of defaults,
+   * but record no exposure, since their assignments belong to the previous
+   * context; the promise resolves with the stage the new values reached (`fresh`
    * once they arrived, `last_good` when the request failed) and the change
    * listeners receive the keys whose value differs. Never rejects.
    */
@@ -491,9 +492,13 @@ export class FlagneticClient {
       this.summary.count(key, d.variation, d.reason);
       // What an exposure call reports is what was served here, not what the
       // values document says by the time it is called.
-      if (d.experiment) this.served.set(key, d);
-      else this.served.delete(key);
-      if (d.experiment && this.values?.flags.get(key)?.automaticExposure === true) this.emitExposure(key, d);
+      // Until the new context's answer arrives the held values still answer
+      // the previous one: their experiment blocks carry that context's unit
+      // IDs, and an exposure for them would record a unit that is not here.
+      if (d.experiment && this.context === this.acceptedContext) {
+        this.served.set(key, d);
+        if (this.values?.flags.get(key)?.automaticExposure === true) this.emitExposure(key, d);
+      } else this.served.delete(key);
     } catch (e) {
       this.log("error", "evaluation_failed", { flag: key, cause: causeOf(e) });
     }
@@ -537,7 +542,7 @@ export class FlagneticClient {
       }
       const served = this.served.get(key);
       if (!served) {
-        this.log("debug", "exposure_skipped", { flag: key, cause: this.values ? "no_experiment" : "no_values" });
+        this.log("debug", "exposure_skipped", { flag: key, cause: this.values ? (this.context === this.acceptedContext ? "no_experiment" : "previous_context") : "no_values" });
         return;
       }
       this.emitExposure(key, served);
@@ -595,7 +600,7 @@ export class FlagneticClient {
    * Accepts a values document from source; false, with `fetch_failed`, when
    * the fallback chain refuses it.
    */
-  private accept(source: unknown, from: string, anyVersion = false): boolean {
+  private accept(source: unknown, from: string, anyVersion = false, answered?: Context): boolean {
     let doc: ValuesDocument;
     try {
       doc = ValuesDocument.parse(source);
@@ -609,6 +614,9 @@ export class FlagneticClient {
     }
     const changed = ValuesDocument.changedKeys(this.values, doc);
     this.values = doc;
+    // Set before the listeners run, so a getter they call already serves
+    // the new context's assignments.
+    if (answered) this.acceptedContext = answered;
     this.receivedAt = new Date(this.now());
     this.staleSince = undefined;
     this.log("info", "values_loaded", { source: from, ruleset_version: doc.rulesetVersion, flags: doc.flags.size });
@@ -853,8 +861,7 @@ export class FlagneticClient {
     // for the previous context, and the evaluation of the new one follows,
     // so it neither serves nor counts as a failure.
     if (context !== this.context) return false;
-    if (!this.accept(text, "network", context !== this.acceptedContext)) return false;
-    this.acceptedContext = context;
+    if (!this.accept(text, "network", context !== this.acceptedContext, context)) return false;
     // The server answers again, so a stream a refusal closed comes back.
     this.logged.delete("revoked");
     if (this.stream && !this.stream.running) this.stream.open();
@@ -922,7 +929,7 @@ export class FlagneticClient {
 
   /** @internal Serves an offline document; the version never has to rise. */
   loadOffline(source: unknown): void {
-    this.accept(source, "offline", true);
+    this.accept(source, "offline", true, this.context);
   }
 
   /** @internal */

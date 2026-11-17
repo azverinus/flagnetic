@@ -779,6 +779,37 @@ describe("the persisted event queue", () => {
     expect(h.count("exposure_skipped")).toBe(1);
   });
 
+  test("no exposure is emitted while the held values answer the previous context, and one is once the new context's answer arrives", async () => {
+    const h = harness();
+    const c = h.client({ store: false, pollInterval: 3_600_000, flushInterval: 3_600_000, sendSummaries: false });
+    await h.serve("/sdk/v1/evaluate", values(1, {
+      auto: experimentFlag(true, true),
+      manual: experimentFlag(true, false, "paywall_exp1"),
+    }));
+    expect(c.getBool("manual", false)).toBe(true);
+
+    // The held values still serve, but they belong to the previous context.
+    const done = c.setContext({ units: { user: "u-2002" } });
+    const pending = await h.waitFor("/sdk/v1/evaluate");
+    expect(c.getBool("auto", false), "the previous values keep serving").toBe(true);
+    expect(c.getBool("manual", false)).toBe(true);
+    c.exposure("manual");
+    expect(h.count("exposure_skipped")).toBe(1);
+
+    // The answer for the new context arrives: its assignments are the ones reported.
+    const answered = {
+      auto: { ...experimentFlag(true, true), experiment: { ...(experimentFlag(true, true).experiment as object), unit_type: "user", unit_id: "u-2002" } },
+    };
+    pending.answer({ status: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify(values(2, answered)) });
+    expect(await done).toBe("fresh");
+    expect(c.getBool("auto", false)).toBe(true);
+    void c.flush();
+    const req = await h.waitFor("/sdk/v1/events");
+    const sent = (JSON.parse(req.body ?? "{}") as { events: Record<string, unknown>[] }).events;
+    expect(sent.filter((e) => e.type === "exposure").map((e) => [e.flag_key, e.unit_id])).toStrictEqual([["auto", "u-2002"]]);
+    req.answer({ status: 202, body: JSON.stringify({ accepted: 1, duplicates: 0, dropped_rows: 0, rejected: [] }) });
+  });
+
   test("an exposure is emitted once per assignment, automatically for a flag that asks for it", async () => {
     const h = harness();
     const c = h.client({ store: false, pollInterval: 3_600_000, flushInterval: 3_600_000, sendSummaries: false });
