@@ -43,7 +43,7 @@ Both secure modes require TLS 1.2 or later and verify the server's certificate a
   - `authentication`: the server refused the username and password, or offered no mechanism the connection may use.
   - `rejected`: the server refused the sender, the recipient or the mail.
 
-The answer never carries the password.
+The answer never carries the password. The `host` is not restricted: the instance admin who names it is trusted to, as the operator of the instance would, which is why the answer does not tell what the instance reached.
 
 ## Setting up common relays
 
