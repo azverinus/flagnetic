@@ -13,8 +13,10 @@ module Flagnetic
   # FLAGNETIC_BASE_URL environment variables, and credentials
   # (flagnetic.sdk_key, flagnetic.base_url):
   #
-  # - sdk_key, base_url: see above. Without both the client serves
-  #   built-in defaults and logs client_not_configured.
+  # - sdk_key, base_url: see above. Without both (and without
+  #   offline_file), building the client raises NotConfigured in
+  #   production; elsewhere the client serves built-in defaults and logs
+  #   client_not_configured.
   # - offline_file: a ruleset document to serve instead; no network.
   # - start: nil (default) starts the client at boot in a server or job
   #   process and on first use in rails console, rails runner and rake;
@@ -108,10 +110,24 @@ module Flagnetic
         elsif sdk_key && base_url
           Client.new(sdk_key, base_url: base_url, **options).tap { |c| c.ready(timeout: config.ready_timeout) }
         else
+          not_configured!(sdk_key, base_url) if ::Rails.env.production?
           log.call(:warn, :client_not_configured, { rails_env: ::Rails.env.to_s })
           Client.new(offline: EMPTY, **options, send_summaries: false)
         end
       end
+
+      # not_configured! refuses to build a production client without an SDK
+      # key and base URL. Serving built-in defaults there would turn every
+      # flag off for every user behind nothing but a log line, the moment a
+      # deployment loses its secrets; failing the boot shows it at once.
+      def not_configured!(sdk_key, base_url)
+        missing = { sdk_key: ["SDK key", sdk_key], base_url: ["base URL", base_url] }
+                  .filter_map { |name, (what, value)| "no #{what} (#{sources(name)})" unless value }
+        raise NotConfigured, "Flagnetic is not configured for production: #{missing.join(" and ")}. " \
+                             "Set them, or set config.flagnetic.offline_file to serve a ruleset file"
+      end
+
+      def sources(name) = "config.flagnetic.#{name}, FLAGNETIC_#{name.upcase} or credentials flagnetic.#{name}"
 
       # setting reads name from config, the environment variable, then
       # credentials; blank is unset.
