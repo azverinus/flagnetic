@@ -162,9 +162,9 @@ test("a viewer reads the project's audit log and filters by whoever acted in it"
   await expect(entries(page).filter({ hasText: "project.created" })).toHaveCount(1);
 
   // The viewer may not read the instance's members; the instance admin
-  // acted here, through the harness's bootstrap token only, so they are
-  // offered all the same, as that token's member.
-  await choose(page, "Member", "The member whose API token is bootstrap");
+  // acted here, by the harness's bootstrap token and, to grant the viewer,
+  // signed in, so they are offered all the same, by the name they acted under.
+  await choose(page, "Member", admin.name);
   await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(page).toHaveURL(/actor=[0-9a-f-]{36}/);
   await expect(entries(page).filter({ hasText: "project.created" })).toHaveCount(1);
