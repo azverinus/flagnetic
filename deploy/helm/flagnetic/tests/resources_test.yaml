@@ -1,0 +1,95 @@
+suite: services, budget, account, test pod, notes
+templates:
+  - templates/service.yaml
+  - templates/service-metrics.yaml
+  - templates/poddisruptionbudget.yaml
+  - templates/serviceaccount.yaml
+  - templates/tests/test-ready.yaml
+  - templates/NOTES.txt
+set:
+  secrets.existingSecret: mine
+release:
+  name: flags
+  namespace: ops
+tests:
+  - it: exposes http and metrics on separate Services
+    asserts:
+      - equal:
+          path: spec.ports[0].name
+          value: http
+        template: templates/service.yaml
+      - equal:
+          path: spec.ports[0].port
+          value: 8080
+        template: templates/service.yaml
+      - equal:
+          path: metadata.name
+          value: flags-flagnetic-metrics
+        template: templates/service-metrics.yaml
+      - equal:
+          path: spec.ports[0].port
+          value: 9090
+        template: templates/service-metrics.yaml
+      - equal:
+          path: spec.type
+          value: ClusterIP
+        template: templates/service-metrics.yaml
+  # The migration Job's pod and the test Pod carry the release's labels; only
+  # the component keeps them out of the Services and the budget.
+  - it: selects only the server's pods
+    asserts:
+      - equal:
+          path: spec.selector["app.kubernetes.io/component"]
+          value: server
+        template: templates/service.yaml
+      - equal:
+          path: spec.selector["app.kubernetes.io/component"]
+          value: server
+        template: templates/service-metrics.yaml
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/component"]
+          value: server
+        template: templates/poddisruptionbudget.yaml
+      - notExists:
+          path: metadata.labels["app.kubernetes.io/component"]
+        template: templates/tests/test-ready.yaml
+  - it: keeps at most one replica unavailable
+    template: templates/poddisruptionbudget.yaml
+    asserts:
+      - equal:
+          path: spec.maxUnavailable
+          value: 1
+  - it: renders no budget when switched off
+    template: templates/poddisruptionbudget.yaml
+    set:
+      podDisruptionBudget.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: creates a ServiceAccount that does not mount a token
+    template: templates/serviceaccount.yaml
+    asserts:
+      - equal:
+          path: automountServiceAccountToken
+          value: false
+  - it: renders no ServiceAccount when told not to create one
+    template: templates/serviceaccount.yaml
+    set:
+      serviceAccount.create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: asks the Service for /readyz in the test Pod
+    template: templates/tests/test-ready.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: test
+      - equal:
+          path: spec.containers[0].command[5]
+          value: http://flags-flagnetic:8080/readyz
+  - it: tells how to create the first admin
+    template: templates/NOTES.txt
+    asserts:
+      - matchRegexRaw:
+          pattern: "kubectl exec -n ops deploy/flags-flagnetic -- flagnetic admin bootstrap --email"

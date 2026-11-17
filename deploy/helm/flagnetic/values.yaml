@@ -1,0 +1,102 @@
+# Default values of the Flagnetic chart. README.md lists every value.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ghcr.io/azverinus/flagnetic
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+replicaCount: 2
+
+# PostgreSQL and the instance's secret key. The chart never generates them: a
+# key made at render time would change on every `helm template` and under
+# Argo CD, and the server refuses to start under a key other than the first.
+secrets:
+  # Name of a Secret that holds both. Recommended; the chart then renders none.
+  existingSecret: ""
+  # Keys of the existing Secret.
+  databaseUrlKey: DATABASE_URL
+  secretKeyKey: FLAGNETIC_SECRET_KEY
+  # Without an existing Secret, the values the chart's own Secret holds.
+  databaseUrl: ""
+  secretKey: ""
+
+# Settings as FLAGNETIC_* environment variables: each key is the setting's file
+# key in docs/configuration.md (log_level becomes FLAGNETIC_LOG_LEVEL). The
+# listeners and auto_migrate are the chart's own.
+config: {}
+
+# Environment variables and sources for them, as in a container spec.
+extraEnv: []
+extraEnvFrom: []
+
+migrations:
+  # hook: a Job before every install and upgrade, so a failed migration stops
+  # the upgrade before a pod is replaced. initContainer: every pod migrates
+  # before it serves. auto: the server migrates when it starts.
+  mode: hook
+  # The server waits up to five minutes for the migration lock, so the Job's
+  # deadline lies above it.
+  activeDeadlineSeconds: 900
+  resources: {}
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+podLabels: {}
+
+terminationGracePeriodSeconds: 30
+
+probes:
+  # A cold start waits for PostgreSQL and the schema check.
+  startup:
+    periodSeconds: 2
+    failureThreshold: 60
+  readiness:
+    periodSeconds: 5
+    failureThreshold: 3
+  liveness:
+    periodSeconds: 10
+    failureThreshold: 3
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+  metrics:
+    port: 9090
+    annotations: {}
+
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+
+# Soft constraints that spread replicas over zones and hosts.
+topologySpreadConstraints:
+  enabled: true
+  maxSkew: 1
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# The Pod `helm test` runs: it asks the Service for /readyz.
+test:
+  image:
+    repository: busybox
+    tag: "1.37.0"
+  resources: {}

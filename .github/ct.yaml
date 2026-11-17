@@ -1,0 +1,8 @@
+# chart-testing settings for the Helm chart.
+chart-dirs:
+  - deploy/helm
+# The chart's version is the server's, bumped by release-please at release,
+# not in the pull request that changes the chart.
+check-version-increment: false
+validate-maintainers: false
+helm-extra-args: --timeout 300s

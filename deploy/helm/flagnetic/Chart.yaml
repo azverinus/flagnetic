@@ -1,0 +1,17 @@
+apiVersion: v2
+name: flagnetic
+description: "Self-hosted feature flags and experiments: one server, PostgreSQL as its only dependency."
+type: application
+# The chart is versioned with the server: release-please bumps both lines with
+# the server's release, so a chart and the image it installs never disagree.
+version: 0.5.0  # x-release-please-version
+appVersion: "0.5.0"  # x-release-please-version
+# The three newest Kubernetes minors are tested; newer ones are not refused.
+kubeVersion: ">=1.35.0-0"
+home: https://github.com/azverinus/flagnetic
+sources:
+  - https://github.com/azverinus/flagnetic
+keywords:
+  - feature-flags
+  - experiments
+  - feature-toggles

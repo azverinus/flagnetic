@@ -1,0 +1,5 @@
+# Values `ct lint` and `ct install` render the chart with, and the kubeconform
+# check: the Secret is the chart's own, pointing at the test-only PostgreSQL.
+secrets:
+  databaseUrl: postgres://flagnetic:flagnetic@postgres.default.svc:5432/flagnetic?sslmode=disable
+  secretKey: dGVzdC1vbmx5LXNlY3JldC1rZXktMzItYnl0ZXMtbG9uZyEh

@@ -22,6 +22,9 @@
 #                     it requires changed
 #   migrations changed  squawk on the migrations added since the merge base, and
 #                     on the bad fixtures; not run without squawk installed
+#   chart changed     helm lint, the helm-unittest suites and kubeconform on
+#                     what the chart renders; not run without helm (with the
+#                     helm-unittest plugin) and kubeconform installed
 #   console, the JavaScript, Python, Ruby, Dart and Flutter SDKs
 #                     the steps of their jobs, when their paths changed
 #   --full            the tests of the changed packages of the server, of
@@ -243,7 +246,7 @@ print_plan() {
     say "  server tests:     $(printf '%s\n' "$TEST_PKGS" | sed '/^$/d' | wc -l | tr -d ' ') packages, left to CI (--full runs them here)"
   fi
   for i in "${!MOD_PATH[@]}"; do [ "${MOD_RUN[$i]}" = 1 ] && say "  module checked:   ${MOD_REL[$i]}"; done
-  say "  migrations: $RUN_MIGRATIONS  console: $RUN_CONSOLE  sdk-js: $RUN_SDK_JS  python: $RUN_PYTHON  ruby: $RUN_RUBY  dart: $RUN_DART  flutter: $RUN_FLUTTER  workflows: $RUN_WORKFLOWS  playwright specs: $(printf '%s' "$SPECS" | tr '\n' ' ')"
+  say "  migrations: $RUN_MIGRATIONS  helm: $RUN_HELM  console: $RUN_CONSOLE  sdk-js: $RUN_SDK_JS  python: $RUN_PYTHON  ruby: $RUN_RUBY  dart: $RUN_DART  flutter: $RUN_FLUTTER  workflows: $RUN_WORKFLOWS  playwright specs: $(printf '%s' "$SPECS" | tr '\n' ' ')"
 }
 print_plan
 [ "$PLAN_ONLY" = 1 ] && exit 0
@@ -465,6 +468,11 @@ if [ "$RUN_MIGRATIONS" = 1 ]; then
     step "migration lint" digest_tail "make the migration expand/contract (see CONTRIBUTING.md), or add a squawk-ignore with its reason on the line before" \
       bash -c ".github/scripts/lint-migrations.sh --base '$BASE_REF' && .github/scripts/lint-migrations.sh --self-test"
   else not_run "migration lint" "squawk is not installed (.github/scripts/install-squawk.sh DIR installs the pinned one)"; fi
+fi
+if [ "$RUN_HELM" = 1 ]; then
+  if need_tool "${HELM:-helm}" && need_tool "${KUBECONFORM:-kubeconform}" && "${HELM:-helm}" plugin list 2>/dev/null | grep -q '^unittest'; then
+    step "helm chart" digest_tail "fix the chart; helm unittest names the failing suite" .github/scripts/check-helm.sh
+  else not_run "helm chart" "helm with the helm-unittest plugin, and kubeconform, are needed"; fi
 fi
 if [ "$RUN_SDK_JS" = 1 ]; then
   if need_tool pnpm; then step "sdk-js" digest_tail "fix what the output says" task sdk-js:check

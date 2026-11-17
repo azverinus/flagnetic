@@ -59,6 +59,18 @@ flagnetic import --file deploy/demo-project.yaml
 
 The command talks to `http://localhost:8080`; point it elsewhere with `--url` or `FLAGNETIC_URL`. See [Exporting and importing a project](transfer.md).
 
+## On Kubernetes
+
+The Helm chart in [`deploy/helm/flagnetic`](../deploy/helm/flagnetic/README.md) installs Flagnetic against your own PostgreSQL and a Secret that holds `DATABASE_URL` and `FLAGNETIC_SECRET_KEY`; it never generates the key. A hook Job runs `flagnetic migrate` before every install and upgrade, and two replicas roll behind a PodDisruptionBudget and the server's drain.
+
+```bash
+helm install flagnetic oci://ghcr.io/azverinus/charts/flagnetic -n flagnetic \
+  --set secrets.existingSecret=flagnetic \
+  --set config.base_url=https://flags.example.com
+```
+
+The chart's README has the Secret, every value and the supported Kubernetes and Helm versions.
+
 ## As a binary
 
 ### Get the binary

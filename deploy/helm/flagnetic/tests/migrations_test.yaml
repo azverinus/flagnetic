@@ -1,0 +1,93 @@
+suite: migrations
+templates:
+  - templates/migrate-job.yaml
+  - templates/deployment.yaml
+set:
+  secrets.existingSecret: mine
+tests:
+  - it: hook mode, the default, renders a pre-install and pre-upgrade Job
+    template: templates/migrate-job.yaml
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: pre-install,pre-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "0"
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation,hook-succeeded
+      - equal:
+          path: spec.backoffLimit
+          value: 0
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 900
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value: ["migrate"]
+      - equal:
+          path: spec.template.spec.restartPolicy
+          value: Never
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+      # Not the server's: the Services and the budget leave this pod out.
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/component"]
+          value: migrate
+  - it: hook mode starts the Deployment without migrating and without init containers
+    template: templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FLAGNETIC_AUTO_MIGRATE
+            value: "false"
+      - notExists:
+          path: spec.template.spec.initContainers
+  - it: initContainer mode migrates in every pod and renders no Job
+    set:
+      migrations.mode: initContainer
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/migrate-job.yaml
+      - equal:
+          path: spec.template.spec.initContainers[0].args
+          value: ["migrate"]
+        template: templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FLAGNETIC_AUTO_MIGRATE
+            value: "false"
+        template: templates/deployment.yaml
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.readOnlyRootFilesystem
+          value: true
+        template: templates/deployment.yaml
+  - it: auto mode lets the server migrate and renders no Job or init container
+    set:
+      migrations.mode: auto
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/migrate-job.yaml
+      - notExists:
+          path: spec.template.spec.initContainers
+        template: templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FLAGNETIC_AUTO_MIGRATE
+            value: "true"
+        template: templates/deployment.yaml
+  - it: refuses a mode that does not exist
+    set:
+      migrations.mode: sometimes
+    template: templates/migrate-job.yaml
+    asserts:
+      - failedTemplate: {}
