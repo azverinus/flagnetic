@@ -125,10 +125,7 @@ export function Sidebar({ children, className }: { children: ReactNode; classNam
   return (
     <div
       data-collapsed={collapsed ? "" : undefined}
-      className={cn(
-        "shrink-0 transition-[width] motion-reduce:transition-none",
-        collapsed ? "w-12" : "w-64",
-      )}
+      className={cn("shrink-0", collapsed ? "w-12" : "w-64")}
     >
       {column}
     </div>
