@@ -815,7 +815,7 @@ test.describe("the console in Russian", () => {
       await expect(page.getByText(/Пароль сохранён и больше не показывается/)).toBeVisible();
       await page.getByRole("button", { name: "Отправить тестовое письмо" }).click();
       await expect(page.getByRole("alert")).toHaveText(
-        "SMTP-сервер отклонил имя пользователя и пароль. Проверьте их, затем сохраните и проверьте снова.",
+        "SMTP-сервер недоступен или не принял тестовое письмо. Проверьте настройки; причину называет журнал инстанса.",
       );
       await expectNoSeriousViolations(page, "the mail settings in Russian");
 

@@ -142,17 +142,9 @@ describe("the mail settings form's checks", () => {
 describe("a refusal of the mail settings", () => {
   activateForTests("en");
 
-  const failed = (failure?: string) =>
-    new ApiError(502, { code: "smtp_failed", ...(failure ? { failure } : {}) });
-
-  it("explains each step at which the test mail failed", () => {
-    expect(mailProblem(i18n, failed("connection"))).toMatch(/could not reach the SMTP server/);
-    expect(mailProblem(i18n, failed("tls"))).toMatch(/secure connection .* failed/);
-    expect(mailProblem(i18n, failed("authentication"))).toMatch(
-      /refused the username and password/,
-    );
-    expect(mailProblem(i18n, failed("rejected"))).toMatch(/refused the sender, the recipient/);
-    expect(mailProblem(i18n, failed())).toMatch(/did not accept the test mail/);
+  it("says a failed test mail failed, not at which step", () => {
+    const message = mailProblem(i18n, new ApiError(502, { code: "smtp_failed" }));
+    expect(message).toMatch(/could not be reached or did not accept the test mail/);
   });
 
   it("says the public address is what links are built from", () => {

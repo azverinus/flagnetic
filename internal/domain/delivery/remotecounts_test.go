@@ -1,12 +1,14 @@
 package delivery_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/azverinus/flagnetic/eval"
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
+	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
 func TestTheUserAgentNamesTheSDK(t *testing.T) {
@@ -99,15 +101,41 @@ func TestRemoteEvaluationsAreCountedByTheirTrueReason(t *testing.T) {
 	}
 }
 
-func TestRemoteCountsAreBounded(t *testing.T) {
-	var c delivery.RemoteCounts
-	e := delivery.RemoteEvaluator{SDK: delivery.SDKIdentity{Name: "unknown"}}
-	results := map[string]eval.Result{}
-	for i := range delivery.MaxRemoteCountGroups + 3 {
-		results["flag"+strings.Repeat("x", i%7)+string(rune('a'+i%26))+time.Duration(i).String()] = eval.Result{Reason: eval.ReasonOff}
+var keyCounter byte
+
+func nextKey() byte { keyCounter++; return keyCounter }
+
+func keyN(n byte) delivery.SDKKeyID { return id.FromBytes[delivery.SDKKey]([16]byte{15: n}) }
+
+func manyFlags(n int) map[string]eval.Result {
+	results := make(map[string]eval.Result, n)
+	for i := range n {
+		results[fmt.Sprintf("flag-%d", i)] = eval.Result{Reason: eval.ReasonOff}
 	}
-	c.Add(e, 1, results, time.Time{})
-	if c.Len() != delivery.MaxRemoteCountGroups || c.Dropped != 3 {
-		t.Errorf("groups = %d, dropped = %d, want %d and 3", c.Len(), c.Dropped, delivery.MaxRemoteCountGroups)
+	return results
+}
+
+func TestOneKeyCannotFillTheGroupsOfAReplica(t *testing.T) {
+	var c delivery.RemoteCounts
+	noisy := delivery.RemoteEvaluator{Key: delivery.SDKKey{ID: keyN(nextKey())}, SDK: delivery.SDKIdentity{Name: "unknown"}}
+	c.Add(noisy, 1, manyFlags(delivery.MaxRemoteCountGroupsPerKey+3), time.Time{})
+	if c.Len() != delivery.MaxRemoteCountGroupsPerKey || c.Dropped != 3 {
+		t.Errorf("groups = %d, dropped = %d, want %d and 3", c.Len(), c.Dropped, delivery.MaxRemoteCountGroupsPerKey)
+	}
+	// A key already at its share still counts into the groups it holds.
+	c.Add(noisy, 1, manyFlags(1), time.Time{})
+	if c.Dropped != 3 {
+		t.Errorf("an evaluation of a group the key holds was dropped: %d", c.Dropped)
+	}
+	// The other keys keep counting, up to the groups of the replica.
+	for range delivery.MaxRemoteCountGroups / delivery.MaxRemoteCountGroupsPerKey {
+		other := delivery.RemoteEvaluator{Key: delivery.SDKKey{ID: keyN(nextKey())}, SDK: delivery.SDKIdentity{Name: "unknown"}}
+		c.Add(other, 1, manyFlags(delivery.MaxRemoteCountGroupsPerKey), time.Time{})
+	}
+	if want := delivery.MaxRemoteCountGroups; c.Len() != want {
+		t.Errorf("groups = %d, want the replica's %d", c.Len(), want)
+	}
+	if c.Dropped != 3+delivery.MaxRemoteCountGroupsPerKey {
+		t.Errorf("dropped = %d, want the key's 3 and the full replica's %d", c.Dropped, delivery.MaxRemoteCountGroupsPerKey)
 	}
 }

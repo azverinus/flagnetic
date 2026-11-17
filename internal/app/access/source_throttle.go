@@ -35,22 +35,17 @@ func NewSourceThrottle(tx Transactor, store SourceThrottleStore) *SourceThrottle
 	return &SourceThrottle{tx: tx, store: store}
 }
 
-// Reserve counts one failure of the source ip comes from at at, before what
-// is presented is checked. A throttled source is refused rate_limited, its
-// failure taken back; otherwise the function returned takes the failure back
-// for an attempt that guessed nothing, even if the request was cancelled.
-func (t *SourceThrottle) Reserve(ctx context.Context, ip netip.Addr, at time.Time) (func(context.Context) error, error) {
+// Reserve counts one failure of the source ip comes from at at, which is
+// never taken back: what is presented matched nothing, or is a request that
+// makes the instance work for anyone who sends it. A throttled source is
+// refused rate_limited, its failure taken back.
+func (t *SourceThrottle) Reserve(ctx context.Context, ip netip.Addr, at time.Time) error {
 	reserved, err := t.store.ReserveSourceAttempt(ctx, access.NewAttempt("", ip, at))
 	if err != nil {
-		return nil, err
-	}
-	release := func(ctx context.Context) error {
-		return t.tx.Within(context.WithoutCancel(ctx), func(ctx context.Context) error {
-			return t.store.ReleaseAttempt(ctx, reserved)
-		})
+		return err
 	}
 	if refusal := reserved.Refusal(); refusal != nil {
-		return nil, releaseAttempt(ctx, t.tx, t.store, reserved, refusal)
+		return releaseAttempt(ctx, t.tx, t.store, reserved, refusal)
 	}
-	return release, nil
+	return nil
 }

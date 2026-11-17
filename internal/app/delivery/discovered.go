@@ -37,9 +37,11 @@ type DiscoveredAttributeStore interface {
 const (
 	// maxDiscoverySightings is how many sightings are held in all.
 	maxDiscoverySightings = 1024
-	// maxDiscoveryPending is how many sightings of one project are held, so
-	// one project cannot take the whole queue.
-	maxDiscoveryPending = 1000
+	// maxDiscoveryPending is how many sightings of one project are held, an
+	// eighth of the queue: the context of a client key is anyone's to fill
+	// with attributes, so a project's share must leave the places of the
+	// others' sightings.
+	maxDiscoveryPending = 128
 )
 
 // DiscoveryDrops counts the sightings a replica dropped since the last

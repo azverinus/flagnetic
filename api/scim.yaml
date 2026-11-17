@@ -38,7 +38,7 @@ info:
     member last claimed signing in through the provider and the provider's
     groups they are in.
 
-    Bodies are at most 64 KiB. Errors follow RFC 7644 §3.12:
+    Bodies are at most 1 MiB. Errors follow RFC 7644 §3.12:
     `application/scim+json`, `schemas` naming
     `urn:ietf:params:scim:api:messages:2.0:Error`, `status` as a string, and
     `scimType` for the errors it defines (`invalidFilter`, `invalidSyntax`,

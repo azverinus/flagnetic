@@ -3663,7 +3663,7 @@ type Problem struct {
 	Detail *string      `json:"detail,omitempty"`
 	Errors *[]Violation `json:"errors,omitempty"`
 
-	// Failure Why a system the server asked did not answer as needed, for `provider_unreachable`; for `smtp_failed` the step that failed, `connection`, `tls`, `authentication` or `rejected`; for `sink_not_ready` the failure class of the target's check, such as `connect` or `status`.
+	// Failure Why a system the server asked did not answer as needed, for `provider_unreachable`; for `sink_not_ready` the failure class of the target's check, such as `connect` or `status`.
 	Failure *string `json:"failure,omitempty"`
 
 	// FailureCode The target's own error code, for `sink_not_ready`, when it speaks one, such as a ClickHouse exception or an S3 error code.
@@ -8403,11 +8403,10 @@ type ClientInterface interface {
 	// the SMTP server in force, and answers once the server accepted it: the
 	// only mail the instance sends while its sender waits. Refused
 	// `smtp_not_configured` (409) while there is no SMTP server, and
-	// `smtp_failed` (502) with `failure` naming the step that failed:
-	// `connection` (unreachable or broken), `tls` (no STARTTLS, a
-	// handshake or certificate that failed), `authentication` (the
-	// credentials were refused) or `rejected` (the sender, the recipient or
-	// the mail was refused).
+	// `smtp_failed` (502) when the exchange failed, without saying at which
+	// step: the host is the caller's to name, and the step would tell what
+	// is reachable behind it. The instance's log record of the failure
+	// names the step.
 	//
 	// Corresponds with POST /instance/smtp/test (the `SendTestMail` operationId).
 	SendTestMail(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -13025,11 +13024,10 @@ func (c *Client) UpdateMailSettings(ctx context.Context, body UpdateMailSettings
 // the SMTP server in force, and answers once the server accepted it: the
 // only mail the instance sends while its sender waits. Refused
 // `smtp_not_configured` (409) while there is no SMTP server, and
-// `smtp_failed` (502) with `failure` naming the step that failed:
-// `connection` (unreachable or broken), `tls` (no STARTTLS, a
-// handshake or certificate that failed), `authentication` (the
-// credentials were refused) or `rejected` (the sender, the recipient or
-// the mail was refused).
+// `smtp_failed` (502) when the exchange failed, without saying at which
+// step: the host is the caller's to name, and the step would tell what
+// is reachable behind it. The instance's log record of the failure
+// names the step.
 //
 // Corresponds with POST /instance/smtp/test (the `SendTestMail` operationId).
 func (c *Client) SendTestMail(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -30403,11 +30401,10 @@ type ClientWithResponsesInterface interface {
 	// the SMTP server in force, and answers once the server accepted it: the
 	// only mail the instance sends while its sender waits. Refused
 	// `smtp_not_configured` (409) while there is no SMTP server, and
-	// `smtp_failed` (502) with `failure` naming the step that failed:
-	// `connection` (unreachable or broken), `tls` (no STARTTLS, a
-	// handshake or certificate that failed), `authentication` (the
-	// credentials were refused) or `rejected` (the sender, the recipient or
-	// the mail was refused).
+	// `smtp_failed` (502) when the exchange failed, without saying at which
+	// step: the host is the caller's to name, and the step would tell what
+	// is reachable behind it. The instance's log record of the failure
+	// names the step.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -51827,11 +51824,10 @@ func (c *ClientWithResponses) UpdateMailSettingsWithResponse(ctx context.Context
 // the SMTP server in force, and answers once the server accepted it: the
 // only mail the instance sends while its sender waits. Refused
 // `smtp_not_configured` (409) while there is no SMTP server, and
-// `smtp_failed` (502) with `failure` naming the step that failed:
-// `connection` (unreachable or broken), `tls` (no STARTTLS, a
-// handshake or certificate that failed), `authentication` (the
-// credentials were refused) or `rejected` (the sender, the recipient or
-// the mail was refused).
+// `smtp_failed` (502) when the exchange failed, without saying at which
+// step: the host is the caller's to name, and the step would tell what
+// is reachable behind it. The instance's log record of the failure
+// names the step.
 //
 // Returns a wrapper object for the known response body format(s).
 //

@@ -223,9 +223,12 @@ var errTestMailNotConfigured = apperrors.Conflict("smtp_not_configured",
 
 // Handle sends the test mail to the member calling, in their language, and
 // answers once the server accepted it. It is refused smtp_not_configured
-// while there is no SMTP server, and smtp_failed naming the failure class
-// when the server could not be reached, would not secure the connection,
-// refused the credentials or refused the mail.
+// while there is no SMTP server, and smtp_failed when the exchange failed,
+// without saying at which step: the host is the instance admin's to name,
+// and telling a refused connection from a failed handshake from a refused
+// recipient would let one who is not the host's operator map the network
+// behind it. The log record of the failure names the step, for the
+// operator.
 func (h *SendTestMail) Handle(ctx context.Context, caller access.Caller, requestID string) error {
 	member := caller.Member
 	if member == nil {
@@ -243,9 +246,10 @@ func (h *SendTestMail) Handle(ctx context.Context, caller access.Caller, request
 	case errors.Is(err, ErrSMTPNotConfigured):
 		return errTestMailNotConfigured
 	case errors.As(err, &failed):
+		h.postman.d.Logger.WarnContext(ctx, "test mail not sent",
+			"kind", string(access.MailTest), "request_id", requestID, "failure", string(failed.Failure), "error", err.Error())
 		return apperrors.BadGateway("smtp_failed",
-			"the SMTP server could not be reached or refused the mail: "+string(failed.Failure)).
-			WithExtension("failure", string(failed.Failure)).WithCause(err)
+			"the SMTP server could not be reached or did not accept the mail; the instance's log says why").WithCause(err)
 	}
 	return err
 }

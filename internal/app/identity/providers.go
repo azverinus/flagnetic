@@ -115,6 +115,10 @@ type ProviderSettings interface {
 	// it before reading the providers they name, so neither change can
 	// leave the settings sending people to a provider that let them down.
 	LockProviderSettings(ctx context.Context, slug string) (SettingsOfProvider, error)
+	// RevokeProviderSessions ends, at at, every session opened through the
+	// provider with the slug and not ended yet, whoever holds it, and
+	// returns how many it ended.
+	RevokeProviderSessions(ctx context.Context, slug string, at time.Time) (int, error)
 }
 
 // SettingsOfProvider is what the auth settings ask of one auth provider.
@@ -496,8 +500,8 @@ type DisableProvider struct{ d ProviderDeps }
 // NewDisableProvider returns the handler.
 func NewDisableProvider(d ProviderDeps) *DisableProvider { return &DisableProvider{d: d} }
 
-// Handle disables the provider, which stops its sign-ins and leaves its
-// members, identities and grants as they are, and records
+// Handle disables the provider, which stops its sign-ins, ends the sessions
+// it opened and leaves its members, identities and grants as they are, and records
 // auth_provider.disabled; a disabled provider is returned as it is and
 // nothing is recorded. A provider an enforced domain names, or the only
 // enabled one while local login is disabled, is refused provider_in_use:
@@ -538,6 +542,13 @@ func setEnabled(ctx context.Context, d ProviderDeps, cmd ProviderCommand, enable
 		}
 		if err = d.Store.SetProviderEnabled(ctx, after); err != nil {
 			return err
+		}
+		if !enabled {
+			// A session the provider opened would otherwise outlive the
+			// switch that stops its sign-ins.
+			if _, err = d.Settings.RevokeProviderSessions(ctx, cmd.Slug, now); err != nil {
+				return err
+			}
 		}
 		return d.record(ctx, now, cmd.Request, action, &before, &after)
 	})

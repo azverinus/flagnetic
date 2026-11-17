@@ -171,3 +171,15 @@ func TestSettingsAreEqualWithTheSameEnforcedDomains(t *testing.T) {
 		t.Error("the same settings are not equal")
 	}
 }
+
+func TestASessionIsRefusedByWhatRefusesTheSameSignIn(t *testing.T) {
+	s := access.DefaultAuthSettings
+	s.SSOEnforcedDomains = []access.EnforcedDomain{{Domain: "corp.example", Provider: "corp"}}
+	assertRefusal(t, s.SessionRefusal(access.SignInLocal, "", "ann@corp.example"), "sso_required", "corp")
+	assertRefusal(t, s.SessionRefusal(access.SignInLocal, "", "ann@example.com"), "", "")
+	assertRefusal(t, s.SessionRefusal(access.SignInOIDC, "other", "ann@corp.example"), "sso_required", "corp")
+	assertRefusal(t, s.SessionRefusal(access.SignInSAML, "corp", "ann@corp.example"), "", "")
+	s.LocalLoginEnabled = false
+	assertRefusal(t, s.SessionRefusal(access.SignInLocal, "", "ann@example.com"), "local_login_disabled", "")
+	assertRefusal(t, s.SessionRefusal(access.SignInOIDC, "other", "ann@example.com"), "", "")
+}

@@ -381,12 +381,14 @@ func TestInvitingAMemberTheInstanceHasIsRefusedAndPointsAtGranting(t *testing.T)
 }
 
 func TestInvitingSomebodyToTheSameProjectAgainReplacesTheInvitation(t *testing.T) {
-	srv := testkit.StartServer(t)
+	c := testkit.Clock()
+	srv := testkit.StartServer(t, testkit.WithClock(c))
 	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
 	owner := memberIn(t, srv, p, access.RoleOwner)
 
 	first, email := inviteTo(t, owner.ClientWithResponses, p.Key, "viewer")
+	// An instance that cannot mail invites again at once: nothing is mailed.
 	second := mustInviteTo(t, owner.ClientWithResponses, p.Key, strings.ToUpper(email), "maintainer")
 	if second.Member.Id != first.Member.Id {
 		t.Fatalf("the second invitation made member %s, want %s again", second.Member.Id, first.Member.Id)
@@ -407,6 +409,7 @@ func TestInvitingSomebodyToTheSameProjectAgainReplacesTheInvitation(t *testing.T
 	if got := opened(t, srv, *second.Invitation.Url); got.JSON200 == nil {
 		t.Fatalf("the link after another owner's attempt = %d: %s, want it to stand", got.StatusCode(), got.Body)
 	}
+	c.Advance(time.Minute)
 	third := mustInviteTo(t, admin, p.Key, email, "maintainer")
 	wantGone(t, srv, *second.Invitation.Url, "the second link, once an instance admin issued it again")
 
@@ -681,6 +684,7 @@ func TestAProjectListsTheMembersInvitedToItWithTheRoleTheirInvitationGrants(t *t
 	viewer, viewerEmail := inviteTo(t, owner.ClientWithResponses, p.Key, "viewer")
 	_, maintainerEmail := inviteTo(t, owner.ClientWithResponses, p.Key, "developer")
 	// Invited again with another role, the member is listed once, with it.
+	c.Advance(time.Minute)
 	maintainer := mustInviteTo(t, owner.ClientWithResponses, p.Key, maintainerEmail, "maintainer")
 
 	// Neither an accepted invitation, nor one to another project or to the

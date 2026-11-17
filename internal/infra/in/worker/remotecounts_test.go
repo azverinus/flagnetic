@@ -26,7 +26,7 @@ func TestRemoteEvaluationsNotCountedAreLoggedWithTheirCount(t *testing.T) {
 	t.Cleanup(pool.Close)
 	counts := appdelivery.NewRemoteEvaluationCounts(pgevents.NewStore(pool), testkit.Clock())
 	results := map[string]eval.Result{}
-	for i := range delivery.MaxRemoteCountGroups + 3 {
+	for i := range delivery.MaxRemoteCountGroupsPerKey + 3 {
 		results[fmt.Sprintf("flag-%d", i)] = eval.Result{Reason: eval.ReasonOff}
 	}
 	counts.Add(delivery.RemoteEvaluator{SDK: delivery.SDKIdentity{Name: "unknown"}}, 1, results)

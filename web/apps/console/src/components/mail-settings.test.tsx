@@ -232,16 +232,16 @@ describe("the mail settings", () => {
     expect(server.requests.filter((r) => r.method === "POST")).toHaveLength(1);
   });
 
-  it("explains the step at which the test mail failed", async () => {
+  it("says the test mail failed without naming the step", async () => {
     fakeServer({
       "GET /instance/smtp": { status: 200, body: stored },
-      "POST /instance/smtp/test": problem(502, "smtp_failed", { failure: "authentication" }),
+      "POST /instance/smtp/test": problem(502, "smtp_failed"),
     });
     await render();
 
     await userEvent.click(await screen.findByRole("button", { name: "Send a test mail" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/refused the username and password/);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/did not accept the test mail/);
   });
 
   it("removes the server after confirmation and starts the form over", async () => {

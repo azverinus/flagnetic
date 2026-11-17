@@ -136,6 +136,6 @@ type sourceThrottle struct{ svc *appaccess.SourceThrottle }
 
 var _ appidentity.SourceThrottle = sourceThrottle{}
 
-func (t sourceThrottle) Reserve(ctx context.Context, ip netip.Addr, at time.Time) (func(context.Context) error, error) {
+func (t sourceThrottle) Reserve(ctx context.Context, ip netip.Addr, at time.Time) error {
 	return t.svc.Reserve(ctx, ip, at)
 }

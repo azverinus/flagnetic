@@ -5729,11 +5729,10 @@ export const updateMailSettings = <ThrowOnError extends boolean = false>(
  * the SMTP server in force, and answers once the server accepted it: the
  * only mail the instance sends while its sender waits. Refused
  * `smtp_not_configured` (409) while there is no SMTP server, and
- * `smtp_failed` (502) with `failure` naming the step that failed:
- * `connection` (unreachable or broken), `tls` (no STARTTLS, a
- * handshake or certificate that failed), `authentication` (the
- * credentials were refused) or `rejected` (the sender, the recipient or
- * the mail was refused).
+ * `smtp_failed` (502) when the exchange failed, without saying at which
+ * step: the host is the caller's to name, and the step would tell what
+ * is reachable behind it. The instance's log record of the failure
+ * names the step.
  *
  */
 export const sendTestMail = <ThrowOnError extends boolean = false>(
