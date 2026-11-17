@@ -25,15 +25,15 @@ func (s *Store) LockSDKInventory(ctx context.Context, key delivery.SDKKeyID) err
 	return nil
 }
 
-// TrimInventory deletes the rows of key beyond the newest max by last time
+// TrimInventory deletes the rows of key beyond the newest keep by last time
 // seen, ties broken by the order of their identities so that which rows go
 // does not depend on chance, and returns how many.
-func (s *Store) TrimInventory(ctx context.Context, key delivery.SDKKeyID, max int) (int, error) {
+func (s *Store) TrimInventory(ctx context.Context, key delivery.SDKKeyID, keep int) (int, error) {
 	tag, err := s.db(ctx).Exec(ctx, `DELETE FROM sdk_inventory
 		WHERE sdk_key_id = $1 AND (environment_id, sdk_name, sdk_version, platform, app_version) IN (
 			SELECT environment_id, sdk_name, sdk_version, platform, app_version FROM sdk_inventory WHERE sdk_key_id = $1
 			ORDER BY last_seen_at DESC, sdk_name DESC, sdk_version DESC, platform DESC, app_version DESC OFFSET $2)`,
-		key.Bytes(), max)
+		key.Bytes(), keep)
 	if err != nil {
 		return 0, fmt.Errorf("trimming the SDK inventory of a key: %w", err)
 	}

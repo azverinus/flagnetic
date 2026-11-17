@@ -16,9 +16,9 @@ type InventoryStore interface {
 	// LockSDKInventory holds, until the unit of work ends, the right to add
 	// rows of key to the inventory.
 	LockSDKInventory(ctx context.Context, key delivery.SDKKeyID) error
-	// TrimInventory deletes the rows of key beyond the newest max by last
+	// TrimInventory deletes the rows of key beyond the newest keep by last
 	// time seen, the oldest first, and returns how many.
-	TrimInventory(ctx context.Context, key delivery.SDKKeyID, max int) (int, error)
+	TrimInventory(ctx context.Context, key delivery.SDKKeyID, keep int) (int, error)
 	// RecordInventory records a sighting of an SDK: a new row, or the row's
 	// last time and ruleset version moved on, unless the row was seen less
 	// than delivery.InventoryInterval before with the same ruleset version,
