@@ -531,7 +531,7 @@ func TestTestingAnAuthProviderFollowsThreeRedirectsOnItsHostAndNeverToPlainHTTPA
 	res := test(redirecting(t, 4).URL)
 	assertProblem(t, "four redirects", res.StatusCode(), res.Body, http.StatusBadGateway, "provider_unreachable")
 
-	elsewhere := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	elsewhere := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, `{"issuer":"x"}`)
 	}))
 	t.Cleanup(elsewhere.Close)
