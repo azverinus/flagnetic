@@ -133,6 +133,15 @@ class ClientStreamTest < Minitest::Test
     refute_equal "closed by the server", fields[:cause]
   end
 
+  def test_an_oversized_stream_line_drops_the_stream_and_reconnects
+    connected_client
+    @server.streams.first.write("data: #{"x" * (70 << 10)}")
+    eventually { @server.stream_requests.size >= 2 }
+    level, fields = logged(:sse_dropped).first
+    assert_equal :warn, level
+    assert_match(/event-stream line exceeds 65536 bytes/, fields[:cause])
+  end
+
   def test_silence_reconnects
     connected_client(timing: { silence: 0.3 })
     eventually { @server.stream_requests.size >= 2 }

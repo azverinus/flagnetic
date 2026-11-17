@@ -42,11 +42,12 @@ final class _IoTransport implements Transport {
     Uri url,
     Map<String, String> headers,
     List<int> json,
-    Duration timeout,
-  ) =>
+    Duration timeout, {
+    int maxBytes = maxResponseBytes,
+  }) =>
       // The body is not compressed: a context is a few hundred bytes, and
       // the evaluate endpoint does not decompress a request.
-      _send(() => _http.postUrl(url), headers, json, timeout);
+      _send(() => _http.postUrl(url), headers, json, timeout, maxBytes);
 
   /// Opens a request with [open], sends [headers] and [body], and reads the
   /// whole answer within [timeout].
@@ -60,6 +61,7 @@ final class _IoTransport implements Transport {
     Map<String, String> headers,
     List<int>? body,
     Duration timeout,
+    int maxBytes,
   ) async {
     HttpClientRequest? request;
     StreamSubscription<List<int>>? reading;
@@ -83,12 +85,12 @@ final class _IoTransport implements Transport {
         reading = response.listen(
           (chunk) {
             bytes.addAll(chunk);
-            if (bytes.length > maxResponseBytes && !done.isCompleted) {
+            if (bytes.length > maxBytes && !done.isCompleted) {
               unawaited(reading?.cancel());
               done.completeError(
                 TransportException(
                   TransportFailure.network,
-                  'answer larger than $maxResponseBytes bytes',
+                  'answer larger than $maxBytes bytes',
                 ),
               );
             }

@@ -6,14 +6,14 @@
 // receipt.
 import type { Clock } from "../internal/clock.js";
 import { packBatches, type QueuedEvent } from "../internal/events.js";
-import { retryAfterMs, trimTrailingSlashes } from "../internal/http.js";
+import { readBoundedText, retryAfterMs, trimTrailingSlashes } from "../internal/http.js";
 import { causeOf } from "./logger.js";
 import { SCHEMA_VERSION_MAX, SDK_API_PATH, VERSION } from "../version.js";
 
 /** This SDK's name in the envelope and in the SDK inventory. */
 export const SDK_NAME = "flagnetic-js";
 
-/** How much of a 202 answer the client reads before giving up on it. */
+/** How many bytes of a 202 answer the client reads before giving up on it. */
 const MAX_ANSWER_BYTES = 1 << 20;
 
 /** One entry of a 202 answer's rejected list: an event the platform refused for good. */
@@ -161,8 +161,7 @@ export class Ingest {
   // batch was accepted either way, so nothing is retried.
   private async read(res: Response): Promise<IngestResult> {
     try {
-      const text = await res.text();
-      if (text.length > MAX_ANSWER_BYTES) return empty;
+      const text = await readBoundedText(res, MAX_ANSWER_BYTES);
       const parsed = JSON.parse(text) as Partial<IngestResult>;
       return {
         accepted: numberOf(parsed.accepted),

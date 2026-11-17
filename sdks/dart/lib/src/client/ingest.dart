@@ -15,6 +15,11 @@ import 'types.dart';
 /// counting began.
 const maxWindowAge = Duration(hours: 1);
 
+/// The most of an ingest answer that is read. It lists the events the
+/// platform refused, a few lines at most; an endless body would otherwise
+/// be held up to the transport's general cap.
+const _maxAnswerBytes = 1 << 20;
+
 /// What the platform did with one batch, and whether the batch may be sent
 /// again.
 enum _Outcome {
@@ -515,6 +520,7 @@ final class Ingest {
         },
         utf8.encode(jsonEncode(_envelope(batch))),
         _settings.requestTimeout,
+        maxBytes: _maxAnswerBytes,
       );
     } on TransportException catch (e) {
       return (outcome: _Outcome.retry, status: null, cause: e.kind.name);

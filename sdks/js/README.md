@@ -187,7 +187,7 @@ const ruleset = decodeRuleset(document); // a ruleset document, as JSON text, by
 const result = ruleset.evaluate("new_checkout", { units: { user: "u-1001" }, attributes: { country: "DE" } });
 ```
 
-The regular expressions of `matches` conditions run on a linear-time RE2 engine of the package, so a pattern means what it means on the server and an attribute value cannot stall the process. A ruleset from a server newer than the package may hold an operator, condition kind or serve kind the evaluator does not know; `ruleset.unsupportedRules()` reports them by flag, and evaluating such a flag answers `error` with `inconsistent_ruleset`.
+The regular expressions of `matches` conditions run on a linear-time RE2 engine of the package, so a pattern means what it means on the server and an attribute value cannot stall the process. A string attribute longer than 64 KiB (65,536 UTF-8 bytes) does not match, and raises no error. A ruleset from a server newer than the package may hold an operator, condition kind or serve kind the evaluator does not know; `ruleset.unsupportedRules()` reports them by flag, and evaluating such a flag answers `error` with `inconsistent_ruleset`.
 
 ## Development
 

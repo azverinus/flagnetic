@@ -123,8 +123,9 @@ final class _WebTransport implements Transport {
     Uri url,
     Map<String, String> headers,
     List<int> json,
-    Duration timeout,
-  ) async {
+    Duration timeout, {
+    int maxBytes = maxResponseBytes,
+  }) async {
     final abort = _AbortController();
     _inFlight.add(abort);
     try {
@@ -144,7 +145,7 @@ final class _WebTransport implements Transport {
         return (
           status: response.status,
           headers: _headersOf(response),
-          body: await _readAll(response.body),
+          body: await _readAll(response.body, maxBytes),
         );
       }().timeout(timeout);
     } on TimeoutException {
@@ -216,10 +217,10 @@ final class _WebTransport implements Transport {
     );
   }
 
-  /// All of [body], at most [maxResponseBytes]: `arrayBuffer` would hold an
+  /// All of [body], at most [maxBytes]: `arrayBuffer` would hold an
   /// endless body or a gzip bomb until the tab ran out of memory. Past the
   /// cap the reader is cancelled, which ends the connection.
-  static Future<List<int>> _readAll(_ReadableStream? body) async {
+  static Future<List<int>> _readAll(_ReadableStream? body, int maxBytes) async {
     final reader = body?.getReader();
     final bytes = <int>[];
     while (reader != null) {
@@ -228,13 +229,13 @@ final class _WebTransport implements Transport {
       final value = chunk.value;
       if (value == null) continue;
       bytes.addAll(value.toDart);
-      if (bytes.length > maxResponseBytes) {
+      if (bytes.length > maxBytes) {
         unawaited(
           reader.cancel().toDart.then<void>((_) {}, onError: (Object _) {}),
         );
         throw TransportException(
           TransportFailure.network,
-          'answer larger than $maxResponseBytes bytes',
+          'answer larger than $maxBytes bytes',
         );
       }
     }

@@ -18,3 +18,37 @@ export function trimTrailingSlashes(url: string): string {
   while (end > 0 && url.charCodeAt(end - 1) === 0x2f) end--;
   return url.slice(0, end);
 }
+
+/** A response body that outgrew the cap its reader was given. */
+export class BodyTooLarge extends Error {
+  constructor(limit: number) {
+    super(`response body over ${limit} bytes`);
+  }
+}
+
+/**
+ * The body as text, read through a byte count: the stream is cancelled and
+ * BodyTooLarge thrown as soon as more than `limit` bytes have arrived, so a
+ * peer cannot make the process buffer an endless answer. The count is of
+ * the decoded bytes, as `fetch` decompresses transparently.
+ */
+export async function readBoundedText(res: Response, limit: number): Promise<string> {
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let text = "";
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > limit) throw new BodyTooLarge(limit);
+      text += decoder.decode(value, { stream: true });
+    }
+  } catch (e) {
+    await reader.cancel().catch(() => undefined);
+    throw e;
+  }
+  return text + decoder.decode();
+}

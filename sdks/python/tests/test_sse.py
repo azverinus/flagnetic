@@ -35,3 +35,17 @@ def test_a_retry_in_milliseconds_is_read_in_seconds() -> None:
     parser = EventStreamParser()
     parser.feed(b"retry: 1500\n\n")
     assert parser.retry == 1.5
+
+
+def test_a_line_without_a_newline_fed_in_small_pieces_is_a_stream_error() -> None:
+    parser = EventStreamParser()
+    with pytest.raises(StreamError):
+        for _ in range(100_000):
+            parser.feed(b"x" * 16)
+
+
+def test_endless_short_data_lines_are_a_stream_error() -> None:
+    parser = EventStreamParser()
+    with pytest.raises(StreamError):
+        for _ in range(100_000):
+            parser.feed(b"data: " + b"x" * 100 + b"\n")

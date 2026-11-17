@@ -1,9 +1,13 @@
 package flagnetic
 
 import (
+	"bufio"
+	"bytes"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -100,5 +104,47 @@ func TestScanSSELinesSplitsOnEveryLineEnding(t *testing.T) {
 	}
 	if advance, token, _ := scanSSELines([]byte("a\r\nb"), false); advance != 3 || string(token) != "a" {
 		t.Errorf("CRLF split into (%d, %q), want (3, \"a\")", advance, token)
+	}
+}
+
+func TestSSEReaderEndsTheStreamOnALineOverTheCap(t *testing.T) {
+	r := newSSEReader(strings.NewReader("data: " + strings.Repeat("x", maxFrameBytes) + "\n\n"))
+	if _, err := r.next(); !errors.Is(err, bufio.ErrTooLong) {
+		t.Fatalf("next = %v, want bufio.ErrTooLong", err)
+	}
+}
+
+func TestSSEReaderEndsTheStreamOnAnEventOverTheCap(t *testing.T) {
+	// Each line is short, so only the accumulated data of the one event
+	// shows the breach; without a cap it grows for as long as the server
+	// keeps writing and never dispatches.
+	line := "data: " + strings.Repeat("x", 1000) + "\n"
+	r := newSSEReader(strings.NewReader(strings.Repeat(line, 100)))
+	if _, err := r.next(); !errors.Is(err, bufio.ErrTooLong) {
+		t.Fatalf("next = %v, want bufio.ErrTooLong", err)
+	}
+}
+
+func TestSSEReaderKeepsAnEventAtTheCap(t *testing.T) {
+	r := newSSEReader(strings.NewReader("data: " + strings.Repeat("x", maxFrameBytes-100) + "\n\n"))
+	f, err := r.next()
+	if err != nil || len(f.Data) != maxFrameBytes-100 {
+		t.Fatalf("next = %d bytes, %v", len(f.Data), err)
+	}
+}
+
+func TestIngestAnswerIsBoundedAfterDecompression(t *testing.T) {
+	// A few kilobytes of gzip expand to far more than the cap; the
+	// accepted count sits after the cap, so it must not be read.
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	_, _ = zw.Write([]byte(`{"pad":"` + strings.Repeat("a", 2*maxIngestResultBytes) + `","accepted":7}`))
+	_ = zw.Close()
+	resp := &http.Response{
+		Header: http.Header{"Content-Encoding": []string{"gzip"}},
+		Body:   io.NopCloser(&buf),
+	}
+	if got := (&ingest{}).read(resp); got.Accepted != 0 {
+		t.Fatalf("accepted = %d, want 0", got.Accepted)
 	}
 }

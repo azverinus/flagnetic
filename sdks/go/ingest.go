@@ -206,7 +206,9 @@ func (i *ingest) read(resp *http.Response) ingestResult {
 			return ingestResult{}
 		}
 		defer func() { _ = zr.Close() }()
-		r = zr
+		// The compressed answer is capped above, but it can expand a
+		// thousandfold: bound what it decompresses to as well.
+		r = io.LimitReader(zr, maxIngestResultBytes)
 	}
 	doc, err := io.ReadAll(r)
 	if err != nil {

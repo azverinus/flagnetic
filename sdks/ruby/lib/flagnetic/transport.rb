@@ -16,9 +16,22 @@ module Flagnetic
     # it. body is decompressed; retry_after is the raw header value.
     EventsResponse = Struct.new(:status, :body, :retry_after, keyword_init: true)
 
+    # BodyTooLarge is a response body that grew past its limit. A fetch
+    # raises it like any network error, so it counts as a failed fetch.
+    class BodyTooLarge < StandardError; end
+
+    # RULESET_LIMIT bounds a ruleset body after decompression; a ruleset the
+    # server accepts is far smaller, so a larger one is a misbehaving peer.
+    RULESET_LIMIT = 256 << 20
+    # ANSWER_LIMIT bounds the answer to an events POST, a few counters and
+    # rejection reasons.
+    ANSWER_LIMIT = 1 << 20
+
     attr_reader :stream_uri, :timeout
 
-    def initialize(sdk_key:, base_url:, platform:, timeout:)
+    def initialize(sdk_key:, base_url:, platform:, timeout:, ruleset_limit: RULESET_LIMIT, answer_limit: ANSWER_LIMIT)
+      @ruleset_limit = ruleset_limit
+      @answer_limit = answer_limit
       base = URI(base_url.to_s.chomp("/"))
       raise ArgumentError, "base_url must be an http or https URL, got #{base_url.inspect}" unless
         base.is_a?(URI::HTTP) && base.host
@@ -49,22 +62,41 @@ module Flagnetic
       request["Content-Encoding"] = "gzip"
       request["Flagnetic-Schema-Version"] = SCHEMA_VERSION_MAX.to_s
       request.body = gzipped_body
-      response = http_for(@events_uri, timeout).start { |h| h.request(request) }
-      EventsResponse.new(status: response.code.to_i, body: response.body.to_s, retry_after: response["Retry-After"])
+      status = retry_after = body = nil
+      http_for(@events_uri, timeout).start do |h|
+        h.request(request) do |response|
+          status = response.code.to_i
+          retry_after = response["Retry-After"]
+          body = begin
+            read_body(response, @answer_limit)
+          rescue BodyTooLarge
+            # An answer past the limit is cut off, not an error: the batch
+            # reached the server, and EventBatch reads an undecodable
+            # answer as accepted without counts, so it is not sent twice.
+            ""
+          end
+        end
+      end
+      EventsResponse.new(status: status, body: body, retry_after: retry_after)
     end
 
     # fetch_ruleset GETs the ruleset, revalidating the held version with
     # If-None-Match. It raises on network errors and timeouts; Net::HTTP
-    # asks for and inflates gzip.
+    # asks for and inflates gzip, and the inflated body is bounded.
     def fetch_ruleset(held_version)
       request = Net::HTTP::Get.new(@ruleset_uri)
       headers.each { |k, v| request[k] = v }
       request["Accept"] = "application/json"
       request["Flagnetic-Schema-Version"] = SCHEMA_VERSION_MAX.to_s
       request["If-None-Match"] = %("#{held_version}") if held_version
-      http = http_for(@ruleset_uri, @timeout)
-      response = http.start { |h| h.request(request) }
-      Response.new(status: response.code.to_i, body: response.body.to_s)
+      status = body = nil
+      http_for(@ruleset_uri, @timeout).start do |h|
+        h.request(request) do |response|
+          status = response.code.to_i
+          body = read_body(response, @ruleset_limit)
+        end
+      end
+      Response.new(status: status, body: body)
     end
 
     # stream_request is the change stream's request; Last-Event-ID is the
@@ -97,6 +129,19 @@ module Flagnetic
     def inspect = "#<#{self.class} #{@ruleset_uri.host}:#{@ruleset_uri.port}>"
 
     private
+
+    # read_body gathers the body in the pieces Net::HTTP yields, which are
+    # inflated when the answer is gzip, and raises as soon as their total
+    # passes limit: a Content-Length or a compressed size says nothing of
+    # what a peer will make the process hold.
+    def read_body(response, limit)
+      body = +"".b
+      response.read_body do |piece|
+        body << piece
+        raise BodyTooLarge, "the response body exceeds #{limit} bytes" if body.bytesize > limit
+      end
+      body.force_encoding(Encoding::UTF_8)
+    end
 
     def headers
       { "Authorization" => "Bearer #{@sdk_key}", "User-Agent" => @user_agent }

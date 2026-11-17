@@ -4,11 +4,18 @@
 import { decodeRuleset, type Ruleset } from "../evaluator/evaluate.js";
 import { Backoff } from "../internal/backoff.js";
 import type { Clock } from "../internal/clock.js";
-import { retryAfterMs, trimTrailingSlashes } from "../internal/http.js";
+import { readBoundedText, retryAfterMs, trimTrailingSlashes } from "../internal/http.js";
 import { causeOf } from "./logger.js";
-import { SseParser } from "../internal/sse.js";
+import { SseOverflow, SseParser } from "../internal/sse.js";
 import type { LogEvent, LogLevel } from "./types.js";
 import { SCHEMA_VERSION_MAX, SCHEMA_VERSION_MIN, SDK_API_PATH, SUPPORTED_SCHEMA_VERSIONS, VERSION } from "../version.js";
+
+/**
+ * The most a ruleset answer may hold once decompressed, in bytes. Far above
+ * any real ruleset; it bounds what a faulty or hostile peer can make the
+ * process buffer.
+ */
+const MAX_RULESET_BYTES = 256 * 1024 * 1024;
 
 /** Every interval of delivery, in milliseconds. */
 export interface Timing {
@@ -345,7 +352,7 @@ export class Delivery {
           await res.body?.cancel();
           throw new AttemptFailed(`status ${res.status}`, res.status, retryAfterMs(res.headers.get("Retry-After"), this.clock.now()));
         }
-        text = await res.text();
+        text = await readBoundedText(res, MAX_RULESET_BYTES);
       } catch (e) {
         if (e instanceof AttemptFailed) throw e;
         const reason: unknown = abort.signal.aborted ? abort.signal.reason : e;
@@ -470,6 +477,8 @@ export class Delivery {
     } catch (e) {
       const reason: unknown = abort.signal.aborted ? abort.signal.reason : e;
       cause = reason instanceof AttemptFailed ? reason.message : causeOf(e);
+      // The peer's bytes failed the stream: stop reading them.
+      if (e instanceof SseOverflow) this.endStream(e, abort);
     }
     if (run !== this.streamRun) {
       // A newer run replaced this one while it unwound.
