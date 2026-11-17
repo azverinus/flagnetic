@@ -63,7 +63,7 @@ export async function signIn(
 const sessionOnly = [
   /^POST \/api\/v1\/members$/,
   /^PATCH \/api\/v1\/members\/[^/]+$/,
-  /^POST \/api\/v1\/members\/[^/]+\/(reactivate|password-reset)$/,
+  /^POST \/api\/v1\/members\/[^/]+\/(invitation|reactivate|password-reset)$/,
   /^POST \/api\/v1\/projects\/[^/]+\/grants$/,
 ];
 
