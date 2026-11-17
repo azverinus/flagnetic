@@ -530,7 +530,7 @@ func TestReactivatingAMemberWhoHoldsAnIdentityMakesThemActive(t *testing.T) {
 		t.Fatalf("deactivating = %v, %v: %s", res.StatusCode(), err, res.Body)
 	}
 
-	res, err := e.admin.ReactivateMemberWithResponse(t.Context(), id)
+	res, err := e.session(t).ReactivateMemberWithResponse(t.Context(), id)
 
 	if err != nil || res.JSON200 == nil || res.JSON200.Member.Status != management.MemberStatusActive {
 		t.Fatalf("reactivating a member with an identity and no password = %v, %v: %s", res.StatusCode(), err, res.Body)
@@ -559,7 +559,7 @@ func TestReactivatingAMemberWithNoWayInInvitesThemAgain(t *testing.T) {
 		t.Fatalf("unlinking = %v, %v", un.StatusCode(), err)
 	}
 
-	res, err := e.admin.ReactivateMemberWithResponse(t.Context(), id)
+	res, err := e.session(t).ReactivateMemberWithResponse(t.Context(), id)
 
 	if err != nil || res.JSON200 == nil || res.JSON200.Member.Status != management.MemberStatusInvited || res.JSON200.Invitation == nil {
 		t.Errorf("reactivating a member with no way in = %v, %v: %s", res.StatusCode(), err, res.Body)
@@ -579,7 +579,7 @@ func TestReactivatingAMemberWhoseOnlyIdentityIsAtADisabledProviderInvitesThemAga
 		t.Fatalf("disabling the provider = %v, %v: %s", res.StatusCode(), err, res.Body)
 	}
 
-	res, err := e.admin.ReactivateMemberWithResponse(t.Context(), id)
+	res, err := e.session(t).ReactivateMemberWithResponse(t.Context(), id)
 
 	// An identity at a disabled provider signs nobody in, so it is no way in.
 	if err != nil || res.JSON200 == nil || res.JSON200.Member.Status != management.MemberStatusInvited || res.JSON200.Invitation == nil {

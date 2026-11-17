@@ -230,9 +230,7 @@ func idOf(t *testing.T, b *testkit.Browser) openapi_types.UUID {
 func startFresh(t *testing.T) env {
 	t.Helper()
 	pool := testkit.FreshPool(t)
-	e := start(t, testkit.WithPool(pool))
-	e.admin = testkit.Client(t, e.srv, testkit.Bootstrap(t, pool))
-	return e
+	return startOn(t, pool)
 }
 
 func TestSigningInThroughDexGrantsWhatTheMappedGroupsMapTo(t *testing.T) {
@@ -397,7 +395,7 @@ func TestAMemberLosesAGrantWhenTheirGroupIsGoneAndKeepsWhatWasGrantedByHand(t *t
 	e.wantGrants(t, beta, member, management.GrantSourceSso, slug, "viewer")
 
 	// A grant by hand of the same role sits beside the provider's.
-	if res, err := e.admin.CreateGrantWithResponse(t.Context(), alpha, management.GrantCreate{Member: member, Role: "developer"}); err != nil || res.JSON201 == nil {
+	if res, err := e.session(t).CreateGrantWithResponse(t.Context(), alpha, management.GrantCreate{Member: member, Role: "developer"}); err != nil || res.JSON201 == nil {
 		t.Fatalf("granting by hand: %v, %d: %s", err, res.StatusCode(), res.Body)
 	}
 	e.wantGrants(t, alpha, member, management.GrantSourceManual, "", "developer")
@@ -430,7 +428,7 @@ func TestAGrantAProviderMadeIsRemovedOnlyByTheProviderButAManualOneByHand(t *tes
 	alpha := e.project(t)
 	e.mapGroups(t, slug, projectMapping("eng", alpha, "developer"))
 	member := idOf(t, e.forgedPerson(t, idp, slug, uniqueEmail(), map[string]any{"groups": []any{"eng"}}))
-	manual, err := e.admin.CreateGrantWithResponse(t.Context(), alpha, management.GrantCreate{Member: member, Role: "viewer"})
+	manual, err := e.session(t).CreateGrantWithResponse(t.Context(), alpha, management.GrantCreate{Member: member, Role: "viewer"})
 	if err != nil || manual.JSON201 == nil {
 		t.Fatalf("granting by hand: %v, %d: %s", err, manual.StatusCode(), manual.Body)
 	}
@@ -518,7 +516,7 @@ func TestAnInstanceAdminAMappingMadeIsDemotedOnlyByThatProvider(t *testing.T) {
 	}
 
 	// By hand it is refused: the directory owns it.
-	res, err := e.admin.UpdateMemberWithResponse(t.Context(), member.String(), management.MemberPatch{InstanceAdmin: ptr(false)})
+	res, err := e.session(t).UpdateMemberWithResponse(t.Context(), member.String(), management.MemberPatch{InstanceAdmin: ptr(false)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -527,7 +525,7 @@ func TestAnInstanceAdminAMappingMadeIsDemotedOnlyByThatProvider(t *testing.T) {
 	t.Run("an instance admin made by hand is never taken away", func(t *testing.T) {
 		handEmail := uniqueEmail()
 		hand := idOf(t, e.forgedPerson(t, idp, slug, handEmail, map[string]any{"groups": []any{}}))
-		if res, err := e.admin.UpdateMemberWithResponse(t.Context(), hand.String(), management.MemberPatch{InstanceAdmin: ptr(true)}); err != nil || res.JSON200 == nil {
+		if res, err := e.session(t).UpdateMemberWithResponse(t.Context(), hand.String(), management.MemberPatch{InstanceAdmin: ptr(true)}); err != nil || res.JSON200 == nil {
 			t.Fatalf("promoting by hand: %v, %d: %s", err, res.StatusCode(), res.Body)
 		}
 		e.forgedPerson(t, idp, slug, handEmail, map[string]any{"groups": []any{"it-admins"}})

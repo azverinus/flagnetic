@@ -518,3 +518,11 @@ func TestEveryReplicaLearnsTheSMTPSettingsOfAnother(t *testing.T) {
 	}
 	await("after removing", http.StatusNotFound)
 }
+
+// session signs the instance's admin in afresh, for the operations that
+// create access and refuse every API token; at each call, since a session
+// ends with the idle timeout a test's clock may outrun.
+func (in smtpInstance) session(t *testing.T) *management.ClientWithResponses {
+	t.Helper()
+	return signedIn(t, in.srv, in.member).ClientWithResponses
+}
