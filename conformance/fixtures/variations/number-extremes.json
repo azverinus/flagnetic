@@ -1,0 +1,145 @@
+{
+  "name": "variations/number-extremes",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "unit_types": [
+      "user"
+    ],
+    "attributes": [],
+    "segments": [],
+    "flags": [
+      {
+        "key": "n_largest",
+        "type": "number",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "v",
+            "value": 1.7976931348623157e308
+          }
+        ],
+        "on": true,
+        "off_variation": "v",
+        "fallthrough": "v",
+        "rules": []
+      },
+      {
+        "key": "n_smallest",
+        "type": "number",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "v",
+            "value": 5e-324
+          }
+        ],
+        "on": true,
+        "off_variation": "v",
+        "fallthrough": "v",
+        "rules": []
+      },
+      {
+        "key": "n_exponent",
+        "type": "number",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "v",
+            "value": 1e21
+          }
+        ],
+        "on": true,
+        "off_variation": "v",
+        "fallthrough": "v",
+        "rules": []
+      },
+      {
+        "key": "n_negative_fraction",
+        "type": "number",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "v",
+            "value": -0.5
+          }
+        ],
+        "on": true,
+        "off_variation": "v",
+        "fallthrough": "v",
+        "rules": []
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "the largest number is served as it was written",
+      "context": {
+        "units": {
+          "user": "u1"
+        }
+      },
+      "flag": "n_largest",
+      "expect": {
+        "type": "number",
+        "value": 1.7976931348623157e308,
+        "variation": "v",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "the smallest number is served as it was written",
+      "context": {
+        "units": {
+          "user": "u1"
+        }
+      },
+      "flag": "n_smallest",
+      "expect": {
+        "type": "number",
+        "value": 5e-324,
+        "variation": "v",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "the exponent number is served as it was written",
+      "context": {
+        "units": {
+          "user": "u1"
+        }
+      },
+      "flag": "n_exponent",
+      "expect": {
+        "type": "number",
+        "value": 1e21,
+        "variation": "v",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "the negative_fraction number is served as it was written",
+      "context": {
+        "units": {
+          "user": "u1"
+        }
+      },
+      "flag": "n_negative_fraction",
+      "expect": {
+        "type": "number",
+        "value": -0.5,
+        "variation": "v",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    }
+  ]
+}

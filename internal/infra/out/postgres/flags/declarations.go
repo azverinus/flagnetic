@@ -12,7 +12,9 @@ import (
 // attribute keyed key: the segments whose conditions name it, by key, then
 // one reference per flag and environment whose configuration names it in a
 // rule's condition, a rollout or an override, archived flags included, by
-// flag key and then environment order. A unit type and an attribute never
+// flag key and then environment order, then the draft and running
+// experiments assigning units of it, by key: an experiment starts, and goes
+// on assigning, only under a unit type the ruleset declares. A unit type and an attribute never
 // share a key, so the key alone says which is meant, and a unit type is
 // named as an attribute too, holding the unit's ID. Containment of the key
 // finds every kind through the GIN indexes on segments' conditions and
@@ -33,6 +35,9 @@ func (s *Store) DeclarationReferences(ctx context.Context, project workspace.Pro
 		            jsonb_build_object('serve', jsonb_build_object('unit_type', $2::text))))
 		        OR c.document @> jsonb_build_object('rules', jsonb_build_array(
 		            jsonb_build_object('conditions', jsonb_build_array(jsonb_build_object('attribute', $2::text))))))
+		    UNION ALL
+		    SELECT 2, 'experiment', key, NULL, 0 FROM experiments
+		    WHERE project_id = $1 AND unit_type = $2::text AND status IN ('draft', 'running')
 		) r
 		ORDER BY rank, key COLLATE "C", sort_order, environment COLLATE "C"`, project.Bytes(), key)
 	if err != nil {

@@ -2,7 +2,7 @@
 
 Flagnetic is one binary, `flagnetic`, with the web console built in, and PostgreSQL is the only thing it needs. This guide installs it with Docker Compose or as a binary, puts it behind TLS and a reverse proxy, sizes its PostgreSQL connections and upgrades it. [Operations](operations.md) covers running it once it is up, and the [configuration reference](configuration.md) lists every setting.
 
-Flagnetic 0.4 is a developer preview: try it, build against it, and do not run it where an outage would hurt. See [what 0.x promises](sdks/compatibility.md#what-0x-promises) before you rely on it.
+Flagnetic 0.5 is a developer preview: try it, build against it, and do not run it where an outage would hurt. See [what 0.x promises](sdks/compatibility.md#what-0x-promises) before you rely on it.
 
 ## What you need
 
@@ -25,7 +25,7 @@ docker compose up -d
 Compose reads the secret key from `.env` and refuses to start without it. The server image is `ghcr.io/azverinus/flagnetic`, for `linux/amd64` and `linux/arm64`, with build provenance and an SBOM. The compose file pulls `latest`; to pin a release, add it to `.env` before `docker compose up -d`:
 
 ```bash
-echo "FLAGNETIC_VERSION=0.4.0" >> .env
+echo "FLAGNETIC_VERSION=0.5.0" >> .env
 ```
 
 `docker compose build` builds the image from your checkout instead.
@@ -66,7 +66,7 @@ The command talks to `http://localhost:8080`; point it elsewhere with `--url` or
 From the release image, for Linux (add `--platform linux/arm64` to `docker create` for ARM):
 
 ```bash
-docker create --name flagnetic-binary ghcr.io/azverinus/flagnetic:0.4.0
+docker create --name flagnetic-binary ghcr.io/azverinus/flagnetic:0.5.0
 docker cp flagnetic-binary:/usr/local/bin/flagnetic ./flagnetic
 docker rm flagnetic-binary
 ```
@@ -74,7 +74,7 @@ docker rm flagnetic-binary
 Or built from source, for any platform Go supports, with Go, Node.js, pnpm and [Task](https://taskfile.dev):
 
 ```bash
-git clone --branch v0.4.0 https://github.com/azverinus/flagnetic.git
+git clone --branch v0.5.0 https://github.com/azverinus/flagnetic.git
 cd flagnetic
 task build        # the console, then bin/flagnetic embedding it
 ```
@@ -242,5 +242,14 @@ Read the release notes of every version between yours and the new one: a change 
 4. **Start the new replicas.**
 
 From 0.1.0 on, migrations only move forward, without data loss: a migration is never edited once released, and there are no down migrations. 0.x does not promise that an older version keeps working against a database a newer one migrated: to go back, restore the backup taken before the upgrade and deploy the previous version. A replica never runs against a schema older than its own: with auto-migration off it refuses to start until `flagnetic migrate` has run (see [Migrations](operations.md#migrations)).
+
+### Upgrading to 0.5
+
+Two changes need a look before the upgrade:
+
+- **The metrics listener answers on this host only.** `FLAGNETIC_METRICS_LISTEN_ADDR` now defaults to `127.0.0.1:9090`. The container image and the Compose file are unchanged in effect (the image sets `:9090`, and Compose publishes it on the host's loopback). A binary install that a Prometheus on another host scrapes sets the address of an interface it can reach, for example `10.0.0.5:9090`. See [Metrics](operations.md#metrics).
+- **A script's API token can no longer create or widen access.** Granting a role, inviting a member to the instance or a project, reactivating or editing a member, and issuing a password reset need a signed-in session, as creating a token already did; a token is refused `403 session_required`. See [Only a session creates a credential](access.md#only-a-session-creates-a-credential).
+
+Secrets sealed before 0.5 keep opening and are bound to their row the next time it is stored ([Operations](operations.md#the-secret-key)).
 
 The SDK API (`/sdk/v1`) and the ruleset format only grow, so SDKs keep working across server upgrades without being upgraded themselves. The management API (`/api/v1`) and the console may still change incompatibly between 0.x releases, each such change marked as breaking in the release notes; scripts using the management API should be checked against them.

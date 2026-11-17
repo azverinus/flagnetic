@@ -162,8 +162,8 @@ func TestAnEmptyMetricsAddressSwitchesMetricsOff(t *testing.T) {
 		}
 		return cfg.MetricsListenAddr
 	}
-	if got := load(map[string]string{}); got != ":9090" {
-		t.Errorf("unset: %q, want :9090", got)
+	if got := load(map[string]string{}); got != "127.0.0.1:9090" {
+		t.Errorf("unset: %q, want 127.0.0.1:9090", got)
 	}
 	if got := load(map[string]string{"FLAGNETIC_METRICS_LISTEN_ADDR": ""}); got != "" {
 		t.Errorf("set empty: %q, want off", got)

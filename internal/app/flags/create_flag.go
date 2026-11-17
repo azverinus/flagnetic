@@ -15,6 +15,9 @@ import (
 type FlagCreator interface {
 	// CreateFlag refuses a key the project uses as already_exists.
 	CreateFlag(ctx context.Context, f flags.Flag) error
+	// CountFlags returns how many flags project holds, archived ones
+	// included.
+	CountFlags(ctx context.Context, project workspace.ProjectID) (int, error)
 	CreateConfigurations(ctx context.Context, cs []flags.Configuration) error
 }
 
@@ -61,6 +64,13 @@ func (h *CreateFlag) Handle(ctx context.Context, cmd CreateFlagCommand) (FlagVie
 	var out FlagView
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		if err := lockProject(ctx, h.d.Projects, cmd.Project); err != nil {
+			return err
+		}
+		existing, err := h.d.Store.CountFlags(ctx, cmd.Project)
+		if err != nil {
+			return err
+		}
+		if err = flags.CheckFlagCount(existing); err != nil {
 			return err
 		}
 		owner, err := h.owner(ctx, cmd)

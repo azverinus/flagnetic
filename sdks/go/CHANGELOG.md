@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/go/v0.1.1...sdks/go/v0.1.2) (2026-11-17)
+
+
+### Bug Fixes
+
+* **delivery:** narrow what a client key learns from answers and refusals ([#346](https://github.com/azverinus/flagnetic/issues/346)) ([f29ee44](https://github.com/azverinus/flagnetic/commit/f29ee44b01c8fdeafbcb9342ef062afdc6dd2453))
+* **sdks:** bound stream lines, events, response bodies and the matched input ([#337](https://github.com/azverinus/flagnetic/issues/337)) ([695477d](https://github.com/azverinus/flagnetic/commit/695477d7d31700fe25b1458eefd315e733355b2a))
+* **sdks:** harden the smaller SDK findings ([#353](https://github.com/azverinus/flagnetic/issues/353)) ([dfa56a4](https://github.com/azverinus/flagnetic/commit/dfa56a4bbbebb92c97d1f63810130c0ec2c45b0b))
+
 ## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/go/v0.1.0...sdks/go/v0.1.1) (2026-11-16)
 
 

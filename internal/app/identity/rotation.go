@@ -28,7 +28,7 @@ func (h *RotateCertificate) Handle(ctx context.Context, cmd ProviderCommand) (id
 	if _, err = current.StartRotation(identity.SPKey{}, now); err != nil {
 		return identity.Provider{}, err
 	}
-	next, err := sealSPKey(h.d.SPKeys, h.d.Sealer, now)
+	next, err := sealSPKey(h.d.SPKeys, h.d.Sealer, current.ID, now)
 	if err != nil {
 		return identity.Provider{}, err
 	}
@@ -38,8 +38,16 @@ func (h *RotateCertificate) Handle(ctx context.Context, cmd ProviderCommand) (id
 		if lockErr != nil {
 			return lockErr
 		}
+		if before.ID != current.ID {
+			// The provider was deleted and made again since the key was sealed
+			// for the first, and the key belongs to that one.
+			return ErrNotFound
+		}
 		after, startErr := before.StartRotation(next, now)
 		if startErr != nil {
+			return startErr
+		}
+		if after, startErr = rebindProvider(h.d.Sealer, after); startErr != nil {
 			return startErr
 		}
 		if storeErr := h.d.Store.UpdateProvider(ctx, after); storeErr != nil {
@@ -74,6 +82,9 @@ func (h *CompleteCertificateRotation) Handle(ctx context.Context, cmd ProviderCo
 		}
 		after, err := before.CompleteRotation(now)
 		if err != nil {
+			return err
+		}
+		if after, err = rebindProvider(h.d.Sealer, after); err != nil {
 			return err
 		}
 		if err = h.d.Store.UpdateProvider(ctx, after); err != nil {

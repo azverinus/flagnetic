@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.3](https://github.com/azverinus/flagnetic/compare/sdks/ruby/v0.1.2...sdks/ruby/v0.1.3) (2026-11-17)
+
+
+### Bug Fixes
+
+* **sdks:** bound stream lines, events, response bodies and the matched input ([#337](https://github.com/azverinus/flagnetic/issues/337)) ([695477d](https://github.com/azverinus/flagnetic/commit/695477d7d31700fe25b1458eefd315e733355b2a))
+* **sdks:** harden the smaller SDK findings ([#353](https://github.com/azverinus/flagnetic/issues/353)) ([dfa56a4](https://github.com/azverinus/flagnetic/commit/dfa56a4bbbebb92c97d1f63810130c0ec2c45b0b))
+
 ## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/ruby/v0.1.1...sdks/ruby/v0.1.2) (2026-11-16)
 
 

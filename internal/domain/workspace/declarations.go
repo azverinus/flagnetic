@@ -30,6 +30,22 @@ type Environment struct {
 // EnvironmentID identifies an environment.
 type EnvironmentID = id.Of[Environment]
 
+// MaxEnvironments is how many environments a project has at most: every flag
+// holds a configuration in each, and every SDK key reads one.
+const MaxEnvironments = 20
+
+// CheckEnvironmentCount refuses adding an environment to a project that
+// already has existing, which is the most it may.
+func CheckEnvironmentCount(existing int) error {
+	if existing < MaxEnvironments {
+		return nil
+	}
+	return apperrors.Invalid("invalid_environment", "the environment is not valid", apperrors.Violation{
+		Pointer: "/key", Code: "too_many", Detail: "a project has at most 20 environments",
+		Params: map[string]any{"max": MaxEnvironments},
+	})
+}
+
 // NewEnvironment returns an environment of project placed at sortOrder.
 func NewEnvironment(environmentID EnvironmentID, project ProjectID, key, name string, sortOrder int, now time.Time) (Environment, error) {
 	f := check("invalid_environment", "the environment is not valid").key(key).nameOf(name)

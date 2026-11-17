@@ -113,6 +113,8 @@ func TestASegmentConditionNamesADeclarationWithAnOperatorAndValueOfItsType(t *te
 		"a segment excluded":              {flags.Condition{Kind: "not_in_segment", Segment: "x"}, "/conditions/0/kind invalid_value"},
 		"a prerequisite":                  {flags.Condition{Kind: "prerequisite", Flag: "f", Variation: "v"}, "/conditions/0/kind invalid_value"},
 		"an unknown kind":                 {flags.Condition{Kind: "expression"}, "/conditions/0/kind invalid_value"},
+		"a string over 1,000 characters":  {cond("os", "eq", `"`+strings.Repeat("a", 1001)+`"`), "/conditions/0/value too_long"},
+		"a list entry over 1,000":         {cond("os", "in", `["a","`+strings.Repeat("a", 1001)+`"]`), "/conditions/0/value too_long"},
 		"a list of 10,001 unit IDs":       {cond("user", "in", `[`+strings.Repeat(`"u",`, 10000)+`"u"]`), "/conditions/0/value too_many"},
 		"a list of 10,001 for contains":   {cond("roles", "contains_any", `[`+strings.Repeat(`"r",`, 10000)+`"r"]`), "/conditions/0/value too_many"},
 	} {
@@ -121,6 +123,9 @@ func TestASegmentConditionNamesADeclarationWithAnOperatorAndValueOfItsType(t *te
 		if got := segmentViolations(t, err); !slices.Equal(got, []string{want}) {
 			t.Errorf("%s: violations = %v, want %s", name, got, want)
 		}
+	}
+	if _, err := flags.NewSegment(segment("s", cond("os", "eq", `"`+strings.Repeat("a", 1000)+`"`))); err != nil {
+		t.Errorf("a string of 1,000 characters: %v", err)
 	}
 	if _, err := flags.NewSegment(segment("s", cond("user", "in", `[`+strings.Repeat(`"u",`, 9999)+`"u"]`))); err != nil {
 		t.Errorf("10,000 unit IDs: %v", err)

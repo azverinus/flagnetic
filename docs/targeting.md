@@ -68,7 +68,7 @@ Every condition is checked when a configuration or segment is written, and refus
 - `unknown_segment`: a segment the project does not have.
 - `unknown_flag`, `archived_flag`, `unknown_variation`: a prerequisite naming a flag the project does not have, an archived one, or a variation the flag does not have.
 
-A unit type or attribute that a rule, rollout, override or segment names, an archived flag's included, is not deleted (`409 in_use`, `references` naming each segment, or flag and environment, that names it). `GET /unit-types` and `GET /attributes` give each declaration a `usage_count`: the flags naming it, each counted once whatever its environments and archived ones included, plus the segments naming it.
+A unit type or attribute that a rule, rollout, override or segment names, an archived flag's included, is not deleted (`409 in_use`, `references` naming each segment, or flag and environment, that names it). A unit type a draft or running experiment assigns is not deleted either, and `references` names each such experiment (`kind` `experiment`, no environment): a stopped or archived experiment assigns nobody and does not hold it. `GET /unit-types` and `GET /attributes` give each declaration a `usage_count`: the flags naming it, each counted once whatever its environments and archived ones included, plus the segments naming it.
 
 In the console, **Unit types** and **Attributes** show each declaration's count in **Used by flags and segments**, and a refused deletion names every flag, with its environment, and every segment that still names it.
 
@@ -79,6 +79,11 @@ In the console, **Unit types** and **Attributes** show each declaration's count 
 | Rules in a configuration | 50 |
 | Conditions in a rule or a segment | 20 |
 | Entries in a list value | 10,000 |
+| String value of a condition, or an entry of its list | 1,000 characters (`too_long`) |
+| Flags in a project, archived ones included | 5,000 |
+| Segments in a project | 1,000 |
+| Variations of a flag | 50 |
+| Environments in a project | 20 |
 | `matches` pattern | 500 characters (`too_long`), and no more repetition than a program of 1,000 steps holds (`too_complex`): `a{1,400}` fits, `(?:[a-z0-9]{1,100}-){1,10}` does not |
 | Overrides in a configuration | 200 |
 | Prerequisites in a configuration | 50 |
@@ -87,4 +92,4 @@ In the console, **Unit types** and **Attributes** show each declaration's count 
 | Override note | 200 characters |
 | Kill switch reason | 2,000 characters |
 
-A write over a limit is refused `too_many` (or `too_long`), with the limit in `params.max`.
+A write over a limit is refused `too_many` (or `too_long`), with the limit in `params.max`. Creating a flag, a segment or an environment past its project limit is refused `422` with the violation at `/key`. A project over a limit when it was set (a ruleset written before the limit) keeps what it holds: only creating more, or writing a longer value, is refused.
