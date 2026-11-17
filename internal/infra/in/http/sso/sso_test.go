@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -773,5 +774,43 @@ func TestAProviderWhoseDiscoveryFailsIsAskedOnceWhileItKeepsFailing(t *testing.T
 	}
 	if n := asked.Load(); n != 1 {
 		t.Errorf("the provider's discovery was fetched %d times for five starts, want one", n)
+	}
+}
+
+func TestSimultaneousStartsAtOneProviderShareOneDiscoveryFetch(t *testing.T) {
+	var asked atomic.Int32
+	// The answer is slow, so every start arrives while the first fetch is
+	// still out: without sharing it each would fetch on its own.
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		asked.Add(1)
+		time.Sleep(300 * time.Millisecond)
+		http.Error(w, "down", http.StatusInternalServerError)
+	}))
+	t.Cleanup(slow.Close)
+	e := start(t)
+	slug := e.create(t, provider{issuer: slow.URL, clientID: "c", clientSecret: "s", domains: []string{"example.com"}})
+
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	var wg sync.WaitGroup
+	statuses := make([]int, 5)
+	for i := range statuses {
+		wg.Go(func() {
+			res, err := client.Get(e.srv.URL + "/sso/" + slug + "/start")
+			if err != nil {
+				t.Errorf("GET /sso/%s/start: %v", slug, err)
+				return
+			}
+			_ = res.Body.Close()
+			statuses[i] = res.StatusCode
+		})
+	}
+	wg.Wait()
+	for i, s := range statuses {
+		if s != http.StatusSeeOther {
+			t.Errorf("start %d = %d, want the sign-in page with the failure", i+1, s)
+		}
+	}
+	if n := asked.Load(); n != 1 {
+		t.Errorf("the provider's discovery was fetched %d times for five simultaneous starts, want one", n)
 	}
 }
