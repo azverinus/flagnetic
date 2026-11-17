@@ -3,7 +3,9 @@ package access
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
@@ -67,6 +69,23 @@ func NewInvitationMailer(postman *Postman, smtp SMTPReader, details InvitationDe
 	return &InvitationMailer{postman: postman, smtp: smtp, details: details, settings: settings, providers: providers, consoleURL: consoleURL}
 }
 
+// maxMailNameRunes bounds a person's name in an invitation mail. The names
+// are text the inviter wrote about themself and the invitee, in a mail that
+// comes from the instance: unbounded, they would let a member write a message
+// of their own into it.
+const maxMailNameRunes = 64
+
+// mailName returns name as one short line: every run of whitespace and
+// control characters becomes one space, and what follows the first 64
+// characters is cut.
+func mailName(name string) string {
+	line := strings.Join(strings.FieldsFunc(name, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }), " ")
+	if runes := []rune(line); len(runes) > maxMailNameRunes {
+		return strings.TrimSpace(string(runes[:maxMailNameRunes]))
+	}
+	return line
+}
+
 // invitationLinkPath is where the console opens an invitation, followed by
 // its secret.
 const invitationLinkPath = "/invitations/"
@@ -96,7 +115,7 @@ func (im *InvitationMailer) mail(ctx context.Context, invitee access.Member, iss
 		return IssuedInvitation{}, err
 	}
 	data := InvitationMailData{
-		URL: im.consoleURL + invitationLinkPath + issued.Secret.Reveal(), ExpiresAt: issued.ExpiresAt, InvitedBy: details.InvitedBy,
+		URL: im.consoleURL + invitationLinkPath + issued.Secret.Reveal(), ExpiresAt: issued.ExpiresAt, InvitedBy: mailName(details.InvitedBy),
 	}
 	if g := issued.Grant; g != nil && details.ProjectName != "" {
 		data.Project, data.Role = details.ProjectName, g.Role
@@ -118,7 +137,7 @@ func (im *InvitationMailer) mail(ctx context.Context, invitee access.Member, iss
 		}
 	}
 	im.postman.Queue(ctx, Mail{
-		Kind: access.MailInvitation, To: MailRecipient{Name: invitee.DisplayName, Email: invitee.Email},
+		Kind: access.MailInvitation, To: MailRecipient{Name: mailName(invitee.DisplayName), Email: invitee.Email},
 		Locale: im.postman.Locale(invitee.Locale, details.InviterLocale), Data: data, RequestID: requestID,
 	})
 	issued.Mailed, issued.Secret = true, secret.String{}

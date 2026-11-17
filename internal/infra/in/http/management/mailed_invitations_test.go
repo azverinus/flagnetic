@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
@@ -131,7 +132,8 @@ func TestWithSMTPReissuingMailsAFreshLinkAndKillsTheOldOne(t *testing.T) {
 
 func TestWithSMTPAProjectInvitationIsMailedNamingTheProjectTheRoleAndTheInviter(t *testing.T) {
 	t.Parallel()
-	in := startMailingInstance(t, testkit.MailpitOpen, nil)
+	c := testkit.Clock()
+	in := startMailingInstance(t, testkit.MailpitOpen, []testkit.ServerOption{testkit.WithClock(c)})
 	p := createProject(t, in.admin, projectKey())
 	owner := testkit.NewMember(t, in.pool, testkit.WithDisplayName("Katherine Johnson"))
 	testkit.Grant(t, in.pool, projectIDOf(p), owner.ID, access.RoleOwner)
@@ -158,7 +160,8 @@ func TestWithSMTPAProjectInvitationIsMailedNamingTheProjectTheRoleAndTheInviter(
 	}
 
 	// Re-inviting to the same project reissues the invitation, mailed again
-	// with the new role.
+	// with the new role, once a minute has passed.
+	c.Advance(time.Minute)
 	again := do(ownerClient.InviteProjectMemberWithResponse(t.Context(), p.Key,
 		management.ProjectInvitationCreate{Email: email, DisplayName: "Ada Lovelace", Role: "viewer"}))
 	if again.JSON201 == nil {
@@ -336,5 +339,22 @@ func TestAnInvitationWhoseMailFailsStandsAndTheFailureIsCountedAndLogged(t *test
 	}
 	if n := len(in.auditOf(t, "member.invited", res.JSON201.Member.Id.String())); n != 1 {
 		t.Errorf("member.invited entries = %d, want 1", n)
+	}
+}
+
+func TestAnInvitationMailNamesTheInviterAsOneShortLine(t *testing.T) {
+	t.Parallel()
+	in := startMailingInstance(t, testkit.MailpitOpen, nil)
+	long := strings.Repeat("Urgent ", 20)
+	inviter := testkit.NewMember(t, in.pool, testkit.AsInstanceAdmin(), testkit.WithDisplayName("Grace\t Hopper "+long))
+	client := testkit.Client(t, in.srv, testkit.PersonalToken(t, in.pool, inviter.ID, "inviter", access.ScopeRead, access.ScopeInstanceAdmin))
+	email := newEmail()
+	if got := do(client.InviteMemberWithResponse(t.Context(), management.MemberInvite{Email: email, DisplayName: "Ada"})); got.JSON201 == nil {
+		t.Fatalf("POST /members = %d: %s", got.StatusCode(), got.Body)
+	}
+	subject := in.mp.AwaitMails(t, email, 1)[0].Subject
+	name, ok := strings.CutSuffix(subject, " invited you to Flagnetic")
+	if !ok || !strings.HasPrefix(name, "Grace Hopper Urgent") || len([]rune(name)) > 64 || strings.ContainsAny(name, "\t\r\n") || strings.Contains(name, "  ") {
+		t.Errorf("subject = %q, want the inviter's name as one line of at most 64 characters", subject)
 	}
 }
