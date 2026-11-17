@@ -1,6 +1,7 @@
 import type { Environment } from "@flagnetic/api";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { AccessContext } from "@/lib/access";
@@ -49,6 +50,44 @@ describe("the protection switch", () => {
     expect(toggle).not.toBeChecked();
     await userEvent.click(toggle);
     const dialog = await screen.findByRole("dialog", { name: "Protect Production" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Protect environment" }));
+
+    await waitFor(() => expect(requests.some((r) => r.method === "PUT")).toBe(true));
+    const put = requests.find((r) => r.method === "PUT")!;
+    expect(put.headers.get("If-Match")).toBe('"4"');
+    expect(await put.json()).toEqual({ protected: true });
+  });
+
+  it("keeps asking what it asked when another owner changes the environment meanwhile", async () => {
+    const { requests } = fakeServer({
+      [protect]: problem(412, "precondition_failed"),
+      "GET /projects/shop/environments": { status: 200, body: { items: [] } },
+    });
+    function Harness() {
+      const [live, setLive] = useState<Environment>(production);
+      return (
+        <AccessContext.Provider
+          value={{ permissions: new Set(["environment.protect"]), roles: [] as never }}
+        >
+          <button
+            type="button"
+            onClick={() => setLive({ ...production, protected: true, version: 5 })}
+          >
+            Another owner protects it
+          </button>
+          <EnvironmentProtection project="shop" environment={live} />
+        </AccessContext.Provider>
+      );
+    }
+    renderWithProviders(<Harness />);
+    await userEvent.click(screen.getByRole("switch", { name: "Protected" }));
+    const dialog = await screen.findByRole("dialog", { name: "Protect Production" });
+
+    // Another owner protects it while the dialog is open.
+    act(() =>
+      screen.getByRole("button", { name: "Another owner protects it", hidden: true }).click(),
+    );
+    expect(screen.getByRole("dialog", { name: "Protect Production" })).toBe(dialog);
     await userEvent.click(within(dialog).getByRole("button", { name: "Protect environment" }));
 
     await waitFor(() => expect(requests.some((r) => r.method === "PUT")).toBe(true));

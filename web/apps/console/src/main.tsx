@@ -11,7 +11,7 @@ import { activateLocale } from "./i18n/i18n";
 import { instanceDefaultLocale, resolveLocale, storedLocale } from "./i18n/locale";
 import { configureClient } from "./lib/http";
 import { createQueryClient } from "./lib/query-client";
-import { onSessionEnded } from "./lib/signed-in";
+import { listenForSessionChange, onSessionChangedElsewhere, onSessionEnded } from "./lib/signed-in";
 import { applyTheme, readTheme } from "./lib/theme";
 import { routeTree } from "./routeTree.gen";
 
@@ -35,6 +35,16 @@ configureClient(
     queryClient,
     () => router.state.location,
     (search) => void router.navigate({ to: "/sign-in", search }),
+  ),
+);
+
+// A member signing in or out in another tab changes the session this tab shares.
+listenForSessionChange(
+  onSessionChangedElsewhere(
+    queryClient,
+    () => router.state.location,
+    (search) => void router.navigate({ to: "/sign-in", search }),
+    () => void router.invalidate(),
   ),
 );
 

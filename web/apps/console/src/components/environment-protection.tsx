@@ -30,23 +30,27 @@ export function EnvironmentProtection({
   const label = useId();
   const can = useCan("environment.protect");
   const reason = useMissingPermissionReason("environment.protect");
-  const [asking, setAsking] = useState(false);
+  // What the member was asked about, fixed when the dialog opened: another
+  // owner's change reaching this screen meanwhile must not turn "Protect"
+  // into "Stop protecting" under the member's hand. The version is the one
+  // they saw, so a change made in between is refused, not overwritten.
+  const [asking, setAsking] = useState<{ protect: boolean; version: number }>();
   const name = environment.name;
-  const next = !environment.protected;
+  const next = asking?.protect ?? !environment.protected;
 
   const change = useMutation({
-    mutationFn: () =>
+    mutationFn: ({ protect, version }: { protect: boolean; version: number }) =>
       unwrap(
         setEnvironmentProtection({
           path: { project, environment: environment.key },
-          body: { protected: next },
-          headers: ifMatch(environment.version),
+          body: { protected: protect },
+          headers: ifMatch(version),
         }),
       ),
     meta: { toast: false },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: environmentsQuery(project).queryKey });
-      setAsking(false);
+      setAsking(undefined);
       toast.success(next ? t`${name} is protected.` : t`${name} is no longer protected.`);
     },
   });
@@ -73,19 +77,21 @@ export function EnvironmentProtection({
           disabled={!can}
           onCheckedChange={() => {
             change.reset();
-            setAsking(true);
+            setAsking({ protect: !environment.protected, version: environment.version });
           }}
         />
       </div>
       <ConfirmDialog
-        open={asking}
-        onOpenChange={setAsking}
+        open={asking !== undefined}
+        onOpenChange={(open) => {
+          if (!open) setAsking(undefined);
+        }}
         title={next ? t`Protect ${name}` : t`Stop protecting ${name}`}
         confirmLabel={next ? <Trans>Protect environment</Trans> : <Trans>Stop protecting</Trans>}
         destructive={!next}
         pending={change.isPending}
         refusal={change.error}
-        onConfirm={() => change.mutate()}
+        onConfirm={() => asking && change.mutate(asking)}
       >
         <p>
           {next ? (
