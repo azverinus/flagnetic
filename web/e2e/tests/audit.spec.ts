@@ -197,7 +197,10 @@ test("the overview's recent activity shows a change made in the console, without
   await rename.getByLabel("Name").fill("Pre-production");
   await rename.getByRole("button", { name: "Save" }).click();
   await expect(rename).toBeHidden();
-  await navigation.getByRole("link", { name: "Overview" }).click();
+  await page
+    .getByRole("navigation", { name: "Project" })
+    .getByRole("link", { name: "Overview" })
+    .click();
 
   await expect(recent.getByRole("row").nth(1)).toContainText("environment.updated");
   expect(await page.evaluate(() => "sameDocument" in window)).toBe(true);
