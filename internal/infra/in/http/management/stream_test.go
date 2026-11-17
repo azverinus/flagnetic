@@ -489,7 +489,7 @@ func TestAMemberDemotedFromInstanceAdminHasTheStreamClosedAtTheNextHeartbeat(t *
 	s.Started(t)
 
 	off := false
-	res := do(admin.UpdateMemberWithResponse(t.Context(), member.ID.String(), management.MemberPatch{InstanceAdmin: &off}))
+	res := do(testkit.InstanceAdminSession(t, srv).UpdateMemberWithResponse(t.Context(), member.ID.String(), management.MemberPatch{InstanceAdmin: &off}))
 	if res.StatusCode() != http.StatusOK {
 		t.Fatalf("PATCH member = %d %s", res.StatusCode(), res.Body)
 	}

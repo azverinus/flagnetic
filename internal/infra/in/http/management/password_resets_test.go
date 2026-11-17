@@ -554,7 +554,7 @@ func TestAskingForAPasswordResetIsThrottledPerAddress(t *testing.T) {
 func TestAnEmailChangeEndsTheMembersOpenPasswordResetsAndInvitations(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	m := testkit.NewMember(t, pool)
 	issued := issueReset(t, admin, m.ID)
 	// An invitation the member still holds: the store is the only way to

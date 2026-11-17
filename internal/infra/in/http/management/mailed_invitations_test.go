@@ -352,7 +352,7 @@ func TestAnInvitationMailNamesTheInviterAsOneShortLine(t *testing.T) {
 	in := startMailingInstance(t, testkit.MailpitOpen, nil)
 	long := strings.Repeat("Urgent ", 20)
 	inviter := testkit.NewMember(t, in.pool, testkit.AsInstanceAdmin(), testkit.WithDisplayName("Grace\t Hopper "+long))
-	client := testkit.Client(t, in.srv, testkit.PersonalToken(t, in.pool, inviter.ID, "inviter", access.ScopeRead, access.ScopeInstanceAdmin))
+	client := signedIn(t, in.srv, inviter)
 	email := newEmail()
 	if got := do(client.InviteMemberWithResponse(t.Context(), management.MemberInvite{Email: email, DisplayName: "Ada"})); got.JSON201 == nil {
 		t.Fatalf("POST /members = %d: %s", got.StatusCode(), got.Body)
