@@ -186,7 +186,12 @@ func TestEnforcingADomainRefusesItsPasswordsWhileItsProviderStillSignsIn(t *test
 		}
 	})
 	t.Run("the enforced provider's identity is not unlinked", func(t *testing.T) {
-		identity := identityAt(t, methodsOf(t, aliceAt), corp)
+		// The enforcement ended alice's password session: she reads her
+		// identities through one the enforced provider opened.
+		idp.NextClaims(map[string]any{"sub": "sub-alice", "email": alice.Email})
+		viaCorp := testkit.NewBrowser(t, e.srv.URL)
+		e.signIn(t, viaCorp, corp, "", e.opts())
+		identity := identityAt(t, methodsOf(t, viaCorp), corp)
 		res, err := e.admin.UnlinkMemberIdentityWithResponse(t.Context(), alice.ID.String(), identity.Id.String())
 		if err != nil {
 			t.Fatal(err)
@@ -518,6 +523,21 @@ func TestEnforcingADomainWhileLocalLoginIsOffNeedsAnIdentityItStillLetsIn(t *tes
 	if res := putSettings(t, keeperAt.ClientWithResponses, func(s *management.AuthSettings) { s.LocalLoginEnabled = false }); res.JSON200 == nil {
 		t.Fatalf("closing local login while holding an identity = %d: %s", res.StatusCode(), res.Body)
 	}
+	// Closing local login ended the keeper's own password session, and the
+	// change says how many it ended: they go on through their provider.
+	if res, err := keeperAt.GetMeWithResponse(t.Context()); err != nil || res.StatusCode() != http.StatusUnauthorized {
+		t.Errorf("the keeper's password session after closing local login = %v, %v; want 401", res.StatusCode(), err)
+	}
+	action := "auth_settings.updated"
+	if audit, err := e.admin.ListAuditEntriesWithResponse(t.Context(), &management.ListAuditEntriesParams{Action: &action}); err != nil ||
+		audit.JSON200 == nil || len(audit.JSON200.Items) != 1 {
+		t.Errorf("auth_settings.updated entries = %v: %s, want 1", err, audit.Body)
+	} else if after, _ := audit.JSON200.Items[0].After.(map[string]any); after["sessions_revoked"] != float64(1) {
+		t.Errorf("after = %v, want sessions_revoked 1", after)
+	}
+	idp.NextClaims(map[string]any{"sub": "sub-keeper-other", "email": keeper.Email})
+	keeperAt = testkit.NewBrowser(t, e.srv.URL)
+	e.signIn(t, keeperAt, other, "", e.opts())
 
 	// Local login is off already: enforcing the keeper's own domain to corp
 	// would leave them no way in, the same as closing local login would.

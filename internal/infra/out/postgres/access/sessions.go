@@ -157,12 +157,15 @@ func (s *Store) RevokeSession(ctx context.Context, session access.SessionID, at 
 
 // RevokeRefusedSessions ends, at at, every session not ended yet that the
 // auth settings no longer let sign its member in, and returns how many it
-// ended.
+// ended. A session its timeouts ended already is left to the retention
+// worker, so the count is of sessions that still signed someone in.
 func (s *Store) RevokeRefusedSessions(ctx context.Context, settings access.AuthSettings, at time.Time) (int, error) {
+	cut := access.EndedSessionCutoffs(at, settings.SessionTimeouts())
 	rows, err := s.db(ctx).Query(ctx, `
 		SELECT s.id, s.method, COALESCE(s.provider, ''), m.email
 		FROM sessions s JOIN members m ON m.id = s.member_id
-		WHERE s.revoked_at IS NULL`)
+		WHERE s.revoked_at IS NULL AND s.last_seen_at > $1 AND s.created_at > $2 AND s.expires_at > $3`,
+		cut.LastSeenBy, cut.CreatedBy, cut.ExpiresBy)
 	if err != nil {
 		return 0, fmt.Errorf("listing the live sessions: %w", err)
 	}
