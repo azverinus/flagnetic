@@ -61,6 +61,13 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   const drawer = useSyncExternalStore(subscribeToDrawerWidth, isDrawerWidth, () => false);
   const [collapsed, setCollapsed] = useState(sidebarCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // A window widened past the drawer's width closes the drawer for good,
+  // so narrowing it again does not bring the drawer back over the page.
+  const [wasDrawer, setWasDrawer] = useState(drawer);
+  if (drawer !== wasDrawer) {
+    setWasDrawer(drawer);
+    if (!drawer) setDrawerOpen(false);
+  }
   const toggleCollapsed = useCallback(() => {
     setCollapsed((was) => {
       rememberSidebarCollapsed(!was);
@@ -71,7 +78,6 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     () => ({
       drawer,
       collapsed: collapsed && !drawer,
-      // A window widened past the drawer's width leaves it closed.
       drawerOpen: drawer && drawerOpen,
       setDrawerOpen,
       toggleCollapsed,

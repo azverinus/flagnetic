@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -85,6 +85,37 @@ describe("the sidebar", () => {
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(opener).toHaveFocus();
+  });
+
+  it("does not bring a drawer back after the window was widened past it", async () => {
+    let width = 390;
+    const listeners = new Set<() => void>();
+    window.matchMedia = ((query: string) => {
+      const max = /max-width:\s*(\d+)px/.exec(query);
+      return {
+        get matches() {
+          return max ? width <= Number(max[1]) : false;
+        },
+        media: query,
+        addEventListener: (_: string, notify: () => void) => listeners.add(notify),
+        removeEventListener: (_: string, notify: () => void) => listeners.delete(notify),
+      } as unknown as MediaQueryList;
+    }) as typeof window.matchMedia;
+    const resize = (next: number) =>
+      act(() => {
+        width = next;
+        listeners.forEach((notify) => notify());
+      });
+    const user = userEvent.setup();
+    renderWithProviders(<Frame />);
+    await user.click(screen.getByRole("button", { name: "Open the sidebar" }));
+    expect(screen.getByRole("dialog", { name: "Menu" })).toBeInTheDocument();
+
+    resize(1440);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    resize(390);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("keeps the drawer full-width even when the column was collapsed", async () => {
