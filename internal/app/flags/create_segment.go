@@ -76,7 +76,7 @@ func (h *CreateSegment) Handle(ctx context.Context, cmd CreateSegmentCommand) (f
 		if err != nil {
 			return err
 		}
-		if err := flags.CheckSegmentCount(existing); err != nil {
+		if err = flags.CheckSegmentCount(existing); err != nil {
 			return err
 		}
 		decl, err := declarationsOf(ctx, h.d.Declarations, cmd.Project)

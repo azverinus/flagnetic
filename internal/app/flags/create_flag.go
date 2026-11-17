@@ -70,7 +70,7 @@ func (h *CreateFlag) Handle(ctx context.Context, cmd CreateFlagCommand) (FlagVie
 		if err != nil {
 			return err
 		}
-		if err := flags.CheckFlagCount(existing); err != nil {
+		if err = flags.CheckFlagCount(existing); err != nil {
 			return err
 		}
 		owner, err := h.owner(ctx, cmd)

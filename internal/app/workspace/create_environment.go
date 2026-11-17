@@ -67,7 +67,7 @@ func (h *CreateEnvironment) Handle(ctx context.Context, cmd CreateEnvironmentCom
 		if err != nil {
 			return err
 		}
-		if err := workspace.CheckEnvironmentCount(existing); err != nil {
+		if err = workspace.CheckEnvironmentCount(existing); err != nil {
 			return err
 		}
 		next, err := h.store.NextSortOrder(ctx, cmd.Project)
