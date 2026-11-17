@@ -40,6 +40,12 @@ var errEmailHeld = apperrors.Conflict("already_exists",
 var errInvitedByAnother = apperrors.Conflict("already_exists",
 	"a member with this email is invited already; the member who invited them, or an instance admin, issues their invitation again")
 
+// reinviteInterval is how long a project invitation to an address stands
+// before the same address may be invited again: each invitation mails the
+// address, so inviting at will would let a member send mail to a stranger
+// as often as they like.
+const reinviteInterval = time.Minute
+
 // InviteToProject invites a person to the instance with a role in a project.
 type InviteToProject struct {
 	tx     Transactor
@@ -79,7 +85,10 @@ type InviteToProjectCommand struct {
 // already_exists, except a member invited who has a pending invitation to this
 // project that the caller issued, or any such when the caller is an instance
 // admin, who is invited again with the new role: a fresh invitation then
-// replaces theirs, recorded as member.invitation_reissued.
+// replaces theirs, recorded as member.invitation_reissued; inviting the
+// address again less than a minute after the last invitation is refused
+// too_many_requests, as each one mails it; an instance that cannot mail has
+// no such interval.
 func (h *InviteToProject) Handle(ctx context.Context, cmd InviteToProjectCommand) (InvitedMember, error) {
 	grant, err := access.NewInvitationGrant(cmd.Project.ID, cmd.Role, "/role")
 	if err != nil {
@@ -97,7 +106,7 @@ func (h *InviteToProject) Handle(ctx context.Context, cmd InviteToProjectCommand
 	origin := invitationOrigin{InvitedBy: creatorOf(cmd.Caller), Grant: &grant}
 	var res InvitedMember
 	err = h.tx.Within(ctx, func(ctx context.Context) error {
-		member, action, memberErr := h.memberToInvite(ctx, invited, cmd.Project, cmd.Caller)
+		member, action, memberErr := h.memberToInvite(ctx, invited, cmd.Project, cmd.Caller, now)
 		if memberErr != nil {
 			return memberErr
 		}
@@ -131,7 +140,7 @@ func (h *InviteToProject) Handle(ctx context.Context, cmd InviteToProjectCommand
 // the audit action issuing it records: a new invited member, created, or the
 // invited one whose pending invitation is to project and may be issued again
 // by caller: the member who issued it, or an instance admin.
-func (h *InviteToProject) memberToInvite(ctx context.Context, invited access.Member, project ProjectRef, caller access.Caller,
+func (h *InviteToProject) memberToInvite(ctx context.Context, invited access.Member, project ProjectRef, caller access.Caller, now time.Time,
 ) (access.Member, string, error) {
 	existing, err := h.store.LockMemberByEmail(ctx, invited.Email)
 	if errors.Is(err, ErrNotFound) {
@@ -155,6 +164,16 @@ func (h *InviteToProject) memberToInvite(ctx context.Context, invited access.Mem
 	}
 	if by := caller.Member; by == nil || (by.ID != pending.InvitedBy && !by.InstanceAdmin) {
 		return access.Member{}, "", errInvitedByAnother
+	}
+	// Only an invitation that is mailed needs spacing: one the instance
+	// cannot mail is shown to the member who issues it, and mails nobody.
+	mails, err := h.mailer.canMail(ctx)
+	if err != nil {
+		return access.Member{}, "", err
+	}
+	if wait := reinviteInterval - now.Sub(pending.CreatedAt); mails && wait > 0 {
+		return access.Member{}, "", apperrors.RateLimited("too_many_requests",
+			"this address was invited a moment ago; try again in a minute", wait.Truncate(time.Second)+time.Second)
 	}
 	return existing, "member.invitation_reissued", nil
 }

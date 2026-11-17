@@ -193,9 +193,20 @@ type SSOSignIn struct {
 // OpenSession opens the session of a member who proved who they are to an
 // auth provider, records their sign-in and the source it came from, and
 // returns the value of its cookie, which is handed to the browser and never
-// stored. It records auth.signed_in with the method and the provider.
+// stored. It records auth.signed_in with the method and the provider. The
+// member is locked and read again first, the order deactivating takes: a
+// session opened while the member is deactivated would survive their
+// session revocation and live again when they are reactivated, so a member
+// no longer active is refused ErrSessionExpired.
 func (s *SSO) OpenSession(ctx context.Context, in SSOSignIn) (secret.String, error) {
 	settings, err := s.settings.AuthSettings(ctx)
+	if err != nil {
+		return secret.String{}, err
+	}
+	current, _, err := s.store.LockMember(ctx, in.Member.ID)
+	if errors.Is(err, ErrNotFound) || (err == nil && current.Status != access.MemberActive) {
+		return secret.String{}, access.ErrSessionExpired
+	}
 	if err != nil {
 		return secret.String{}, err
 	}

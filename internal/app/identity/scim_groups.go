@@ -300,8 +300,12 @@ func (d SCIMGroupDeps) change(ctx context.Context, req SCIMRequest, group identi
 // and whom the caller's provider does not provision: invalidValue, whether
 // the member exists elsewhere or not.
 func (d SCIMGroupDeps) checkJoining(ctx context.Context, req SCIMRequest, before, after []identity.MemberID) error {
+	held := make(map[identity.MemberID]struct{}, len(before))
+	for _, m := range before {
+		held[m] = struct{}{}
+	}
 	for _, m := range after {
-		if slices.Contains(before, m) {
+		if _, ok := held[m]; ok {
 			continue
 		}
 		_, err := d.Members.Get(ctx, req.Caller.ProviderSlug, m)
@@ -374,14 +378,15 @@ func groupChange(before, after identity.GroupState) (b, a map[string]any) {
 	if before.ExternalID != after.ExternalID {
 		b["external_id"], a["external_id"] = nullable(before.ExternalID), nullable(after.ExternalID)
 	}
+	was, is := memberIndex(before.Members), memberIndex(after.Members)
 	var joined, left []identity.MemberID
 	for _, m := range after.Members {
-		if !slices.Contains(before.Members, m) {
+		if _, ok := was[m]; !ok {
 			joined = append(joined, m)
 		}
 	}
 	for _, m := range before.Members {
-		if !slices.Contains(after.Members, m) {
+		if _, ok := is[m]; !ok {
 			left = append(left, m)
 		}
 	}
@@ -392,6 +397,14 @@ func groupChange(before, after identity.GroupState) (b, a map[string]any) {
 		a["members_removed"] = memberStrings(left)
 	}
 	return b, a
+}
+
+func memberIndex(members []identity.MemberID) map[identity.MemberID]struct{} {
+	set := make(map[identity.MemberID]struct{}, len(members))
+	for _, m := range members {
+		set[m] = struct{}{}
+	}
+	return set
 }
 
 func nullable(s string) any {

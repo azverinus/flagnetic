@@ -88,7 +88,7 @@ test.describe("mail settings", () => {
     await page.getByRole("button", { name: "Send a test mail" }).click();
 
     await expect(page.getByRole("alert")).toHaveText(
-      "The SMTP server refused the username and password. Check them, then save and test again.",
+      "The SMTP server could not be reached or did not accept the test mail. Check the settings; the instance's log says why.",
     );
     await expectNoSeriousViolations(page, "the mail settings with a failed test mail");
     expect(await mailsTo(admin.email)).toEqual([]);

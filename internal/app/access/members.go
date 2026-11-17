@@ -178,6 +178,8 @@ func keepAnInstanceAdmin(ctx context.Context, store MemberChanger, before, after
 type UpdateMemberStore interface {
 	MemberChanger
 	InvitationGrantStore
+	InvitationStore
+	PasswordResetStore
 }
 
 // UpdateMember edits a member for an instance admin.
@@ -208,14 +210,26 @@ type UpdateMemberCommand struct {
 // Demoting an instance admin drops the grant of each invitation they issued
 // to a project they hold no grant.manage in, recording
 // invitation.grant_revoked, since they no longer hold it everywhere.
+// Changing the email consumes the member's open invitations and password
+// resets: their links were mailed or handed out for the address the member
+// no longer has, and would otherwise let whoever holds them act as the
+// member at the new one.
 func (h *UpdateMember) Handle(ctx context.Context, cmd UpdateMemberCommand) (MemberView, error) {
 	return changeMember(ctx, h.tx, h.store, h.audit, h.clock, h.ids, cmd.Request, cmd.Member,
-		func(ctx context.Context, before access.Member, _ bool, _ time.Time) (access.Member, []governance.Record, error) {
+		func(ctx context.Context, before access.Member, _ bool, now time.Time) (access.Member, []governance.Record, error) {
 			after, err := before.Edited(cmd.Change)
 			if err != nil {
 				return access.Member{}, nil, err
 			}
 			records := memberEdited(before, after)
+			if before.Email != after.Email {
+				if _, err = h.store.ConsumeInvitations(ctx, before.ID, now); err != nil {
+					return access.Member{}, nil, err
+				}
+				if _, err = h.store.ConsumePasswordResets(ctx, before.ID, now); err != nil {
+					return access.Member{}, nil, err
+				}
+			}
 			if before.InstanceAdmin && !after.InstanceAdmin {
 				dropped, err := dropInvitationGrants(ctx, h.store, after, workspace.ProjectID{})
 				if err != nil {

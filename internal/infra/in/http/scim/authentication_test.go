@@ -127,7 +127,7 @@ func TestTheUseOfATokenIsRecordedAtMostOnceAMinute(t *testing.T) {
 	}
 }
 
-func TestBadTokensCountAgainstTheAddressThrottleAndGoodOnesDoNot(t *testing.T) {
+func TestBadTokensCountAgainstTheAddressThrottleAndGoodOnesAreStillServed(t *testing.T) {
 	// The tests of a package share the loopback address and its throttle, so
 	// this one comes from an address of its own, which the server believes
 	// its peer about.
@@ -149,7 +149,11 @@ func TestBadTokensCountAgainstTheAddressThrottleAndGoodOnesDoNot(t *testing.T) {
 	if last.header.Get("Retry-After") == "" {
 		t.Error("a throttled address is not told when to retry")
 	}
-	assertScimError(t, "a good token from a throttled address", e.callFrom(t, from, token, http.MethodGet, "/Users", ""), http.StatusTooManyRequests, "")
+	// A token that matches proves its presenter knows it: a connector with
+	// the right token is not locked out by whoever guesses from its address.
+	if r := e.callFrom(t, from, token, http.MethodGet, "/Users", ""); r.status != http.StatusOK {
+		t.Errorf("a good token from a throttled address = %d, want 200: %s", r.status, r.body)
+	}
 	if r := e.call(t, token, http.MethodGet, "/Users", ""); r.status != http.StatusOK {
 		t.Errorf("a good token from another address = %d, want 200", r.status)
 	}
@@ -167,8 +171,29 @@ func TestUnknownPathsAndMethodsAreSCIMErrorsAndABodyHasABound(t *testing.T) {
 		t.Errorf("Allow = %q, want GET", allow)
 	}
 
-	big := `{"userName":"` + email("example.com") + `","displayName":"` + strings.Repeat("x", 70<<10) + `"}`
-	assertScimError(t, "a body over 64 KiB", e.call(t, token, http.MethodPost, "/Users", big), http.StatusRequestEntityTooLarge, "")
+	big := `{"userName":"` + email("example.com") + `","displayName":"` + strings.Repeat("x", 1100<<10) + `"}`
+	assertScimError(t, "a body over 1 MiB", e.call(t, token, http.MethodPost, "/Users", big), http.StatusRequestEntityTooLarge, "")
 	assertScimError(t, "a body that is not JSON", e.call(t, token, http.MethodPost, "/Users", `{"userName":`), http.StatusBadRequest, "invalidSyntax")
 	assertScimError(t, "an id that is none", e.call(t, token, http.MethodGet, "/Users/not-a-uuid", ""), http.StatusNotFound, "")
+}
+
+func TestAConnectorOnARevokedTokenDoesNotThrottleTheOneWithTheNewToken(t *testing.T) {
+	e := start(t, testkit.WithEdge(func(o *flaghttp.Options) {
+		o.TrustedProxies = []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32"), netip.MustParsePrefix("::1/128")}
+	}))
+	slug := e.provider(t)
+	old := e.createToken(t, management.ScimTokenCreate{Provider: slug})
+	fresh := e.token(t, slug)
+	if res, err := e.browser.RevokeScimTokenWithResponse(t.Context(), old.Token.Id.String()); err != nil || res.StatusCode() != http.StatusNoContent {
+		t.Fatalf("revoking: %v, %d", err, res.StatusCode())
+	}
+	from := "203.0.113.9"
+	for range 150 {
+		if r := e.callFrom(t, from, old.Value, http.MethodGet, "/Users", ""); r.status != http.StatusUnauthorized {
+			t.Fatalf("the revoked token = %d, want 401: %s", r.status, r.body)
+		}
+	}
+	if r := e.callFrom(t, from, fresh, http.MethodGet, "/Users", ""); r.status != http.StatusOK {
+		t.Errorf("the new token behind the address of a connector on the revoked one = %d, want 200: %s", r.status, r.body)
+	}
 }

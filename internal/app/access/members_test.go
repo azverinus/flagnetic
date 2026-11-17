@@ -3,6 +3,7 @@ package access_test
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"slices"
 	"sync"
 	"testing"
@@ -116,5 +117,29 @@ func TestAcceptingAnInvitationWhileItIsReplacedOrItsMemberDeactivatedEndsCleanly
 		if changeErr != nil {
 			t.Fatalf("round %d: the concurrent change = %v", round, changeErr)
 		}
+	}
+}
+
+// A personal token is never created for a member deactivated since their
+// session was read: it would survive the revocation of their tokens and
+// live again when they are reactivated.
+func TestNoPersonalTokenIsCreatedForAMemberDeactivatedInTheMeantime(t *testing.T) {
+	pool := testkit.Pool(t)
+	c := clock.System{}
+	store := pgaccess.NewStore(pool)
+	create := appaccess.NewCreatePersonalToken(postgres.NewTransactor(pool), store, store, testkit.Record(pool), c, id.NewSource(c), rand.Reader)
+	m := testkit.NewMember(t, pool, testkit.WithStatus(access.MemberDeactivated))
+	stale := access.Member{ID: m.ID, Email: m.Email, DisplayName: "Test Member", Status: access.MemberActive}
+	session := access.Session{Member: m.ID}
+
+	_, err := create.Handle(t.Context(), appaccess.CreatePersonalTokenCommand{
+		Caller: access.SessionCaller(session, stale), Name: "ci", Request: governance.Request{Actor: cli},
+	})
+	if !errors.Is(err, access.ErrSessionExpired) {
+		t.Fatalf("create for a deactivated member = %v, want session_expired", err)
+	}
+	tokens, err := store.PersonalTokens(t.Context(), m.ID)
+	if err != nil || len(tokens) != 0 {
+		t.Errorf("tokens = %d, %v, want none", len(tokens), err)
 	}
 }

@@ -18,7 +18,7 @@ In the console, **SCIM tokens** under the instance navigation does all of this: 
 
 Several tokens may coexist, which is how a token is rotated: create the new one, give it to the identity provider, revoke the old one.
 
-A token is refused `401 invalidCredentials` when it is unknown, revoked or expired, when its provider is **disabled** (enabling the provider brings its tokens back), and when what is presented is no SCIM token at all, a personal access token or a project token included. The answers are alike, so a caller cannot tell which. Every refusal counts against the throttle of the address it comes from, the one local sign-in, invitation acceptance and password reset share: an address past 100 failures in 15 minutes is answered `429` with `Retry-After`. A token that is accepted costs nothing against it. Tokens are stored sealed under the instance's secret key and compared one by one, so an instance is meant to hold a handful.
+A token is refused `401 invalidCredentials` when it is unknown, revoked or expired, when its provider is **disabled** (enabling the provider brings its tokens back), and when what is presented is no SCIM token at all, a personal access token or a project token included. The answers are alike, so a caller cannot tell which. A value that matches no token counts against the throttle of the address it comes from, the one local sign-in, invitation acceptance and password reset share: an address past 100 failures in 15 minutes is answered `429` with `Retry-After`. A token that is accepted costs nothing against it, and is accepted even from a throttled address, since presenting it proves its holder knows it; so does a token that was revoked within the last week, expired, or belongs to a disabled provider: it is refused without counting, so a connector still on the token a rotation replaced does not lock out the one with the new token behind the same address. Tokens are stored sealed under the instance's secret key and compared one by one, so an instance is meant to hold a handful.
 
 ## What a token reaches
 
@@ -45,7 +45,7 @@ Okta deactivates a user with a patch that has no path (`{"op": "replace", "value
 
 ## Users
 
-`/scim/v2/Users` answers `application/scim+json` and errors as RFC 7644 §3.12 describes them: `schemas`, `status` as a string, `detail`, and a `scimType` where the RFC names one (`invalidFilter`, `invalidSyntax`, `invalidValue`, `mutability`, `uniqueness`, `noTarget`). Bodies are at most 64 KiB (`413`). A User is:
+`/scim/v2/Users` answers `application/scim+json` and errors as RFC 7644 §3.12 describes them: `schemas`, `status` as a string, `detail`, and a `scimType` where the RFC names one (`invalidFilter`, `invalidSyntax`, `invalidValue`, `mutability`, `uniqueness`, `noTarget`). Bodies are at most 1 MiB (`413`), which holds a group of some twenty thousand members. A User is:
 
 | Attribute | Meaning |
 |---|---|

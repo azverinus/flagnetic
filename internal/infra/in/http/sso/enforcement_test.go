@@ -186,7 +186,12 @@ func TestEnforcingADomainRefusesItsPasswordsWhileItsProviderStillSignsIn(t *test
 		}
 	})
 	t.Run("the enforced provider's identity is not unlinked", func(t *testing.T) {
-		identity := identityAt(t, methodsOf(t, aliceAt), corp)
+		// The enforcement ended alice's password session: she reads her
+		// identities through one the enforced provider opened.
+		idp.NextClaims(map[string]any{"sub": "sub-alice", "email": alice.Email})
+		viaCorp := testkit.NewBrowser(t, e.srv.URL)
+		e.signIn(t, viaCorp, corp, "", e.opts())
+		identity := identityAt(t, methodsOf(t, viaCorp), corp)
 		res, err := e.admin.UnlinkMemberIdentityWithResponse(t.Context(), alice.ID.String(), identity.Id.String())
 		if err != nil {
 			t.Fatal(err)
@@ -518,6 +523,21 @@ func TestEnforcingADomainWhileLocalLoginIsOffNeedsAnIdentityItStillLetsIn(t *tes
 	if res := putSettings(t, keeperAt.ClientWithResponses, func(s *management.AuthSettings) { s.LocalLoginEnabled = false }); res.JSON200 == nil {
 		t.Fatalf("closing local login while holding an identity = %d: %s", res.StatusCode(), res.Body)
 	}
+	// Closing local login ended the keeper's own password session, and the
+	// change says how many it ended: they go on through their provider.
+	if res, err := keeperAt.GetMeWithResponse(t.Context()); err != nil || res.StatusCode() != http.StatusUnauthorized {
+		t.Errorf("the keeper's password session after closing local login = %v, %v; want 401", res.StatusCode(), err)
+	}
+	action := "auth_settings.updated"
+	if audit, err := e.admin.ListAuditEntriesWithResponse(t.Context(), &management.ListAuditEntriesParams{Action: &action}); err != nil ||
+		audit.JSON200 == nil || len(audit.JSON200.Items) != 1 {
+		t.Errorf("auth_settings.updated entries = %v: %s, want 1", err, audit.Body)
+	} else if after, _ := audit.JSON200.Items[0].After.(map[string]any); after["sessions_revoked"] != float64(1) {
+		t.Errorf("after = %v, want sessions_revoked 1", after)
+	}
+	idp.NextClaims(map[string]any{"sub": "sub-keeper-other", "email": keeper.Email})
+	keeperAt = testkit.NewBrowser(t, e.srv.URL)
+	e.signIn(t, keeperAt, other, "", e.opts())
 
 	// Local login is off already: enforcing the keeper's own domain to corp
 	// would leave them no way in, the same as closing local login would.
@@ -541,5 +561,74 @@ func TestEnforcingADomainWhileLocalLoginIsOffNeedsAnIdentityItStillLetsIn(t *tes
 	e.link(t, idp, keeperAt, corp, "sub-keeper-corp", nil)
 	if res = putSettings(t, keeperAt.ClientWithResponses, enforceCorp); res.JSON200 == nil {
 		t.Errorf("enforcing with the enforced provider's identity held = %d: %s", res.StatusCode(), res.Body)
+	}
+}
+
+func TestEnforcingADomainEndsThePasswordSessionsOfItsMembersAndOthersSessionsThroughOtherProviders(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := startIsolated(t)
+	corp := e.forged(t, idp, noFallback("corp.example"))
+	alice := testkit.NewMember(t, e.pool, testkit.WithEmail("alice@corp.example"))
+	outsider := testkit.NewMember(t, e.pool, testkit.WithEmail("outsider@example.com"))
+	aliceAt := testkit.NewBrowser(t, e.srv.URL)
+	aliceAt.SignIn(t, alice.Email, alice.Password)
+	outsiderAt := testkit.NewBrowser(t, e.srv.URL)
+	outsiderAt.SignIn(t, outsider.Email, outsider.Password)
+	e.link(t, idp, aliceAt, corp, "sub-alice", nil)
+	// Alice's sign-in through corp opens a second session, which the
+	// enforcement sends her to and so keeps.
+	idp.NextClaims(map[string]any{"sub": "sub-alice", "email": alice.Email})
+	viaCorp := testkit.NewBrowser(t, e.srv.URL)
+	e.signIn(t, viaCorp, corp, "", e.opts())
+
+	enforce(t, e.admin, "corp.example", corp)
+
+	status := func(b *testkit.Browser) int {
+		res, err := b.GetMeWithResponse(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res.StatusCode()
+	}
+	if got := status(aliceAt); got != http.StatusUnauthorized {
+		t.Errorf("alice's password session after the enforcement = %d, want 401", got)
+	}
+	if got := status(viaCorp); got != http.StatusOK {
+		t.Errorf("alice's session through corp after the enforcement = %d, want 200", got)
+	}
+	if got := status(outsiderAt); got != http.StatusOK {
+		t.Errorf("a password session outside the domain after the enforcement = %d, want 200", got)
+	}
+}
+
+func TestDisablingAProviderEndsTheSessionsItOpened(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := startIsolated(t)
+	corp := e.forged(t, idp, noFallback("corp.example"))
+	other := e.forged(t, idp, noFallback("corp.example"))
+	alice := testkit.NewMember(t, e.pool, testkit.WithEmail("alice@corp.example"))
+	aliceAt := testkit.NewBrowser(t, e.srv.URL)
+	aliceAt.SignIn(t, alice.Email, alice.Password)
+	e.link(t, idp, aliceAt, corp, "sub-alice", nil)
+	e.link(t, idp, aliceAt, other, "sub-alice-other", nil)
+	signInThrough := func(slug, subject string) *testkit.Browser {
+		idp.NextClaims(map[string]any{"sub": subject, "email": alice.Email})
+		b := testkit.NewBrowser(t, e.srv.URL)
+		e.signIn(t, b, slug, "", e.opts())
+		return b
+	}
+	viaCorp, viaOther := signInThrough(corp, "sub-alice"), signInThrough(other, "sub-alice-other")
+
+	if res, err := e.admin.DisableAuthProviderWithResponse(t.Context(), corp); err != nil || res.JSON200 == nil {
+		t.Fatalf("disable = %v, %v", res, err)
+	}
+	for b, want := range map[*testkit.Browser]int{viaCorp: http.StatusUnauthorized, viaOther: http.StatusOK, aliceAt: http.StatusOK} {
+		res, err := b.GetMeWithResponse(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.StatusCode() != want {
+			t.Errorf("GET /me = %d, want %d", res.StatusCode(), want)
+		}
 	}
 }

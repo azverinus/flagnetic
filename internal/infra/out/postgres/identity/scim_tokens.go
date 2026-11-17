@@ -85,11 +85,12 @@ func (s *Store) RevokeSCIMToken(ctx context.Context, token identity.SCIMTokenID,
 	return r, nil
 }
 
-// UnrevokedSCIMTokens returns every token not revoked, with its sealed hash.
-func (s *Store) UnrevokedSCIMTokens(ctx context.Context) ([]appidentity.SealedSCIMToken, error) {
+// AuthenticableSCIMTokens returns every token not revoked, and those revoked
+// at or after revokedSince, with their sealed hashes.
+func (s *Store) AuthenticableSCIMTokens(ctx context.Context, revokedSince time.Time) ([]appidentity.SealedSCIMToken, error) {
 	rows, err := s.db(ctx).Query(ctx, `
 		SELECT `+scimRowColumns+`, t.token_hash_sealed, p.enabled
-		FROM scim_tokens t JOIN auth_providers p ON p.id = t.provider_id WHERE t.revoked_at IS NULL`)
+		FROM scim_tokens t JOIN auth_providers p ON p.id = t.provider_id WHERE t.revoked_at IS NULL OR t.revoked_at >= $1`, revokedSince)
 	if err != nil {
 		return nil, fmt.Errorf("reading the live SCIM tokens: %w", err)
 	}

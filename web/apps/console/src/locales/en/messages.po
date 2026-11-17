@@ -8218,10 +8218,6 @@ msgstr "The identity providers members sign in through. Each is offered on the s
 msgid "The idle timeout cannot be longer than the absolute timeout."
 msgstr "The idle timeout cannot be longer than the absolute timeout."
 
-#: src/lib/mail-settings.ts
-msgid "The instance could not reach the SMTP server, or the connection broke. Check the host and the port, and that the server accepts connections from the instance."
-msgstr "The instance could not reach the SMTP server, or the connection broke. Check the host and the port, and that the server accepts connections from the instance."
-
 #: src/components/password-reset-link-dialog.tsx
 msgid "The instance does not mail this link, so pass it to {name} yourself, over a channel only they read. It works once, until {until}."
 msgstr "The instance does not mail this link, so pass it to {name} yourself, over a channel only they read. It works once, until {until}."
@@ -8586,10 +8582,6 @@ msgstr "The secret it replaces keeps signing beside this one for a day, so the r
 msgid "The secret it replaces keeps signing beside this one for a day, so the receiver can take the new one without refusing an event."
 msgstr "The secret it replaces keeps signing beside this one for a day, so the receiver can take the new one without refusing an event."
 
-#: src/lib/mail-settings.ts
-msgid "The secure connection to the SMTP server failed: it does not offer STARTTLS, or the TLS handshake or its certificate failed. Check the security and the port."
-msgstr "The secure connection to the SMTP server failed: it does not offer STARTTLS, or the TLS handshake or its certificate failed. Check the security and the port."
-
 #: src/lib/problem-messages.ts
 msgid "the segment {key}"
 msgstr "the segment {key}"
@@ -8660,20 +8652,12 @@ msgid "The SMTP server accepted a test mail to {recipient}. Check that it arrive
 msgstr "The SMTP server accepted a test mail to {recipient}. Check that it arrived."
 
 #: src/lib/mail-settings.ts
-msgid "The SMTP server did not accept the test mail."
-msgstr "The SMTP server did not accept the test mail."
+msgid "The SMTP server could not be reached or did not accept the test mail. Check the settings; the instance's log says why."
+msgstr "The SMTP server could not be reached or did not accept the test mail. Check the settings; the instance's log says why."
 
 #: src/components/mail-settings.tsx
 msgid "The SMTP server is removed."
 msgstr "The SMTP server is removed."
-
-#: src/lib/mail-settings.ts
-msgid "The SMTP server refused the sender, the recipient or the mail. Check that the server accepts mail from the sender address and to your address."
-msgstr "The SMTP server refused the sender, the recipient or the mail. Check that the server accepts mail from the sender address and to your address."
-
-#: src/lib/mail-settings.ts
-msgid "The SMTP server refused the username and password. Check them, then save and test again."
-msgstr "The SMTP server refused the username and password. Check them, then save and test again."
 
 #: src/components/mail-settings.tsx
 msgid "The SMTP server the instance sends its mail through."

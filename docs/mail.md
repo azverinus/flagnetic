@@ -37,13 +37,13 @@ Both secure modes require TLS 1.2 or later and verify the server's certificate a
 `POST /instance/smtp/test` sends a mail to the caller's own address, in their language, and answers once the server accepted it: `204`. It is the one mail the instance sends while the caller waits, so a configuration problem shows at once.
 
 - `409 smtp_not_configured`: there is no SMTP server yet.
-- `502 smtp_failed`, with `failure` naming the step that failed:
+- `502 smtp_failed`: the server could not be reached, or did not accept the mail. The answer does not say at which step, since the host is the instance admin's to name and the step would tell what is reachable behind it; the instance's log record `test mail not sent` carries a `failure` naming it, for whoever operates the instance:
   - `connection`: the server could not be reached, or the connection broke or timed out.
   - `tls`: STARTTLS was not offered, the handshake failed, or the certificate was not trusted.
   - `authentication`: the server refused the username and password, or offered no mechanism the connection may use.
   - `rejected`: the server refused the sender, the recipient or the mail.
 
-The answer never carries the password.
+The answer never carries the password. The `host` is not restricted: the instance admin who names it is trusted to, as the operator of the instance would, which is why the answer does not tell what the instance reached.
 
 ## Setting up common relays
 
@@ -66,17 +66,17 @@ Sending as an address on your own domain works best when the domain publishes SP
 
 ## Troubleshooting
 
-Start from what the test mail says. A `502 smtp_failed` carries a `failure`; the same classes label `flagnetic_mail_sent_total` and the server's log record for a mail that failed later.
+Start from what the test mail says. A `502 smtp_failed` does not say why; the `failure` of the log record `test mail not sent` does, and the same classes label `flagnetic_mail_sent_total` and the server's log record for a mail that failed later.
 
 | Symptom | Cause and what to do |
 |---|---|
 | `422 invalid_smtp_settings` | A field breaks a rule; the violations name each one. The common one is a username over `security: none` to a host that is not this machine: switch to `starttls` or `tls`. |
 | `422 base_url_required` | `FLAGNETIC_BASE_URL` is not set. Set it to the address members open the console at and restart. |
 | `409 smtp_not_configured` | There is no SMTP server yet, or it was removed. |
-| `failure: connection` | The host or port is wrong, a firewall or the cloud provider blocks outbound SMTP (many block port 25, and some every port until you ask), the relay is down, or it did not accept the connection within 10 seconds or finish the exchange within 30. Try another port the relay offers, such as 587 or 2525. Test from the instance's own network: `nc -vz <host> <port>`. |
-| `failure: tls` | The mode does not match the port (`tls` on 587, `starttls` on 465), the relay does not offer STARTTLS, its certificate is for another name than `host`, has expired or comes from an authority the instance's system does not trust, or the relay only speaks TLS 1.0 or 1.1. Give the host name the certificate names, not an address. |
-| `failure: authentication` | The username or password is wrong, the relay needs an app password or an API key rather than the account password, authenticated SMTP is off for the account, or the relay offers only a mechanism the connection may not use (PLAIN and LOGIN need TLS). The password is sealed and never shown; type it again. |
-| `failure: rejected` | The relay refused the sender, the recipient or the mail itself. Usually `from` is not an address the account may send as, the domain is not verified at the relay, or the relay is in a sandbox that allows only some recipients. The answer does not carry the relay's own message; the server's log record of the failure does, under `error`, as does the relay's log. |
+| log `failure: connection` | The host or port is wrong, a firewall or the cloud provider blocks outbound SMTP (many block port 25, and some every port until you ask), the relay is down, or it did not accept the connection within 10 seconds or finish the exchange within 30. Try another port the relay offers, such as 587 or 2525. Test from the instance's own network: `nc -vz <host> <port>`. |
+| log `failure: tls` | The mode does not match the port (`tls` on 587, `starttls` on 465), the relay does not offer STARTTLS, its certificate is for another name than `host`, has expired or comes from an authority the instance's system does not trust, or the relay only speaks TLS 1.0 or 1.1. Give the host name the certificate names, not an address. |
+| log `failure: authentication` | The username or password is wrong, the relay needs an app password or an API key rather than the account password, authenticated SMTP is off for the account, or the relay offers only a mechanism the connection may not use (PLAIN and LOGIN need TLS). The password is sealed and never shown; type it again. |
+| log `failure: rejected` | The relay refused the sender, the recipient or the mail itself. Usually `from` is not an address the account may send as, the domain is not verified at the relay, or the relay is in a sandbox that allows only some recipients. The answer does not carry the relay's own message; the server's log record of the failure does, under `error`, as does the relay's log. |
 | The test mail was accepted and never arrived | Look in the recipient's spam folder and at the relay's own delivery log. The instance reports only what the relay answered at the time. |
 | An invitation shows a link instead of being mailed | No SMTP server is configured, or `FLAGNETIC_BASE_URL` is unset. The link is yours to hand over. |
 | A password reset mail never comes | The instance mails it only while it has an SMTP server, only to an active member who holds a password, at most once in 5 minutes, and only while local login is on, self-service reset is allowed and the member's domain is not [enforced](sso.md#sso-enforcement-and-local-login); the answer is `202` either way so nobody learns which emails exist. |

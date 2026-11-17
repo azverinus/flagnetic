@@ -26,8 +26,9 @@ import (
 const BaseURL = "/scim/v2"
 
 // maxBody bounds a request's body: a provisioning resource carries no payload
-// worth more.
-const maxBody = 64 << 10
+// worth more than a group's member list, which is about 50 bytes a member, so
+// a group of some twenty thousand members still fits.
+const maxBody = 1 << 20
 
 const (
 	errorSchema = "urn:ietf:params:scim:api:messages:2.0:Error"
@@ -207,7 +208,7 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 	case isScimErr:
 		writeError(w, scimStatuses[scimErr.Type], scimErr.Type, scimErr.Detail)
 	case errors.As(err, &tooLarge):
-		writeError(w, http.StatusRequestEntityTooLarge, "", "the body has more than 64 KiB")
+		writeError(w, http.StatusRequestEntityTooLarge, "", "the body has more than 1 MiB")
 	case errors.Is(err, appidentity.ErrEmailTaken):
 		writeError(w, http.StatusConflict, "uniqueness", "a member with this email exists and cannot be taken over by this provider")
 	case errors.Is(err, appidentity.ErrExternalIDTaken):

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -39,6 +40,10 @@ type accessSettings struct{ store *pgaccess.Store }
 func (a accessSettings) LockProviderSettings(ctx context.Context, slug string) (appidentity.SettingsOfProvider, error) {
 	s, err := a.store.LockAuthSettings(ctx)
 	return appidentity.SettingsOfProvider{LocalLoginEnabled: s.LocalLoginEnabled, EnforcedDomains: s.EnforcedDomainsOf(slug)}, err
+}
+
+func (a accessSettings) RevokeProviderSessions(ctx context.Context, slug string, at time.Time) (int, error) {
+	return a.store.RevokeAllProviderSessions(ctx, slug, at)
 }
 
 func codeOf(err error) string {

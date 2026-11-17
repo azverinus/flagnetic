@@ -155,6 +155,18 @@ func (s AuthSettings) ProviderRefusal(email, provider string) error {
 	return nil
 }
 
+// SessionRefusal returns why a session opened by method through the auth
+// provider with the slug provider (empty for a local sign-in) no longer
+// signs email in under the settings: what refuses the same sign-in now,
+// PasswordRefusal for a local one and ProviderRefusal for a provider's; nil
+// when the session may go on.
+func (s AuthSettings) SessionRefusal(method SignInMethod, provider, email string) error {
+	if method == SignInLocal {
+		return s.PasswordRefusal(email)
+	}
+	return s.ProviderRefusal(email, provider)
+}
+
 // EnforcedDomainsOf returns the enforced domains sent to provider, a slug.
 func (s AuthSettings) EnforcedDomainsOf(provider string) []string {
 	var out []string

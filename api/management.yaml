@@ -6272,11 +6272,10 @@ paths:
         the SMTP server in force, and answers once the server accepted it: the
         only mail the instance sends while its sender waits. Refused
         `smtp_not_configured` (409) while there is no SMTP server, and
-        `smtp_failed` (502) with `failure` naming the step that failed:
-        `connection` (unreachable or broken), `tls` (no STARTTLS, a
-        handshake or certificate that failed), `authentication` (the
-        credentials were refused) or `rejected` (the sender, the recipient or
-        the mail was refused).
+        `smtp_failed` (502) when the exchange failed, without saying at which
+        step: the host is the caller's to name, and the step would tell what
+        is reachable behind it. The instance's log record of the failure
+        names the step.
       x-permission: instance_admin
       tags: [instance]
       responses:
@@ -8088,7 +8087,7 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
     BadGateway:
-      description: "`provider_unreachable` or `smtp_failed`: a system the server asked, such as an identity provider or the SMTP server, did not answer as needed; `failure` says why."
+      description: "`provider_unreachable` or `smtp_failed`: a system the server asked, such as an identity provider or the SMTP server, did not answer as needed; for `provider_unreachable` `failure` says why."
       content:
         application/problem+json:
           schema:
@@ -8249,7 +8248,7 @@ components:
             type: string
         failure:
           type: string
-          description: Why a system the server asked did not answer as needed, for `provider_unreachable`; for `smtp_failed` the step that failed, `connection`, `tls`, `authentication` or `rejected`; for `sink_not_ready` the failure class of the target's check, such as `connect` or `status`.
+          description: Why a system the server asked did not answer as needed, for `provider_unreachable`; for `sink_not_ready` the failure class of the target's check, such as `connect` or `status`.
         failure_status:
           type: integer
           description: The HTTP status the target answered, for `sink_not_ready`, when it answered.
