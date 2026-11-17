@@ -7,13 +7,13 @@ export interface SseEvent {
 }
 
 /**
- * The longest line, in UTF-8 bytes, the parser holds. The server's frames are
+ * The longest line, in UTF-16 code units, the parser holds. The server's frames are
  * far smaller; the cap is what keeps a peer that never sends a line break
  * from growing the buffer without bound.
  */
 export const MAX_LINE_BYTES = 64 * 1024;
 
-/** The most `data` of one event, in UTF-8 bytes, line feeds between its lines included. */
+/** The most `data` of one event, in UTF-16 code units, line feeds between its lines included. */
 export const MAX_EVENT_BYTES = 64 * 1024;
 
 /** A stream line or event over its cap: the stream is failed, not read on. */
@@ -22,21 +22,6 @@ export class SseOverflow extends Error {
     super(`event stream ${what} too long`);
     this.name = "SseOverflow";
   }
-}
-
-/** The length of a string in UTF-8 bytes; a lone surrogate counts as its replacement character, three bytes. */
-function utf8Length(s: string): number {
-  let n = 0;
-  for (let i = 0; i < s.length; i++) {
-    const c = s.charCodeAt(i);
-    if (c < 0x80) n += 1;
-    else if (c < 0x800) n += 2;
-    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length && (s.charCodeAt(i + 1) & 0xfc00) === 0xdc00) {
-      n += 4;
-      i++;
-    } else n += 3;
-  }
-  return n;
 }
 
 /**
@@ -85,7 +70,7 @@ export class SseParser {
       const c = text[i];
       if (c !== "\n" && c !== "\r") continue;
       const segment = text.slice(start, i);
-      if (this.bufferBytes + utf8Length(segment) > MAX_LINE_BYTES) throw new SseOverflow("line");
+      if (this.bufferBytes + segment.length > MAX_LINE_BYTES) throw new SseOverflow("line");
       this.line(this.buffer + segment, out);
       this.buffer = "";
       this.bufferBytes = 0;
@@ -99,7 +84,7 @@ export class SseParser {
       start = i + 1;
     }
     const rest = text.slice(start);
-    this.bufferBytes += utf8Length(rest);
+    this.bufferBytes += rest.length;
     if (this.bufferBytes > MAX_LINE_BYTES) throw new SseOverflow("line");
     this.buffer += rest;
     return out;
@@ -126,7 +111,7 @@ export class SseParser {
         this.event = value;
         break;
       case "data":
-        this.dataBytes += utf8Length(value) + (this.data.length > 0 ? 1 : 0);
+        this.dataBytes += value.length + (this.data.length > 0 ? 1 : 0);
         if (this.dataBytes > MAX_EVENT_BYTES) throw new SseOverflow("event");
         this.data.push(value);
         break;
