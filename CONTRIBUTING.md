@@ -43,6 +43,16 @@ A permission arrives with the first operation that needs it:
 3. Add its rows to the tests that hold the catalog and the roles row by row (`internal/domain/access/catalog_test.go`) and to the permission matrix of the management API (`internal/infra/in/http/management/permissions_test.go`), which calls one operation of each permission as every role and expects the refusal to name it; then to the tables in `docs/access.md`.
 4. In the console, add it to `Permission` in `web/apps/console/src/lib/access-names.ts` with the words that complete "the permission to …", so a disabled action can say what it needs, and translate them.
 
+### Deprecating an operation
+
+From 1.0 a surface is only ever added to; a thing to remove is deprecated first and removed only in a major release (see [Compatibility and support](docs/compatibility.md#deprecation-and-removal)).
+
+1. Annotate the operation in its `api/*.yaml` document: `deprecated: true`, `x-deprecated-since` with today's date (`YYYY-MM-DD`), and `x-sunset` with the earliest date a major release may remove it when you want to announce one. A deprecated operation without `x-deprecated-since` fails `task generate` and its guard test.
+2. Run `task generate`: it writes the operation into the `deprecations.gen.go` of its API, and the server then answers `Deprecation` and `Sunset` headers for it with no further code.
+3. Mark the operation in its description with what replaces it, and in `docs/`. For a surface without an operation (a field, a command, a flag, a variable, a metric) mark it deprecated in its documentation instead.
+4. Commit it as `feat` (or `fix` when a defect is the reason) so the release notes list it; never `refactor` or `chore`.
+5. Remove it only in a major release, as a breaking change (`feat(api)!:`).
+
 ## How the code is organised
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md). In short: domain rules in `internal/domain` as plain Go, use cases in `internal/app`, adapters in `internal/infra`, dependencies pointing inwards and enforced by the linter.

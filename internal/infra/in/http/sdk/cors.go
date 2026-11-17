@@ -11,8 +11,9 @@ const (
 	allowedMethods = "GET, POST, OPTIONS"
 	allowedHeaders = "Authorization, Content-Type, Content-Encoding, Flagnetic-Schema-Version, Last-Event-ID"
 	// exposedHeaders are what a browser SDK reads of an answer: the
-	// ruleset's version, how long to wait, and its rate-limit budget.
-	exposedHeaders = "ETag, Retry-After, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset"
+	// ruleset's version, how long to wait, its rate-limit budget, and the
+	// announcement of a deprecated operation.
+	exposedHeaders = "ETag, Retry-After, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, Deprecation, Sunset"
 	// preflightMaxAge lets a browser keep a preflight for a day, so a page
 	// pays it once rather than before every request.
 	preflightMaxAge = "86400"

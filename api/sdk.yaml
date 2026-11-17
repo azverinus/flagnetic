@@ -29,7 +29,7 @@ info:
     `Authorization`, `Content-Type`, `Content-Encoding`,
     `Flagnetic-Schema-Version` and `Last-Event-ID`, cached for a day. Every
     answer exposes `ETag`, `Retry-After`, `RateLimit-Limit`,
-    `RateLimit-Remaining` and `RateLimit-Reset` to scripts and allows any
+    `RateLimit-Remaining`, `RateLimit-Reset`, `Deprecation` and `Sunset` to scripts and allows any
     origin (`Access-Control-Allow-Origin: *`), unless a client key lists
     allowed origins: then a listed origin is echoed with `Vary: Origin` and
     any other refused `403 origin_not_allowed`. A server key sent with an

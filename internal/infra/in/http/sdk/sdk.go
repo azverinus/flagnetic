@@ -17,6 +17,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/deprecation"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 )
@@ -104,7 +105,8 @@ func Mount(edge *flaghttp.Server, h Handlers, o Options) {
 	a := &api{paths: map[string]bool{}, edge: edge, h: h, clock: o.Clock, limits: newLimiter(o.RateLimits, o.Clock, o.Registerer),
 		events: newEventMetrics(o.Registerer)}
 	routed := func(path string) bool { return a.paths[path] }
-	edge.Wrap(BaseURL+"/", func(next http.Handler) http.Handler { return compression(edge)(cors(routed)(next)) })
+	deprecated := deprecation.Middleware(BaseURL, Deprecated)
+	edge.Wrap(BaseURL+"/", func(next http.Handler) http.Handler { return deprecated(compression(edge)(cors(routed)(next))) })
 	HandlerWithOptions(a, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
 		BaseRouter:       router{a},

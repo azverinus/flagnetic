@@ -29,6 +29,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/deprecation"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management/operations"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
@@ -278,6 +279,8 @@ func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer, opts Op
 	// in the path the browser opens.
 	edge.SecretPath(invitationLinkPath + "{secret}")
 	edge.SecretPath(passwordResetLinkPath + "{secret}")
+	// A deprecated operation is announced whatever its handler answers.
+	edge.Wrap(BaseURL+"/", deprecation.Middleware(BaseURL, Deprecated))
 	HandlerWithOptions(rawBodies{ServerInterface: strict, a: a}, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
 		BaseRouter:       router{a},

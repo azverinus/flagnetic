@@ -71,7 +71,7 @@ The server enforces the list, not the browser: a request from an origin the key 
 
 ## Browsers
 
-The SDK API answers a CORS preflight (`OPTIONS`) on any of its paths with `204` and no key, allowing `GET`, `POST` and `OPTIONS` and the headers `Authorization`, `Content-Type`, `Content-Encoding`, `Flagnetic-Schema-Version` and `Last-Event-ID`, cached for a day. Every answer, problems included, allows any origin unless a client key lists its origins, and exposes `ETag`, `Retry-After`, `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset` to scripts. Credentials are never allowed, so no cookie rides along.
+The SDK API answers a CORS preflight (`OPTIONS`) on any of its paths with `204` and no key, allowing `GET`, `POST` and `OPTIONS` and the headers `Authorization`, `Content-Type`, `Content-Encoding`, `Flagnetic-Schema-Version` and `Last-Event-ID`, cached for a day. Every answer, problems included, allows any origin unless a client key lists its origins, and exposes `ETag`, `Retry-After`, `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`, `Deprecation` and `Sunset` to scripts. Credentials are never allowed, so no cookie rides along.
 
 A server key sent with an `Origin` header is refused `403 server_key_from_browser`, whatever the origin: a server key in a web page can be read by anyone who opens it. Use a client key there, and create a new server key if one was ever shipped to a browser.
 

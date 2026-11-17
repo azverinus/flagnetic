@@ -14,7 +14,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
-const exposed = "ETag, Retry-After, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset"
+const exposed = "ETag, Retry-After, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, Deprecation, Sunset"
 
 // send sends a request to srv's SDK API with the headers given as name,
 // value pairs, and reads the answer whole.

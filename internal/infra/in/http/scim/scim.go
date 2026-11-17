@@ -16,6 +16,7 @@ import (
 	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
 	"github.com/azverinus/flagnetic/internal/domain/identity"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/deprecation"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/text"
@@ -69,6 +70,7 @@ var _ ServerInterface = (*api)(nil)
 func Mount(edge *flaghttp.Server, h Handlers) {
 	a := &api{h: h, log: edge.Logger()}
 	mux := http.NewServeMux()
+	edge.Wrap(BaseURL+"/", deprecation.Middleware(BaseURL, Deprecated))
 	HandlerWithOptions(a, StdHTTPServerOptions{BaseURL: BaseURL, BaseRouter: mux, ErrorHandlerFunc: a.parameterError})
 	// The body limit is judged while it is read, so a SCIM client is told in
 	// its own error document.

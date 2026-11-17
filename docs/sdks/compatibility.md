@@ -2,6 +2,8 @@
 
 Which server an SDK build can talk to, and what an SDK version promises. A build shipped years ago keeps working: the server keeps serving every SDK API path a released SDK speaks and every document schema it shipped under that path, and every SDK treats a document it cannot read as a failure of the fallback chain, never as "everything off".
 
+What the server promises for every surface from 1.0, and how a deprecation is announced, is on [Compatibility and support](../compatibility.md).
+
 Every SDK is in its 0.x line: until 1.0.0 a minor release may still change the SDK's own API, while the protocol between an SDK and the server only grows.
 
 ## What 0.x promises
