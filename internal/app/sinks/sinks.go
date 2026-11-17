@@ -83,7 +83,22 @@ type Resolver interface {
 
 // Sealer seals a value under the instance's secret key.
 type Sealer interface {
-	Seal(purpose secret.Purpose, plaintext []byte) (string, error)
+	Seal(purpose secret.Purpose, plaintext []byte, binding secret.Binding) (string, error)
+	// Rebind returns sealed bound to binding, sealing again a value sealed
+	// before rows were bound.
+	Rebind(purpose secret.Purpose, sealed string, binding secret.Binding) (string, error)
+}
+
+// rebind returns s with the secrets it holds bound to its row, so that a
+// write of the row leaves none sealed before rows were bound.
+func rebind(sealer Sealer, s sinks.Sink) (sinks.Sink, error) {
+	var err error
+	purpose, binding := s.Kind.SecretPurpose(), secretBinding(s.ID)
+	if s.SealedSecret, err = sealer.Rebind(purpose, s.SealedSecret, binding); err != nil {
+		return s, err
+	}
+	s.PreviousSealedSecret, err = sealer.Rebind(purpose, s.PreviousSealedSecret, binding)
+	return s, err
 }
 
 // Deps are what the sink use cases run on.
@@ -244,14 +259,14 @@ func values(s sinks.Sink) map[string]any {
 			settings[k] = v
 		}
 		out["clickhouse"] = map[string]any{
-			"url": c.ClickHouse.URL, "database": c.ClickHouse.Database, "table_prefix": c.ClickHouse.TablePrefix,
+			"url": governance.TargetOrigin(c.ClickHouse.URL), "database": c.ClickHouse.Database, "table_prefix": c.ClickHouse.TablePrefix,
 			"username": c.ClickHouse.Username, "password": redacted, "tls_skip_verify": c.ClickHouse.TLSSkipVerify,
 			"create_tables": c.ClickHouse.CreateTables, "settings": settings,
 		}
 	case c.ObjectStorage != nil:
 		o := c.ObjectStorage
 		out["object_storage"] = map[string]any{
-			"endpoint": o.Endpoint, "region": o.Region, "bucket": o.Bucket, "prefix": o.Prefix,
+			"endpoint": governance.TargetOrigin(o.Endpoint), "region": o.Region, "bucket": o.Bucket, "prefix": o.Prefix,
 			"access_key_id": o.AccessKeyID, "secret_access_key": redacted, "path_style": o.PathStyle,
 			"format": o.Format, "compression": o.Compression,
 		}
@@ -260,7 +275,7 @@ func values(s sinks.Sink) map[string]any {
 		for k := range c.Webhook.Headers {
 			headers[k] = redacted
 		}
-		out["webhook"] = map[string]any{"url": c.Webhook.URL, "headers": headers, "secret": redacted}
+		out["webhook"] = map[string]any{"url": governance.TargetOrigin(c.Webhook.URL), "headers": headers, "secret": redacted}
 	}
 	return out
 }

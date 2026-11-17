@@ -135,13 +135,25 @@ func groupMember(raw string) (MemberID, error) {
 	return m, nil
 }
 
+// addMembers appends to to each of add it does not hold, in order, in time
+// linear in both: a group of thousands of members is written in one request.
 func addMembers(to []MemberID, add ...MemberID) []MemberID {
+	held := memberSet(to)
 	for _, m := range add {
-		if !slices.Contains(to, m) {
+		if _, ok := held[m]; !ok {
+			held[m] = struct{}{}
 			to = append(to, m)
 		}
 	}
 	return to
+}
+
+func memberSet(members []MemberID) map[MemberID]struct{} {
+	set := make(map[MemberID]struct{}, len(members))
+	for _, m := range members {
+		set[m] = struct{}{}
+	}
+	return set
 }
 
 // ApplyGroupPatch applies the operations of a PatchOp, in order, to g, the
@@ -289,7 +301,8 @@ func patchMembers(g *GroupState, op string, value any, hasValue bool) error {
 	case "add":
 		g.Members = addMembers(g.Members, members...)
 	case "remove":
-		g.Members = slices.DeleteFunc(g.Members, func(held MemberID) bool { return slices.Contains(members, held) })
+		gone := memberSet(members)
+		g.Members = slices.DeleteFunc(g.Members, func(held MemberID) bool { _, ok := gone[held]; return ok })
 	default:
 		g.Members = addMembers(nil, members...)
 	}
@@ -329,14 +342,15 @@ func TouchedMembers(before, after GroupState) []MemberID {
 	if before.DisplayName != after.DisplayName {
 		return addMembers(slices.Clone(before.Members), after.Members...)
 	}
+	was, is := memberSet(before.Members), memberSet(after.Members)
 	var out []MemberID
 	for _, m := range before.Members {
-		if !slices.Contains(after.Members, m) {
+		if _, ok := is[m]; !ok {
 			out = append(out, m)
 		}
 	}
 	for _, m := range after.Members {
-		if !slices.Contains(before.Members, m) {
+		if _, ok := was[m]; !ok {
 			out = append(out, m)
 		}
 	}

@@ -45,7 +45,10 @@ type AuditLog interface {
 
 // Sealer seals a value under the instance's secret key.
 type Sealer interface {
-	Seal(purpose secret.Purpose, plaintext []byte) (string, error)
+	Seal(purpose secret.Purpose, plaintext []byte, binding secret.Binding) (string, error)
+	// Rebind returns sealed bound to binding, sealing again a value sealed
+	// before rows were bound.
+	Rebind(purpose secret.Purpose, sealed string, binding secret.Binding) (string, error)
 }
 
 // ProviderStore keeps auth providers.
@@ -69,6 +72,9 @@ type ProviderStore interface {
 	// SetProviderEnabled stores p's enabled flag, update time and version.
 	SetProviderEnabled(ctx context.Context, p identity.Provider) error
 	DeleteProvider(ctx context.Context, provider identity.ProviderID) error
+	// HasIdentities reports whether any identity is linked through provider,
+	// reading in the unit of work ctx carries.
+	HasIdentities(ctx context.Context, provider identity.ProviderID) (bool, error)
 }
 
 // ProviderReference is something that depends on an auth provider, such as
@@ -112,6 +118,10 @@ type ProviderSettings interface {
 	// it before reading the providers they name, so neither change can
 	// leave the settings sending people to a provider that let them down.
 	LockProviderSettings(ctx context.Context, slug string) (SettingsOfProvider, error)
+	// RevokeProviderSessions ends, at at, every session opened through the
+	// provider with the slug and not ended yet, whoever holds it, and
+	// returns how many it ended.
+	RevokeProviderSessions(ctx context.Context, slug string, at time.Time) (int, error)
 }
 
 // SettingsOfProvider is what the auth settings ask of one auth provider.
@@ -129,6 +139,23 @@ const (
 	usedByEnforcedDomains = "enforced domains"
 	usedByOnlyWayIn       = "only way in"
 )
+
+var errIdentitiesLinked = apperrors.Conflict("provider_identities_linked",
+	"members have identities linked at this provider, whose subjects the new issuer or entity ID could repeat for other people: unlink them first, or create a new provider")
+
+// movesSubjects reports whether the edit from before to after, reading meta
+// as the identity provider's metadata, changes who the subjects of the
+// provider's identities are: the issuer of an OIDC provider, the entity ID of
+// a SAML one.
+func movesSubjects(before, after identity.Provider, meta *identity.IDPMetadata) bool {
+	switch {
+	case before.OIDC != nil && after.OIDC != nil:
+		return before.OIDC.Issuer != after.OIDC.Issuer
+	case before.SAML != nil && meta != nil:
+		return before.SAML.IDP.EntityID != meta.EntityID
+	}
+	return false
+}
 
 func providerInUse(detail string, uses []string) error {
 	return apperrors.Conflict("provider_in_use", detail).WithExtension("used_by", uses)
@@ -308,16 +335,17 @@ func (h *CreateProvider) Handle(ctx context.Context, cmd CreateProviderCommand) 
 	}
 	now := h.d.now()
 	var p identity.Provider
+	pid := id.New[identity.Provider](h.d.IDs)
 	if in.Kind == identity.KindSAML {
-		if p, err = h.newSAML(ctx, in, now); err != nil {
+		if p, err = h.newSAML(ctx, pid, in, now); err != nil {
 			return identity.Provider{}, err
 		}
 	} else {
-		sealed, sealErr := h.d.Sealer.Seal(secret.PurposeOIDCClientSecret, []byte(in.OIDC.ClientSecret.Reveal()))
+		sealed, sealErr := h.d.Sealer.Seal(secret.PurposeOIDCClientSecret, []byte(in.OIDC.ClientSecret.Reveal()), providerSecretBinding(pid))
 		if sealErr != nil {
 			return identity.Provider{}, sealErr
 		}
-		p = identity.New(id.New[identity.Provider](h.d.IDs), in, sealed, now)
+		p = identity.New(pid, in, sealed, now)
 	}
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		if txErr := h.d.Store.CreateProvider(ctx, p); txErr != nil {
@@ -330,16 +358,16 @@ func (h *CreateProvider) Handle(ctx context.Context, cmd CreateProviderCommand) 
 
 // newSAML returns the SAML provider in names: its identity provider's metadata
 // read, a key pair generated and its private key sealed.
-func (h *CreateProvider) newSAML(ctx context.Context, in identity.ProviderInput, now time.Time) (identity.Provider, error) {
+func (h *CreateProvider) newSAML(ctx context.Context, pid identity.ProviderID, in identity.ProviderInput, now time.Time) (identity.Provider, error) {
 	meta, err := readIDPMetadata(ctx, h.d.SAML, in.SAML.MetadataURL, in.SAML.MetadataXML)
 	if err != nil {
 		return identity.Provider{}, err
 	}
-	sp, err := sealSPKey(h.d.SPKeys, h.d.Sealer, now)
+	sp, err := sealSPKey(h.d.SPKeys, h.d.Sealer, pid, now)
 	if err != nil {
 		return identity.Provider{}, err
 	}
-	return identity.NewSAML(id.New[identity.Provider](h.d.IDs), in, meta, sp, now), nil
+	return identity.NewSAML(pid, in, meta, sp, now), nil
 }
 
 // UpdateProviderCommand is an edit of the provider Slug, based on its version
@@ -365,13 +393,8 @@ func (h *UpdateProvider) Handle(ctx context.Context, cmd UpdateProviderCommand) 
 	if err := h.d.requireBaseURL(); err != nil {
 		return identity.Provider{}, err
 	}
-	var sealed string
 	if cmd.Change.ClientSecret != nil {
 		if err := identity.CheckClientSecret(*cmd.Change.ClientSecret); err != nil {
-			return identity.Provider{}, err
-		}
-		var err error
-		if sealed, err = h.d.Sealer.Seal(secret.PurposeOIDCClientSecret, []byte(cmd.Change.ClientSecret.Reveal())); err != nil {
 			return identity.Provider{}, err
 		}
 	}
@@ -408,6 +431,14 @@ func (h *UpdateProvider) Handle(ctx context.Context, cmd UpdateProviderCommand) 
 		if err = precondition.Check(cmd.Expected, before.Version); err != nil {
 			return err
 		}
+		// Sealed once the provider is locked: the secret is bound to its row.
+		var sealed string
+		if cmd.Change.ClientSecret != nil {
+			if sealed, err = h.d.Sealer.Seal(secret.PurposeOIDCClientSecret, []byte(cmd.Change.ClientSecret.Reveal()),
+				providerSecretBinding(before.ID)); err != nil {
+				return err
+			}
+		}
 		after, err := before.CheckChange(cmd.Change)
 		if err != nil {
 			return err
@@ -418,6 +449,18 @@ func (h *UpdateProvider) Handle(ctx context.Context, cmd UpdateProviderCommand) 
 					[]string{usedByEnforcedDomains})
 			}
 		}
+		if movesSubjects(before, after, meta) {
+			// An identity is its subject at the provider, which names a person
+			// only within one issuer or entity: a subject of the new one equal to
+			// a linked subject would sign in as the member who linked it.
+			linked, linkedErr := h.d.Store.HasIdentities(ctx, before.ID)
+			if linkedErr != nil {
+				return linkedErr
+			}
+			if linked {
+				return errIdentitiesLinked
+			}
+		}
 		if meta != nil && after.SAML != nil {
 			after = after.WithIDPMetadata(*meta, now)
 		}
@@ -426,6 +469,9 @@ func (h *UpdateProvider) Handle(ctx context.Context, cmd UpdateProviderCommand) 
 		}
 		if sealed != "" {
 			after.OIDC.SealedClientSecret = sealed
+		}
+		if after, err = rebindProvider(h.d.Sealer, after); err != nil {
+			return err
 		}
 		after.UpdatedAt, after.Version = now, before.Version+1
 		if err = h.d.Store.UpdateProvider(ctx, after); err != nil {
@@ -464,8 +510,8 @@ type DisableProvider struct{ d ProviderDeps }
 // NewDisableProvider returns the handler.
 func NewDisableProvider(d ProviderDeps) *DisableProvider { return &DisableProvider{d: d} }
 
-// Handle disables the provider, which stops its sign-ins and leaves its
-// members, identities and grants as they are, and records
+// Handle disables the provider, which stops its sign-ins, ends the sessions
+// it opened and leaves its members, identities and grants as they are, and records
 // auth_provider.disabled; a disabled provider is returned as it is and
 // nothing is recorded. A provider an enforced domain names, or the only
 // enabled one while local login is disabled, is refused provider_in_use:
@@ -506,6 +552,13 @@ func setEnabled(ctx context.Context, d ProviderDeps, cmd ProviderCommand, enable
 		}
 		if err = d.Store.SetProviderEnabled(ctx, after); err != nil {
 			return err
+		}
+		if !enabled {
+			// A session the provider opened would otherwise outlive the
+			// switch that stops its sign-ins.
+			if _, err = d.Settings.RevokeProviderSessions(ctx, cmd.Slug, now); err != nil {
+				return err
+			}
 		}
 		return d.record(ctx, now, cmd.Request, action, &before, &after)
 	})

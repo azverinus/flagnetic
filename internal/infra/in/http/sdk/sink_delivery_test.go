@@ -1074,3 +1074,70 @@ func TestAWebhookSinkNeverDialsAnAddressItsInstanceDoesNotAllow(t *testing.T) {
 		t.Errorf("the receiver got %d calls, want none", n)
 	}
 }
+
+// Recording a failed attempt takes the project's row before the sink's and
+// its stream's, as every other write of a project's sinks does: taking the
+// sink first and the project last, through the outbox's foreign key,
+// deadlocks with a replay, an update or a resume holding the project.
+func TestRecordingASinkFailureTakesTheProjectBeforeTheSink(t *testing.T) {
+	f := startDelivering(t)
+	release := make(chan struct{})
+	r := testkit.StartReceiver(t, testkit.Reply{}, testkit.Reply{Status: http.StatusInternalServerError, Release: release})
+	created, _ := f.enabled(t, webhook(r, "exposure"))
+	f.post(t, f.exposure("u-1", "true", f.clock.Now()))
+	f.srv.AwaitHorizon(t)
+
+	round := make(chan error, 1)
+	go func() { round <- f.srv.Tick(t, worker.SinkDeliveryName) }()
+	deadline := time.Now().Add(10 * time.Second)
+	for len(batchCalls(r)) == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the batch never reached the receiver")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// A writer of the project holds it while the failure is recorded.
+	pool := testkit.Pool(t)
+	holder, err := pool.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = holder.Rollback(t.Context()) }()
+	if _, err = holder.Exec(t.Context(), `SELECT 1 FROM projects WHERE key = $1 FOR NO KEY UPDATE`, f.p.key); err != nil {
+		t.Fatal(err)
+	}
+	var holderPID int
+	if err = holder.QueryRow(t.Context(), `SELECT pg_backend_pid()`).Scan(&holderPID); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+
+	// Once the failure waits for the project, the sink must still be free.
+	for waiting := false; !waiting; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the failure never waited for the project")
+		}
+		if err = pool.QueryRow(t.Context(), `SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid)))`, holderPID).Scan(&waiting); err != nil {
+			t.Fatal(err)
+		}
+	}
+	probe, err := pool.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = probe.Rollback(t.Context()) }()
+	if _, err = probe.Exec(t.Context(), `SELECT 1 FROM sinks WHERE id = $1 FOR NO KEY UPDATE NOWAIT`, created.Id); err != nil {
+		t.Errorf("the sink is locked while the failure waits for the project: %v", err)
+	}
+	_ = probe.Rollback(t.Context())
+	if err = holder.Commit(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err = <-round; err != nil {
+		t.Fatalf("sink delivery round: %v", err)
+	}
+	if s := f.sink(t, created); s.Health != management.SinkHealthFailing {
+		t.Errorf("health = %s, want failing", s.Health)
+	}
+}

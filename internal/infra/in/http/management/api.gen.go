@@ -3222,7 +3222,7 @@ type HashCheckRequest struct {
 	SecondSalt *string `json:"second_salt,omitempty"`
 
 	// UnitIds 1000 to 200000 unit IDs, each 1 to 256 bytes, as often as each occurs.
-	UnitIds []string `json:"unit_ids"`
+	UnitIds UnitIDList `json:"unit_ids"`
 }
 
 // IdPCertificate A certificate a SAML identity provider's signatures are checked against.
@@ -3663,7 +3663,7 @@ type Problem struct {
 	Detail *string      `json:"detail,omitempty"`
 	Errors *[]Violation `json:"errors,omitempty"`
 
-	// Failure Why a system the server asked did not answer as needed, for `provider_unreachable`; for `smtp_failed` the step that failed, `connection`, `tls`, `authentication` or `rejected`; for `sink_not_ready` the failure class of the target's check, such as `connect` or `status`.
+	// Failure Why a system the server asked did not answer as needed, for `provider_unreachable`; for `sink_not_ready` the failure class of the target's check, such as `connect` or `status`.
 	Failure *string `json:"failure,omitempty"`
 
 	// FailureCode The target's own error code, for `sink_not_ready`, when it speaks one, such as a ClickHouse exception or an S3 error code.
@@ -8066,7 +8066,13 @@ type ClientInterface interface {
 	// is changed with `enable` and `disable`. Refused as a creation is, and
 	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 	// drops a domain enforced to the provider: lift the enforcement first.
-	// Audited `auth_provider.updated`; an edit that changes nothing is not.
+	// Changing the `issuer` of an OIDC provider, or the identity provider
+	// whose entity ID differs in new SAML metadata, while members have
+	// identities linked at it is 409 `provider_identities_linked`: a subject
+	// of the new issuer equal to a linked one would sign in as the member who
+	// linked it, so the identities are unlinked first or a new provider is
+	// created. Audited `auth_provider.updated`; an edit that changes nothing
+	// is not.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -8084,7 +8090,13 @@ type ClientInterface interface {
 	// is changed with `enable` and `disable`. Refused as a creation is, and
 	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 	// drops a domain enforced to the provider: lift the enforcement first.
-	// Audited `auth_provider.updated`; an edit that changes nothing is not.
+	// Changing the `issuer` of an OIDC provider, or the identity provider
+	// whose entity ID differs in new SAML metadata, while members have
+	// identities linked at it is 409 `provider_identities_linked`: a subject
+	// of the new issuer equal to a linked one would sign in as the member who
+	// linked it, so the identities are unlinked first or a new provider is
+	// created. Audited `auth_provider.updated`; an edit that changes nothing
+	// is not.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -8391,11 +8403,10 @@ type ClientInterface interface {
 	// the SMTP server in force, and answers once the server accepted it: the
 	// only mail the instance sends while its sender waits. Refused
 	// `smtp_not_configured` (409) while there is no SMTP server, and
-	// `smtp_failed` (502) with `failure` naming the step that failed:
-	// `connection` (unreachable or broken), `tls` (no STARTTLS, a
-	// handshake or certificate that failed), `authentication` (the
-	// credentials were refused) or `rejected` (the sender, the recipient or
-	// the mail was refused).
+	// `smtp_failed` (502) when the exchange failed, without saying at which
+	// step: the host is the caller's to name, and the step would tell what
+	// is reachable behind it. The instance's log record of the failure
+	// names the step.
 	//
 	// Corresponds with POST /instance/smtp/test (the `SendTestMail` operationId).
 	SendTestMail(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8476,7 +8487,9 @@ type ClientInterface interface {
 	// member nothing is linked and the browser lands on the settings page
 	// with `error=identity_linked`; any other failure lands there with its
 	// sign-in code. A disabled or unknown provider is not found. Only a
-	// session may do this.
+	// session may do this, and only one that signed in in the last 15
+	// minutes: an older one is refused 403 `recent_sign_in_required`, and
+	// the member signs in again first.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -8497,7 +8510,9 @@ type ClientInterface interface {
 	// member nothing is linked and the browser lands on the settings page
 	// with `error=identity_linked`; any other failure lands there with its
 	// sign-in code. A disabled or unknown provider is not found. Only a
-	// session may do this.
+	// session may do this, and only one that signed in in the last 15
+	// minutes: an older one is refused 403 `recent_sign_in_required`, and
+	// the member signs in again first.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -8657,7 +8672,8 @@ type ClientInterface interface {
 	// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 	// request's origin when it is not set, followed by
 	// `/invitations/<secret>`; it expires after seven days. An email the
-	// instance holds, whatever its case, is refused `already_exists`.
+	// instance holds, whatever its case, is refused `already_exists`. Needs
+	// a signed-in session: an API token is refused `session_required`.
 	//
 	// The invitation may carry a `grant` of a built-in role in a project,
 	// which accepting it makes by hand, in the name of the instance admin
@@ -8679,7 +8695,8 @@ type ClientInterface interface {
 	// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 	// request's origin when it is not set, followed by
 	// `/invitations/<secret>`; it expires after seven days. An email the
-	// instance holds, whatever its case, is refused `already_exists`.
+	// instance holds, whatever its case, is refused `already_exists`. Needs
+	// a signed-in session: an API token is refused `session_required`.
 	//
 	// The invitation may carry a `grant` of a built-in role in a project,
 	// which accepting it makes by hand, in the name of the instance admin
@@ -8707,7 +8724,10 @@ type ClientInterface interface {
 	// `last_instance_admin`, and demoting one an auth provider's group
 	// mapping made `sso_sourced`: only the provider takes it away. Making a
 	// member still invited an instance admin is refused `member_invited`:
-	// they are made one once they have accepted their invitation.
+	// they are made one once they have accepted their invitation. Needs a
+	// signed-in session: an API token is refused `session_required`, so a
+	// leaked token cannot promote a member, or change a member's email to
+	// take their account over.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -8722,7 +8742,10 @@ type ClientInterface interface {
 	// `last_instance_admin`, and demoting one an auth provider's group
 	// mapping made `sso_sourced`: only the provider takes it away. Making a
 	// member still invited an instance admin is refused `member_invited`:
-	// they are made one once they have accepted their invitation.
+	// they are made one once they have accepted their invitation. Needs a
+	// signed-in session: an API token is refused `session_required`, so a
+	// leaked token cannot promote a member, or change a member's email to
+	// take their account over.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -8777,7 +8800,8 @@ type ClientInterface interface {
 	// keeps the project and role of the one it replaces only while the
 	// member who issued that one still holds `grant.manage` in the project;
 	// otherwise it grants nothing, and the audit log records
-	// `invitation.grant_revoked`.
+	// `invitation.grant_revoked`. Needs a signed-in session: an API token is
+	// refused `session_required`.
 	//
 	// Corresponds with POST /members/{member}/invitation (the `ReissueInvitation` operationId).
 	ReissueInvitation(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8790,7 +8814,9 @@ type ClientInterface interface {
 	// `member_not_active`: issue their invitation again instead. A
 	// deactivated member is refused `member_deactivated`. Earlier password
 	// resets of the member stay open; completing one ends the others.
-	// Recorded as `password.reset_issued`, without the link.
+	// Recorded as `password.reset_issued`, without the link. Needs a
+	// signed-in session: an API token is refused `session_required`, so a
+	// leaked token cannot take over a member's account.
 	//
 	// Corresponds with POST /members/{member}/password-reset (the `IssuePasswordReset` operationId).
 	IssuePasswordReset(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8802,7 +8828,8 @@ type ClientInterface interface {
 	// invitation's one-time link, as on invitation. What their
 	// deactivation revoked stays revoked: they sign in afresh and create
 	// new tokens. Reactivating a member who is not deactivated changes
-	// nothing.
+	// nothing. Needs a signed-in session: an API token is refused
+	// `session_required`.
 	//
 	// Corresponds with POST /members/{member}/reactivate (the `ReactivateMember` operationId).
 	ReactivateMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -9024,12 +9051,13 @@ type ClientInterface interface {
 	// ListDiscoveredAttributes Attributes SDKs sent that the project does not declare
 	//
 	// The attributes that contexts evaluated through the SDK API and the
-	// tester carried without the project declaring them, by key, with the
+	// tester (when its caller holds `declaration.manage`) carried without
+	// the project declaring them, by key, with the
 	// JSON types seen and when they were first and last seen. Only an
 	// attribute's key and type are recorded, never a value. A dismissed
 	// attribute is left out until it is seen with a type not seen before;
-	// an attribute declared since is left out. A project records at most
-	// 500, dismissed ones included.
+	// an attribute declared since is left out. A project lists at most
+	// 500; dismissed ones are not counted, so dismissing frees a place.
 	//
 	// Corresponds with GET /projects/{project}/attributes/discovered (the `ListDiscoveredAttributes` operationId).
 	ListDiscoveredAttributes(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -10050,8 +10078,9 @@ type ClientInterface interface {
 	// type then unit identifier and prerequisites by flag, so that two
 	// exports of an unchanged project are the same bytes. Rule identifiers and rollout
 	// salts are in it, which keep every unit in its bucket in a copy; owners
-	// are email addresses, and an override's note is in it and its author is
-	// not.
+	// are email addresses, written only for an owner who holds a grant in
+	// the project and empty for any other, and an override's note is in it
+	// and its author is not.
 	//
 	// Members, grants, tokens, SDK keys, webhook subscriptions, change
 	// requests, audit entries, events, the standard attributes and the
@@ -10438,8 +10467,9 @@ type ClientInterface interface {
 	// project is refused `role_not_allowed`, naming it in `permission`;
 	// the same member and role twice `already_granted`; a deactivated
 	// member `member_deactivated`; an unknown member or role
-	// `invalid_grant`. Only a member grants: a project token never changes
-	// who has access.
+	// `invalid_grant`. Only a member grants, signed in: an API token, a
+	// project token or a personal one, is refused `session_required`, so a
+	// leaked token cannot leave behind access that outlives it.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10458,8 +10488,9 @@ type ClientInterface interface {
 	// project is refused `role_not_allowed`, naming it in `permission`;
 	// the same member and role twice `already_granted`; a deactivated
 	// member `member_deactivated`; an unknown member or role
-	// `invalid_grant`. Only a member grants: a project token never changes
-	// who has access.
+	// `invalid_grant`. Only a member grants, signed in: an API token, a
+	// project token or a personal one, is refused `session_required`, so a
+	// leaked token cannot leave behind access that outlives it.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10499,8 +10530,10 @@ type ClientInterface interface {
 	// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 	// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 	// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-	// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-	// whatever the server's limit for other bodies.
+	// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+	// whatever the server's limit for other bodies; the list is read
+	// entry by entry and cut one past the bound, so a longer one is refused
+	// without being held whole.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10528,8 +10561,10 @@ type ClientInterface interface {
 	// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 	// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 	// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-	// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-	// whatever the server's limit for other bodies.
+	// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+	// whatever the server's limit for other bodies; the list is read
+	// entry by entry and cut one past the bound, so a longer one is refused
+	// without being held whole.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10843,7 +10878,8 @@ type ClientInterface interface {
 	// deactivated before it is accepted; the audit log records
 	// `invitation.grant_revoked` with the reason `inviter_lost_permission`
 	// or `inviter_deactivated`. Only a member invites: a project token
-	// never holds `grant.manage`.
+	// never holds `grant.manage`. Needs a signed-in session: an API token is
+	// refused `session_required`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10874,7 +10910,8 @@ type ClientInterface interface {
 	// deactivated before it is accepted; the audit log records
 	// `invitation.grant_revoked` with the reason `inviter_lost_permission`
 	// or `inviter_deactivated`. Only a member invites: a project token
-	// never holds `grant.manage`.
+	// never holds `grant.manage`. Needs a signed-in session: an API token is
+	// refused `session_required`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -12435,7 +12472,13 @@ func (c *Client) GetAuthProvider(ctx context.Context, provider AuthProviderSlug,
 // is changed with `enable` and `disable`. Refused as a creation is, and
 // 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 // drops a domain enforced to the provider: lift the enforcement first.
-// Audited `auth_provider.updated`; an edit that changes nothing is not.
+// Changing the `issuer` of an OIDC provider, or the identity provider
+// whose entity ID differs in new SAML metadata, while members have
+// identities linked at it is 409 `provider_identities_linked`: a subject
+// of the new issuer equal to a linked one would sign in as the member who
+// linked it, so the identities are unlinked first or a new provider is
+// created. Audited `auth_provider.updated`; an edit that changes nothing
+// is not.
 //
 // Takes any type of body and a specified content type.
 //
@@ -12463,7 +12506,13 @@ func (c *Client) UpdateAuthProviderWithBody(ctx context.Context, provider AuthPr
 // is changed with `enable` and `disable`. Refused as a creation is, and
 // 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 // drops a domain enforced to the provider: lift the enforcement first.
-// Audited `auth_provider.updated`; an edit that changes nothing is not.
+// Changing the `issuer` of an OIDC provider, or the identity provider
+// whose entity ID differs in new SAML metadata, while members have
+// identities linked at it is 409 `provider_identities_linked`: a subject
+// of the new issuer equal to a linked one would sign in as the member who
+// linked it, so the identities are unlinked first or a new provider is
+// created. Audited `auth_provider.updated`; an edit that changes nothing
+// is not.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -12980,11 +13029,10 @@ func (c *Client) UpdateMailSettings(ctx context.Context, body UpdateMailSettings
 // the SMTP server in force, and answers once the server accepted it: the
 // only mail the instance sends while its sender waits. Refused
 // `smtp_not_configured` (409) while there is no SMTP server, and
-// `smtp_failed` (502) with `failure` naming the step that failed:
-// `connection` (unreachable or broken), `tls` (no STARTTLS, a
-// handshake or certificate that failed), `authentication` (the
-// credentials were refused) or `rejected` (the sender, the recipient or
-// the mail was refused).
+// `smtp_failed` (502) when the exchange failed, without saying at which
+// step: the host is the caller's to name, and the step would tell what
+// is reachable behind it. The instance's log record of the failure
+// names the step.
 //
 // Corresponds with POST /instance/smtp/test (the `SendTestMail` operationId).
 func (c *Client) SendTestMail(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -13125,7 +13173,9 @@ func (c *Client) UnlinkMyIdentity(ctx context.Context, identity IdentityID, reqE
 // member nothing is linked and the browser lands on the settings page
 // with `error=identity_linked`; any other failure lands there with its
 // sign-in code. A disabled or unknown provider is not found. Only a
-// session may do this.
+// session may do this, and only one that signed in in the last 15
+// minutes: an older one is refused 403 `recent_sign_in_required`, and
+// the member signs in again first.
 //
 // Takes any type of body and a specified content type.
 //
@@ -13156,7 +13206,9 @@ func (c *Client) LinkMyIdentityWithBody(ctx context.Context, provider AuthProvid
 // member nothing is linked and the browser lands on the settings page
 // with `error=identity_linked`; any other failure lands there with its
 // sign-in code. A disabled or unknown provider is not found. Only a
-// session may do this.
+// session may do this, and only one that signed in in the last 15
+// minutes: an older one is refused 403 `recent_sign_in_required`, and
+// the member signs in again first.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -13436,7 +13488,8 @@ func (c *Client) ListMembers(ctx context.Context, params *ListMembersParams, req
 // once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 // request's origin when it is not set, followed by
 // `/invitations/<secret>`; it expires after seven days. An email the
-// instance holds, whatever its case, is refused `already_exists`.
+// instance holds, whatever its case, is refused `already_exists`. Needs
+// a signed-in session: an API token is refused `session_required`.
 //
 // The invitation may carry a `grant` of a built-in role in a project,
 // which accepting it makes by hand, in the name of the instance admin
@@ -13468,7 +13521,8 @@ func (c *Client) InviteMemberWithBody(ctx context.Context, contentType string, b
 // once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 // request's origin when it is not set, followed by
 // `/invitations/<secret>`; it expires after seven days. An email the
-// instance holds, whatever its case, is refused `already_exists`.
+// instance holds, whatever its case, is refused `already_exists`. Needs
+// a signed-in session: an API token is refused `session_required`.
 //
 // The invitation may carry a `grant` of a built-in role in a project,
 // which accepting it makes by hand, in the name of the instance admin
@@ -13516,7 +13570,10 @@ func (c *Client) GetMember(ctx context.Context, member MemberID, reqEditors ...R
 // `last_instance_admin`, and demoting one an auth provider's group
 // mapping made `sso_sourced`: only the provider takes it away. Making a
 // member still invited an instance admin is refused `member_invited`:
-// they are made one once they have accepted their invitation.
+// they are made one once they have accepted their invitation. Needs a
+// signed-in session: an API token is refused `session_required`, so a
+// leaked token cannot promote a member, or change a member's email to
+// take their account over.
 //
 // Takes any type of body and a specified content type.
 //
@@ -13541,7 +13598,10 @@ func (c *Client) UpdateMemberWithBody(ctx context.Context, member MemberID, cont
 // `last_instance_admin`, and demoting one an auth provider's group
 // mapping made `sso_sourced`: only the provider takes it away. Making a
 // member still invited an instance admin is refused `member_invited`:
-// they are made one once they have accepted their invitation.
+// they are made one once they have accepted their invitation. Needs a
+// signed-in session: an API token is refused `session_required`, so a
+// leaked token cannot promote a member, or change a member's email to
+// take their account over.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -13636,7 +13696,8 @@ func (c *Client) UnlinkMemberIdentity(ctx context.Context, member MemberID, iden
 // keeps the project and role of the one it replaces only while the
 // member who issued that one still holds `grant.manage` in the project;
 // otherwise it grants nothing, and the audit log records
-// `invitation.grant_revoked`.
+// `invitation.grant_revoked`. Needs a signed-in session: an API token is
+// refused `session_required`.
 //
 // Corresponds with POST /members/{member}/invitation (the `ReissueInvitation` operationId).
 func (c *Client) ReissueInvitation(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -13659,7 +13720,9 @@ func (c *Client) ReissueInvitation(ctx context.Context, member MemberID, reqEdit
 // `member_not_active`: issue their invitation again instead. A
 // deactivated member is refused `member_deactivated`. Earlier password
 // resets of the member stay open; completing one ends the others.
-// Recorded as `password.reset_issued`, without the link.
+// Recorded as `password.reset_issued`, without the link. Needs a
+// signed-in session: an API token is refused `session_required`, so a
+// leaked token cannot take over a member's account.
 //
 // Corresponds with POST /members/{member}/password-reset (the `IssuePasswordReset` operationId).
 func (c *Client) IssuePasswordReset(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -13681,7 +13744,8 @@ func (c *Client) IssuePasswordReset(ctx context.Context, member MemberID, reqEdi
 // invitation's one-time link, as on invitation. What their
 // deactivation revoked stays revoked: they sign in afresh and create
 // new tokens. Reactivating a member who is not deactivated changes
-// nothing.
+// nothing. Needs a signed-in session: an API token is refused
+// `session_required`.
 //
 // Corresponds with POST /members/{member}/reactivate (the `ReactivateMember` operationId).
 func (c *Client) ReactivateMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -14073,12 +14137,13 @@ func (c *Client) CreateAttribute(ctx context.Context, project ProjectKey, body C
 // ListDiscoveredAttributes Attributes SDKs sent that the project does not declare
 //
 // The attributes that contexts evaluated through the SDK API and the
-// tester carried without the project declaring them, by key, with the
+// tester (when its caller holds `declaration.manage`) carried without
+// the project declaring them, by key, with the
 // JSON types seen and when they were first and last seen. Only an
 // attribute's key and type are recorded, never a value. A dismissed
 // attribute is left out until it is seen with a type not seen before;
-// an attribute declared since is left out. A project records at most
-// 500, dismissed ones included.
+// an attribute declared since is left out. A project lists at most
+// 500; dismissed ones are not counted, so dismissing frees a place.
 //
 // Corresponds with GET /projects/{project}/attributes/discovered (the `ListDiscoveredAttributes` operationId).
 func (c *Client) ListDiscoveredAttributes(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -15799,8 +15864,9 @@ func (c *Client) StopExperiment(ctx context.Context, project ProjectKey, experim
 // type then unit identifier and prerequisites by flag, so that two
 // exports of an unchanged project are the same bytes. Rule identifiers and rollout
 // salts are in it, which keep every unit in its bucket in a copy; owners
-// are email addresses, and an override's note is in it and its author is
-// not.
+// are email addresses, written only for an owner who holds a grant in
+// the project and empty for any other, and an override's note is in it
+// and its author is not.
 //
 // Members, grants, tokens, SDK keys, webhook subscriptions, change
 // requests, audit entries, events, the standard attributes and the
@@ -16437,8 +16503,9 @@ func (c *Client) ListGrants(ctx context.Context, project ProjectKey, reqEditors 
 // project is refused `role_not_allowed`, naming it in `permission`;
 // the same member and role twice `already_granted`; a deactivated
 // member `member_deactivated`; an unknown member or role
-// `invalid_grant`. Only a member grants: a project token never changes
-// who has access.
+// `invalid_grant`. Only a member grants, signed in: an API token, a
+// project token or a personal one, is refused `session_required`, so a
+// leaked token cannot leave behind access that outlives it.
 //
 // Takes any type of body and a specified content type.
 //
@@ -16467,8 +16534,9 @@ func (c *Client) CreateGrantWithBody(ctx context.Context, project ProjectKey, co
 // project is refused `role_not_allowed`, naming it in `permission`;
 // the same member and role twice `already_granted`; a deactivated
 // member `member_deactivated`; an unknown member or role
-// `invalid_grant`. Only a member grants: a project token never changes
-// who has access.
+// `invalid_grant`. Only a member grants, signed in: an API token, a
+// project token or a personal one, is refused `session_required`, so a
+// leaked token cannot leave behind access that outlives it.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -16528,8 +16596,10 @@ func (c *Client) DeleteGrant(ctx context.Context, project ProjectKey, grant Gran
 // or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 // only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 // empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-// whatever the server's limit for other bodies.
+// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+// whatever the server's limit for other bodies; the list is read
+// entry by entry and cut one past the bound, so a longer one is refused
+// without being held whole.
 //
 // Takes any type of body and a specified content type.
 //
@@ -16567,8 +16637,10 @@ func (c *Client) CheckHashUniformityWithBody(ctx context.Context, project Projec
 // or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 // only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 // empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-// whatever the server's limit for other bodies.
+// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+// whatever the server's limit for other bodies; the list is read
+// entry by entry and cut one past the bound, so a longer one is refused
+// without being held whole.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -16942,7 +17014,8 @@ func (c *Client) ListProjectInvitations(ctx context.Context, project ProjectKey,
 // deactivated before it is accepted; the audit log records
 // `invitation.grant_revoked` with the reason `inviter_lost_permission`
 // or `inviter_deactivated`. Only a member invites: a project token
-// never holds `grant.manage`.
+// never holds `grant.manage`. Needs a signed-in session: an API token is
+// refused `session_required`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -16983,7 +17056,8 @@ func (c *Client) InviteProjectMemberWithBody(ctx context.Context, project Projec
 // deactivated before it is accepted; the audit log records
 // `invitation.grant_revoked` with the reason `inviter_lost_permission`
 // or `inviter_deactivated`. Only a member invites: a project token
-// never holds `grant.manage`.
+// never holds `grant.manage`. Needs a signed-in session: an API token is
+// refused `session_required`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -29976,7 +30050,13 @@ type ClientWithResponsesInterface interface {
 	// is changed with `enable` and `disable`. Refused as a creation is, and
 	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 	// drops a domain enforced to the provider: lift the enforcement first.
-	// Audited `auth_provider.updated`; an edit that changes nothing is not.
+	// Changing the `issuer` of an OIDC provider, or the identity provider
+	// whose entity ID differs in new SAML metadata, while members have
+	// identities linked at it is 409 `provider_identities_linked`: a subject
+	// of the new issuer equal to a linked one would sign in as the member who
+	// linked it, so the identities are unlinked first or a new provider is
+	// created. Audited `auth_provider.updated`; an edit that changes nothing
+	// is not.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -29994,7 +30074,13 @@ type ClientWithResponsesInterface interface {
 	// is changed with `enable` and `disable`. Refused as a creation is, and
 	// 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 	// drops a domain enforced to the provider: lift the enforcement first.
-	// Audited `auth_provider.updated`; an edit that changes nothing is not.
+	// Changing the `issuer` of an OIDC provider, or the identity provider
+	// whose entity ID differs in new SAML metadata, while members have
+	// identities linked at it is 409 `provider_identities_linked`: a subject
+	// of the new issuer equal to a linked one would sign in as the member who
+	// linked it, so the identities are unlinked first or a new provider is
+	// created. Audited `auth_provider.updated`; an edit that changes nothing
+	// is not.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -30325,11 +30411,10 @@ type ClientWithResponsesInterface interface {
 	// the SMTP server in force, and answers once the server accepted it: the
 	// only mail the instance sends while its sender waits. Refused
 	// `smtp_not_configured` (409) while there is no SMTP server, and
-	// `smtp_failed` (502) with `failure` naming the step that failed:
-	// `connection` (unreachable or broken), `tls` (no STARTTLS, a
-	// handshake or certificate that failed), `authentication` (the
-	// credentials were refused) or `rejected` (the sender, the recipient or
-	// the mail was refused).
+	// `smtp_failed` (502) when the exchange failed, without saying at which
+	// step: the host is the caller's to name, and the step would tell what
+	// is reachable behind it. The instance's log record of the failure
+	// names the step.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -30418,7 +30503,9 @@ type ClientWithResponsesInterface interface {
 	// member nothing is linked and the browser lands on the settings page
 	// with `error=identity_linked`; any other failure lands there with its
 	// sign-in code. A disabled or unknown provider is not found. Only a
-	// session may do this.
+	// session may do this, and only one that signed in in the last 15
+	// minutes: an older one is refused 403 `recent_sign_in_required`, and
+	// the member signs in again first.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -30439,7 +30526,9 @@ type ClientWithResponsesInterface interface {
 	// member nothing is linked and the browser lands on the settings page
 	// with `error=identity_linked`; any other failure lands there with its
 	// sign-in code. A disabled or unknown provider is not found. Only a
-	// session may do this.
+	// session may do this, and only one that signed in in the last 15
+	// minutes: an older one is refused 403 `recent_sign_in_required`, and
+	// the member signs in again first.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -30613,7 +30702,8 @@ type ClientWithResponsesInterface interface {
 	// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 	// request's origin when it is not set, followed by
 	// `/invitations/<secret>`; it expires after seven days. An email the
-	// instance holds, whatever its case, is refused `already_exists`.
+	// instance holds, whatever its case, is refused `already_exists`. Needs
+	// a signed-in session: an API token is refused `session_required`.
 	//
 	// The invitation may carry a `grant` of a built-in role in a project,
 	// which accepting it makes by hand, in the name of the instance admin
@@ -30635,7 +30725,8 @@ type ClientWithResponsesInterface interface {
 	// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 	// request's origin when it is not set, followed by
 	// `/invitations/<secret>`; it expires after seven days. An email the
-	// instance holds, whatever its case, is refused `already_exists`.
+	// instance holds, whatever its case, is refused `already_exists`. Needs
+	// a signed-in session: an API token is refused `session_required`.
 	//
 	// The invitation may carry a `grant` of a built-in role in a project,
 	// which accepting it makes by hand, in the name of the instance admin
@@ -30665,7 +30756,10 @@ type ClientWithResponsesInterface interface {
 	// `last_instance_admin`, and demoting one an auth provider's group
 	// mapping made `sso_sourced`: only the provider takes it away. Making a
 	// member still invited an instance admin is refused `member_invited`:
-	// they are made one once they have accepted their invitation.
+	// they are made one once they have accepted their invitation. Needs a
+	// signed-in session: an API token is refused `session_required`, so a
+	// leaked token cannot promote a member, or change a member's email to
+	// take their account over.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -30680,7 +30774,10 @@ type ClientWithResponsesInterface interface {
 	// `last_instance_admin`, and demoting one an auth provider's group
 	// mapping made `sso_sourced`: only the provider takes it away. Making a
 	// member still invited an instance admin is refused `member_invited`:
-	// they are made one once they have accepted their invitation.
+	// they are made one once they have accepted their invitation. Needs a
+	// signed-in session: an API token is refused `session_required`, so a
+	// leaked token cannot promote a member, or change a member's email to
+	// take their account over.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -30741,7 +30838,8 @@ type ClientWithResponsesInterface interface {
 	// keeps the project and role of the one it replaces only while the
 	// member who issued that one still holds `grant.manage` in the project;
 	// otherwise it grants nothing, and the audit log records
-	// `invitation.grant_revoked`.
+	// `invitation.grant_revoked`. Needs a signed-in session: an API token is
+	// refused `session_required`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -30756,7 +30854,9 @@ type ClientWithResponsesInterface interface {
 	// `member_not_active`: issue their invitation again instead. A
 	// deactivated member is refused `member_deactivated`. Earlier password
 	// resets of the member stay open; completing one ends the others.
-	// Recorded as `password.reset_issued`, without the link.
+	// Recorded as `password.reset_issued`, without the link. Needs a
+	// signed-in session: an API token is refused `session_required`, so a
+	// leaked token cannot take over a member's account.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -30770,7 +30870,8 @@ type ClientWithResponsesInterface interface {
 	// invitation's one-time link, as on invitation. What their
 	// deactivation revoked stays revoked: they sign in afresh and create
 	// new tokens. Reactivating a member who is not deactivated changes
-	// nothing.
+	// nothing. Needs a signed-in session: an API token is refused
+	// `session_required`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -31010,12 +31111,13 @@ type ClientWithResponsesInterface interface {
 	// ListDiscoveredAttributesWithResponse Attributes SDKs sent that the project does not declare
 	//
 	// The attributes that contexts evaluated through the SDK API and the
-	// tester carried without the project declaring them, by key, with the
+	// tester (when its caller holds `declaration.manage`) carried without
+	// the project declaring them, by key, with the
 	// JSON types seen and when they were first and last seen. Only an
 	// attribute's key and type are recorded, never a value. A dismissed
 	// attribute is left out until it is seen with a type not seen before;
-	// an attribute declared since is left out. A project records at most
-	// 500, dismissed ones included.
+	// an attribute declared since is left out. A project lists at most
+	// 500; dismissed ones are not counted, so dismissing frees a place.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -32110,8 +32212,9 @@ type ClientWithResponsesInterface interface {
 	// type then unit identifier and prerequisites by flag, so that two
 	// exports of an unchanged project are the same bytes. Rule identifiers and rollout
 	// salts are in it, which keep every unit in its bucket in a copy; owners
-	// are email addresses, and an override's note is in it and its author is
-	// not.
+	// are email addresses, written only for an owner who holds a grant in
+	// the project and empty for any other, and an override's note is in it
+	// and its author is not.
 	//
 	// Members, grants, tokens, SDK keys, webhook subscriptions, change
 	// requests, audit entries, events, the standard attributes and the
@@ -32520,8 +32623,9 @@ type ClientWithResponsesInterface interface {
 	// project is refused `role_not_allowed`, naming it in `permission`;
 	// the same member and role twice `already_granted`; a deactivated
 	// member `member_deactivated`; an unknown member or role
-	// `invalid_grant`. Only a member grants: a project token never changes
-	// who has access.
+	// `invalid_grant`. Only a member grants, signed in: an API token, a
+	// project token or a personal one, is refused `session_required`, so a
+	// leaked token cannot leave behind access that outlives it.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -32540,8 +32644,9 @@ type ClientWithResponsesInterface interface {
 	// project is refused `role_not_allowed`, naming it in `permission`;
 	// the same member and role twice `already_granted`; a deactivated
 	// member `member_deactivated`; an unknown member or role
-	// `invalid_grant`. Only a member grants: a project token never changes
-	// who has access.
+	// `invalid_grant`. Only a member grants, signed in: an API token, a
+	// project token or a personal one, is refused `session_required`, so a
+	// leaked token cannot leave behind access that outlives it.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -32583,8 +32688,10 @@ type ClientWithResponsesInterface interface {
 	// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 	// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 	// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-	// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-	// whatever the server's limit for other bodies.
+	// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+	// whatever the server's limit for other bodies; the list is read
+	// entry by entry and cut one past the bound, so a longer one is refused
+	// without being held whole.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -32612,8 +32719,10 @@ type ClientWithResponsesInterface interface {
 	// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 	// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 	// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-	// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-	// whatever the server's limit for other bodies.
+	// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+	// whatever the server's limit for other bodies; the list is read
+	// entry by entry and cut one past the bound, so a longer one is refused
+	// without being held whole.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -32929,7 +33038,8 @@ type ClientWithResponsesInterface interface {
 	// deactivated before it is accepted; the audit log records
 	// `invitation.grant_revoked` with the reason `inviter_lost_permission`
 	// or `inviter_deactivated`. Only a member invites: a project token
-	// never holds `grant.manage`.
+	// never holds `grant.manage`. Needs a signed-in session: an API token is
+	// refused `session_required`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -32960,7 +33070,8 @@ type ClientWithResponsesInterface interface {
 	// deactivated before it is accepted; the audit log records
 	// `invitation.grant_revoked` with the reason `inviter_lost_permission`
 	// or `inviter_deactivated`. Only a member invites: a project token
-	// never holds `grant.manage`.
+	// never holds `grant.manage`. Needs a signed-in session: an API token is
+	// refused `session_required`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -51235,7 +51346,13 @@ func (c *ClientWithResponses) GetAuthProviderWithResponse(ctx context.Context, p
 // is changed with `enable` and `disable`. Refused as a creation is, and
 // 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 // drops a domain enforced to the provider: lift the enforcement first.
-// Audited `auth_provider.updated`; an edit that changes nothing is not.
+// Changing the `issuer` of an OIDC provider, or the identity provider
+// whose entity ID differs in new SAML metadata, while members have
+// identities linked at it is 409 `provider_identities_linked`: a subject
+// of the new issuer equal to a linked one would sign in as the member who
+// linked it, so the identities are unlinked first or a new provider is
+// created. Audited `auth_provider.updated`; an edit that changes nothing
+// is not.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -51259,7 +51376,13 @@ func (c *ClientWithResponses) UpdateAuthProviderWithBodyWithResponse(ctx context
 // is changed with `enable` and `disable`. Refused as a creation is, and
 // 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
 // drops a domain enforced to the provider: lift the enforcement first.
-// Audited `auth_provider.updated`; an edit that changes nothing is not.
+// Changing the `issuer` of an OIDC provider, or the identity provider
+// whose entity ID differs in new SAML metadata, while members have
+// identities linked at it is 409 `provider_identities_linked`: a subject
+// of the new issuer equal to a linked one would sign in as the member who
+// linked it, so the identities are unlinked first or a new provider is
+// created. Audited `auth_provider.updated`; an edit that changes nothing
+// is not.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -51716,11 +51839,10 @@ func (c *ClientWithResponses) UpdateMailSettingsWithResponse(ctx context.Context
 // the SMTP server in force, and answers once the server accepted it: the
 // only mail the instance sends while its sender waits. Refused
 // `smtp_not_configured` (409) while there is no SMTP server, and
-// `smtp_failed` (502) with `failure` naming the step that failed:
-// `connection` (unreachable or broken), `tls` (no STARTTLS, a
-// handshake or certificate that failed), `authentication` (the
-// credentials were refused) or `rejected` (the sender, the recipient or
-// the mail was refused).
+// `smtp_failed` (502) when the exchange failed, without saying at which
+// step: the host is the caller's to name, and the step would tell what
+// is reachable behind it. The instance's log record of the failure
+// names the step.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -51845,7 +51967,9 @@ func (c *ClientWithResponses) UnlinkMyIdentityWithResponse(ctx context.Context, 
 // member nothing is linked and the browser lands on the settings page
 // with `error=identity_linked`; any other failure lands there with its
 // sign-in code. A disabled or unknown provider is not found. Only a
-// session may do this.
+// session may do this, and only one that signed in in the last 15
+// minutes: an older one is refused 403 `recent_sign_in_required`, and
+// the member signs in again first.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -51872,7 +51996,9 @@ func (c *ClientWithResponses) LinkMyIdentityWithBodyWithResponse(ctx context.Con
 // member nothing is linked and the browser lands on the settings page
 // with `error=identity_linked`; any other failure lands there with its
 // sign-in code. A disabled or unknown provider is not found. Only a
-// session may do this.
+// session may do this, and only one that signed in in the last 15
+// minutes: an older one is refused 403 `recent_sign_in_required`, and
+// the member signs in again first.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -52118,7 +52244,8 @@ func (c *ClientWithResponses) ListMembersWithResponse(ctx context.Context, param
 // once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 // request's origin when it is not set, followed by
 // `/invitations/<secret>`; it expires after seven days. An email the
-// instance holds, whatever its case, is refused `already_exists`.
+// instance holds, whatever its case, is refused `already_exists`. Needs
+// a signed-in session: an API token is refused `session_required`.
 //
 // The invitation may carry a `grant` of a built-in role in a project,
 // which accepting it makes by hand, in the name of the instance admin
@@ -52146,7 +52273,8 @@ func (c *ClientWithResponses) InviteMemberWithBodyWithResponse(ctx context.Conte
 // once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 // request's origin when it is not set, followed by
 // `/invitations/<secret>`; it expires after seven days. An email the
-// instance holds, whatever its case, is refused `already_exists`.
+// instance holds, whatever its case, is refused `already_exists`. Needs
+// a signed-in session: an API token is refused `session_required`.
 //
 // The invitation may carry a `grant` of a built-in role in a project,
 // which accepting it makes by hand, in the name of the instance admin
@@ -52188,7 +52316,10 @@ func (c *ClientWithResponses) GetMemberWithResponse(ctx context.Context, member 
 // `last_instance_admin`, and demoting one an auth provider's group
 // mapping made `sso_sourced`: only the provider takes it away. Making a
 // member still invited an instance admin is refused `member_invited`:
-// they are made one once they have accepted their invitation.
+// they are made one once they have accepted their invitation. Needs a
+// signed-in session: an API token is refused `session_required`, so a
+// leaked token cannot promote a member, or change a member's email to
+// take their account over.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -52209,7 +52340,10 @@ func (c *ClientWithResponses) UpdateMemberWithBodyWithResponse(ctx context.Conte
 // `last_instance_admin`, and demoting one an auth provider's group
 // mapping made `sso_sourced`: only the provider takes it away. Making a
 // member still invited an instance admin is refused `member_invited`:
-// they are made one once they have accepted their invitation.
+// they are made one once they have accepted their invitation. Needs a
+// signed-in session: an API token is refused `session_required`, so a
+// leaked token cannot promote a member, or change a member's email to
+// take their account over.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -52294,7 +52428,8 @@ func (c *ClientWithResponses) UnlinkMemberIdentityWithResponse(ctx context.Conte
 // keeps the project and role of the one it replaces only while the
 // member who issued that one still holds `grant.manage` in the project;
 // otherwise it grants nothing, and the audit log records
-// `invitation.grant_revoked`.
+// `invitation.grant_revoked`. Needs a signed-in session: an API token is
+// refused `session_required`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -52315,7 +52450,9 @@ func (c *ClientWithResponses) ReissueInvitationWithResponse(ctx context.Context,
 // `member_not_active`: issue their invitation again instead. A
 // deactivated member is refused `member_deactivated`. Earlier password
 // resets of the member stay open; completing one ends the others.
-// Recorded as `password.reset_issued`, without the link.
+// Recorded as `password.reset_issued`, without the link. Needs a
+// signed-in session: an API token is refused `session_required`, so a
+// leaked token cannot take over a member's account.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -52335,7 +52472,8 @@ func (c *ClientWithResponses) IssuePasswordResetWithResponse(ctx context.Context
 // invitation's one-time link, as on invitation. What their
 // deactivation revoked stays revoked: they sign in afresh and create
 // new tokens. Reactivating a member who is not deactivated changes
-// nothing.
+// nothing. Needs a signed-in session: an API token is refused
+// `session_required`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -52677,12 +52815,13 @@ func (c *ClientWithResponses) CreateAttributeWithResponse(ctx context.Context, p
 // ListDiscoveredAttributesWithResponse Attributes SDKs sent that the project does not declare
 //
 // The attributes that contexts evaluated through the SDK API and the
-// tester carried without the project declaring them, by key, with the
+// tester (when its caller holds `declaration.manage`) carried without
+// the project declaring them, by key, with the
 // JSON types seen and when they were first and last seen. Only an
 // attribute's key and type are recorded, never a value. A dismissed
 // attribute is left out until it is seen with a type not seen before;
-// an attribute declared since is left out. A project records at most
-// 500, dismissed ones included.
+// an attribute declared since is left out. A project lists at most
+// 500; dismissed ones are not counted, so dismissing frees a place.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -54197,8 +54336,9 @@ func (c *ClientWithResponses) StopExperimentWithResponse(ctx context.Context, pr
 // type then unit identifier and prerequisites by flag, so that two
 // exports of an unchanged project are the same bytes. Rule identifiers and rollout
 // salts are in it, which keep every unit in its bucket in a copy; owners
-// are email addresses, and an override's note is in it and its author is
-// not.
+// are email addresses, written only for an owner who holds a grant in
+// the project and empty for any other, and an override's note is in it
+// and its author is not.
 //
 // Members, grants, tokens, SDK keys, webhook subscriptions, change
 // requests, audit entries, events, the standard attributes and the
@@ -54757,8 +54897,9 @@ func (c *ClientWithResponses) ListGrantsWithResponse(ctx context.Context, projec
 // project is refused `role_not_allowed`, naming it in `permission`;
 // the same member and role twice `already_granted`; a deactivated
 // member `member_deactivated`; an unknown member or role
-// `invalid_grant`. Only a member grants: a project token never changes
-// who has access.
+// `invalid_grant`. Only a member grants, signed in: an API token, a
+// project token or a personal one, is refused `session_required`, so a
+// leaked token cannot leave behind access that outlives it.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -54783,8 +54924,9 @@ func (c *ClientWithResponses) CreateGrantWithBodyWithResponse(ctx context.Contex
 // project is refused `role_not_allowed`, naming it in `permission`;
 // the same member and role twice `already_granted`; a deactivated
 // member `member_deactivated`; an unknown member or role
-// `invalid_grant`. Only a member grants: a project token never changes
-// who has access.
+// `invalid_grant`. Only a member grants, signed in: an API token, a
+// project token or a personal one, is refused `session_required`, so a
+// leaked token cannot leave behind access that outlives it.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -54838,8 +54980,10 @@ func (c *ClientWithResponses) DeleteGrantWithResponse(ctx context.Context, proje
 // or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 // only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 // empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-// whatever the server's limit for other bodies.
+// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+// whatever the server's limit for other bodies; the list is read
+// entry by entry and cut one past the bound, so a longer one is refused
+// without being held whole.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -54873,8 +55017,10 @@ func (c *ClientWithResponses) CheckHashUniformityWithBodyWithResponse(ctx contex
 // or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 // only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 // empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-// whatever the server's limit for other bodies.
+// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+// whatever the server's limit for other bodies; the list is read
+// entry by entry and cut one past the bound, so a longer one is refused
+// without being held whole.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -55226,7 +55372,8 @@ func (c *ClientWithResponses) ListProjectInvitationsWithResponse(ctx context.Con
 // deactivated before it is accepted; the audit log records
 // `invitation.grant_revoked` with the reason `inviter_lost_permission`
 // or `inviter_deactivated`. Only a member invites: a project token
-// never holds `grant.manage`.
+// never holds `grant.manage`. Needs a signed-in session: an API token is
+// refused `session_required`.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -55263,7 +55410,8 @@ func (c *ClientWithResponses) InviteProjectMemberWithBodyWithResponse(ctx contex
 // deactivated before it is accepted; the audit log records
 // `invitation.grant_revoked` with the reason `inviter_lost_permission`
 // or `inviter_deactivated`. Only a member invites: a project token
-// never holds `grant.manage`.
+// never holds `grant.manage`. Needs a signed-in session: an API token is
+// refused `session_required`.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

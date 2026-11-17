@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/testkit"
@@ -167,7 +168,12 @@ func TestDiscoveredAttributesAreCappedPerProject(t *testing.T) {
 		}
 		return "{" + strings.Join(parts, ",") + "}"
 	}
-	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, attributes(0, 600))})
+	// A replica holds a project's sightings 128 at a time, so the project
+	// reaches its cap over several rounds.
+	for from := 0; from < 600; from += 100 {
+		mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, attributes(from, from+100))})
+		discovered(t, srv, admin, p.Key)
+	}
 	got := discovered(t, srv, admin, p.Key)
 	if len(got) != 500 || got[0] != "k1000 string 1" || got[499] != "k1499 string 1" {
 		t.Fatalf("discovered %d, first %q, last %q; want the first 500 by key", len(got), got[0], got[len(got)-1])
@@ -177,15 +183,39 @@ func TestDiscoveredAttributesAreCappedPerProject(t *testing.T) {
 	}
 	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"k1001":1,"k1600":"x"}`)})
 	got = discovered(t, srv, admin, p.Key)
-	if len(got) != 499 || got[0] != "k1001 string,number 2" || slices.Contains(got, "k1600 string 1") {
-		t.Errorf("at the cap, dismissed included: %d listed, first %q; want known keys merged and no new one", len(got), got[0])
+	if len(got) != 500 || got[0] != "k1001 string,number 2" || !slices.Contains(got, "k1600 string 1") {
+		t.Errorf("a dismissed key frees its place: %d listed, first %q; want k1001 merged and k1600 kept", len(got), got[0])
+	}
+	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"k1601":"x"}`)})
+	if got := discovered(t, srv, admin, p.Key); slices.Contains(got, "k1601 string 1") {
+		t.Errorf("at the cap again: k1601 listed")
+	}
+	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"k1000":1}`)})
+	if got := discovered(t, srv, admin, p.Key); len(got) != 500 || slices.ContainsFunc(got, func(s string) bool { return strings.HasPrefix(s, "k1000 ") }) {
+		t.Errorf("a dismissed key seen with a new type at the cap: %d listed, want 500 without k1000", len(got))
 	}
 	if res := do(admin.DeclareDiscoveredAttributeWithResponse(t.Context(), p.Key, "k1002", management.DiscoveredAttributeDeclaration{Type: "string"})); res.JSON201 == nil {
 		t.Fatalf("declare = %d %s", res.StatusCode(), res.Body)
 	}
-	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"k1600":"x"}`)})
-	if got := discovered(t, srv, admin, p.Key); !slices.Contains(got, "k1600 string 1") {
-		t.Errorf("a declaration frees a place: k1600 not listed")
+	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"k1601":"x"}`)})
+	if got := discovered(t, srv, admin, p.Key); !slices.Contains(got, "k1601 string 1") {
+		t.Errorf("a declaration frees a place: k1601 not listed")
+	}
+}
+
+func TestTheTesterOfAViewerRecordsNoDiscoveredAttributes(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	viewer := testkit.Client(t, srv, testkit.GrantedToken(t, testkit.Pool(t), projectIDOf(p), access.RoleViewer))
+
+	mustEvaluate(t, viewer, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"junk":"x"}`)})
+	if got := discovered(t, srv, admin, p.Key); len(got) != 0 {
+		t.Errorf("a viewer's context recorded %v, want nothing", got)
+	}
+	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"real":"x"}`)})
+	if got := discovered(t, srv, admin, p.Key); !slices.Equal(got, []string{"real string 1"}) {
+		t.Errorf("a manager's context recorded %v, want real", got)
 	}
 }
 
@@ -209,36 +239,45 @@ func droppedWarning(t *testing.T, srv *testkit.Server) map[string]any {
 	return warnings[0].Attrs
 }
 
-func TestAReplicaHoldsAtMostAThousandSightingsOfAProject(t *testing.T) {
+func TestOneProjectCannotTakeTheWholeDiscoveryQueueOfAReplica(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
-	p := createProject(t, admin, projectKey())
-	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, attributeKeys("k", 1001))})
-	if got := discovered(t, srv, admin, p.Key); len(got) != 500 {
-		t.Errorf("discovered %d, want the project's 500", len(got))
+	noisy, quiet := createProject(t, admin, projectKey()), createProject(t, admin, projectKey())
+	mustEvaluate(t, admin, noisy.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, attributeKeys("k", 1001))})
+	mustEvaluate(t, admin, quiet.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, attributeKeys("q", 30))})
+	if got := discovered(t, srv, admin, quiet.Key); len(got) != 30 {
+		t.Errorf("quiet project: discovered %d, want all 30 whatever the noisy one sent", len(got))
 	}
-	if got := droppedWarning(t, srv); got["dropped"] != int64(1) || got["project_full"] != int64(1) || got["queue_full"] != int64(0) {
-		t.Errorf("warning = %v, want the one sighting beyond the project's thousand", got)
+	if got := droppedWarning(t, srv); got["dropped"] != int64(873) || got["project_full"] != int64(873) || got["queue_full"] != int64(0) {
+		t.Errorf("warning = %v, want the 873 sightings beyond the project's 128", got)
+	}
+	if got := discovered(t, srv, admin, noisy.Key); len(got) != 128 {
+		t.Errorf("noisy project: discovered %d, want its 128", len(got))
 	}
 }
 
 func TestAReplicaHoldsAtMost1024SightingsInAll(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
-	first, second := createProject(t, admin, projectKey()), createProject(t, admin, projectKey())
-	mustEvaluate(t, admin, first.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, attributeKeys("k", 1000))})
-	mustEvaluate(t, admin, second.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, attributeKeys("k", 30))})
+	var projects []management.Project
+	for range 8 {
+		p := createProject(t, admin, projectKey())
+		mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, attributeKeys("k", 128))})
+		projects = append(projects, p)
+	}
+	last := createProject(t, admin, projectKey())
+	mustEvaluate(t, admin, last.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, attributeKeys("k", 6))})
 	// A key already held takes no new place, so it is merged however full
 	// the queue is.
-	mustEvaluate(t, admin, first.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"k0":"x"}`)})
+	mustEvaluate(t, admin, projects[0].Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"k0":"x"}`)})
 
-	if got := discovered(t, srv, admin, second.Key); len(got) != 24 {
-		t.Errorf("second project: discovered %d, want the 24 places the first left", len(got))
+	if got := discovered(t, srv, admin, last.Key); len(got) != 0 {
+		t.Errorf("ninth project: discovered %d, want none: the queue was full", len(got))
 	}
 	if got := droppedWarning(t, srv); got["dropped"] != int64(6) || got["queue_full"] != int64(6) || got["project_full"] != int64(0) {
 		t.Errorf("warning = %v, want the six sightings beyond 1,024", got)
 	}
-	if got := discovered(t, srv, admin, first.Key); len(got) != 500 || got[0] != "k0 string 2" {
+	if got := discovered(t, srv, admin, projects[0].Key); len(got) != 128 || got[0] != "k0 string 2" {
 		t.Errorf("first project: %d discovered, first %q; want k0 seen twice", len(got), got[0])
 	}
 }

@@ -63,6 +63,21 @@ class TestingTest < Minitest::Test
     assert_equal 1, c.recorder.evaluation_summaries.size
   end
 
+  def test_the_recorder_keeps_the_latest_ten_thousand_of_each_list
+    recorder = Flagnetic::Recorder.new
+    time = "2026-01-01T00:00:00Z"
+    10_005.times do |i|
+      recorder.send(:record_event, { "type" => "exposure", "event_id" => "e#{i}", "evaluation_reason" => "fallthrough",
+                                     "occurred_at" => time })
+      recorder.send(:record_event, { "type" => "alias", "event_id" => "a#{i}", "occurred_at" => time })
+      recorder.send(:record, Flagnetic::Recorder::EvaluationSummary.new(event_id: "s#{i}", counts: []))
+    end
+    [[recorder.exposures, "e"], [recorder.aliases, "a"], [recorder.evaluation_summaries, "s"]].each do |list, prefix|
+      assert_equal 10_000, list.size
+      assert_equal ["#{prefix}5", "#{prefix}10004"], [list.first.event_id, list.last.event_id]
+    end
+  end
+
   def test_offline_from_a_document_and_a_file
     doc = document(1, { "on" => true })
     assert Flagnetic::Testing.offline(doc).bool("on", default: false)

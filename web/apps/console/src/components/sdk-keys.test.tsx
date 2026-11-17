@@ -209,6 +209,35 @@ describe("the SDK keys of an environment", () => {
     expect(sent).toEqual({ kind: "server", name: "checkout backend", allowed_origins: [] });
   });
 
+  it("show a new key's value without waiting for the list to be read again", async () => {
+    let created = false;
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    serve(["project.read", "sdk_key.manage"], () => [], {
+      [`GET ${base}`]: async () => {
+        if (created) await gate;
+        return { status: 200, body: { items: [] } };
+      },
+      [`POST ${base}`]: () => {
+        created = true;
+        return { status: 201, body: { key: serverKey, value } };
+      },
+    });
+    renderKeys();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "New SDK key" }));
+    const dialog = await screen.findByRole("dialog", { name: "New SDK key" });
+    await user.type(within(dialog).getByLabelText("Name"), "checkout backend");
+    await user.click(within(dialog).getByRole("button", { name: "Create key" }));
+
+    // The list is still being read, and the value is already on the screen.
+    const reveal = await screen.findByRole("dialog", { name: "The new SDK key" });
+    expect(within(reveal).getByText(value)).toBeInTheDocument();
+    release();
+  });
+
   it("explain the limit of active keys in the dialog", async () => {
     serve(["project.read", "sdk_key.manage"], () => [], {
       [`POST ${base}`]: () => problem(409, "sdk_key_limit_reached"),

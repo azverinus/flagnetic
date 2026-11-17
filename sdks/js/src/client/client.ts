@@ -6,7 +6,8 @@
 // never imports the evaluator, which keeps it small in a bundle.
 import { Backoff } from "../internal/backoff.js";
 import { realClock, type Clock } from "../internal/clock.js";
-import { trimTrailingSlashes } from "../internal/http.js";
+import { readBoundedText, trimTrailingSlashes } from "../internal/http.js";
+import { MAX_VALUE_DEPTH } from "../internal/json.js";
 import { causeOf, consoleLogger, safeLog, type LogLevel } from "../internal/logger.js";
 import { SDK_API_PATH, VERSION } from "../version.js";
 import { aliasEvent, exposureEvent, ExposureSuppressor, type AliasLink } from "../internal/events.js";
@@ -108,6 +109,9 @@ export function createClient(sdkKey: string, baseUrl: string, options: ClientOpt
 export function createClientWith(sdkKey: string, baseUrl: string, options: ClientOptions, internals: ClientInternals): FlagneticClient {
   return new FlagneticClient(sdkKey, baseUrl, options, internals);
 }
+
+/** The most an evaluate answer may hold, in bytes: a context's values are small, and this bounds what a faulty or hostile peer can make the page buffer. */
+const MAX_ANSWER_BYTES = 32 * 1024 * 1024;
 
 /**
  * A client-mode client. Every public member is total: an internal failure is
@@ -365,8 +369,9 @@ export class FlagneticClient {
 
   /**
    * Replaces the context and evaluates it. The previous values keep serving
-   * until the response arrives, so signing in causes no flash of defaults;
-   * the promise resolves with the stage the new values reached (`fresh`
+   * until the response arrives, so signing in causes no flash of defaults,
+   * but record no exposure, since their assignments belong to the previous
+   * context; the promise resolves with the stage the new values reached (`fresh`
    * once they arrived, `last_good` when the request failed) and the change
    * listeners receive the keys whose value differs. Never rejects.
    */
@@ -419,6 +424,40 @@ export class FlagneticClient {
     let timer: unknown;
     await Promise.race([flushed, new Promise<void>((resolve) => (timer = this.clock.setTimeout(resolve, Math.max(0, timeout))))]);
     this.clock.clearTimeout(timer);
+  }
+
+  /**
+   * Removes what this SDK key keeps in browser storage: the last good values
+   * of every unit set it stored and the event queue, with the exposures and
+   * aliases not yet sent and the evaluation counts not yet summarized, so
+   * nothing recorded before the call is sent or written back. For the
+   * sign-out path of a shared browser: `await flush()` first to send what is
+   * queued, and call it after `setContext` has resolved, since accepting the
+   * values of an evaluation still in flight stores them again. The values in
+   * memory keep serving; the client goes on storing what it accepts from
+   * here on. Never throws.
+   */
+  clearStored(): void {
+    try {
+      const index = this.store.get(this.keys.index);
+      if (index !== null) {
+        try {
+          const listed: unknown = JSON.parse(index);
+          if (Array.isArray(listed)) {
+            // Only this key's own entries: an index is in shared storage,
+            // where anything may have written it.
+            for (const k of listed) if (typeof k === "string" && k.startsWith(`${this.keys.index}.`)) this.store.remove(k);
+          }
+        } catch {
+          // A torn index lists nothing to remove; it goes below all the same.
+        }
+      }
+      this.store.remove(this.keys.index);
+      if (this.ingest) this.ingest.clear();
+      else this.store.remove(this.keys.events);
+    } catch (e) {
+      this.log("error", "evaluation_failed", { operation: "clear_stored", cause: causeOf(e) });
+    }
   }
 
   /**
@@ -488,9 +527,13 @@ export class FlagneticClient {
       this.summary.count(key, d.variation, d.reason);
       // What an exposure call reports is what was served here, not what the
       // values document says by the time it is called.
-      if (d.experiment) this.served.set(key, d);
-      else this.served.delete(key);
-      if (d.experiment && this.values?.flags.get(key)?.automaticExposure === true) this.emitExposure(key, d);
+      // Until the new context's answer arrives the held values still answer
+      // the previous one: their experiment blocks carry that context's unit
+      // IDs, and an exposure for them would record a unit that is not here.
+      if (d.experiment && this.context === this.acceptedContext) {
+        this.served.set(key, d);
+        if (this.values?.flags.get(key)?.automaticExposure === true) this.emitExposure(key, d);
+      } else this.served.delete(key);
     } catch (e) {
       this.log("error", "evaluation_failed", { flag: key, cause: causeOf(e) });
     }
@@ -534,7 +577,7 @@ export class FlagneticClient {
       }
       const served = this.served.get(key);
       if (!served) {
-        this.log("debug", "exposure_skipped", { flag: key, cause: this.values ? "no_experiment" : "no_values" });
+        this.log("debug", "exposure_skipped", { flag: key, cause: this.values ? (this.context === this.acceptedContext ? "no_experiment" : "previous_context") : "no_values" });
         return;
       }
       this.emitExposure(key, served);
@@ -592,25 +635,38 @@ export class FlagneticClient {
    * Accepts a values document from source; false, with `fetch_failed`, when
    * the fallback chain refuses it.
    */
-  private accept(source: unknown, from: string, anyVersion = false): boolean {
+  private accept(source: unknown, from: string, anyVersion = false, answered?: Context): boolean {
     let doc: ValuesDocument;
+    let changed: string[];
     try {
       doc = ValuesDocument.parse(source);
       const held = this.values;
       if (!anyVersion && held && doc.rulesetVersion < held.rulesetVersion) {
         throw new Refused("version", `ruleset_version ${doc.rulesetVersion} is below the held ${held.rulesetVersion}`);
       }
+      // Comparing walks every served value: whatever it throws refuses the
+      // document like a parse failure, and the held values keep serving.
+      changed = ValuesDocument.changedKeys(held, doc);
     } catch (e) {
       this.refused(e, from);
       return false;
     }
-    const changed = ValuesDocument.changedKeys(this.values, doc);
     this.values = doc;
+    // Set before the listeners run, so a getter they call already serves
+    // the new context's assignments.
+    if (answered) this.acceptedContext = answered;
     this.receivedAt = new Date(this.now());
     this.staleSince = undefined;
     this.log("info", "values_loaded", { source: from, ruleset_version: doc.rulesetVersion, flags: doc.flags.size });
     for (const ignored of doc.ignoredAttributes) {
       this.once(`attr:${ignored.name}`, "warn", "attribute_ignored", { name: ignored.name, code: ignored.code });
+    }
+    for (const flag of doc.tooDeep) {
+      this.once(`deep:${flag}:${String(doc.rulesetVersion)}`, "error", "value_too_deep", {
+        flag,
+        max_depth: MAX_VALUE_DEPTH,
+        ruleset_version: doc.rulesetVersion,
+      });
     }
     const dropped = this.refuseLocalOverrides(doc);
     this.setStage("fresh");
@@ -833,7 +889,14 @@ export class FlagneticClient {
         this.failed({ source: "network", cause: "status", status: res.status, trigger });
         return false;
       }
-      text = await res.text();
+      try {
+        text = await readBoundedText(res, MAX_ANSWER_BYTES);
+      } catch (e) {
+        if (this.closed) return false;
+        const reason: unknown = controller.signal.aborted ? (controller.signal.reason as unknown) : e;
+        this.failed({ source: "network", cause: "network", trigger, detail: causeOf(reason) });
+        return false;
+      }
     } finally {
       this.clock.clearTimeout(timer);
       this.abortInFlight = undefined;
@@ -843,8 +906,7 @@ export class FlagneticClient {
     // for the previous context, and the evaluation of the new one follows,
     // so it neither serves nor counts as a failure.
     if (context !== this.context) return false;
-    if (!this.accept(text, "network", context !== this.acceptedContext)) return false;
-    this.acceptedContext = context;
+    if (!this.accept(text, "network", context !== this.acceptedContext, context)) return false;
     // The server answers again, so a stream a refusal closed comes back.
     this.logged.delete("revoked");
     if (this.stream && !this.stream.running) this.stream.open();
@@ -884,10 +946,16 @@ export class FlagneticClient {
     const receivedAt = this.receivedAt;
     if (!values || !receivedAt) return;
     const key = this.keys.lastGood(units);
-    this.store.set(
-      key,
-      JSON.stringify({ units, ruleset_version: values.rulesetVersion, received_at: receivedAt.toISOString(), values: values.raw }),
-    );
+    let entry: string;
+    try {
+      entry = JSON.stringify({ units, ruleset_version: values.rulesetVersion, received_at: receivedAt.toISOString(), values: values.raw });
+    } catch (e) {
+      // A field this SDK does not read can still nest too deeply to
+      // serialize: the values serve, they only do not survive a reload.
+      this.log("warn", "store_failed", { operation: "write", key, cause: causeOf(e) });
+      return;
+    }
+    this.store.set(key, entry);
     let keys: string[] = [];
     const index = this.store.get(this.keys.index);
     if (index !== null) {
@@ -912,7 +980,7 @@ export class FlagneticClient {
 
   /** @internal Serves an offline document; the version never has to rise. */
   loadOffline(source: unknown): void {
-    this.accept(source, "offline", true);
+    this.accept(source, "offline", true, this.context);
   }
 
   /** @internal */

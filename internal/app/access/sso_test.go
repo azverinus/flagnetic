@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"errors"
 	"strings"
 	"testing"
 
@@ -57,5 +58,25 @@ func TestSSOProvisionsNoMemberForAnAddressThatIsNoneOrIsTaken(t *testing.T) {
 		if err == nil {
 			t.Errorf("provisioning a member for %s succeeded", name)
 		}
+	}
+}
+
+// A session is never opened for a member deactivated since the provider
+// vouched for them: it would survive the revocation of their sessions and
+// live again when they are reactivated.
+func TestSSOOpensNoSessionForAMemberDeactivatedInTheMeantime(t *testing.T) {
+	pool := testkit.Pool(t)
+	sso := newSSO(t)
+	tx := postgres.NewTransactor(pool)
+	m := testkit.NewMember(t, pool, testkit.WithStatus(access.MemberDeactivated))
+	// The member as the sign-in read them, before the deactivation.
+	stale := access.Member{ID: m.ID, Email: m.Email, DisplayName: "Test Member", Status: access.MemberActive}
+
+	err := tx.Within(t.Context(), func(ctx context.Context) error {
+		_, err := sso.OpenSession(ctx, appaccess.SSOSignIn{Member: stale, Method: "oidc", Provider: "idp"})
+		return err
+	})
+	if !errors.Is(err, access.ErrSessionExpired) {
+		t.Fatalf("OpenSession for a deactivated member = %v, want session_expired", err)
 	}
 }

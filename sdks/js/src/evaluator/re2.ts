@@ -33,7 +33,21 @@ export type Matcher = (input: string) => boolean;
 /** Compiles an RE2 pattern into a matcher, or throws a SyntaxError. */
 export function compileRE2(pattern: string): Matcher {
   const prog = compile(new Parser(codePoints(pattern)).parse());
-  return (input) => run(prog, input);
+  return (input) => {
+    // An input over the cap is a non-match, not an error: the attribute
+    // comes from the caller, and the Pike VM's work grows with its length.
+    // Code units times three bounds the UTF-8 length, so a short string
+    // skips the exact count.
+    if (input.length * 3 > MAX_INPUT_BYTES && utf8Bytes(input) > MAX_INPUT_BYTES) return false;
+    return run(prog, input);
+  };
+}
+
+/** The longest input, in UTF-8 bytes, that a `matches` condition tests; a longer one does not match. */
+export const MAX_INPUT_BYTES = 64 * 1024;
+
+function utf8Bytes(s: string): number {
+  return new TextEncoder().encode(s).length;
 }
 
 // ---------------------------------------------------------------- syntax

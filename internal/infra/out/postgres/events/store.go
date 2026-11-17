@@ -209,6 +209,10 @@ func (s *Store) EnsureEventPartitions(ctx context.Context, at time.Time) error {
 	return nil
 }
 
+// partitionLockTimeout bounds how long creating partitions waits for a lock,
+// the advisory one that serializes replicas included.
+var partitionLockTimeout = 5 * time.Second
+
 // CreateEventPartitions creates the partitions of every raw event table for
 // the UTC day of from and the ahead days after it, those missing. It runs
 // on its own connection, outside any unit of work the context carries, so
@@ -221,15 +225,18 @@ func (s *Store) CreateEventPartitions(ctx context.Context, from time.Time, ahead
 		return fmt.Errorf("creating event partitions: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('event_partitions', 0))`); err != nil {
-		return fmt.Errorf("creating event partitions: %w", err)
-	}
 	// Attaching a partition locks its parent table against every reader and
 	// writer, and while it waits for a long reader to finish, every insert
 	// queues behind it. Giving up after a few seconds bounds that stall: the
 	// worker tries again at its next round, days ahead of need, and a batch
 	// that needed the day now fails rather than hangs, and is retried.
-	if _, err = tx.Exec(ctx, `SET LOCAL lock_timeout = '5s'`); err != nil {
+	if _, err = tx.Exec(ctx, fmt.Sprintf(`SET LOCAL lock_timeout = '%dms'`, partitionLockTimeout.Milliseconds())); err != nil {
+		return fmt.Errorf("creating event partitions: %w", err)
+	}
+	// The advisory lock comes after the timeout, so that a replica holding
+	// it for long makes the others give up too instead of holding their
+	// connections while they wait.
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('event_partitions', 0))`); err != nil {
 		return fmt.Errorf("creating event partitions: %w", err)
 	}
 	var days []string
@@ -333,24 +340,71 @@ func (s *Store) LinkAliases(ctx context.Context, aliases []events.AliasRecord) e
 		fromTypes[i], fromIDs[i], toTypes[i], toIDs[i] = a.Alias.FromUnitType, a.Alias.FromUnitID, a.Alias.ToUnitType, a.Alias.ToUnitID
 		occurredAt[i], receivedAt[i] = a.Alias.OccurredAt, a.ReceivedAt
 	}
+	// The environment's count moves by the rows this adds, in the statement
+	// that adds them, so the count and the links never part. One batch is one
+	// key's, so one environment's.
 	_, err := s.db(ctx).Exec(ctx, `
-		INSERT INTO alias_links (environment_id, from_unit_type, from_unit_id, to_unit_type, to_unit_id, event_id,
-			occurred_at, received_at)
-		SELECT DISTINCT ON (t.environment_id, t.from_unit_type, t.from_unit_id, t.to_unit_type, t.to_unit_id)
-			t.environment_id, t.from_unit_type, t.from_unit_id, t.to_unit_type, t.to_unit_id, t.event_id, t.occurred_at,
-			t.received_at
-		FROM unnest($1::uuid[], $2::text[], $3::text[], $4::text[], $5::text[], $6::uuid[], $7::timestamptz[],
-			$8::timestamptz[]) AS t (environment_id, from_unit_type, from_unit_id, to_unit_type, to_unit_id, event_id,
-			occurred_at, received_at)
-		ORDER BY t.environment_id, t.from_unit_type, t.from_unit_id, t.to_unit_type, t.to_unit_id, t.occurred_at, t.event_id
-		ON CONFLICT (environment_id, from_unit_type, from_unit_id, to_unit_type, to_unit_id) DO UPDATE SET
-			event_id = excluded.event_id, occurred_at = excluded.occurred_at, received_at = excluded.received_at
-		WHERE excluded.occurred_at < alias_links.occurred_at`,
+		WITH linked AS (
+			INSERT INTO alias_links (environment_id, from_unit_type, from_unit_id, to_unit_type, to_unit_id, event_id,
+				occurred_at, received_at)
+			SELECT DISTINCT ON (t.environment_id, t.from_unit_type, t.from_unit_id, t.to_unit_type, t.to_unit_id)
+				t.environment_id, t.from_unit_type, t.from_unit_id, t.to_unit_type, t.to_unit_id, t.event_id, t.occurred_at,
+				t.received_at
+			FROM unnest($1::uuid[], $2::text[], $3::text[], $4::text[], $5::text[], $6::uuid[], $7::timestamptz[],
+				$8::timestamptz[]) AS t (environment_id, from_unit_type, from_unit_id, to_unit_type, to_unit_id, event_id,
+				occurred_at, received_at)
+			ORDER BY t.environment_id, t.from_unit_type, t.from_unit_id, t.to_unit_type, t.to_unit_id, t.occurred_at, t.event_id
+			ON CONFLICT (environment_id, from_unit_type, from_unit_id, to_unit_type, to_unit_id) DO UPDATE SET
+				event_id = excluded.event_id, occurred_at = excluded.occurred_at, received_at = excluded.received_at
+			WHERE excluded.occurred_at < alias_links.occurred_at
+			RETURNING environment_id, (xmax = 0) AS inserted)
+		INSERT INTO alias_link_counts (environment_id, links)
+		SELECT environment_id, count(*) FROM linked WHERE inserted GROUP BY environment_id
+		ON CONFLICT (environment_id) DO UPDATE SET links = alias_link_counts.links + excluded.links`,
 		environments, fromTypes, fromIDs, toTypes, toIDs, eventIDs, occurredAt, receivedAt)
 	if err != nil {
 		return fmt.Errorf("linking aliases: %w", err)
 	}
 	return nil
+}
+
+// AliasLinkCount returns how many alias links environment holds.
+func (s *Store) AliasLinkCount(ctx context.Context, environment workspace.EnvironmentID) (int64, error) {
+	var n int64
+	err := s.db(ctx).QueryRow(ctx, `SELECT coalesce((SELECT links FROM alias_link_counts WHERE environment_id = $1), 0)`,
+		environment.Bytes()).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("counting alias links: %w", err)
+	}
+	return n, nil
+}
+
+// LinkedPairs returns which of pairs are already linked in environment.
+func (s *Store) LinkedPairs(ctx context.Context, environment workspace.EnvironmentID, pairs []events.AliasPair,
+) (map[events.AliasPair]bool, error) {
+	n := len(pairs)
+	fromTypes, fromIDs, toTypes, toIDs := make([]string, n), make([]string, n), make([]string, n), make([]string, n)
+	for i, p := range pairs {
+		fromTypes[i], fromIDs[i], toTypes[i], toIDs[i] = p.FromUnitType, p.FromUnitID, p.ToUnitType, p.ToUnitID
+	}
+	rows, err := s.db(ctx).Query(ctx, `
+		SELECT l.from_unit_type, l.from_unit_id, l.to_unit_type, l.to_unit_id
+		FROM alias_links l
+		JOIN unnest($2::text[], $3::text[], $4::text[], $5::text[]) AS t (from_unit_type, from_unit_id, to_unit_type, to_unit_id)
+			USING (from_unit_type, from_unit_id, to_unit_type, to_unit_id)
+		WHERE l.environment_id = $1`, environment.Bytes(), fromTypes, fromIDs, toTypes, toIDs)
+	if err != nil {
+		return nil, fmt.Errorf("reading linked pairs: %w", err)
+	}
+	found, err := pgx.CollectRows(rows, pgx.RowToStructByPos[events.AliasPair])
+	if err != nil {
+		return nil, fmt.Errorf("reading linked pairs: %w", err)
+	}
+	out := make(map[events.AliasPair]bool, len(found))
+	for _, p := range found {
+		out[p] = true
+	}
+	return out, nil
 }
 
 // AliasLinks returns the alias links of environment, in the order of their

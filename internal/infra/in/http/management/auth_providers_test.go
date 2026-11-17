@@ -148,7 +148,7 @@ func TestTheClientSecretIsSealedAndAnEditKeepsItUnlessItNamesANewOne(t *testing.
 		if strings.Contains(p.OIDC.SealedClientSecret, *body.ClientSecret) {
 			t.Fatal("the stored secret is not sealed")
 		}
-		plain, err := keyring.Open(secret.PurposeOIDCClientSecret, p.OIDC.SealedClientSecret)
+		plain, err := keyring.Open(secret.PurposeOIDCClientSecret, p.OIDC.SealedClientSecret, secret.Row("auth_providers", p.ID.String()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -487,6 +487,9 @@ func TestTestingAnAuthProviderThatCannotBeReachedIsABadGatewaySayingWhy(t *testi
 		if len(ext.Failure) > 1<<10 {
 			t.Errorf("%s: failure of %d bytes, want it cut short", name, len(ext.Failure))
 		}
+		if strings.Contains(ext.Failure, "not here") {
+			t.Errorf("%s: the failure hands on what the address answered: %q", name, ext.Failure)
+		}
 	}
 	unknown := do(admin.TestAuthProviderWithResponse(t.Context(), providerSlug()))
 	assertProblem(t, "an unknown provider", unknown.StatusCode(), unknown.Body, http.StatusNotFound, "not_found")
@@ -510,7 +513,7 @@ func redirecting(t *testing.T, hops int) *httptest.Server {
 	return srv
 }
 
-func TestTestingAnAuthProviderFollowsThreeRedirectsAndNeverToPlainHTTPAwayFromLoopback(t *testing.T) {
+func TestTestingAnAuthProviderFollowsThreeRedirectsOnItsHostAndNeverToPlainHTTPAwayFromLoopback(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	test := func(issuer string) *management.TestAuthProviderResponse {
@@ -527,6 +530,20 @@ func TestTestingAnAuthProviderFollowsThreeRedirectsAndNeverToPlainHTTPAwayFromLo
 	}
 	res := test(redirecting(t, 4).URL)
 	assertProblem(t, "four redirects", res.StatusCode(), res.Body, http.StatusBadGateway, "provider_unreachable")
+
+	elsewhere := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `{"issuer":"x"}`)
+	}))
+	t.Cleanup(elsewhere.Close)
+	crossHost := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, elsewhere.URL+r.URL.Path, http.StatusFound)
+	}))
+	t.Cleanup(crossHost.Close)
+	res = test(crossHost.URL)
+	assertProblem(t, "a redirect to another host", res.StatusCode(), res.Body, http.StatusBadGateway, "provider_unreachable")
+	if !strings.Contains(string(res.Body), "another host") {
+		t.Errorf("the failure does not say the redirect went to another host: %s", res.Body)
+	}
 
 	downgrade := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "http://idp.example.com"+r.URL.Path, http.StatusFound)

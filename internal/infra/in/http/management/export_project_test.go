@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"go.yaml.in/yaml/v3"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
@@ -177,7 +178,8 @@ func TestExportHoldsTheProjectsConfigurationAndNothingElse(t *testing.T) {
 	assertJSON(t, "segments", keysOf(d, "segments"), `["employees", "pro"]`)
 	assertJSON(t, "flags", keysOf(d, "flags"), `["banner_text", "matching_v2", "new_matching", "old_flag"]`)
 
-	// A flag carries its definition, its owner by email, whether it is
+	// A flag carries its definition, its owner by email (empty for an owner
+	// holding no grant, as the instance admin here), whether it is
 	// archived and its configuration in every environment, with the rule
 	// identifiers and rollout salts the API shows.
 	stored := getFlag(t, f.admin, k, "new_matching")
@@ -186,7 +188,7 @@ func TestExportHoldsTheProjectsConfigurationAndNothingElse(t *testing.T) {
 		"key": fl["key"], "type": fl["type"], "name": fl["name"], "description": fl["description"], "owner": fl["owner"],
 		"tags": fl["tags"], "lifetime": fl["lifetime"], "automatic_exposure": fl["automatic_exposure"], "archived": fl["archived"],
 		"variations": fl["variations"],
-	}, `{"key": "new_matching", "type": "boolean", "name": "New matching", "description": "", "owner": "`+testkit.InstanceAdminEmail+`",
+	}, `{"key": "new_matching", "type": "boolean", "name": "New matching", "description": "", "owner": "",
 		"tags": ["mobile", "matching"], "lifetime": "temporary", "automatic_exposure": false, "archived": false,
 		"variations": [{"key": "true", "value": true, "name": "true", "description": ""}, {"key": "false", "value": false, "name": "false", "description": ""}]}`)
 	assertJSON(t, "new_matching expected_removal_at", fl["expected_removal_at"], asJSON(t, stored.ExpectedRemovalAt))
@@ -384,7 +386,7 @@ func TestExportHoldsEveryExperimentWhateverItsStatus(t *testing.T) {
 		"owner": e["owner"], "expected_end_at": e["expected_end_at"], "decision": e["decision"], "stopped_at": e["stopped_at"],
 	}, `{"flag": "checkout_title", "unit_type": "user", "variations": [{"variation": "a", "weight": 5000}, {"variation": "b", "weight": 5000}],
 		"traffic_allocation": 7000, "inclusion_salt": "`+running.InclusionSalt+`", "variation_salt": "`+running.VariationSalt+`",
-		"hypothesis": "Short titles raise completed checkouts.", "owner": "`+testkit.InstanceAdminEmail+`",
+		"hypothesis": "Short titles raise completed checkouts.", "owner": "",
 		"expected_end_at": "2027-01-31", "decision": null, "stopped_at": null}`)
 	if got := e["started_at"]; got == nil || got != running.StartedAt.UTC().Format(time.RFC3339Nano) {
 		t.Errorf("started_at = %v, want %v", got, running.StartedAt)
@@ -404,4 +406,48 @@ func TestExportHoldsEveryExperimentWhateverItsStatus(t *testing.T) {
 	// A rule serving an experiment names it by key.
 	rules := entry(t, d, "flags", "checkout_title")["configurations"].(map[string]any)["staging"].(map[string]any)["rules"].([]any)
 	assertJSON(t, "serve", rules[0].(map[string]any)["serve"], `{"kind": "experiment", "experiment": "title_test"}`)
+}
+
+// An export is a project.read answer, so it names an owner by email only when
+// the owner holds a grant in the project, as the project's members list
+// already shows; an instance admin or a former member who owns a flag or an
+// experiment is written with an empty owner.
+func TestExportNamesOnlyOwnersHoldingAGrant(t *testing.T) {
+	f := exportedProject(t)
+	k := f.project.Key
+	pool := testkit.Pool(t)
+	member := testkit.NewMember(t, pool)
+	testkit.Grant(t, pool, projectIDOf(f.project), member.ID, access.RoleDeveloper)
+	owner := openapi_types.UUID(member.ID.Bytes())
+	createFlag(t, f.admin, k, management.FlagCreate{Key: "owned_flag", Type: management.FlagTypeBoolean, Name: "Owned", Owner: &owner})
+	body := validExperiment("owned_test")
+	body.Flag, body.Variations, body.Owner = "owned_flag", weights("true", 5000, "false", 5000), &owner
+	createExperiment(t, f.admin, k, body)
+
+	d := exported(t, f.admin, k)
+	if got := entry(t, d, "flags", "owned_flag")["owner"]; got != member.Email {
+		t.Errorf("flag owner holding a grant = %v, want %s", got, member.Email)
+	}
+	if got := entry(t, d, "experiments", "owned_test")["owner"]; got != member.Email {
+		t.Errorf("experiment owner holding a grant = %v, want %s", got, member.Email)
+	}
+
+	grants := do(f.admin.ListGrantsWithResponse(t.Context(), k))
+	if grants.JSON200 == nil {
+		t.Fatalf("list grants = %d %s", grants.StatusCode(), grants.Body)
+	}
+	for _, g := range grants.JSON200.Items {
+		if g.Member == owner {
+			if r := do(f.admin.DeleteGrantWithResponse(t.Context(), k, g.Id.String())); r.StatusCode() != http.StatusNoContent {
+				t.Fatalf("delete grant = %d %s", r.StatusCode(), r.Body)
+			}
+		}
+	}
+	d = exported(t, f.admin, k)
+	if got := entry(t, d, "flags", "owned_flag")["owner"]; got != "" {
+		t.Errorf("flag owner without a grant = %v, want empty", got)
+	}
+	if got := entry(t, d, "experiments", "owned_test")["owner"]; got != "" {
+		t.Errorf("experiment owner without a grant = %v, want empty", got)
+	}
 }

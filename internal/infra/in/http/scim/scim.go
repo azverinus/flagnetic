@@ -16,6 +16,7 @@ import (
 	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
 	"github.com/azverinus/flagnetic/internal/domain/identity"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/deprecation"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/text"
@@ -25,8 +26,9 @@ import (
 const BaseURL = "/scim/v2"
 
 // maxBody bounds a request's body: a provisioning resource carries no payload
-// worth more.
-const maxBody = 64 << 10
+// worth more than a group's member list, which is about 50 bytes a member, so
+// a group of some twenty thousand members still fits.
+const maxBody = 1 << 20
 
 const (
 	errorSchema = "urn:ietf:params:scim:api:messages:2.0:Error"
@@ -69,6 +71,7 @@ var _ ServerInterface = (*api)(nil)
 func Mount(edge *flaghttp.Server, h Handlers) {
 	a := &api{h: h, log: edge.Logger()}
 	mux := http.NewServeMux()
+	edge.Wrap(BaseURL+"/", deprecation.Middleware(BaseURL, Deprecated))
 	HandlerWithOptions(a, StdHTTPServerOptions{BaseURL: BaseURL, BaseRouter: mux, ErrorHandlerFunc: a.parameterError})
 	// The body limit is judged while it is read, so a SCIM client is told in
 	// its own error document.
@@ -205,7 +208,7 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 	case isScimErr:
 		writeError(w, scimStatuses[scimErr.Type], scimErr.Type, scimErr.Detail)
 	case errors.As(err, &tooLarge):
-		writeError(w, http.StatusRequestEntityTooLarge, "", "the body has more than 64 KiB")
+		writeError(w, http.StatusRequestEntityTooLarge, "", "the body has more than 1 MiB")
 	case errors.Is(err, appidentity.ErrEmailTaken):
 		writeError(w, http.StatusConflict, "uniqueness", "a member with this email exists and cannot be taken over by this provider")
 	case errors.Is(err, appidentity.ErrExternalIDTaken):

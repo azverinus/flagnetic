@@ -1,11 +1,14 @@
 import { QueryClient } from "@tanstack/react-query";
 import { isRedirect } from "@tanstack/react-router";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakeServer, problem } from "@/test/fake-server";
 
 import { meQuery } from "./queries";
 import {
+  announceSessionChange,
+  listenForSessionChange,
+  onSessionChangedElsewhere,
   onSessionEnded,
   requireSignedIn,
   signInSearch,
@@ -142,5 +145,94 @@ describe("the search of the page a failed linking returns to", () => {
     expect(validateLinkErrorSearch({ error: "<script>" })).toEqual({});
     expect(validateLinkErrorSearch({ error: 3 })).toEqual({});
     expect(validateLinkErrorSearch({})).toEqual({});
+  });
+});
+
+describe("a session change in another tab", () => {
+  const where = () => ({ pathname: "/projects/checkout" });
+
+  it("sends a tab that holds a member to sign-in once they signed out elsewhere", () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(meQuery.queryKey, me as never);
+    const navigate = vi.fn();
+
+    onSessionChangedElsewhere(queryClient, where, navigate, vi.fn())("signed-out");
+
+    expect(navigate).toHaveBeenCalledWith({ returnTo: "/projects/checkout", ended: true });
+    expect(queryClient.getQueryData(meQuery.queryKey)).toBeUndefined();
+  });
+
+  it("drops what a tab holds of the first member when another signs in, and reads it again", () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(meQuery.queryKey, me as never);
+    const navigate = vi.fn();
+    const reload = vi.fn();
+
+    onSessionChangedElsewhere(queryClient, where, navigate, reload)("signed-in");
+
+    expect(queryClient.getQueryData(meQuery.queryKey)).toBeUndefined();
+    expect(reload).toHaveBeenCalledOnce();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("leaves a tab that holds nobody alone", () => {
+    const navigate = vi.fn();
+    const reload = vi.fn();
+    const change = onSessionChangedElsewhere(new QueryClient(), where, navigate, reload);
+
+    change("signed-in");
+    change("signed-out");
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
+  });
+});
+
+describe("telling the other tabs", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("reaches a listener in another tab, and only for a change it knows", () => {
+    const open = new Set<{ onmessage: ((event: MessageEvent) => void) | null }>();
+    class FakeChannel {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      constructor() {
+        open.add(this);
+      }
+      postMessage(data: unknown) {
+        for (const other of open) {
+          if (other !== this) other.onmessage?.({ data } as MessageEvent);
+        }
+      }
+      close() {
+        open.delete(this);
+      }
+    }
+    vi.stubGlobal("BroadcastChannel", FakeChannel);
+    const heard = vi.fn();
+    const stop = listenForSessionChange(heard);
+    const otherTab = new FakeChannel();
+    const otherTabHeard = vi.fn();
+    otherTab.onmessage = (event) => otherTabHeard(event.data);
+
+    // What this tab announces reaches the other tab, never this tab's own listener.
+    announceSessionChange("signed-in");
+    expect(otherTabHeard).toHaveBeenCalledWith("signed-in");
+    expect(heard).not.toHaveBeenCalled();
+
+    otherTab.postMessage("signed-out");
+    otherTab.postMessage("something else");
+
+    expect(heard).toHaveBeenCalledOnce();
+    expect(heard).toHaveBeenCalledWith("signed-out");
+    otherTab.close();
+    stop();
+    expect(open.size).toBe(0);
+  });
+
+  it("does nothing where the browser has no broadcast channel", () => {
+    vi.stubGlobal("BroadcastChannel", undefined);
+
+    expect(() => announceSessionChange("signed-out")).not.toThrow();
+    expect(() => listenForSessionChange(vi.fn())()).not.toThrow();
   });
 });

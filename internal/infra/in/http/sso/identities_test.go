@@ -1,10 +1,12 @@
 package sso_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/scim"
@@ -528,7 +530,7 @@ func TestReactivatingAMemberWhoHoldsAnIdentityMakesThemActive(t *testing.T) {
 		t.Fatalf("deactivating = %v, %v: %s", res.StatusCode(), err, res.Body)
 	}
 
-	res, err := e.admin.ReactivateMemberWithResponse(t.Context(), id)
+	res, err := e.session(t).ReactivateMemberWithResponse(t.Context(), id)
 
 	if err != nil || res.JSON200 == nil || res.JSON200.Member.Status != management.MemberStatusActive {
 		t.Fatalf("reactivating a member with an identity and no password = %v, %v: %s", res.StatusCode(), err, res.Body)
@@ -557,7 +559,7 @@ func TestReactivatingAMemberWithNoWayInInvitesThemAgain(t *testing.T) {
 		t.Fatalf("unlinking = %v, %v", un.StatusCode(), err)
 	}
 
-	res, err := e.admin.ReactivateMemberWithResponse(t.Context(), id)
+	res, err := e.session(t).ReactivateMemberWithResponse(t.Context(), id)
 
 	if err != nil || res.JSON200 == nil || res.JSON200.Member.Status != management.MemberStatusInvited || res.JSON200.Invitation == nil {
 		t.Errorf("reactivating a member with no way in = %v, %v: %s", res.StatusCode(), err, res.Body)
@@ -577,7 +579,7 @@ func TestReactivatingAMemberWhoseOnlyIdentityIsAtADisabledProviderInvitesThemAga
 		t.Fatalf("disabling the provider = %v, %v: %s", res.StatusCode(), err, res.Body)
 	}
 
-	res, err := e.admin.ReactivateMemberWithResponse(t.Context(), id)
+	res, err := e.session(t).ReactivateMemberWithResponse(t.Context(), id)
 
 	// An identity at a disabled provider signs nobody in, so it is no way in.
 	if err != nil || res.JSON200 == nil || res.JSON200.Member.Status != management.MemberStatusInvited || res.JSON200.Invitation == nil {
@@ -780,5 +782,100 @@ func TestUnlinkingOneOfTwoIdentitiesAtAProviderTakesBackNothing(t *testing.T) {
 	}
 	if after := e.unlinkedAfter(t, m.Email); after != nil {
 		t.Errorf("identity.unlinked after = %v, want none", after)
+	}
+}
+
+func TestAnOIDCProviderWithIdentitiesKeepsItsIssuer(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	slug := e.forged(t, idp, func(p *provider) { p.autoProvision = false })
+	m := e.passwordMember(t)
+	e.link(t, idp, m.b, slug, "held-subject", nil)
+	before := e.getProvider(t, slug)
+	moved := management.AuthProviderPatch{Issuer: ptr("https://another-issuer.example.com"), ClientSecret: ptr("another-client-secret")}
+	update := func(version int64, patch management.AuthProviderPatch) *management.UpdateAuthProviderResponse {
+		t.Helper()
+		res, err := e.admin.UpdateAuthProviderWithResponse(t.Context(), slug, &management.UpdateAuthProviderParams{IfMatch: ptr(fmt.Sprintf(`"%d"`, version))}, patch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+
+	// A subject of the new issuer equal to one of the old would sign in as the
+	// member who linked it.
+	res := update(before.Version, moved)
+	problemOf(t, "an issuer changed under identities", res.StatusCode(), res.Body, http.StatusConflict)
+	if !strings.Contains(string(res.Body), `"provider_identities_linked"`) {
+		t.Errorf("PATCH issuer = %s, want provider_identities_linked", res.Body)
+	}
+	if after := e.getProvider(t, slug); after.Version != before.Version || *after.Issuer != *before.Issuer {
+		t.Errorf("a refused edit changed the provider: %+v", after)
+	}
+	// What does not name the identity provider's subjects stays editable.
+	if res := update(before.Version, management.AuthProviderPatch{DisplayName: ptr("Renamed")}); res.JSON200 == nil {
+		t.Fatalf("PATCH display name = %d: %s", res.StatusCode(), res.Body)
+	}
+
+	linked := identityAt(t, methodsOf(t, m.b), slug)
+	if res, err := m.b.UnlinkMyIdentityWithResponse(t.Context(), linked.Id.String()); err != nil || res.StatusCode() != http.StatusNoContent {
+		t.Fatalf("unlinking = %v, %v: %s", res.StatusCode(), err, res.Body)
+	}
+	if res := update(before.Version+1, moved); res.JSON200 == nil {
+		t.Errorf("PATCH issuer without identities = %d: %s", res.StatusCode(), res.Body)
+	}
+}
+
+func TestASAMLProviderWithIdentitiesKeepsItsEntityID(t *testing.T) {
+	idp := testkit.StartForgingSAMLIDP(t)
+	other := testkit.StartForgingSAMLIDP(t)
+	e := start(t)
+	p := e.createSAML(t, idp, nil)
+	if b, _ := e.samlSignIn(t, idp, p.Slug, "", samlPerson(uniqueEmail())); signedIn(t, b) == nil {
+		t.Fatal("the sign-in that links the identity failed")
+	}
+
+	res, err := e.admin.UpdateAuthProviderWithResponse(t.Context(), p.Slug, &management.UpdateAuthProviderParams{IfMatch: ptr(`"1"`)},
+		management.AuthProviderPatch{IdpMetadataUrl: ptr(other.MetadataURL)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	problemOf(t, "an entity ID changed under identities", res.StatusCode(), res.Body, http.StatusConflict)
+	if !strings.Contains(string(res.Body), `"provider_identities_linked"`) {
+		t.Errorf("PATCH metadata = %s, want provider_identities_linked", res.Body)
+	}
+	// Metadata of the same entity is the edit that keeps working.
+	res, err = e.admin.UpdateAuthProviderWithResponse(t.Context(), p.Slug, &management.UpdateAuthProviderParams{IfMatch: ptr(`"1"`)},
+		management.AuthProviderPatch{IdpMetadataXml: ptr(idp.Metadata(testkit.SAMLMetadataOptions{}))})
+	if err != nil || res.JSON200 == nil {
+		t.Errorf("PATCH metadata of the same entity = %v, %v: %s", res.StatusCode(), err, res.Body)
+	}
+}
+
+func TestLinkingNeedsASessionThatSignedInRecently(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	c := testkit.Clock()
+	e := start(t, testkit.WithClock(c))
+	slug := e.forged(t, idp, func(p *provider) { p.autoProvision = false })
+	m := e.passwordMember(t)
+
+	// A session hijacked for a while would otherwise link the intruder's own
+	// account, which then outlives the member's change of password.
+	c.Advance(16 * time.Minute)
+	res, err := m.b.LinkMyIdentityWithResponse(t.Context(), slug, management.IdentityLinkStart{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	problemOf(t, "linking from a session opened 16 minutes ago", res.StatusCode(), res.Body, http.StatusForbidden)
+	if !strings.Contains(string(res.Body), `"recent_sign_in_required"`) {
+		t.Errorf("POST link = %s, want recent_sign_in_required", res.Body)
+	}
+
+	// Signing in again opens a recent session, which links.
+	m.b.SignIn(t, m.Email, m.Password)
+	c.Advance(14 * time.Minute)
+	e.link(t, idp, m.b, slug, "recent-subject", nil)
+	if n := len(methodsOf(t, m.b).Identities); n != 1 {
+		t.Errorf("%d identities after linking from a recent session, want 1", n)
 	}
 }

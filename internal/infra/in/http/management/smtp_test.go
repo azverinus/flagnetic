@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -408,7 +409,8 @@ func TestATestMailThatFailsNamesTheFailure(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			mp := testkit.StartMailpit(t, tc.mode)
-			in := startSMTPInstance(t, tc.server)
+			logs := testkit.NewLogSink()
+			in := startSMTPInstance(t, append([]testkit.ServerOption{testkit.WithEdge(func(o *flaghttp.Options) { o.Logger = logs.Logger() })}, tc.server...))
 			body := settingsFor(mp)
 			if tc.edit != nil {
 				tc.edit(t, &body)
@@ -420,8 +422,19 @@ func TestATestMailThatFailsNamesTheFailure(t *testing.T) {
 				t.Fatal(err)
 			}
 			p := assertProblem(t, "the test mail", res.StatusCode(), res.Body, http.StatusBadGateway, "smtp_failed")
-			if p.Failure == nil || *p.Failure != tc.failure {
-				t.Errorf("failure = %v, want %q: %s", p.Failure, tc.failure, res.Body)
+			// The answer does not tell which step failed: that would map the
+			// network behind a host the caller may name. The log does.
+			if p.Failure != nil {
+				t.Errorf("the answer names a failure class %q: %s", *p.Failure, res.Body)
+			}
+			for _, class := range []string{"connection", "tls", "authentication", "rejected"} {
+				if strings.Contains(string(res.Body), class) {
+					t.Errorf("the answer mentions %q: %s", class, res.Body)
+				}
+			}
+			recs := logs.Find("test mail not sent")
+			if len(recs) != 1 || recs[0].Attrs["failure"] != tc.failure {
+				t.Errorf("log records = %+v, want one naming the failure %q", recs, tc.failure)
 			}
 			if strings.Contains(string(res.Body), testkit.MailpitPassword) || strings.Contains(string(res.Body), wrongPassword) {
 				t.Errorf("the failure answers a password: %s", res.Body)
@@ -504,4 +517,12 @@ func TestEveryReplicaLearnsTheSMTPSettingsOfAnother(t *testing.T) {
 		t.Fatalf("DELETE = %v, %v", res.StatusCode(), err)
 	}
 	await("after removing", http.StatusNotFound)
+}
+
+// session signs the instance's admin in afresh, for the operations that
+// create access and refuse every API token; at each call, since a session
+// ends with the idle timeout a test's clock may outrun.
+func (in smtpInstance) session(t *testing.T) *management.ClientWithResponses {
+	t.Helper()
+	return signedIn(t, in.srv, in.member).ClientWithResponses
 }

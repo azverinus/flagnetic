@@ -169,13 +169,22 @@ type remoteTally struct {
 // counted.
 const MaxRemoteCountGroups = 10000
 
+// MaxRemoteCountGroupsPerKey bounds the groups one key holds between two
+// flushes, a tenth of MaxRemoteCountGroups: a client key is public and every
+// evaluation opens a group per flag, so without a share of its own a few
+// requests of one key would fill the groups and leave the evaluations of
+// every other key uncounted for the minute.
+const MaxRemoteCountGroupsPerKey = 1000
+
 // RemoteCounts counts the remote evaluations a replica answers, per key,
 // SDK, platform, app version, flag, variation and true reason, until they
 // are taken as summary rows. The zero value counts nothing yet.
 type RemoteCounts struct {
 	groups map[remoteGroup]*remoteTally
-	// Dropped counts the evaluations not counted because the groups were
-	// full.
+	// perKey is how many groups each key holds.
+	perKey map[SDKKeyID]int
+	// Dropped counts the evaluations not counted because the groups, or
+	// their key's share of them, were full.
 	Dropped int
 }
 
@@ -185,15 +194,17 @@ type RemoteCounts struct {
 func (c *RemoteCounts) Add(e RemoteEvaluator, rulesetVersion int64, results map[string]eval.Result, at time.Time) {
 	if c.groups == nil {
 		c.groups = map[remoteGroup]*remoteTally{}
+		c.perKey = map[SDKKeyID]int{}
 	}
 	for flag, r := range results {
 		g := remoteGroup{key: e.Key.ID, sdk: e.SDK, appVersion: e.AppVersion, flag: flag, variation: r.Variation, reason: r.Reason}
 		t, ok := c.groups[g]
 		if !ok {
-			if len(c.groups) >= MaxRemoteCountGroups {
+			if len(c.groups) >= MaxRemoteCountGroups || c.perKey[e.Key.ID] >= MaxRemoteCountGroupsPerKey {
 				c.Dropped++
 				continue
 			}
+			c.perKey[e.Key.ID]++
 			t = &remoteTally{evaluator: e, first: at}
 			c.groups[g] = t
 		}

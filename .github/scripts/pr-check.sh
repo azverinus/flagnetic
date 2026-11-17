@@ -1,32 +1,39 @@
 #!/usr/bin/env bash
-# Runs on this machine the checks CI will run for the changes of the current
-# branch, so a pull request is opened green. Run it through `task pr:check`,
-# which passes the pinned versions of the tools.
+# Runs on this machine the checks of CI that answer in minutes, for the
+# changes of the current branch, and leaves the server's tests to CI, which
+# runs them in parallel jobs. Run it through `task pr:check`, which passes the
+# pinned versions of the tools.
 #
 #   task pr:check                  the checks for the branch against origin/main
+#   task pr:check -- --full        the server's tests and coverage floors too
 #   task pr:check -- --plan        show what would run, run nothing
 #   task pr:check -- --base REF    compare with another base than origin/main
 #
 # What runs follows from the files changed since the merge base with
-# origin/main, committed or not, and mirrors the jobs of ci.yml:
+# origin/main, committed or not. The rules are those of CI: both read them
+# from ci-plan.sh.
 #
 #   always            DCO sign-off of the commits, and the workflows (actionlint)
 #                     when one changed
 #   Go changed        go.mod tidy of every module of go.work, generated code
 #                     current, govulncheck
-#   server changed    build, golangci-lint, then the tests of the changed
-#                     packages, of every package that depends on them (their
-#                     tests exercise them through the test kit) and of the
-#                     guard tests, with the race detector and a coverage profile
-#                     that go-test-coverage checks against .testcoverage.yml
+#   server changed    build and golangci-lint
 #   a Go module       lint, tests with its coverage floors, when it or a module
 #                     it requires changed
+#   migrations changed  squawk on the migrations added since the merge base, and
+#                     on the bad fixtures; not run without squawk installed
 #   console, the JavaScript, Python, Ruby, Dart and Flutter SDKs
 #                     the steps of their jobs, when their paths changed
-#                     (the path filters are read from the `what changed` jobs
-#                     of ci.yml, so the two cannot drift)
+#   --full            the tests of the changed packages of the server, of
+#                     every package that depends on them (their tests exercise
+#                     them through the test kit) and of the guard tests, with
+#                     the race detector and a coverage profile that
+#                     go-test-coverage checks against .testcoverage.yml. This
+#                     is the slow part, minutes to a quarter of an hour, and
+#                     what CI runs on every pull request: use it to reproduce
+#                     a failure of CI, not before every push.
 #
-# Not replicated, left to CI: CodeQL, the docker build, the oldest Go release
+# Never replicated, left to CI: CodeQL, the docker build, the oldest Go release
 # of the module matrix, the other PostgreSQL versions (tests run on one), the
 # browsers of the SDK suites, the released-requirements check, the
 # end-to-end suites, and Playwright beyond the specs that changed.
@@ -68,10 +75,12 @@ PG_CONTAINER="flagnetic-pr-check-postgres"
 TEST_FLAGS="${PR_CHECK_TEST_FLAGS:-}"
 
 PLAN_ONLY=0
+RUN_TESTS=0
 BASE_REF="origin/main"
 while [ $# -gt 0 ]; do
   case "$1" in
     --plan) PLAN_ONLY=1 ;;
+    --full) RUN_TESTS=1 ;;
     --base) shift; BASE_REF="${1:?--base needs a ref}" ;;
     *) echo "pr-check: unknown argument $1" >&2; exit 2 ;;
   esac
@@ -209,218 +218,32 @@ digest_coverage() { grep -vE '^\s*$' "$1" | head -n 40; return 0; }
 
 git fetch --quiet origin "${BASE_REF#origin/}" 2>/dev/null || say "pr-check: could not fetch $BASE_REF; using the copy of it you have"
 BASE="$(git merge-base HEAD "$BASE_REF")" || { say "pr-check: no merge base with $BASE_REF"; exit 2; }
-CHANGED="$( { git diff --name-only --no-renames "$BASE"; git ls-files --others --exclude-standard; } | sort -u | sed '/^$/d')"
 UNCOMMITTED="$(git status --porcelain | wc -l | tr -d ' ')"
 
-changed() { grep -qE "$1" <<<"$CHANGED"; }
-
+# What the change needs is decided by the script CI asks too.
+# shellcheck source=.github/scripts/ci-plan.sh
+. "$ROOT/.github/scripts/ci-plan.sh"
+plan_changed "$BASE"
 if [ -z "$CHANGED" ]; then
   say "pr-check: no change since the merge base with $BASE_REF ($(git rev-parse --short "$BASE")); nothing to check"
   exit 0
 fi
-
-CI_YML=".github/workflows/ci.yml"
-# The path filter of a "what changed" step of ci.yml: the <n>th `grep -qE`
-# of step <id> in job <job>. The checks below run on the same paths CI does.
-ci_filter() { # <job> <step id> <n>
-  local re
-  re="$(awk -v job="$1" -v id="$2" -v n="$3" '
-    /^  [A-Za-z0-9_-]+:/ { injob = ($1 == job ":"); instep = 0; seen = 0 }
-    injob && /^      - id:/ { instep = ($3 == id); seen = 0 }
-    injob && instep && index($0, "grep -qE \047") {
-      seen++
-      if (seen == n) {
-        s = substr($0, index($0, "grep -qE \047") + 10)
-        print substr(s, 1, index(s, "\047") - 1)
-        exit
-      }
-    }
-  ' "$CI_YML")"
-  if [ -z "$re" ]; then
-    say "pr-check: cannot read the path filter $1/$2 #$3 from ci.yml; fix .github/scripts/pr-check.sh" >&2
-    return 1
-  fi
-  printf '%s' "$re"
-}
-
-# The Go modules of go.work: path, directory relative to the repository.
-MOD_PATH=(); MOD_REL=(); MOD_TOUCHED=()
-while IFS='|' read -r path dir; do
-  [ -n "$path" ] || continue
-  MOD_PATH+=("$path")
-  rel="${dir#"$ROOT"}"; rel="${rel#/}"; [ -n "$rel" ] || rel="."
-  MOD_REL+=("$rel")
-  MOD_TOUCHED+=(0)
-done < <(go list -m -f '{{.Path}}|{{.Dir}}')
-ROOT_MODULE="${MOD_PATH[0]}"
-for i in "${!MOD_PATH[@]}"; do [ "${MOD_REL[$i]}" = "." ] && ROOT_MODULE="${MOD_PATH[$i]}"; done
-
-# module_of <file or directory relative to the root>: index of the deepest
-# module containing it.
-module_of() {
-  local best=-1 bestlen=-1 i rel len
-  for i in "${!MOD_REL[@]}"; do
-    rel="${MOD_REL[$i]}"
-    if [ "$rel" = "." ]; then len=0
-    elif [ "$1" = "$rel" ] || [ "${1#"$rel"/}" != "$1" ]; then len="${#rel}"
-    else continue; fi
-    if [ "$len" -gt "$bestlen" ]; then best="$i"; bestlen="$len"; fi
-  done
-  printf '%s' "$best"
-}
-
-# import_path <directory relative to the root>
-import_path() {
-  local m rel
-  m="$(module_of "$1")"
-  rel="${MOD_REL[$m]}"
-  if [ "$rel" = "." ]; then
-    if [ "$1" = "." ]; then printf '%s' "${MOD_PATH[$m]}"; else printf '%s/%s' "${MOD_PATH[$m]}" "$1"; fi
-  elif [ "$1" = "$rel" ]; then printf '%s' "${MOD_PATH[$m]}"
-  else printf '%s/%s' "${MOD_PATH[$m]}" "${1#"$rel"/}"; fi
-}
-
-# The package directory of a changed file: its own, or for a file a package
-# embeds (a migration, a template), the nearest directory above holding Go.
-package_dir() {
-  local d
-  d="$(dirname "$1")"
-  while [ "$d" != "." ] && ! ls "$d"/*.go >/dev/null 2>&1; do d="$(dirname "$d")"; done
-  printf '%s' "$d"
-}
-
-CHANGED_PKGS=""      # import paths of the packages with a change
-CHANGED_ROOT_DIRS="" # their directories, root module only
-WIDE=0
-while IFS= read -r f; do
-  [ -n "$f" ] || continue
-  m="$(module_of "$f")"
-  MOD_TOUCHED[$m]=1
-  case "$f" in
-    go.mod|go.sum|go.work) WIDE=1 ;;
-  esac
-  case "$f" in
-    *.go) d="$(dirname "$f")" ;;
-    internal/*|cmd/*|eval/*|sdks/go/*|sdks/go-openfeature/*) case "$f" in *.md) continue ;; esac; d="$(package_dir "$f")" ;;
-    *) continue ;;
-  esac
-  ip="$(import_path "$d")"
-  CHANGED_PKGS="$CHANGED_PKGS$ip"$'\n'
-  [ "${MOD_REL[$m]}" = "." ] && CHANGED_ROOT_DIRS="$CHANGED_ROOT_DIRS$d"$'\n'
-done <<EOF
-$CHANGED
-EOF
-CHANGED_PKGS="$(printf '%s' "$CHANGED_PKGS" | sort -u | sed '/^$/d')"
-CHANGED_ROOT_DIRS="$(printf '%s' "$CHANGED_ROOT_DIRS" | sort -u | sed '/^$/d')"
-
-ANY_GO=0
-changed '\.go$|(^|/)go\.(mod|sum)$|^go\.work|^api/' && ANY_GO=1
-# What the server's tests read besides Go: the API documents, the docs, the
-# conformance fixtures, the console's sources.
-SERVER=0
-changed '^(internal|cmd|api|docs|conformance|deploy)/|^go\.(mod|sum|work)|^web/apps/console/|^\.testcoverage\.yml$' && SERVER=1
-[ -n "$CHANGED_PKGS" ] && SERVER=1
-
-GENERATED_RE='\.gen\.go$'
-RUN_CONSOLE=0; RUN_SDK_JS=0; RUN_PYTHON=0; RUN_RUBY=0; RUN_DART=0; RUN_FLUTTER=0; RUN_WORKFLOWS=0
-RE_SDK_JS="$(ci_filter changes sdk-js 1)" || exit 2
-RE_PYTHON="$(ci_filter changes sdk-python 1)" || exit 2
-RE_RUBY="$(ci_filter changes diff 2)" || exit 2
-RE_DART="$(ci_filter dart-changes diff 1)" || exit 2
-RE_FLUTTER="$(ci_filter dart-changes diff 2)" || exit 2
-changed '^web/|^api/management\.yaml$|^internal/infra/in/http/console/' && RUN_CONSOLE=1
-changed "$RE_SDK_JS" && RUN_SDK_JS=1
-changed "$RE_PYTHON" && RUN_PYTHON=1
-changed "$RE_RUBY" && RUN_RUBY=1
-changed "$RE_DART" && RUN_DART=1
-changed "$RE_FLUTTER" && RUN_FLUTTER=1
-changed '^\.github/workflows/|^\.github/scripts/check-ci-ok\.sh$' && RUN_WORKFLOWS=1
+PLAN_MODE=pr
+plan_compute
 SPECS="$(printf '%s\n' "$CHANGED" | grep -E '^web/e2e/.*\.spec\.ts$' | while read -r s; do [ -f "$s" ] && echo "${s#web/e2e/}"; done)"
-
-# Go modules besides the root: affected when they, or a module they require,
-# changed, or the conformance suite or the SDK contract they are tested with.
-MOD_RUN=()
-for i in "${!MOD_PATH[@]}"; do
-  MOD_RUN[$i]=0
-  [ "${MOD_REL[$i]}" = "." ] && continue
-  [ "${MOD_REL[$i]}" = "e2e" ] && continue
-  [ "${MOD_TOUCHED[$i]}" = 1 ] && MOD_RUN[$i]=1
-  changed '^(conformance/|api/sdk\.yaml$)' && MOD_RUN[$i]=1
-done
-for _ in 1 2; do # a module that requires an affected module is affected
-  for i in "${!MOD_PATH[@]}"; do
-    [ "${MOD_REL[$i]}" = "." ] && continue
-    [ "${MOD_REL[$i]}" = "e2e" ] && continue
-    [ "${MOD_RUN[$i]}" = 1 ] && continue
-    for j in "${!MOD_PATH[@]}"; do
-      [ "${MOD_RUN[$j]}" = 1 ] || continue
-      if go mod edit -json "${MOD_REL[$i]}/go.mod" | jq -e --arg p "${MOD_PATH[$j]}" '.Require[]? | select(.Path == $p)' >/dev/null; then MOD_RUN[$i]=1; fi
-    done
-  done
-done
-
-# ---------------------------------------------------------- the server tests
-#
-# The tests that can see a change: those of the packages that changed, those
-# of every package importing one (their tests start the server through the
-# test kit), and the guard tests, which read files outside their package.
-
-# A guard test is one that reads files outside its own package, so a change
-# elsewhere can break it. Two kinds, told apart by what they read:
-#   - a test that parses Go source (go/parser, go/ast, go/packages) checks
-#     every server package, so it runs whenever the server changed;
-#   - a test that opens a fixed file elsewhere in the tree ("../../api/x.yaml")
-#     can only be broken by a change under that top-level directory, so it
-#     runs when something there changed. Running these on every server change
-#     would add the largest test package to a change in a leaf package.
-GUARD_SOURCE_RE='go/parser|go/packages|go/ast|parser\.Parse|packages\.Load'
-GUARD_PATH_RE='"(\.\./)+[^"]+"'
-
-guard_packages() {
-  if [ "$SERVER" = 1 ]; then
-    grep -rlE "$GUARD_SOURCE_RE" --include='*_test.go' internal cmd 2>/dev/null
-  fi
-  grep -rlE "$GUARD_PATH_RE" --include='*_test.go' internal cmd 2>/dev/null | while read -r f; do
-    for top in $(grep -ohE "$GUARD_PATH_RE" "$f" | tr -d '"' | sed -E 's#^(\.\./)+##' | cut -d/ -f1 | sort -u); do
-      if changed "^$top/"; then echo "$f"; break; fi
-    done
-  done
-}
-
-GUARDS="$(guard_packages | while read -r f; do import_path "$(dirname "$f")"; echo; done | sed '/^$/d' | sort -u)"
-
-TEST_PKGS=""; COVER_PKGS=""
-if [ "$SERVER" = 1 ] || [ -n "$CHANGED_PKGS" ] || [ -n "$GUARDS" ]; then
-  if [ "$WIDE" = 1 ]; then
-    TEST_PKGS="./..."
-    COVER_PKGS="./internal/..."
-  else
-    go list -e -test -f '{{.ImportPath}} {{join .Deps " "}}' ./... > "$WORK/deps.txt" 2>/dev/null
-    printf '%s\n' "$CHANGED_PKGS" > "$WORK/changed.txt"
-    TEST_PKGS="$(awk '
-      NR == FNR { changed[$1] = 1; next }
-      $1 ~ /\.test$/ {
-        pkg = $1; sub(/\.test$/, "", pkg)
-        hit = (pkg in changed)
-        for (i = 2; i <= NF && !hit; i++) if ($i in changed) hit = 1
-        if (hit) print pkg
-      }' "$WORK/changed.txt" "$WORK/deps.txt")"
-    TEST_PKGS="$TEST_PKGS"$'\n'"$GUARDS"
-    # A changed package without tests of its own is covered by the packages
-    # above, but is built and vetted by the build step.
-    TEST_PKGS="$(printf '%s\n' "$TEST_PKGS" | sort -u | sed '/^$/d' | grep -E "^$ROOT_MODULE(/|$)")"
-    COVER_PKGS="$(printf '%s\n' "$CHANGED_PKGS" | grep -E "^$ROOT_MODULE/internal/" | grep -vE "$GENERATED_RE" | sed "s#^$ROOT_MODULE#.#" | while read -r d; do ls "$d"/*.go 2>/dev/null | grep -qv '_test\.go$' && echo "$d"; done | tr '\n' ',' | sed 's/,$//')"
-  fi
-fi
 
 print_plan() {
   say "pr-check plan (base $(git rev-parse --short "$BASE") = merge base with $BASE_REF; $(printf '%s\n' "$CHANGED" | wc -l | tr -d ' ') files changed, $UNCOMMITTED uncommitted)"
   say "  Go changed: $ANY_GO   server: $SERVER   wide (go.mod/go.sum/go.work of the root): $WIDE"
   say "  changed packages: $(printf '%s' "$CHANGED_PKGS" | tr '\n' ' ')"
-  say "  test packages:    $(printf '%s' "$TEST_PKGS" | sed "s#$ROOT_MODULE/##g" | tr '\n' ' ')"
-  say "  coverage of:      $COVER_PKGS"
+  if [ "$RUN_TESTS" = 1 ]; then
+    say "  test packages:    $(printf '%s' "$TEST_PKGS" | sed "s#$ROOT_MODULE/##g" | tr '\n' ' ')"
+    say "  coverage of:      $COVER_PKGS"
+  else
+    say "  server tests:     $(printf '%s\n' "$TEST_PKGS" | sed '/^$/d' | wc -l | tr -d ' ') packages, left to CI (--full runs them here)"
+  fi
   for i in "${!MOD_PATH[@]}"; do [ "${MOD_RUN[$i]}" = 1 ] && say "  module checked:   ${MOD_REL[$i]}"; done
-  say "  console: $RUN_CONSOLE  sdk-js: $RUN_SDK_JS  python: $RUN_PYTHON  ruby: $RUN_RUBY  dart: $RUN_DART  flutter: $RUN_FLUTTER  workflows: $RUN_WORKFLOWS  playwright specs: $(printf '%s' "$SPECS" | tr '\n' ' ')"
+  say "  migrations: $RUN_MIGRATIONS  console: $RUN_CONSOLE  sdk-js: $RUN_SDK_JS  python: $RUN_PYTHON  ruby: $RUN_RUBY  dart: $RUN_DART  flutter: $RUN_FLUTTER  workflows: $RUN_WORKFLOWS  playwright specs: $(printf '%s' "$SPECS" | tr '\n' ' ')"
 }
 print_plan
 [ "$PLAN_ONLY" = 1 ] && exit 0
@@ -500,7 +323,7 @@ server_tests() {
   args="-race -count=1 -timeout 20m -p $P -parallel $PARALLEL"
   if [ -n "$COVER_PKGS" ]; then args="$args -coverpkg=$COVER_PKGS -coverprofile=$WORK/coverage.out"; fi
   # shellcheck disable=SC2086
-  nice -n "$NICE" go test $args $TEST_FLAGS $TEST_PKGS
+  nice -n "$NICE" go test $args $TEST_FLAGS $(printf '%s ' $TEST_PKGS)
 }
 
 server_coverage() {
@@ -561,6 +384,9 @@ if [ "$RUN_WORKFLOWS" = 1 ]; then
 fi
 
 # --- heavy checks, one machine-wide queue
+# The server's tests run on request only: CI runs them on every pull request.
+[ "$RUN_TESTS" = 1 ] || { [ -n "$TEST_PKGS" ] && skipped "go test -race (server)" "left to CI; --full runs it here"; TEST_PKGS=""; }
+
 HEAVY=0
 [ -n "$TEST_PKGS" ] && HEAVY=1
 [ "$SERVER" = 1 ] && HEAVY=1
@@ -585,7 +411,7 @@ done
 if [ -n "$TEST_PKGS" ]; then
   dns_answers_unknown_names
   if step "postgres for the tests" digest_tail "start Docker or set DATABASE_URL" ensure_postgres; then
-        if [ "$TEST_PKGS" = "./..." ]; then test_label="every package"; else test_label="$(printf '%s\n' "$TEST_PKGS" | wc -l | tr -d ' ') packages"; fi
+    if [ "$WIDE" = 1 ]; then test_label="every package"; else test_label="$(printf '%s\n' "$TEST_PKGS" | wc -l | tr -d ' ') packages"; fi
     step "go test -race ($test_label)" digest_gotest \
       "run the failing test alone: go test -race -run '<TestName>' <package>" server_tests
     if [ -n "$COVER_PKGS" ] && [ -s "$WORK/coverage.out" ]; then
@@ -633,6 +459,12 @@ if [ -n "$SPECS" ]; then
     # shellcheck disable=SC2086
     js_step "console end to end (changed specs)" web/e2e "env -u DATABASE_URL pnpm test:local $(printf '%s ' $SPECS)"
   else not_run "console end to end" "pnpm and docker are needed"; fi
+fi
+if [ "$RUN_MIGRATIONS" = 1 ]; then
+  if need_tool "${SQUAWK:-squawk}"; then
+    step "migration lint" digest_tail "make the migration expand/contract (see CONTRIBUTING.md), or add a squawk-ignore with its reason on the line before" \
+      bash -c ".github/scripts/lint-migrations.sh --base '$BASE_REF' && .github/scripts/lint-migrations.sh --self-test"
+  else not_run "migration lint" "squawk is not installed (.github/scripts/install-squawk.sh DIR installs the pinned one)"; fi
 fi
 if [ "$RUN_SDK_JS" = 1 ]; then
   if need_tool pnpm; then step "sdk-js" digest_tail "fix what the output says" task sdk-js:check

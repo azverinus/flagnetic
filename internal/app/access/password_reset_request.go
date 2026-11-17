@@ -159,7 +159,7 @@ const requestBound = 30 * time.Second
 // failure is logged, and so is a request dropped because the replica is
 // running too many background jobs.
 func (h *RequestPasswordReset) Handle(ctx context.Context, cmd RequestPasswordResetCommand) error {
-	if _, err := h.d.Throttle.Reserve(ctx, cmd.ClientIP, h.d.Clock.Now()); err != nil {
+	if err := h.d.Throttle.Reserve(ctx, cmd.ClientIP, h.d.Clock.Now()); err != nil {
 		return err
 	}
 	h.d.Background.Go(ctx, "password reset request", requestBound, func(ctx context.Context) {

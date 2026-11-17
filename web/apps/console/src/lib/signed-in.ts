@@ -108,3 +108,70 @@ export function onSessionEnded(
     navigate(signInSearch(here, true));
   };
 }
+
+/** What one tab tells the others about the session they share. */
+export type SessionChange = "signed-in" | "signed-out";
+
+const sessionChannelName = "flagnetic-session";
+
+// One channel per tab, both to announce and to listen on: a broadcast
+// channel delivers to every other channel of the same name, those of the
+// sending tab included, so a tab announcing on a second channel would hear
+// itself and drop the session it has just signed in with.
+let tabChannel: BroadcastChannel | undefined;
+
+function sessionChannel(): BroadcastChannel | undefined {
+  if (typeof BroadcastChannel === "undefined") return undefined;
+  tabChannel ??= new BroadcastChannel(sessionChannelName);
+  return tabChannel;
+}
+
+/**
+ * Tells the other tabs of this browser that a member signed in or out here.
+ * The session is one cookie shared by every tab, so a tab that does not
+ * hear of it keeps showing the member's data after they signed out, and
+ * keeps the first member's identity while the cookie is the second's.
+ * Nothing is sent where the browser has no broadcast channel; the other
+ * tabs then learn of it from their next refused request, as before.
+ */
+export function announceSessionChange(change: SessionChange): void {
+  sessionChannel()?.postMessage(change);
+}
+
+/** Calls `onChange` when another tab announces a session change; returns how to stop. */
+export function listenForSessionChange(onChange: (change: SessionChange) => void): () => void {
+  const channel = sessionChannel();
+  if (channel === undefined) return () => undefined;
+  channel.onmessage = (event: MessageEvent<unknown>) => {
+    if (event.data === "signed-in" || event.data === "signed-out") onChange(event.data);
+  };
+  return () => {
+    channel.close();
+    if (tabChannel === channel) tabChannel = undefined;
+  };
+}
+
+/**
+ * What this tab does when another tab changed the session. After a sign-out
+ * it goes to sign-in as it does when its own session ends, and shows nothing
+ * of the member's data. After a sign-in, which may be another member's, what
+ * it holds of the first member is dropped and read again under the cookie
+ * there now is, by `reload`. A tab that holds nobody has nothing to drop.
+ */
+export function onSessionChangedElsewhere(
+  queryClient: QueryClient,
+  where: () => Where,
+  navigate: (search: SignInSearch) => void,
+  reload: () => void,
+): (change: SessionChange) => void {
+  const ended = onSessionEnded(queryClient, where, navigate);
+  return (change) => {
+    if (change === "signed-out") {
+      ended();
+      return;
+    }
+    if (queryClient.getQueryData(meQuery.queryKey) === undefined) return;
+    queryClient.clear();
+    reload();
+  };
+}

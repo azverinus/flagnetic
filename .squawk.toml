@@ -1,0 +1,25 @@
+# Settings of squawk, which lints every migration a change adds (see
+# .github/scripts/lint-migrations.sh). The lint exists so that a replica of the
+# previous minor keeps working against the schema this one migrates to: a
+# migration may add, never rename or drop what the previous minor reads or
+# writes, and it must not hold a lock that stops those replicas for long.
+
+# The oldest supported PostgreSQL: a rule that depends on the version (a column
+# with a default, for one) judges the migration by what 16 does.
+pg_version = "16"
+
+# What squawk checks besides the lock and compatibility rules, left out because
+# it is style, not rolling-upgrade safety. The schema tests and the review own
+# naming and types.
+excluded_rules = [
+  # A migration runs once, in a transaction, so IF [NOT] EXISTS guards add
+  # nothing.
+  "prefer-robust-stmts",
+  # Column types and key styles are the review's call.
+  "prefer-text-field",
+  "prefer-bigint-over-int",
+  "prefer-identity",
+  "prefer-timestamptz",
+  # Timeouts are set by the migration runner, not by each file.
+  "require-timeout-settings",
+]

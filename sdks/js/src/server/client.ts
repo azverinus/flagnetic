@@ -2,9 +2,10 @@
 // Delivery fetches and streams; this module owns the fallback chain's stage,
 // the getters, local overrides and the listeners.
 import { LocalOverrideRefused, LocalOverridesNotAllowed } from "../internal/overrides.js";
-import { decodeRuleset, type Context, type Result, type Ruleset } from "../evaluator/evaluate.js";
+import { decodeRuleset, flagsTooDeep, type Context, type Result, type Ruleset } from "../evaluator/evaluate.js";
 import type { JsonValue } from "../evaluator/ruleset.js";
 import { fitsFlagType, flagTypeOf } from "../internal/detail.js";
+import { MAX_VALUE_DEPTH } from "../internal/json.js";
 import { aliasEvent, contextFingerprint, exposureEvent, ExposureSuppressor, ServedDetails, type AliasLink, type QueuedEvent } from "../internal/events.js";
 import { changedFlags } from "./changes.js";
 import { defaultTiming, Delivery, realClock, type Clock, type Timing, type TraceEvent } from "./delivery.js";
@@ -687,6 +688,13 @@ export class FlagneticServer {
     this.held = { rs, receivedAt };
     this.log("info", "ruleset_loaded", { source, ruleset_version: rs.version, flags: rs.document.flags.length });
     this.reportUnsupported(rs);
+    for (const key of flagsTooDeep(rs)) {
+      this.once(`deep:${key}:${String(rs.version)}`, "error", "value_too_deep", {
+        flag: key,
+        max_depth: MAX_VALUE_DEPTH,
+        ruleset_version: rs.version,
+      });
+    }
   }
 
   // reportUnsupported logs rule_unsupported for every flag of rs holding a

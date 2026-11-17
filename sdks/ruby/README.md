@@ -131,7 +131,7 @@ Log events have stable names (`Flagnetic::EVENTS`); alert on the name, never on 
 | `exposure_skipped` | debug | `flag`, `cause` (`no_experiment`, `no_detail`, `repeat`) |
 | `exposures_disabled` | warn | |
 | `ingest_failed` | warn | `kind`, `events`, `retry_in`, `status`, `error` |
-| `client_not_configured` | warn | `rails_env`: the Rails integration found no SDK key and base URL and serves built-in defaults |
+| `client_not_configured` | warn | `rails_env`: the Rails integration found no SDK key and base URL outside production and serves built-in defaults |
 | `queue_dropped` | warn | `kind` (`exposure_or_alias`, `evaluation_summary`), `cause` (`queue_full`, `not_serialisable`, `client_error`, `refused_by_the_platform`, `window_older_than_one_hour`) and what was dropped (`fault` for `not_serialisable`) |
 
 A ruleset from a newer server may hold constructs this SDK does not know. The client logs `rule_unsupported` once per flag and ruleset version, and the flag serves its default with the error code `inconsistent_ruleset`.
@@ -144,7 +144,7 @@ A condition this SDK cannot evaluate although the server accepted it, such as a 
 
 ## Rails
 
-Under Rails the gem loads a railtie (nothing of it loads without Rails) that sets `Flagnetic.client` up without an initializer. The SDK key and base URL come from the first of `config.flagnetic.sdk_key` and `config.flagnetic.base_url`, the `FLAGNETIC_SDK_KEY` and `FLAGNETIC_BASE_URL` environment variables, and credentials (`flagnetic.sdk_key`, `flagnetic.base_url`). Without both, the client serves built-in defaults and logs `client_not_configured`.
+Under Rails the gem loads a railtie (nothing of it loads without Rails) that sets `Flagnetic.client` up without an initializer. The SDK key and base URL come from the first of `config.flagnetic.sdk_key` and `config.flagnetic.base_url`, the `FLAGNETIC_SDK_KEY` and `FLAGNETIC_BASE_URL` environment variables, and credentials (`flagnetic.sdk_key`, `flagnetic.base_url`). Without both and without `offline_file`, building the client in production raises `Flagnetic::NotConfigured`, naming what is missing and where to set it, so a deployment that lost its key fails at boot (in console, runner and rake, on first use) instead of serving built-in defaults to every user; in any other environment the client serves built-in defaults and logs `client_not_configured`.
 
 A server or job process builds the client at boot and waits up to `ready_timeout` seconds for the ruleset; `rails console`, `rails runner` and rake build it on first use, so a task that never asks for a flag makes no request. Every forked child (Puma cluster mode, Unicorn) starts its own background thread at once, and every process closes its client at exit, which flushes what it queued. Local overrides are allowed in every environment but production, where no setting enables them.
 
@@ -191,6 +191,8 @@ client.recorder.exposures            # what exposure and automatic exposure reco
 client.recorder.aliases
 client.recorder.reset
 ```
+
+Each of the recorder's evaluation summaries, exposures and aliases keeps the latest 10,000 entries and drops the oldest beyond that, so an offline client left running in a long process stays bounded.
 
 `with_flags` and `with_ruleset` make such a client `Flagnetic.client` for a block and restore the previous one afterwards, even when the block raises. They are process-wide, so tests running in parallel threads must not use them. Include the helpers in RSpec or Minitest:
 
@@ -259,7 +261,7 @@ Every other flag evaluates normally. The fix is to upgrade the SDK.
 
 ## Regular expressions
 
-A `matches` condition is RE2 syntax with RE2 semantics, as Go's `regexp` reads it, and not the dialect of Ruby's own engine. A pattern is parsed as RE2 and matched by an engine of its own that runs in time linear in the input, so a context value can never make a match slow or cut it off. `^` and `$` are not line anchors, `\s` is `[\t\n\f\r ]`, lookarounds and backreferences are refused and `(?i)` folds case by Go's rules, `\p{...}` included. A pattern RE2 refuses makes the condition `inconsistent_ruleset`.
+A `matches` condition is RE2 syntax with RE2 semantics, as Go's `regexp` reads it, and not the dialect of Ruby's own engine. A pattern is parsed as RE2 and matched by an engine of its own that runs in time linear in the input, so a context value can never make a match slow or cut it off. `^` and `$` are not line anchors, `\s` is `[\t\n\f\r ]`, lookarounds and backreferences are refused and `(?i)` folds case by Go's rules, `\p{...}` included. A pattern RE2 refuses makes the condition `inconsistent_ruleset`. A string longer than 64 KiB (in bytes) is not matched at all: the condition is false for it, without an error, because the cost of a match grows with the input.
 
 The case folding orbits and property names come from Go's `unicode` package, and `lib/flagnetic/eval/unicode_tables.rb` is generated from it:
 

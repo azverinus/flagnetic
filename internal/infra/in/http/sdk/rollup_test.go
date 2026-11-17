@@ -15,6 +15,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -426,5 +427,33 @@ func TestTwoReplicasRollingUpAtOnceCountEachExposureOnce(t *testing.T) {
 	wg.Wait()
 	if v := byVariation(f.exposures(t))["true"]; v.Exposures != 50 || v.FirstExposures != 50 {
 		t.Errorf("true = %+v, want each of the 50 exposures counted once", v)
+	}
+}
+
+func TestAnExperimentAtItsLimitOfFirstExposuresRefusesNewUnitsOnly(t *testing.T) {
+	c := clock.NewFake(protocolTime)
+	srv := testkit.StartServer(t, testkit.WithClock(c), testkit.WithEventLimits(0, 2))
+	p := newProject(t, srv)
+	p.flag(t, "checkout")
+	f := &rollupFixture{exposuresFixture: exposuresFixture{srv: srv, clock: c, p: p,
+		experiment: p.experiment(t, "checkout_test", "checkout", "user", "true", 5000, "false", 5000)}}
+	_, f.server = p.sdkKey(t, "production", management.SdkKeyKindServer)
+
+	f.post(t, f.exposure("u-1", "true", protocolTime), f.exposure("u-2", "false", protocolTime))
+	// The rollup has not counted them: the limit is read from what it has.
+	f.post(t, f.exposure("u-3", "true", protocolTime))
+	f.rollUp(t)
+
+	earlier := protocolTime.Add(-time.Hour)
+	res := batchResult(t, srv, f.server, f.envelope(t,
+		f.exposure("u-1", "true", earlier),
+		f.exposure("u-4", "true", protocolTime),
+		f.override("u-5", "true", protocolTime),
+	))
+	if res.Accepted != 2 || len(res.Rejected) != 1 || res.Rejected[0].Index != 1 || res.Rejected[0].Code != "quota_exceeded" {
+		t.Fatalf("exposures at the limit = %+v, want a unit counted and an override taken, a new unit refused", res)
+	}
+	if refused := f.refused(t, "production"); len(refused) != 0 {
+		t.Errorf("refusals counted = %v, want the limit's left out", refused)
 	}
 }

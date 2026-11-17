@@ -176,7 +176,8 @@ func TestAMixedBatchIsJudgedPerEvent(t *testing.T) {
 // A client key ships inside apps: were a row's variation kept as sent, anyone
 // holding the key could grow the daily counts, kept for good, without bound.
 func TestASummaryRowOfAVariationItsFlagLacksIsDropped(t *testing.T) {
-	srv, p, value := eventsServer(t)
+	srv, p, client := eventsServer(t)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	got := batchResult(t, srv, value, batch(summaryEvent(eventID(protocolTime, 1),
 		map[string]any{"flag": "checkout", "variation": "true", "reason": "targeting_match", "count": 3},
 		map[string]any{"flag": "checkout", "variation": "made_up_1", "reason": "targeting_match", "count": 1},
@@ -192,10 +193,19 @@ func TestASummaryRowOfAVariationItsFlagLacksIsDropped(t *testing.T) {
 	if len(summaries) != 1 || summaries[0].Row.Variation != "true" {
 		t.Errorf("summaries stored = %+v, want the row of the flag's own variation alone", summaries)
 	}
+	// A client key is told no count of dropped rows: it would say whether a
+	// flag key it guessed belongs to the project, an archived flag included.
+	guess := batchResult(t, srv, client, batch(summaryEvent(eventID(protocolTime, 2),
+		map[string]any{"flag": "no_such_flag", "variation": "true", "reason": "fallback", "count": 1},
+	)))
+	if guess.Accepted != 1 || guess.DroppedRows != 0 {
+		t.Errorf("a client key's answer = %+v, want the summary accepted and no dropped rows told", guess)
+	}
 }
 
 func TestAcceptedSummariesAndAliasesAreStoredOnce(t *testing.T) {
-	srv, p, value := eventsServer(t)
+	srv, p, _ := eventsServer(t)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	body := batch(aliasEvent(eventID(protocolTime, 1)), summaryEvent(eventID(protocolTime, 2),
 		map[string]any{"flag": "checkout", "variation": "true", "reason": "targeting_match", "count": 3},
 		map[string]any{"flag": "banner_text", "variation": nil, "reason": "fallback", "count": 2},
@@ -439,7 +449,8 @@ func TestThePartitionWorkerKeepsPartitionsAheadOfTheClock(t *testing.T) {
 }
 
 func TestACopyOfARefusedEventIsRefusedNotADuplicate(t *testing.T) {
-	srv, _, value := eventsServer(t)
+	srv, p, _ := eventsServer(t)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	undeclared := aliasEvent(eventID(protocolTime, 1))
 	undeclared["to_unit_type"] = "device"
 	res := batchResult(t, srv, value, batch(undeclared, undeclared))

@@ -11,8 +11,9 @@ const (
 	allowedMethods = "GET, POST, OPTIONS"
 	allowedHeaders = "Authorization, Content-Type, Content-Encoding, Flagnetic-Schema-Version, Last-Event-ID"
 	// exposedHeaders are what a browser SDK reads of an answer: the
-	// ruleset's version, how long to wait, and its rate-limit budget.
-	exposedHeaders = "ETag, Retry-After, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset"
+	// ruleset's version, how long to wait, its rate-limit budget, and the
+	// announcement of a deprecated operation.
+	exposedHeaders = "ETag, Retry-After, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, Deprecation, Sunset"
 	// preflightMaxAge lets a browser keep a preflight for a day, so a page
 	// pays it once rather than before every request.
 	preflightMaxAge = "86400"
@@ -43,6 +44,15 @@ func cors(routed func(path string) bool) func(http.Handler) http.Handler {
 	}
 }
 
+// requestOrigin returns the Origin header of r and whether r carries one.
+func requestOrigin(r *http.Request) (origin string, sent bool) {
+	origins, sent := r.Header["Origin"]
+	if sent && len(origins) > 0 {
+		origin = strings.TrimSpace(origins[0])
+	}
+	return origin, sent
+}
+
 // admitOrigin applies the key's allowed origins to the answer: refused
 // server_key_from_browser for a server key sent from a browser,
 // origin_not_allowed for an origin a client key does not list. A key that
@@ -51,11 +61,7 @@ func cors(routed func(path string) bool) func(http.Handler) http.Handler {
 // in place of "*", and a request without Origin, which is no browser's, is
 // answered without the header.
 func admitOrigin(w http.ResponseWriter, r *http.Request, restricted func(origin string, sent bool) (bool, error)) error {
-	origins, sent := r.Header["Origin"]
-	origin := ""
-	if sent && len(origins) > 0 {
-		origin = strings.TrimSpace(origins[0])
-	}
+	origin, sent := requestOrigin(r)
 	isRestricted, err := restricted(origin, sent)
 	if !isRestricted {
 		return err

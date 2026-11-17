@@ -47,16 +47,7 @@
       "variation": "light"
     }
   },
-  "ignored_attributes": [
-    {
-      "code": "undeclared",
-      "name": "favourite_colour"
-    },
-    {
-      "code": "type_mismatch",
-      "name": "plan"
-    }
-  ],
+  "ignored_attributes": [],
   "ruleset_version": 2,
   "schema_version": 1
 }

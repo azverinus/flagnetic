@@ -210,7 +210,8 @@ func (a *api) PostEvents(w http.ResponseWriter, r *http.Request, params PostEven
 		a.writeError(w, r, err)
 		return
 	}
-	res, err := a.h.Ingest.Handle(r.Context(), keyOf(r.Context()), b)
+	key := keyOf(r.Context())
+	res, err := a.h.Ingest.Handle(r.Context(), key, b)
 	if err != nil {
 		a.writeError(w, r, err)
 		return
@@ -218,7 +219,7 @@ func (a *api) PostEvents(w http.ResponseWriter, r *http.Request, params PostEven
 	a.events.observe(res)
 	a.h.Inventory.Note(keyOf(r.Context()), delivery.IdentifySDK(r.UserAgent(), b.SDK), "", 0)
 	out := EventBatchResult{
-		Accepted: res.AcceptedTotal(), Duplicates: res.Duplicates, DroppedRows: res.DroppedRows,
+		Accepted: res.AcceptedTotal(), Duplicates: res.Duplicates, DroppedRows: res.DroppedRowsTold(key.Kind),
 		Rejected: make([]EventRejection, 0, len(res.Rejected)),
 	}
 	for _, rj := range res.Rejected {

@@ -177,3 +177,7 @@ func (p providerSettings) LockProviderSettings(ctx context.Context, slug string)
 	}
 	return appidentity.SettingsOfProvider{LocalLoginEnabled: s.LocalLoginEnabled, EnforcedDomains: s.EnforcedDomainsOf(slug)}, nil
 }
+
+func (p providerSettings) RevokeProviderSessions(ctx context.Context, slug string, at time.Time) (int, error) {
+	return p.store.RevokeAllProviderSessions(ctx, slug, at)
+}

@@ -278,7 +278,8 @@ abstract final class LogEvents {
   static const eventsFailed = 'events_failed';
 
   /// (debug) An exposure call recorded nothing. Fields: flag, cause:
-  /// `no_values` (stage `built_in`: nothing is held), `no_experiment` (no
+  /// `no_values` (stage `built_in`: nothing is held), `previous_context` (the
+  /// values held still answer the context before `setContext`), `no_experiment` (no
   /// evaluation of this flag for this context carried an experiment block),
   /// `local_override` (the flag is currently overridden) or `exposures_off`.
   static const exposureSkipped = 'exposure_skipped';

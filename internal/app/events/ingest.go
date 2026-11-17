@@ -47,6 +47,16 @@ type EventStore interface {
 	// at at, and returns those not received before: the events to store.
 	ClaimEvents(ctx context.Context, project workspace.ProjectID, typ events.EventType, ids []delivery.EventID,
 		at time.Time) (map[delivery.EventID]bool, error)
+	// AliasLinkCount returns how many alias links environment holds.
+	AliasLinkCount(ctx context.Context, environment workspace.EnvironmentID) (int64, error)
+	// LinkedPairs returns which of pairs are already linked in environment.
+	LinkedPairs(ctx context.Context, environment workspace.EnvironmentID, pairs []events.AliasPair) (map[events.AliasPair]bool, error)
+	// UnitsFirstExposed returns how many units of each of experiments the
+	// rollup has counted a first exposure of in environment.
+	UnitsFirstExposed(ctx context.Context, environment workspace.EnvironmentID, experiments []experiments.ExperimentID,
+	) (map[experiments.ExperimentID]int64, error)
+	// ExposedUnits returns which of units have a first exposure stored.
+	ExposedUnits(ctx context.Context, units []events.UnitKey) (map[events.UnitKey]bool, error)
 	SaveSummaries(ctx context.Context, rows []delivery.SummaryRecord) error
 	SaveAliases(ctx context.Context, aliases []events.AliasRecord) error
 	// LinkAliases links the pair of each alias in its environment, once per
@@ -61,18 +71,40 @@ type EventStore interface {
 	EnsureEventPartitions(ctx context.Context, at time.Time) error
 }
 
+// Limits bound what ingest keeps for good. A limit of 0 is the default.
+type Limits struct {
+	// AliasLinks is the most alias links an environment keeps.
+	AliasLinks int
+	// FirstExposures is the most units whose first exposure an experiment
+	// keeps in an environment.
+	FirstExposures int
+}
+
+// The limits ingest applies when the configuration gives none.
+const (
+	DefaultAliasLinksLimit     = 5_000_000
+	DefaultFirstExposuresLimit = 10_000_000
+)
+
 // IngestEvents stores the events an SDK posts in a batch.
 type IngestEvents struct {
 	tx        Transactor
 	store     EventStore
 	clock     clock.Clock
 	retention time.Duration
+	limits    Limits
 }
 
 // NewIngestEvents returns the handler, accepting events within retention of
 // the clock's time.
-func NewIngestEvents(tx Transactor, store EventStore, c clock.Clock, retention time.Duration) *IngestEvents {
-	return &IngestEvents{tx: tx, store: store, clock: c, retention: retention}
+func NewIngestEvents(tx Transactor, store EventStore, c clock.Clock, retention time.Duration, limits Limits) *IngestEvents {
+	if limits.AliasLinks <= 0 {
+		limits.AliasLinks = DefaultAliasLinksLimit
+	}
+	if limits.FirstExposures <= 0 {
+		limits.FirstExposures = DefaultFirstExposuresLimit
+	}
+	return &IngestEvents{tx: tx, store: store, clock: c, retention: retention, limits: limits}
 }
 
 // EventBatch is a batch of events as an SDK posts it, each event as sent.
@@ -100,10 +132,21 @@ type BatchResult struct {
 	// earlier one.
 	Duplicates int
 	// DroppedRows counts the summary rows naming a flag the project does
-	// not have.
+	// not have, or a variation the flag lacks.
 	DroppedRows int
 	// Rejected are the events refused, by index.
 	Rejected []EventRejection
+}
+
+// DroppedRowsTold is the count of dropped rows a key of kind k is told: the
+// true count for a server key, 0 for a client key. Told to a client key, the
+// count would say whether a flag key it guessed belongs to the project, an
+// archived flag included. DroppedRows stays the true count for the metrics.
+func (r BatchResult) DroppedRowsTold(k delivery.SDKKeyKind) int {
+	if k == delivery.SDKKeyClient {
+		return 0
+	}
+	return r.DroppedRows
 }
 
 // AcceptedTotal is how many events were stored, whatever their type.
@@ -120,9 +163,10 @@ func (r BatchResult) AcceptedTotal() int {
 // the SDK may drop the batch. An event whose ID was received before, in this
 // batch or for as long as event IDs are kept (see claimRetention), is a
 // duplicate and stored once. A summary row naming a flag the project does
-// not have is dropped: nobody could read it. An exposure is checked against the experiment it names;
-// the details of its refusal are specific to a server key and generic to a
-// client key.
+// not have is dropped: nobody could read it, and a client key is told none
+// were. An exposure is checked against the experiment it names; a server
+// key is told the check it failed, and a client key unknown_experiment for
+// every refusal, so that it learns nothing of the project's experiments.
 //
 // When the SDK's clock and the server's differ by more than a minute, every
 // time in the batch is shifted by the difference before it is judged, so a
@@ -148,6 +192,18 @@ func (h *IngestEvents) Handle(ctx context.Context, key delivery.SDKKey, b EventB
 		return err
 	})
 	return res, err
+}
+
+// rejectUndeclaredUnitType refuses an alias naming a unit type the project
+// does not declare. A client key ships inside apps and browsers, where
+// anyone can read it, and a code of its own would tell it which unit types
+// the project declares: it is answered the generic event_invalid, naming
+// nothing of the project.
+func rejectUndeclaredUnitType(e events.JudgedEvent, field, unitType string, detailed bool) events.JudgedEvent {
+	if !detailed {
+		return e.Reject(events.RejectEventInvalid, "the alias is not valid")
+	}
+	return e.Reject(events.RejectUndeclaredUnitType, fmt.Sprintf("%s %q is not a unit type of this project", field, unitType))
 }
 
 // write stores the events judged in the unit of work ctx carries.
@@ -181,6 +237,10 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 	if err != nil {
 		return BatchResult{}, err
 	}
+	full, err := h.atLimit(ctx, key, judged, named)
+	if err != nil {
+		return BatchResult{}, err
+	}
 	// An event is a duplicate within the batch only after an earlier copy
 	// that was not refused: a copy of a refused event is refused alike
 	// rather than counted as received.
@@ -196,12 +256,13 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 		if a := e.Alias; a != nil {
 			switch {
 			case !declared[a.FromUnitType]:
-				judged[i] = e.Reject(events.RejectUndeclaredUnitType,
-					fmt.Sprintf("from_unit_type %q is not a unit type of this project", a.FromUnitType))
+				judged[i] = rejectUndeclaredUnitType(e, "from_unit_type", a.FromUnitType, detailed)
 				continue
 			case !declared[a.ToUnitType]:
-				judged[i] = e.Reject(events.RejectUndeclaredUnitType,
-					fmt.Sprintf("to_unit_type %q is not a unit type of this project", a.ToUnitType))
+				judged[i] = rejectUndeclaredUnitType(e, "to_unit_type", a.ToUnitType, detailed)
+				continue
+			case !full.admitLink(a.Pair()):
+				judged[i] = e.Reject(events.RejectQuotaExceeded, "this environment holds as many alias links as it may keep")
 				continue
 			}
 		}
@@ -211,8 +272,12 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 			if exists {
 				experiment = &facts
 			}
-			if rj := events.CheckExposure(*x, experiment, detailed); rj != nil {
-				judged[i] = e.Reject(rj.Code, rj.Detail)
+			if rj := events.CheckExposure(*x, experiment); rj != nil {
+				told := *rj
+				if !detailed {
+					told = rj.ForClient(x.ExperimentKey)
+				}
+				judged[i] = e.Reject(told.Code, told.Detail)
 				// Only a refusal for a started experiment is counted: a key
 				// nobody declared would let whoever holds a client key grow
 				// the table with keys of their own making, and a draft is
@@ -221,6 +286,14 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 				if exists && facts.Status != experiments.StatusDraft {
 					refused[rejectionKey{facts.ID, rj.Code}]++
 				}
+				continue
+			}
+			// An override exposure never makes a first exposure. A refusal
+			// for the limit is not counted with the checks' own: it says
+			// nothing of the event, and the count's reasons are the checks'.
+			unit := events.UnitKey{Environment: key.Environment, Experiment: facts.ID, UnitType: x.UnitType, UnitID: x.UnitID}
+			if !x.Override && full.experiments[facts.ID] && !full.exposed[unit] {
+				judged[i] = e.Reject(events.RejectQuotaExceeded, "this experiment holds as many first exposures as it may keep")
 				continue
 			}
 		}
@@ -313,6 +386,108 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 	}
 	if err := h.countRejections(ctx, key, refused, now); err != nil {
 		return BatchResult{}, err
+	}
+	return res, nil
+}
+
+// limitsReached is what a batch is judged against: where an environment or
+// an experiment already keeps as much as the limit allows, and of that what
+// the batch's events would only update.
+type limitsReached struct {
+	// limitLinks is whether the batch's new pairs could take the
+	// environment past its limit of alias links; linked holds the pairs of
+	// the batch it already has, and linkRoom how many new pairs it may
+	// still take.
+	limitLinks bool
+	linked     map[events.AliasPair]bool
+	linkRoom   int64
+	// admitted holds the new pairs given room so far, so that every alias
+	// of one of them is taken alike.
+	admitted map[events.AliasPair]bool
+	// experiments are those holding as many first exposures as they may;
+	// exposed holds the units of the batch they already have.
+	experiments map[experiments.ExperimentID]bool
+	exposed     map[events.UnitKey]bool
+}
+
+// admitLink reports whether an alias of pair may be taken: its pair is
+// already linked, or the limit leaves room for one more, which it takes.
+func (l *limitsReached) admitLink(pair events.AliasPair) bool {
+	if !l.limitLinks || l.linked[pair] || l.admitted[pair] {
+		return true
+	}
+	if l.linkRoom == 0 {
+		return false
+	}
+	l.linkRoom--
+	l.admitted[pair] = true
+	return true
+}
+
+// atLimit reads what the batch's aliases and exposures add to, which is
+// nothing a limit stops while the environment or experiment is below it.
+func (h *IngestEvents) atLimit(ctx context.Context, key delivery.SDKKey, judged []events.JudgedEvent,
+	named map[string]events.ExperimentFacts,
+) (limitsReached, error) {
+	var (
+		res   limitsReached
+		pairs []events.AliasPair
+		exps  []experiments.ExperimentID
+		seen  = map[experiments.ExperimentID]bool{}
+	)
+	for _, e := range judged {
+		if e.Rejection != nil {
+			continue
+		}
+		if a := e.Alias; a != nil {
+			pairs = append(pairs, a.Pair())
+		}
+		if x := e.Exposure; x != nil && !x.Override {
+			if facts, ok := named[x.ExperimentKey]; ok && !seen[facts.ID] {
+				seen[facts.ID] = true
+				exps = append(exps, facts.ID)
+			}
+		}
+	}
+	if len(pairs) > 0 {
+		links, err := h.store.AliasLinkCount(ctx, key.Environment)
+		if err != nil {
+			return res, err
+		}
+		// Only a batch whose pairs could all be new and still overrun the
+		// limit reads which of them are linked: below that, every one fits.
+		if res.limitLinks = links+int64(len(pairs)) > int64(h.limits.AliasLinks); res.limitLinks {
+			if res.linked, err = h.store.LinkedPairs(ctx, key.Environment, pairs); err != nil {
+				return res, err
+			}
+			res.linkRoom = max(0, int64(h.limits.AliasLinks)-links)
+			res.admitted = map[events.AliasPair]bool{}
+		}
+	}
+	if len(exps) > 0 {
+		counts, err := h.store.UnitsFirstExposed(ctx, key.Environment, exps)
+		if err != nil {
+			return res, err
+		}
+		res.experiments = map[experiments.ExperimentID]bool{}
+		for id, n := range counts {
+			res.experiments[id] = n >= int64(h.limits.FirstExposures)
+		}
+		if len(res.experiments) > 0 {
+			var units []events.UnitKey
+			for _, e := range judged {
+				if x := e.Exposure; e.Rejection == nil && x != nil && !x.Override {
+					if facts, ok := named[x.ExperimentKey]; ok && res.experiments[facts.ID] {
+						units = append(units, events.UnitKey{Environment: key.Environment, Experiment: facts.ID, UnitType: x.UnitType, UnitID: x.UnitID})
+					}
+				}
+			}
+			if len(units) > 0 {
+				if res.exposed, err = h.store.ExposedUnits(ctx, units); err != nil {
+					return res, err
+				}
+			}
+		}
 	}
 	return res, nil
 }

@@ -22,6 +22,9 @@ type PersonalTokenStore interface {
 	// MemberByID returns the member with the identifier; ErrNotFound when
 	// none has it.
 	MemberByID(ctx context.Context, member access.MemberID) (access.Member, error)
+	// LockMember returns the member, locked until the unit of work ends, and
+	// whether they hold a password; ErrNotFound when none has the identifier.
+	LockMember(ctx context.Context, member access.MemberID) (access.Member, bool, error)
 	// PersonalTokens returns every personal access token of member, revoked
 	// and expired ones included, the newest first.
 	PersonalTokens(ctx context.Context, member access.MemberID) ([]access.APIToken, error)
@@ -108,7 +111,11 @@ func NewCreatePersonalToken(tx Transactor, store PersonalTokenStore, settings Au
 // Handle creates the token and records api_token.created with its hint.
 // Only a session creates one, so a leaked token can neither multiply itself
 // nor outlive its revocation; its scopes are those the session's member
-// holds, and its expiry is within what the auth settings allow.
+// holds, and its expiry is within what the auth settings allow. The member
+// is locked and read again before the token is stored, the order
+// deactivating takes: a token created while the member is deactivated would
+// survive the revocation of their tokens and live again on reactivation, so
+// a member no longer active is refused session_expired.
 func (h *CreatePersonalToken) Handle(ctx context.Context, cmd CreatePersonalTokenCommand) (CreatedToken, error) {
 	if cmd.Caller.Session == nil || cmd.Caller.Member == nil {
 		return CreatedToken{}, access.ErrSessionRequired
@@ -136,6 +143,13 @@ func (h *CreatePersonalToken) Handle(ctx context.Context, cmd CreatePersonalToke
 		return CreatedToken{}, err
 	}
 	if err := h.tx.Within(ctx, func(ctx context.Context) error {
+		current, _, err := h.store.LockMember(ctx, holder.ID)
+		if errors.Is(err, ErrNotFound) || (err == nil && current.Status != access.MemberActive) {
+			return access.ErrSessionExpired
+		}
+		if err != nil {
+			return err
+		}
 		if err := h.store.CreateToken(ctx, token); err != nil {
 			return err
 		}

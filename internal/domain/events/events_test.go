@@ -346,39 +346,34 @@ func TestAnExposureIsCheckedAgainstItsExperimentInOrder(t *testing.T) {
 		experiment *events.ExperimentFacts
 		code       events.RejectionCode
 		server     string
-		client     string
 	}{
 		"no such experiment": {exposed(t, nil), nil, events.RejectUnknownExperiment,
-			`no experiment is keyed "onboarding_test"`, `no experiment is keyed "onboarding_test"`},
+			`no experiment is keyed "onboarding_test"`},
 		"a draft experiment": {exposed(t, nil), draft(), events.RejectUnknownExperiment,
-			`no experiment is keyed "onboarding_test"`, `no experiment is keyed "onboarding_test"`},
+			`no experiment is keyed "onboarding_test"`},
 		"another unit type": {exposed(t, map[string]any{"unit_type": "anonymous"}), onboarding(), events.RejectUnitTypeMismatch,
-			`experiment "onboarding_test" assigns units of type "user", not "anonymous"`,
-			"the unit type is not the experiment's"},
+			`experiment "onboarding_test" assigns units of type "user", not "anonymous"`},
 		"a variation it lacks": {exposed(t, map[string]any{"variation_key": "wizard"}), onboarding(), events.RejectUnknownVariation,
-			`experiment "onboarding_test" has no variation "wizard"`, "the variation is not one of the experiment's"},
+			`experiment "onboarding_test" has no variation "wizard"`},
 		"another flag": {exposed(t, map[string]any{"flag_key": "pricing"}), onboarding(), events.RejectEventInvalid,
-			`flag_key is "pricing", but experiment "onboarding_test" is on flag "onboarding"`, "the flag is not the experiment's"},
+			`flag_key is "pricing", but experiment "onboarding_test" is on flag "onboarding"`},
 		"a reason that is not an experiment's": {exposed(t, map[string]any{"evaluation_reason": "rule"}), onboarding(), events.RejectEventInvalid,
-			`evaluation_reason is "rule", not "experiment" or "override"`, `evaluation_reason is "rule", not "experiment" or "override"`},
+			`evaluation_reason is "rule", not "experiment" or "override"`},
 		// The unit type is judged before the variation, the variation before
 		// the flag and the reason.
 		"unit type before variation": {exposed(t, map[string]any{"unit_type": "device", "variation_key": "wizard", "flag_key": "x"}), onboarding(),
-			events.RejectUnitTypeMismatch, `experiment "onboarding_test" assigns units of type "user", not "device"`,
-			"the unit type is not the experiment's"},
+			events.RejectUnitTypeMismatch, `experiment "onboarding_test" assigns units of type "user", not "device"`},
 		"variation before flag": {exposed(t, map[string]any{"variation_key": "wizard", "flag_key": "pricing", "evaluation_reason": "rule"}), onboarding(),
-			events.RejectUnknownVariation, `experiment "onboarding_test" has no variation "wizard"`, "the variation is not one of the experiment's"},
+			events.RejectUnknownVariation, `experiment "onboarding_test" has no variation "wizard"`},
 	} {
 		t.Run(name, func(t *testing.T) {
-			for _, detailed := range []bool{true, false} {
-				got := events.CheckExposure(c.x, c.experiment, detailed)
-				want := c.client
-				if detailed {
-					want = c.server
-				}
-				if got == nil || got.Code != c.code || got.Detail != want {
-					t.Errorf("detailed %t: rejection = %+v, want %s %q", detailed, got, c.code, want)
-				}
+			got := events.CheckExposure(c.x, c.experiment)
+			if got == nil || got.Code != c.code || got.Detail != c.server {
+				t.Errorf("rejection = %+v, want %s %q", got, c.code, c.server)
+			}
+			told := got.ForClient("onboarding_test")
+			if told.Code != events.RejectUnknownExperiment || told.Detail != `no experiment is keyed "onboarding_test"` {
+				t.Errorf("a client key is told %+v, want every refusal answered as no such experiment", told)
 			}
 		})
 	}
@@ -386,11 +381,11 @@ func TestAnExposureIsCheckedAgainstItsExperimentInOrder(t *testing.T) {
 
 func TestAnOverrideExposureMayNameAnyVariationOfTheFlag(t *testing.T) {
 	x := exposed(t, map[string]any{"variation_key": "classic", "override": true, "evaluation_reason": "override"})
-	if got := events.CheckExposure(x, onboarding(), true); got != nil {
+	if got := events.CheckExposure(x, onboarding()); got != nil {
 		t.Errorf("override exposure of a variation the experiment does not weigh = %+v, want accepted", got)
 	}
 	plain := exposed(t, map[string]any{"variation_key": "classic"})
-	if got := events.CheckExposure(plain, onboarding(), true); got == nil || got.Code != events.RejectUnknownVariation {
+	if got := events.CheckExposure(plain, onboarding()); got == nil || got.Code != events.RejectUnknownVariation {
 		t.Errorf("the same without override = %+v, want unknown_variation", got)
 	}
 }
@@ -400,11 +395,8 @@ func TestAnOverrideExposureMayNameAnyVariationOfTheFlag(t *testing.T) {
 // inside apps could otherwise grow the counts with names of its own making.
 func TestAnOverrideExposureOfAVariationTheFlagLacksIsRefused(t *testing.T) {
 	x := exposed(t, map[string]any{"variation_key": "made_up", "override": true, "evaluation_reason": "override"})
-	for _, detailed := range []bool{true, false} {
-		got := events.CheckExposure(x, onboarding(), detailed)
-		if got == nil || got.Code != events.RejectUnknownVariation {
-			t.Errorf("detailed %t: override exposure of a variation the flag lacks = %+v, want unknown_variation", detailed, got)
-		}
+	if got := events.CheckExposure(x, onboarding()); got == nil || got.Code != events.RejectUnknownVariation {
+		t.Errorf("override exposure of a variation the flag lacks = %+v, want unknown_variation", got)
 	}
 }
 
@@ -420,7 +412,7 @@ func TestASummaryRowCountsOnlyAVariationItsFlagHas(t *testing.T) {
 
 func TestAnExposureThatAgreesIsNotRejected(t *testing.T) {
 	for _, changes := range []map[string]any{nil, {"variation_key": "control"}, {"override": true, "evaluation_reason": "override"}} {
-		if got := events.CheckExposure(exposed(t, changes), onboarding(), false); got != nil {
+		if got := events.CheckExposure(exposed(t, changes), onboarding()); got != nil {
 			t.Errorf("%v = %+v, want accepted", changes, got)
 		}
 	}

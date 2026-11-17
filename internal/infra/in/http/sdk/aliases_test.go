@@ -7,6 +7,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -29,8 +30,26 @@ func aliasLinks(t *testing.T, p project, environment string) []events.AliasLink 
 	return links
 }
 
+func TestAClientKeyIsToldNoMoreOfAnUndeclaredUnitTypeThanThatTheAliasIsInvalid(t *testing.T) {
+	srv, _, client := eventsServer(t)
+	res := batchResult(t, srv, client, batch(
+		aliasOf(1, protocolTime, "device", "d-1", "user", "u-1"),
+		aliasOf(2, protocolTime, "anonymous", "d-1", "device", "u-1"),
+		aliasOf(3, protocolTime, "anonymous", "d-1", "anonymous", "d-2"),
+	))
+	if res.Accepted != 0 || len(res.Rejected) != 3 {
+		t.Fatalf("aliases = %+v, want all refused", res)
+	}
+	for _, r := range res.Rejected[:2] {
+		if r.Code != "event_invalid" || r.Detail != "the alias is not valid" {
+			t.Errorf("rejection %d = %+v, want event_invalid saying nothing of the unit type", r.Index, r)
+		}
+	}
+}
+
 func TestAliasesAreCheckedAgainstTheDeclaredUnitTypes(t *testing.T) {
-	srv, p, value := eventsServer(t)
+	srv, p, _ := eventsServer(t)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	res := batchResult(t, srv, value, batch(
 		aliasOf(1, protocolTime, "device", "d-1", "user", "u-1"),
 		aliasOf(2, protocolTime, "anonymous", "d-1", "device", "u-1"),
@@ -108,5 +127,69 @@ func TestAnAliasLinksItsPairOnceKeepingTheEarliestTime(t *testing.T) {
 	}
 	if links := aliasLinks(t, p, "staging"); len(links) != 1 || !links[0].Alias.OccurredAt.Equal(protocolTime) {
 		t.Errorf("staging links = %+v, want its own", links)
+	}
+}
+
+func TestAnEnvironmentAtItsLimitOfAliasLinksRefusesNewPairsOnly(t *testing.T) {
+	srv := testkit.StartServer(t, testkit.WithClock(clock.NewFake(protocolTime)), testkit.WithEventLimits(2, 0))
+	p := newProject(t, srv)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindClient)
+	_, staging := p.sdkKey(t, "staging", management.SdkKeyKindClient)
+
+	if res := batchResult(t, srv, value, batch(
+		aliasOf(1, protocolTime, "anonymous", "d-1", "user", "u-1"),
+		aliasOf(2, protocolTime, "anonymous", "d-2", "user", "u-2"),
+	)); res.Accepted != 2 {
+		t.Fatalf("aliases up to the limit = %+v", res)
+	}
+	// The limit is reached: a pair already linked is still taken, with its
+	// earlier time, and a new one is refused, in the same batch.
+	earlier := protocolTime.Add(-time.Hour)
+	res := batchResult(t, srv, value, batch(
+		aliasOf(3, earlier, "anonymous", "d-1", "user", "u-1"),
+		aliasOf(4, protocolTime, "anonymous", "d-3", "user", "u-3"),
+	))
+	if res.Accepted != 1 || len(res.Rejected) != 1 || res.Rejected[0].Index != 1 || res.Rejected[0].Code != "quota_exceeded" {
+		t.Fatalf("aliases at the limit = %+v, want the new pair refused quota_exceeded", res)
+	}
+	links := aliasLinks(t, p, "production")
+	if len(links) != 2 {
+		t.Fatalf("links = %+v, want the two within the limit", links)
+	}
+	for _, l := range links {
+		if l.Alias.ToUnitID == "u-1" && !l.Alias.OccurredAt.Equal(earlier) {
+			t.Errorf("link of u-1 = %+v, want the earlier alias's time", l)
+		}
+	}
+	// A refused alias's ID is not claimed: it is refused again, not
+	// counted as received.
+	if again := batchResult(t, srv, value, batch(aliasOf(4, protocolTime, "anonymous", "d-3", "user", "u-3"))); again.Duplicates != 0 ||
+		len(again.Rejected) != 1 {
+		t.Errorf("refused alias sent again = %+v", again)
+	}
+	// Another environment counts its own links.
+	if res := batchResult(t, srv, staging, batch(aliasOf(5, protocolTime, "anonymous", "d-3", "user", "u-3"))); res.Accepted != 1 {
+		t.Errorf("staging alias = %+v, want accepted", res)
+	}
+}
+
+func TestABatchOfNewPairsTakesOnlyWhatTheLimitLeaves(t *testing.T) {
+	srv := testkit.StartServer(t, testkit.WithClock(clock.NewFake(protocolTime)), testkit.WithEventLimits(2, 0))
+	p := newProject(t, srv)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindClient)
+
+	// Three new pairs, one of them twice, against room for two: the pair
+	// sent twice takes one place, and the third pair is refused.
+	res := batchResult(t, srv, value, batch(
+		aliasOf(1, protocolTime, "anonymous", "d-1", "user", "u-1"),
+		aliasOf(2, protocolTime, "anonymous", "d-2", "user", "u-2"),
+		aliasOf(3, protocolTime.Add(-time.Hour), "anonymous", "d-1", "user", "u-1"),
+		aliasOf(4, protocolTime, "anonymous", "d-3", "user", "u-3"),
+	))
+	if res.Accepted != 3 || len(res.Rejected) != 1 || res.Rejected[0].Index != 3 || res.Rejected[0].Code != "quota_exceeded" {
+		t.Fatalf("batch past the limit = %+v, want the third pair refused quota_exceeded", res)
+	}
+	if links := aliasLinks(t, p, "production"); len(links) != 2 {
+		t.Errorf("links = %+v, want the two within the limit", links)
 	}
 }

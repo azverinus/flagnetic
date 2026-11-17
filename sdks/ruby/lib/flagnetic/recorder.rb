@@ -7,7 +7,17 @@ module Flagnetic
   # test can assert on it: the running evaluation counts, every evaluation
   # summary a flush or close would have sent, and every exposure and alias
   # the client recorded. It is thread-safe.
+  #
+  # Each of the three lists keeps the latest 10,000 entries and drops the
+  # oldest beyond that, so an offline client left running in a long
+  # process (a development server, a long test suite without reset) does
+  # not grow without bound. The running counts are one row per flag,
+  # variation and reason and need no cap.
   class Recorder
+    # CAPACITY is how many entries each list keeps.
+    CAPACITY = 10_000
+    private_constant :CAPACITY
+
     # SummaryCount is one row of an evaluation summary: how often a flag
     # served a variation for an evaluation reason. It carries no unit IDs
     # and no values; variation is nil for local_override and fallback.
@@ -79,7 +89,7 @@ module Flagnetic
     # record keeps an evaluation summary the client would have sent once a
     # window closed.
     def record(summary)
-      @mutex.synchronize { @summaries << summary }
+      @mutex.synchronize { append(@summaries, summary) }
     end
 
     # evaluation_summaries returns the evaluation summaries the client
@@ -96,21 +106,19 @@ module Flagnetic
     def record_event(event)
       case event["type"]
       when "exposure"
-        @mutex.synchronize do
-          @exposures << Exposure.new(event_id: event["event_id"], experiment_key: event["experiment_key"],
-                                     flag_key: event["flag_key"], variation_key: event["variation_key"],
-                                     unit_type: event["unit_type"], unit_id: event["unit_id"],
-                                     platform: event["platform"], app_version: event["app_version"],
-                                     reason: event["evaluation_reason"].to_sym, override: event["override"],
-                                     ruleset_version: event["ruleset_version"],
-                                     occurred_at: Time.parse(event["occurred_at"]))
-        end
+        exposure = Exposure.new(event_id: event["event_id"], experiment_key: event["experiment_key"],
+                                flag_key: event["flag_key"], variation_key: event["variation_key"],
+                                unit_type: event["unit_type"], unit_id: event["unit_id"],
+                                platform: event["platform"], app_version: event["app_version"],
+                                reason: event["evaluation_reason"].to_sym, override: event["override"],
+                                ruleset_version: event["ruleset_version"],
+                                occurred_at: Time.parse(event["occurred_at"]))
+        @mutex.synchronize { append(@exposures, exposure) }
       when "alias"
-        @mutex.synchronize do
-          @aliases << Alias.new(event_id: event["event_id"], from_unit_type: event["from_unit_type"],
-                                from_unit_id: event["from_unit_id"], to_unit_type: event["to_unit_type"],
-                                to_unit_id: event["to_unit_id"], occurred_at: Time.parse(event["occurred_at"]))
-        end
+        link = Alias.new(event_id: event["event_id"], from_unit_type: event["from_unit_type"],
+                         from_unit_id: event["from_unit_id"], to_unit_type: event["to_unit_type"],
+                         to_unit_id: event["to_unit_id"], occurred_at: Time.parse(event["occurred_at"]))
+        @mutex.synchronize { append(@aliases, link) }
       end
     end
 
@@ -131,5 +139,14 @@ module Flagnetic
     # The client hands the recorder what it counts and reports; a test only
     # reads it.
     private :count, :record, :record_event
+
+    private
+
+    # append adds entry to list, dropping the oldest entry once the list
+    # holds CAPACITY. The caller holds the mutex.
+    def append(list, entry)
+      list.shift if list.size >= CAPACITY
+      list << entry
+    end
   end
 end

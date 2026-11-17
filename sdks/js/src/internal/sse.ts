@@ -7,6 +7,24 @@ export interface SseEvent {
 }
 
 /**
+ * The longest line, in UTF-16 code units, the parser holds. The server's frames are
+ * far smaller; the cap is what keeps a peer that never sends a line break
+ * from growing the buffer without bound.
+ */
+export const MAX_LINE_BYTES = 64 * 1024;
+
+/** The most `data` of one event, in UTF-16 code units, line feeds between its lines included. */
+export const MAX_EVENT_BYTES = 64 * 1024;
+
+/** A stream line or event over its cap: the stream is failed, not read on. */
+export class SseOverflow extends Error {
+  constructor(what: "line" | "event") {
+    super(`event stream ${what} too long`);
+    this.name = "SseOverflow";
+  }
+}
+
+/**
  * A line parser for `text/event-stream` as the HTML standard defines it:
  * `event`, `data` (multi-line, joined by a line feed), `id`, `retry`,
  * comments, and lines ending in CRLF, CR or LF, fed chunk by chunk.
@@ -21,6 +39,8 @@ export class SseParser {
    */
   comments = 0;
   private buffer = "";
+  private bufferBytes = 0;
+  private dataBytes = 0;
   private pendingCR = false;
   private event = "";
   private data: string[] = [];
@@ -28,7 +48,11 @@ export class SseParser {
   private readonly decoder = new TextDecoder("utf-8");
   private first = true;
 
-  /** Feeds a chunk of the body and returns the events it completes. */
+  /**
+   * Feeds a chunk of the body and returns the events it completes. Throws
+   * SseOverflow when a line or the data of one event outgrows its cap; the
+   * parser is not usable afterwards.
+   */
   feed(chunk: Uint8Array | string): SseEvent[] {
     let text = typeof chunk === "string" ? chunk : this.decoder.decode(chunk, { stream: true });
     if (this.first && text.length > 0) {
@@ -45,8 +69,11 @@ export class SseParser {
     for (let i = 0; i < text.length; i++) {
       const c = text[i];
       if (c !== "\n" && c !== "\r") continue;
-      this.line(this.buffer + text.slice(start, i), out);
+      const segment = text.slice(start, i);
+      if (this.bufferBytes + segment.length > MAX_LINE_BYTES) throw new SseOverflow("line");
+      this.line(this.buffer + segment, out);
       this.buffer = "";
+      this.bufferBytes = 0;
       if (c === "\r") {
         if (i + 1 < text.length) {
           if (text[i + 1] === "\n") i++;
@@ -56,7 +83,10 @@ export class SseParser {
       }
       start = i + 1;
     }
-    this.buffer += text.slice(start);
+    const rest = text.slice(start);
+    this.bufferBytes += rest.length;
+    if (this.bufferBytes > MAX_LINE_BYTES) throw new SseOverflow("line");
+    this.buffer += rest;
     return out;
   }
 
@@ -65,6 +95,7 @@ export class SseParser {
       if (this.data.length > 0) out.push({ event: this.event || "message", data: this.data.join("\n"), id: this.id });
       this.event = "";
       this.data = [];
+      this.dataBytes = 0;
       return;
     }
     if (line.startsWith(":")) {
@@ -80,6 +111,8 @@ export class SseParser {
         this.event = value;
         break;
       case "data":
+        this.dataBytes += value.length + (this.data.length > 0 ? 1 : 0);
+        if (this.dataBytes > MAX_EVENT_BYTES) throw new SseOverflow("event");
         this.data.push(value);
         break;
       case "id":

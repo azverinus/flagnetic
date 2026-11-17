@@ -42,6 +42,18 @@ export type SignInFormProps = {
 const leaveFor = (href: string) => window.location.assign(href);
 
 /**
+ * What of an email the methods lookup is sent: its domain alone, as `@domain`.
+ * The answer is judged from the domain, and the address travels in the
+ * query string, where a proxy's access log would record it. Text with no
+ * `@` has no domain, and the server answers a bare `@` as it would that
+ * text, so none of it is sent.
+ */
+function domainOnly(email: string): string {
+  const at = email.lastIndexOf("@");
+  return at < 0 ? "@" : email.slice(at);
+}
+
+/**
  * The ways to sign in: email and password when the instance allows them,
  * with the forgotten-password page when the instance mails resets, and a
  * link to each enabled auth provider's sign-in. While providers exist the
@@ -93,7 +105,7 @@ export function SignInForm({
     onSuccess: onSignedIn,
   });
   const lookup = useMutation({
-    mutationFn: (email: string) => unwrap(getAuthMethods({ query: { email } })),
+    mutationFn: (email: string) => unwrap(getAuthMethods({ query: { email: domainOnly(email) } })),
     meta: { toast: false, readsAuditAgain: false },
     onSuccess: (answer) => {
       const enforced = answer.enforced_provider;

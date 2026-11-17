@@ -18,7 +18,7 @@ import (
 )
 
 func siem() management.WebhookCreate {
-	return management.WebhookCreate{Name: "SIEM", Url: "https://receiver.example/hook", Events: []string{"flag.kill_switch"}}
+	return management.WebhookCreate{Name: "SIEM", Url: "https://receiver.example/hook/s3cret-token?key=s3cret-query", Events: []string{"flag.kill_switch"}}
 }
 
 func createWebhook(t *testing.T, c *management.ClientWithResponses, project string, body management.WebhookCreate) management.WebhookWithSecret {
@@ -73,7 +73,7 @@ func TestCreatingAWebhookSubscriptionShowsItsSecretOnceAndSealsIt(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	opened, err := secret.NewKeyring(secret.New(testkit.SecretKey)).Open(secret.PurposeWebhookSecret, stored.SealedSecret)
+	opened, err := secret.NewKeyring(secret.New(testkit.SecretKey)).Open(secret.PurposeWebhookSecret, stored.SealedSecret, secret.Row("webhook_subscriptions", stored.ID.String()))
 	if strings.Contains(stored.SealedSecret, created.Secret) || err != nil || string(opened) != created.Secret {
 		t.Errorf("stored %q, opening it = %q, %v", stored.SealedSecret, opened, err)
 	}
@@ -89,7 +89,7 @@ func TestCreatingAWebhookSubscriptionShowsItsSecretOnceAndSealsIt(t *testing.T) 
 	}
 
 	e, before, after := webhookEntry(t, srv, "webhook.created", created)
-	if e.Entity.Kind != "webhook" || before != nil || after["secret"] != "[redacted]" || after["url"] != created.Url {
+	if e.Entity.Kind != "webhook" || before != nil || after["secret"] != "[redacted]" || after["url"] != "https://receiver.example" {
 		t.Errorf("audit entry %+v, after %v", e, after)
 	}
 }

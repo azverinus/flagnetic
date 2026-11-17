@@ -9,7 +9,8 @@ import (
 	"time"
 )
 
-// maxFrameBytes bounds one line of the change stream. The only event the
+// maxFrameBytes bounds one line of the change stream, and the data one
+// event accumulates over its lines. The only event the
 // stream carries is a version, so a longer line is a broken or hostile
 // server and ends the connection.
 const maxFrameBytes = 64 << 10
@@ -94,6 +95,12 @@ func (r *sseReader) next() (sseFrame, error) {
 			case "event":
 				r.event = value
 			case "data":
+				// Each line is within the line cap, but an event of many
+				// short lines would otherwise grow without end until the
+				// server stops writing.
+				if r.data.Len()+len(value)+1 > maxFrameBytes {
+					return sseFrame{}, bufio.ErrTooLong
+				}
 				r.data.WriteString(value)
 				r.data.WriteByte('\n')
 				r.hasData = true

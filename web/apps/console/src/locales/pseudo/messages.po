@@ -208,16 +208,16 @@ msgstr ""
 msgid "{inviter} invites you to this instance."
 msgstr ""
 
+#: src/components/flag-on-off.tsx
 #: src/components/kill-switch-dialog.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "{key} is off in {name}."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "{key} is on in {name}."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "{key} on in {name}"
 msgstr ""
 
@@ -341,11 +341,11 @@ msgstr ""
 msgid "{name} is protected, so reverting its configuration to version {proposedVersion} goes through a change request. What it proposes is that version, as it was; nobody edits it."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "{name} is protected: switching {key} off there goes through a change request."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "{name} is protected: switching {key} on there goes through a change request."
 msgstr ""
 
@@ -2240,7 +2240,7 @@ msgstr ""
 msgid "contains any of"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "Contexts are served by the overrides, rules and fallthrough below."
 msgstr ""
 
@@ -3411,7 +3411,7 @@ msgstr ""
 msgid "Every context"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "Every context receives the off variation."
 msgstr ""
 
@@ -4490,7 +4490,7 @@ msgstr ""
 msgid "Keys"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "Kill switch"
 msgstr ""
 
@@ -4914,6 +4914,10 @@ msgstr ""
 
 #: src/components/auth-provider-detail.tsx
 msgid "Members can no longer sign in through it. A provider that members have signed in through, or that granted access through its group mappings, cannot be deleted; disable it instead. This cannot be undone."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Members have identities linked at this provider. Changing its issuer or entity ID could let another person sign in as one of them. Unlink those identities first, or create a new provider."
 msgstr ""
 
 #: src/components/project-invitations.tsx
@@ -5609,8 +5613,8 @@ msgid "Observed share"
 msgstr ""
 
 #: src/components/compare-environments.tsx
+#: src/components/flag-on-off.tsx
 #: src/components/tester-panel.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Off"
 msgstr ""
@@ -5635,7 +5639,7 @@ msgid "Older entries"
 msgstr ""
 
 #: src/components/compare-environments.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "On"
 msgstr ""
@@ -7254,6 +7258,10 @@ msgstr ""
 msgid "Sign out"
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "Sign out and sign in again, then link the provider."
+msgstr ""
+
 #: src/components/saml-provider-form.tsx
 msgid "Sign the requests the instance sends with its current key, for an identity provider that checks them against the certificate in the SP metadata."
 msgstr ""
@@ -7357,7 +7365,7 @@ msgstr ""
 msgid "Some fields need correcting."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "Someone changed this configuration a moment ago. It is read again: switch it once more if you still mean to."
 msgstr ""
 
@@ -8210,10 +8218,6 @@ msgstr ""
 msgid "The idle timeout cannot be longer than the absolute timeout."
 msgstr ""
 
-#: src/lib/mail-settings.ts
-msgid "The instance could not reach the SMTP server, or the connection broke. Check the host and the port, and that the server accepts connections from the instance."
-msgstr ""
-
 #: src/components/password-reset-link-dialog.tsx
 msgid "The instance does not mail this link, so pass it to {name} yourself, over a channel only they read. It works once, until {until}."
 msgstr ""
@@ -8578,10 +8582,6 @@ msgstr ""
 msgid "The secret it replaces keeps signing beside this one for a day, so the receiver can take the new one without refusing an event."
 msgstr ""
 
-#: src/lib/mail-settings.ts
-msgid "The secure connection to the SMTP server failed: it does not offer STARTTLS, or the TLS handshake or its certificate failed. Check the security and the port."
-msgstr ""
-
 #: src/lib/problem-messages.ts
 msgid "the segment {key}"
 msgstr ""
@@ -8652,19 +8652,11 @@ msgid "The SMTP server accepted a test mail to {recipient}. Check that it arrive
 msgstr ""
 
 #: src/lib/mail-settings.ts
-msgid "The SMTP server did not accept the test mail."
+msgid "The SMTP server could not be reached or did not accept the test mail. Check the settings; the instance's log says why."
 msgstr ""
 
 #: src/components/mail-settings.tsx
 msgid "The SMTP server is removed."
-msgstr ""
-
-#: src/lib/mail-settings.ts
-msgid "The SMTP server refused the sender, the recipient or the mail. Check that the server accepts mail from the sender address and to your address."
-msgstr ""
-
-#: src/lib/mail-settings.ts
-msgid "The SMTP server refused the username and password. Check them, then save and test again."
 msgstr ""
 
 #: src/components/mail-settings.tsx

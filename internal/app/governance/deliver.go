@@ -42,7 +42,7 @@ type DeliveryStore interface {
 	// replica still running at now, up to governance.MaxDeliveriesInFlight.
 	// It runs in the unit of work ctx carries and returns the deliveries
 	// leased.
-	ClaimDeliveries(ctx context.Context, token LeaseToken, now, until time.Time, limit int) ([]governance.DeliveryID, error)
+	ClaimDeliveries(ctx context.Context, token LeaseToken, now, until time.Time, limit int) ([]ClaimedDelivery, error)
 	// RenewLease pushes the lease token holds on delivery to until and
 	// returns the delivery as its attempt needs it; false when the lease ran
 	// out by now or is another's, the delivery settled or its subscription
@@ -97,7 +97,7 @@ type Sender interface {
 
 // Opener opens a value sealed under the instance's secret key.
 type Opener interface {
-	Open(purpose secret.Purpose, sealed string) ([]byte, error)
+	Open(purpose secret.Purpose, sealed string, binding secret.Binding) ([]byte, error)
 }
 
 // deliveryBatch bounds the deliveries one claim leases. A round claims
@@ -159,10 +159,18 @@ type Deliver struct{ d DeliverDeps }
 // NewDeliver returns the use case.
 func NewDeliver(d DeliverDeps) *Deliver { return &Deliver{d: d} }
 
+// ClaimedDelivery is a delivery a replica leased, with the project of its
+// subscription, zero for an instance's, so that a replica can share its
+// attempts between projects.
+type ClaimedDelivery struct {
+	ID      governance.DeliveryID
+	Project workspace.ProjectID
+}
+
 // Claim is a batch of deliveries a replica leased, each to be attempted.
 type Claim struct {
 	Token      LeaseToken
-	Deliveries []governance.DeliveryID
+	Deliveries []ClaimedDelivery
 }
 
 func (h *Deliver) now() time.Time { return h.d.Clock.Now().UTC().Truncate(time.Microsecond) }
@@ -208,7 +216,7 @@ func (h *Deliver) Attempt(ctx context.Context, token LeaseToken, delivery govern
 	}
 	secrets := make([]string, len(l.SealedSecrets))
 	for i, sealed := range l.SealedSecrets {
-		value, openErr := h.d.Opener.Open(secret.PurposeWebhookSecret, sealed)
+		value, openErr := h.d.Opener.Open(secret.PurposeWebhookSecret, sealed, webhookSecretBinding(l.Delivery.Webhook))
 		if openErr != nil {
 			// The lease runs out and another round tries again: a key the
 			// operator restores lets it through.

@@ -40,7 +40,7 @@ func objectStorageSink() management.SinkCreate {
 func webhookSink() management.SinkCreate {
 	return management.SinkCreate{
 		Name: "Ingest", Kind: "webhook",
-		Webhook: &management.SinkWebhookInput{Url: ptr("https://receiver.example/sink")},
+		Webhook: &management.SinkWebhookInput{Url: ptr("https://receiver.example/sink/s3cret-path?token=s3cret-query")},
 	}
 }
 
@@ -74,7 +74,7 @@ func storedSink(t *testing.T, p management.Project, sink management.Sink) sinks.
 // openedSecret returns the secret s holds, opened for its kind's purpose.
 func openedSecret(t *testing.T, s sinks.Sink) string {
 	t.Helper()
-	plain, err := secret.NewKeyring(secret.New(testkit.SecretKey)).Open(s.Kind.SecretPurpose(), s.SealedSecret)
+	plain, err := secret.NewKeyring(secret.New(testkit.SecretKey)).Open(s.Kind.SecretPurpose(), s.SealedSecret, secret.Row("sinks", s.ID.String()))
 	if err != nil {
 		t.Fatalf("opening the secret of the %s sink: %v", s.Kind, err)
 	}
@@ -141,7 +141,7 @@ func TestCreatingASinkOfEachKindSealsItsSecretMasksItAndStartsDisabled(t *testin
 			if other == stored.Kind {
 				continue
 			}
-			if _, err := secret.NewKeyring(secret.New(testkit.SecretKey)).Open(other.SecretPurpose(), stored.SealedSecret); err == nil {
+			if _, err := secret.NewKeyring(secret.New(testkit.SecretKey)).Open(other.SecretPurpose(), stored.SealedSecret, secret.Row("sinks", stored.ID.String())); err == nil {
 				t.Errorf("%s: the secret opens as a %s sink's", name, other)
 			}
 		}
@@ -162,6 +162,9 @@ func TestCreatingASinkOfEachKindSealsItsSecretMasksItAndStartsDisabled(t *testin
 		field := map[string]string{"clickhouse": "password", "object_storage": "secret_access_key", "webhook": "secret"}[tc.body.Kind]
 		if entries[0].Entity.Kind != "sink" || entries[0].Before != nil || sub[field] != "[redacted]" || strings.Contains(string(raw), tc.plaintext) {
 			t.Errorf("%s: audit entry %s", name, raw)
+		}
+		if strings.Contains(string(raw), "s3cret") {
+			t.Errorf("%s: audit entry records a target URL path or query: %s", name, raw)
 		}
 	}
 
@@ -734,7 +737,7 @@ func TestOnlyAWebhookSinksSecretIsRotatedAndTheOldOneSignsBesideTheNewForTheOver
 
 	stored := storedSink(t, p, sinkOf(created))
 	keyring := secret.NewKeyring(secret.New(testkit.SecretKey))
-	previous, err := keyring.Open(secret.PurposeSinkWebhookSecret, stored.PreviousSealedSecret)
+	previous, err := keyring.Open(secret.PurposeSinkWebhookSecret, stored.PreviousSealedSecret, secret.Row("sinks", stored.ID.String()))
 	if openedSecret(t, stored) != second || err != nil || string(previous) != first || stored.PreviousSecretExpiresAt == nil ||
 		!stored.PreviousSecretExpiresAt.After(now) {
 		t.Errorf("after a rotation the sink signs with %q beside %q until %v", openedSecret(t, stored), previous, stored.PreviousSecretExpiresAt)
@@ -747,7 +750,7 @@ func TestOnlyAWebhookSinksSecretIsRotatedAndTheOldOneSignsBesideTheNewForTheOver
 	}
 	testkit.RecordSecret(*again.JSON200.Secret)
 	stored = storedSink(t, p, sinkOf(created))
-	if previous, err = keyring.Open(secret.PurposeSinkWebhookSecret, stored.PreviousSealedSecret); err != nil || string(previous) != second {
+	if previous, err = keyring.Open(secret.PurposeSinkWebhookSecret, stored.PreviousSealedSecret, secret.Row("sinks", stored.ID.String())); err != nil || string(previous) != second {
 		t.Errorf("after a second rotation the previous secret opens as %q, %v, want the first rotation's", previous, err)
 	}
 

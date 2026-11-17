@@ -2,6 +2,8 @@
 
 Which server an SDK build can talk to, and what an SDK version promises. A build shipped years ago keeps working: the server keeps serving every SDK API path a released SDK speaks and every document schema it shipped under that path, and every SDK treats a document it cannot read as a failure of the fallback chain, never as "everything off".
 
+What the server promises for every surface from 1.0, and how a deprecation is announced, is on [Compatibility and support](../compatibility.md).
+
 Every SDK is in its 0.x line: until 1.0.0 a minor release may still change the SDK's own API, while the protocol between an SDK and the server only grows.
 
 ## What 0.x promises
@@ -48,7 +50,7 @@ A **client key** ships inside apps and browsers, so it never receives a ruleset:
 |---|---|
 | `targeting_match` | targeting decided the value: a matched rule, a rollout, the fallthrough or a failed prerequisite |
 | `off` | the flag is off |
-| `override` | an override for this unit decided the value |
+| `override` | an override for this unit led it into a running experiment, so the exposure is marked as an override's |
 | `experiment` | a running experiment assigned the value |
 | `error` | the flag could not be evaluated; the SDK serves its built-in default as `fallback` |
 

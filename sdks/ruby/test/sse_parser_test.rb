@@ -71,4 +71,44 @@ class SSEParserTest < Minitest::Test
     parser = SSEParser.new(max_line: 16)
     assert_raises(SSEParser::Error) { parser.feed("x" * 17) { nil } }
   end
+
+  def test_the_default_line_limit_is_64_kib
+    parser = SSEParser.new
+    parser.feed("data: #{"x" * ((64 << 10) - 6)}") { nil } # exactly at the limit, still waiting for its end
+    assert_raises(SSEParser::Error) { parser.feed("x") { nil } }
+  end
+
+  def test_a_line_without_a_newline_arriving_in_pieces_is_refused
+    parser = SSEParser.new(max_line: 64)
+    pieces = 0
+    error = assert_raises(SSEParser::Error) do
+      loop do
+        parser.feed("x" * 10) { nil }
+        pieces += 1
+      end
+    end
+    assert_match(/exceeds 64 bytes/, error.message)
+    assert_operator pieces, :<=, 7
+  end
+
+  def test_endless_short_data_lines_are_refused
+    parser = SSEParser.new(max_line: 64, max_event: 256)
+    error = assert_raises(SSEParser::Error) do
+      100.times { parser.feed("data: #{"y" * 30}\n") { nil } }
+    end
+    assert_match(/event exceeds 256 bytes/, error.message)
+  end
+
+  def test_an_event_exactly_at_the_limit_dispatches_and_the_count_restarts
+    parser = SSEParser.new(max_line: 64, max_event: 8)
+    out = []
+    parser.feed("data: abc\ndata: de\n\n") { |k, v| out << [k, v] } # "abc\nde\n" is 7 bytes of data plus line ends
+    parser.feed("data: abc\ndata: de\n\n") { |k, v| out << [k, v] }
+    assert_equal 2, out.size
+  end
+
+  def test_one_large_chunk_of_short_data_lines_is_refused
+    parser = SSEParser.new(max_line: 64, max_event: 256)
+    assert_raises(SSEParser::Error) { parser.feed("data: #{"y" * 30}\n" * 100) { nil } }
+  end
 end

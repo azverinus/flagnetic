@@ -23,8 +23,9 @@ final class _Unsupported implements Transport {
     Uri url,
     Map<String, String> headers,
     List<int> json,
-    Duration timeout,
-  ) async => throw const TransportException(
+    Duration timeout, {
+    int maxBytes = maxResponseBytes,
+  }) async => throw const TransportException(
     TransportFailure.network,
     'no HTTP transport on this platform',
   );

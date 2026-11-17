@@ -73,7 +73,8 @@ func (s *Store) addGroupMembers(ctx context.Context, g appidentity.SCIMGroupReco
 }
 
 // SaveSCIMGroup stores g in place of the group with its identifier, its
-// members replaced.
+// members replaced: the memberships g no longer holds are deleted and the
+// new ones added, so the rows of the members who stay are not rewritten.
 func (s *Store) SaveSCIMGroup(ctx context.Context, g appidentity.SCIMGroupRecord) error {
 	_, err := s.db(ctx).Exec(ctx, `
 		UPDATE scim_groups SET display_name = $2, external_id = $3, updated_at = $4 WHERE id = $1`,
@@ -81,10 +82,20 @@ func (s *Store) SaveSCIMGroup(ctx context.Context, g appidentity.SCIMGroupRecord
 	if err != nil {
 		return groupRefusal(err, "saving a SCIM group")
 	}
-	if _, err = s.db(ctx).Exec(ctx, `DELETE FROM scim_group_members WHERE group_id = $1`, g.ID.Bytes()); err != nil {
-		return fmt.Errorf("clearing a SCIM group's members: %w", err)
+	if _, err = s.db(ctx).Exec(ctx, `
+		DELETE FROM scim_group_members WHERE group_id = $1 AND member_id <> ALL($2::uuid[])`,
+		g.ID.Bytes(), memberBytes(g.Members)); err != nil {
+		return fmt.Errorf("removing the members who left a SCIM group: %w", err)
 	}
-	return s.addGroupMembers(ctx, g)
+	if len(g.Members) == 0 {
+		return nil
+	}
+	if _, err = s.db(ctx).Exec(ctx, `
+		INSERT INTO scim_group_members (group_id, member_id) SELECT $1, unnest($2::uuid[]) ON CONFLICT DO NOTHING`,
+		g.ID.Bytes(), memberBytes(g.Members)); err != nil {
+		return fmt.Errorf("adding the members who joined a SCIM group: %w", err)
+	}
+	return nil
 }
 
 // DeleteSCIMGroup removes the group; its memberships go with it.

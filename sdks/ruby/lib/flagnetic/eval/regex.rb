@@ -34,6 +34,7 @@ module Flagnetic
     #   code point sharing a folding orbit with one, as Go does; whether a
     #   code point has the property is Ruby's Unicode data, the orbits are
     #   Go's.
+    # - A string over 64 KiB is not matched: it is a non-match, not an error.
     # - A match searches anywhere in the string unless the pattern is
     #   anchored. Every byte of invalid UTF-8 in the matched string reads as
     #   one U+FFFD, as Go decodes it.
@@ -44,6 +45,12 @@ module Flagnetic
       REPLACEMENT = [0xFFFD].pack("U")
       private_constant :REPLACEMENT
 
+      # MAX_INPUT_BYTES is the longest string a pattern is matched against.
+      # The Pike VM's cost is the input times the program, and a context
+      # value is chosen by an end user, so a longer one is a non-match
+      # instead of a request that burns CPU.
+      MAX_INPUT_BYTES = 64 << 10
+
       # Pattern is a compiled matches pattern.
       class Pattern
         def initialize(program)
@@ -51,8 +58,11 @@ module Flagnetic
           freeze
         end
 
-        # match? reports whether s contains a match.
+        # match? reports whether s contains a match; a string over
+        # MAX_INPUT_BYTES contains none.
         def match?(str)
+          return false if str.bytesize > MAX_INPUT_BYTES
+
           str = str.scrub { |bad| REPLACEMENT * bad.bytesize } unless str.valid_encoding?
           Vm.search(@program, str.codepoints)
         end

@@ -42,7 +42,7 @@ func listedEmails(t *testing.T, c *management.ClientWithResponses, params manage
 func TestTheInstancesMembersAreListedFilteredAndRead(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	unique := strings.ToLower(rand.Text()[:10])
 	invited := testkit.NewMember(t, pool, testkit.WithStatus(access.MemberInvited),
 		testkit.WithDisplayName("Grace Hopper "+unique), testkit.WithEmail("grace-"+unique+"@example.com"))
@@ -94,7 +94,7 @@ func TestTheInstancesMembersAreListedFilteredAndRead(t *testing.T) {
 func TestAnInstanceAdminEditsAMember(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	m := testkit.NewMember(t, pool)
 	other := testkit.NewMember(t, pool)
 	renamed := "renamed-" + strings.ToLower(rand.Text()[:10]) + "@example.com"
@@ -181,7 +181,7 @@ func TestEverythingUnderMembersNeedsAnInstanceAdmin(t *testing.T) {
 			}
 		}
 	}
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	if got := memberOf(t, admin, target.ID); got.Status != management.MemberStatusActive || got.InstanceAdmin {
 		t.Errorf("target = %+v, want unchanged", got)
 	}
@@ -210,7 +210,7 @@ func memberIDByEmail(t *testing.T, c *management.ClientWithResponses, email stri
 func TestDeactivationRevokesEverySessionAndTokenAndReactivationRestoresSignIn(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	m := testkit.NewMember(t, pool)
 	browser := signedIn(t, srv, m)
 	token := testkit.Client(t, srv, testkit.PersonalToken(t, pool, m.ID, "script"))
@@ -273,7 +273,7 @@ func TestTheLastActiveInstanceAdminCannotBeDeactivated(t *testing.T) {
 
 	res := do(admin.DeactivateMemberWithResponse(t.Context(), first.String()))
 	assertProblem(t, "deactivating the last", res.StatusCode(), res.Body, http.StatusConflict, "last_instance_admin")
-	demote := do(admin.UpdateMemberWithResponse(t.Context(), first.String(), management.MemberPatch{InstanceAdmin: ptr(false)}))
+	demote := do(testkit.InstanceAdminSessionOn(t, srv, pool).UpdateMemberWithResponse(t.Context(), first.String(), management.MemberPatch{InstanceAdmin: ptr(false)}))
 	assertProblem(t, "demoting the last", demote.StatusCode(), demote.Body, http.StatusConflict, "last_instance_admin")
 	if got := memberOf(t, admin, first); got.Status != management.MemberStatusActive || !got.InstanceAdmin {
 		t.Errorf("the last instance admin = %+v, want unchanged", got)
@@ -291,7 +291,7 @@ func TestTheLastActiveInstanceAdminCannotBeDeactivated(t *testing.T) {
 func TestAMemberCountsTheProjectsTheyHoldAGrantIn(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	m := testkit.NewMember(t, pool)
 	a, b := createProject(t, admin, projectKey()), createProject(t, admin, projectKey())
 	if got := memberOf(t, admin, m.ID); got.ProjectCount != 0 {
@@ -325,7 +325,7 @@ func TestAMemberCountsTheProjectsTheyHoldAGrantIn(t *testing.T) {
 func TestAProjectCountsItsMembers(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
 	if p.MemberCount != 0 {
 		t.Errorf("a new project counts %d members, want 0", p.MemberCount)
@@ -355,7 +355,7 @@ func TestAProjectCountsItsMembers(t *testing.T) {
 // holds their link, which is its issuer until an invitation is mailed.
 func TestAnInvitedMemberIsGivenNothingByHandUntilTheyJoin(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
 	invited := invite(t, admin, "Invited")
 	m := id.FromBytes[access.Member](invited.Member.Id)
@@ -391,7 +391,7 @@ func grantHeld(t *testing.T, project workspace.ProjectID, member access.MemberID
 
 func TestAnInvitedMemberCountsNothing(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	p := createProject(t, admin, projectKey())
 	invited := invite(t, admin, "Invited")
 	m := id.FromBytes[access.Member](invited.Member.Id)
@@ -408,7 +408,7 @@ func TestAnInvitedMemberCountsNothing(t *testing.T) {
 func TestTheCountsCostOneQueryPerPage(t *testing.T) {
 	pool, queries := testkit.TracedPool(t)
 	srv := testkit.StartServer(t, testkit.WithPool(pool))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	for range 20 {
 		m := testkit.NewMember(t, pool)
 		testkit.Grant(t, pool, projectIDOf(createProject(t, admin, projectKey())), m.ID, access.RoleDeveloper)
@@ -428,5 +428,44 @@ func TestTheCountsCostOneQueryPerPage(t *testing.T) {
 	}
 	if n := queries.Containing("member_count"); n != 1 {
 		t.Errorf("queries counting members = %d, want 1 for the page", n)
+	}
+}
+
+// A leaked instance:admin token must not leave access behind that outlives
+// its revocation: granting, inviting, reactivating, promoting and resetting a
+// password all need the session of the member, and change nothing without it.
+func TestATokenCreatesNoAccessEvenFromAnInstanceAdmin(t *testing.T) {
+	srv := testkit.StartServer(t)
+	pool := testkit.Pool(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, testkit.InstanceAdminSession(t, srv), projectKey())
+	member := testkit.NewMember(t, pool)
+	gone := testkit.NewMember(t, pool, testkit.WithStatus(access.MemberDeactivated))
+	grantRes := do(admin.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: member.ID.Bytes(), Role: "viewer"}))
+	nobody := "nobody-" + strings.ToLower(rand.Text()[:8]) + "@example.com"
+	inviteRes := do(admin.InviteMemberWithResponse(t.Context(), management.MemberInvite{Email: nobody, DisplayName: "Nobody"}))
+	reactivateRes := do(admin.ReactivateMemberWithResponse(t.Context(), gone.ID.String()))
+	promoteRes := do(admin.UpdateMemberWithResponse(t.Context(), member.ID.String(), management.MemberPatch{InstanceAdmin: ptr(true)}))
+	resetRes := do(admin.IssuePasswordResetWithResponse(t.Context(), member.ID.String()))
+	invited := testkit.NewMember(t, pool, testkit.WithStatus(access.MemberInvited))
+	reissueRes := do(admin.ReissueInvitationWithResponse(t.Context(), invited.ID.String()))
+	assertProblem(t, "issuing an invitation again", reissueRes.StatusCode(), reissueRes.Body, http.StatusForbidden, "session_required")
+	projectInviteRes := do(admin.InviteProjectMemberWithResponse(t.Context(), p.Key, management.ProjectInvitationCreate{
+		Email: "project-" + nobody, DisplayName: "Nobody", Role: "viewer"}))
+	assertProblem(t, "inviting to a project", projectInviteRes.StatusCode(), projectInviteRes.Body, http.StatusForbidden, "session_required")
+	assertProblem(t, "granting", grantRes.StatusCode(), grantRes.Body, http.StatusForbidden, "session_required")
+	assertProblem(t, "inviting", inviteRes.StatusCode(), inviteRes.Body, http.StatusForbidden, "session_required")
+	assertProblem(t, "reactivating", reactivateRes.StatusCode(), reactivateRes.Body, http.StatusForbidden, "session_required")
+	assertProblem(t, "promoting", promoteRes.StatusCode(), promoteRes.Body, http.StatusForbidden, "session_required")
+	assertProblem(t, "resetting a password", resetRes.StatusCode(), resetRes.Body, http.StatusForbidden, "session_required")
+
+	if got := memberOf(t, admin, member.ID); got.InstanceAdmin {
+		t.Error("the member was promoted by a token")
+	}
+	if got := memberOf(t, admin, gone.ID); got.Status != management.MemberStatusDeactivated {
+		t.Errorf("the deactivated member = %s, want still deactivated", got.Status)
+	}
+	if got := listedEmails(t, admin, management.ListMembersParams{Q: &nobody}); len(got) != 0 {
+		t.Errorf("members named %s = %v, want none: a token invited someone", nobody, got)
 	}
 }

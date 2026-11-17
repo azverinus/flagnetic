@@ -29,6 +29,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/deprecation"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management/operations"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
@@ -278,6 +279,8 @@ func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer, opts Op
 	// in the path the browser opens.
 	edge.SecretPath(invitationLinkPath + "{secret}")
 	edge.SecretPath(passwordResetLinkPath + "{secret}")
+	// A deprecated operation is announced whatever its handler answers.
+	edge.Wrap(BaseURL+"/", deprecation.Middleware(BaseURL, Deprecated))
 	HandlerWithOptions(rawBodies{ServerInterface: strict, a: a}, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
 		BaseRouter:       router{a},
@@ -409,7 +412,7 @@ func (a *api) seam(op operations.Entry, next http.Handler) http.Handler {
 			console:       a.opts.console(scheme, r.Host),
 		})
 		r = r.WithContext(ctx)
-		cred := credentialOf(r)
+		cred := credentialOf(r, browserOf(ctx).secureCookies)
 		caller, err := a.authenticate(ctx, cred, op.Operation)
 		var in *addressed
 		switch {
@@ -487,14 +490,15 @@ type credential struct {
 	ip            netip.Addr
 }
 
-// credentialOf reads the credential r presents.
-func credentialOf(r *http.Request) credential {
+// credentialOf reads the credential r presents; secure says whether the
+// session cookie of r is Secure, which decides its name.
+func credentialOf(r *http.Request, secure bool) credential {
 	c := credential{ip: flaghttp.ClientOf(r.Context()).IP}
 	if _, present := r.Header["Authorization"]; present {
 		v := r.Header.Get("Authorization")
 		c.authorization = &v
 	}
-	if cookie, err := r.Cookie(SessionCookie); err == nil {
+	if cookie, err := r.Cookie(SessionCookieName(secure)); err == nil {
 		v := cookie.Value
 		c.cookie = &v
 	}

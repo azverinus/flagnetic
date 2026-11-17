@@ -173,6 +173,21 @@ export class Ingest {
     }
   }
 
+  /**
+   * Forgets what is waiting to be sent: the stored queue, every tab's, and
+   * the evaluation counts not yet turned into a summary, so nothing recorded
+   * before the call is written back or sent. A pending retry is cancelled; a
+   * batch in flight finishes, and its answer only removes what is no longer
+   * stored.
+   */
+  clear(): void {
+    this.summary.take();
+    this.store.remove(this.config.queueKey);
+    this.config.clock.clearTimeout(this.retryTimer);
+    this.retryTimer = undefined;
+    this.backoff.reset();
+  }
+
   /** Stops the timers; what is queued stays in storage for the next load. */
   close(): void {
     this.closed = true;

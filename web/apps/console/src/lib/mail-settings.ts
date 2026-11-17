@@ -150,34 +150,19 @@ export function mailFormSchema(i18n: I18n, { stored }: { stored: SmtpSettings | 
 }
 
 /**
- * The sentence for a refusal of the mail settings or the test mail. A test
- * mail that failed says at which step, since each points at different
- * settings; the public address is said to be what mailed links are built
+ * The sentence for a refusal of the mail settings or the test mail. The
+ * public address is said to be what mailed links are built
  * from. Any other refusal reads as everywhere else.
  */
 export function mailProblem(i18n: I18n, error: ApiError): string {
   switch (error.code) {
     case "smtp_failed":
-      switch (error.problem.failure) {
-        case "connection":
-          return i18n._(
-            msg`The instance could not reach the SMTP server, or the connection broke. Check the host and the port, and that the server accepts connections from the instance.`,
-          );
-        case "tls":
-          return i18n._(
-            msg`The secure connection to the SMTP server failed: it does not offer STARTTLS, or the TLS handshake or its certificate failed. Check the security and the port.`,
-          );
-        case "authentication":
-          return i18n._(
-            msg`The SMTP server refused the username and password. Check them, then save and test again.`,
-          );
-        case "rejected":
-          return i18n._(
-            msg`The SMTP server refused the sender, the recipient or the mail. Check that the server accepts mail from the sender address and to your address.`,
-          );
-        default:
-          return i18n._(msg`The SMTP server did not accept the test mail.`);
-      }
+      // The answer never says at which step the exchange failed: the host is
+      // the instance admin's to name, and the step would map what is
+      // reachable behind it. The instance's log does.
+      return i18n._(
+        msg`The SMTP server could not be reached or did not accept the test mail. Check the settings; the instance's log says why.`,
+      );
     case "smtp_not_configured":
       return i18n._(msg`No SMTP server is configured. Save the settings first.`);
     case "base_url_required":

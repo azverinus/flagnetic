@@ -434,6 +434,43 @@ describe("the ruleset stream", () => {
     expect(h.events("sse_dropped")[0]?.fields.cause).toBe("no frame for 150 ms");
   });
 
+  test("a ruleset answer over the size cap is a fetch failure; no body is buffered", async () => {
+    const logs: Logged[] = [];
+    let cancelled = false;
+    const huge = (): Promise<Response> =>
+      Promise.resolve(new Response(
+        new ReadableStream<Uint8Array>({
+          pull(c) {
+            c.enqueue(new Uint8Array(64 * 1024 * 1024));
+          },
+          cancel() {
+            cancelled = true;
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ));
+    const client = createServerWith(key, "http://127.0.0.1:1", { logger: (level, event, fields) => logs.push({ level, event, fields }) }, {
+      timing: fast,
+      fetch: huge,
+    });
+    cleanups.push(() => client.close());
+    await eventually(() => {
+      expect(logs.some((l) => l.event === "fetch_failed")).toBe(true);
+    });
+    expect(cancelled).toBe(true);
+    expect(logs.find((l) => l.event === "fetch_failed")?.fields.cause).toBe("network error: response body over 268435456 bytes");
+  });
+
+  test("a stream line with no line break is a stream failure, and the stream reconnects", async () => {
+    const p = await platform(rulesetOf(1, {}));
+    const h = start(p);
+    await expect(h.client.ready(2000)).resolves.toBe("fresh");
+    await p.until(() => p.openStreams === 1);
+    p.write("data: " + "x".repeat(70_000));
+    await p.until(() => p.streamRequests().length >= 2, 2000);
+    expect(h.events("sse_dropped")[0]?.fields.cause).toBe("event stream line too long");
+  });
+
   test("a fetch below the announced version is retried after 1, 2 and 4 s (scaled); the version never goes down", async () => {
     const p = await platform(rulesetOf(2, { a: true }));
     const h = start(p, {}, { catchUp: [100, 200, 400] });

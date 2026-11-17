@@ -164,7 +164,7 @@ func TestAKillSwitchAndAGrantAreNoticed(t *testing.T) {
 	assertNoticeOf(t, admin, p.Key, entryID, n, "staging", &killed.JSON200.Configuration.Version)
 
 	m := testkit.NewMember(t, testkit.Pool(t))
-	grant(t, admin, p.Key, m.ID, string(access.RoleViewer))
+	grant(t, testkit.InstanceAdminSession(t, a), p.Key, m.ID, string(access.RoleViewer))
 	entryID, n = nextChange(t, s)
 	assertNoticeOf(t, admin, p.Key, entryID, n, "", nil)
 	if n.Kind != "grant" || n.Environment != nil {
@@ -251,7 +251,7 @@ func TestAMemberLosingTheirGrantHasTheStreamClosedAtTheNextNotice(t *testing.T) 
 	admin := testkit.Client(t, a, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
 	viewer := testkit.NewMember(t, pool)
-	g := grant(t, admin, p.Key, viewer.ID, string(access.RoleViewer))
+	g := grant(t, testkit.InstanceAdminSession(t, a), p.Key, viewer.ID, string(access.RoleViewer))
 	s := openChanges(t, b, testkit.PersonalToken(t, pool, viewer.ID, "viewer", access.ScopeRead), p.Key, "")
 	s.Started(t)
 
@@ -300,7 +300,7 @@ func TestAMemberLosingTheirGrantHasTheStreamClosedAtTheNextHeartbeat(t *testing.
 	admin := testkit.Client(t, a, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
 	viewer := testkit.NewMember(t, pool)
-	g := grant(t, admin, p.Key, viewer.ID, string(access.RoleViewer))
+	g := grant(t, testkit.InstanceAdminSession(t, a), p.Key, viewer.ID, string(access.RoleViewer))
 	s := openChanges(t, b, testkit.PersonalToken(t, pool, viewer.ID, "viewer", access.ScopeRead), p.Key, "")
 	s.Started(t)
 
@@ -473,5 +473,48 @@ func TestARevokedTokenHasItsStreamClosedAtTheNextHeartbeat(t *testing.T) {
 	c.Advance(15 * time.Second)
 	if !s.Ended(2 * time.Second) {
 		t.Error("the stream of a revoked token is open after the heartbeat")
+	}
+}
+
+func TestAMemberDemotedFromInstanceAdminHasTheStreamClosedAtTheNextHeartbeat(t *testing.T) {
+	c := clock.NewFake(time.Now())
+	srv := testkit.StartServer(t, testkit.WithClock(c))
+	pool := testkit.Pool(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	// Holding no grant in the project, the member reads it only as an
+	// instance admin.
+	member := testkit.NewMember(t, pool, testkit.AsInstanceAdmin())
+	s := openChanges(t, srv, testkit.PersonalToken(t, pool, member.ID, "admin", access.ScopeRead), p.Key, "")
+	s.Started(t)
+
+	off := false
+	res := do(testkit.InstanceAdminSession(t, srv).UpdateMemberWithResponse(t.Context(), member.ID.String(), management.MemberPatch{InstanceAdmin: &off}))
+	if res.StatusCode() != http.StatusOK {
+		t.Fatalf("PATCH member = %d %s", res.StatusCode(), res.Body)
+	}
+	c.Advance(15 * time.Second)
+	if !s.Ended(2 * time.Second) {
+		t.Error("the stream of a member no longer instance admin is open after the heartbeat")
+	}
+}
+
+func TestADeactivatedMemberHasTheStreamClosedAtTheNextHeartbeat(t *testing.T) {
+	c := clock.NewFake(time.Now())
+	srv := testkit.StartServer(t, testkit.WithClock(c))
+	pool := testkit.Pool(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	viewer := testkit.NewMember(t, pool)
+	testkit.Grant(t, pool, projectIDOf(p), viewer.ID, access.RoleViewer)
+	s := openChanges(t, srv, testkit.PersonalToken(t, pool, viewer.ID, "viewer", access.ScopeRead), p.Key, "")
+	s.Started(t)
+
+	if res := do(admin.DeactivateMemberWithResponse(t.Context(), viewer.ID.String())); res.StatusCode() != http.StatusOK {
+		t.Fatalf("deactivate = %d %s", res.StatusCode(), res.Body)
+	}
+	c.Advance(15 * time.Second)
+	if !s.Ended(2 * time.Second) {
+		t.Error("the stream of a deactivated member is open after the heartbeat")
 	}
 }

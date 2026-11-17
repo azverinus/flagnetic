@@ -82,6 +82,16 @@ class RegexTest < Minitest::Test
     assert_equal true, Fiber.new { matches(pattern, "aaa") }.resume
   end
 
+  def test_an_input_over_64_kib_is_a_non_match_and_one_at_64_kib_is_matched
+    limit = 64 << 10
+    assert_equal true, matches("b$", "#{"a" * (limit - 1)}b")
+    assert_equal false, matches("b$", "#{"a" * limit}b")
+    assert_equal false, matches(".", "a" * (limit + 1)), "no error, just no match"
+    # The limit is in bytes: 32769 two-byte characters are over it.
+    assert_equal false, matches("é", "é" * ((limit / 2) + 1))
+    assert_equal true, matches("é", "é" * (limit / 2))
+  end
+
   private
 
   def matches(pattern, input) = RegexHelper.matches(pattern, input)

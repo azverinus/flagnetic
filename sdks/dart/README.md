@@ -30,7 +30,8 @@ final showCheckout = client.getBool('checkout', false);
 final limit = client.getInt('upload_limit', 10);
 client.onChange((keys) => rebuild(keys));
 
-// After sign-in, keep the anonymous unit beside the user unit.
+// After sign-in, keep the anonymous unit beside the user unit. The previous
+// values serve until the new answer arrives, but record no exposure.
 await client.setContext(
   const FlagneticContext(units: {'anonymous': 'd-8f1c', 'user': 'u-1001'}),
 );

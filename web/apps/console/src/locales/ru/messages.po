@@ -208,16 +208,16 @@ msgstr "{inviter} приглашает вас в проект {projectName} с �
 msgid "{inviter} invites you to this instance."
 msgstr "{inviter} приглашает вас в этот инстанс."
 
+#: src/components/flag-on-off.tsx
 #: src/components/kill-switch-dialog.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "{key} is off in {name}."
 msgstr "{key} выключен в окружении {name}."
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "{key} is on in {name}."
 msgstr "{key} включён в окружении {name}."
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "{key} on in {name}"
 msgstr "{key} включён в окружении {name}"
 
@@ -341,11 +341,11 @@ msgstr "У участника {name} нет активных сессий."
 msgid "{name} is protected, so reverting its configuration to version {proposedVersion} goes through a change request. What it proposes is that version, as it was; nobody edits it."
 msgstr "Окружение {name} защищено, поэтому откат его конфигурации к версии {proposedVersion} проходит через запрос на изменение. Он предлагает эту версию такой, какой она была; её никто не редактирует."
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "{name} is protected: switching {key} off there goes through a change request."
 msgstr "Окружение {name} защищено: выключение {key} в нём проходит через запрос на изменение."
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "{name} is protected: switching {key} on there goes through a change request."
 msgstr "Окружение {name} защищено: включение {key} в нём проходит через запрос на изменение."
 
@@ -2240,7 +2240,7 @@ msgstr "содержит все из"
 msgid "contains any of"
 msgstr "содержит любое из"
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "Contexts are served by the overrides, rules and fallthrough below."
 msgstr "Значения контекстам задают overrides, правила и вариант для остальных ниже."
 
@@ -3411,7 +3411,7 @@ msgstr "любой контекст"
 msgid "Every context"
 msgstr "Любой контекст"
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "Every context receives the off variation."
 msgstr "Каждый контекст получает вариант при выключении."
 
@@ -4490,7 +4490,7 @@ msgstr "Ключ или название"
 msgid "Keys"
 msgstr "Ключи"
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "Kill switch"
 msgstr "Kill switch"
 
@@ -4915,6 +4915,10 @@ msgstr "Участники больше не смогут входить чер�
 #: src/components/auth-provider-detail.tsx
 msgid "Members can no longer sign in through it. A provider that members have signed in through, or that granted access through its group mappings, cannot be deleted; disable it instead. This cannot be undone."
 msgstr "Участники больше не смогут входить через него. Провайдера, через которого участники уже входили или который выдавал доступ по сопоставлениям групп, удалить нельзя — отключите его. Это нельзя отменить."
+
+#: src/lib/problem-messages.ts
+msgid "Members have identities linked at this provider. Changing its issuer or entity ID could let another person sign in as one of them. Unlink those identities first, or create a new provider."
+msgstr "У участников есть учётные записи, привязанные к этому провайдеру. Если сменить его Issuer или Entity ID, другой человек сможет войти как один из них. Сначала отвяжите эти учётные записи или создайте нового провайдера."
 
 #: src/components/project-invitations.tsx
 msgid "Members invited to the project"
@@ -5609,8 +5613,8 @@ msgid "Observed share"
 msgstr "Наблюдаемая доля"
 
 #: src/components/compare-environments.tsx
+#: src/components/flag-on-off.tsx
 #: src/components/tester-panel.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Off"
 msgstr "Выключен"
@@ -5635,7 +5639,7 @@ msgid "Older entries"
 msgstr "Более старые записи"
 
 #: src/components/compare-environments.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "On"
 msgstr "Включён"
@@ -7254,6 +7258,10 @@ msgstr "Войти через провайдера"
 msgid "Sign out"
 msgstr "Выйти"
 
+#: src/lib/problem-messages.ts
+msgid "Sign out and sign in again, then link the provider."
+msgstr "Выйдите и войдите снова, затем привяжите провайдера."
+
 #: src/components/saml-provider-form.tsx
 msgid "Sign the requests the instance sends with its current key, for an identity provider that checks them against the certificate in the SP metadata."
 msgstr "Подписывать отправляемые инстансом запросы текущим ключом — для провайдера идентификации, который проверяет их по сертификату из метаданных SP."
@@ -7357,7 +7365,7 @@ msgstr "Часть показов отклонена и не учтена выш
 msgid "Some fields need correcting."
 msgstr "Исправьте некоторые поля."
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-on-off.tsx
 msgid "Someone changed this configuration a moment ago. It is read again: switch it once more if you still mean to."
 msgstr "Кто-то только что изменил эту конфигурацию. Она загружена заново: переключите ещё раз, если всё ещё нужно."
 
@@ -8210,10 +8218,6 @@ msgstr "Провайдеры идентификации, через которы
 msgid "The idle timeout cannot be longer than the absolute timeout."
 msgstr "Тайм-аут бездействия не может быть больше предельной длительности сессии."
 
-#: src/lib/mail-settings.ts
-msgid "The instance could not reach the SMTP server, or the connection broke. Check the host and the port, and that the server accepts connections from the instance."
-msgstr "Инстанс не смог подключиться к SMTP-серверу, или соединение оборвалось. Проверьте хост и порт, а также что сервер принимает подключения от инстанса."
-
 #: src/components/password-reset-link-dialog.tsx
 msgid "The instance does not mail this link, so pass it to {name} yourself, over a channel only they read. It works once, until {until}."
 msgstr "Инстанс не отправляет эту ссылку по почте, поэтому передайте её участнику {name} сами, по каналу, который читает только он. Она сработает один раз, до {until}."
@@ -8578,10 +8582,6 @@ msgstr "Прежний секрет ещё сутки подписывает в�
 msgid "The secret it replaces keeps signing beside this one for a day, so the receiver can take the new one without refusing an event."
 msgstr "Прежний секрет ещё сутки подписывает вместе с этим, так что получатель успеет перейти на новый, не отклонив ни одного события."
 
-#: src/lib/mail-settings.ts
-msgid "The secure connection to the SMTP server failed: it does not offer STARTTLS, or the TLS handshake or its certificate failed. Check the security and the port."
-msgstr "Не удалось установить защищённое соединение с SMTP-сервером: он не предлагает STARTTLS, или не прошло TLS-рукопожатие либо проверка его сертификата. Проверьте режим защиты и порт."
-
 #: src/lib/problem-messages.ts
 msgid "the segment {key}"
 msgstr "сегмент {key}"
@@ -8652,20 +8652,12 @@ msgid "The SMTP server accepted a test mail to {recipient}. Check that it arrive
 msgstr "SMTP-сервер принял тестовое письмо для {recipient}. Проверьте, что оно пришло."
 
 #: src/lib/mail-settings.ts
-msgid "The SMTP server did not accept the test mail."
-msgstr "SMTP-сервер не принял тестовое письмо."
+msgid "The SMTP server could not be reached or did not accept the test mail. Check the settings; the instance's log says why."
+msgstr "SMTP-сервер недоступен или не принял тестовое письмо. Проверьте настройки; причину называет журнал инстанса."
 
 #: src/components/mail-settings.tsx
 msgid "The SMTP server is removed."
 msgstr "SMTP-сервер удалён."
-
-#: src/lib/mail-settings.ts
-msgid "The SMTP server refused the sender, the recipient or the mail. Check that the server accepts mail from the sender address and to your address."
-msgstr "SMTP-сервер отклонил отправителя, получателя или само письмо. Проверьте, что сервер принимает почту от адреса отправителя и на ваш адрес."
-
-#: src/lib/mail-settings.ts
-msgid "The SMTP server refused the username and password. Check them, then save and test again."
-msgstr "SMTP-сервер отклонил имя пользователя и пароль. Проверьте их, затем сохраните и проверьте снова."
 
 #: src/components/mail-settings.tsx
 msgid "The SMTP server the instance sends its mail through."

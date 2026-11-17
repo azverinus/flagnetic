@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
@@ -79,7 +80,7 @@ func TestWithSMTPAnInvitationIsMailedAndItsLinkAccepts(t *testing.T) {
 	in := startMailingInstance(t, testkit.MailpitStartTLS, nil)
 	email := newEmail()
 
-	mi := inviteMailed(t, in.admin, email)
+	mi := inviteMailed(t, in.session(t), email)
 	got := in.mp.AwaitMails(t, email, 1)[0]
 	if got.Subject != "Grace Hopper invited you to Flagnetic" || !strings.Contains(got.Text, "Ada Lovelace") ||
 		!strings.Contains(got.Text, email) || strings.Contains(got.Text, "project") {
@@ -111,10 +112,10 @@ func TestWithSMTPReissuingMailsAFreshLinkAndKillsTheOldOne(t *testing.T) {
 	t.Parallel()
 	in := startMailingInstance(t, testkit.MailpitOpen, nil)
 	email := newEmail()
-	mi := inviteMailed(t, in.admin, email)
+	mi := inviteMailed(t, in.session(t), email)
 	first := invitationLinkIn(t, in.mp.AwaitMails(t, email, 1)[0])
 
-	res := do(in.admin.ReissueInvitationWithResponse(t.Context(), mi.Member.Id.String()))
+	res := do(in.session(t).ReissueInvitationWithResponse(t.Context(), mi.Member.Id.String()))
 	if res.JSON201 == nil {
 		t.Fatalf("POST /members/%s/invitation = %d: %s", mi.Member.Id, res.StatusCode(), res.Body)
 	}
@@ -131,12 +132,12 @@ func TestWithSMTPReissuingMailsAFreshLinkAndKillsTheOldOne(t *testing.T) {
 
 func TestWithSMTPAProjectInvitationIsMailedNamingTheProjectTheRoleAndTheInviter(t *testing.T) {
 	t.Parallel()
-	in := startMailingInstance(t, testkit.MailpitOpen, nil)
+	c := testkit.Clock()
+	in := startMailingInstance(t, testkit.MailpitOpen, []testkit.ServerOption{testkit.WithClock(c)})
 	p := createProject(t, in.admin, projectKey())
 	owner := testkit.NewMember(t, in.pool, testkit.WithDisplayName("Katherine Johnson"))
 	testkit.Grant(t, in.pool, projectIDOf(p), owner.ID, access.RoleOwner)
-	ownerClient := testkit.Client(t, in.srv, testkit.PersonalToken(t, in.pool, owner.ID, "inviter",
-		access.ScopeRead, access.ScopeFlagsWrite, access.ScopeExperimentsWrite, access.ScopeProjectAdmin))
+	ownerClient := signedIn(t, in.srv, owner)
 	email := newEmail()
 
 	res := do(ownerClient.InviteProjectMemberWithResponse(t.Context(), p.Key,
@@ -157,8 +158,15 @@ func TestWithSMTPAProjectInvitationIsMailedNamingTheProjectTheRoleAndTheInviter(
 		}
 	}
 
+	// Each invitation mails the address, so it is invited again only a
+	// minute after the last one.
+	hurried := do(ownerClient.InviteProjectMemberWithResponse(t.Context(), p.Key,
+		management.ProjectInvitationCreate{Email: email, DisplayName: "Ada Lovelace", Role: "viewer"}))
+	assertProblem(t, "inviting again at once", hurried.StatusCode(), hurried.Body, http.StatusTooManyRequests, "too_many_requests")
+
 	// Re-inviting to the same project reissues the invitation, mailed again
-	// with the new role.
+	// with the new role, once a minute has passed.
+	c.Advance(time.Minute)
 	again := do(ownerClient.InviteProjectMemberWithResponse(t.Context(), p.Key,
 		management.ProjectInvitationCreate{Email: email, DisplayName: "Ada Lovelace", Role: "viewer"}))
 	if again.JSON201 == nil {
@@ -190,7 +198,7 @@ func TestAnInvitationIsMailedInTheInvitersLanguageUnlessTheInstanceKnowsTheInvit
 			in := startMailingInstance(t, testkit.MailpitOpen,
 				[]testkit.ServerOption{testkit.WithDefaultLocale(tc.instance)}, testkit.WithLocale(tc.inviter))
 			email := newEmail()
-			inviteMailed(t, in.admin, email)
+			inviteMailed(t, in.session(t), email)
 			got := in.mp.AwaitMails(t, email, 1)[0]
 			if got.Subject != tc.subject {
 				t.Errorf("subject = %q, want %q", got.Subject, tc.subject)
@@ -211,7 +219,7 @@ func TestAnInvitationIsMailedInTheInviteesLanguageWhenTheInstanceKnowsIt(t *test
 	invitee := testkit.NewPasswordlessMember(t, in.pool, testkit.WithEmail(email), testkit.WithLocale("ru"),
 		testkit.WithStatus(access.MemberDeactivated))
 
-	res := do(in.admin.ReactivateMemberWithResponse(t.Context(), invitee.ID.String()))
+	res := do(in.session(t).ReactivateMemberWithResponse(t.Context(), invitee.ID.String()))
 	if res.JSON200 == nil {
 		t.Fatalf("reactivating = %d: %s", res.StatusCode(), res.Body)
 	}
@@ -231,7 +239,7 @@ func TestWithSMTPAnInstanceInvitationWithAGrantIsMailedNamingTheProject(t *testi
 	p := createProject(t, in.admin, projectKey())
 	email := newEmail()
 
-	res := do(in.admin.InviteMemberWithResponse(t.Context(), management.MemberInvite{
+	res := do(in.session(t).InviteMemberWithResponse(t.Context(), management.MemberInvite{
 		Email: email, DisplayName: "Ada Lovelace", Grant: &management.InvitationGrantCreate{Project: p.Key, Role: "maintainer"},
 	}))
 	if res.JSON201 == nil {
@@ -257,13 +265,13 @@ func TestAReactivatedMemberIsMailedTheirFreshInvitation(t *testing.T) {
 	t.Parallel()
 	in := startMailingInstance(t, testkit.MailpitOpen, nil)
 	email := newEmail()
-	mi := inviteMailed(t, in.admin, email)
+	mi := inviteMailed(t, in.session(t), email)
 	first := invitationLinkIn(t, in.mp.AwaitMails(t, email, 1)[0])
 	if res := do(in.admin.DeactivateMemberWithResponse(t.Context(), mi.Member.Id.String())); res.StatusCode() != http.StatusOK {
 		t.Fatalf("deactivating = %d: %s", res.StatusCode(), res.Body)
 	}
 
-	res := do(in.admin.ReactivateMemberWithResponse(t.Context(), mi.Member.Id.String()))
+	res := do(in.session(t).ReactivateMemberWithResponse(t.Context(), mi.Member.Id.String()))
 	if res.JSON200 == nil {
 		t.Fatalf("reactivating = %d: %s", res.StatusCode(), res.Body)
 	}
@@ -285,7 +293,7 @@ func TestOnceSMTPIsRemovedAnInvitationShowsItsLinkAgain(t *testing.T) {
 		t.Fatalf("DELETE /instance/smtp = %d: %s", res.StatusCode(), res.Body)
 	}
 	email := newEmail()
-	res := do(in.admin.InviteMemberWithResponse(t.Context(), management.MemberInvite{Email: email, DisplayName: "Unmailed"}))
+	res := do(in.session(t).InviteMemberWithResponse(t.Context(), management.MemberInvite{Email: email, DisplayName: "Unmailed"}))
 	if res.JSON201 == nil {
 		t.Fatalf("POST /members = %d: %s", res.StatusCode(), res.Body)
 	}
@@ -297,7 +305,7 @@ func TestOnceSMTPIsRemovedAnInvitationShowsItsLinkAgain(t *testing.T) {
 	// shows the instance has done what it would have for the first.
 	other := newEmail()
 	putSMTP(t, in.admin, settingsFor(in.mp))
-	inviteMailed(t, in.admin, other)
+	inviteMailed(t, in.session(t), other)
 	in.mp.AwaitMails(t, other, 1)
 	in.mp.AssertNoMail(t, email)
 }
@@ -310,7 +318,7 @@ func TestAnInvitationWhoseMailFailsStandsAndTheFailureIsCountedAndLogged(t *test
 		[]testkit.ServerOption{testkit.WithEdge(func(o *flaghttp.Options) { o.Logger = logs.Logger() })})
 	email := newEmail()
 
-	res := do(in.admin.InviteMemberWithResponse(t.Context(), management.MemberInvite{Email: email, DisplayName: "Bounced"}))
+	res := do(in.session(t).InviteMemberWithResponse(t.Context(), management.MemberInvite{Email: email, DisplayName: "Bounced"}))
 	if res.JSON201 == nil {
 		t.Fatalf("POST /members = %d: %s, want 201 whatever the mail server says", res.StatusCode(), res.Body)
 	}
@@ -336,5 +344,22 @@ func TestAnInvitationWhoseMailFailsStandsAndTheFailureIsCountedAndLogged(t *test
 	}
 	if n := len(in.auditOf(t, "member.invited", res.JSON201.Member.Id.String())); n != 1 {
 		t.Errorf("member.invited entries = %d, want 1", n)
+	}
+}
+
+func TestAnInvitationMailNamesTheInviterAsOneShortLine(t *testing.T) {
+	t.Parallel()
+	in := startMailingInstance(t, testkit.MailpitOpen, nil)
+	long := strings.Repeat("Urgent ", 20)
+	inviter := testkit.NewMember(t, in.pool, testkit.AsInstanceAdmin(), testkit.WithDisplayName("Grace\t Hopper "+long))
+	client := signedIn(t, in.srv, inviter)
+	email := newEmail()
+	if got := do(client.InviteMemberWithResponse(t.Context(), management.MemberInvite{Email: email, DisplayName: "Ada"})); got.JSON201 == nil {
+		t.Fatalf("POST /members = %d: %s", got.StatusCode(), got.Body)
+	}
+	subject := in.mp.AwaitMails(t, email, 1)[0].Subject
+	name, ok := strings.CutSuffix(subject, " invited you to Flagnetic")
+	if !ok || !strings.HasPrefix(name, "Grace Hopper Urgent") || len([]rune(name)) > 64 || strings.ContainsAny(name, "\t\r\n") || strings.Contains(name, "  ") {
+		t.Errorf("subject = %q, want the inviter's name as one line of at most 64 characters", subject)
 	}
 }

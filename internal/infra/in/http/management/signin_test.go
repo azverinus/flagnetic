@@ -100,7 +100,7 @@ func TestSignInOpensASessionWhoseWritesAreRefusedCrossOriginUntilSignOut(t *test
 }
 
 func TestSignInCookieAttributes(t *testing.T) {
-	attrs := regexp.MustCompile(`^flagnetic_session=[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{43}; Path=/; HttpOnly(; Secure)?; SameSite=Lax$`)
+	attrs := regexp.MustCompile(`^((?:__Host-)?flagnetic_session)=[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{43}; Path=/; HttpOnly(; Secure)?; SameSite=Lax$`)
 	for name, tc := range map[string]struct {
 		opts   []testkit.ServerOption
 		header map[string]string
@@ -131,6 +131,12 @@ func TestSignInCookieAttributes(t *testing.T) {
 		}
 		if secure := strings.Contains(got[0], "; Secure"); secure != tc.secure {
 			t.Errorf("%s: Secure = %v, want %v", name, secure, tc.secure)
+		}
+		// A Secure cookie carries the __Host- prefix, which makes a browser refuse
+		// one set by a sibling subdomain or without Secure: a cookie another
+		// site of the domain tossed in cannot stand in for the member's own.
+		if name := attrs.FindStringSubmatch(got[0])[1]; (name == "__Host-flagnetic_session") != tc.secure {
+			t.Errorf("%s: the cookie is named %s, Secure = %v", name, name, tc.secure)
 		}
 	}
 }
@@ -520,5 +526,42 @@ func TestACookieOfASessionTheServerNoLongerHoldsHasExpired(t *testing.T) {
 	}
 	if p := res.ApplicationproblemJSON401; p == nil || p.Code != "session_expired" || res.HTTPResponse.Header.Get("Set-Cookie") != clearedCookie {
 		t.Errorf("GET /me = %d %s, want 401 session_expired clearing the cookie", res.StatusCode(), res.Body)
+	}
+}
+
+func TestWhereCookiesAreSecureOnlyTheHostBoundSessionCookieIsRead(t *testing.T) {
+	srv := testkit.StartServer(t, testkit.WithBaseURL("https://flags.example.com"))
+	m := testkit.NewMember(t, testkit.Pool(t))
+	b := testkit.NewBrowser(t, srv.URL)
+	res, err := b.SignInWithResponse(t.Context(), management.SignInRequest{Email: m.Email, Password: m.Password})
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, ok := strings.CutPrefix(res.HTTPResponse.Header.Get("Set-Cookie"), "__Host-flagnetic_session=")
+	if !ok {
+		t.Fatalf("Set-Cookie = %q, want the __Host- session cookie", res.HTTPResponse.Header.Get("Set-Cookie"))
+	}
+	value, _, _ := strings.Cut(set, ";")
+
+	for name, tc := range map[string]struct {
+		cookie string
+		want   int
+	}{
+		"the host-bound cookie":               {"__Host-flagnetic_session=" + value, http.StatusOK},
+		"the same value under the plain name": {"flagnetic_session=" + value, http.StatusUnauthorized},
+	} {
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/api/v1/me", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Cookie", tc.cookie)
+		got, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = got.Body.Close()
+		if got.StatusCode != tc.want {
+			t.Errorf("%s: GET /me = %d, want %d", name, got.StatusCode, tc.want)
+		}
 	}
 }

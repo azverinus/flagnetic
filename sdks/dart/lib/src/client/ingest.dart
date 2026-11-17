@@ -15,6 +15,11 @@ import 'types.dart';
 /// counting began.
 const maxWindowAge = Duration(hours: 1);
 
+/// The most of an ingest answer that is read. It lists the events the
+/// platform refused, a few lines at most; an endless body would otherwise
+/// be held up to the transport's general cap.
+const _maxAnswerBytes = 1 << 20;
+
 /// What the platform did with one batch, and whether the batch may be sent
 /// again.
 enum _Outcome {
@@ -132,7 +137,12 @@ final class Ingest {
     final keys = _keys;
     if (store == null || keys == null) return _loaded;
     final entry = _storeCall('read', () => store.get(keys.events));
-    return _loaded = entry.then(_restore);
+    // Every flush awaits the load, so an error escaping the restore would
+    // surface in each unawaited flush after it; the queue starts empty
+    // instead.
+    return _loaded = entry.then(_restore).catchError((Object e) {
+      _storeFailed('read', e);
+    });
   }
 
   /// Starts the flush interval; called once the client is running.
@@ -270,21 +280,29 @@ final class Ingest {
     });
   }
 
+  /// Puts what an earlier run stored back in front of the queue. The entry
+  /// is read from storage another version, another process or a torn write
+  /// may have left, so nothing in it is trusted: an entry that is not an
+  /// array of events is removed whole, and an event of the wrong shape is
+  /// skipped, since sending or merging it later would fail far from here
+  /// with nobody to catch the error.
   void _restore(String? raw) {
     if (raw == null) return;
     final List<QueuedEvent> restored;
+    var skipped = 0;
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! List<Object?>) {
         throw const FormatException('not an array of events');
       }
-      restored = [
-        for (final item in decoded)
-          if (item is Map<String, Object?> &&
-              item['type'] is String &&
-              item['event_id'] is String)
-            item,
-      ];
+      restored = [];
+      for (final item in decoded) {
+        if (_restorable(item)) {
+          restored.add(item! as QueuedEvent);
+        } else {
+          skipped++;
+        }
+      }
     } on Object catch (e) {
       // A torn or foreign entry is not worth keeping.
       _storeFailed('read', e);
@@ -292,7 +310,21 @@ final class Ingest {
       unawaited(_storeCall('remove', () => _store!.remove(_keys!.events)));
       return;
     }
-    if (restored.isEmpty) return;
+    if (skipped > 0) {
+      _log(LogLevel.warn, LogEvents.storeFailed, {
+        'operation': 'read',
+        'key': _keys?.events,
+        'cause': 'malformed events',
+        'skipped': skipped,
+      });
+    }
+    if (restored.isEmpty) {
+      // Nothing worth keeping; an entry of skipped events alone goes too.
+      if (skipped > 0) {
+        unawaited(_storeCall('remove', () => _store!.remove(_keys!.events)));
+      }
+      return;
+    }
     // What an earlier run recorded is older than anything this one has, so
     // it goes in front and is the first to be sent and the first dropped.
     _queue.insertAll(0, restored);
@@ -301,6 +333,30 @@ final class Ingest {
     // queue holding only itself; this puts the restored ones back in front
     // of it, so a second restart still finds them.
     _persist();
+  }
+
+  /// Whether a stored [item] is an event this SDK records, in the shape it
+  /// records it: a known type and a string event ID and, for a summary, the
+  /// interval and rows the merge into the next window reads.
+  static bool _restorable(Object? item) {
+    if (item is! Map<String, Object?>) return false;
+    if (item['event_id'] is! String) return false;
+    return switch (item['type']) {
+      EventTypes.exposure || EventTypes.alias => true,
+      EventTypes.evaluationSummary =>
+        item['interval_start'] is String &&
+            item['interval_end'] is String &&
+            item['counts'] is List<Object?> &&
+            (item['counts']! as List<Object?>).every(
+              (row) =>
+                  row is Map<String, Object?> &&
+                  row['flag'] is String &&
+                  row['reason'] is String &&
+                  row['count'] is int &&
+                  (row['variation'] == null || row['variation'] is String),
+            ),
+      _ => false,
+    };
   }
 
   /// Writes the queue as it stands. Writes run one after another, so the
@@ -515,6 +571,7 @@ final class Ingest {
         },
         utf8.encode(jsonEncode(_envelope(batch))),
         _settings.requestTimeout,
+        maxBytes: _maxAnswerBytes,
       );
     } on TransportException catch (e) {
       return (outcome: _Outcome.retry, status: null, cause: e.kind.name);

@@ -99,6 +99,11 @@ type Options struct {
 	// EventsPartitionsAhead is how many days after today the raw event
 	// tables' partitions are created ahead of time.
 	EventsPartitionsAhead int
+	// AliasLinksLimit is the most alias links an environment keeps.
+	AliasLinksLimit int
+	// FirstExposuresLimit is the most first exposures an experiment keeps
+	// in an environment.
+	FirstExposuresLimit int
 	// SDKInventoryRetention is how long the SDK inventory keeps an SDK
 	// after it was last seen.
 	SDKInventoryRetention time.Duration
@@ -431,8 +436,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Start: appidentity.NewStartSignIn(signIn), Callback: appidentity.NewCompleteCallback(signIn), ACS: appidentity.NewCompleteACS(signIn), Metadata: appidentity.NewServeMetadata(signIn),
 		Complete: appidentity.NewCompleteSignIn(signIn),
 	}, sso.Options{
-		SecureCookies: managementOptions.SecureCookies, SessionCookie: management.SessionCookieHeader, SessionCookieName: management.SessionCookie,
-		Metrics: sso.NewMetrics(reg),
+		SecureCookies: managementOptions.SecureCookies, SessionCookie: management.SessionCookieHeader, SessionCookieName: management.SessionCookieName,
+		Metrics: sso.NewMetrics(reg), Clock: d.Clock,
 	})
 	scimUsers := appidentity.SCIMUserDeps{
 		Tx: tx, Providers: identityStore, Members: scimMembers{svc: provisioning}, Groups: identityStore,
@@ -774,8 +779,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		ServeRuleset: appdelivery.NewServeRuleset(rulesetCache),
 		WatchRuleset: appdelivery.NewWatchRuleset(rulesetStream, rulesetCache.Unmeasured()),
 		Evaluate:     appdelivery.NewEvaluateRemotely(rulesetCache, discoveries, remoteCounts, d.Clock),
-		Ingest:       appevents.NewIngestEvents(ingestTx, eventStore, d.Clock, o.EventsRetention),
-		Inventory:    inventory,
+		Ingest: appevents.NewIngestEvents(ingestTx, eventStore, d.Clock, o.EventsRetention,
+			appevents.Limits{AliasLinks: o.AliasLinksLimit, FirstExposures: o.FirstExposuresLimit}),
+		Inventory: inventory,
 	}, sdk.Options{Clock: d.Clock, RateLimits: o.RateLimits, Registerer: reg})
 	return Background{
 		Workers: []worker.Worker{

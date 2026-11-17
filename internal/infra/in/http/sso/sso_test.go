@@ -4,11 +4,16 @@ import (
 	"cmp"
 	"crypto/rand"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
@@ -24,11 +29,19 @@ const publicURL = "http://localhost:8080"
 type env struct {
 	srv   *testkit.Server
 	admin *management.ClientWithResponses
+	// pool is the database the server runs on.
+	pool *pgxpool.Pool
 }
 
 func start(t *testing.T, opts ...testkit.ServerOption) env {
 	t.Helper()
-	srv := testkit.StartServer(t, append([]testkit.ServerOption{testkit.WithBaseURL(publicURL)}, opts...)...)
+	return startOn(t, testkit.Pool(t), opts...)
+}
+
+// startOn is start for a server running on pool.
+func startOn(t *testing.T, pool *pgxpool.Pool, opts ...testkit.ServerOption) env {
+	t.Helper()
+	srv := testkit.StartServer(t, append([]testkit.ServerOption{testkit.WithBaseURL(publicURL), testkit.WithPool(pool)}, opts...)...)
 	t.Cleanup(func() {
 		if t.Failed() {
 			for _, r := range srv.Logs.Find("single sign-on failed") {
@@ -36,7 +49,7 @@ func start(t *testing.T, opts ...testkit.ServerOption) env {
 			}
 		}
 	})
-	return env{srv: srv, admin: testkit.Client(t, srv, testkit.InstanceAdminToken(t))}
+	return env{srv: srv, pool: pool, admin: testkit.Client(t, srv, testkit.Bootstrap(t, pool))}
 }
 
 func ptr[T any](v T) *T { return &v }
@@ -54,6 +67,8 @@ type provider struct {
 	requireVerifiedEmail           *bool
 	// scopes are the scopes asked of the provider; its default when empty.
 	scopes []string
+	// emailClaim is the claim the email is read from; "email" when empty.
+	emailClaim string
 }
 
 func (e env) create(t *testing.T, p provider) string {
@@ -66,6 +81,9 @@ func (e env) create(t *testing.T, p provider) string {
 	}
 	if len(p.scopes) > 0 {
 		body.Scopes = &p.scopes
+	}
+	if p.emailClaim != "" {
+		body.Claims = &management.AuthProviderClaimsPatch{Email: &p.emailClaim}
 	}
 	res, err := e.admin.CreateAuthProviderWithResponse(t.Context(), body)
 	if err != nil || res.JSON201 == nil {
@@ -509,6 +527,14 @@ func TestAnEmailIsLinkedToAnExistingMemberOnlyWhenTheProviderVouchesForIt(t *tes
 		{"a verification stated as a string", func(p *provider) { p.linkByEmail = true }, map[string]any{"email_verified": "true"}, nil, "member_not_found", ""},
 		{"an unverified email where verification is not required", func(p *provider) { p.linkByEmail, p.requireVerifiedEmail = true, ptr(false) },
 			map[string]any{"email_verified": false}, nil, "", ""},
+		// email_verified speaks of the standard email claim alone: with another
+		// claim as the email it would vouch for an address the person may have
+		// set themselves.
+		{"an email read from another claim than the verified one", func(p *provider) { p.linkByEmail, p.emailClaim = true, "upn" },
+			map[string]any{"email": nil, "upn": "{email}", "email_verified": true}, nil, "member_not_found", ""},
+		{"an email read from another claim where verification is not required",
+			func(p *provider) { p.linkByEmail, p.emailClaim, p.requireVerifiedEmail = true, "upn", ptr(false) },
+			map[string]any{"email": nil, "upn": "{email}"}, nil, "", ""},
 		{"an email outside the domains", func(p *provider) { p.linkByEmail, p.domains = true, []string{"corp.example.net"} }, nil, nil, "member_not_found", ""},
 		{"an email only UserInfo holds", func(p *provider) { p.linkByEmail = true }, map[string]any{"email": nil},
 			map[string]any{"sub": "subject-1", "email": "{email}", "email_verified": true}, "", ""},
@@ -522,6 +548,9 @@ func TestAnEmailIsLinkedToAnExistingMemberOnlyWhenTheProviderVouchesForIt(t *tes
 			m := testkit.NewMember(t, pool)
 			claims := map[string]any{"email": m.Email, "sub": "subject-" + m.Email}
 			for k, v := range tc.claims {
+				if v == "{email}" {
+					v = m.Email
+				}
 				claims[k] = v
 			}
 			if tc.userInfo != nil {
@@ -666,7 +695,7 @@ func TestTheAttemptCookieIsHostBoundWhereCookiesAreSecure(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			srv := testkit.StartServer(t, append([]testkit.ServerOption{testkit.WithBaseURL(tc.baseURL)}, tc.options...)...)
-			e := env{srv: srv, admin: testkit.Client(t, srv, testkit.InstanceAdminToken(t))}
+			e := env{srv: srv, pool: testkit.Pool(t), admin: testkit.Client(t, srv, testkit.InstanceAdminToken(t))}
 			slug := e.forged(t, idp, nil)
 			client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/sso/"+slug+"/start", nil)
@@ -701,4 +730,106 @@ func TestTheAttemptCookieIsHostBoundWhereCookiesAreSecure(t *testing.T) {
 			}
 		})
 	}
+}
+
+// startOnly asks to start a sign-in at slug without following where it leads.
+func (e env) startOnly(t *testing.T, slug string) *http.Response {
+	t.Helper()
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	res, err := client.Get(e.srv.URL + "/sso/" + slug + "/start")
+	if err != nil {
+		t.Fatalf("GET /sso/%s/start: %v", slug, err)
+	}
+	_ = res.Body.Close()
+	return res
+}
+
+func TestStartingSignInsIsLimitedPerClientAddress(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	c := testkit.Clock()
+	e := start(t, testkit.WithClock(c))
+	slug := e.forged(t, idp, nil)
+
+	for i := range 60 {
+		if res := e.startOnly(t, slug); res.StatusCode != http.StatusFound {
+			t.Fatalf("start %d = %d, want the redirect to the provider", i+1, res.StatusCode)
+		}
+	}
+	res := e.startOnly(t, slug)
+	if res.StatusCode != http.StatusTooManyRequests || res.Header.Get("Retry-After") == "" {
+		t.Errorf("the 61st start in a minute = %d with Retry-After %q, want 429 with one", res.StatusCode, res.Header.Get("Retry-After"))
+	}
+
+	c.Advance(61 * time.Second)
+	if res := e.startOnly(t, slug); res.StatusCode != http.StatusFound {
+		t.Errorf("a start in the next window = %d, want the redirect to the provider", res.StatusCode)
+	}
+}
+
+func TestAProviderWhoseDiscoveryFailsIsAskedOnceWhileItKeepsFailing(t *testing.T) {
+	var asked atomic.Int32
+	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		asked.Add(1)
+		http.Error(w, "down", http.StatusInternalServerError)
+	}))
+	t.Cleanup(down.Close)
+	e := start(t)
+	slug := e.create(t, provider{issuer: down.URL, clientID: "c", clientSecret: "s", domains: []string{"example.com"}})
+
+	for range 5 {
+		res := e.startOnly(t, slug)
+		if loc := res.Header.Get("Location"); res.StatusCode != http.StatusSeeOther || !strings.Contains(loc, "error=sso_failed") {
+			t.Fatalf("a start at a provider that is down = %d to %q, want the sign-in page with sso_failed", res.StatusCode, loc)
+		}
+	}
+	if n := asked.Load(); n != 1 {
+		t.Errorf("the provider's discovery was fetched %d times for five starts, want one", n)
+	}
+}
+
+func TestSimultaneousStartsAtOneProviderShareOneDiscoveryFetch(t *testing.T) {
+	var asked atomic.Int32
+	// The answer is slow, so every start arrives while the first fetch is
+	// still out: without sharing it each would fetch on its own.
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		asked.Add(1)
+		time.Sleep(300 * time.Millisecond)
+		http.Error(w, "down", http.StatusInternalServerError)
+	}))
+	t.Cleanup(slow.Close)
+	e := start(t)
+	slug := e.create(t, provider{issuer: slow.URL, clientID: "c", clientSecret: "s", domains: []string{"example.com"}})
+
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	var wg sync.WaitGroup
+	statuses := make([]int, 5)
+	for i := range statuses {
+		wg.Go(func() {
+			res, err := client.Get(e.srv.URL + "/sso/" + slug + "/start")
+			if err != nil {
+				t.Errorf("GET /sso/%s/start: %v", slug, err)
+				return
+			}
+			_ = res.Body.Close()
+			statuses[i] = res.StatusCode
+		})
+	}
+	wg.Wait()
+	for i, s := range statuses {
+		if s != http.StatusSeeOther {
+			t.Errorf("start %d = %d, want the sign-in page with the failure", i+1, s)
+		}
+	}
+	if n := asked.Load(); n != 1 {
+		t.Errorf("the provider's discovery was fetched %d times for five simultaneous starts, want one", n)
+	}
+}
+
+// session returns the instance admin signed in afresh, for the operations
+// that create access (inviting, granting, reactivating, promoting and issuing
+// a password reset) and refuse every API token. It is signed in at each call,
+// since a session ends with the idle timeout a test's clock may outrun.
+func (e env) session(t *testing.T) *management.ClientWithResponses {
+	t.Helper()
+	return testkit.InstanceAdminSessionOn(t, e.srv, e.pool)
 }

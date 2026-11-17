@@ -69,6 +69,47 @@ void main() {
     expect(client.isForeground, isTrue);
   });
 
+  for (final state in [
+    AppLifecycleState.paused,
+    AppLifecycleState.hidden,
+    AppLifecycleState.detached,
+  ]) {
+    testWidgets('attaching while the app is $state backgrounds the client '
+        'at once', (tester) async {
+      addTearDown(
+        () => tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        ),
+      );
+      tester.binding.handleAppLifecycleStateChanged(state);
+      final client = offlineClient({'checkout': true});
+      addTearDown(client.close);
+      expect(client.isForeground, isTrue);
+
+      final observer = FlagneticLifecycleObserver(client)..attach();
+      addTearDown(observer.detach);
+      expect(client.isForeground, isFalse);
+    });
+  }
+
+  for (final state in [AppLifecycleState.resumed, AppLifecycleState.inactive]) {
+    testWidgets('attaching while the app is $state leaves the client in the '
+        'foreground', (tester) async {
+      addTearDown(
+        () => tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        ),
+      );
+      tester.binding.handleAppLifecycleStateChanged(state);
+      final client = offlineClient({'checkout': true});
+      addTearDown(client.close);
+
+      final observer = FlagneticLifecycleObserver(client)..attach();
+      addTearDown(observer.detach);
+      expect(client.isForeground, isTrue);
+    });
+  }
+
   testWidgets('attaching twice observes once', (tester) async {
     final client = offlineClient({'checkout': true});
     addTearDown(client.close);

@@ -143,15 +143,36 @@ func TestEveryWriteToMeAndEveryTokenCreationNeedsASession(t *testing.T) {
 	}
 }
 
+// A token that could grant, invite, reactivate, promote or reset a password
+// would leave behind access that outlives the token's own revocation, so each
+// operation that creates or changes who can sign in needs a session.
+func TestEveryOperationCreatingAccessNeedsASession(t *testing.T) {
+	for _, name := range []string{"createGrant", "inviteMember", "reactivateMember", "updateMember", "issuePasswordReset", "reissueInvitation", "inviteProjectMember"} {
+		found := false
+		for pattern, e := range Table {
+			if e.Name != name {
+				continue
+			}
+			found = true
+			if !e.SessionRequired {
+				t.Errorf("%s (%s) does not require a session", pattern, name)
+			}
+		}
+		if !found {
+			t.Errorf("operation %s is not in the table", name)
+		}
+	}
+}
+
 func TestAnOperationsOwnBodyLimitIsRead(t *testing.T) {
-	doc := "paths:\n  /projects/{project}/hash-check:\n    post:\n      operationId: checkHashUniformity\n      x-permission: project.read\n      x-max-body-bytes: 67108864\n" +
+	doc := "paths:\n  /projects/{project}/hash-check:\n    post:\n      operationId: checkHashUniformity\n      x-permission: project.read\n      x-max-body-bytes: 52428800\n" +
 		"  /projects:\n    post:\n      operationId: createProject\n      x-permission: instance_admin\n"
 	ops, err := Read([]byte(doc))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := ops["POST /projects/{project}/hash-check"].MaxBodyBytes; got != 64<<20 {
-		t.Errorf("hash-check's body limit = %d, want 64 MiB", got)
+	if got := ops["POST /projects/{project}/hash-check"].MaxBodyBytes; got != 50<<20 {
+		t.Errorf("hash-check's body limit = %d, want 50 MiB", got)
 	}
 	if got := ops["POST /projects"].MaxBodyBytes; got != 0 {
 		t.Errorf("a body limit nobody declared = %d, want 0", got)

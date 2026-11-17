@@ -4,6 +4,7 @@
 // everything it must (unknown fields, an unknown reason, a flag of an
 // unknown type).
 import type { JsonValue } from "../evaluator/ruleset.js";
+import { nestsTooDeep } from "../internal/json.js";
 import { jsonEquals, type Experiment, type FlagType } from "./types.js";
 import { SCHEMA_VERSION_MAX, SUPPORTED_SCHEMA_VERSIONS } from "../version.js";
 
@@ -67,7 +68,7 @@ export interface IgnoredAttribute {
 /** A remote evaluation response held by a client. */
 export class ValuesDocument {
   private constructor(
-    /** The document as it arrived, persisted verbatim. */
+    /** The document as it arrived, persisted verbatim but for flag values nested too deeply. */
     readonly raw: Readonly<Record<string, unknown>>,
     /** The ruleset version the server evaluated against. */
     readonly rulesetVersion: number,
@@ -76,6 +77,8 @@ export class ValuesDocument {
     /** The flags of a type this SDK serves, by key. */
     readonly flags: ReadonlyMap<string, ServedFlag>,
     readonly ignoredAttributes: readonly IgnoredAttribute[],
+    /** The keys of the flags whose value nests deeper than the server stores, sorted. */
+    readonly tooDeep: readonly string[],
   ) {}
 
   /**
@@ -111,11 +114,26 @@ export class ValuesDocument {
       throw new Refused("parse", "flags is not an object");
     }
     const flags = new Map<string, ServedFlag>();
+    const tooDeep: string[] = [];
+    let rawFlags: Record<string, unknown> | undefined;
     for (const [key, value] of Object.entries(flagsJson)) {
       if (typeof value !== "object" || value === null || Array.isArray(value)) {
         throw new Refused("parse", `flag ${JSON.stringify(key)} is not an object`);
       }
-      const flag = servedFlag(value as Record<string, unknown>);
+      let json = value as Record<string, unknown>;
+      // A value nested deeper than the server stores is a defect of this
+      // flag alone: it is served as a flag without a value, which falls
+      // back with inconsistent_ruleset, and it leaves the document that is
+      // persisted, since copying or serializing it would overflow the stack.
+      if (Object.hasOwn(json, "value") && nestsTooDeep(json.value)) {
+        const rest = { ...json };
+        delete rest.value;
+        json = rest;
+        tooDeep.push(key);
+        rawFlags ??= { ...(flagsJson as Record<string, unknown>) };
+        rawFlags[key] = rest;
+      }
+      const flag = servedFlag(json);
       // A flag of a type this SDK does not know is absent, so a type added
       // to the server never breaks an older SDK.
       if (flag) flags.set(key, flag);
@@ -123,7 +141,9 @@ export class ValuesDocument {
     const environment = doc.environment;
     const isProtected =
       typeof environment === "object" && environment !== null && (environment as Record<string, unknown>).protected === true;
-    return new ValuesDocument(doc, version, isProtected, flags, ignoredAttributes(doc.ignored_attributes));
+    // The caller's document is never changed: a copy holds what was dropped.
+    const raw = rawFlags ? { ...doc, flags: rawFlags } : doc;
+    return new ValuesDocument(raw, version, isProtected, flags, ignoredAttributes(doc.ignored_attributes), tooDeep.sort());
   }
 
   /**

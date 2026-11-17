@@ -117,7 +117,10 @@ func (h *Enable) enable(ctx context.Context, cmd EnableCommand, warnings []strin
 	if err = h.d.syncStreams(ctx, before, before.EventKinds, cmd.StartFrom, now); err != nil {
 		return before, err
 	}
-	after := before
+	after, err := rebind(h.d.Sealer, before)
+	if err != nil {
+		return before, err
+	}
 	after.Enabled, after.Warnings = true, warnings
 	after.UpdatedAt, after.Version = now, before.Version+1
 	if err = h.d.Store.Update(ctx, after); err != nil {

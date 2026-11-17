@@ -6,6 +6,7 @@ import {
   buildContext,
   contextDraftOf,
   contextLabel,
+  forgetRecentContexts,
   matchedRuleOf,
   recentContexts,
   rememberContext,
@@ -48,6 +49,36 @@ describe("the tester's context", () => {
       units: { user: "emp-1" },
       attributes: { age: 42, beta: true, groups: ["staff", "qa"] },
     });
+  });
+
+  it("takes a unit type or an attribute named like a property every object has", () => {
+    const named = new Map<string, "string">([
+      ["constructor", "string"],
+      ["__proto__", "string"],
+    ]);
+    const built = buildContext(
+      i18n,
+      {
+        units: [
+          { unitType: "constructor", unitId: "u1" },
+          { unitType: "__proto__", unitId: "u2" },
+        ],
+        attributes: [
+          { attribute: "constructor", text: "x", list: [] },
+          { attribute: "__proto__", text: "y", list: [] },
+        ],
+      },
+      named as never,
+    );
+    expect(built.issues.size).toBe(0);
+    expect(Object.entries(built.context.units ?? {})).toEqual([
+      ["constructor", "u1"],
+      ["__proto__", "u2"],
+    ]);
+    expect(Object.entries(built.context.attributes ?? {})).toEqual([
+      ["constructor", "x"],
+      ["__proto__", "y"],
+    ]);
   });
 
   it("refuses a unit type twice, a unit ID over 256 bytes and a value not of the attribute's type", () => {
@@ -93,6 +124,16 @@ describe("the contexts a project's tester remembers", () => {
     expect(recent[0]).toEqual({ attributes: { age: 3, platform: "ios" } });
     expect(recent[1]).toEqual({ units: { user: "u-11" } });
     expect(recentContexts("billing")).toEqual([]);
+  });
+
+  it("forgets the recent contexts of every project and nothing else", () => {
+    rememberContext("checkout", { units: { user: "u-1" } });
+    rememberContext("billing", { units: { user: "u-2" } });
+    localStorage.setItem("flagnetic.last-project", "checkout");
+    forgetRecentContexts();
+    expect(recentContexts("checkout")).toEqual([]);
+    expect(recentContexts("billing")).toEqual([]);
+    expect(localStorage.getItem("flagnetic.last-project")).toBe("checkout");
   });
 
   it("forgets what it cannot read rather than failing", () => {

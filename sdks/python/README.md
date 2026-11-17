@@ -13,6 +13,9 @@ supported upstream (a release reaching its end of life is dropped in a minor ver
 0.1.0 on ([compatibility](../../docs/sdks/compatibility.md)); [docs/sdks/python.md](../../docs/sdks/python.md) is how
 it is deployed and tested.
 
+Because that engine is pure Python, the `matches` operator treats a context value longer than 64 KiB of UTF-8 as a
+non-match, not an error: the cost of a match is the input times the pattern, and a caller chose the input.
+
 ## Quick start
 
 ```python
@@ -36,6 +39,10 @@ replica, a proxy that ends the stream early) is a failure like any other and log
 `closed_early`, while the close of a stable stream waits 0 to 2 seconds. `store="/var/lib/app/flagnetic.json"` keeps the last good ruleset across restarts. The file is headed
 by a digest of the SDK key, so one written under another key (another environment's, say) is discarded with
 `store_failed`.
+
+A flag value nesting arrays and objects deeper than 32 levels, which the server refuses to store, fails that flag
+alone: its getters serve your default with `inconsistent_ruleset`, `condition_invalid` names the variation once per
+flag and ruleset version, and every other flag of the ruleset serves.
 
 ## Experiments and events
 

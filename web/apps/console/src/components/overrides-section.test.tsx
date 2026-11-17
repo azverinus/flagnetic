@@ -1,0 +1,98 @@
+import type { Flag, FlagConfiguration } from "@flagnetic/api";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeAll, describe, expect, it } from "vitest";
+
+import { AccessContext } from "@/lib/access";
+import { fakeServer } from "@/test/fake-server";
+import { activateForTests, renderWithProviders } from "@/test/render";
+
+import { OverridesSection } from "./overrides-section";
+
+beforeAll(() => activateForTests("en"));
+
+const flag = {
+  id: "f1",
+  key: "checkout",
+  variations: [{ key: "on" }, { key: "off" }],
+} as unknown as Flag;
+
+function configurationWith(overrides: { unit_type: string; unit_id: string }[]) {
+  return {
+    environment: "production",
+    version: 7,
+    on: true,
+    off_variation: "off",
+    fallthrough: { variation: "off" },
+    prerequisites: [],
+    rules: [],
+    overrides: overrides.map((override) => ({
+      ...override,
+      variation: "on",
+      note: null,
+      added_by: null,
+    })),
+  } as unknown as FlagConfiguration;
+}
+
+function show(configuration: FlagConfiguration) {
+  return renderWithProviders(
+    <AccessContext.Provider
+      value={{ permissions: new Set(["flag_configuration.update"]), roles: [] as never }}
+    >
+      <OverridesSection
+        project="shop"
+        flag={flag}
+        configuration={configuration}
+        unitTypes={[{ key: "user" } as never]}
+        nameOf={(member) => member}
+      />
+    </AccessContext.Provider>,
+  );
+}
+
+const configurationPath = "/projects/shop/flags/checkout/environments/production";
+
+describe("removing an override", () => {
+  it("deletes the override at its own address", async () => {
+    const { requests } = fakeServer({
+      [`DELETE ${configurationPath}/overrides/user/emp-1`]: {
+        status: 200,
+        body: configurationWith([]),
+      },
+    });
+    show(configurationWith([{ unit_type: "user", unit_id: "emp-1" }]));
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Remove the override of user emp-1" }),
+    );
+
+    await waitFor(() => expect(requests.some((r) => r.method === "DELETE")).toBe(true));
+  });
+
+  it.each([".", ".."])(
+    "writes the configuration without it when the unit ID is %s, which has no address",
+    async (unitId) => {
+      const { requests } = fakeServer({
+        [`PUT ${configurationPath}`]: { status: 200, body: configurationWith([]) },
+      });
+      show(
+        configurationWith([
+          { unit_type: "user", unit_id: unitId },
+          { unit_type: "user", unit_id: "emp-1" },
+        ]),
+      );
+
+      await userEvent.click(
+        await screen.findByRole("button", { name: `Remove the override of user ${unitId}` }),
+      );
+
+      await waitFor(() => expect(requests.some((r) => r.method === "PUT")).toBe(true));
+      const put = requests.find((r) => r.method === "PUT")!;
+      expect(put.headers.get("If-Match")).toBe('"7"');
+      const sent = (await put.json()) as { overrides: { unit_id: string }[] };
+      expect(sent.overrides.map((override) => override.unit_id)).toEqual(["emp-1"]);
+      expect(requests.some((r) => r.method === "DELETE")).toBe(false);
+    },
+  );
+});

@@ -176,7 +176,7 @@ func SinkDelivery(d SinkDeliverer, risk AtRiskEvaluator, interval time.Duration,
 		// finish within the longest call a target allows.
 		Timeout: sinkRoundFor + 2*sinks.ObjectStorageCallTimeout,
 		Round: func(ctx context.Context) error {
-			r := &sinkRound{d: d, log: log, slots: make(chan struct{}, sinksAtOnce), busy: map[sinks.ID]bool{}, woken: make(chan struct{}, 1)}
+			r := &sinkRound{d: d, log: log, slots: make(chan struct{}, sinksAtOnce), perProject: newProjectSlots(attemptsPerProject), busy: map[sinks.ID]bool{}, woken: make(chan struct{}, 1)}
 			err := r.run(ctx, interval)
 			r.attempts.Wait()
 			// A sink is judged after the attempts of the round, so that one
@@ -198,6 +198,8 @@ type sinkRound struct {
 	log   *slog.Logger
 	slots chan struct{}
 	woken chan struct{}
+	// perProject shares the slots between projects.
+	perProject *projectSlots
 
 	attempts sync.WaitGroup
 	mu       sync.Mutex
@@ -207,6 +209,17 @@ type sinkRound struct {
 func (r *sinkRound) run(ctx context.Context, interval time.Duration) error {
 	until := time.Now().Add(sinkRoundFor)
 	for ctx.Err() == nil && time.Now().Before(until) {
+		// A replica holding as many sinks as it attempts at once claims no
+		// more until one finishes: a claimed sink waiting for a slot keeps
+		// its streams leased, and claiming on would take every sink due away
+		// from the other replicas.
+		if r.full() {
+			select {
+			case <-r.woken:
+			case <-ctx.Done():
+			}
+			continue
+		}
 		// Whether nothing was under way when the claim looked: a sink that
 		// finished meanwhile may have a stream due that the claim passed
 		// over because it was still busy, so only a claim made with every
@@ -233,6 +246,12 @@ func (r *sinkRound) run(ctx context.Context, interval time.Duration) error {
 	return ctx.Err()
 }
 
+func (r *sinkRound) full() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.busy) >= sinksAtOnce
+}
+
 func (r *sinkRound) idle() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -253,11 +272,8 @@ func (r *sinkRound) claim(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	for _, s := range c.Sinks {
-		select {
-		case r.slots <- struct{}{}:
-		case <-ctx.Done():
-			return 0, ctx.Err()
-		}
+		// A claimed sink is busy from now on, so the next claim leaves it
+		// out, while it waits for its project's slot and the replica's.
 		r.mu.Lock()
 		r.busy[s.Sink.ID] = true
 		r.mu.Unlock()
@@ -266,12 +282,22 @@ func (r *sinkRound) claim(ctx context.Context) (int, error) {
 				r.mu.Lock()
 				delete(r.busy, s.Sink.ID)
 				r.mu.Unlock()
-				<-r.slots
 				select {
 				case r.woken <- struct{}{}:
 				default:
 				}
 			}()
+			release, err := r.perProject.acquire(ctx, s.Sink.Project)
+			if err != nil {
+				return
+			}
+			defer release()
+			select {
+			case r.slots <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
+			defer func() { <-r.slots }()
 			_ = safego.Call(ctx, SinkDeliveryName, r.log, func(ctx context.Context) error {
 				r.attempt(ctx, c.Token, s)
 				return nil

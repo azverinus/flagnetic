@@ -197,7 +197,9 @@ func WithChangeStream(enabled bool) Option {
 	return func(o *options) { o.changeStream = &enabled }
 }
 
-// WithRequestTimeout bounds each request; default 10 seconds.
+// WithRequestTimeout bounds each request; default 10 seconds. For the
+// change stream it bounds the wait for the response to start, not the
+// stream itself, which stays open for as long as heartbeats arrive.
 func WithRequestTimeout(d time.Duration) Option {
 	return func(o *options) { o.requestTimeout = d }
 }
@@ -378,8 +380,9 @@ func (c *Client) startLoops(o options, online func(context.Context, *sync.WaitGr
 // intervals are the SDK's default waits: what the two
 // background loops wait for, and the bounds their backoffs grow to.
 type intervals struct {
-	// requestTimeout bounds one ruleset request. The change stream is
-	// long-lived and is bounded by heartbeat instead.
+	// requestTimeout bounds one ruleset request, and the change stream's
+	// wait for its response headers. The open stream is long-lived and is
+	// bounded by heartbeat instead.
 	requestTimeout time.Duration
 	// poll is the safety poll while the change stream is connected,
 	// downPoll while it is down or disabled.

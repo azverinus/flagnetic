@@ -589,3 +589,63 @@ func (s *Store) Conflicts(ctx context.Context, environment workspace.Environment
 	}
 	return out, nil
 }
+
+// UnitsFirstExposed returns how many units each of experiments has a first
+// exposure of in environment, as the daily counts hold them: every unit has
+// one first exposure, counted on the day it occurred, so their sum is the
+// units, and it is read from the few days instead of from every unit. An
+// experiment with none is absent.
+func (s *Store) UnitsFirstExposed(ctx context.Context, environment workspace.EnvironmentID, exps []experiments.ExperimentID,
+) (map[experiments.ExperimentID]int64, error) {
+	rows, err := s.db(ctx).Query(ctx, `SELECT experiment_id, sum(first_exposures)::bigint FROM exposure_counts_daily
+		WHERE environment_id = $1 AND experiment_id = ANY($2::uuid[])
+		GROUP BY experiment_id`, environment.Bytes(), bytesOf(exps))
+	if err != nil {
+		return nil, fmt.Errorf("counting the units first exposed: %w", err)
+	}
+	out := map[experiments.ExperimentID]int64{}
+	var (
+		experiment [16]byte
+		n          int64
+	)
+	_, err = pgx.ForEachRow(rows, []any{&experiment, &n}, func() error {
+		out[id.FromBytes[experiments.Experiment](experiment)] = n
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("counting the units first exposed: %w", err)
+	}
+	return out, nil
+}
+
+// ExposedUnits returns which of units have a first exposure stored.
+func (s *Store) ExposedUnits(ctx context.Context, units []events.UnitKey) (map[events.UnitKey]bool, error) {
+	n := len(units)
+	var (
+		environments, exps = make([][16]byte, n), make([][16]byte, n)
+		types, ids         = make([]string, n), make([]string, n)
+	)
+	for i, u := range units {
+		environments[i], exps[i], types[i], ids[i] = u.Environment.Bytes(), u.Experiment.Bytes(), u.UnitType, u.UnitID
+	}
+	rows, err := s.db(ctx).Query(ctx, `
+		SELECT f.environment_id, f.experiment_id, f.unit_type, f.unit_id
+		FROM first_exposures f
+		JOIN unnest($1::uuid[], $2::uuid[], $3::text[], $4::text[]) AS t (environment_id, experiment_id, unit_type, unit_id)
+			USING (environment_id, experiment_id, unit_type, unit_id)`, environments, exps, types, ids)
+	if err != nil {
+		return nil, fmt.Errorf("reading the units first exposed: %w", err)
+	}
+	out := map[events.UnitKey]bool{}
+	var env, exp [16]byte
+	var u events.UnitKey
+	_, err = pgx.ForEachRow(rows, []any{&env, &exp, &u.UnitType, &u.UnitID}, func() error {
+		u.Environment, u.Experiment = id.FromBytes[workspace.Environment](env), id.FromBytes[experiments.Experiment](exp)
+		out[u] = true
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("reading the units first exposed: %w", err)
+	}
+	return out, nil
+}

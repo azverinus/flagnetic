@@ -112,9 +112,9 @@ export function TokenCreateForm(props: TokenCreateFormProps) {
         : props.create(request);
     },
     list,
-    () => undefined,
+    onCreated,
     // The answer carries the token's value.
-    { secret: true },
+    { reveals: true },
   );
   const { errors } = form.formState;
   // A refused scope is named by its index in the list sent: shown under the list.
@@ -138,7 +138,7 @@ export function TokenCreateForm(props: TokenCreateFormProps) {
 
   return (
     <DialogForm
-      onSubmit={form.handleSubmit((values) => create.mutate(values, { onSuccess: onCreated }))}
+      onSubmit={form.handleSubmit((values) => create.mutate(values))}
       onCancel={onCancel}
       submitLabel={<Trans>Create token</Trans>}
       pending={create.isPending}

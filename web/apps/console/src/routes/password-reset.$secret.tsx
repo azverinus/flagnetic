@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { PasswordResetCompletion } from "@/components/password-reset-completion";
 import { SignedOutCard } from "@/components/signed-out-card";
 import { meQuery } from "@/lib/queries";
+import { announceSessionChange } from "@/lib/signed-in";
 
 /**
  * The page a password reset's one-time link opens, before anyone is signed
@@ -29,6 +30,7 @@ function PasswordResetPage() {
           // signed in now; nothing read for another stays.
           queryClient.clear();
           queryClient.setQueryData(meQuery.queryKey, me);
+          announceSessionChange("signed-in");
           toast.success(t`Your new password is set. Every other session of yours is signed out.`);
           void router.navigate({ to: "/", replace: true });
         }}

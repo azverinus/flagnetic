@@ -1,0 +1,30 @@
+openapi: 3.1.0
+info:
+  title: Fixture
+  version: 1.0.0
+servers:
+  - url: /sdk/v1
+paths:
+  /ruleset:
+    get:
+      operationId: getRuleset
+      deprecated: true
+      x-deprecated-since: 2027-03-01
+      x-sunset: 2028-03-01
+      responses:
+        "200":
+          description: ok
+  /evaluate:
+    post:
+      operationId: evaluate
+      deprecated: true
+      x-deprecated-since: 2027-03-01
+      responses:
+        "200":
+          description: ok
+  /events:
+    post:
+      operationId: postEvents
+      responses:
+        "202":
+          description: ok

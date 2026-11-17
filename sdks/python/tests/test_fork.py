@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
+import signal
+import socket
 import threading
 import time
 import warnings
@@ -12,6 +15,7 @@ from typing import Any
 import pytest
 
 import flagnetic
+from flagnetic import _ingest
 from mock_server import MockServer, Request, Response
 from protocol import SDK_KEY, read, read_json
 
@@ -78,3 +82,59 @@ def test_a_forked_child_serves_a_fresh_ruleset_and_sends_its_own_events() -> Non
     finally:
         client.close()
         server.close()
+
+
+@pytest.mark.skipif(not hasattr(os, "fork"), reason="the platform has no fork")
+def test_a_forked_child_lets_go_of_a_request_whose_lock_a_parent_thread_held() -> None:
+    ingest = _ingest.Ingest(
+        base_url="http://127.0.0.1:1",
+        sdk_key=SDK_KEY,
+        agent="test",
+        platform="test",
+        version="0",
+        schema_version=1,
+        request_timeout=1,
+    )
+    parent_end, child_end = socket.socketpair()
+    conn = http.client.HTTPConnection("127.0.0.1", 1)
+    conn.sock = child_end
+    ingest._conn = conn
+    held, release = threading.Event(), threading.Event()
+
+    def hold() -> None:
+        # A parent thread in the middle of a request: it holds the lock when the process forks.
+        with ingest._lock:
+            held.set()
+            release.wait(10)
+
+    holder = threading.Thread(target=hold)
+    holder.start()
+    try:
+        assert held.wait(5)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            pid = os.fork()
+        if pid == 0:
+            code = 1
+            try:
+                ingest.abandon()
+                code = 0 if child_end.fileno() == -1 and ingest._conn is None else 2
+            finally:
+                os._exit(code)
+        deadline = time.monotonic() + 5
+        done, status = os.waitpid(pid, os.WNOHANG)
+        while done == 0 and time.monotonic() < deadline:
+            time.sleep(0.01)
+            done, status = os.waitpid(pid, os.WNOHANG)
+        if done == 0:
+            os.kill(pid, signal.SIGKILL)
+            os.waitpid(pid, 0)
+            pytest.fail("the child blocked on the lock the parent's thread held at the fork")
+        assert os.waitstatus_to_exitcode(status) == 0
+        # The parent shares the socket and keeps it.
+        assert child_end.fileno() != -1
+    finally:
+        release.set()
+        holder.join(5)
+        parent_end.close()
+        child_end.close()

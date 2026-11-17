@@ -104,6 +104,11 @@ type Config struct {
 	// SDKInventoryRetentionDays is how many days a row of the SDK
 	// inventory is kept after its SDK was last seen.
 	SDKInventoryRetentionDays int
+	// AliasLinksLimit is the most alias links an environment keeps.
+	AliasLinksLimit int
+	// FirstExposuresLimit is the most first exposures an experiment keeps
+	// in an environment.
+	FirstExposuresLimit int
 	// WebhookAllowHTTP accepts plain http webhook targets.
 	WebhookAllowHTTP bool
 	// WebhookAllowPrivateNetworks accepts webhook targets on loopback,
@@ -335,9 +340,9 @@ func Settings() []Setting {
 		{
 			Name:        "FLAGNETIC_METRICS_LISTEN_ADDR",
 			Key:         "metrics_listen_addr",
-			Default:     ":9090",
-			Description: "Address of the metrics listener, which serves Prometheus metrics on `/metrics` and nothing else. Keep it off the internet. Set it empty to switch metrics off and open no port.",
-			Example:     "127.0.0.1:9090",
+			Default:     "127.0.0.1:9090",
+			Description: "Address of the metrics listener, which serves Prometheus metrics on `/metrics` and nothing else. It listens on this host only by default; set an address on another interface for a scraper elsewhere, and keep it off the internet. Set it empty to switch metrics off and open no port.",
+			Example:     "10.0.0.5:9090",
 			apply: func(cfg *Config, v string) error {
 				if v != "" {
 					if err := checkAddr(v); err != nil {
@@ -557,6 +562,29 @@ func Settings() []Setting {
 			apply:   wholeNumber(func(c *Config, n int) { c.SDKInventoryRetentionDays = n }),
 		},
 		{
+			Name:    "FLAGNETIC_ALIAS_LINKS_LIMIT",
+			Key:     "alias_links_limit",
+			Default: "5000000",
+			Unit:    "links",
+			Description: "The most alias links an environment keeps. Links are kept as long as the environment exists, so the limit is what stops " +
+				"a client key from growing them without end. Once an environment holds this many, an alias linking a new pair is refused " +
+				"`quota_exceeded`, while one for a pair already linked is still accepted. The count is exact for batches one after another " +
+				"and may be exceeded by the batches in flight at the moment the limit is reached.",
+			Example: "5000000",
+			apply:   wholeNumber(func(c *Config, n int) { c.AliasLinksLimit = n }),
+		},
+		{
+			Name:    "FLAGNETIC_FIRST_EXPOSURES_LIMIT",
+			Key:     "first_exposures_limit",
+			Default: "10000000",
+			Unit:    "units",
+			Description: "The most units whose first exposure an experiment keeps in an environment. Once the rollup has counted this many, " +
+				"an exposure of another unit is refused `quota_exceeded`, while one of a unit already counted is still accepted. " +
+				"Exposures received before the rollup has counted them are not refused, so the limit is approximate by the rollup's lag.",
+			Example: "10000000",
+			apply:   wholeNumber(func(c *Config, n int) { c.FirstExposuresLimit = n }),
+		},
+		{
 			Name:    "FLAGNETIC_WEBHOOK_ALLOW_HTTP",
 			Key:     "webhook_allow_http",
 			Default: "false",
@@ -737,7 +765,8 @@ func Settings() []Setting {
 			func(l *RateLimits) *int { return &l.ClientConcurrentStreams }),
 		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_STREAMS_PER_REPLICA", "10000", "streams",
 			"Ruleset streams all client keys together may hold open on one replica at once, whatever their keys and client IPs, "+
-				"which bounds the connections a public client key can hold the replica to.",
+				"which bounds the connections a public client key can hold the replica to. "+
+				"One client key may hold a quarter of them (at least one), and a stream beyond its share is refused with that share as `RateLimit-Limit`.",
 			func(l *RateLimits) *int { return &l.ClientStreamsPerReplica }),
 		rateLimit("FLAGNETIC_RATE_LIMIT_SERVER_RULESET", "600", "requests per minute",
 			"Ruleset downloads a server key may ask of one replica per minute, counted per key.",

@@ -1038,7 +1038,9 @@ export const listMyIdentities = <ThrowOnError extends boolean = false>(
  * member nothing is linked and the browser lands on the settings page
  * with `error=identity_linked`; any other failure lands there with its
  * sign-in code. A disabled or unknown provider is not found. Only a
- * session may do this.
+ * session may do this, and only one that signed in in the last 15
+ * minutes: an older one is refused 403 `recent_sign_in_required`, and
+ * the member signs in again first.
  *
  */
 export const linkMyIdentity = <ThrowOnError extends boolean = false>(
@@ -1509,8 +1511,9 @@ export const getProjectMe = <ThrowOnError extends boolean = false>(
  * type then unit identifier and prerequisites by flag, so that two
  * exports of an unchanged project are the same bytes. Rule identifiers and rollout
  * salts are in it, which keep every unit in its bucket in a copy; owners
- * are email addresses, and an override's note is in it and its author is
- * not.
+ * are email addresses, written only for an owner who holds a grant in
+ * the project and empty for any other, and an override's note is in it
+ * and its author is not.
  *
  * Members, grants, tokens, SDK keys, webhook subscriptions, change
  * requests, audit entries, events, the standard attributes and the
@@ -2258,12 +2261,13 @@ export const createAttribute = <ThrowOnError extends boolean = false>(
  * Attributes SDKs sent that the project does not declare
  *
  * The attributes that contexts evaluated through the SDK API and the
- * tester carried without the project declaring them, by key, with the
+ * tester (when its caller holds `declaration.manage`) carried without
+ * the project declaring them, by key, with the
  * JSON types seen and when they were first and last seen. Only an
  * attribute's key and type are recorded, never a value. A dismissed
  * attribute is left out until it is seen with a type not seen before;
- * an attribute declared since is left out. A project records at most
- * 500, dismissed ones included.
+ * an attribute declared since is left out. A project lists at most
+ * 500; dismissed ones are not counted, so dismissing frees a place.
  *
  */
 export const listDiscoveredAttributes = <ThrowOnError extends boolean = false>(
@@ -3440,8 +3444,10 @@ export const sendStaleFlagDigest = <ThrowOnError extends boolean = false>(
  * or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
  * only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
  * empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
- * Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
- * whatever the server's limit for other bodies.
+ * Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+ * whatever the server's limit for other bodies; the list is read
+ * entry by entry and cut one past the bound, so a longer one is refused
+ * without being held whole.
  *
  */
 export const checkHashUniformity = <ThrowOnError extends boolean = false>(
@@ -4264,8 +4270,9 @@ export const listGrants = <ThrowOnError extends boolean = false>(
  * project is refused `role_not_allowed`, naming it in `permission`;
  * the same member and role twice `already_granted`; a deactivated
  * member `member_deactivated`; an unknown member or role
- * `invalid_grant`. Only a member grants: a project token never changes
- * who has access.
+ * `invalid_grant`. Only a member grants, signed in: an API token, a
+ * project token or a personal one, is refused `session_required`, so a
+ * leaked token cannot leave behind access that outlives it.
  *
  */
 export const createGrant = <ThrowOnError extends boolean = false>(
@@ -4372,7 +4379,8 @@ export const listProjectInvitations = <ThrowOnError extends boolean = false>(
  * deactivated before it is accepted; the audit log records
  * `invitation.grant_revoked` with the reason `inviter_lost_permission`
  * or `inviter_deactivated`. Only a member invites: a project token
- * never holds `grant.manage`.
+ * never holds `grant.manage`. Needs a signed-in session: an API token is
+ * refused `session_required`.
  *
  */
 export const inviteProjectMember = <ThrowOnError extends boolean = false>(
@@ -4670,7 +4678,8 @@ export const listMembers = <ThrowOnError extends boolean = false>(
  * once and never again. The link is `FLAGNETIC_BASE_URL`, or this
  * request's origin when it is not set, followed by
  * `/invitations/<secret>`; it expires after seven days. An email the
- * instance holds, whatever its case, is refused `already_exists`.
+ * instance holds, whatever its case, is refused `already_exists`. Needs
+ * a signed-in session: an API token is refused `session_required`.
  *
  * The invitation may carry a `grant` of a built-in role in a project,
  * which accepting it makes by hand, in the name of the instance admin
@@ -4729,7 +4738,10 @@ export const getMember = <ThrowOnError extends boolean = false>(
  * `last_instance_admin`, and demoting one an auth provider's group
  * mapping made `sso_sourced`: only the provider takes it away. Making a
  * member still invited an instance admin is refused `member_invited`:
- * they are made one once they have accepted their invitation.
+ * they are made one once they have accepted their invitation. Needs a
+ * signed-in session: an API token is refused `session_required`, so a
+ * leaked token cannot promote a member, or change a member's email to
+ * take their account over.
  *
  */
 export const updateMember = <ThrowOnError extends boolean = false>(
@@ -4788,7 +4800,8 @@ export const deactivateMember = <ThrowOnError extends boolean = false>(
  * invitation's one-time link, as on invitation. What their
  * deactivation revoked stays revoked: they sign in afresh and create
  * new tokens. Reactivating a member who is not deactivated changes
- * nothing.
+ * nothing. Needs a signed-in session: an API token is refused
+ * `session_required`.
  *
  */
 export const reactivateMember = <ThrowOnError extends boolean = false>(
@@ -4816,7 +4829,8 @@ export const reactivateMember = <ThrowOnError extends boolean = false>(
  * keeps the project and role of the one it replaces only while the
  * member who issued that one still holds `grant.manage` in the project;
  * otherwise it grants nothing, and the audit log records
- * `invitation.grant_revoked`.
+ * `invitation.grant_revoked`. Needs a signed-in session: an API token is
+ * refused `session_required`.
  *
  */
 export const reissueInvitation = <ThrowOnError extends boolean = false>(
@@ -4848,7 +4862,9 @@ export const reissueInvitation = <ThrowOnError extends boolean = false>(
  * `member_not_active`: issue their invitation again instead. A
  * deactivated member is refused `member_deactivated`. Earlier password
  * resets of the member stay open; completing one ends the others.
- * Recorded as `password.reset_issued`, without the link.
+ * Recorded as `password.reset_issued`, without the link. Needs a
+ * signed-in session: an API token is refused `session_required`, so a
+ * leaked token cannot take over a member's account.
  *
  */
 export const issuePasswordReset = <ThrowOnError extends boolean = false>(
@@ -5232,7 +5248,13 @@ export const getAuthProvider = <ThrowOnError extends boolean = false>(
  * is changed with `enable` and `disable`. Refused as a creation is, and
  * 409 `provider_in_use` (`used_by` naming `enforced domains`) when it
  * drops a domain enforced to the provider: lift the enforcement first.
- * Audited `auth_provider.updated`; an edit that changes nothing is not.
+ * Changing the `issuer` of an OIDC provider, or the identity provider
+ * whose entity ID differs in new SAML metadata, while members have
+ * identities linked at it is 409 `provider_identities_linked`: a subject
+ * of the new issuer equal to a linked one would sign in as the member who
+ * linked it, so the identities are unlinked first or a new provider is
+ * created. Audited `auth_provider.updated`; an edit that changes nothing
+ * is not.
  *
  */
 export const updateAuthProvider = <ThrowOnError extends boolean = false>(
@@ -5710,11 +5732,10 @@ export const updateMailSettings = <ThrowOnError extends boolean = false>(
  * the SMTP server in force, and answers once the server accepted it: the
  * only mail the instance sends while its sender waits. Refused
  * `smtp_not_configured` (409) while there is no SMTP server, and
- * `smtp_failed` (502) with `failure` naming the step that failed:
- * `connection` (unreachable or broken), `tls` (no STARTTLS, a
- * handshake or certificate that failed), `authentication` (the
- * credentials were refused) or `rejected` (the sender, the recipient or
- * the mail was refused).
+ * `smtp_failed` (502) when the exchange failed, without saying at which
+ * step: the host is the caller's to name, and the step would tell what
+ * is reachable behind it. The instance's log record of the failure
+ * names the step.
  *
  */
 export const sendTestMail = <ThrowOnError extends boolean = false>(
