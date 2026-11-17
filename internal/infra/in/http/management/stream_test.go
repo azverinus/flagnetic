@@ -164,7 +164,7 @@ func TestAKillSwitchAndAGrantAreNoticed(t *testing.T) {
 	assertNoticeOf(t, admin, p.Key, entryID, n, "staging", &killed.JSON200.Configuration.Version)
 
 	m := testkit.NewMember(t, testkit.Pool(t))
-	grant(t, admin, p.Key, m.ID, string(access.RoleViewer))
+	grant(t, testkit.InstanceAdminSession(t, a), p.Key, m.ID, string(access.RoleViewer))
 	entryID, n = nextChange(t, s)
 	assertNoticeOf(t, admin, p.Key, entryID, n, "", nil)
 	if n.Kind != "grant" || n.Environment != nil {
@@ -251,7 +251,7 @@ func TestAMemberLosingTheirGrantHasTheStreamClosedAtTheNextNotice(t *testing.T) 
 	admin := testkit.Client(t, a, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
 	viewer := testkit.NewMember(t, pool)
-	g := grant(t, admin, p.Key, viewer.ID, string(access.RoleViewer))
+	g := grant(t, testkit.InstanceAdminSession(t, a), p.Key, viewer.ID, string(access.RoleViewer))
 	s := openChanges(t, b, testkit.PersonalToken(t, pool, viewer.ID, "viewer", access.ScopeRead), p.Key, "")
 	s.Started(t)
 
@@ -300,7 +300,7 @@ func TestAMemberLosingTheirGrantHasTheStreamClosedAtTheNextHeartbeat(t *testing.
 	admin := testkit.Client(t, a, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
 	viewer := testkit.NewMember(t, pool)
-	g := grant(t, admin, p.Key, viewer.ID, string(access.RoleViewer))
+	g := grant(t, testkit.InstanceAdminSession(t, a), p.Key, viewer.ID, string(access.RoleViewer))
 	s := openChanges(t, b, testkit.PersonalToken(t, pool, viewer.ID, "viewer", access.ScopeRead), p.Key, "")
 	s.Started(t)
 

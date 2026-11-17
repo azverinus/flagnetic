@@ -69,7 +69,7 @@ func sessionIsDead(t *testing.T, b *testkit.Browser, why string) {
 func TestAnInstanceAdminIssuesAPasswordResetTheMemberCompletes(t *testing.T) {
 	c := testkit.Clock()
 	srv := testkit.StartServer(t, testkit.WithClock(c))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	m := testkit.NewMember(t, testkit.Pool(t), testkit.WithDisplayName("Grace Hopper"))
 
 	issued := issueReset(t, admin, m.ID)
@@ -137,7 +137,7 @@ func TestAnInstanceAdminIssuesAPasswordResetTheMemberCompletes(t *testing.T) {
 
 func TestCompletingAPasswordResetSignsOutEveryDeviceAndClearsALockout(t *testing.T) {
 	srv := testkit.StartServer(t, trustLoopback())
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	m := testkit.NewMember(t, testkit.Pool(t))
 	phone, laptop := signedIn(t, srv, m), signedIn(t, srv, m)
 	lockEmail(t, srv, m.Email)
@@ -173,7 +173,7 @@ func TestCompletingAPasswordResetSignsOutEveryDeviceAndClearsALockout(t *testing
 func TestCompletingAPasswordResetEndsEveryOtherOpenResetAndInvitation(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	m := testkit.NewMember(t, pool)
 
 	first, second, third := issueReset(t, admin, m.ID), issueReset(t, admin, m.ID), issueReset(t, admin, m.ID)
@@ -209,7 +209,7 @@ func TestCompletingAPasswordResetEndsEveryOtherOpenResetAndInvitation(t *testing
 func TestAPasswordResetExpiresAfterAnHour(t *testing.T) {
 	c := testkit.Clock()
 	srv := testkit.StartServer(t, testkit.WithClock(c))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	issued := issueReset(t, admin, testkit.NewMember(t, testkit.Pool(t)).ID)
 
 	c.Advance(time.Hour - time.Minute)
@@ -230,7 +230,7 @@ func TestAnUnknownPasswordResetSecretIsGone(t *testing.T) {
 
 func TestCompletingAPasswordResetAppliesThePasswordPolicy(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	m := testkit.NewMember(t, testkit.Pool(t), testkit.WithEmail("weak.reset@example.com"))
 	issued := issueReset(t, admin, m.ID)
 	b := testkit.NewBrowser(t, srv.URL)
@@ -259,7 +259,7 @@ func TestCompletingAPasswordResetAppliesThePasswordPolicy(t *testing.T) {
 func TestIssuingAPasswordResetIsRefusedForAMemberWhoIsNotActive(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 
 	invited := testkit.NewMember(t, pool, testkit.WithStatus(access.MemberInvited))
 	res := do(admin.IssuePasswordResetWithResponse(t.Context(), invited.ID.String()))
@@ -299,7 +299,7 @@ func TestIssuingAPasswordResetNeedsAnInstanceAdmin(t *testing.T) {
 
 func TestAPasswordChangeEndsTheMembersOpenPasswordResets(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	m := testkit.NewMember(t, testkit.Pool(t))
 	issued := issueReset(t, admin, m.ID)
 
@@ -312,7 +312,7 @@ func TestAPasswordChangeEndsTheMembersOpenPasswordResets(t *testing.T) {
 
 func TestADeactivationEndsTheMembersOpenPasswordResets(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	m := testkit.NewMember(t, testkit.Pool(t))
 	issued := issueReset(t, admin, m.ID)
 
@@ -330,7 +330,7 @@ func TestADeactivationEndsTheMembersOpenPasswordResets(t *testing.T) {
 
 func TestCompletingAPasswordResetIsRefusedAsAForm(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	issued := issueReset(t, admin, testkit.NewMember(t, testkit.Pool(t)).ID)
 	b := testkit.NewBrowser(t, srv.URL)
 	b.Header.Set("Sec-Fetch-Site", "cross-site")
@@ -349,7 +349,7 @@ func TestCompletingAPasswordResetIsRefusedAsAForm(t *testing.T) {
 
 func TestAPasswordResetBodyOver8KiBIsRefusedBeforeAnything(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	issued := issueReset(t, admin, testkit.NewMember(t, testkit.Pool(t)).ID)
 	body := `{"password":"` + strings.Repeat("x", 8<<10) + `"}`
 	res, err := testkit.NewBrowser(t, srv.URL).CompletePasswordResetWithBodyWithResponse(t.Context(), secretOf(issued.Url),
@@ -364,7 +364,7 @@ func TestAPasswordResetBodyOver8KiBIsRefusedBeforeAnything(t *testing.T) {
 
 func TestAPasswordResetSecretNeverReachesALogLine(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	issued := issueReset(t, admin, testkit.NewMember(t, testkit.Pool(t)).ID)
 	secret := secretOf(issued.Url)
 	resetOpened(t, srv, issued.Url)
@@ -393,7 +393,7 @@ func TestAPasswordResetSecretNeverReachesALogLine(t *testing.T) {
 
 func TestThePerAddressThrottleCoversPasswordResetCompletion(t *testing.T) {
 	srv := testkit.StartServer(t, trustLoopback())
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	m := testkit.NewMember(t, testkit.Pool(t))
 	issued := issueReset(t, admin, m.ID)
 	b := fromAddress(t, srv, someAddress())
@@ -417,7 +417,7 @@ func TestThePerAddressThrottleCoversPasswordResetCompletion(t *testing.T) {
 
 func TestACompletedPasswordResetCountsNoFailureOfItsAddress(t *testing.T) {
 	srv := testkit.StartServer(t, trustLoopback())
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	issued := issueReset(t, admin, testkit.NewMember(t, testkit.Pool(t)).ID)
 	b := fromAddress(t, srv, someAddress())
 	for range access.SourceFailureLimit - 1 {
@@ -436,7 +436,7 @@ func TestACompletedPasswordResetCountsNoFailureOfItsAddress(t *testing.T) {
 
 func TestOnlyOneOfConcurrentCompletionsSucceeds(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	issued := issueReset(t, admin, testkit.NewMember(t, testkit.Pool(t)).ID)
 
 	var wg sync.WaitGroup
@@ -472,7 +472,7 @@ func TestOnlyOneOfConcurrentCompletionsSucceeds(t *testing.T) {
 func TestTheRetentionWorkerPurgesPasswordResetsThirtyDaysAfterUseOrExpiry(t *testing.T) {
 	c := testkit.Clock()
 	srv, pool := retentionServer(t, c)
-	admin := testkit.Client(t, srv, testkit.Bootstrap(t, pool))
+	signIn := func() *management.ClientWithResponses { return testkit.InstanceAdminSessionOn(t, srv, pool) }
 	store := pgaccess.NewStore(pool)
 	kept := func(link string) bool {
 		hash, ok := access.ParsePasswordResetSecret(secretOf(link))
@@ -486,15 +486,15 @@ func TestTheRetentionWorkerPurgesPasswordResetsThirtyDaysAfterUseOrExpiry(t *tes
 		return err == nil
 	}
 
-	used := issueReset(t, admin, testkit.NewMember(t, pool).ID)
+	used := issueReset(t, signIn(), testkit.NewMember(t, pool).ID)
 	if res := completeReset(t, testkit.NewBrowser(t, srv.URL), used.Url, resetPassword); res.StatusCode() != http.StatusOK {
 		t.Fatalf("complete = %d %s", res.StatusCode(), res.Body)
 	}
-	expired := issueReset(t, admin, testkit.NewMember(t, pool).ID)
+	expired := issueReset(t, signIn(), testkit.NewMember(t, pool).ID)
 
 	// A day short of thirty after the first two ended: nothing is purged.
 	c.Advance(29 * 24 * time.Hour)
-	recent := issueReset(t, admin, testkit.NewMember(t, pool).ID)
+	recent := issueReset(t, signIn(), testkit.NewMember(t, pool).ID)
 	purge(t, srv)
 	if n := purged(t, srv, "password_resets"); n != 0 {
 		t.Fatalf("purged password resets = %d a day short of the retention, want 0", n)

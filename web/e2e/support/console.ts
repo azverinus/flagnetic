@@ -8,6 +8,7 @@ import {
   getEnvironment,
   inviteMember,
   setEnvironmentProtection,
+  signIn as signInOperation,
   signOut,
 } from "@flagnetic/api";
 import type { Browser, Page } from "@playwright/test";
@@ -54,15 +55,57 @@ export async function signIn(
   await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"));
 }
 
+/**
+ * The operations that create access refuse every API token, so a script's
+ * token cannot leave behind a member, a role or a password that outlives it:
+ * the instance admin performs them signed in.
+ */
+const sessionOnly = [
+  /^POST \/api\/v1\/members$/,
+  /^PATCH \/api\/v1\/members\/[^/]+$/,
+  /^POST \/api\/v1\/members\/[^/]+\/(reactivate|password-reset)$/,
+  /^POST \/api\/v1\/projects\/[^/]+\/grants$/,
+];
+
+/**
+ * The management API as the instance admin, for seeding and for checking:
+ * with the bootstrap token, and with a session signed in afresh for the
+ * operations only a session may perform.
+ */
+export function adminClient(baseURL: string, token: string): Client {
+  const withToken: typeof fetch = (input, init) => fetch(input, init);
+  const signedIn: typeof fetch = async (input, init) => {
+    const request = new Request(input, init);
+    const { pathname } = new URL(request.url);
+    if (!sessionOnly.some((pattern) => pattern.test(`${request.method} ${pathname}`))) {
+      return withToken(request);
+    }
+    const anonymous = createClient(createConfig({ baseUrl: `${baseURL}/api/v1` }));
+    const opened = await signInOperation({
+      client: anonymous,
+      body: { email: admin.email, password: admin.password },
+    });
+    const cookie = opened.response?.headers.get("set-cookie")?.split(";")[0];
+    if (!cookie)
+      throw new Error(`signing the instance admin in failed: ${JSON.stringify(opened.error)}`);
+    const headers = new Headers(request.headers);
+    headers.delete("Authorization");
+    headers.set("Cookie", cookie);
+    return fetch(new Request(request, { headers }));
+  };
+  return createClient(
+    createConfig({
+      baseUrl: `${baseURL}/api/v1`,
+      headers: { Authorization: `Bearer ${token}` },
+      fetch: signedIn,
+    }),
+  );
+}
+
 /** The management API as the instance admin, for seeding and for checking. */
 export function managementClient(): Client {
   const state = readState();
-  return createClient(
-    createConfig({
-      baseUrl: `${state.baseURL}/api/v1`,
-      headers: { Authorization: `Bearer ${state.token}` },
-    }),
-  );
+  return adminClient(state.baseURL, state.token);
 }
 
 /** The data of a generated operation's result, or a failure naming what was attempted. */

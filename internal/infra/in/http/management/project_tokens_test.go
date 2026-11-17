@@ -367,10 +367,7 @@ func TestAnOwnersProjectTokenNeverManagesGrants(t *testing.T) {
 	m := testkit.NewMember(t, testkit.Pool(t))
 
 	res := do(c.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: m.ID.Bytes(), Role: "viewer"}))
-	if pr := assertProblem(t, "granting", res.StatusCode(), res.Body, http.StatusForbidden, "forbidden"); pr.Permission == nil ||
-		*pr.Permission != "grant.manage" {
-		t.Errorf("the refusal names %v, want grant.manage", pr.Permission)
-	}
+	assertProblem(t, "granting", res.StatusCode(), res.Body, http.StatusForbidden, "session_required")
 	if listed := do(c.ListGrantsWithResponse(t.Context(), p.Key)); listed.JSON200 == nil {
 		t.Errorf("listing grants = %d: %s", listed.StatusCode(), listed.Body)
 	}

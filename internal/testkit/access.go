@@ -42,6 +42,25 @@ func InstanceAdminToken(t testing.TB) string {
 	return Bootstrap(t, Pool(t))
 }
 
+// InstanceAdminSession returns a client of the management API of srv signed
+// in as the bootstrapped instance admin of the package's database, for the
+// operations that refuse every API token, such as granting a role or
+// inviting a member.
+func InstanceAdminSession(t testing.TB, srv *Server) *management.ClientWithResponses {
+	t.Helper()
+	return InstanceAdminSessionOn(t, srv, Pool(t))
+}
+
+// InstanceAdminSessionOn is InstanceAdminSession for a server running on
+// pool, such as a fresh database of the test's own.
+func InstanceAdminSessionOn(t testing.TB, srv *Server, pool *pgxpool.Pool) *management.ClientWithResponses {
+	t.Helper()
+	Bootstrap(t, pool)
+	b := NewBrowser(t, srv.URL)
+	b.SignIn(t, InstanceAdminEmail, InstanceAdminPassword)
+	return b.ClientWithResponses
+}
+
 // Bootstrap returns the bootstrap token of the instance on pool, running
 // `admin bootstrap` as InstanceAdminEmail on first use, at the test kit's
 // Start.

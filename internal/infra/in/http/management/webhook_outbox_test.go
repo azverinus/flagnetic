@@ -163,7 +163,7 @@ func TestAnEventReachesOnlyTheSubscriptionsThatMatch(t *testing.T) {
 	}
 	switchOn(t, admin, p.Key, "checkout", "staging")
 	member := testkit.NewMember(t, pool, testkit.WithEmail("viewer-"+strings.ToLower(projectKey())+"@example.com"))
-	grant(t, admin, p.Key, member.ID, "viewer")
+	grant(t, testkit.InstanceAdminSession(t, srv), p.Key, member.ID, "viewer")
 	fanOut(t, srv)
 
 	for name, tc := range map[string]struct {
@@ -235,7 +235,7 @@ func TestRulesSegmentsGrantsAndSDKKeysAreCatalogued(t *testing.T) {
 		Key: "vips", Name: "VIPs", Private: ptr(true), Conditions: conditions(attr("email", "eq", `"a@example.com"`)),
 	})
 	member := testkit.NewMember(t, pool, testkit.WithEmail("dev-"+strings.ToLower(projectKey())+"@example.com"))
-	grant(t, admin, p.Key, member.ID, "developer")
+	grant(t, testkit.InstanceAdminSession(t, srv), p.Key, member.ID, "developer")
 	key := mustCreateSDKKey(t, admin, p.Key, "staging", management.SdkKeyCreate{Kind: "server", Name: "checkout-api"})
 	if res := revoke(t, admin, p.Key, "staging", key.Key.Id.String()); res.JSON200 == nil {
 		t.Fatalf("revoke = %d %s", res.StatusCode(), res.Body)
@@ -261,7 +261,7 @@ func TestAnEnvironmentFilterPassesProjectLevelEvents(t *testing.T) {
 	switchOn(t, admin, p.Key, "checkout", "staging")
 	switchOn(t, admin, p.Key, "checkout", "development")
 	member := testkit.NewMember(t, pool, testkit.WithEmail("viewer-"+strings.ToLower(projectKey())+"@example.com"))
-	grant(t, admin, p.Key, member.ID, "viewer")
+	grant(t, testkit.InstanceAdminSession(t, srv), p.Key, member.ID, "viewer")
 	fanOut(t, srv)
 
 	if got, want := deliveredTypes(t, admin, p.Key, staging.Id), []string{"flag.created", "flag.switched_on", "grant.created"}; !slices.Equal(got, want) {

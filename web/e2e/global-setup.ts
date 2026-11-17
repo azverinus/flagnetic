@@ -8,6 +8,7 @@ import {
   listProjects,
 } from "@flagnetic/api";
 
+import { adminClient } from "./support/console";
 import { startDex, stopDex } from "./support/dex";
 import { startKeycloak, stopKeycloak } from "./support/keycloak";
 import { startMailpit, stopMailpit } from "./support/mailpit";
@@ -48,12 +49,7 @@ export default async function globalSetup(): Promise<void> {
     const failed = started.find((result) => result.status === "rejected");
     if (failed) throw failed.reason;
     const { baseURL } = await serve(binary, port);
-    const client = createClient(
-      createConfig({
-        baseUrl: `${baseURL}/api/v1`,
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-    );
+    const client = adminClient(baseURL, token);
 
     for (const project of [seededProject, secondProject]) {
       const created = await createProject({ client, body: project });

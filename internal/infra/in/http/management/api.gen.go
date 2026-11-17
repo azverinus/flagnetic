@@ -8673,7 +8673,8 @@ type ClientInterface interface {
 	// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 	// request's origin when it is not set, followed by
 	// `/invitations/<secret>`; it expires after seven days. An email the
-	// instance holds, whatever its case, is refused `already_exists`.
+	// instance holds, whatever its case, is refused `already_exists`. Needs
+	// a signed-in session: an API token is refused `session_required`.
 	//
 	// The invitation may carry a `grant` of a built-in role in a project,
 	// which accepting it makes by hand, in the name of the instance admin
@@ -8695,7 +8696,8 @@ type ClientInterface interface {
 	// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 	// request's origin when it is not set, followed by
 	// `/invitations/<secret>`; it expires after seven days. An email the
-	// instance holds, whatever its case, is refused `already_exists`.
+	// instance holds, whatever its case, is refused `already_exists`. Needs
+	// a signed-in session: an API token is refused `session_required`.
 	//
 	// The invitation may carry a `grant` of a built-in role in a project,
 	// which accepting it makes by hand, in the name of the instance admin
@@ -8723,7 +8725,10 @@ type ClientInterface interface {
 	// `last_instance_admin`, and demoting one an auth provider's group
 	// mapping made `sso_sourced`: only the provider takes it away. Making a
 	// member still invited an instance admin is refused `member_invited`:
-	// they are made one once they have accepted their invitation.
+	// they are made one once they have accepted their invitation. Needs a
+	// signed-in session: an API token is refused `session_required`, so a
+	// leaked token cannot promote a member, or change a member's email to
+	// take their account over.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -8738,7 +8743,10 @@ type ClientInterface interface {
 	// `last_instance_admin`, and demoting one an auth provider's group
 	// mapping made `sso_sourced`: only the provider takes it away. Making a
 	// member still invited an instance admin is refused `member_invited`:
-	// they are made one once they have accepted their invitation.
+	// they are made one once they have accepted their invitation. Needs a
+	// signed-in session: an API token is refused `session_required`, so a
+	// leaked token cannot promote a member, or change a member's email to
+	// take their account over.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -8793,7 +8801,8 @@ type ClientInterface interface {
 	// keeps the project and role of the one it replaces only while the
 	// member who issued that one still holds `grant.manage` in the project;
 	// otherwise it grants nothing, and the audit log records
-	// `invitation.grant_revoked`.
+	// `invitation.grant_revoked`. Needs a signed-in session: an API token is
+	// refused `session_required`.
 	//
 	// Corresponds with POST /members/{member}/invitation (the `ReissueInvitation` operationId).
 	ReissueInvitation(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8806,7 +8815,9 @@ type ClientInterface interface {
 	// `member_not_active`: issue their invitation again instead. A
 	// deactivated member is refused `member_deactivated`. Earlier password
 	// resets of the member stay open; completing one ends the others.
-	// Recorded as `password.reset_issued`, without the link.
+	// Recorded as `password.reset_issued`, without the link. Needs a
+	// signed-in session: an API token is refused `session_required`, so a
+	// leaked token cannot take over a member's account.
 	//
 	// Corresponds with POST /members/{member}/password-reset (the `IssuePasswordReset` operationId).
 	IssuePasswordReset(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8818,7 +8829,8 @@ type ClientInterface interface {
 	// invitation's one-time link, as on invitation. What their
 	// deactivation revoked stays revoked: they sign in afresh and create
 	// new tokens. Reactivating a member who is not deactivated changes
-	// nothing.
+	// nothing. Needs a signed-in session: an API token is refused
+	// `session_required`.
 	//
 	// Corresponds with POST /members/{member}/reactivate (the `ReactivateMember` operationId).
 	ReactivateMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -10455,8 +10467,9 @@ type ClientInterface interface {
 	// project is refused `role_not_allowed`, naming it in `permission`;
 	// the same member and role twice `already_granted`; a deactivated
 	// member `member_deactivated`; an unknown member or role
-	// `invalid_grant`. Only a member grants: a project token never changes
-	// who has access.
+	// `invalid_grant`. Only a member grants, signed in: an API token, a
+	// project token or a personal one, is refused `session_required`, so a
+	// leaked token cannot leave behind access that outlives it.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10475,8 +10488,9 @@ type ClientInterface interface {
 	// project is refused `role_not_allowed`, naming it in `permission`;
 	// the same member and role twice `already_granted`; a deactivated
 	// member `member_deactivated`; an unknown member or role
-	// `invalid_grant`. Only a member grants: a project token never changes
-	// who has access.
+	// `invalid_grant`. Only a member grants, signed in: an API token, a
+	// project token or a personal one, is refused `session_required`, so a
+	// leaked token cannot leave behind access that outlives it.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -13469,7 +13483,8 @@ func (c *Client) ListMembers(ctx context.Context, params *ListMembersParams, req
 // once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 // request's origin when it is not set, followed by
 // `/invitations/<secret>`; it expires after seven days. An email the
-// instance holds, whatever its case, is refused `already_exists`.
+// instance holds, whatever its case, is refused `already_exists`. Needs
+// a signed-in session: an API token is refused `session_required`.
 //
 // The invitation may carry a `grant` of a built-in role in a project,
 // which accepting it makes by hand, in the name of the instance admin
@@ -13501,7 +13516,8 @@ func (c *Client) InviteMemberWithBody(ctx context.Context, contentType string, b
 // once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 // request's origin when it is not set, followed by
 // `/invitations/<secret>`; it expires after seven days. An email the
-// instance holds, whatever its case, is refused `already_exists`.
+// instance holds, whatever its case, is refused `already_exists`. Needs
+// a signed-in session: an API token is refused `session_required`.
 //
 // The invitation may carry a `grant` of a built-in role in a project,
 // which accepting it makes by hand, in the name of the instance admin
@@ -13549,7 +13565,10 @@ func (c *Client) GetMember(ctx context.Context, member MemberID, reqEditors ...R
 // `last_instance_admin`, and demoting one an auth provider's group
 // mapping made `sso_sourced`: only the provider takes it away. Making a
 // member still invited an instance admin is refused `member_invited`:
-// they are made one once they have accepted their invitation.
+// they are made one once they have accepted their invitation. Needs a
+// signed-in session: an API token is refused `session_required`, so a
+// leaked token cannot promote a member, or change a member's email to
+// take their account over.
 //
 // Takes any type of body and a specified content type.
 //
@@ -13574,7 +13593,10 @@ func (c *Client) UpdateMemberWithBody(ctx context.Context, member MemberID, cont
 // `last_instance_admin`, and demoting one an auth provider's group
 // mapping made `sso_sourced`: only the provider takes it away. Making a
 // member still invited an instance admin is refused `member_invited`:
-// they are made one once they have accepted their invitation.
+// they are made one once they have accepted their invitation. Needs a
+// signed-in session: an API token is refused `session_required`, so a
+// leaked token cannot promote a member, or change a member's email to
+// take their account over.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -13669,7 +13691,8 @@ func (c *Client) UnlinkMemberIdentity(ctx context.Context, member MemberID, iden
 // keeps the project and role of the one it replaces only while the
 // member who issued that one still holds `grant.manage` in the project;
 // otherwise it grants nothing, and the audit log records
-// `invitation.grant_revoked`.
+// `invitation.grant_revoked`. Needs a signed-in session: an API token is
+// refused `session_required`.
 //
 // Corresponds with POST /members/{member}/invitation (the `ReissueInvitation` operationId).
 func (c *Client) ReissueInvitation(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -13692,7 +13715,9 @@ func (c *Client) ReissueInvitation(ctx context.Context, member MemberID, reqEdit
 // `member_not_active`: issue their invitation again instead. A
 // deactivated member is refused `member_deactivated`. Earlier password
 // resets of the member stay open; completing one ends the others.
-// Recorded as `password.reset_issued`, without the link.
+// Recorded as `password.reset_issued`, without the link. Needs a
+// signed-in session: an API token is refused `session_required`, so a
+// leaked token cannot take over a member's account.
 //
 // Corresponds with POST /members/{member}/password-reset (the `IssuePasswordReset` operationId).
 func (c *Client) IssuePasswordReset(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -13714,7 +13739,8 @@ func (c *Client) IssuePasswordReset(ctx context.Context, member MemberID, reqEdi
 // invitation's one-time link, as on invitation. What their
 // deactivation revoked stays revoked: they sign in afresh and create
 // new tokens. Reactivating a member who is not deactivated changes
-// nothing.
+// nothing. Needs a signed-in session: an API token is refused
+// `session_required`.
 //
 // Corresponds with POST /members/{member}/reactivate (the `ReactivateMember` operationId).
 func (c *Client) ReactivateMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -16471,8 +16497,9 @@ func (c *Client) ListGrants(ctx context.Context, project ProjectKey, reqEditors 
 // project is refused `role_not_allowed`, naming it in `permission`;
 // the same member and role twice `already_granted`; a deactivated
 // member `member_deactivated`; an unknown member or role
-// `invalid_grant`. Only a member grants: a project token never changes
-// who has access.
+// `invalid_grant`. Only a member grants, signed in: an API token, a
+// project token or a personal one, is refused `session_required`, so a
+// leaked token cannot leave behind access that outlives it.
 //
 // Takes any type of body and a specified content type.
 //
@@ -16501,8 +16528,9 @@ func (c *Client) CreateGrantWithBody(ctx context.Context, project ProjectKey, co
 // project is refused `role_not_allowed`, naming it in `permission`;
 // the same member and role twice `already_granted`; a deactivated
 // member `member_deactivated`; an unknown member or role
-// `invalid_grant`. Only a member grants: a project token never changes
-// who has access.
+// `invalid_grant`. Only a member grants, signed in: an API token, a
+// project token or a personal one, is refused `session_required`, so a
+// leaked token cannot leave behind access that outlives it.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -30663,7 +30691,8 @@ type ClientWithResponsesInterface interface {
 	// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 	// request's origin when it is not set, followed by
 	// `/invitations/<secret>`; it expires after seven days. An email the
-	// instance holds, whatever its case, is refused `already_exists`.
+	// instance holds, whatever its case, is refused `already_exists`. Needs
+	// a signed-in session: an API token is refused `session_required`.
 	//
 	// The invitation may carry a `grant` of a built-in role in a project,
 	// which accepting it makes by hand, in the name of the instance admin
@@ -30685,7 +30714,8 @@ type ClientWithResponsesInterface interface {
 	// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 	// request's origin when it is not set, followed by
 	// `/invitations/<secret>`; it expires after seven days. An email the
-	// instance holds, whatever its case, is refused `already_exists`.
+	// instance holds, whatever its case, is refused `already_exists`. Needs
+	// a signed-in session: an API token is refused `session_required`.
 	//
 	// The invitation may carry a `grant` of a built-in role in a project,
 	// which accepting it makes by hand, in the name of the instance admin
@@ -30715,7 +30745,10 @@ type ClientWithResponsesInterface interface {
 	// `last_instance_admin`, and demoting one an auth provider's group
 	// mapping made `sso_sourced`: only the provider takes it away. Making a
 	// member still invited an instance admin is refused `member_invited`:
-	// they are made one once they have accepted their invitation.
+	// they are made one once they have accepted their invitation. Needs a
+	// signed-in session: an API token is refused `session_required`, so a
+	// leaked token cannot promote a member, or change a member's email to
+	// take their account over.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -30730,7 +30763,10 @@ type ClientWithResponsesInterface interface {
 	// `last_instance_admin`, and demoting one an auth provider's group
 	// mapping made `sso_sourced`: only the provider takes it away. Making a
 	// member still invited an instance admin is refused `member_invited`:
-	// they are made one once they have accepted their invitation.
+	// they are made one once they have accepted their invitation. Needs a
+	// signed-in session: an API token is refused `session_required`, so a
+	// leaked token cannot promote a member, or change a member's email to
+	// take their account over.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -30791,7 +30827,8 @@ type ClientWithResponsesInterface interface {
 	// keeps the project and role of the one it replaces only while the
 	// member who issued that one still holds `grant.manage` in the project;
 	// otherwise it grants nothing, and the audit log records
-	// `invitation.grant_revoked`.
+	// `invitation.grant_revoked`. Needs a signed-in session: an API token is
+	// refused `session_required`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -30806,7 +30843,9 @@ type ClientWithResponsesInterface interface {
 	// `member_not_active`: issue their invitation again instead. A
 	// deactivated member is refused `member_deactivated`. Earlier password
 	// resets of the member stay open; completing one ends the others.
-	// Recorded as `password.reset_issued`, without the link.
+	// Recorded as `password.reset_issued`, without the link. Needs a
+	// signed-in session: an API token is refused `session_required`, so a
+	// leaked token cannot take over a member's account.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -30820,7 +30859,8 @@ type ClientWithResponsesInterface interface {
 	// invitation's one-time link, as on invitation. What their
 	// deactivation revoked stays revoked: they sign in afresh and create
 	// new tokens. Reactivating a member who is not deactivated changes
-	// nothing.
+	// nothing. Needs a signed-in session: an API token is refused
+	// `session_required`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -32571,8 +32611,9 @@ type ClientWithResponsesInterface interface {
 	// project is refused `role_not_allowed`, naming it in `permission`;
 	// the same member and role twice `already_granted`; a deactivated
 	// member `member_deactivated`; an unknown member or role
-	// `invalid_grant`. Only a member grants: a project token never changes
-	// who has access.
+	// `invalid_grant`. Only a member grants, signed in: an API token, a
+	// project token or a personal one, is refused `session_required`, so a
+	// leaked token cannot leave behind access that outlives it.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -32591,8 +32632,9 @@ type ClientWithResponsesInterface interface {
 	// project is refused `role_not_allowed`, naming it in `permission`;
 	// the same member and role twice `already_granted`; a deactivated
 	// member `member_deactivated`; an unknown member or role
-	// `invalid_grant`. Only a member grants: a project token never changes
-	// who has access.
+	// `invalid_grant`. Only a member grants, signed in: an API token, a
+	// project token or a personal one, is refused `session_required`, so a
+	// leaked token cannot leave behind access that outlives it.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -52185,7 +52227,8 @@ func (c *ClientWithResponses) ListMembersWithResponse(ctx context.Context, param
 // once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 // request's origin when it is not set, followed by
 // `/invitations/<secret>`; it expires after seven days. An email the
-// instance holds, whatever its case, is refused `already_exists`.
+// instance holds, whatever its case, is refused `already_exists`. Needs
+// a signed-in session: an API token is refused `session_required`.
 //
 // The invitation may carry a `grant` of a built-in role in a project,
 // which accepting it makes by hand, in the name of the instance admin
@@ -52213,7 +52256,8 @@ func (c *ClientWithResponses) InviteMemberWithBodyWithResponse(ctx context.Conte
 // once and never again. The link is `FLAGNETIC_BASE_URL`, or this
 // request's origin when it is not set, followed by
 // `/invitations/<secret>`; it expires after seven days. An email the
-// instance holds, whatever its case, is refused `already_exists`.
+// instance holds, whatever its case, is refused `already_exists`. Needs
+// a signed-in session: an API token is refused `session_required`.
 //
 // The invitation may carry a `grant` of a built-in role in a project,
 // which accepting it makes by hand, in the name of the instance admin
@@ -52255,7 +52299,10 @@ func (c *ClientWithResponses) GetMemberWithResponse(ctx context.Context, member 
 // `last_instance_admin`, and demoting one an auth provider's group
 // mapping made `sso_sourced`: only the provider takes it away. Making a
 // member still invited an instance admin is refused `member_invited`:
-// they are made one once they have accepted their invitation.
+// they are made one once they have accepted their invitation. Needs a
+// signed-in session: an API token is refused `session_required`, so a
+// leaked token cannot promote a member, or change a member's email to
+// take their account over.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -52276,7 +52323,10 @@ func (c *ClientWithResponses) UpdateMemberWithBodyWithResponse(ctx context.Conte
 // `last_instance_admin`, and demoting one an auth provider's group
 // mapping made `sso_sourced`: only the provider takes it away. Making a
 // member still invited an instance admin is refused `member_invited`:
-// they are made one once they have accepted their invitation.
+// they are made one once they have accepted their invitation. Needs a
+// signed-in session: an API token is refused `session_required`, so a
+// leaked token cannot promote a member, or change a member's email to
+// take their account over.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -52361,7 +52411,8 @@ func (c *ClientWithResponses) UnlinkMemberIdentityWithResponse(ctx context.Conte
 // keeps the project and role of the one it replaces only while the
 // member who issued that one still holds `grant.manage` in the project;
 // otherwise it grants nothing, and the audit log records
-// `invitation.grant_revoked`.
+// `invitation.grant_revoked`. Needs a signed-in session: an API token is
+// refused `session_required`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -52382,7 +52433,9 @@ func (c *ClientWithResponses) ReissueInvitationWithResponse(ctx context.Context,
 // `member_not_active`: issue their invitation again instead. A
 // deactivated member is refused `member_deactivated`. Earlier password
 // resets of the member stay open; completing one ends the others.
-// Recorded as `password.reset_issued`, without the link.
+// Recorded as `password.reset_issued`, without the link. Needs a
+// signed-in session: an API token is refused `session_required`, so a
+// leaked token cannot take over a member's account.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -52402,7 +52455,8 @@ func (c *ClientWithResponses) IssuePasswordResetWithResponse(ctx context.Context
 // invitation's one-time link, as on invitation. What their
 // deactivation revoked stays revoked: they sign in afresh and create
 // new tokens. Reactivating a member who is not deactivated changes
-// nothing.
+// nothing. Needs a signed-in session: an API token is refused
+// `session_required`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -54825,8 +54879,9 @@ func (c *ClientWithResponses) ListGrantsWithResponse(ctx context.Context, projec
 // project is refused `role_not_allowed`, naming it in `permission`;
 // the same member and role twice `already_granted`; a deactivated
 // member `member_deactivated`; an unknown member or role
-// `invalid_grant`. Only a member grants: a project token never changes
-// who has access.
+// `invalid_grant`. Only a member grants, signed in: an API token, a
+// project token or a personal one, is refused `session_required`, so a
+// leaked token cannot leave behind access that outlives it.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -54851,8 +54906,9 @@ func (c *ClientWithResponses) CreateGrantWithBodyWithResponse(ctx context.Contex
 // project is refused `role_not_allowed`, naming it in `permission`;
 // the same member and role twice `already_granted`; a deactivated
 // member `member_deactivated`; an unknown member or role
-// `invalid_grant`. Only a member grants: a project token never changes
-// who has access.
+// `invalid_grant`. Only a member grants, signed in: an API token, a
+// project token or a personal one, is refused `session_required`, so a
+// leaked token cannot leave behind access that outlives it.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

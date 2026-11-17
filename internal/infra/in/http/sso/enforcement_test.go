@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/testkit"
@@ -19,15 +17,13 @@ import (
 // no other.
 type isolated struct {
 	env
-	pool *pgxpool.Pool
 }
 
 func startIsolated(t *testing.T) isolated {
 	t.Helper()
 	pool := testkit.FreshPool(t)
-	e := start(t, testkit.WithPool(pool))
-	e.admin = testkit.Client(t, e.srv, testkit.Bootstrap(t, pool))
-	return isolated{env: e, pool: pool}
+	e := startOn(t, pool)
+	return isolated{env: e}
 }
 
 // settingsWith returns the auth settings c reads, changed by change.
@@ -319,7 +315,7 @@ func TestAnInvitationToAnEnforcedDomainIsNotAcceptedWithAPassword(t *testing.T) 
 	enforce(t, e.admin, "corp.example", corp)
 	invite := func(email string) string {
 		t.Helper()
-		res, err := e.admin.InviteMemberWithResponse(t.Context(), management.MemberInvite{Email: email, DisplayName: "Carol"})
+		res, err := e.session(t).InviteMemberWithResponse(t.Context(), management.MemberInvite{Email: email, DisplayName: "Carol"})
 		if err != nil || res.JSON201 == nil || res.JSON201.Invitation == nil || res.JSON201.Invitation.Url == nil {
 			t.Fatalf("inviting %s = %v: %v", email, res.StatusCode(), err)
 		}
@@ -362,7 +358,7 @@ func TestAPasswordResetIsNoWayInForAnEnforcedDomain(t *testing.T) {
 	e := startIsolated(t)
 	corp := e.forged(t, idp, noFallback("corp.example"))
 	dave := testkit.NewMember(t, e.pool, testkit.WithEmail("dave@corp.example"))
-	issued, err := e.admin.IssuePasswordResetWithResponse(t.Context(), dave.ID.String())
+	issued, err := e.session(t).IssuePasswordResetWithResponse(t.Context(), dave.ID.String())
 	if err != nil || issued.JSON201 == nil {
 		t.Fatalf("issuing a reset = %v: %v", issued.StatusCode(), err)
 	}
@@ -398,7 +394,7 @@ func TestDisablingLocalLoginNeedsAnIdentityAndRefusesEveryPassword(t *testing.T)
 	wantRefused(t, "holding no identity", res.StatusCode(), res.Body, res.ApplicationproblemJSON422, http.StatusUnprocessableEntity, "identity_required", "")
 
 	e.link(t, idp, adminAt, corp, "sub-admin", nil)
-	invited, err := e.admin.InviteMemberWithResponse(t.Context(), management.MemberInvite{Email: "erin@example.com", DisplayName: "Erin"})
+	invited, err := e.session(t).InviteMemberWithResponse(t.Context(), management.MemberInvite{Email: "erin@example.com", DisplayName: "Erin"})
 	if err != nil || invited.JSON201 == nil || invited.JSON201.Invitation == nil || invited.JSON201.Invitation.Url == nil {
 		t.Fatalf("inviting = %v: %v", invited.StatusCode(), err)
 	}

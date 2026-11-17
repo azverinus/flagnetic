@@ -304,7 +304,7 @@ func TestASourceIsKnownForThirtyDaysAfterTheLastSignInFromIt(t *testing.T) {
 
 func TestAcceptingAnInvitationMakesItsSourceKnown(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithClock(testkit.Clock()), trustLoopback())
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	mi := invite(t, admin, "Ada Lovelace")
 	home := someAddress()
 	if res := accept(t, fromAddress(t, srv, home), *mi.Invitation.Url, newPassword); res.JSON200 == nil {

@@ -22,7 +22,7 @@ func (e env) inviteTo(t *testing.T, email, project, role string) (string, manage
 	if project != "" {
 		body.Grant = &management.InvitationGrantCreate{Project: project, Role: role}
 	}
-	res, err := e.admin.InviteMemberWithResponse(t.Context(), body)
+	res, err := e.session(t).InviteMemberWithResponse(t.Context(), body)
 	if err != nil || res.JSON201 == nil || res.JSON201.Invitation == nil || res.JSON201.Invitation.Url == nil {
 		t.Fatalf("inviting %s: %v, %d: %s", email, err, res.StatusCode(), res.Body)
 	}
@@ -186,7 +186,7 @@ func TestAnInvitedMemberLinkedAtAProviderIsActivatedSigningInThroughIt(t *testin
 	if d, err := e.admin.DisableAuthProviderWithResponse(t.Context(), slug); err != nil || d.StatusCode() != http.StatusOK {
 		t.Fatalf("disabling the provider: %v, %d: %s", err, d.StatusCode(), d.Body)
 	}
-	r, err := e.admin.ReactivateMemberWithResponse(t.Context(), member.String())
+	r, err := e.session(t).ReactivateMemberWithResponse(t.Context(), member.String())
 	if err != nil || r.JSON200 == nil || r.JSON200.Member.Status != management.MemberStatusInvited {
 		t.Fatalf("reactivating: %v, %d: %s", err, r.StatusCode(), r.Body)
 	}
