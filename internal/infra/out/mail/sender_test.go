@@ -142,6 +142,9 @@ func TestADisplayNameWithSpecialCharactersIsMailed(t *testing.T) {
 			if to[0].Address != "ada@example.com" {
 				t.Errorf("address = %q", to[0].Address)
 			}
+			if to[0].Name != name {
+				t.Errorf("name = %q, want %q", to[0].Name, name)
+			}
 		})
 	}
 }
