@@ -172,6 +172,11 @@ final class FlagneticClient {
   // experiments of the values held, and the call sends nothing rather than
   // the assignment of an experiment the platform no longer serves.
   final Map<String, Detail> _details = {};
+  // Whether the values held answer the current context. `setContext` clears
+  // it: until the new context's answer arrives the values keep serving, but
+  // their experiment blocks carry the previous context's unit IDs, and an
+  // exposure for them would record a unit that is not here.
+  bool _valuesAnswerContext = false;
   late final ExposureSuppressor _exposed = ExposureSuppressor(
     _options.exposureMemory,
   );
@@ -396,6 +401,7 @@ final class FlagneticClient {
       // The details held answer the previous context; an exposure reports
       // the detail of the context the flag was evaluated for.
       _details.clear();
+      _valuesAnswerContext = false;
       if (_values != null) {
         // The held values answer the previous context, so they are stale
         // from here: last good, not fresh. No attempt failed, so this is
@@ -563,7 +569,14 @@ final class FlagneticClient {
       }
       final detail = _details[key];
       if (detail == null) {
-        _skipped(key, _values == null ? 'no_values' : 'no_experiment');
+        _skipped(
+          key,
+          _values == null
+              ? 'no_values'
+              : !_valuesAnswerContext
+              ? 'previous_context'
+              : 'no_experiment',
+        );
         return;
       }
       _emitExposure(key, detail);
@@ -733,7 +746,7 @@ final class FlagneticClient {
       // included, so a flag no build evaluates any more is visible. Evaluation records no exposure of its own unless the
       // flag opted into automatic exposure.
       _summary.count(key, detail.variation, detail.reason);
-      if (detail.experiment == null) {
+      if (detail.experiment == null || !_valuesAnswerContext) {
         _details.remove(key);
       } else {
         _details[key] = detail;
@@ -852,6 +865,9 @@ final class FlagneticClient {
     }
     final changed = ValuesDocument.changedKeys(_values, doc);
     _values = doc;
+    // Set before the listeners run, so a getter they call already serves
+    // the new context's assignments.
+    _valuesAnswerContext = true;
     _receivedAt = DateTime.now().toUtc();
     _staleSince = null;
     _log(LogLevel.info, LogEvents.valuesLoaded, {
@@ -1205,6 +1221,7 @@ final class FlagneticClient {
       } when sameUnits(units.cast<String, String>(), _context.units)) {
         final doc = ValuesDocument.parse(values);
         _values = doc;
+        _valuesAnswerContext = true;
         _receivedAt = DateTime.parse(receivedAt).toUtc();
         _log(LogLevel.info, LogEvents.valuesLoaded, {
           'source': 'store',
