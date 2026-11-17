@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.5](https://github.com/azverinus/flagnetic/compare/sdks/js/v0.1.4...sdks/js/v0.1.5) (2026-11-17)
+
+
+### Bug Fixes
+
+* **sdks:** bound stream lines, events, response bodies and the matched input ([#337](https://github.com/azverinus/flagnetic/issues/337)) ([695477d](https://github.com/azverinus/flagnetic/commit/695477d7d31700fe25b1458eefd315e733355b2a))
+* **sdks:** harden the smaller SDK findings ([#353](https://github.com/azverinus/flagnetic/issues/353)) ([dfa56a4](https://github.com/azverinus/flagnetic/commit/dfa56a4bbbebb92c97d1f63810130c0ec2c45b0b))
+* **sdks:** record no exposure for the previous context's values ([#345](https://github.com/azverinus/flagnetic/issues/345)) ([b2a0899](https://github.com/azverinus/flagnetic/commit/b2a089971ebeaac8429b8b603dd519787fa62825))
+
+
+### Dependencies
+
+* **sdk-js:** Bump the sdk-js group in /sdks/js with 4 updates ([#354](https://github.com/azverinus/flagnetic/issues/354)) ([ada171a](https://github.com/azverinus/flagnetic/commit/ada171aa629ce4a389aaa53626f380073beb1569))
+
 ## [0.1.4](https://github.com/azverinus/flagnetic/compare/sdks/js/v0.1.3...sdks/js/v0.1.4) (2026-11-16)
 
 
