@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/identity"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
@@ -203,4 +204,28 @@ func sameSet(a, b []identity.MemberID) bool {
 		}
 	}
 	return true
+}
+
+// A directory writes a whole group in one request, so a group of tens of
+// thousands of members is patched and compared in time linear in its size:
+// the quadratic version of any of these takes a minute.
+func TestAHugeGroupIsPatchedAndComparedInLinearTime(t *testing.T) {
+	const size = 30000
+	m := memberIDs(size)
+	started := time.Now()
+	base := identity.GroupState{DisplayName: "eng"}
+	added, err := identity.ApplyGroupPatch(base, uuidOf(m[0]), []identity.PatchOperation{{Op: "add", Path: "members", Value: refs(m...)}})
+	if err != nil || len(added.Members) != size {
+		t.Fatalf("adding %d members = %d, %v", size, len(added.Members), err)
+	}
+	removed, err := identity.ApplyGroupPatch(added, uuidOf(m[0]), []identity.PatchOperation{{Op: "remove", Path: "members", Value: refs(m[:size/2]...)}})
+	if err != nil || len(removed.Members) != size/2 || removed.Members[0] != m[size/2] {
+		t.Fatalf("removing half = %d members, %v", len(removed.Members), err)
+	}
+	if got := identity.TouchedMembers(added, removed); len(got) != size/2 {
+		t.Errorf("touched = %d members, want %d", len(got), size/2)
+	}
+	if elapsed := time.Since(started); elapsed > 5*time.Second {
+		t.Errorf("patching and comparing %d members took %s, want it linear", size, elapsed)
+	}
 }

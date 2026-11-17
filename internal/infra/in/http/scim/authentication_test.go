@@ -171,8 +171,8 @@ func TestUnknownPathsAndMethodsAreSCIMErrorsAndABodyHasABound(t *testing.T) {
 		t.Errorf("Allow = %q, want GET", allow)
 	}
 
-	big := `{"userName":"` + email("example.com") + `","displayName":"` + strings.Repeat("x", 70<<10) + `"}`
-	assertScimError(t, "a body over 64 KiB", e.call(t, token, http.MethodPost, "/Users", big), http.StatusRequestEntityTooLarge, "")
+	big := `{"userName":"` + email("example.com") + `","displayName":"` + strings.Repeat("x", 1100<<10) + `"}`
+	assertScimError(t, "a body over 1 MiB", e.call(t, token, http.MethodPost, "/Users", big), http.StatusRequestEntityTooLarge, "")
 	assertScimError(t, "a body that is not JSON", e.call(t, token, http.MethodPost, "/Users", `{"userName":`), http.StatusBadRequest, "invalidSyntax")
 	assertScimError(t, "an id that is none", e.call(t, token, http.MethodGet, "/Users/not-a-uuid", ""), http.StatusNotFound, "")
 }

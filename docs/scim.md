@@ -45,7 +45,7 @@ Okta deactivates a user with a patch that has no path (`{"op": "replace", "value
 
 ## Users
 
-`/scim/v2/Users` answers `application/scim+json` and errors as RFC 7644 §3.12 describes them: `schemas`, `status` as a string, `detail`, and a `scimType` where the RFC names one (`invalidFilter`, `invalidSyntax`, `invalidValue`, `mutability`, `uniqueness`, `noTarget`). Bodies are at most 64 KiB (`413`). A User is:
+`/scim/v2/Users` answers `application/scim+json` and errors as RFC 7644 §3.12 describes them: `schemas`, `status` as a string, `detail`, and a `scimType` where the RFC names one (`invalidFilter`, `invalidSyntax`, `invalidValue`, `mutability`, `uniqueness`, `noTarget`). Bodies are at most 1 MiB (`413`), which holds a group of some twenty thousand members. A User is:
 
 | Attribute | Meaning |
 |---|---|
