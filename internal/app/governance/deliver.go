@@ -97,7 +97,7 @@ type Sender interface {
 
 // Opener opens a value sealed under the instance's secret key.
 type Opener interface {
-	Open(purpose secret.Purpose, sealed string) ([]byte, error)
+	Open(purpose secret.Purpose, sealed string, binding secret.Binding) ([]byte, error)
 }
 
 // deliveryBatch bounds the deliveries one claim leases. A round claims
@@ -216,7 +216,7 @@ func (h *Deliver) Attempt(ctx context.Context, token LeaseToken, delivery govern
 	}
 	secrets := make([]string, len(l.SealedSecrets))
 	for i, sealed := range l.SealedSecrets {
-		value, openErr := h.d.Opener.Open(secret.PurposeWebhookSecret, sealed)
+		value, openErr := h.d.Opener.Open(secret.PurposeWebhookSecret, sealed, webhookSecretBinding(l.Delivery.Webhook))
 		if openErr != nil {
 			// The lease runs out and another round tries again: a key the
 			// operator restores lets it through.

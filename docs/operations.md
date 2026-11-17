@@ -46,6 +46,8 @@ With `FLAGNETIC_AUTO_MIGRATE=false`, `serve` compares the database's schema with
 
 **Keep the key for the life of the instance.** On its first start the instance stores a canary, a random value sealed under the key, and every replica opens it on every start. A replica given another key cannot open it and refuses to start, exit code 1, with a message naming `FLAGNETIC_SECRET_KEY`: a mistyped or rotated key stops the deploy instead of silently losing what the instance sealed. Start it again with the original key.
 
+Each sealed secret is also bound to the row that holds it (an SMTP password to the instance's SMTP settings, a webhook secret to its subscription, and so on), so a value copied into another row does not open there. Values sealed by an earlier version carry no such binding and keep opening; each is sealed again, bound, the next time its row is stored with it: an edit of the SMTP settings, an auth provider or a sink, enabling a sink, or rotating a secret or a certificate. A SCIM token is never written again and keeps its earlier form until it expires or is revoked.
+
 ## The first instance admin
 
 A fresh instance has no one who can sign in. `flagnetic admin bootstrap` creates the first instance admin, with a password and an API token, from the command line and the database's own configuration:
@@ -336,7 +338,7 @@ A webhook subscription's target is `https` on the public internet. A target over
 
 ## Metrics
 
-Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNETIC_METRICS_LISTEN_ADDR` (`:9090` by default), and never on the public listener. Keep the port inside your network. Setting the address empty switches metrics off and opens no port.
+Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNETIC_METRICS_LISTEN_ADDR` (`127.0.0.1:9090` by default, so only this host reaches it; the container image sets the variable to `:9090` and leaves what to publish to you; being a variable, it wins over `metrics_listen_addr` in a configuration file, so change it there with the variable), and never on the public listener. Keep the port inside your network. Setting the address empty switches metrics off and opens no port.
 
 | Metric | Labels | What it tells |
 |---|---|---|
@@ -379,7 +381,7 @@ Worth an alert: `flagnetic_listener_up` at 0 for more than a minute, which leave
 
 Logs go to standard error, one JSON object per line by default (`FLAGNETIC_LOG_FORMAT=text` for a terminal), at `FLAGNETIC_LOG_LEVEL`. Secrets are written as `[redacted]`, and `DATABASE_URL` is logged without its password.
 
-Every response carries an `X-Request-ID` header: the one the request came with when it is well formed (letters, digits and `._:-`, at most 128 characters), otherwise a new one. Every log line written while serving a request carries it as `request_id`, together with the matched `route`, so one request's lines can be found together.
+Every response carries an `X-Request-ID` header: the one the request came with when it is well formed (letters, digits and `._:-`, at most 128 characters), otherwise a new one. The ID is therefore chosen by the caller when it is well formed: it traces a request through the proxies in front, but is no proof of who made it, so rely on an audit entry's actor, never on its `request_id`, to know that. Every log line written while serving a request carries it as `request_id`, together with the matched `route`, so one request's lines can be found together.
 
 Each request is logged once when it completes, as a `request` record with `method`, `route` (the matched route pattern, or `unmatched`), `path`, `status`, `duration`, `bytes` and `client_ip` (see [behind a reverse proxy](#behind-a-reverse-proxy)). `/healthz` and `/readyz` are left out. An unexpected error is answered with a bare `internal` problem and logged at error with its cause under the same request ID, so a client can report the ID and you can find the cause. A request whose client went away before it was answered (a browser navigating away, say) is logged with `status` 499 and its cause only at debug, as `request canceled by the client`: it is not a failure, so it never shows as a 500. A request that ran past a deadline of the server's, or that the replica ended when it stopped (see [stopping](#stopping)), is still a 500 logged at error.
 

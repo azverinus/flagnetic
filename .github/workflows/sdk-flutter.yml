@@ -25,8 +25,8 @@ jobs:
       run:
         working-directory: sdks/flutter
     steps:
-      - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           flutter-version: ${{ matrix.flutter }}
@@ -55,7 +55,7 @@ jobs:
       run:
         working-directory: sdks/flutter
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Is flagnetic on pub.dev
         id: core
         run: |
@@ -68,7 +68,7 @@ jobs:
               ;;
             *) echo "pub.dev answered $status" >&2; exit 1 ;;
           esac
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         if: steps.core.outputs.released == 'true'
         with:
           channel: stable

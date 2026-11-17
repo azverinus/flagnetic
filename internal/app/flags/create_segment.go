@@ -32,6 +32,8 @@ func declarationsOf(ctx context.Context, d Declarations, project workspace.Proje
 type SegmentCreator interface {
 	// CreateSegment refuses a key the project uses as already_exists.
 	CreateSegment(ctx context.Context, s flags.Segment) error
+	// CountSegments returns how many segments project holds.
+	CountSegments(ctx context.Context, project workspace.ProjectID) (int, error)
 }
 
 // CreateSegmentDeps are what CreateSegment runs on.
@@ -68,6 +70,13 @@ func (h *CreateSegment) Handle(ctx context.Context, cmd CreateSegmentCommand) (f
 	var s flags.Segment
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		if err := lockProject(ctx, h.d.Projects, cmd.Project); err != nil {
+			return err
+		}
+		existing, err := h.d.Store.CountSegments(ctx, cmd.Project)
+		if err != nil {
+			return err
+		}
+		if err = flags.CheckSegmentCount(existing); err != nil {
 			return err
 		}
 		decl, err := declarationsOf(ctx, h.d.Declarations, cmd.Project)

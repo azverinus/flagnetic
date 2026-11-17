@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/flutter/v0.1.1...sdks/flutter/v0.1.2) (2026-11-17)
+
+
+### Bug Fixes
+
+* **sdks:** harden the smaller SDK findings ([#353](https://github.com/azverinus/flagnetic/issues/353)) ([dfa56a4](https://github.com/azverinus/flagnetic/commit/dfa56a4bbbebb92c97d1f63810130c0ec2c45b0b))
+
 ## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/flutter/v0.1.0...sdks/flutter/v0.1.1) (2026-11-11)
 
 

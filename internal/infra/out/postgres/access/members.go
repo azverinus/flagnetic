@@ -10,6 +10,7 @@ import (
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
@@ -115,6 +116,35 @@ func (s *Store) MemberEmails(ctx context.Context, members []access.MemberID) (ma
 		)
 		if err := rows.Scan(&memberID, &email); err != nil {
 			return nil, fmt.Errorf("reading the emails of members: %w", err)
+		}
+		out[id.FromBytes[access.Member](memberID)] = email
+	}
+	return out, rows.Err()
+}
+
+// ProjectMemberEmails returns the email address of each of members that
+// holds a grant in project; any other member is absent.
+func (s *Store) ProjectMemberEmails(ctx context.Context, project workspace.ProjectID, members []access.MemberID) (map[access.MemberID]string, error) {
+	ids := make([][16]byte, len(members))
+	for i, m := range members {
+		ids[i] = m.Bytes()
+	}
+	rows, err := s.db(ctx).Query(ctx, `
+		SELECT m.id, m.email FROM members m
+		WHERE m.id = ANY ($1)
+		  AND EXISTS (SELECT 1 FROM grants g WHERE g.member_id = m.id AND g.project_id = $2)`, ids, project.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("reading the emails of a project's members: %w", err)
+	}
+	defer rows.Close()
+	out := make(map[access.MemberID]string, len(members))
+	for rows.Next() {
+		var (
+			memberID [16]byte
+			email    string
+		)
+		if err := rows.Scan(&memberID, &email); err != nil {
+			return nil, fmt.Errorf("reading the emails of a project's members: %w", err)
 		}
 		out[id.FromBytes[access.Member](memberID)] = email
 	}

@@ -261,6 +261,10 @@ func (c *check) variations(typ Type, given *[]VariationInput) []Variation {
 		c.add("/variations", "invalid_value", "a flag has at least one variation", map[string]any{"min": 1})
 		return nil
 	}
+	if len(in) > maxVariations {
+		c.add("/variations", "too_many", "a flag has at most 50 variations", map[string]any{"max": maxVariations})
+		return nil
+	}
 	out := make([]Variation, 0, len(in))
 	seen := map[string]bool{}
 	for i, v := range in {
@@ -320,6 +324,13 @@ func (c *check) value(pointer string, typ Type, raw json.RawMessage) json.RawMes
 		c.add(pointer, "too_deep", "a variation's value nests arrays and objects at most 32 deep", map[string]any{"max": maxValueDepth})
 		return nil
 	}
+	if hasNonFiniteNumber(compact.Bytes()) {
+		// 1e999 is valid JSON and has no finite float64: each SDK would
+		// read it as infinity or refuse the whole ruleset, a different
+		// answer in every language.
+		c.add(pointer, "invalid_value", "a number in a value fits a 64-bit float, which 1e999 does not", nil)
+		return nil
+	}
 	first := compact.Bytes()[0]
 	var ok bool
 	switch typ {
@@ -337,6 +348,24 @@ func (c *check) value(pointer string, typ Type, raw json.RawMessage) json.RawMes
 		return nil
 	}
 	return compact.Bytes()
+}
+
+// hasNonFiniteNumber reports whether doc, valid JSON, holds a number that is
+// no finite 64-bit float, at any depth.
+func hasNonFiniteNumber(doc []byte) bool {
+	dec := json.NewDecoder(bytes.NewReader(doc))
+	dec.UseNumber()
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return false
+		}
+		if n, ok := tok.(json.Number); ok {
+			if _, err := strconv.ParseFloat(n.String(), 64); err != nil {
+				return true
+			}
+		}
+	}
 }
 
 // jsonDepth returns how deep doc, valid JSON, nests arrays and objects: 0

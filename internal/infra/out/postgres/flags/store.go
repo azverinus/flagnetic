@@ -179,6 +179,13 @@ func (s *Store) DeleteFlag(ctx context.Context, flag flags.FlagID) error {
 	return err
 }
 
+// CountFlags returns how many flags project holds, archived ones included.
+func (s *Store) CountFlags(ctx context.Context, project workspace.ProjectID) (int, error) {
+	var n int
+	err := s.db(ctx).QueryRow(ctx, `SELECT count(*) FROM flags WHERE project_id = $1`, project.Bytes()).Scan(&n)
+	return n, err
+}
+
 // ProjectFlags returns every flag of project, archived ones included.
 func (s *Store) ProjectFlags(ctx context.Context, project workspace.ProjectID) ([]flags.Flag, error) {
 	return s.flags(ctx, `SELECT `+flagColumns+` FROM flags WHERE project_id = $1 ORDER BY key COLLATE "C"`, project.Bytes())

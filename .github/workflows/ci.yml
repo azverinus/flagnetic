@@ -28,12 +28,12 @@ jobs:
     if: needs.plan.outputs.server == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
           cache: false
-      - uses: golangci/golangci-lint-action@v9
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.14.0
 
@@ -68,8 +68,8 @@ jobs:
     env:
       DATABASE_URL: postgres://flagnetic:flagnetic@localhost:5432/flagnetic?sslmode=disable
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
       - name: Test with the race detector
@@ -83,7 +83,7 @@ jobs:
       # One PostgreSQL is enough for coverage: the first of the plan's list.
       - name: Keep the coverage profile
         if: needs.plan.outputs.cover_packages != '' && matrix.postgres == fromJSON(needs.plan.outputs.postgres)[0]
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: coverage-${{ matrix.shard.id }}
           path: coverage.out
@@ -100,11 +100,11 @@ jobs:
     if: needs.plan.outputs.cover_packages != ''
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: coverage-*
           path: profiles
@@ -131,8 +131,8 @@ jobs:
     if: needs.plan.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
       - name: Scan reachable code
@@ -154,11 +154,11 @@ jobs:
       run:
         working-directory: ${{ matrix.dir }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
         with:
           package_json_file: ${{ matrix.dir }}/package.json
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
       - name: No high or critical advisories
@@ -170,8 +170,8 @@ jobs:
     if: needs.plan.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
       - name: go.mod is tidy
@@ -193,11 +193,11 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
         with:
           package_json_file: web/package.json
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           cache: pnpm
@@ -252,10 +252,10 @@ jobs:
       cover_packages: ${{ steps.plan.outputs.cover_packages }}
       postgres: ${{ steps.plan.outputs.postgres }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
       - id: plan
@@ -328,14 +328,14 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
         with:
           package_json_file: web/package.json
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           cache: pnpm
@@ -350,7 +350,7 @@ jobs:
         run: pnpm --filter @flagnetic/e2e exec playwright test --shard="$SHARD/3"
       - name: Keep the report
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-report-${{ matrix.shard }}
           path: web/e2e/playwright-report
@@ -380,8 +380,8 @@ jobs:
     if: needs.plan.outputs.workflows == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
       - name: Lint the workflows
@@ -395,10 +395,10 @@ jobs:
     if: needs.plan.outputs.docker == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
       - name: Build the image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           file: deploy/Dockerfile
@@ -431,8 +431,8 @@ jobs:
       run:
         working-directory: ${{ matrix.dir }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version: ${{ matrix.go }}
           cache-dependency-path: ${{ matrix.dir }}/go.mod
@@ -457,7 +457,7 @@ jobs:
           cat "$GOWORK"
       - name: go.mod is tidy
         run: '"$GITHUB_WORKSPACE/.github/scripts/check-tidy.sh" .'
-      - uses: golangci/golangci-lint-action@v9
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.14.0
           working-directory: ${{ matrix.dir }}
@@ -522,10 +522,10 @@ jobs:
     env:
       GOWORK: "off"
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version: oldstable
           cache-dependency-path: ${{ matrix.dir }}/go.mod
@@ -568,8 +568,8 @@ jobs:
       SDK_PYTHON: ${{ needs.plan.outputs.sdk_python }}
       SDK_DART: ${{ needs.plan.outputs.dart }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
           cache-dependency-path: |
@@ -577,7 +577,7 @@ jobs:
             e2e/go.sum
       - name: go.mod is tidy
         run: .github/scripts/check-tidy.sh e2e
-      - uses: golangci/golangci-lint-action@v9
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.14.0
           working-directory: e2e
@@ -588,7 +588,7 @@ jobs:
       - name: Run the harness and the Go SDK against two replicas
         working-directory: e2e
         run: go test -count=1 -v ./...
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1
         if: env.RUBY_SMOKE == 'true'
         with:
           ruby-version: "4.0"
@@ -628,11 +628,11 @@ jobs:
           done
           cat "$RUNNER_TEMP/up.log"
           exit 1
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
         if: env.SDK_JS == 'true'
         with:
           package_json_file: sdks/js/package.json
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         if: env.SDK_JS == 'true'
         with:
           node-version: 24
@@ -660,11 +660,11 @@ jobs:
             # starts with escape sequences.
             grep -o '{"sdk":"flagnetic-js","kill_switch_ms":-\?[0-9]*}' "$RUNNER_TEMP/smoke.log"
           } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         if: env.SDK_PYTHON == 'true'
         with:
           python-version: 3.x
-      - uses: astral-sh/setup-uv@v10.3.3
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         if: env.SDK_PYTHON == 'true'
       # Its own `up`, seeded again with new keys: the smokes before it end
       # by revoking theirs. The smoke writes its kill-switch line to the job
@@ -687,7 +687,7 @@ jobs:
           cd sdks/python
           uv sync --locked --python "$(command -v python)"
           uv run pytest e2e || { cat "$RUNNER_TEMP/up-python.log"; exit 1; }
-      - uses: dart-lang/setup-dart@v1
+      - uses: dart-lang/setup-dart@2286a0c042b44434fe26d292bbce8d34f7ec662b # v1
         if: env.SDK_DART == 'true'
         with:
           sdk: stable
@@ -715,7 +715,7 @@ jobs:
           dart test -r expanded test/e2e_test.dart || { cat "$RUNNER_TEMP/up-dart.log"; exit 1; }
       - name: Keep the replicas' log
         if: failure() && (env.SDK_JS == 'true' || env.SDK_PYTHON == 'true' || env.SDK_DART == 'true')
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: sdk-e2e-replicas
           path: |
@@ -757,7 +757,7 @@ jobs:
     if: needs.plan.outputs.migrations == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - name: Install squawk

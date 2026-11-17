@@ -148,7 +148,7 @@ func TestTheClientSecretIsSealedAndAnEditKeepsItUnlessItNamesANewOne(t *testing.
 		if strings.Contains(p.OIDC.SealedClientSecret, *body.ClientSecret) {
 			t.Fatal("the stored secret is not sealed")
 		}
-		plain, err := keyring.Open(secret.PurposeOIDCClientSecret, p.OIDC.SealedClientSecret)
+		plain, err := keyring.Open(secret.PurposeOIDCClientSecret, p.OIDC.SealedClientSecret, secret.Row("auth_providers", p.ID.String()))
 		if err != nil {
 			t.Fatal(err)
 		}

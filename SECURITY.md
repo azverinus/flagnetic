@@ -8,7 +8,7 @@ Include what you found, how to reproduce it, the version or commit, and the impa
 
 ## Supported versions
 
-Until 1.0, fixes go to `main` and the latest release only, currently 0.4. From 1.0, the latest minor release is supported: fixes, security fixes included, ship in the next patch or minor release from `main`, with no release branches. See [Compatibility and support](docs/compatibility.md#support).
+Until 1.0, fixes go to `main` and the latest release only, currently 0.5. From 1.0, the latest minor release is supported: fixes, security fixes included, ship in the next patch or minor release from `main`, with no release branches. See [Compatibility and support](docs/compatibility.md#support).
 
 ## Scope
 

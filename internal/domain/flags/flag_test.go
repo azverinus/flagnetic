@@ -3,6 +3,7 @@ package flags_test
 import (
 	"encoding/json"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -121,6 +122,8 @@ func TestVariationsAreTypedByTheFlagType(t *testing.T) {
 		"a number":             {flags.TypeNumber, `3`},
 		"a negative fraction":  {flags.TypeNumber, `-0.25`},
 		"an exponent":          {flags.TypeNumber, `1e3`},
+		"the largest float":    {flags.TypeNumber, `1.7976931348623157e308`},
+		"a vanishing exponent": {flags.TypeNumber, `1e-999`},
 		"an object":            {flags.TypeJSON, `{"b":[1,2],"a":null}`},
 		"an array":             {flags.TypeJSON, `[]`},
 		"a JSON string":        {flags.TypeJSON, `"s"`},
@@ -145,6 +148,9 @@ func TestVariationsAreTypedByTheFlagType(t *testing.T) {
 		"JSON given null":          {flags.TypeJSON, `null`, "/variations/0/value invalid_value"},
 		"malformed JSON":           {flags.TypeJSON, `{`, "/variations/0/value invalid_value"},
 		"over 64 KiB":              {flags.TypeJSON, `"` + strings.Repeat("x", 64*1024-1) + `"`, "/variations/0/value too_long"},
+		"a number past a float":    {flags.TypeNumber, `1e999`, "/variations/0/value invalid_value"},
+		"a negative past a float":  {flags.TypeNumber, `-1e999`, "/variations/0/value invalid_value"},
+		"a number nested in JSON":  {flags.TypeJSON, `{"a":[1,1e400]}`, "/variations/0/value invalid_value"},
 		"33 levels deep": {flags.TypeJSON, strings.Repeat(`{"a":[`, 16) + `[1]` + strings.Repeat(`]}`, 16),
 			"/variations/0/value too_deep"},
 	} {
@@ -161,6 +167,7 @@ func TestVariationsAreTypedByTheFlagType(t *testing.T) {
 		"empty":           {input("f", flags.TypeString, []flags.VariationInput{}...), []string{"/variations invalid_value"}},
 		"duplicate keys":  {input("f", flags.TypeString, variation("a", `"x"`), variation("a", `"y"`)), []string{"/variations/1/key duplicate"}},
 		"a key's pattern": {input("f", flags.TypeString, variation("a b", `"x"`)), []string{"/variations/0/key invalid_key"}},
+		"51 variations":   {input("f", flags.TypeString, fiftyOneVariations()...), []string{"/variations too_many"}},
 		"a long key":      {input("f", flags.TypeString, variation(strings.Repeat("k", 65), `"x"`)), []string{"/variations/0/key invalid_key"}},
 	} {
 		if name == "empty" {
@@ -401,5 +408,34 @@ func TestArchivingHidesAFlagUntilItIsRestoredAndOnlyAnArchivedFlagIsDeleted(t *t
 	}
 	if _, twice := restored.Restore(later); twice {
 		t.Error("restoring an active flag changed it")
+	}
+}
+
+func fiftyOneVariations() []flags.VariationInput {
+	out := make([]flags.VariationInput, 51)
+	for i := range out {
+		out[i] = variation("v"+strconv.Itoa(i), `"x"`)
+	}
+	return out
+}
+
+func TestAFlagHoldsFiftyVariations(t *testing.T) {
+	if _, err := flags.NewFlag(input("f", flags.TypeString, fiftyOneVariations()[:50]...)); err != nil {
+		t.Errorf("50 variations: %v", err)
+	}
+}
+
+func TestAProjectHoldsAtMostAsManyFlagsAndSegmentsAsTheLimits(t *testing.T) {
+	if err := flags.CheckFlagCount(flags.MaxFlags - 1); err != nil {
+		t.Errorf("one below the flag limit: %v", err)
+	}
+	if got := violations(t, flags.CheckFlagCount(flags.MaxFlags)); !slices.Equal(got, []string{"/key too_many"}) {
+		t.Errorf("at the flag limit: violations = %v", got)
+	}
+	if err := flags.CheckSegmentCount(flags.MaxSegments - 1); err != nil {
+		t.Errorf("one below the segment limit: %v", err)
+	}
+	if got := segmentViolations(t, flags.CheckSegmentCount(flags.MaxSegments)); !slices.Equal(got, []string{"/key too_many"}) {
+		t.Errorf("at the segment limit: violations = %v", got)
 	}
 }
