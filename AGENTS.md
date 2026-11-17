@@ -27,6 +27,7 @@ Requires Go (the toolchain in `go.mod` is fetched automatically), Docker for Pos
 
 - **Layers.** `internal/domain` is plain Go: no `pgx`, no `net/http`, no I/O, no clock reads. `internal/app` holds one handler per use case and declares its ports as interfaces. Adapters live in `internal/infra`. `task lint` enforces the import rules; do not silence it.
 - **Contracts first.** API changes start in `api/*.yaml`; regenerate (`task generate`) and commit the generated code. Once an SDK is released, the SDK protocol and ruleset format change only additively.
+- **Migrations are expand/contract.** Never rename or drop what the previous minor uses; add the new shape, write both, and drop the old one one minor after the code stops using it. squawk lints each added migration; an exception is a `-- squawk-ignore <rule>` line with its reason on the line before.
 - **Evaluation changes start as a conformance fixture** in `conformance/fixtures`; every evaluator must pass it.
 - **Tests go through the highest seam that shows the behaviour**: domain unit tests for rules, real PostgreSQL for repositories and handlers, the generated client for HTTP. Never fake a repository; never read tables in a test.
 - **Exposure is an explicit call.** Evaluation never records one.

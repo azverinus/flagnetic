@@ -58,6 +58,9 @@ RE_DART='^(sdks/dart/|conformance/|api/sdk\.yaml$|docs/sdks/(behaviour-matrix|co
 RE_FLUTTER='^(sdks/dart/|sdks/flutter/|\.github/scripts/check-pub-package\.sh$|\.github/workflows/sdk-flutter\.yml$)'
 # What every published Go module is tested with besides its own sources.
 RE_MODULES='^(conformance/|api/sdk\.yaml$)'
+# The migration lint: the migrations it reads, its settings and the scripts and
+# fixtures that run and test it.
+RE_MIGRATIONS='^internal/infra/out/postgres/migrations/.*\.sql$|^\.squawk\.toml$|^\.github/scripts/(lint-migrations|install-squawk)\.sh$|^\.github/scripts/testdata/migration-lint/'
 RE_WORKFLOWS='^\.github/(workflows/|actionlint\.yaml$|scripts/check-ci-ok\.sh$)'
 
 # Merging the server's release pull request publishes the image, so it is
@@ -197,7 +200,7 @@ EOF
   CHANGED_ROOT_DIRS="$(printf '%s' "$CHANGED_ROOT_DIRS" | sort -u | sed '/^$/d')"
 
   ANY_GO=0; SERVER=0
-  RUN_CONSOLE=0; RUN_CONSOLE_E2E=0; RUN_SDK_JS=0; RUN_PYTHON=0; RUN_RUBY=0; RUN_DART=0; RUN_FLUTTER=0; RUN_WORKFLOWS=0
+  RUN_CONSOLE=0; RUN_CONSOLE_E2E=0; RUN_SDK_JS=0; RUN_PYTHON=0; RUN_RUBY=0; RUN_DART=0; RUN_FLUTTER=0; RUN_WORKFLOWS=0; RUN_MIGRATIONS=0
   changed "$RE_GO" && ANY_GO=1
   changed "$RE_SERVER" && SERVER=1
   [ -n "$CHANGED_ROOT_DIRS" ] && SERVER=1
@@ -210,6 +213,7 @@ EOF
   changed "$RE_DART" && RUN_DART=1
   changed "$RE_FLUTTER" && RUN_FLUTTER=1
   changed "$RE_WORKFLOWS" && RUN_WORKFLOWS=1
+  changed "$RE_MIGRATIONS" && RUN_MIGRATIONS=1
 
   # The server's packages that can see a change: those that changed and those
   # whose tests depend on one, in the server or in a module it imports (their
@@ -236,7 +240,7 @@ EOF
   if [ "$PLAN_MODE" = main ] && { [ "$SERVER" = 1 ] || [ "$RUN_CONSOLE" = 1 ]; }; then FULL=1; fi
   if [ "$FULL" = 1 ]; then
     ANY_GO=1; SERVER=1; WIDE=1
-    RUN_CONSOLE=1; RUN_CONSOLE_E2E=1; RUN_SDK_JS=1; RUN_PYTHON=1; RUN_RUBY=1; RUN_DART=1; RUN_FLUTTER=1; RUN_WORKFLOWS=1
+    RUN_CONSOLE=1; RUN_CONSOLE_E2E=1; RUN_SDK_JS=1; RUN_PYTHON=1; RUN_RUBY=1; RUN_DART=1; RUN_FLUTTER=1; RUN_WORKFLOWS=1; RUN_MIGRATIONS=1
   fi
 
   # The published Go modules (the end-to-end harness is published nowhere and
@@ -348,6 +352,7 @@ plan_print() {
   echo "dart=$(bool "$RUN_DART")"
   echo "flutter=$(bool "$RUN_FLUTTER")"
   echo "workflows=$(bool "$RUN_WORKFLOWS")"
+  echo "migrations=$(bool "$RUN_MIGRATIONS")"
   echo "modules=$modules"
   echo "test_shards=$shards"
   echo "cover_packages=$COVER_PKGS"

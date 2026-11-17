@@ -61,6 +61,15 @@ The repository holds several Go modules: the server at the root, and the modules
 
 The Python SDK in `sdks/python` is built and checked with [uv](https://docs.astral.sh/uv/) (it fetches the Python it needs): `uv sync`, then `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy` and `uv run pytest` in that directory, which CI runs on the oldest and the newest supported Python. Its regular expression engine takes case folding and Unicode classes from Go's tables; after a Go release that changes them, regenerate with `go run ./sdks/python/scripts/_unicode_tables > sdks/python/src/flagnetic/_eval/_re2/unicode_tables.py`, which CI compares.
 
+### Migrations
+
+From 1.0 a replica of 1.x runs correctly against the schema of 1.(x+1), because a rolling update migrates before the new replicas start while the old ones still serve. So every migration is expand/contract:
+
+- It may add (a table, a nullable column or one with a default, an index built `CONCURRENTLY` under `-- +goose NO TRANSACTION`), and it never renames or drops anything the previous minor reads or writes, nor tightens a constraint its writes could violate (`NOT NULL` without a default, a new unique or check constraint without `NOT VALID`).
+- To replace a column, one minor adds the new one and writes both; the next reads only the new one; the minor after drops the old one. A column or table the code stops using is dropped one minor after the code stops using it, never in the same release.
+- [squawk](https://github.com/sbdchd/squawk) lints every migration file a pull request adds (`.github/scripts/lint-migrations.sh`, settings in `.squawk.toml`, for PostgreSQL 16); migrations already released are not linted. CI runs it, and `task pr:check` runs it when the migrations change and reports it as not run when squawk is missing (`.github/scripts/install-squawk.sh <dir>` installs the pinned, checksum-verified release).
+- A deliberate exception is a squawk ignore comment on the line before the statement, with the reason on the line before that, for example `-- The column was never read by any release.` followed by `-- squawk-ignore ban-drop-column`. The lint fails an ignore that has no reason.
+
 ## Tests
 
 Every change comes with tests at the seam that shows the behaviour:
