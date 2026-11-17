@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/ruby-openfeature/v0.1.0...sdks/ruby-openfeature/v0.1.1) (2026-11-17)
+
+
+### Bug Fixes
+
+* **sdk-ruby:** back off from a stream closed before its first heartbeat ([#319](https://github.com/azverinus/flagnetic/issues/319)) ([51824cb](https://github.com/azverinus/flagnetic/commit/51824cb66f2e4aa41f1d15f4864935844a94a664))
+
 ## 0.1.0 (2026-10-28)
 
 

@@ -113,6 +113,13 @@ func (s *Store) SegmentByKey(ctx context.Context, project workspace.ProjectID, k
 	return seg, nil
 }
 
+// CountSegments returns how many segments project holds.
+func (s *Store) CountSegments(ctx context.Context, project workspace.ProjectID) (int, error) {
+	var n int
+	err := s.db(ctx).QueryRow(ctx, `SELECT count(*) FROM segments WHERE project_id = $1`, project.Bytes()).Scan(&n)
+	return n, err
+}
+
 // Segments returns project's segments by key.
 func (s *Store) Segments(ctx context.Context, project workspace.ProjectID) ([]flags.Segment, error) {
 	rows, err := s.db(ctx).Query(ctx, `SELECT `+segmentColumns+` FROM segments WHERE project_id = $1 ORDER BY key COLLATE "C"`,

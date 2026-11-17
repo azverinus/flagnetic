@@ -62,6 +62,11 @@ type Experiments interface {
 type Members interface {
 	// MemberEmails returns the email address of each of members that exists.
 	MemberEmails(ctx context.Context, members []access.MemberID) (map[access.MemberID]string, error)
+	// ProjectMemberEmails returns the email address of each of members that
+	// holds a grant in project, which is the set of addresses anyone who can
+	// read the project already sees among its members; any other member is
+	// absent.
+	ProjectMemberEmails(ctx context.Context, project workspace.ProjectID, members []access.MemberID) (map[access.MemberID]string, error)
 }
 
 // History tells how far a project's history has come, which the audit log

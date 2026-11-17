@@ -212,3 +212,13 @@ func (i defaultIDs) Environment() workspace.EnvironmentID {
 }
 func (i defaultIDs) UnitType() workspace.UnitTypeID   { return id.New[workspace.UnitType](i.src) }
 func (i defaultIDs) Attribute() workspace.AttributeID { return id.New[workspace.Attribute](i.src) }
+
+func TestAProjectHasAtMostTwentyEnvironments(t *testing.T) {
+	if err := workspace.CheckEnvironmentCount(workspace.MaxEnvironments - 1); err != nil {
+		t.Errorf("one below the limit: %v", err)
+	}
+	code, pointer, v := violation(workspace.CheckEnvironmentCount(workspace.MaxEnvironments))
+	if code != "invalid_environment" || pointer != "/key" || v != "too_many" {
+		t.Errorf("at the limit = %s %s %s, want invalid_environment /key too_many", code, pointer, v)
+	}
+}

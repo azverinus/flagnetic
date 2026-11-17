@@ -11,12 +11,13 @@ import (
 type DeclarationReferenceFinder interface {
 	// DeclarationReferences returns the segments whose conditions name the
 	// declaration key, then one reference per flag and environment whose
-	// rules, rollouts or overrides name it, archived flags included.
+	// rules, rollouts or overrides name it, archived flags included, then
+	// the draft and running experiments assigning units of it.
 	DeclarationReferences(ctx context.Context, project workspace.ProjectID, key string) ([]flags.Reference, error)
 }
 
-// DeclarationGuard keeps every rule, rollout, override and segment naming a
-// declared unit type or attribute: the workspace context asks it before
+// DeclarationGuard keeps every rule, rollout, override, segment and draft or
+// running experiment naming a declared unit type or attribute: the workspace context asks it before
 // deleting one.
 type DeclarationGuard struct{ store DeclarationReferenceFinder }
 

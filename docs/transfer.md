@@ -81,7 +81,7 @@ A condition is written as the management API writes it:
 | Field | Meaning |
 |---|---|
 | `key`, `type`, `name`, `description` | `type` is `boolean`, `string`, `number` or `json`, and never changes once the flag exists (`type_immutable`). |
-| `owner` | The owner's email address. Optional. See [Owners](#protection-owners-and-permissions). |
+| `owner` | The owner's email address. Optional; an export writes `""` for an owner who holds no grant in the project (an instance admin without one, a former member). See [Owners](#protection-owners-and-permissions). |
 | `tags` | A list of strings. |
 | `lifetime`, `expected_removal_at` | `permanent` or `temporary`; a temporary flag's expected removal instant (RFC 3339), `null` otherwise. |
 | `automatic_exposure` | Whether the SDK records an exposure on evaluation. |
@@ -190,7 +190,7 @@ Two exports of an unchanged project are the same bytes, so a diff shows only rea
 
 ## What never travels
 
-Members and their grants, roles, tokens and SDK keys, webhook subscriptions and sinks, change requests, scheduled changes, the audit log, discovered attributes, events (exposures, aliases, summaries) and the authors of overrides. A document carries no credentials and no personal history; owners are exported as email addresses and nothing else about a person.
+Members and their grants, roles, tokens and SDK keys, webhook subscriptions and sinks, change requests, scheduled changes, the audit log, discovered attributes, events (exposures, aliases, summaries) and the authors of overrides. A document carries no credentials and no personal history; owners are exported as email addresses, only for owners who hold a grant in the project (the members `GET /projects/{project}/members` already lists to the same readers), and nothing else about a person.
 
 ## The compatibility promise
 
