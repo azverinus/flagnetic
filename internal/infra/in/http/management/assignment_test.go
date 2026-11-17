@@ -193,3 +193,17 @@ func TestTheUniformityCheckTakesTheLargestList(t *testing.T) {
 	res = hashCheck(t, f.admin, f.project.Key, management.HashCheckRequest{UnitIds: append(ids, "one-more")})
 	assertProblem(t, "200,001 unit IDs", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid_uniformity_check")
 }
+
+// A list past the bound is refused as a violation, however small its entries,
+// and a body past what the largest list needs is refused as too large.
+func TestTheUniformityCheckRefusesAnOversizedBody(t *testing.T) {
+	f := startExperiments(t)
+	send := func(entries int) *management.CheckHashUniformityResponse {
+		body := `{"unit_ids":[` + strings.Repeat(`"",`, entries) + `"x"]}`
+		return do(f.admin.CheckHashUniformityWithBodyWithResponse(t.Context(), f.project.Key, "application/json", strings.NewReader(body)))
+	}
+	res := send(300_000)
+	assertProblem(t, "300,001 unit IDs", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid_uniformity_check")
+	res = send(20_000_000)
+	assertProblem(t, "a 60 MB body", res.StatusCode(), res.Body, http.StatusRequestEntityTooLarge, "request_too_large")
+}

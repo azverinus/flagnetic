@@ -3222,7 +3222,7 @@ type HashCheckRequest struct {
 	SecondSalt *string `json:"second_salt,omitempty"`
 
 	// UnitIds 1000 to 200000 unit IDs, each 1 to 256 bytes, as often as each occurs.
-	UnitIds []string `json:"unit_ids"`
+	UnitIds UnitIDList `json:"unit_ids"`
 }
 
 // IdPCertificate A certificate a SAML identity provider's signatures are checked against.
@@ -10515,8 +10515,10 @@ type ClientInterface interface {
 	// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 	// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 	// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-	// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-	// whatever the server's limit for other bodies.
+	// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+	// whatever the server's limit for other bodies; the list is read
+	// entry by entry and cut one past the bound, so a longer one is refused
+	// without being held whole.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10544,8 +10546,10 @@ type ClientInterface interface {
 	// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 	// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 	// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-	// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-	// whatever the server's limit for other bodies.
+	// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+	// whatever the server's limit for other bodies; the list is read
+	// entry by entry and cut one past the bound, so a longer one is refused
+	// without being held whole.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -16560,8 +16564,10 @@ func (c *Client) DeleteGrant(ctx context.Context, project ProjectKey, grant Gran
 // or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 // only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 // empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-// whatever the server's limit for other bodies.
+// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+// whatever the server's limit for other bodies; the list is read
+// entry by entry and cut one past the bound, so a longer one is refused
+// without being held whole.
 //
 // Takes any type of body and a specified content type.
 //
@@ -16599,8 +16605,10 @@ func (c *Client) CheckHashUniformityWithBody(ctx context.Context, project Projec
 // or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 // only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 // empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-// whatever the server's limit for other bodies.
+// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+// whatever the server's limit for other bodies; the list is read
+// entry by entry and cut one past the bound, so a longer one is refused
+// without being held whole.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -32631,8 +32639,10 @@ type ClientWithResponsesInterface interface {
 	// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 	// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 	// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-	// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-	// whatever the server's limit for other bodies.
+	// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+	// whatever the server's limit for other bodies; the list is read
+	// entry by entry and cut one past the bound, so a longer one is refused
+	// without being held whole.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -32660,8 +32670,10 @@ type ClientWithResponsesInterface interface {
 	// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 	// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 	// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-	// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-	// whatever the server's limit for other bodies.
+	// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+	// whatever the server's limit for other bodies; the list is read
+	// entry by entry and cut one past the bound, so a longer one is refused
+	// without being held whole.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -54902,8 +54914,10 @@ func (c *ClientWithResponses) DeleteGrantWithResponse(ctx context.Context, proje
 // or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 // only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 // empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-// whatever the server's limit for other bodies.
+// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+// whatever the server's limit for other bodies; the list is read
+// entry by entry and cut one past the bound, so a longer one is refused
+// without being held whole.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -54937,8 +54951,10 @@ func (c *ClientWithResponses) CheckHashUniformityWithBodyWithResponse(ctx contex
 // or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
 // only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
 // empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
-// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
-// whatever the server's limit for other bodies.
+// Its body may take up to 50 MiB, enough for 200000 IDs of 256 bytes,
+// whatever the server's limit for other bodies; the list is read
+// entry by entry and cut one past the bound, so a longer one is refused
+// without being held whole.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
