@@ -97,6 +97,10 @@ plan_changed() {
 
 changed() { grep -qE "$1" <<<"$CHANGED"; }
 
+# A plan that could not be worked out must stop the run: a half-made one
+# would name fewer checks than the change needs, and they would pass unrun.
+plan_fail() { echo "ci-plan: $*" >&2; exit 1; }
+
 # module_of <file or directory relative to the root>: index of the deepest
 # module containing it.
 module_of() {
@@ -164,6 +168,7 @@ plan_compute() {
     MOD_TOUCHED+=(0)
     MOD_RUN+=(0)
   done < <(go list -m -f '{{.Path}}|{{.Dir}}')
+  [ "${#MOD_PATH[@]}" -gt 0 ] || plan_fail "go list -m names no module of go.work"
   ROOT_MODULE="${MOD_PATH[0]}"
   for i in "${!MOD_PATH[@]}"; do [ "${MOD_REL[$i]}" = "." ] && ROOT_MODULE="${MOD_PATH[$i]}"; done
 
@@ -264,7 +269,7 @@ EOF
   # The server's tests and the packages whose coverage they are held to.
   TEST_PKGS=""; COVER_PKGS=""
   if [ "$WIDE" = 1 ]; then
-    TEST_PKGS="$(go list ./... 2>/dev/null)"
+    TEST_PKGS="$(go list ./...)" && [ -n "$TEST_PKGS" ] || plan_fail "go list ./... names no package of the server"
     COVER_PKGS="./internal/..."
   else
     GUARDS="$(guard_packages | while read -r f; do import_path "$(dirname "$f")"; echo; done | sed '/^$/d')"
@@ -323,6 +328,13 @@ plan_shards() {
 }
 
 plan_print() {
+  local modules shards
+  modules="$(printf '%s\n' "$MODULES" | jq -Rsc 'split("\n") | map(select(. != ""))')"
+  shards="$(plan_shards)"
+  case "$modules$shards" in
+    \[*\]\[*\]) ;;
+    *) plan_fail "jq did not write the lists of modules and test jobs" ;;
+  esac
   echo "full=$(bool "$FULL")"
   echo "go=$(bool "$ANY_GO")"
   echo "server=$(bool "$SERVER")"
@@ -336,8 +348,8 @@ plan_print() {
   echo "dart=$(bool "$RUN_DART")"
   echo "flutter=$(bool "$RUN_FLUTTER")"
   echo "workflows=$(bool "$RUN_WORKFLOWS")"
-  echo "modules=$(printf '%s\n' "$MODULES" | jq -Rsc 'split("\n") | map(select(. != ""))')"
-  echo "test_shards=$(plan_shards)"
+  echo "modules=$modules"
+  echo "test_shards=$shards"
   echo "cover_packages=$COVER_PKGS"
   echo "postgres=$POSTGRES"
 }
