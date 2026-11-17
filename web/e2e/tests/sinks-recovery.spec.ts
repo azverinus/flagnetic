@@ -107,7 +107,7 @@ test.describe("sink recovery", () => {
       await expect(
         page
           .getByRole("navigation", { name: "Project" })
-          .getByRole("link", { name: /Sinks/ })
+          .getByRole("link", { name: /Project settings/ })
           .getByText("1 sink needs your attention"),
       ).toBeAttached();
       await expectNoSeriousViolations(page, "the sinks banner");

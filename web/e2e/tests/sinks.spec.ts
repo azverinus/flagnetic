@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
-import { seedProject, signIn } from "../support/console";
+import { openProjectSetting, seedProject, signIn } from "../support/console";
 import { runningExperimentInProduction } from "../support/experiments";
 import { postExposures, seedSdkKey } from "../support/sdk";
 import { startReceiver, type Receiver } from "../support/webhook-receiver";
@@ -49,10 +49,7 @@ test.describe("sinks", () => {
 
     // The navigation lists Sinks, and the list starts empty.
     await page.goto(`/projects/${project}`);
-    await page
-      .getByRole("navigation", { name: "Project" })
-      .getByRole("link", { name: "Sinks" })
-      .click();
+    await openProjectSetting(page, "Sinks");
     await expect(page).toHaveURL(new RegExp(`/projects/${project}/sinks$`));
     await expect(page.getByRole("heading", { name: "Sinks", level: 1 })).toBeVisible();
     await expect(page.getByText("No sink yet.")).toBeVisible();
@@ -171,10 +168,7 @@ test.describe("sinks", () => {
     expect(rotated).not.toBe(first);
 
     // The list shows all three, none enabled, and a sink is deleted after confirming.
-    await page
-      .getByRole("navigation", { name: "Project" })
-      .getByRole("link", { name: "Sinks" })
-      .click();
+    await openProjectSetting(page, "Sinks");
     await expect(sinkRow(page, "Analytics warehouse")).toContainText("ClickHouse");
     await expect(sinkRow(page, "Lake")).toContainText("Object storage");
     await expect(sinkRow(page, "Pipeline")).toContainText("Webhook");

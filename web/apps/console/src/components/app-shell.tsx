@@ -1,81 +1,74 @@
-import { Trans, useLingui } from "@lingui/react/macro";
-import { useParams } from "@tanstack/react-router";
-import { PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { Trans } from "@lingui/react/macro";
+import { useRouterState } from "@tanstack/react-router";
+import { type ReactNode, useEffect } from "react";
 
+import { AreaNavigation } from "@/components/area-navigation";
 import { Breadcrumb } from "@/components/breadcrumb";
-import { InstanceNavigation, ProjectNavigation } from "@/components/navigation";
+import { InstanceLink, ProjectNavigation } from "@/components/navigation";
 import { PersonalMenu } from "@/components/personal-menu";
 import { ProjectSwitcher } from "@/components/project-switcher";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/cn";
-import { rememberSidebarCollapsed, sidebarCollapsed } from "@/lib/preferences";
+import {
+  Sidebar,
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { useShellProject } from "@/lib/use-shell-project";
 
 /**
- * The frame of every signed-in page: the sidebar, the header with the
- * breadcrumb and the personal menu, and the main column the page renders
- * in. The main column is positioned, so what anchors to it (the bar of
- * unsaved changes) never covers the sidebar.
+ * The frame of every signed-in page, in zones: the sidebar on the deepest
+ * surface, and the rest of the window as one inset card with a 48 px header
+ * (the sidebar's toggle and the breadcrumb) over the page. The page's
+ * column is positioned, so what anchors to it (the bar of unsaved changes)
+ * never covers the sidebar.
  */
 export function AppShell({ children }: { children: ReactNode }) {
-  const { t } = useLingui();
-  const [collapsed, setCollapsed] = useState(sidebarCollapsed);
-  const { project } = useParams({ strict: false });
-  const toggle = () => {
-    rememberSidebarCollapsed(!collapsed);
-    setCollapsed(!collapsed);
-  };
-
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <a
-        href="#main"
-        className="sr-only z-50 rounded-md bg-background px-3 py-2 focus:not-sr-only focus:absolute focus:top-2 focus:left-2"
-      >
-        <Trans>Skip to content</Trans>
-      </a>
-      <aside
-        aria-label={t`Sidebar`}
-        data-collapsed={collapsed ? "" : undefined}
-        className={cn(
-          "flex shrink-0 flex-col border-r bg-card transition-[width]",
-          collapsed ? "w-14" : "w-14 md:w-60",
-        )}
-      >
-        <div className="flex h-14 items-center gap-2 border-b px-4">
-          <img src="/favicon.svg" alt="" className="size-6 shrink-0" />
-          <span className={cn("truncate font-medium", collapsed ? "sr-only" : "hidden md:inline")}>
-            Flagnetic
-          </span>
-        </div>
-        <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-2">
-          <ProjectSwitcher collapsed={collapsed} />
-          {project ? <ProjectNavigation project={project} collapsed={collapsed} /> : null}
-          <InstanceNavigation collapsed={collapsed} />
-        </div>
-        <div className="hidden border-t p-2 md:block">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggle}
-            aria-label={collapsed ? t`Expand the sidebar` : t`Collapse the sidebar`}
-            aria-expanded={!collapsed}
-          >
-            {collapsed ? <PanelLeftOpenIcon aria-hidden /> : <PanelLeftCloseIcon aria-hidden />}
-          </Button>
-        </div>
-      </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4">
-          <Breadcrumb />
-          <div className="ml-auto shrink-0">
-            <PersonalMenu />
-          </div>
-        </header>
-        <main id="main" tabIndex={-1} className="relative min-w-0 flex-1 overflow-auto">
-          {children}
-        </main>
+    <SidebarProvider>
+      <div className="flex h-dvh overflow-hidden bg-sidebar">
+        <a
+          href="#main"
+          className="sr-only z-50 rounded-md bg-background px-3 py-2 focus:not-sr-only focus:absolute focus:top-2 focus:left-2"
+        >
+          <Trans>Skip to content</Trans>
+        </a>
+        <ShellSidebar />
+        <SidebarInset>
+          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+            <SidebarTrigger />
+            <Breadcrumb />
+          </header>
+          <AreaNavigation />
+          <main id="main" tabIndex={-1} className="relative min-w-0 flex-1 overflow-auto">
+            {children}
+          </main>
+        </SidebarInset>
       </div>
-    </div>
+    </SidebarProvider>
+  );
+}
+
+/**
+ * What the sidebar holds, top to bottom: the project switcher, the
+ * project's screens, then the link to the instance and the account row.
+ */
+function ShellSidebar() {
+  const { collapsed, setDrawerOpen } = useSidebar();
+  const { key: project } = useShellProject();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  // A drawer closes once a link has taken the member elsewhere.
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname, setDrawerOpen]);
+  return (
+    <Sidebar>
+      <ProjectSwitcher />
+      {project ? <ProjectNavigation project={project} /> : <div className="flex-1" />}
+      <div className="flex flex-col gap-0.5">
+        <InstanceLink />
+        <PersonalMenu collapsed={collapsed} />
+      </div>
+    </Sidebar>
   );
 }

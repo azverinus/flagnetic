@@ -43,6 +43,11 @@ msgstr ""
 
 #. placeholder {0}: disabled.length
 #: src/components/webhook-disabled-banner.tsx
+msgid "{0, plural, one {# webhook needs your attention} other {# webhooks need your attention}}"
+msgstr ""
+
+#. placeholder {0}: disabled.length
+#: src/components/webhook-disabled-banner.tsx
 msgid "{0, plural, one {The platform disabled # webhook after its receiver kept failing. It is sent nothing until it is enabled again.} other {The platform disabled # webhooks after their receivers kept failing. They are sent nothing until they are enabled again.}}"
 msgstr ""
 
@@ -955,6 +960,10 @@ msgstr ""
 msgid "Active alerts"
 msgstr ""
 
+#: src/components/navigation.tsx
+msgid "Activity"
+msgstr ""
+
 #: src/components/audit-entry-sheet.tsx
 #: src/components/audit-log.tsx
 msgid "Actor"
@@ -1481,8 +1490,8 @@ msgstr ""
 msgid "Attribute updated"
 msgstr ""
 
+#: src/components/area-screens.ts
 #: src/components/import-project.tsx
-#: src/components/navigation.tsx
 #: src/components/saml-provider-form.tsx
 #: src/components/tester-panel.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -1509,7 +1518,7 @@ msgstr ""
 msgid "Audit entry"
 msgstr ""
 
-#: src/components/navigation.tsx
+#: src/components/area-screens.ts
 #: src/routes/_signed-in/admin/audit.tsx
 #: src/routes/_signed-in/projects/$project/audit.tsx
 msgid "Audit log"
@@ -1526,13 +1535,13 @@ msgstr ""
 msgid "Auth provider not found"
 msgstr ""
 
+#: src/components/area-screens.ts
 #: src/components/auth-provider-list.tsx
-#: src/components/navigation.tsx
 #: src/routes/_signed-in/admin/auth-providers/route.tsx
 msgid "Auth providers"
 msgstr ""
 
-#: src/components/navigation.tsx
+#: src/components/area-screens.ts
 #: src/routes/_signed-in/admin/auth-settings.tsx
 msgid "Auth settings"
 msgstr ""
@@ -1709,7 +1718,7 @@ msgstr ""
 msgid "Change request rebased"
 msgstr ""
 
-#: src/components/navigation.tsx
+#: src/components/area-screens.ts
 #: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/route.tsx
@@ -1845,6 +1854,7 @@ msgid "Choose a password."
 msgstr ""
 
 #: src/components/group-mappings.tsx
+#: src/components/project-switcher.tsx
 msgid "Choose a project"
 msgstr ""
 
@@ -2118,7 +2128,7 @@ msgstr ""
 msgid "Code"
 msgstr ""
 
-#: src/components/app-shell.tsx
+#: src/components/ui/sidebar.tsx
 msgid "Collapse the sidebar"
 msgstr ""
 
@@ -3266,9 +3276,9 @@ msgstr ""
 msgid "Environment updated"
 msgstr ""
 
+#: src/components/area-screens.ts
 #: src/components/experiment-exposures.tsx
 #: src/components/import-project.tsx
-#: src/components/navigation.tsx
 #: src/components/sink-editor.tsx
 #: src/components/webhook-editor.tsx
 #: src/lib/sinks.ts
@@ -3355,7 +3365,7 @@ msgstr ""
 msgid "Event type"
 msgstr ""
 
-#: src/components/navigation.tsx
+#: src/components/area-screens.ts
 #: src/routes/_signed-in/projects/$project/event-volume.tsx
 msgid "Event volume"
 msgstr ""
@@ -3500,7 +3510,7 @@ msgstr ""
 msgid "Exhausted"
 msgstr ""
 
-#: src/components/app-shell.tsx
+#: src/components/ui/sidebar.tsx
 msgid "Expand the sidebar"
 msgstr ""
 
@@ -3575,8 +3585,8 @@ msgstr ""
 msgid "Experiment updated"
 msgstr ""
 
+#: src/components/area-screens.ts
 #: src/components/import-project.tsx
-#: src/components/navigation.tsx
 #: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/route.tsx
@@ -3816,9 +3826,9 @@ msgstr ""
 msgid "Flag restored"
 msgstr ""
 
+#: src/components/area-screens.ts
 #: src/components/firebase-wizard.tsx
 #: src/components/import-project.tsx
-#: src/components/navigation.tsx
 #: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/route.tsx
@@ -3899,6 +3909,10 @@ msgstr ""
 
 #: src/components/sink-screen.tsx
 msgid "Gaps ({gaps})"
+msgstr ""
+
+#: src/components/area-screens.ts
+msgid "General"
 msgstr ""
 
 #: src/components/saml-provider-detail.tsx
@@ -4128,7 +4142,7 @@ msgstr ""
 msgid "import a project document into the project"
 msgstr ""
 
-#: src/components/navigation.tsx
+#: src/components/area-screens.ts
 #: src/routes/_signed-in/projects/$project/import-export.tsx
 msgid "Import and export"
 msgstr ""
@@ -4215,6 +4229,7 @@ msgstr ""
 
 #. An audit entry that belongs to no project.
 #. An audit entry that belongs to no project.
+#: src/components/area-navigation.tsx
 #: src/components/navigation.tsx
 #: src/routes/_signed-in/admin/audit.$entry.tsx
 #: src/routes/_signed-in/admin/audit.tsx
@@ -4753,8 +4768,8 @@ msgstr ""
 msgid "Made private."
 msgstr ""
 
+#: src/components/area-screens.ts
 #: src/components/mail-settings.tsx
-#: src/components/navigation.tsx
 #: src/routes/_signed-in/admin/mail.tsx
 msgid "Mail"
 msgstr ""
@@ -4899,7 +4914,7 @@ msgstr ""
 msgid "Member updated"
 msgstr ""
 
-#: src/components/navigation.tsx
+#: src/components/area-screens.ts
 #: src/components/projects-table.tsx
 #: src/components/scim-groups.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
@@ -4942,6 +4957,10 @@ msgstr ""
 
 #: src/components/condition-row.tsx
 msgid "Membership (condition {position})"
+msgstr ""
+
+#: src/components/ui/sidebar.tsx
+msgid "Menu"
 msgstr ""
 
 #: src/components/import-project.tsx
@@ -5485,11 +5504,6 @@ msgstr ""
 msgid "None"
 msgstr ""
 
-#. The project switcher, when no project is open.
-#: src/components/project-switcher.tsx
-msgid "none chosen"
-msgstr ""
-
 #: src/components/sink-recovery.tsx
 msgid "None ticked means every kind the sink exports."
 msgstr ""
@@ -5740,6 +5754,10 @@ msgstr ""
 msgid "Open the change request for review"
 msgstr ""
 
+#: src/components/ui/sidebar.tsx
+msgid "Open the sidebar"
+msgstr ""
+
 #: src/components/auth-provider-badges.tsx
 #: src/components/new-auth-provider.tsx
 #: src/components/session-list.tsx
@@ -5816,8 +5834,8 @@ msgstr ""
 msgid "Overrides in this environment"
 msgstr ""
 
+#: src/components/area-screens.ts
 #: src/components/experiment-transitions.tsx
-#: src/components/navigation.tsx
 msgid "Overview"
 msgstr ""
 
@@ -6107,6 +6125,10 @@ msgid "Project not found"
 msgstr ""
 
 #: src/components/navigation.tsx
+msgid "Project settings"
+msgstr ""
+
+#: src/components/area-screens.ts
 #: src/components/project-token-list.tsx
 #: src/routes/_signed-in/projects/$project/tokens.tsx
 msgid "Project tokens"
@@ -6117,10 +6139,10 @@ msgid "Project updated"
 msgstr ""
 
 #: src/components/project-switcher.tsx
-msgid "Project: {label}"
+msgid "Project:"
 msgstr ""
 
-#: src/components/navigation.tsx
+#: src/components/area-screens.ts
 #: src/components/project-switcher.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
@@ -6917,7 +6939,7 @@ msgstr ""
 msgid "SCIM token"
 msgstr ""
 
-#: src/components/navigation.tsx
+#: src/components/area-screens.ts
 #: src/components/scim-tokens.tsx
 #: src/routes/_signed-in/admin/scim-tokens.tsx
 msgid "SCIM tokens"
@@ -7014,8 +7036,8 @@ msgstr ""
 msgid "Segment updated"
 msgstr ""
 
+#: src/components/area-screens.ts
 #: src/components/import-project.tsx
-#: src/components/navigation.tsx
 #: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 #: src/routes/_signed-in/projects/$project/segments/route.tsx
@@ -7180,8 +7202,8 @@ msgstr ""
 msgid "Setting value"
 msgstr ""
 
+#: src/components/area-navigation.tsx
 #: src/components/auth-provider-detail.tsx
-#: src/components/navigation.tsx
 #: src/components/sink-editor.tsx
 #: src/components/sink-screen.tsx
 #: src/components/webhook-detail.tsx
@@ -7222,7 +7244,7 @@ msgstr ""
 msgid "Show the current mappings"
 msgstr ""
 
-#: src/components/app-shell.tsx
+#: src/components/ui/sidebar.tsx
 msgid "Sidebar"
 msgstr ""
 
@@ -7328,7 +7350,7 @@ msgstr ""
 msgid "Sink not found"
 msgstr ""
 
-#: src/components/navigation.tsx
+#: src/components/area-screens.ts
 #: src/components/sink-list.tsx
 #: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/sinks/route.tsx
@@ -7417,7 +7439,6 @@ msgstr ""
 msgid "SSO: {provider}"
 msgstr ""
 
-#: src/components/navigation.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Stale flags"
@@ -9274,8 +9295,8 @@ msgstr ""
 msgid "Unit type updated"
 msgstr ""
 
+#: src/components/area-screens.ts
 #: src/components/import-project.tsx
-#: src/components/navigation.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Unit types"
 msgstr ""
@@ -9536,7 +9557,7 @@ msgstr ""
 msgid "Webhook subscription updated"
 msgstr ""
 
-#: src/components/navigation.tsx
+#: src/components/area-screens.ts
 #: src/components/webhook-list.tsx
 #: src/lib/webhooks.ts
 #: src/routes/_signed-in/admin/webhooks/route.tsx

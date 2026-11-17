@@ -2,9 +2,8 @@ import { type Me, signOut, updateMe } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { LogOutIcon, SettingsIcon } from "lucide-react";
+import { ChevronsUpDownIcon, LogOutIcon, SettingsIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { languageName } from "@/i18n/format";
 import { locales } from "@/i18n/locale";
+import { cn } from "@/lib/cn";
 import { unwrap } from "@/lib/errors";
 import { chosenLocale, followBrowser, followMemberLocale, localeChoice } from "@/lib/member-locale";
 import { meQuery } from "@/lib/queries";
@@ -34,10 +34,10 @@ export function initialsOf(name: string, email: string): string {
 }
 
 /**
- * The signed-in member's menu: who they are, their settings, the theme,
+ * The signed-in member's menu, the account row at the sidebar's foot: who they are, their settings, the theme,
  * the language, and signing out.
  */
-export function PersonalMenu() {
+export function PersonalMenu({ collapsed = false }: { collapsed?: boolean }) {
   const { i18n, t } = useLingui();
   const { data: me } = useSuspenseQuery(meQuery);
   const [theme, setTheme] = useTheme();
@@ -68,18 +68,29 @@ export function PersonalMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="min-w-0 gap-2 px-2">
+        <button
+          type="button"
+          className={cn(
+            "flex h-12 w-full min-w-0 items-center gap-2.5 rounded-lg px-2 text-left text-sm transition-colors hover:bg-foreground/[0.06]",
+            collapsed && "justify-center px-0",
+          )}
+        >
           <span
             aria-hidden
-            className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground"
+            className="flex size-7 shrink-0 items-center justify-center rounded-full border bg-raised text-xs font-medium text-foreground-secondary"
           >
             {initialsOf(name, email)}
           </span>
-          {/* The name is the button's accessible name, read out even where it is not shown. */}
-          <span className="sr-only max-w-48 truncate sm:not-sr-only">{name}</span>
-        </Button>
+          {/* The name is the button's accessible name, read out even in the rail. */}
+          <span className={cn("min-w-0 flex-1 truncate font-medium", collapsed && "sr-only")}>
+            {name}
+          </span>
+          {collapsed ? null : (
+            <ChevronsUpDownIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+          )}
+        </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent side="top" align="start" className="w-64">
         <DropdownMenuLabel className="flex flex-col gap-0.5">
           <span className="truncate">{name}</span>
           {email && email !== name ? (

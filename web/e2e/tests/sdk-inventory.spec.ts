@@ -99,7 +99,7 @@ test.describe("downloading the ruleset", () => {
     await openEnvironment(page, project, "SDK keys");
 
     const download = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Download ruleset" }).click();
+    await page.getByRole("button", { name: "Download ruleset", exact: true }).click();
     const file = await download;
     expect(file.suggestedFilename()).toMatch(
       new RegExp(`^${project}-staging-ruleset-\\d+\\.json$`),
@@ -113,7 +113,7 @@ test.describe("downloading the ruleset", () => {
   test("is open to a viewer, who needs only to read the project", async ({ page }) => {
     await openEnvironment(page, seededProject.key, "SDKs", viewer);
     const download = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Download ruleset" }).click();
+    await page.getByRole("button", { name: "Download ruleset", exact: true }).click();
     expect((await download).suggestedFilename()).toMatch(/^checkout-staging-ruleset-\d+\.json$/);
   });
 });

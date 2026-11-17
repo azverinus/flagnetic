@@ -9,7 +9,13 @@ import { readFile } from "node:fs/promises";
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations } from "../support/axe";
-import { managementClient, must, seedProject, signIn } from "../support/console";
+import {
+  managementClient,
+  must,
+  openProjectSetting,
+  seedProject,
+  signIn,
+} from "../support/console";
 import { admin, seededProject, viewer } from "../support/instance";
 
 /**
@@ -182,8 +188,7 @@ test("the overview's recent activity shows a change made in the console, without
   // A reload would drop this mark.
   await page.evaluate(() => Object.assign(window, { sameDocument: true }));
 
-  const navigation = page.getByRole("navigation", { name: "Project" });
-  await navigation.getByRole("link", { name: "Environments" }).click();
+  await openProjectSetting(page, "Environments");
   const staging = page
     .getByRole("row")
     .filter({ has: page.getByRole("cell", { name: "staging", exact: true }) });
@@ -192,7 +197,10 @@ test("the overview's recent activity shows a change made in the console, without
   await rename.getByLabel("Name").fill("Pre-production");
   await rename.getByRole("button", { name: "Save" }).click();
   await expect(rename).toBeHidden();
-  await navigation.getByRole("link", { name: "Overview" }).click();
+  await page
+    .getByRole("navigation", { name: "Project" })
+    .getByRole("link", { name: "Overview" })
+    .click();
 
   await expect(recent.getByRole("row").nth(1)).toContainText("environment.updated");
   expect(await page.evaluate(() => "sameDocument" in window)).toBe(true);
