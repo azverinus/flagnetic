@@ -629,7 +629,7 @@ func TestRejectedEventsAreNeverSentAgain(t *testing.T) {
 		})
 	}
 	if len(codes) != 9 {
-		t.Errorf("events-mixed.json rejects with %d codes, want every per-event rejection code (8)", len(codes)-1)
+		t.Errorf("events-mixed.json rejects %d events, want 8", len(codes)-1)
 	}
 }
 

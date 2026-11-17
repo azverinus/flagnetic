@@ -50,7 +50,7 @@ A **client key** ships inside apps and browsers, so it never receives a ruleset:
 |---|---|
 | `targeting_match` | targeting decided the value: a matched rule, a rollout, the fallthrough or a failed prerequisite |
 | `off` | the flag is off |
-| `override` | an override for this unit decided the value |
+| `override` | an override for this unit led it into a running experiment, so the exposure is marked as an override's |
 | `experiment` | a running experiment assigned the value |
 | `error` | the flag could not be evaluated; the SDK serves its built-in default as `fallback` |
 

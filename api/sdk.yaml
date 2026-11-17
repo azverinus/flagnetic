@@ -74,7 +74,8 @@ info:
     body at any level (the evaluate body and its `context`, the events
     envelope and its `sdk`, each event, each summary row) and a query
     parameter of any operation. Context attributes keep their own rule: one
-    the project does not declare is listed in `ignored_attributes`.
+    the project does not declare is listed in `ignored_attributes` for a
+    server key.
 
     **Problems.** Every error is a problem document (RFC 9457) in the same
     shape as the management API's: `type` (`urn:flagnetic:problem:<code>`),
@@ -172,7 +173,8 @@ paths:
         undeclared attribute, or one named like a unit type, is left out and
         listed in `ignored_attributes` with `undeclared`; a value of the
         wrong type is left out and listed with `type_mismatch`; `null` is
-        kept. A context over the limits (64 attributes, 256 characters per
+        kept. A client key's `ignored_attributes` is always empty, since it
+        would otherwise tell which attributes the project declares. A context over the limits (64 attributes, 256 characters per
         string, 64 items per list, 256 bytes per unit ID) is
         `422 invalid_context`, every violation pointing into the body with
         `too_long` or `too_many` and `params.max`. A unit type given twice
@@ -310,17 +312,24 @@ paths:
         longer: one already received is counted in `duplicates`, never
         twice. A summary row naming a flag
         the project does not have, or a variation its flag does not have, is
-        dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
+        dropped and counted in `dropped_rows`, which is always 0 for a client key,
+        since a count would tell whether a flag key it guessed is a flag of the
+        project. A refused event is listed in `rejected` with its
         index, its `event_id` when it has one, a `code` and a `detail`; the
         SDK never sends it again.
 
         The rejection codes are an open set, which a later server may add
         to: an SDK treats a code it does not know like any other rejection
-        and never resends the event. The codes today: `event_invalid` (a
+        and never resends the event. A client key is told no more of an
+        exposure's refusal than `unknown_experiment`, whatever it got wrong
+        and whether the experiment exists, is a draft or is none, so that it
+        learns nothing of the project's experiments from a refusal. The
+        codes today: `event_invalid` (a
         member missing, of the wrong type, a string over 256 bytes or
         holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
         `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-        time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
+        time older than the retention window, after the clock skew shift), `undeclared_unit_type` (an alias of a server key naming a unit type the
+        project does not declare; a client key is answered `event_invalid`),
         `unknown_experiment` (an exposure naming no experiment of the
         project, or a draft, which is served to no unit; a started
         experiment of any status exists, since a mobile app flushes its
@@ -835,7 +844,9 @@ components:
             $ref: "#/components/schemas/FlagEvaluation"
         ignored_attributes:
           type: array
-          description: The attributes left out of the evaluation, and why.
+          description: >-
+            The attributes left out of the evaluation, and why; always empty
+            for a client key.
           items:
             $ref: "#/components/schemas/IgnoredAttribute"
     FlagEvaluation:
@@ -1069,7 +1080,9 @@ components:
           description: The events already received, by `event_id`.
         dropped_rows:
           type: integer
-          description: The summary rows naming a flag the project does not have, or a variation its flag does not have.
+          description: >-
+            The summary rows naming a flag the project does not have, or a
+            variation its flag does not have; always 0 for a client key.
         rejected:
           type: array
           items:

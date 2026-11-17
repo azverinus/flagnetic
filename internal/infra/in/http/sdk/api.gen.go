@@ -101,7 +101,7 @@ type Evaluation struct {
 	// Flags The result of each flag evaluated, by flag key.
 	Flags map[string]FlagEvaluation `json:"flags"`
 
-	// IgnoredAttributes The attributes left out of the evaluation, and why.
+	// IgnoredAttributes The attributes left out of the evaluation, and why; always empty for a client key.
 	IgnoredAttributes []IgnoredAttribute `json:"ignored_attributes"`
 
 	// RulesetVersion The version of the ruleset evaluated.
@@ -184,7 +184,7 @@ type EventBatchResult struct {
 	// Accepted The events stored.
 	Accepted int `json:"accepted"`
 
-	// DroppedRows The summary rows naming a flag the project does not have, or a variation its flag does not have.
+	// DroppedRows The summary rows naming a flag the project does not have, or a variation its flag does not have; always 0 for a client key.
 	DroppedRows int `json:"dropped_rows"`
 
 	// Duplicates The events already received, by `event_id`.
@@ -639,7 +639,8 @@ type ClientInterface interface {
 	// undeclared attribute, or one named like a unit type, is left out and
 	// listed in `ignored_attributes` with `undeclared`; a value of the
 	// wrong type is left out and listed with `type_mismatch`; `null` is
-	// kept. A context over the limits (64 attributes, 256 characters per
+	// kept. A client key's `ignored_attributes` is always empty, since it
+	// would otherwise tell which attributes the project declares. A context over the limits (64 attributes, 256 characters per
 	// string, 64 items per list, 256 bytes per unit ID) is
 	// `422 invalid_context`, every violation pointing into the body with
 	// `too_long` or `too_many` and `params.max`. A unit type given twice
@@ -670,7 +671,8 @@ type ClientInterface interface {
 	// undeclared attribute, or one named like a unit type, is left out and
 	// listed in `ignored_attributes` with `undeclared`; a value of the
 	// wrong type is left out and listed with `type_mismatch`; `null` is
-	// kept. A context over the limits (64 attributes, 256 characters per
+	// kept. A client key's `ignored_attributes` is always empty, since it
+	// would otherwise tell which attributes the project declares. A context over the limits (64 attributes, 256 characters per
 	// string, 64 items per list, 256 bytes per unit ID) is
 	// `422 invalid_context`, every violation pointing into the body with
 	// `too_long` or `too_many` and `params.max`. A unit type given twice
@@ -706,17 +708,24 @@ type ClientInterface interface {
 	// longer: one already received is counted in `duplicates`, never
 	// twice. A summary row naming a flag
 	// the project does not have, or a variation its flag does not have, is
-	// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
+	// dropped and counted in `dropped_rows`, which is always 0 for a client key,
+	// since a count would tell whether a flag key it guessed is a flag of the
+	// project. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
 	// SDK never sends it again.
 	//
 	// The rejection codes are an open set, which a later server may add
 	// to: an SDK treats a code it does not know like any other rejection
-	// and never resends the event. The codes today: `event_invalid` (a
+	// and never resends the event. A client key is told no more of an
+	// exposure's refusal than `unknown_experiment`, whatever it got wrong
+	// and whether the experiment exists, is a draft or is none, so that it
+	// learns nothing of the project's experiments from a refusal. The
+	// codes today: `event_invalid` (a
 	// member missing, of the wrong type, a string over 256 bytes or
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
+	// time older than the retention window, after the clock skew shift), `undeclared_unit_type` (an alias of a server key naming a unit type the
+	// project does not declare; a client key is answered `event_invalid`),
 	// `unknown_experiment` (an exposure naming no experiment of the
 	// project, or a draft, which is served to no unit; a started
 	// experiment of any status exists, since a mobile app flushes its
@@ -783,17 +792,24 @@ type ClientInterface interface {
 	// longer: one already received is counted in `duplicates`, never
 	// twice. A summary row naming a flag
 	// the project does not have, or a variation its flag does not have, is
-	// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
+	// dropped and counted in `dropped_rows`, which is always 0 for a client key,
+	// since a count would tell whether a flag key it guessed is a flag of the
+	// project. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
 	// SDK never sends it again.
 	//
 	// The rejection codes are an open set, which a later server may add
 	// to: an SDK treats a code it does not know like any other rejection
-	// and never resends the event. The codes today: `event_invalid` (a
+	// and never resends the event. A client key is told no more of an
+	// exposure's refusal than `unknown_experiment`, whatever it got wrong
+	// and whether the experiment exists, is a draft or is none, so that it
+	// learns nothing of the project's experiments from a refusal. The
+	// codes today: `event_invalid` (a
 	// member missing, of the wrong type, a string over 256 bytes or
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
+	// time older than the retention window, after the clock skew shift), `undeclared_unit_type` (an alias of a server key naming a unit type the
+	// project does not declare; a client key is answered `event_invalid`),
 	// `unknown_experiment` (an exposure naming no experiment of the
 	// project, or a draft, which is served to no unit; a started
 	// experiment of any status exists, since a mobile app flushes its
@@ -860,17 +876,24 @@ type ClientInterface interface {
 	// longer: one already received is counted in `duplicates`, never
 	// twice. A summary row naming a flag
 	// the project does not have, or a variation its flag does not have, is
-	// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
+	// dropped and counted in `dropped_rows`, which is always 0 for a client key,
+	// since a count would tell whether a flag key it guessed is a flag of the
+	// project. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
 	// SDK never sends it again.
 	//
 	// The rejection codes are an open set, which a later server may add
 	// to: an SDK treats a code it does not know like any other rejection
-	// and never resends the event. The codes today: `event_invalid` (a
+	// and never resends the event. A client key is told no more of an
+	// exposure's refusal than `unknown_experiment`, whatever it got wrong
+	// and whether the experiment exists, is a draft or is none, so that it
+	// learns nothing of the project's experiments from a refusal. The
+	// codes today: `event_invalid` (a
 	// member missing, of the wrong type, a string over 256 bytes or
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
+	// time older than the retention window, after the clock skew shift), `undeclared_unit_type` (an alias of a server key naming a unit type the
+	// project does not declare; a client key is answered `event_invalid`),
 	// `unknown_experiment` (an exposure naming no experiment of the
 	// project, or a draft, which is served to no unit; a started
 	// experiment of any status exists, since a mobile app flushes its
@@ -972,7 +995,8 @@ type ClientInterface interface {
 // undeclared attribute, or one named like a unit type, is left out and
 // listed in `ignored_attributes` with `undeclared`; a value of the
 // wrong type is left out and listed with `type_mismatch`; `null` is
-// kept. A context over the limits (64 attributes, 256 characters per
+// kept. A client key's `ignored_attributes` is always empty, since it
+// would otherwise tell which attributes the project declares. A context over the limits (64 attributes, 256 characters per
 // string, 64 items per list, 256 bytes per unit ID) is
 // `422 invalid_context`, every violation pointing into the body with
 // `too_long` or `too_many` and `params.max`. A unit type given twice
@@ -1013,7 +1037,8 @@ func (c *Client) EvaluateWithBody(ctx context.Context, params *EvaluateParams, c
 // undeclared attribute, or one named like a unit type, is left out and
 // listed in `ignored_attributes` with `undeclared`; a value of the
 // wrong type is left out and listed with `type_mismatch`; `null` is
-// kept. A context over the limits (64 attributes, 256 characters per
+// kept. A client key's `ignored_attributes` is always empty, since it
+// would otherwise tell which attributes the project declares. A context over the limits (64 attributes, 256 characters per
 // string, 64 items per list, 256 bytes per unit ID) is
 // `422 invalid_context`, every violation pointing into the body with
 // `too_long` or `too_many` and `params.max`. A unit type given twice
@@ -1059,17 +1084,24 @@ func (c *Client) Evaluate(ctx context.Context, params *EvaluateParams, body Eval
 // longer: one already received is counted in `duplicates`, never
 // twice. A summary row naming a flag
 // the project does not have, or a variation its flag does not have, is
-// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
+// dropped and counted in `dropped_rows`, which is always 0 for a client key,
+// since a count would tell whether a flag key it guessed is a flag of the
+// project. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
 // SDK never sends it again.
 //
 // The rejection codes are an open set, which a later server may add
 // to: an SDK treats a code it does not know like any other rejection
-// and never resends the event. The codes today: `event_invalid` (a
+// and never resends the event. A client key is told no more of an
+// exposure's refusal than `unknown_experiment`, whatever it got wrong
+// and whether the experiment exists, is a draft or is none, so that it
+// learns nothing of the project's experiments from a refusal. The
+// codes today: `event_invalid` (a
 // member missing, of the wrong type, a string over 256 bytes or
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
+// time older than the retention window, after the clock skew shift), `undeclared_unit_type` (an alias of a server key naming a unit type the
+// project does not declare; a client key is answered `event_invalid`),
 // `unknown_experiment` (an exposure naming no experiment of the
 // project, or a draft, which is served to no unit; a started
 // experiment of any status exists, since a mobile app flushes its
@@ -1146,17 +1178,24 @@ func (c *Client) PostEventsWithBody(ctx context.Context, params *PostEventsParam
 // longer: one already received is counted in `duplicates`, never
 // twice. A summary row naming a flag
 // the project does not have, or a variation its flag does not have, is
-// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
+// dropped and counted in `dropped_rows`, which is always 0 for a client key,
+// since a count would tell whether a flag key it guessed is a flag of the
+// project. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
 // SDK never sends it again.
 //
 // The rejection codes are an open set, which a later server may add
 // to: an SDK treats a code it does not know like any other rejection
-// and never resends the event. The codes today: `event_invalid` (a
+// and never resends the event. A client key is told no more of an
+// exposure's refusal than `unknown_experiment`, whatever it got wrong
+// and whether the experiment exists, is a draft or is none, so that it
+// learns nothing of the project's experiments from a refusal. The
+// codes today: `event_invalid` (a
 // member missing, of the wrong type, a string over 256 bytes or
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
+// time older than the retention window, after the clock skew shift), `undeclared_unit_type` (an alias of a server key naming a unit type the
+// project does not declare; a client key is answered `event_invalid`),
 // `unknown_experiment` (an exposure naming no experiment of the
 // project, or a draft, which is served to no unit; a started
 // experiment of any status exists, since a mobile app flushes its
@@ -1233,17 +1272,24 @@ func (c *Client) PostEvents(ctx context.Context, params *PostEventsParams, body 
 // longer: one already received is counted in `duplicates`, never
 // twice. A summary row naming a flag
 // the project does not have, or a variation its flag does not have, is
-// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
+// dropped and counted in `dropped_rows`, which is always 0 for a client key,
+// since a count would tell whether a flag key it guessed is a flag of the
+// project. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
 // SDK never sends it again.
 //
 // The rejection codes are an open set, which a later server may add
 // to: an SDK treats a code it does not know like any other rejection
-// and never resends the event. The codes today: `event_invalid` (a
+// and never resends the event. A client key is told no more of an
+// exposure's refusal than `unknown_experiment`, whatever it got wrong
+// and whether the experiment exists, is a draft or is none, so that it
+// learns nothing of the project's experiments from a refusal. The
+// codes today: `event_invalid` (a
 // member missing, of the wrong type, a string over 256 bytes or
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
+// time older than the retention window, after the clock skew shift), `undeclared_unit_type` (an alias of a server key naming a unit type the
+// project does not declare; a client key is answered `event_invalid`),
 // `unknown_experiment` (an exposure naming no experiment of the
 // project, or a draft, which is served to no unit; a started
 // experiment of any status exists, since a mobile app flushes its
@@ -1710,7 +1756,8 @@ type ClientWithResponsesInterface interface {
 	// undeclared attribute, or one named like a unit type, is left out and
 	// listed in `ignored_attributes` with `undeclared`; a value of the
 	// wrong type is left out and listed with `type_mismatch`; `null` is
-	// kept. A context over the limits (64 attributes, 256 characters per
+	// kept. A client key's `ignored_attributes` is always empty, since it
+	// would otherwise tell which attributes the project declares. A context over the limits (64 attributes, 256 characters per
 	// string, 64 items per list, 256 bytes per unit ID) is
 	// `422 invalid_context`, every violation pointing into the body with
 	// `too_long` or `too_many` and `params.max`. A unit type given twice
@@ -1741,7 +1788,8 @@ type ClientWithResponsesInterface interface {
 	// undeclared attribute, or one named like a unit type, is left out and
 	// listed in `ignored_attributes` with `undeclared`; a value of the
 	// wrong type is left out and listed with `type_mismatch`; `null` is
-	// kept. A context over the limits (64 attributes, 256 characters per
+	// kept. A client key's `ignored_attributes` is always empty, since it
+	// would otherwise tell which attributes the project declares. A context over the limits (64 attributes, 256 characters per
 	// string, 64 items per list, 256 bytes per unit ID) is
 	// `422 invalid_context`, every violation pointing into the body with
 	// `too_long` or `too_many` and `params.max`. A unit type given twice
@@ -1777,17 +1825,24 @@ type ClientWithResponsesInterface interface {
 	// longer: one already received is counted in `duplicates`, never
 	// twice. A summary row naming a flag
 	// the project does not have, or a variation its flag does not have, is
-	// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
+	// dropped and counted in `dropped_rows`, which is always 0 for a client key,
+	// since a count would tell whether a flag key it guessed is a flag of the
+	// project. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
 	// SDK never sends it again.
 	//
 	// The rejection codes are an open set, which a later server may add
 	// to: an SDK treats a code it does not know like any other rejection
-	// and never resends the event. The codes today: `event_invalid` (a
+	// and never resends the event. A client key is told no more of an
+	// exposure's refusal than `unknown_experiment`, whatever it got wrong
+	// and whether the experiment exists, is a draft or is none, so that it
+	// learns nothing of the project's experiments from a refusal. The
+	// codes today: `event_invalid` (a
 	// member missing, of the wrong type, a string over 256 bytes or
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
+	// time older than the retention window, after the clock skew shift), `undeclared_unit_type` (an alias of a server key naming a unit type the
+	// project does not declare; a client key is answered `event_invalid`),
 	// `unknown_experiment` (an exposure naming no experiment of the
 	// project, or a draft, which is served to no unit; a started
 	// experiment of any status exists, since a mobile app flushes its
@@ -1854,17 +1909,24 @@ type ClientWithResponsesInterface interface {
 	// longer: one already received is counted in `duplicates`, never
 	// twice. A summary row naming a flag
 	// the project does not have, or a variation its flag does not have, is
-	// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
+	// dropped and counted in `dropped_rows`, which is always 0 for a client key,
+	// since a count would tell whether a flag key it guessed is a flag of the
+	// project. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
 	// SDK never sends it again.
 	//
 	// The rejection codes are an open set, which a later server may add
 	// to: an SDK treats a code it does not know like any other rejection
-	// and never resends the event. The codes today: `event_invalid` (a
+	// and never resends the event. A client key is told no more of an
+	// exposure's refusal than `unknown_experiment`, whatever it got wrong
+	// and whether the experiment exists, is a draft or is none, so that it
+	// learns nothing of the project's experiments from a refusal. The
+	// codes today: `event_invalid` (a
 	// member missing, of the wrong type, a string over 256 bytes or
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
+	// time older than the retention window, after the clock skew shift), `undeclared_unit_type` (an alias of a server key naming a unit type the
+	// project does not declare; a client key is answered `event_invalid`),
 	// `unknown_experiment` (an exposure naming no experiment of the
 	// project, or a draft, which is served to no unit; a started
 	// experiment of any status exists, since a mobile app flushes its
@@ -1931,17 +1993,24 @@ type ClientWithResponsesInterface interface {
 	// longer: one already received is counted in `duplicates`, never
 	// twice. A summary row naming a flag
 	// the project does not have, or a variation its flag does not have, is
-	// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
+	// dropped and counted in `dropped_rows`, which is always 0 for a client key,
+	// since a count would tell whether a flag key it guessed is a flag of the
+	// project. A refused event is listed in `rejected` with its
 	// index, its `event_id` when it has one, a `code` and a `detail`; the
 	// SDK never sends it again.
 	//
 	// The rejection codes are an open set, which a later server may add
 	// to: an SDK treats a code it does not know like any other rejection
-	// and never resends the event. The codes today: `event_invalid` (a
+	// and never resends the event. A client key is told no more of an
+	// exposure's refusal than `unknown_experiment`, whatever it got wrong
+	// and whether the experiment exists, is a draft or is none, so that it
+	// learns nothing of the project's experiments from a refusal. The
+	// codes today: `event_invalid` (a
 	// member missing, of the wrong type, a string over 256 bytes or
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-	// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
+	// time older than the retention window, after the clock skew shift), `undeclared_unit_type` (an alias of a server key naming a unit type the
+	// project does not declare; a client key is answered `event_invalid`),
 	// `unknown_experiment` (an exposure naming no experiment of the
 	// project, or a draft, which is served to no unit; a started
 	// experiment of any status exists, since a mobile app flushes its
@@ -2531,7 +2600,8 @@ func (r StreamRulesetResponse) ContentType() string {
 // undeclared attribute, or one named like a unit type, is left out and
 // listed in `ignored_attributes` with `undeclared`; a value of the
 // wrong type is left out and listed with `type_mismatch`; `null` is
-// kept. A context over the limits (64 attributes, 256 characters per
+// kept. A client key's `ignored_attributes` is always empty, since it
+// would otherwise tell which attributes the project declares. A context over the limits (64 attributes, 256 characters per
 // string, 64 items per list, 256 bytes per unit ID) is
 // `422 invalid_context`, every violation pointing into the body with
 // `too_long` or `too_many` and `params.max`. A unit type given twice
@@ -2568,7 +2638,8 @@ func (c *ClientWithResponses) EvaluateWithBodyWithResponse(ctx context.Context, 
 // undeclared attribute, or one named like a unit type, is left out and
 // listed in `ignored_attributes` with `undeclared`; a value of the
 // wrong type is left out and listed with `type_mismatch`; `null` is
-// kept. A context over the limits (64 attributes, 256 characters per
+// kept. A client key's `ignored_attributes` is always empty, since it
+// would otherwise tell which attributes the project declares. A context over the limits (64 attributes, 256 characters per
 // string, 64 items per list, 256 bytes per unit ID) is
 // `422 invalid_context`, every violation pointing into the body with
 // `too_long` or `too_many` and `params.max`. A unit type given twice
@@ -2610,17 +2681,24 @@ func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, params *
 // longer: one already received is counted in `duplicates`, never
 // twice. A summary row naming a flag
 // the project does not have, or a variation its flag does not have, is
-// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
+// dropped and counted in `dropped_rows`, which is always 0 for a client key,
+// since a count would tell whether a flag key it guessed is a flag of the
+// project. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
 // SDK never sends it again.
 //
 // The rejection codes are an open set, which a later server may add
 // to: an SDK treats a code it does not know like any other rejection
-// and never resends the event. The codes today: `event_invalid` (a
+// and never resends the event. A client key is told no more of an
+// exposure's refusal than `unknown_experiment`, whatever it got wrong
+// and whether the experiment exists, is a draft or is none, so that it
+// learns nothing of the project's experiments from a refusal. The
+// codes today: `event_invalid` (a
 // member missing, of the wrong type, a string over 256 bytes or
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
+// time older than the retention window, after the clock skew shift), `undeclared_unit_type` (an alias of a server key naming a unit type the
+// project does not declare; a client key is answered `event_invalid`),
 // `unknown_experiment` (an exposure naming no experiment of the
 // project, or a draft, which is served to no unit; a started
 // experiment of any status exists, since a mobile app flushes its
@@ -2693,17 +2771,24 @@ func (c *ClientWithResponses) PostEventsWithBodyWithResponse(ctx context.Context
 // longer: one already received is counted in `duplicates`, never
 // twice. A summary row naming a flag
 // the project does not have, or a variation its flag does not have, is
-// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
+// dropped and counted in `dropped_rows`, which is always 0 for a client key,
+// since a count would tell whether a flag key it guessed is a flag of the
+// project. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
 // SDK never sends it again.
 //
 // The rejection codes are an open set, which a later server may add
 // to: an SDK treats a code it does not know like any other rejection
-// and never resends the event. The codes today: `event_invalid` (a
+// and never resends the event. A client key is told no more of an
+// exposure's refusal than `unknown_experiment`, whatever it got wrong
+// and whether the experiment exists, is a draft or is none, so that it
+// learns nothing of the project's experiments from a refusal. The
+// codes today: `event_invalid` (a
 // member missing, of the wrong type, a string over 256 bytes or
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
+// time older than the retention window, after the clock skew shift), `undeclared_unit_type` (an alias of a server key naming a unit type the
+// project does not declare; a client key is answered `event_invalid`),
 // `unknown_experiment` (an exposure naming no experiment of the
 // project, or a draft, which is served to no unit; a started
 // experiment of any status exists, since a mobile app flushes its
@@ -2776,17 +2861,24 @@ func (c *ClientWithResponses) PostEventsWithResponse(ctx context.Context, params
 // longer: one already received is counted in `duplicates`, never
 // twice. A summary row naming a flag
 // the project does not have, or a variation its flag does not have, is
-// dropped and counted in `dropped_rows`. A refused event is listed in `rejected` with its
+// dropped and counted in `dropped_rows`, which is always 0 for a client key,
+// since a count would tell whether a flag key it guessed is a flag of the
+// project. A refused event is listed in `rejected` with its
 // index, its `event_id` when it has one, a `code` and a `detail`; the
 // SDK never sends it again.
 //
 // The rejection codes are an open set, which a later server may add
 // to: an SDK treats a code it does not know like any other rejection
-// and never resends the event. The codes today: `event_invalid` (a
+// and never resends the event. A client key is told no more of an
+// exposure's refusal than `unknown_experiment`, whatever it got wrong
+// and whether the experiment exists, is a draft or is none, so that it
+// learns nothing of the project's experiments from a refusal. The
+// codes today: `event_invalid` (a
 // member missing, of the wrong type, a string over 256 bytes or
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
-// time older than the retention window, after the clock skew shift), `undeclared_unit_type`,
+// time older than the retention window, after the clock skew shift), `undeclared_unit_type` (an alias of a server key naming a unit type the
+// project does not declare; a client key is answered `event_invalid`),
 // `unknown_experiment` (an exposure naming no experiment of the
 // project, or a draft, which is served to no unit; a started
 // experiment of any status exists, since a mobile app flushes its

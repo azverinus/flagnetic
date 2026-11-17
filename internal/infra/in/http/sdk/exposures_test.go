@@ -187,7 +187,7 @@ func TestAnExposureOfAnExperimentIsStoredOnce(t *testing.T) {
 
 func TestAnOverrideExposureOfAVariationTheFlagLacksIsRefused(t *testing.T) {
 	f := startExposures(t)
-	got := batchResult(t, f.srv, f.client, batch(exposureEvent(1, map[string]any{
+	got := batchResult(t, f.srv, f.server, batch(exposureEvent(1, map[string]any{
 		"variation_key": "made_up", "override": true, "evaluation_reason": "override",
 	})))
 	if got.Accepted != 0 || len(got.Rejected) != 1 || got.Rejected[0].Code != "unknown_variation" {
@@ -304,39 +304,40 @@ func TestExposuresAreRefusedPerEventWithTheCodeOfTheFirstCheckThatFails(t *testi
 	}
 }
 
-func TestAClientKeyLearnsNothingOfAnExperimentButTheCodeOfARefusal(t *testing.T) {
+func TestAClientKeyIsRefusedEveryExposureAsIfTheExperimentDidNotExist(t *testing.T) {
 	f := startExposures(t)
 	f.p.flag(t, "pricing")
+	f.p.draftExperiment(t, "unreleased_test", "pricing", "user", "true", 5000, "false", 5000)
 	refusals := func() []byte {
 		return batch(
 			exposureEvent(1, map[string]any{"unit_type": "anonymous"}),
 			exposureEvent(2, map[string]any{"variation_key": "maybe"}),
 			exposureEvent(3, map[string]any{"flag_key": "pricing"}),
 			exposureEvent(4, map[string]any{"evaluation_reason": "rule"}),
+			exposureEvent(5, map[string]any{"experiment_key": "unreleased_test"}),
+			exposureEvent(6, map[string]any{"experiment_key": "absent_test"}),
 		)
 	}
 	client := batchResult(t, f.srv, f.client, refusals())
 	server := batchResult(t, f.srv, f.server, refusals())
-	if len(client.Rejected) != 4 || len(server.Rejected) != 4 {
-		t.Fatalf("client rejections = %+v, server = %+v, want 4 each", client.Rejected, server.Rejected)
+	if len(client.Rejected) != 6 || len(server.Rejected) != 6 {
+		t.Fatalf("client rejections = %+v, server = %+v, want 6 each", client.Rejected, server.Rejected)
 	}
-	// What a client key must not learn of the experiment: its unit type, its
-	// flag, its variations and its status.
-	secrets := []string{"user", "checkout", "true", "false", "draft", "running", "stopped"}
+	// Whatever the exposure got wrong, and whether the experiment is a
+	// draft or does not exist, a client key is told the same of it: nothing
+	// of the experiment's unit type, flag, variations or status, and no
+	// code that tells the existing from the absent.
 	for i, c := range client.Rejected {
-		s := server.Rejected[i]
-		if c.Code != s.Code {
-			t.Errorf("rejection %d: client code %s, server code %s, want the same", i, c.Code, s.Code)
+		if c.Code != "unknown_experiment" {
+			t.Errorf("rejection %d: client code %s, want unknown_experiment", i, c.Code)
 		}
-		// The reason is the one the exposure carried and the permitted ones
-		// are the protocol's: the only detail both keys may share.
-		if c.Detail == s.Detail && !strings.HasPrefix(c.Detail, "evaluation_reason is") {
-			t.Errorf("rejection %d: the client key's detail %q is the server key's", i, c.Detail)
+		if !strings.HasPrefix(c.Detail, "no experiment is keyed ") {
+			t.Errorf("rejection %d: the client key's detail is %q", i, c.Detail)
 		}
-		for _, secret := range secrets {
-			if strings.Contains(c.Detail, secret) {
-				t.Errorf("rejection %d: the client key's detail %q names %q", i, c.Detail, secret)
-			}
+	}
+	for i, want := range []string{"unit_type_mismatch", "unknown_variation", "event_invalid", "event_invalid"} {
+		if got := server.Rejected[i].Code; got != want {
+			t.Errorf("rejection %d: server code %s, want %s", i, got, want)
 		}
 	}
 }
@@ -438,7 +439,7 @@ func TestTheCountsOfRefusedExposuresStayWhileTheFlagCannotBeArchivedFromItsExper
 
 func TestIngestCountsExposuresByKind(t *testing.T) {
 	f := startExposures(t)
-	batchResult(t, f.srv, f.client, batch(exposureEvent(1, nil), exposureEvent(2, nil), exposureEvent(3, map[string]any{"unit_type": "anonymous"})))
+	batchResult(t, f.srv, f.server, batch(exposureEvent(1, nil), exposureEvent(2, nil), exposureEvent(3, map[string]any{"unit_type": "anonymous"})))
 	scrape := f.srv.Scrape(t)
 	for series, want := range map[string]float64{
 		`flagnetic_events_ingested_total{kind="exposure"}`:            2,

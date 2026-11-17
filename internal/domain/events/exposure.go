@@ -41,38 +41,43 @@ type ExperimentFacts struct {
 // a variation taken as sent would let anyone holding one grow the counts
 // with names of their own making.
 //
-// A client key ships inside apps and browsers, so what it learns of an
-// experiment is its existence by the key it already holds and nothing more:
-// with detailed false the detail names no unit type, flag, variation or
-// status. The code is the same for both kinds of key.
-func CheckExposure(x Exposure, experiment *ExperimentFacts, detailed bool) *Rejection {
-	reject := func(code RejectionCode, client, server string) *Rejection {
-		if detailed {
-			return &Rejection{Code: code, Detail: server}
-		}
-		return &Rejection{Code: code, Detail: client}
+// The detail names the unit type, flag, variation and status the exposure
+// was judged against, so it is for a server key only; ForClient is what a
+// client key is told.
+func CheckExposure(x Exposure, experiment *ExperimentFacts) *Rejection {
+	reject := func(code RejectionCode, detail string) *Rejection {
+		return &Rejection{Code: code, Detail: detail}
 	}
 	switch {
 	case experiment == nil || experiment.Status == experiments.StatusDraft:
-		return reject(RejectUnknownExperiment, fmt.Sprintf("no experiment is keyed %q", x.ExperimentKey),
-			fmt.Sprintf("no experiment is keyed %q", x.ExperimentKey))
+		return reject(RejectUnknownExperiment, fmt.Sprintf("no experiment is keyed %q", x.ExperimentKey))
 	case x.UnitType != experiment.UnitType:
-		return reject(RejectUnitTypeMismatch, "the unit type is not the experiment's",
+		return reject(RejectUnitTypeMismatch,
 			fmt.Sprintf("experiment %q assigns units of type %q, not %q", x.ExperimentKey, experiment.UnitType, x.UnitType))
 	case !x.Override && !slices.Contains(experiment.Variations, x.VariationKey):
-		return reject(RejectUnknownVariation, "the variation is not one of the experiment's",
+		return reject(RejectUnknownVariation,
 			fmt.Sprintf("experiment %q has no variation %q", x.ExperimentKey, x.VariationKey))
 	case x.Override && !slices.Contains(experiment.FlagVariations, x.VariationKey):
-		return reject(RejectUnknownVariation, "the variation is not one of the experiment's flag",
+		return reject(RejectUnknownVariation,
 			fmt.Sprintf("the flag of experiment %q has no variation %q", x.ExperimentKey, x.VariationKey))
 	case x.FlagKey != experiment.FlagKey:
-		return reject(RejectEventInvalid, "the flag is not the experiment's",
+		return reject(RejectEventInvalid,
 			fmt.Sprintf("flag_key is %q, but experiment %q is on flag %q", x.FlagKey, x.ExperimentKey, experiment.FlagKey))
 	case x.Reason != string(eval.ReasonExperiment) && x.Reason != string(eval.ReasonOverride):
 		msg := fmt.Sprintf("evaluation_reason is %q, not %q or %q", x.Reason, eval.ReasonExperiment, eval.ReasonOverride)
-		return reject(RejectEventInvalid, msg, msg)
+		return reject(RejectEventInvalid, msg)
 	}
 	return nil
+}
+
+// ForClient is the refusal a client key is told in place of r. A client key
+// ships inside apps and browsers, where anyone can read it, and any finer
+// answer, whatever its detail, would let it probe which experiments exist
+// (a draft included), which unit type they assign, which variations they
+// weigh and which flag they run on: every refusal of an exposure is
+// answered as if no experiment were keyed so.
+func (Rejection) ForClient(experimentKey string) Rejection {
+	return Rejection{Code: RejectUnknownExperiment, Detail: fmt.Sprintf("no experiment is keyed %q", experimentKey)}
 }
 
 // RejectionCount is how many exposures of an experiment were refused for one

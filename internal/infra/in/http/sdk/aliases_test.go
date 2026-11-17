@@ -30,8 +30,26 @@ func aliasLinks(t *testing.T, p project, environment string) []events.AliasLink 
 	return links
 }
 
+func TestAClientKeyIsToldNoMoreOfAnUndeclaredUnitTypeThanThatTheAliasIsInvalid(t *testing.T) {
+	srv, _, client := eventsServer(t)
+	res := batchResult(t, srv, client, batch(
+		aliasOf(1, protocolTime, "device", "d-1", "user", "u-1"),
+		aliasOf(2, protocolTime, "anonymous", "d-1", "device", "u-1"),
+		aliasOf(3, protocolTime, "anonymous", "d-1", "anonymous", "d-2"),
+	))
+	if res.Accepted != 0 || len(res.Rejected) != 3 {
+		t.Fatalf("aliases = %+v, want all refused", res)
+	}
+	for _, r := range res.Rejected[:2] {
+		if r.Code != "event_invalid" || r.Detail != "the alias is not valid" {
+			t.Errorf("rejection %d = %+v, want event_invalid saying nothing of the unit type", r.Index, r)
+		}
+	}
+}
+
 func TestAliasesAreCheckedAgainstTheDeclaredUnitTypes(t *testing.T) {
-	srv, p, value := eventsServer(t)
+	srv, p, _ := eventsServer(t)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	res := batchResult(t, srv, value, batch(
 		aliasOf(1, protocolTime, "device", "d-1", "user", "u-1"),
 		aliasOf(2, protocolTime, "anonymous", "d-1", "device", "u-1"),
