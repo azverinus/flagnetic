@@ -42,10 +42,10 @@ var errReplicaDraining = apperrors.Unavailable("unavailable",
 
 // StreamRuleset holds the ruleset stream of the key's environment: each
 // version this replica loads above the last one sent, a heartbeat every
-// heartbeatInterval re-checking the key and catching up a version a failed
-// reload left unsent, until the stream's lifetime ends, the replica drains
-// or the client goes away. A replica that is already draining refuses the
-// stream instead.
+// heartbeatInterval re-checking the key and the origin the stream was opened
+// from and catching up a version a failed reload left unsent, until the
+// stream's lifetime ends, the replica drains or the client goes away. A
+// replica that is already draining refuses the stream instead.
 func (a *api) StreamRuleset(w http.ResponseWriter, r *http.Request, params StreamRulesetParams) {
 	select {
 	case <-a.edge.Draining():
@@ -62,6 +62,7 @@ func (a *api) StreamRuleset(w http.ResponseWriter, r *http.Request, params Strea
 		return
 	}
 	defer sub.Close()
+	origin, sentOrigin := requestOrigin(r)
 	a.h.Inventory.Note(p.key, delivery.ParseUserAgent(r.UserAgent()), "", current)
 
 	// Armed before the first frame, so a client that has read it knows
@@ -102,10 +103,19 @@ func (a *api) StreamRuleset(w http.ResponseWriter, r *http.Request, params Strea
 			// seconds, never past the silence after which the SDK
 			// reconnects.
 			ctx, cancel := context.WithTimeout(r.Context(), appdelivery.RulesetWait)
-			_, err := a.h.Authenticate.Handle(ctx, p.value)
+			key, err := a.h.Authenticate.Handle(ctx, p.value)
 			cancel()
 			if refusesKey(err) {
 				return
+			}
+			// The origin is judged against the key as it is now, so an
+			// origin removed from its list ends the stream here rather
+			// than when its lifetime does. A key that cannot be checked
+			// for now keeps its stream, origin included.
+			if err == nil {
+				if _, originErr := key.AdmitOrigin(origin, sentOrigin); originErr != nil {
+					return
+				}
 			}
 			ctx, cancel = context.WithTimeout(r.Context(), appdelivery.RulesetWait)
 			version, err := a.h.WatchRuleset.CatchUp(ctx, p.key, sent)

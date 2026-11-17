@@ -475,3 +475,46 @@ func TestARevokedTokenHasItsStreamClosedAtTheNextHeartbeat(t *testing.T) {
 		t.Error("the stream of a revoked token is open after the heartbeat")
 	}
 }
+
+func TestAMemberDemotedFromInstanceAdminHasTheStreamClosedAtTheNextHeartbeat(t *testing.T) {
+	c := clock.NewFake(time.Now())
+	srv := testkit.StartServer(t, testkit.WithClock(c))
+	pool := testkit.Pool(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	// Holding no grant in the project, the member reads it only as an
+	// instance admin.
+	member := testkit.NewMember(t, pool, testkit.AsInstanceAdmin())
+	s := openChanges(t, srv, testkit.PersonalToken(t, pool, member.ID, "admin", access.ScopeRead), p.Key, "")
+	s.Started(t)
+
+	off := false
+	res := do(admin.UpdateMemberWithResponse(t.Context(), member.ID.String(), management.MemberPatch{InstanceAdmin: &off}))
+	if res.StatusCode() != http.StatusOK {
+		t.Fatalf("PATCH member = %d %s", res.StatusCode(), res.Body)
+	}
+	c.Advance(15 * time.Second)
+	if !s.Ended(2 * time.Second) {
+		t.Error("the stream of a member no longer instance admin is open after the heartbeat")
+	}
+}
+
+func TestADeactivatedMemberHasTheStreamClosedAtTheNextHeartbeat(t *testing.T) {
+	c := clock.NewFake(time.Now())
+	srv := testkit.StartServer(t, testkit.WithClock(c))
+	pool := testkit.Pool(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	viewer := testkit.NewMember(t, pool)
+	testkit.Grant(t, pool, projectIDOf(p), viewer.ID, access.RoleViewer)
+	s := openChanges(t, srv, testkit.PersonalToken(t, pool, viewer.ID, "viewer", access.ScopeRead), p.Key, "")
+	s.Started(t)
+
+	if res := do(admin.DeactivateMemberWithResponse(t.Context(), viewer.ID.String())); res.StatusCode() != http.StatusOK {
+		t.Fatalf("deactivate = %d %s", res.StatusCode(), res.Body)
+	}
+	c.Advance(15 * time.Second)
+	if !s.Ended(2 * time.Second) {
+		t.Error("the stream of a deactivated member is open after the heartbeat")
+	}
+}

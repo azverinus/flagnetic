@@ -28,7 +28,7 @@ data: {"version":1745040000000}
 - The current version is sent at once when it is above `Last-Event-ID`, and not otherwise, so a reconnecting SDK neither misses nor repeats a version. A missing or unreadable `Last-Event-ID` counts as none.
 - Each later version is sent as soon as the replica holding the stream has loaded it, whichever replica took the change, so the SDK's download right after finds it there. Versions sent only increase.
 - Several changes arriving while the replica loads a ruleset are sent as one version, the newest.
-- A heartbeat comment `: hb` every 15 seconds tells a quiet stream from a dead one; an SDK hearing nothing for 45 seconds reconnects. On each heartbeat the key is checked again: a revoked, expired or deleted key ends the stream, while a key that cannot be checked for now keeps it. A version the replica heard of but could not send, because loading the ruleset failed twice, is sent on the next heartbeat.
+- A heartbeat comment `: hb` every 15 seconds tells a quiet stream from a dead one; an SDK hearing nothing for 45 seconds reconnects. On each heartbeat the key is checked again: a revoked, expired or deleted key ends the stream, as does a client key that no longer lists the origin the stream was opened from, while a key that cannot be checked for now keeps it. A version the replica heard of but could not send, because loading the ruleset failed twice, is sent on the next heartbeat.
 
 ## How a stream ends
 
