@@ -2,7 +2,7 @@
 
 # The console, built once on the build platform: its output is the same for
 # every target, and the Go build embeds it.
-FROM --platform=$BUILDPLATFORM node:26-alpine AS console
+FROM --platform=$BUILDPLATFORM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS console
 WORKDIR /src/web
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 # The pnpm the workspace names in packageManager, so its version has one home.
@@ -14,7 +14,7 @@ RUN pnpm install --frozen-lockfile --filter @flagnetic/console...
 COPY web/ ./
 RUN pnpm --filter @flagnetic/console build
 
-FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS build
 ARG TARGETOS TARGETARCH
 ARG VERSION=dev
 WORKDIR /src
@@ -30,7 +30,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
       -ldflags "-s -w -X github.com/azverinus/flagnetic/internal/pkg/buildinfo.version=${VERSION}" \
       -o /out/flagnetic ./cmd/flagnetic
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 COPY --from=build /out/flagnetic /usr/local/bin/flagnetic
 USER nonroot:nonroot
 # Inside a container the loopback address is unreachable from a published port,
