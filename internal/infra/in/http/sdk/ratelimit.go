@@ -58,6 +58,8 @@ type limiter struct {
 	streams  map[string]int
 	// clientStreams is the number of streams client keys hold open.
 	clientStreams int
+	// keyStreams is the number of streams each client key holds open.
+	keyStreams map[delivery.SDKKeyID]int
 	// windowsSwept and failuresSwept are when each map was last swept.
 	windowsSwept, failuresSwept time.Time
 }
@@ -76,7 +78,7 @@ func newLimiter(limits config.RateLimits, c clock.Clock, reg prometheus.Register
 			Namespace: metrics.Namespace, Subsystem: "sdk", Name: "rate_limited_total",
 			Help: "SDK API requests refused 429 rate_limited, by endpoint and key kind (none for a refusal of the client IP before its key is known).",
 		}, []string{"endpoint", "kind"}),
-		windows: map[string]*window{}, failures: map[netip.Prefix]*window{}, streams: map[string]int{},
+		windows: map[string]*window{}, failures: map[netip.Prefix]*window{}, streams: map[string]int{}, keyStreams: map[delivery.SDKKeyID]int{},
 	}
 	reg.MustRegister(l.refused)
 	return l
@@ -209,10 +211,17 @@ func (l *limiter) take(w http.ResponseWriter, ep endpoint, key delivery.SDKKey, 
 	return l.hold(w, key, ip)
 }
 
+// clientKeyShare is the fraction of the replica's places for client streams
+// one client key may hold, as 1/clientKeyShare: a client key is public, so
+// whoever holds one could otherwise fill the replica's places from many
+// addresses and leave the client SDKs of every other project polling.
+const clientKeyShare = 4
+
 // hold takes one of the stream slots of key from ip and, for a client key,
-// one of the replica's places for client streams: a client key is public,
-// so its holders together must not tie up every connection the replica
-// can hold. A stream's answer tells the budget of its key's slots, which
+// one of the replica's places for client streams, of which the key may hold
+// a quarter: a client key is public, so its holders together must not tie
+// up every connection the replica can hold, nor one key's holders every
+// place. A stream's answer tells the budget of its key's slots, which
 // is what bounds it while it is open.
 func (l *limiter) hold(w http.ResponseWriter, key delivery.SDKKey, ip netip.Addr) (func(), error) {
 	limit := l.concurrent(key.Kind)
@@ -231,6 +240,11 @@ func (l *limiter) hold(w http.ResponseWriter, key delivery.SDKKey, ip netip.Addr
 		l.mu.Unlock()
 		return nil, l.refuse(w, endpointStream, string(key.Kind), limit, time.Second)
 	}
+	share := max(replica/clientKeyShare, 1)
+	if replica > 0 && l.keyStreams[key.ID] >= share {
+		l.mu.Unlock()
+		return nil, l.refuse(w, endpointStream, string(key.Kind), share, time.Second)
+	}
 	if replica > 0 && l.clientStreams >= replica {
 		l.mu.Unlock()
 		return nil, l.refuse(w, endpointStream, string(key.Kind), replica, time.Second)
@@ -240,6 +254,7 @@ func (l *limiter) hold(w http.ResponseWriter, key delivery.SDKKey, ip netip.Addr
 	}
 	if replica > 0 {
 		l.clientStreams++
+		l.keyStreams[key.ID]++
 	}
 	l.mu.Unlock()
 	if limit > 0 {
@@ -257,6 +272,9 @@ func (l *limiter) hold(w http.ResponseWriter, key delivery.SDKKey, ip netip.Addr
 			}
 			if replica > 0 {
 				l.clientStreams--
+				if l.keyStreams[key.ID]--; l.keyStreams[key.ID] <= 0 {
+					delete(l.keyStreams, key.ID)
+				}
 			}
 		})
 	}, nil
