@@ -234,6 +234,28 @@ func TestACertificateRotationBindsTheKeysOfItsProvider(t *testing.T) {
 		}
 	}
 
+	if _, err = appidentity.NewRotateCertificate(d).Handle(t.Context(), cmd); codeOf(err) != "rotation_pending" {
+		t.Errorf("rotating again = %v, want rotation_pending", err)
+	}
+	missing := appidentity.ProviderCommand{Slug: "nothing-here", Request: admin}
+	if _, err = appidentity.NewRotateCertificate(d).Handle(t.Context(), missing); codeOf(err) != "not_found" {
+		t.Errorf("rotating an unknown provider = %v, want not_found", err)
+	}
+	if _, err = appidentity.NewCompleteCertificateRotation(d).Handle(t.Context(), missing); codeOf(err) != "not_found" {
+		t.Errorf("completing the rotation of an unknown provider = %v, want not_found", err)
+	}
+	oidc, err := appidentity.NewCreateProvider(d).Handle(t.Context(), appidentity.CreateProviderCommand{Input: input(), Request: admin})
+	if err != nil {
+		t.Fatal(err)
+	}
+	notSAML := appidentity.ProviderCommand{Slug: oidc.Slug, Request: admin}
+	if _, err = appidentity.NewRotateCertificate(d).Handle(t.Context(), notSAML); codeOf(err) != "not_saml" {
+		t.Errorf("rotating an OIDC provider = %v, want not_saml", err)
+	}
+	if _, err = appidentity.NewCompleteCertificateRotation(d).Handle(t.Context(), notSAML); codeOf(err) != "not_saml" {
+		t.Errorf("completing the rotation of an OIDC provider = %v, want not_saml", err)
+	}
+
 	done, err := appidentity.NewCompleteCertificateRotation(d).Handle(t.Context(), cmd)
 	if err != nil {
 		t.Fatal(err)
