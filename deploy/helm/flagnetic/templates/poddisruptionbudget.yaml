@@ -9,5 +9,5 @@ spec:
   maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
   selector:
     matchLabels:
-      {{- include "flagnetic.selectorLabels" . | nindent 6 }}
+      {{- include "flagnetic.serverSelectorLabels" . | nindent 6 }}
 {{- end }}

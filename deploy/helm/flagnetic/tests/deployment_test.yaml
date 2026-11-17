@@ -65,6 +65,17 @@ tests:
       - equal:
           path: spec.template.spec.topologySpreadConstraints[1].whenUnsatisfiable
           value: ScheduleAnyway
+  - it: labels and selects its pods as the server component
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/component"]
+          value: server
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/component"]
+          value: server
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].labelSelector.matchLabels["app.kubernetes.io/component"]
+          value: server
   - it: leaves the spread out when it is switched off
     set:
       topologySpreadConstraints.enabled: false

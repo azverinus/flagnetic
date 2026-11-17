@@ -798,7 +798,11 @@ jobs:
           KUBECONFORM_VERSION: v0.8.0
           UNITTEST_VERSION: v1.2.1
         run: |
-          helm plugin install https://github.com/helm-unittest/helm-unittest --version "$UNITTEST_VERSION" --verify=false
+          # Helm 4 verifies plugin signatures and the plugin ships none; Helm 3
+          # has no such flag and refuses an unknown one.
+          verify=()
+          case "$(helm version --short)" in v4*) verify=(--verify=false) ;; esac
+          helm plugin install https://github.com/helm-unittest/helm-unittest --version "$UNITTEST_VERSION" "${verify[@]}"
           curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" | tar -xz -C "$RUNNER_TEMP" kubeconform
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Lint, unit tests and kubeconform

@@ -19,4 +19,4 @@ spec:
       targetPort: metrics
       protocol: TCP
   selector:
-    {{- include "flagnetic.selectorLabels" . | nindent 4 }}
+    {{- include "flagnetic.serverSelectorLabels" . | nindent 4 }}

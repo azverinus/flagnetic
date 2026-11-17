@@ -27,6 +27,16 @@ app.kubernetes.io/name: {{ include "flagnetic.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
+{{/*
+The server's pods alone. The migration Job's pod and the helm test Pod carry
+the release's labels too; without the component, the Services would route
+requests to them, and the budget and the spread would count them.
+*/}}
+{{- define "flagnetic.serverSelectorLabels" -}}
+{{ include "flagnetic.selectorLabels" . }}
+app.kubernetes.io/component: server
+{{- end -}}
+
 {{- define "flagnetic.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create -}}
 {{- default (include "flagnetic.fullname" .) .Values.serviceAccount.name -}}

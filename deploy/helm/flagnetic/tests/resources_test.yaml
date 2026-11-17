@@ -34,6 +34,25 @@ tests:
           path: spec.type
           value: ClusterIP
         template: templates/service-metrics.yaml
+  # The migration Job's pod and the test Pod carry the release's labels; only
+  # the component keeps them out of the Services and the budget.
+  - it: selects only the server's pods
+    asserts:
+      - equal:
+          path: spec.selector["app.kubernetes.io/component"]
+          value: server
+        template: templates/service.yaml
+      - equal:
+          path: spec.selector["app.kubernetes.io/component"]
+          value: server
+        template: templates/service-metrics.yaml
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/component"]
+          value: server
+        template: templates/poddisruptionbudget.yaml
+      - notExists:
+          path: metadata.labels["app.kubernetes.io/component"]
+        template: templates/tests/test-ready.yaml
   - it: keeps at most one replica unavailable
     template: templates/poddisruptionbudget.yaml
     asserts:

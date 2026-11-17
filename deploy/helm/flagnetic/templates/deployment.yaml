@@ -9,7 +9,7 @@ spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "flagnetic.selectorLabels" . | nindent 6 }}
+      {{- include "flagnetic.serverSelectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
@@ -22,7 +22,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
-        {{- include "flagnetic.selectorLabels" . | nindent 8 }}
+        {{- include "flagnetic.serverSelectorLabels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -114,7 +114,7 @@ spec:
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              {{- include "flagnetic.selectorLabels" $ | nindent 14 }}
+              {{- include "flagnetic.serverSelectorLabels" $ | nindent 14 }}
         {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
