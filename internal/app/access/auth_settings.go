@@ -143,14 +143,14 @@ func (h *UpdateAuthSettings) Handle(ctx context.Context, cmd UpdateAuthSettingsC
 		}
 		changed = true
 		now := h.d.Clock.Now()
-		if err := h.d.Store.SaveAuthSettings(ctx, s); err != nil {
+		if err = h.d.Store.SaveAuthSettings(ctx, s); err != nil {
 			return err
 		}
 		after := authSettingsRecord(s)
 		if tightens(before, s) {
-			revoked, err := h.d.Store.RevokeRefusedSessions(ctx, s, now)
-			if err != nil {
-				return err
+			revoked, revokeErr := h.d.Store.RevokeRefusedSessions(ctx, s, now)
+			if revokeErr != nil {
+				return revokeErr
 			}
 			if revoked > 0 {
 				after["sessions_revoked"] = revoked
