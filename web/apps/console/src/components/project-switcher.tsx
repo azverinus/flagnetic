@@ -50,7 +50,6 @@ export function ProjectSwitcher() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={shown ? t`Project: ${label} ${shown}` : t`Project: ${label}`}
           className={cn(
             "flex h-12 w-full min-w-0 items-center gap-2.5 rounded-lg px-2 text-left text-sm transition-colors hover:bg-foreground/[0.06]",
             collapsed && "justify-center px-0",
@@ -62,16 +61,16 @@ export function ProjectSwitcher() {
           >
             <FlagIcon className="size-4" />
           </span>
+          {/* The visible text is the button's name, so it is read out in the rail too. */}
+          <span className={cn("flex min-w-0 flex-1 flex-col", collapsed && "sr-only")}>
+            <span className="sr-only">{t`Project:`} </span>
+            <span className="truncate leading-4 font-medium">{label}</span>{" "}
+            {shown ? (
+              <span className="truncate font-mono text-xs text-foreground-secondary">{shown}</span>
+            ) : null}
+          </span>
           {collapsed ? null : (
-            <>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate leading-4 font-medium">{label}</span>
-                {shown ? (
-                  <span className="truncate font-mono text-xs text-muted-foreground">{shown}</span>
-                ) : null}
-              </span>
-              <ChevronsUpDownIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-            </>
+            <ChevronsUpDownIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
           )}
         </button>
       </PopoverTrigger>

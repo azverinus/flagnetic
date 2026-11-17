@@ -6139,11 +6139,7 @@ msgid "Project updated"
 msgstr ""
 
 #: src/components/project-switcher.tsx
-msgid "Project: {label}"
-msgstr ""
-
-#: src/components/project-switcher.tsx
-msgid "Project: {label} {shown}"
+msgid "Project:"
 msgstr ""
 
 #: src/components/area-screens.ts
