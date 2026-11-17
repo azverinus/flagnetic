@@ -209,6 +209,10 @@ func (s *Store) EnsureEventPartitions(ctx context.Context, at time.Time) error {
 	return nil
 }
 
+// partitionLockTimeout bounds how long creating partitions waits for a lock,
+// the advisory one that serializes replicas included.
+var partitionLockTimeout = 5 * time.Second
+
 // CreateEventPartitions creates the partitions of every raw event table for
 // the UTC day of from and the ahead days after it, those missing. It runs
 // on its own connection, outside any unit of work the context carries, so
@@ -221,15 +225,18 @@ func (s *Store) CreateEventPartitions(ctx context.Context, from time.Time, ahead
 		return fmt.Errorf("creating event partitions: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('event_partitions', 0))`); err != nil {
-		return fmt.Errorf("creating event partitions: %w", err)
-	}
 	// Attaching a partition locks its parent table against every reader and
 	// writer, and while it waits for a long reader to finish, every insert
 	// queues behind it. Giving up after a few seconds bounds that stall: the
 	// worker tries again at its next round, days ahead of need, and a batch
 	// that needed the day now fails rather than hangs, and is retried.
-	if _, err = tx.Exec(ctx, `SET LOCAL lock_timeout = '5s'`); err != nil {
+	if _, err = tx.Exec(ctx, fmt.Sprintf(`SET LOCAL lock_timeout = '%dms'`, partitionLockTimeout.Milliseconds())); err != nil {
+		return fmt.Errorf("creating event partitions: %w", err)
+	}
+	// The advisory lock comes after the timeout, so that a replica holding
+	// it for long makes the others give up too instead of holding their
+	// connections while they wait.
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('event_partitions', 0))`); err != nil {
 		return fmt.Errorf("creating event partitions: %w", err)
 	}
 	var days []string

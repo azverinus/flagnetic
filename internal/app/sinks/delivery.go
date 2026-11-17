@@ -83,6 +83,11 @@ type Renewal struct {
 // write names the token of the lease and applies only while it holds, and
 // reports whether it did: a replica whose lease was taken records nothing.
 type DeliveryStore interface {
+	// LockProject locks project's row for the unit of work, or answers
+	// ErrNotFound when there is none. Every write of a project's sinks takes
+	// it before the sink's own rows, so recording a failure takes it first
+	// too.
+	LockProject(ctx context.Context, project workspace.ProjectID) error
 	// Claim leases to token, until until, the streams due by now of sinks
 	// that are enabled or still have a batch in flight and are not stopped,
 	// leaving out those of the sinks busy, the longest due first, at most
@@ -548,6 +553,17 @@ func (h *Deliver) fail(ctx context.Context, ref StreamRef, token LeaseToken, c C
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		var entered bool
 		var err error
+		// The project comes first, as in every other write of its sinks: the
+		// sink's row, then its stream's, then the outbox's foreign key to the
+		// project is the reverse order, and a replay or an update holding the
+		// project would deadlock with it.
+		if err = h.d.Store.LockProject(ctx, c.Sink.Project); errors.Is(err, ErrNotFound) {
+			// The project and its sinks are gone; so is the lease.
+			held = false
+			return nil
+		} else if err != nil {
+			return err
+		}
 		if held, entered, err = h.d.Store.Fail(ctx, ref, token, f, rejected, now.Add(wait), now); err != nil || !held || !entered {
 			return err
 		}
