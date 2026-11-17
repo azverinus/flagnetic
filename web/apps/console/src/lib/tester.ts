@@ -7,7 +7,7 @@ import { formatNumber } from "@/i18n/format";
 import type { AttributeTypes } from "./conditions";
 import { unitIdMaxBytes } from "./flag-detail";
 import type { RuleDraft } from "./rule-editor";
-import { readStored, writeStored } from "./storage";
+import { forgetStoredWithPrefix, readStored, writeStored } from "./storage";
 import { fingerprint } from "./structural-diff";
 
 /** A unit of the tester's context as typed: its type and ID. */
@@ -149,7 +149,17 @@ export function contextLabel(context: EvaluationContext): string {
 /** How many contexts the tester remembers in each project. */
 export const maxRecentContexts = 10;
 
-const recentKey = (project: string) => `flagnetic.recent-contexts.${project}`;
+const recentPrefix = "flagnetic.recent-contexts.";
+const recentKey = (project: string) => `${recentPrefix}${project}`;
+
+/**
+ * Forgets the recent contexts of every project. They hold what support
+ * staff looked up, and the key is not per member, so whoever signs in next
+ * on this browser must not find them.
+ */
+export function forgetRecentContexts(): void {
+  forgetStoredWithPrefix(recentPrefix);
+}
 
 function isContext(value: unknown): value is EvaluationContext {
   const isRecord = (inner: unknown) =>

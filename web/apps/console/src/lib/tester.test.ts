@@ -6,6 +6,7 @@ import {
   buildContext,
   contextDraftOf,
   contextLabel,
+  forgetRecentContexts,
   matchedRuleOf,
   recentContexts,
   rememberContext,
@@ -123,6 +124,16 @@ describe("the contexts a project's tester remembers", () => {
     expect(recent[0]).toEqual({ attributes: { age: 3, platform: "ios" } });
     expect(recent[1]).toEqual({ units: { user: "u-11" } });
     expect(recentContexts("billing")).toEqual([]);
+  });
+
+  it("forgets the recent contexts of every project and nothing else", () => {
+    rememberContext("checkout", { units: { user: "u-1" } });
+    rememberContext("billing", { units: { user: "u-2" } });
+    localStorage.setItem("flagnetic.last-project", "checkout");
+    forgetRecentContexts();
+    expect(recentContexts("checkout")).toEqual([]);
+    expect(recentContexts("billing")).toEqual([]);
+    expect(localStorage.getItem("flagnetic.last-project")).toBe("checkout");
   });
 
   it("forgets what it cannot read rather than failing", () => {

@@ -32,3 +32,15 @@ export function writeStored(key: string, value: string | null): void {
     // Denied storage: the preference lasts until the page is left.
   }
 }
+
+/** Forgets every stored key that starts with the prefix. */
+export function forgetStoredWithPrefix(prefix: string): void {
+  try {
+    const storage = browserStorage();
+    if (!storage) return;
+    const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index));
+    for (const key of keys) if (key?.startsWith(prefix)) storage.removeItem(key);
+  } catch {
+    // Denied storage: there is nothing kept to forget.
+  }
+}
