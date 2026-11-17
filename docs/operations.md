@@ -336,7 +336,7 @@ A webhook subscription's target is `https` on the public internet. A target over
 
 ## Metrics
 
-Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNETIC_METRICS_LISTEN_ADDR` (`:9090` by default), and never on the public listener. Keep the port inside your network. Setting the address empty switches metrics off and opens no port.
+Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNETIC_METRICS_LISTEN_ADDR` (`127.0.0.1:9090` by default, so only this host reaches it; the container image listens on `:9090` and leaves what to publish to you), and never on the public listener. Keep the port inside your network. Setting the address empty switches metrics off and opens no port.
 
 | Metric | Labels | What it tells |
 |---|---|---|
