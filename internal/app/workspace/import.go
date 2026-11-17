@@ -21,6 +21,8 @@ type ImportStore interface {
 	EnvironmentDeleter
 	UnitTypeDeleter
 	AttributeDeleter
+	// CountEnvironments returns how many environments project has.
+	CountEnvironments(ctx context.Context, project workspace.ProjectID) (int, error)
 }
 
 // Importer writes the entities of a project document that the workspace
@@ -169,6 +171,15 @@ func (i *Importer) CreateEnvironment(ctx context.Context, project workspace.Proj
 	now := i.rec.clock.Now()
 	e, err := workspace.NewEnvironment(id.New[workspace.Environment](i.rec.ids), project, key, name, sortOrder, now)
 	if err != nil {
+		return workspace.Environment{}, err
+	}
+	// A document creates environments past the project's limit no more than
+	// a request does: the limit bounds what every replica and SDK holds.
+	existing, err := i.store.CountEnvironments(ctx, project)
+	if err != nil {
+		return workspace.Environment{}, err
+	}
+	if err = workspace.CheckEnvironmentCount(existing); err != nil {
 		return workspace.Environment{}, err
 	}
 	e.Protected = protected
