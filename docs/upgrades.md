@@ -38,10 +38,11 @@ To go further than one minor, upgrade through each one in turn (1.4, 1.5, then 1
 ### Kubernetes with the chart
 
 ```bash
-helm upgrade flagnetic oci://ghcr.io/azverinus/charts/flagnetic -n flagnetic --version <new version> --reset-then-reuse-values
+helm upgrade flagnetic oci://ghcr.io/azverinus/charts/flagnetic -n flagnetic \
+  --version <new version> -f values.yaml
 ```
 
-`--reset-then-reuse-values` keeps the values you set and takes the new chart's defaults for the rest; `--reuse-values` alone would leave out a value the new chart adds.
+Pass your values file again rather than `--reuse-values`, which keeps the old release's defaults for values the new chart adds. [Running on Kubernetes](kubernetes.md#upgrading) has the rest.
 
 The chart's `pre-upgrade` hook Job runs `flagnetic migrate` with the new image before any pod is replaced, while the old pods serve. A failed migration stops the upgrade and leaves the old pods running. The Deployment's rolling update then replaces the pods, and the PodDisruptionBudget keeps at most one of them away from voluntary disruptions: a new pod receives requests when `/readyz` answers, an old one leaves the Service when it starts its [drain](operations.md#stopping) and finishes its in-flight requests within the termination grace period. Keep at least two replicas for this to be free of downtime, which is the chart's default. Settings that choose another migration mode (`migrations.mode`) are in the [chart's README](../deploy/helm/flagnetic/README.md).
 

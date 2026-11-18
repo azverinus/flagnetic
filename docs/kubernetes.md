@@ -208,7 +208,7 @@ helm upgrade flagnetic oci://ghcr.io/azverinus/charts/flagnetic -n flagnetic \
 
 Pass your values file again rather than `--reuse-values`, which would keep the old release's defaults for values the new chart adds. The hook Job migrates the database, and only when it succeeds does Helm roll the Deployment, replacing the pods a few at a time while the others keep serving. A stopping pod answers `/readyz` with 503 for the drain, then finishes its requests, so the Service stops routing to it before it goes and no request is refused; the 30-second `terminationGracePeriodSeconds` covers both (see [Stopping](operations.md#stopping)). A failed migration fails the upgrade with every pod still on the old version; read the Job's log with `kubectl logs -n flagnetic job/flagnetic-migrate`, fix the cause and upgrade again.
 
-`helm rollback` returns the chart to a previous revision but not the database. Migrations only move forward and there are no down migrations, so to go back after a migration, restore the backup taken before the upgrade. The rest of the policy, and the note for each release, is in [Upgrades](install.md#upgrades) and [Compatibility](compatibility.md).
+`helm rollback` returns the chart to a previous revision but not the database. Migrations only move forward and there are no down migrations, so to go back after a migration, restore the backup taken before the upgrade. The rest of the policy, and the note for each release, is in [Upgrading Flagnetic](upgrades.md) and [Compatibility](compatibility.md).
 
 ## Uninstalling
 
