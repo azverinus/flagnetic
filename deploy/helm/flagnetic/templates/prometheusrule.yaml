@@ -1,4 +1,7 @@
 {{- if .Values.prometheusRule.enabled }}
+{{- /* The ServiceMonitor names the job after the metrics Service, so these
+matchers keep the alerts to this release when one Prometheus scrapes several. */}}
+{{- $series := printf "job=%q, namespace=%q" (printf "%s-metrics" (include "flagnetic.fullname" .)) .Release.Namespace }}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -16,7 +19,7 @@ spec:
     - name: {{ include "flagnetic.fullname" . }}
       rules:
         - alert: FlagneticListenerDown
-          expr: flagnetic_listener_up == 0
+          expr: flagnetic_listener_up{ {{- $series -}} } == 0
           for: 1m
           labels:
             severity: warning
@@ -30,7 +33,7 @@ spec:
         - alert: FlagneticRulesetPropagationSlow
           expr: >-
             histogram_quantile(0.99,
-            sum by (le) (rate(flagnetic_ruleset_propagation_seconds_bucket[5m])))
+            sum by (le) (rate(flagnetic_ruleset_propagation_seconds_bucket{ {{- $series -}} }[5m])))
             > {{ .Values.prometheusRule.propagationSeconds }}
           for: 10m
           labels:
@@ -42,7 +45,8 @@ spec:
               answer carrying it has been above
               {{ .Values.prometheusRule.propagationSeconds }} seconds for ten minutes.
         - alert: FlagneticSinkStopped
-          expr: flagnetic_sink_dead_letters > 0
+          # Every replica reports the same count, so one alert per sink.
+          expr: max by (sink) (flagnetic_sink_dead_letters{ {{- $series -}} }) > 0
           for: 10m
           labels:
             severity: warning
@@ -54,7 +58,7 @@ spec:
               a member resumes it.
         - alert: FlagneticWebhookDeliveriesFailing
           expr: >-
-            sum(increase(flagnetic_webhook_deliveries_total{status=~"failed|exhausted"}[15m])) > 0
+            sum(increase(flagnetic_webhook_deliveries_total{ {{- $series -}}, status=~"failed|exhausted"}[15m])) > 0
           for: 5m
           labels:
             severity: warning

@@ -74,16 +74,19 @@ tests:
           value: FlagneticWebhookDeliveriesFailing
       - equal:
           path: spec.groups[0].rules[0].expr
-          value: flagnetic_listener_up == 0
+          value: flagnetic_listener_up{job="flags-flagnetic-metrics", namespace="ops"} == 0
       - matchRegex:
           path: spec.groups[0].rules[1].expr
           pattern: flagnetic_ruleset_propagation_seconds_bucket.* > 2$
       - matchRegex:
           path: spec.groups[0].rules[2].expr
-          pattern: ^flagnetic_sink_dead_letters > 0$
+          pattern: ^max by \(sink\) \(flagnetic_sink_dead_letters\{job="flags-flagnetic-metrics", namespace="ops"\}\) > 0$
       - matchRegex:
           path: spec.groups[0].rules[3].expr
-          pattern: flagnetic_webhook_deliveries_total\{status=~"failed\|exhausted"\}
+          pattern: flagnetic_webhook_deliveries_total\{job="flags-flagnetic-metrics", namespace="ops", status=~"failed\|exhausted"\}
+      - matchRegex:
+          path: spec.groups[0].rules[1].expr
+          pattern: flagnetic_ruleset_propagation_seconds_bucket\{job="flags-flagnetic-metrics", namespace="ops"\}
   - it: takes the propagation threshold from the values
     template: templates/prometheusrule.yaml
     set:

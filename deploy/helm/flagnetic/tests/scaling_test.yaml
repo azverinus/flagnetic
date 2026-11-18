@@ -55,6 +55,23 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: maxReplicas
+  - it: refuses to scale on CPU the pods do not request
+    template: templates/hpa.yaml
+    set:
+      autoscaling.enabled: true
+      resources.requests: null
+    asserts:
+      - failedTemplate:
+          errorPattern: resources.requests.cpu
+  - it: accepts a CPU target above the request
+    template: templates/hpa.yaml
+    set:
+      autoscaling.enabled: true
+      autoscaling.targetCPUUtilizationPercentage: 150
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target.averageUtilization
+          value: 150
   - it: admits any source to http, none to metrics and opens DNS and PostgreSQL
     template: templates/networkpolicy.yaml
     set:

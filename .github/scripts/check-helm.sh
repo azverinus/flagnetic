@@ -24,7 +24,8 @@ echo "== $("$helm" version --short)"
 # ci/ holds what `ct install` installs; render/ holds values that need CRDs a
 # kind cluster lacks, so they are rendered and checked but never installed.
 values_files=("$chart"/ci/*-values.yaml "$chart"/render/*-values.yaml)
-crds='https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+# The catalog is pinned to a commit so a change there cannot change the result.
+crds='https://raw.githubusercontent.com/datreeio/CRDs-catalog/784ec895547a36e548e6810b41f27baade3a0890/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
 
 for values in "${values_files[@]}"; do
   echo "== helm lint $values"

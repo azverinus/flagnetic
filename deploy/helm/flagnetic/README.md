@@ -45,7 +45,7 @@ Pods are replaced one at a time behind a PodDisruptionBudget. A stopping pod kee
 
 ## Traffic
 
-Neither the Ingress nor the HTTPRoute is on by default. An SDK holds a ruleset stream open for up to an hour and the server sends a heartbeat every 15 seconds, so the proxy in front must not buffer `/sdk/v1/stream` and must time out an idle connection above 15 seconds; an hour is a safe value. For ingress-nginx:
+Neither the Ingress nor the HTTPRoute is on by default. An SDK holds a ruleset stream open for up to 65 minutes, and the ruleset stream and the management change stream send a heartbeat every 15 seconds, so the proxy in front must not buffer either stream, must time out an idle connection above 15 seconds and must not end a request before the stream does; an hour is a safe idle timeout. For ingress-nginx:
 
 ```yaml
 ingress:
@@ -61,7 +61,7 @@ ingress:
       hosts: [flags.example.com]
 ```
 
-With the Gateway API, attach the route to your Gateway and raise the Gateway's request and idle timeouts in your implementation's own way:
+With the Gateway API, attach the route to your Gateway and in your implementation's own way raise the Gateway's idle timeout above 15 seconds and its request timeout above 65 minutes, or turn the request timeout off:
 
 ```yaml
 httpRoute:
@@ -78,9 +78,11 @@ Metrics are on a Service of their own that neither the Ingress nor the HTTPRoute
 
 `serviceMonitor.enabled` and `prometheusRule.enabled` render Prometheus Operator resources, so the operator's CRDs must exist first. The alerts use the metrics in [the operations guide](../../../docs/operations.md#metrics).
 
-`autoscaling.enabled` replaces the Deployment's replica count with a HorizontalPodAutoscaler on CPU; the pods request CPU by default, which the autoscaler needs.
+The alerts select the series of this release's metrics Service, so they rely on the ServiceMonitor or on a scrape job named the same.
 
-`networkPolicy.enabled` restricts the server's pods to the `http` port from `networkPolicy.ingress.http.from` and the `metrics` port from `networkPolicy.ingress.metrics.from`, and to DNS, PostgreSQL and the rules in `networkPolicy.egress.rules`. List there what the instance reaches: webhook receivers, sinks, SMTP servers and identity providers (OIDC and SAML). The migration Job and the `helm test` Pod are not selected.
+`autoscaling.enabled` replaces the Deployment's replica count with a HorizontalPodAutoscaler on CPU; the pods request CPU by default, which the autoscaler needs, and the chart refuses to render without it. Turning it on in an upgrade removes the Deployment's replica count, which Kubernetes may reset to one until the autoscaler scales back to `autoscaling.minReplicas`.
+
+`networkPolicy.enabled` restricts the server's pods to the `http` port from `networkPolicy.ingress.http.from` and the `metrics` port from `networkPolicy.ingress.metrics.from`, and to DNS, PostgreSQL and the rules in `networkPolicy.egress.rules`. List there what the instance reaches: webhook receivers, sinks, SMTP servers and identity providers (OIDC and SAML). The migration Job and the `helm test` Pod are not selected. With a ServiceMonitor, list the Prometheus pods in `networkPolicy.ingress.metrics.from`, or no scrape gets through.
 
 ## Supported versions
 

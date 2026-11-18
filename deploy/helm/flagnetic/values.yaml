@@ -87,10 +87,11 @@ podDisruptionBudget:
   maxUnavailable: 1
 
 # Traffic comes in through an Ingress or a Gateway API HTTPRoute; neither is
-# on by default, and both may be on at once. Streams stay open for up to an hour
-# and the server sends a heartbeat every 15 seconds, so the proxy in front needs
-# response buffering off for /sdk/v1/stream and an idle (read) timeout above
-# the heartbeat. For ingress-nginx:
+# on by default, and both may be on at once. An SDK's ruleset stream stays open
+# for up to 65 minutes, and it and the management change stream send a heartbeat
+# every 15 seconds, so the proxy in front needs response buffering off for both
+# streams, an idle (read) timeout above the heartbeat and no request timeout
+# shorter than the stream. For ingress-nginx:
 #   ingress:
 #     enabled: true
 #     className: nginx
@@ -112,8 +113,9 @@ ingress:
   tls: []
 
 # A Gateway API route to the http Service. The Gateway's own timeouts apply:
-# raise its request and idle timeouts above 15 seconds in the implementation's
-# way (for Envoy Gateway, a BackendTrafficPolicy; for Istio, a DestinationRule).
+# in the implementation's way, raise its idle timeout above 15 seconds and its
+# request timeout above 65 minutes, or turn the request timeout off (for Envoy
+# Gateway, a BackendTrafficPolicy, whose default request timeout is 15 seconds).
 #   httpRoute:
 #     enabled: true
 #     parentRefs:
@@ -145,7 +147,7 @@ prometheusRule:
   # Labels the Prometheus instance selects rules by.
   labels: {}
   # The 99th percentile of ruleset propagation above which the alert fires.
-  # The server declares 2 seconds.
+  # The declared 99th percentile of ruleset propagation is 2 seconds.
   propagationSeconds: 2
 
 # Scales the Deployment on CPU against resources.requests.cpu.

@@ -147,7 +147,7 @@
         "enabled": { "type": "boolean" },
         "minReplicas": { "type": "integer", "minimum": 1 },
         "maxReplicas": { "type": "integer", "minimum": 1 },
-        "targetCPUUtilizationPercentage": { "type": "integer", "minimum": 1, "maximum": 100 }
+        "targetCPUUtilizationPercentage": { "type": "integer", "minimum": 1 }
       }
     },
     "networkPolicy": {
