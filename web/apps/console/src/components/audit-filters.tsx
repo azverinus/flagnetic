@@ -42,8 +42,9 @@ export type AuditPlace = Place & { filter: "environment" | "project"; options: F
 /**
  * An audit log's filters and what they are written as: the address holds
  * them, the context panel edits them, and the toolbar's chips show them.
- * A change replaces the address rather than adding to the history, and
- * starts again from the newest page.
+ * A change of filter replaces the address rather than adding to the
+ * history, and starts again from the newest page; turning a page adds an
+ * entry, so going back returns to the page read before.
  */
 export type AuditFilters = {
   scope: AuditScope;
@@ -51,8 +52,13 @@ export type AuditFilters = {
   /** The members the log is filtered by, whoever acted in the entries shown included. */
   actors: FilterOption[];
   place: AuditPlace;
-  /** Replaces the search, the page included. */
+  /** Replaces the search, the page included, in place of the history entry. */
   apply: (search: AuditSearch) => void;
+  /**
+   * Turns to the page the cursor starts, or the newest without one, as a
+   * history entry of its own, so going back returns to the page read before.
+   */
+  turnPage: (cursor: string | undefined) => void;
   /** Changes some of the filters and returns to the newest page. */
   filter: (patch: Partial<AuditSearch>) => void;
   chips: ToolbarChip[];
@@ -66,8 +72,9 @@ function useAuditFiltersOf(
   search: AuditSearch,
   known: FilterOption[],
   place: AuditPlace,
-  apply: (search: AuditSearch) => void,
+  go: (search: AuditSearch, replace: boolean) => void,
 ): AuditFilters {
+  const apply = (next: AuditSearch) => go(next, true);
   const { i18n, t } = useLingui();
   // The same read as the log's own, so it is made once.
   const page = useQuery(auditEntriesQuery(scope, search));
@@ -98,6 +105,7 @@ function useAuditFiltersOf(
     actors,
     place,
     apply,
+    turnPage: (cursor) => go({ ...search, cursor }, false),
     filter,
     chips,
     removeChip: (id) => filter({ [id]: undefined }),
@@ -156,12 +164,12 @@ export function useProjectAuditFilters(): AuditFilters {
     search,
     known,
     place,
-    (next) =>
+    (next, replace) =>
       void navigate({
         to: "/projects/$project/audit",
         params: { project },
         search: next,
-        replace: true,
+        replace,
       }),
   );
 }
@@ -202,7 +210,7 @@ export function useInstanceAuditFilters(): AuditFilters {
     search,
     known,
     place,
-    (next) => void navigate({ to: "/admin/audit", search: next, replace: true }),
+    (next, replace) => void navigate({ to: "/admin/audit", search: next, replace }),
   );
 }
 

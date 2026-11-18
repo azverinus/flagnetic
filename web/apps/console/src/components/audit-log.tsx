@@ -114,7 +114,7 @@ export function AuditEntriesTable({
  */
 export function AuditLog({ filters, EntryLink }: AuditLogProps) {
   const { t } = useLingui();
-  const { scope, search, apply, filter, place } = filters;
+  const { scope, search, apply, turnPage, filter, place } = filters;
   const page = useQuery(auditEntriesQuery(scope, search));
   const filtered = isFiltered(search);
 
@@ -166,14 +166,14 @@ export function AuditLog({ filters, EntryLink }: AuditLogProps) {
             <Button
               variant="outline"
               disabled={!search.cursor}
-              onClick={() => apply({ ...search, cursor: undefined })}
+              onClick={() => turnPage(undefined)}
             >
               <Trans>Newest entries</Trans>
             </Button>
             <Button
               variant="outline"
               disabled={!page.data?.next_cursor || page.isPlaceholderData}
-              onClick={() => apply({ ...search, cursor: page.data?.next_cursor ?? undefined })}
+              onClick={() => turnPage(page.data?.next_cursor ?? undefined)}
             >
               <Trans>Older entries</Trans>
             </Button>

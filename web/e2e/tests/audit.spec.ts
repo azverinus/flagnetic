@@ -115,6 +115,12 @@ test("project audit log: filters, the entry with its before and after, and pagin
   await page.getByRole("button", { name: "Older entries" }).click();
   await expect(page).toHaveURL(/cursor=/);
   await expect(entries(page).filter({ hasText: "project.created" })).toHaveCount(1);
+  // Each page is a history entry: going back returns to the newest one.
+  await page.goBack();
+  await expect(page).not.toHaveURL(/cursor=/);
+  await expect(entries(page).nth(1)).toContainText("unit_type.created");
+  await page.goForward();
+  await expect(page).toHaveURL(/cursor=/);
   await page.getByRole("button", { name: "Newest entries" }).click();
   await expect(page).not.toHaveURL(/cursor=/);
 
