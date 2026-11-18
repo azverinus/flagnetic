@@ -387,6 +387,10 @@ msgstr "{name} never set a password, so they join again through this link."
 msgid "{name} will no longer be able to sign in through {provider} with this account. The member and everything they hold stays, and they can link it again."
 msgstr "{name} will no longer be able to sign in through {provider} with this account. The member and everything they hold stays, and they can link it again."
 
+#: src/components/audit-filters.tsx
+msgid "{name}: {value}"
+msgstr "{name}: {value}"
+
 #: src/components/session-list.tsx
 msgid "{others, plural, one {Revoke # session} other {Revoke # sessions}}"
 msgstr "{others, plural, one {Revoke # session} other {Revoke # sessions}}"
@@ -959,9 +963,14 @@ msgid "ACS URL"
 msgstr "ACS URL"
 
 #: src/components/audit-entry-sheet.tsx
+#: src/components/audit-filters.tsx
 #: src/components/audit-log.tsx
 msgid "Action"
 msgstr "Action"
+
+#: src/components/audit-log.tsx
+msgid "Action, key or actor"
+msgstr "Action, key or actor"
 
 #: src/components/overrides-section.tsx
 #: src/components/row-dialogs.tsx
@@ -990,7 +999,7 @@ msgstr "Activity"
 msgid "Actor"
 msgstr "Actor"
 
-#: src/components/audit-log.tsx
+#: src/components/audit-filters.tsx
 msgid "Actor kind"
 msgstr "Actor kind"
 
@@ -1224,7 +1233,7 @@ msgstr "Another row has this variation."
 msgid "Another variation has this key."
 msgstr "Another variation has this key."
 
-#: src/components/audit-log.tsx
+#: src/components/audit-filters.tsx
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Any"
 msgstr "Any"
@@ -1337,10 +1346,6 @@ msgstr "Apply"
 #: src/components/propose-dialog.tsx
 msgid "Apply at"
 msgstr "Apply at"
-
-#: src/components/audit-log.tsx
-msgid "Apply filters"
-msgstr "Apply filters"
 
 #: src/components/change-request-actions.tsx
 msgid "Apply the change request"
@@ -3279,6 +3284,7 @@ msgid "Enter your password."
 msgstr "Enter your password."
 
 #: src/components/audit-entry-sheet.tsx
+#: src/components/audit-filters.tsx
 #: src/components/audit-log.tsx
 msgid "Entity"
 msgstr "Entity"
@@ -3759,10 +3765,6 @@ msgstr "Fetch from a URL"
 msgid "Field"
 msgstr "Field"
 
-#: src/components/audit-log.tsx
-msgid "Filter the audit log"
-msgstr "Filter the audit log"
-
 #: src/components/webhook-deliveries.tsx
 msgid "Filter the deliveries"
 msgstr "Filter the deliveries"
@@ -3775,6 +3777,7 @@ msgstr "Filter the experiments"
 msgid "Filter the segments"
 msgstr "Filter the segments"
 
+#: src/components/audit-filters.tsx
 #: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/components/ui/toolbar.tsx
@@ -3947,7 +3950,7 @@ msgstr "Format variation {n}"
 msgid "Found"
 msgstr "Found"
 
-#: src/components/audit-log.tsx
+#: src/components/audit-filters.tsx
 #: src/components/sink-recovery.tsx
 #: src/components/webhook-deliveries.tsx
 msgid "From"
@@ -4253,10 +4256,6 @@ msgstr "in {environment}"
 msgid "In {name}, as the server evaluates the flag."
 msgstr "In {name}, as the server evaluates the flag."
 
-#: src/components/audit-log.tsx
-msgid "In the action, the entity's key and the actor's name."
-msgstr "In the action, the entity's key and the actor's name."
-
 #: src/lib/conditions.ts
 msgid "in the segment {segment}"
 msgstr "in the segment {segment}"
@@ -4300,10 +4299,10 @@ msgstr "Inserts events into tables of your ClickHouse database over its HTTP int
 #. An audit entry that belongs to no project.
 #. An audit entry that belongs to no project.
 #: src/components/area-screens.ts
+#: src/components/audit-filters.tsx
 #: src/components/navigation.tsx
 #: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/audit.$entry.tsx
-#: src/routes/_signed-in/admin/audit.tsx
 msgid "Instance"
 msgstr "Instance"
 
@@ -4956,7 +4955,7 @@ msgstr "Me ({myName})"
 
 #. A kind of actor in the audit log.
 #. A kind of entity in the audit log.
-#: src/components/audit-log.tsx
+#: src/components/audit-filters.tsx
 #: src/components/grant-form.tsx
 #: src/components/project-invitations.tsx
 #: src/lib/audit.ts
@@ -6209,12 +6208,12 @@ msgstr "Profile"
 
 #. A kind of entity in the audit log.
 #: src/components/area-screens.ts
+#: src/components/audit-filters.tsx
 #: src/components/group-mappings.tsx
 #: src/components/invite-form.tsx
 #: src/components/navigation.tsx
 #: src/lib/audit.ts
 #: src/routes/_signed-in/admin/audit.$entry.tsx
-#: src/routes/_signed-in/admin/audit.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "Project"
 msgstr "Project"
@@ -7117,7 +7116,6 @@ msgstr "SDKs record an exposure after every evaluation whose result carries an e
 msgid "SDKs stop receiving the flag in every environment and code falls back to its default. It can be restored later; refused while another flag requires it."
 msgstr "SDKs stop receiving the flag in every environment and code falls back to its default. It can be restored later; refused while another flag requires it."
 
-#: src/components/audit-log.tsx
 #: src/components/search-field.tsx
 msgid "Search"
 msgstr "Search"
@@ -9274,7 +9272,7 @@ msgstr "Title"
 msgid "TLS from the first byte, usually port 465"
 msgstr "TLS from the first byte, usually port 465"
 
-#: src/components/audit-log.tsx
+#: src/components/audit-filters.tsx
 #: src/components/sink-recovery.tsx
 #: src/components/webhook-deliveries.tsx
 msgid "To"

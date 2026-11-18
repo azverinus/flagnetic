@@ -1,6 +1,7 @@
-import { type ReactNode, useId } from "react";
+import { type ReactNode, useId, useState } from "react";
 
 import { SearchField } from "@/components/search-field";
+import { Input } from "@/components/ui/input";
 import { Select, SelectItem } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 
@@ -173,5 +174,47 @@ export function PanelTextFacet({ label, placeholder, value, onChange }: PanelTex
         onChange={onChange}
       />
     </div>
+  );
+}
+
+export type PanelDateFacetProps = {
+  label: ReactNode;
+  /** The day (YYYY-MM-DD) the address holds, or undefined while the facet is not set. */
+  value: string | undefined;
+  /** Applies the day, or undefined once the field is emptied. */
+  onChange: (value: string | undefined) => void;
+};
+
+/**
+ * A day facet. A date is typed in several parts, so it applies when the
+ * field loses focus or Enter is pressed, never on the way, and an address
+ * that changes meanwhile replaces what was typed.
+ */
+export function PanelDateFacet({ label, value, onChange }: PanelDateFacetProps) {
+  const [typed, setTyped] = useState(value ?? "");
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    setTyped(value ?? "");
+  }
+  const apply = () => {
+    const next = typed === "" ? undefined : typed;
+    if (next !== value) onChange(next);
+  };
+  return (
+    <FacetFrame label={label}>
+      {(labelId) => (
+        <Input
+          type="date"
+          aria-labelledby={labelId}
+          value={typed}
+          onChange={(event) => setTyped(event.target.value)}
+          onBlur={apply}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") apply();
+          }}
+        />
+      )}
+    </FacetFrame>
   );
 }

@@ -51,4 +51,13 @@ describe("Moment", () => {
     expect(screen.getByText(/Nov 18, 2026/)).not.toHaveAttribute("title");
     expect(screen.getByText("Never")).toBeInTheDocument();
   });
+
+  it("is the exact time to the second in mono with the full variant, also in its title", () => {
+    renderWithProviders(<Moment value="2026-11-18T11:55:07Z" full />);
+
+    const time = screen.getByText(/Nov 18, 2026.*:07/);
+    expect(time).toHaveAttribute("dateTime", "2026-11-18T11:55:07Z");
+    expect(time).toHaveClass("font-mono");
+    expect(time.getAttribute("title")).toBe(time.textContent);
+  });
 });

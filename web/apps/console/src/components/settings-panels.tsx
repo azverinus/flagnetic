@@ -1,6 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 
 import {
   instanceGroupLabels,
@@ -63,12 +64,20 @@ export function ProjectSettingsPanel() {
  * Delivery, then the audit log on its own. Anyone else sees none, since
  * the route tells them the area is not theirs.
  */
-export function InstancePanel() {
+export function InstancePanel({
+  startsOpenWide = false,
+  children,
+}: {
+  /** A list's panel: it starts folded away in a window narrower than 1280 px. */
+  startsOpenWide?: boolean;
+  /** What the screen adds under the links, such as its list's facets. */
+  children?: ReactNode;
+}) {
   const { i18n, t } = useLingui();
   const me = useQuery(meQuery);
   if (!me.data?.member?.instance_admin) return null;
   return (
-    <ContextPanel label={t`Instance`}>
+    <ContextPanel label={t`Instance`} startsOpenWide={startsOpenWide}>
       {instanceGroupOrder.map((group) => (
         <PanelGroup key={group} label={i18n._(instanceGroupLabels[group])}>
           {instanceScreens
@@ -89,6 +98,7 @@ export function InstancePanel() {
             </PanelLink>
           ))}
       </PanelGroup>
+      {children}
     </ContextPanel>
   );
 }

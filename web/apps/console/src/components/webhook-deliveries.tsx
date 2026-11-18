@@ -10,7 +10,6 @@ import { QueryError } from "@/components/query-error";
 import { RowAction, withRowActions } from "@/components/row-dialogs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectItem } from "@/components/ui/select";
 import { Table, type TableColumn } from "@/components/ui/table";
@@ -126,52 +125,52 @@ export function WebhookDeliveries({
       <div
         role="search"
         aria-label={t`Filter the deliveries`}
-        className="flex flex-wrap items-end gap-4"
+        className="flex flex-wrap items-center gap-2"
       >
-        <Field label={<Trans>Status</Trans>} className="w-40">
-          <Select
-            value={filters.status ?? any}
-            onValueChange={(value) =>
-              filter({ status: deliveryStatuses.find((status) => status === value) })
-            }
-          >
-            <SelectItem value={any}>{t`Any status`}</SelectItem>
-            {deliveryStatuses.map((status) => (
-              <SelectItem key={status} value={status}>
-                {deliveryStatus(i18n, status).label}
-              </SelectItem>
-            ))}
-          </Select>
-        </Field>
-        <Field label={<Trans>Event type</Trans>} className="w-64">
-          <Select
-            value={filters.event_type ?? any}
-            onValueChange={(value) => filter({ event_type: value === any ? undefined : value })}
-          >
-            <SelectItem value={any}>{t`Any event type`}</SelectItem>
-            {[...types].sort().map((type) => (
-              <SelectItem key={type} value={type}>
-                {type}
-              </SelectItem>
-            ))}
-          </Select>
-        </Field>
-        <Field label={<Trans>From</Trans>} className="w-40">
-          <Input
-            type="date"
-            value={filters.from ?? ""}
-            onChange={(event) => filter({ from: event.target.value || undefined })}
-          />
-        </Field>
-        <Field label={<Trans>To</Trans>} className="w-40">
-          <Input
-            type="date"
-            value={filters.to ?? ""}
-            onChange={(event) => filter({ to: event.target.value || undefined })}
-          />
-        </Field>
+        <Select
+          aria-label={t`Status`}
+          className="w-40"
+          value={filters.status ?? any}
+          onValueChange={(value) =>
+            filter({ status: deliveryStatuses.find((status) => status === value) })
+          }
+        >
+          <SelectItem value={any}>{t`Any status`}</SelectItem>
+          {deliveryStatuses.map((status) => (
+            <SelectItem key={status} value={status}>
+              {deliveryStatus(i18n, status).label}
+            </SelectItem>
+          ))}
+        </Select>
+        <Select
+          aria-label={t`Event type`}
+          className="w-64"
+          value={filters.event_type ?? any}
+          onValueChange={(value) => filter({ event_type: value === any ? undefined : value })}
+        >
+          <SelectItem value={any}>{t`Any event type`}</SelectItem>
+          {[...types].sort().map((type) => (
+            <SelectItem key={type} value={type}>
+              {type}
+            </SelectItem>
+          ))}
+        </Select>
+        <Input
+          type="date"
+          aria-label={t`From`}
+          className="w-40"
+          value={filters.from ?? ""}
+          onChange={(event) => filter({ from: event.target.value || undefined })}
+        />
+        <Input
+          type="date"
+          aria-label={t`To`}
+          className="w-40"
+          value={filters.to ?? ""}
+          onChange={(event) => filter({ to: event.target.value || undefined })}
+        />
         {filtered ? (
-          <Button variant="outline" onClick={() => onSearch({ tab: search.tab })}>
+          <Button variant="ghost" size="sm" onClick={() => onSearch({ tab: search.tab })}>
             <Trans>Clear the filters</Trans>
           </Button>
         ) : null}
