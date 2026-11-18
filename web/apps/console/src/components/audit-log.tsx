@@ -43,6 +43,8 @@ export type AuditEntriesTableProps = {
   loading: boolean;
   EntryLink: EntryLinkComponent;
   place: Place;
+  /** Show when as how long ago, with the full time on hover, for a short list of recent entries. */
+  relativeTimes?: boolean;
 };
 
 /** Audit entries in the order given: when, who, what, on which entity, and where. */
@@ -52,6 +54,7 @@ export function AuditEntriesTable({
   loading,
   EntryLink,
   place,
+  relativeTimes = false,
 }: AuditEntriesTableProps) {
   const { i18n, t } = useLingui();
   const columns = useMemo<TableColumn<AuditEntry>[]>(
@@ -59,7 +62,12 @@ export function AuditEntriesTable({
       {
         id: "time",
         header: t`Time`,
-        cell: ({ row }) => <Moment value={row.original.occurred_at} full />,
+        cell: ({ row }) =>
+          relativeTimes ? (
+            <Moment value={row.original.occurred_at} relative />
+          ) : (
+            <Moment value={row.original.occurred_at} full />
+          ),
       },
       {
         id: "actor",
@@ -90,7 +98,7 @@ export function AuditEntriesTable({
       },
       { id: "place", header: place.label, cell: ({ row }) => place.of(row.original) },
     ],
-    [EntryLink, i18n, place, t],
+    [EntryLink, i18n, place, relativeTimes, t],
   );
   return (
     <Card list>
@@ -163,11 +171,7 @@ export function AuditLog({ filters, EntryLink }: AuditLogProps) {
             place={place}
           />
           <nav aria-label={t`Pages of entries`} className="flex flex-wrap justify-end gap-2">
-            <Button
-              variant="outline"
-              disabled={!search.cursor}
-              onClick={() => turnPage(undefined)}
-            >
+            <Button variant="outline" disabled={!search.cursor} onClick={() => turnPage(undefined)}>
               <Trans>Newest entries</Trans>
             </Button>
             <Button
