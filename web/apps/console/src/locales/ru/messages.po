@@ -1121,7 +1121,7 @@ msgstr "Алерты"
 msgid "Aliases"
 msgstr "Алиасы"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "All"
 msgstr "Все"
 
@@ -1229,11 +1229,11 @@ msgstr "Этот ключ уже есть у другого варианта."
 msgid "Any"
 msgstr "Любое"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Any author"
 msgstr "Любой автор"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Any environment"
 msgstr "Любое окружение"
 
@@ -1245,12 +1245,12 @@ msgstr "Любые окружения"
 msgid "Any event type"
 msgstr "Любой тип события"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Any flag"
 msgstr "Любой флаг"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Any kind"
 msgstr "Любой вид"
 
@@ -1263,12 +1263,12 @@ msgstr "Любой источник"
 msgid "Any owner"
 msgstr "Любой владелец"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Any schedule"
 msgstr "Любое расписание"
 
+#: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Any state"
 msgstr "Любое состояние"
 
@@ -1578,10 +1578,15 @@ msgstr "Настройки аутентификации"
 msgid "Authentication settings updated"
 msgstr "Настройки аутентификации изменены"
 
+#: src/components/change-requests-panel.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Author"
 msgstr "Автор"
+
+#: src/components/change-requests-panel.tsx
+msgid "Author: {author}"
+msgstr "Автор: {author}"
 
 #: src/components/auth-provider-detail.tsx
 msgid "Authorization endpoint"
@@ -1606,7 +1611,7 @@ msgstr "Автоматический показ включён."
 msgid "Awaiting code removal"
 msgstr "Ждут удаления кода"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Awaiting my decision"
 msgstr "Ждут моего решения"
 
@@ -3277,6 +3282,7 @@ msgid "Entity ID"
 msgstr "Entity ID"
 
 #. A kind of entity in the audit log.
+#: src/components/change-requests-panel.tsx
 #: src/components/experiment-alerts.tsx
 #: src/components/firebase-wizard.tsx
 #: src/components/flag-history.tsx
@@ -3312,6 +3318,10 @@ msgstr "Защита окружения снята"
 #: src/lib/audit.ts
 msgid "Environment updated"
 msgstr "Окружение изменено"
+
+#: src/components/change-requests-panel.tsx
+msgid "Environment: {environment}"
+msgstr "Окружение: {environment}"
 
 #: src/components/area-screens.ts
 #: src/components/experiment-exposures.tsx
@@ -3744,10 +3754,6 @@ msgstr "Поле"
 msgid "Filter the audit log"
 msgstr "Фильтр журнала аудита"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
-msgid "Filter the change requests"
-msgstr "Фильтр запросов на изменение"
-
 #: src/components/webhook-deliveries.tsx
 msgid "Filter the deliveries"
 msgstr "Фильтр доставок"
@@ -3760,6 +3766,7 @@ msgstr "Фильтр экспериментов"
 msgid "Filter the segments"
 msgstr "Фильтр сегментов"
 
+#: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/components/ui/toolbar.tsx
 msgid "Filters"
@@ -3818,6 +3825,7 @@ msgid "Fixed once the project is created, since SDKs and scripts use it."
 msgstr "Не меняется после создания проекта: по нему проект находят SDK и скрипты."
 
 #. A kind of entity in the audit log.
+#: src/components/change-requests-panel.tsx
 #: src/components/experiment-fields.tsx
 #: src/lib/audit.ts
 #: src/lib/experiment-transitions.ts
@@ -3872,6 +3880,10 @@ msgstr "Флаг не найден"
 #: src/lib/audit.ts
 msgid "Flag restored"
 msgstr "Флаг восстановлен"
+
+#: src/components/change-requests-panel.tsx
+msgid "Flag: {flag}"
+msgstr "Флаг: {flag}"
 
 #: src/components/area-screens.ts
 #: src/components/firebase-wizard.tsx
@@ -4570,12 +4582,16 @@ msgid "Kill switch: {flagKey} in {name}"
 msgstr "Kill switch: {flagKey} в окружении {name}"
 
 #: src/components/auth-provider-list.tsx
+#: src/components/change-requests-panel.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/sink-editor.tsx
 #: src/components/sink-list.tsx
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Kind"
 msgstr "Вид"
+
+#: src/components/change-requests-panel.tsx
+msgid "Kind: {kind}"
+msgstr "Вид: {kind}"
 
 #: src/components/sink-list.tsx
 #: src/components/sink-screen.tsx
@@ -5040,7 +5056,7 @@ msgstr "Метаданные по URL перечитываются каждый 
 msgid "Metadata URL"
 msgstr "URL метаданных"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Mine"
 msgstr "Мои"
 
@@ -5614,7 +5630,7 @@ msgstr "Не приватные"
 msgid "Not recorded"
 msgstr "Не записано"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Not scheduled"
 msgstr "Без расписания"
 
@@ -7005,11 +7021,16 @@ msgstr "Сохраняем…"
 msgid "Say why, so the author knows what to change."
 msgstr "Объясните причину, чтобы автор знал, что исправить."
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 msgid "Schedule"
 msgstr "Расписание"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
+msgid "Schedule: {schedule}"
+msgstr "Расписание: {schedule}"
+
+#: src/components/change-requests-panel.tsx
 msgid "Scheduled"
 msgstr "По расписанию"
 
@@ -7621,6 +7642,7 @@ msgstr "STARTTLS и TLS требуют TLS 1.2 или новее и провер
 msgid "STARTTLS, usually port 587"
 msgstr "STARTTLS, обычно порт 587"
 
+#: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
@@ -7635,6 +7657,10 @@ msgstr "Состояние в"
 #: src/components/flags-panel.tsx
 msgid "State in {where}: {state}"
 msgstr "Состояние в {where}: {state}"
+
+#: src/components/change-requests-panel.tsx
+msgid "State: {state}"
+msgstr "Состояние: {state}"
 
 #: src/components/sdk-keys.tsx
 #: src/components/sink-recovery.tsx
@@ -7726,6 +7752,10 @@ msgstr "Строка"
 #: src/lib/webhooks.ts
 msgid "Succeeded"
 msgstr "Доставлена"
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "Summary"
+msgstr "Сводка"
 
 #: src/lib/change-requests.ts
 msgid "Superseded"
@@ -9641,10 +9671,12 @@ msgstr "просматривать проект"
 msgid "Viewer"
 msgstr "Наблюдатель"
 
+#: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
 msgid "Views"
 msgstr "Представления"
 
+#: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
 msgid "Views and filters"
 msgstr "Представления и фильтры"
@@ -9801,10 +9833,6 @@ msgstr "Где провайдер идентификации публикует 
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Where the project serves from. A key is fixed once created; the name can change."
 msgstr "Откуда проект отдаёт значения. Ключ после создания не меняется, название можно изменить."
-
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
-msgid "Which change requests"
-msgstr "Какие запросы на изменение"
 
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Which flags use the segment could not be read; the rules of any that do evaluate by what it holds once saved."

@@ -110,9 +110,10 @@ test.describe("change requests", () => {
     const inbox = nav.getByRole("link", { name: /Change requests/ });
     await expect(inbox).toContainText("2 change requests await your decision");
     await inbox.click();
-    await expect(rosa.page.getByRole("tab", { name: "Awaiting my decision" })).toHaveAttribute(
-      "aria-selected",
-      "true",
+    const views = rosa.page.getByRole("navigation", { name: "Views and filters" });
+    await expect(views.getByRole("link", { name: "Awaiting my decision" })).toHaveAttribute(
+      "aria-current",
+      "page",
     );
     const rows = rosa.page.getByRole("table", { name: "Change requests" }).getByRole("row");
     await expect(rows).toHaveCount(3);
@@ -154,12 +155,28 @@ test.describe("change requests", () => {
     expect(production.fallthrough).toBe("treatment");
 
     // Every state the author's list shows, final ones included.
-    await page.goto(`/projects/${project}/change-requests?tab=mine`);
+    await page.goto(`/projects/${project}/change-requests`);
+    const panel = page.getByRole("navigation", { name: "Views and filters" });
+    await panel.getByRole("link", { name: "Mine" }).click();
+    await expect(page).toHaveURL(/tab=mine/);
+    await expect(panel.getByRole("link", { name: "Mine" })).toHaveAttribute("aria-current", "page");
     const mine = page.getByRole("table", { name: "Change requests" });
     await expect(mine.getByRole("row", { name: /Serve the new copy/ })).toContainText("Applied");
     await expect(mine.getByRole("row", { name: /Turn it on with control/ })).toContainText(
       "Rejected",
     );
+
+    // A facet applies at once, shows as a chip, and the chip removes it.
+    await panel.getByRole("combobox", { name: "State" }).click();
+    await page.getByRole("option", { name: "Rejected", exact: true }).click();
+    await expect(page).toHaveURL(/state=rejected/);
+    await expect(mine.getByRole("row", { name: /Serve the new copy/ })).toHaveCount(0);
+    await expect(page.getByRole("list", { name: "Filters in force" })).toContainText(
+      "State: Rejected",
+    );
+    await page.getByRole("button", { name: "Remove the filter State: Rejected" }).click();
+    await expect(page).not.toHaveURL(/state=/);
+    await expect(mine.getByRole("row", { name: /Serve the new copy/ })).toBeVisible();
   });
 
   test("a decision on a change request someone edited meanwhile is refused and shows the edit", async ({

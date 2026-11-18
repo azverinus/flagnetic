@@ -163,12 +163,11 @@ test.describe("scheduled changes", () => {
     // The list tells scheduled from unscheduled ones.
     await page.goto(`/projects/${project}/change-requests`);
     await expect(page.getByRole("link", { name: "Start the copy test tonight" })).toBeVisible();
-    await page.getByRole("combobox", { name: "Schedule", exact: true }).click();
-    await page.getByRole("option", { name: "Not scheduled", exact: true }).click();
+    const schedule = page.getByRole("radiogroup", { name: "Schedule", exact: true });
+    await schedule.getByRole("radio", { name: "Not scheduled", exact: true }).check();
     await expect(page).toHaveURL(/scheduled=false/);
     await expect(page.getByText("No change request matches these filters.")).toBeVisible();
-    await page.getByRole("combobox", { name: "Schedule", exact: true }).click();
-    await page.getByRole("option", { name: "Scheduled", exact: true }).click();
+    await schedule.getByRole("radio", { name: "Scheduled", exact: true }).check();
     await expect(page).toHaveURL(/scheduled=true/);
     await expect(page.getByRole("link", { name: "Start the copy test tonight" })).toBeVisible();
     await expectNoSeriousViolations(page, "the scheduled change requests");
