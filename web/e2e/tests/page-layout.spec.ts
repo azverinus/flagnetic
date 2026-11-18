@@ -33,6 +33,11 @@ test.describe("the page and its cards", () => {
 
   test("a list fills the width and a flag starts at the same left edge", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
+    // The panel's column takes 256 px of the list's card: the table is
+    // measured with it folded away, as a member who wants the room has it.
+    await page.addInitScript(() =>
+      localStorage.setItem("flagnetic.context-panel-collapsed", "true"),
+    );
     await signIn(page);
 
     await page.goto(`/projects/${project}/flags`);
