@@ -385,6 +385,29 @@ test.describe("the overview", () => {
     await expect(recentActivity(page)).toContainText("project.created");
   });
 
+  test("lists the environments with their keys, each linking to the environment", async ({
+    page,
+  }) => {
+    await openProject(page, seededProject);
+
+    const environments = page.getByRole("list", { name: "Environments" });
+    await expect(environments.getByRole("listitem").first()).toContainText("development");
+    await environments.getByRole("link", { name: /staging/ }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/projects/${seededProject.key}/environments/staging$`),
+    );
+  });
+
+  test("shows eight recent entries at most, as how long ago", async ({ page }) => {
+    await openProject(page, seededProject);
+
+    await expect(recentActivity(page)).toContainText("project.created");
+    expect(await recentActivity(page).getByRole("row").count()).toBeLessThanOrEqual(9);
+    await expect(recentActivity(page).locator("time[title]").first()).toBeVisible();
+    await page.getByRole("link", { name: "View the audit log" }).click();
+    await expect(page).toHaveURL(new RegExp(`/projects/${seededProject.key}/audit$`));
+  });
+
   test("renders a failed query where it belongs, with a way to ask again", async ({ page }) => {
     let refuse = true;
     await page.route(`**/api/v1/projects/${seededProject.key}/audit*`, async (route) => {
@@ -738,7 +761,7 @@ test.describe("the context panel", () => {
     const links = panel(page, "Personal settings").getByRole("link");
     await expect(links).toHaveText(["Profile", "Sign-in methods", "Sessions", "API tokens"]);
 
-    await page.goto(`/projects/${seededProject.key}/flags`);
+    await page.goto(`/projects/${seededProject.key}`);
     await expect(page.getByRole("button", { name: /the panel$/ })).toHaveCount(0);
   });
 

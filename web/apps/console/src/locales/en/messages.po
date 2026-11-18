@@ -72,6 +72,7 @@ msgid "{conflictUnits, plural, one {# unit was exposed to a variation other than
 msgstr "{conflictUnits, plural, one {# unit was exposed to a variation other than its first,} other {# units were exposed to a variation other than their first,}} {conflictTotal, plural, one {in # exposure.} other {in # exposures.}} The latest conflicts:"
 
 #: src/components/navigation.tsx
+#: src/components/needs-attention.tsx
 msgid "{count, plural, one {# change request awaits your decision} other {# change requests await your decision}}"
 msgstr "{count, plural, one {# change request awaits your decision} other {# change requests await your decision}}"
 
@@ -437,6 +438,18 @@ msgstr "{revoked, plural, one {Revoked # session.} other {Revoked # sessions.}}"
 msgid "{savedName} is saved."
 msgstr "{savedName} is saved."
 
+#: src/components/needs-attention.tsx
+msgid "{sinkCount, plural, one {# sink needs attention} other {# sinks need attention}}"
+msgstr "{sinkCount, plural, one {# sink needs attention} other {# sinks need attention}}"
+
+#: src/components/needs-attention.tsx
+msgid "{staleCount, plural, one {# stale flag may be ready to remove} other {# stale flags may be ready to remove}}"
+msgstr "{staleCount, plural, one {# stale flag may be ready to remove} other {# stale flags may be ready to remove}}"
+
+#: src/components/needs-attention.tsx
+msgid "{staleCount}+ stale flags may be ready to remove"
+msgstr "{staleCount}+ stale flags may be ready to remove"
+
 #: src/components/compare-environments.tsx
 msgid "{to} takes the rules of {source} with their identifiers and salts, its prerequisites and its off and fallthrough variations. {to} stays off."
 msgstr "{to} takes the rules of {source} with their identifiers and salts, its prerequisites and its off and fallthrough variations. {to} stays off."
@@ -468,6 +481,10 @@ msgstr "{variation} to {percent}% of {unitType} units"
 #: src/components/experiment-assignment.tsx
 msgid "{variationBucket}, the bucket it would take should the allocation grow"
 msgstr "{variationBucket}, the bucket it would take should the allocation grow"
+
+#: src/components/needs-attention.tsx
+msgid "{webhookCount, plural, one {# webhook disabled by the platform} other {# webhooks disabled by the platform}}"
+msgstr "{webhookCount, plural, one {# webhook disabled by the platform} other {# webhooks disabled by the platform}}"
 
 #: src/lib/problem-messages.ts
 msgid "{what} in {environment}"
@@ -5056,6 +5073,7 @@ msgid "More actions"
 msgstr "More actions"
 
 #: src/components/navigation.tsx
+#: src/components/needs-attention.tsx
 msgid "More than {awaitingCountLimit} change requests await your decision"
 msgstr "More than {awaitingCountLimit} change requests await your decision"
 
@@ -5143,6 +5161,7 @@ msgstr "Names the provider in sign-in addresses and in the redirect URI. It neve
 msgid "Names the provider in sign-in addresses, in the ACS URL and in the entity ID. It never changes."
 msgstr "Names the provider in sign-in addresses, in the ACS URL and in the entity ID. It never changes."
 
+#: src/components/needs-attention.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Needs attention"
 msgstr "Needs attention"

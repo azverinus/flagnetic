@@ -82,7 +82,7 @@ function RecentEntryLink(props: EntryLinkProps) {
 }
 
 /** How many entries the overview shows. */
-const recentEntries = 10;
+const recentEntries = 8;
 
 const unfiltered: AuditSearch = {};
 
@@ -123,6 +123,7 @@ export function RecentActivity({ project }: { project: string }) {
           loading={entries.isPending}
           EntryLink={RecentEntryLink}
           place={place}
+          relativeTimes
         />
       )}
     </section>
