@@ -171,7 +171,9 @@ test.describe("the project shell", () => {
 
     const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
     await expect(breadcrumb).toContainText(seededProject.name);
+    await expect(breadcrumb).toContainText("Project settings");
     await expect(breadcrumb).toContainText("Environments");
+    await expect(page).toHaveURL(new RegExp(`/projects/${seededProject.key}/environments$`));
   });
 
   test("renders not found inside the shell for a project key nobody has", async ({ page }) => {
@@ -681,5 +683,97 @@ test.describe("renaming a project", () => {
     );
     await expect(page.getByLabel("Name")).toHaveValue("Theirs");
     await expect(page.getByText("You have unsaved changes")).toHaveCount(0);
+  });
+});
+
+test.describe("the context panel", () => {
+  const panel = (page: Page, name: string) => page.getByRole("navigation", { name, exact: true });
+
+  test("lists a project's settings in four groups, by what the member may open", async ({
+    page,
+  }) => {
+    await openProject(page, seededProject);
+
+    await openProjectSetting(page, "Environments");
+
+    const screens = panel(page, "Settings");
+    for (const group of ["Project", "Model", "Access", "Integrations"]) {
+      await expect(screens.getByText(group, { exact: true })).toBeVisible();
+    }
+    await expect(screens.getByRole("link", { name: "Environments" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    // An environment's own page keeps its screen current.
+    await page.goto(`/projects/${seededProject.key}/environments`);
+    await expect(screens.getByRole("link", { name: "Webhooks" })).toBeVisible();
+    await expect(screens.getByRole("link", { name: "Sinks" })).toBeVisible();
+  });
+
+  test("groups the instance's screens and ends with the audit log", async ({ page }) => {
+    await signIn(page, admin);
+    await page.goto("/admin/projects");
+
+    const screens = panel(page, "Instance");
+    for (const group of ["Workspace", "Sign-in", "Delivery"]) {
+      await expect(screens.getByText(group, { exact: true })).toBeVisible();
+    }
+    await expect(screens.getByRole("link").last()).toHaveText("Audit log");
+    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Instance");
+  });
+
+  test("lists the personal settings, and a screen with no panel gets the whole card", async ({
+    page,
+  }) => {
+    await signIn(page, admin);
+    await page.goto("/settings/profile");
+
+    const links = panel(page, "Personal settings").getByRole("link");
+    await expect(links).toHaveText(["Profile", "Sign-in methods", "Sessions", "API tokens"]);
+
+    await page.goto(`/projects/${seededProject.key}/flags`);
+    await expect(page.getByRole("button", { name: /the panel$/ })).toHaveCount(0);
+  });
+
+  test("folds away by its own toggle, and stays folded after a reload", async ({ page }) => {
+    await signIn(page, admin);
+    await page.goto(`/projects/${seededProject.key}/environments`);
+    await expect(panel(page, "Settings")).toBeVisible();
+
+    await page.getByRole("button", { name: "Collapse the panel" }).click();
+    await expect(panel(page, "Settings")).toHaveCount(0);
+    await page.reload();
+
+    await expect(page.getByRole("button", { name: "Expand the panel" })).toBeVisible();
+    await expect(panel(page, "Settings")).toHaveCount(0);
+    await page.getByRole("button", { name: "Expand the panel" }).click();
+    await expect(panel(page, "Settings")).toBeVisible();
+  });
+
+  test("is a sheet at 1024 px that the keyboard reaches, and it is accessible", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1000, height: 800 });
+    await signIn(page, admin);
+    await page.goto(`/projects/${seededProject.key}/environments`);
+    await expect(panel(page, "Settings")).toHaveCount(0);
+
+    const opener = page.getByRole("button", { name: "Settings", exact: true });
+    await opener.focus();
+    await page.keyboard.press("Enter");
+
+    const sheet = page.getByRole("dialog", { name: "Settings" });
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press("Tab");
+    await expect(sheet.getByRole("link").first()).toBeFocused();
+    await expectNoSeriousViolations(page, "the context panel as a sheet");
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+    await expect(opener).toBeFocused();
+
+    await opener.click();
+    await sheet.getByRole("link", { name: "Unit types" }).click();
+    await expect(page).toHaveURL(new RegExp(`/projects/${seededProject.key}/unit-types$`));
+    await expect(sheet).toHaveCount(0);
   });
 });

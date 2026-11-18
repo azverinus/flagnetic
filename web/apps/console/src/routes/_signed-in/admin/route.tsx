@@ -2,7 +2,9 @@ import { useLingui } from "@lingui/react/macro";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
+import { instanceArea } from "@/components/area-screens";
 import { RefusedScreen } from "@/components/can";
+import { InstancePanel } from "@/components/settings-panels";
 import { WebhookDisabledBanner } from "@/components/webhook-disabled-banner";
 import { meQuery } from "@/lib/queries";
 
@@ -12,6 +14,7 @@ import { meQuery } from "@/lib/queries";
  * server would refuse.
  */
 export const Route = createFileRoute("/_signed-in/admin")({
+  staticData: { area: instanceArea, panel: InstancePanel },
   component: Instance,
 });
 

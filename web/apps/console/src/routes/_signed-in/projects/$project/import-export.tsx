@@ -9,9 +9,15 @@ import { ImportProject } from "@/components/import-project";
 import { PageHeader } from "@/components/ui/page-header";
 import { SettingsSection } from "@/components/ui/settings-section";
 import { useCan } from "@/lib/access";
+import { projectSettingsArea } from "@/components/area-screens";
+import { ProjectSettingsPanel } from "@/components/settings-panels";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/import-export")({
-  staticData: { crumb: msg`Import and export` },
+  staticData: {
+    crumb: msg`Import and export`,
+    area: projectSettingsArea,
+    panel: ProjectSettingsPanel,
+  },
   component: ImportExport,
 });
 

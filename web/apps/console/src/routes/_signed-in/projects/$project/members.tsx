@@ -28,9 +28,15 @@ import { useListMutation } from "@/lib/mutations";
 import { grantOrigin, grantSourceLabel, ssoGrantRemovalReason } from "@/lib/project-members";
 import { projectsQuery } from "@/lib/queries";
 import { useKnownMembers } from "@/lib/use-known-members";
+import { projectSettingsArea } from "@/components/area-screens";
+import { ProjectSettingsPanel } from "@/components/settings-panels";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/members")({
-  staticData: { crumb: msg`Members` },
+  staticData: {
+    crumb: msg`Members`,
+    area: projectSettingsArea,
+    panel: ProjectSettingsPanel,
+  },
   component: Members,
 });
 

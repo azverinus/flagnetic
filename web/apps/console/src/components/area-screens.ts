@@ -47,6 +47,26 @@ export type ProjectScreen = Screen & {
   exact?: boolean;
 };
 
+/** The area of a project's settings, which the breadcrumb names. */
+export const projectSettingsArea = msg`Project settings`;
+/** The area of the instance's screens, which the breadcrumb names. */
+export const instanceArea = msg`Instance`;
+
+/** The groups of a project's settings in the context panel, in order. */
+export type SettingsGroup = "project" | "model" | "access" | "integrations";
+
+export type SettingsScreen = ProjectScreen & { group: SettingsGroup };
+
+/** What each group of a project's settings is called in the panel. */
+export const settingsGroupLabels: Record<SettingsGroup, MessageDescriptor> = {
+  project: msg`Project`,
+  model: msg`Model`,
+  access: msg`Access`,
+  integrations: msg`Integrations`,
+};
+
+export const settingsGroupOrder: SettingsGroup[] = ["project", "model", "access", "integrations"];
+
 /** The project's daily screens, in the order the sidebar lists them. */
 export const dailyScreens = [
   {
@@ -100,61 +120,83 @@ export const activityScreens = [
 export const projectSettingsScreens = [
   {
     to: "/projects/$project/settings",
+    group: "project",
     label: msg`General`,
     icon: SettingsIcon,
     permission: "project.update",
   },
   {
     to: "/projects/$project/import-export",
+    group: "project",
     label: msg`Import and export`,
     icon: ArrowLeftRightIcon,
     permission: "project.read",
   },
   {
     to: "/projects/$project/environments",
+    group: "model",
     label: msg`Environments`,
     icon: ServerIcon,
     permission: "project.read",
   },
   {
     to: "/projects/$project/unit-types",
+    group: "model",
     label: msg`Unit types`,
     icon: BoxesIcon,
     permission: "project.read",
   },
   {
     to: "/projects/$project/attributes",
+    group: "model",
     label: msg`Attributes`,
     icon: TagsIcon,
     permission: "project.read",
   },
   {
     to: "/projects/$project/members",
+    group: "access",
     label: msg`Members`,
     icon: UsersIcon,
     permission: "project.read",
   },
   {
     to: "/projects/$project/tokens",
+    group: "access",
     label: msg`Project tokens`,
     icon: KeyRoundIcon,
     permission: "project_token.manage",
   },
   {
     to: "/projects/$project/webhooks",
+    group: "integrations",
     label: msg`Webhooks`,
     icon: WebhookIcon,
     permission: "webhook.manage",
   },
   {
     to: "/projects/$project/sinks",
+    group: "integrations",
     label: msg`Sinks`,
     icon: DatabaseZapIcon,
     permission: "sink.manage",
   },
-] satisfies ProjectScreen[];
+] satisfies SettingsScreen[];
+
+/** The groups of the instance's screens in the context panel, in order. */
+export type InstanceGroup = "workspace" | "sign-in" | "delivery";
+
+export const instanceGroupLabels: Record<InstanceGroup, MessageDescriptor> = {
+  workspace: msg`Workspace`,
+  "sign-in": msg`Sign-in`,
+  delivery: msg`Delivery`,
+};
+
+export const instanceGroupOrder: InstanceGroup[] = ["workspace", "sign-in", "delivery"];
 
 export type InstanceScreen = Screen & {
+  /** The group the panel lists the screen under; the audit log stands after them, alone. */
+  group?: InstanceGroup;
   to:
     | "/admin/projects"
     | "/admin/members"
@@ -168,18 +210,23 @@ export type InstanceScreen = Screen & {
 
 /** The screens of the instance, listed to instance admins. */
 export const instanceScreens: InstanceScreen[] = [
-  { to: "/admin/projects", label: msg`Projects`, icon: LayersIcon },
-  { to: "/admin/members", label: msg`Members`, icon: UsersIcon },
-  { to: "/admin/auth-settings", label: msg`Auth settings`, icon: KeyRoundIcon },
-  { to: "/admin/auth-providers", label: msg`Auth providers`, icon: ShieldCheckIcon },
-  { to: "/admin/scim-tokens", label: msg`SCIM tokens`, icon: UserRoundCogIcon },
-  { to: "/admin/mail", label: msg`Mail`, icon: MailIcon },
-  { to: "/admin/webhooks", label: msg`Webhooks`, icon: WebhookIcon },
+  { to: "/admin/projects", group: "workspace", label: msg`Projects`, icon: LayersIcon },
+  { to: "/admin/members", group: "workspace", label: msg`Members`, icon: UsersIcon },
+  { to: "/admin/auth-settings", group: "sign-in", label: msg`Auth settings`, icon: KeyRoundIcon },
+  {
+    to: "/admin/auth-providers",
+    group: "sign-in",
+    label: msg`Auth providers`,
+    icon: ShieldCheckIcon,
+  },
+  { to: "/admin/scim-tokens", group: "sign-in", label: msg`SCIM tokens`, icon: UserRoundCogIcon },
+  { to: "/admin/mail", group: "delivery", label: msg`Mail`, icon: MailIcon },
+  { to: "/admin/webhooks", group: "delivery", label: msg`Webhooks`, icon: WebhookIcon },
   { to: "/admin/audit", label: msg`Audit log`, icon: HistoryIcon },
 ];
 
 /** The screens of a project's settings the caller may open, in the link's order. */
-export function openableSettingsScreens(held: ReadonlySet<string>): ProjectScreen[] {
+export function openableSettingsScreens(held: ReadonlySet<string>): SettingsScreen[] {
   return projectSettingsScreens.filter((screen) => held.has(screen.permission));
 }
 

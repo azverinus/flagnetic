@@ -917,6 +917,10 @@ msgstr ""
 msgid "Accept your invitation"
 msgstr ""
 
+#: src/components/area-screens.ts
+msgid "Access"
+msgstr ""
+
 #: src/components/sink-editor.tsx
 msgid "Access key ID"
 msgstr ""
@@ -1274,8 +1278,8 @@ msgstr ""
 msgid "API token revoked"
 msgstr ""
 
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
-#: src/routes/_signed-in/settings/route.tsx
 #: src/routes/_signed-in/settings/tokens.tsx
 msgid "API tokens"
 msgstr ""
@@ -2128,6 +2132,10 @@ msgstr ""
 msgid "Code"
 msgstr ""
 
+#: src/components/ui/context-panel.tsx
+msgid "Collapse the panel"
+msgstr ""
+
 #: src/components/ui/sidebar.tsx
 msgid "Collapse the sidebar"
 msgstr ""
@@ -2609,6 +2617,7 @@ msgstr ""
 msgid "Deliveries"
 msgstr ""
 
+#: src/components/area-screens.ts
 #: src/components/webhook-delivery-sheet.tsx
 msgid "Delivery"
 msgstr ""
@@ -3510,6 +3519,10 @@ msgstr ""
 msgid "Exhausted"
 msgstr ""
 
+#: src/components/ui/context-panel.tsx
+msgid "Expand the panel"
+msgstr ""
+
 #: src/components/ui/sidebar.tsx
 msgid "Expand the sidebar"
 msgstr ""
@@ -4229,8 +4242,9 @@ msgstr ""
 
 #. An audit entry that belongs to no project.
 #. An audit entry that belongs to no project.
-#: src/components/area-navigation.tsx
+#: src/components/area-screens.ts
 #: src/components/navigation.tsx
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/audit.$entry.tsx
 #: src/routes/_signed-in/admin/audit.tsx
 msgid "Instance"
@@ -4252,6 +4266,10 @@ msgstr ""
 
 #: src/components/webhook-list.tsx
 msgid "Instance webhooks"
+msgstr ""
+
+#: src/components/area-screens.ts
+msgid "Integrations"
 msgstr ""
 
 #: src/lib/audit.ts
@@ -5010,6 +5028,10 @@ msgstr ""
 
 #: src/components/import-project.tsx
 msgid "Mode: Replace"
+msgstr ""
+
+#: src/components/area-screens.ts
+msgid "Model"
 msgstr ""
 
 #: src/components/ui/page-header.tsx
@@ -5998,6 +6020,7 @@ msgid "Persistent: the same at every sign-in"
 msgstr ""
 
 #: src/components/personal-menu.tsx
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/settings/route.tsx
 msgid "Personal settings"
 msgstr ""
@@ -6096,12 +6119,13 @@ msgstr ""
 msgid "Private: evaluated on the server only."
 msgstr ""
 
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/settings/profile.tsx
-#: src/routes/_signed-in/settings/route.tsx
 msgid "Profile"
 msgstr ""
 
 #. A kind of entity in the audit log.
+#: src/components/area-screens.ts
 #: src/components/group-mappings.tsx
 #: src/components/invite-form.tsx
 #: src/components/navigation.tsx
@@ -6128,6 +6152,7 @@ msgstr ""
 msgid "Project not found"
 msgstr ""
 
+#: src/components/area-screens.ts
 #: src/components/navigation.tsx
 msgid "Project settings"
 msgstr ""
@@ -7176,8 +7201,8 @@ msgstr ""
 msgid "Session idle timeout"
 msgstr ""
 
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
-#: src/routes/_signed-in/settings/route.tsx
 #: src/routes/_signed-in/settings/sessions.tsx
 msgid "Sessions"
 msgstr ""
@@ -7206,8 +7231,8 @@ msgstr ""
 msgid "Setting value"
 msgstr ""
 
-#: src/components/area-navigation.tsx
 #: src/components/auth-provider-detail.tsx
+#: src/components/settings-panels.tsx
 #: src/components/sink-editor.tsx
 #: src/components/sink-screen.tsx
 #: src/components/webhook-detail.tsx
@@ -7296,12 +7321,16 @@ msgstr ""
 msgid "Sign yourself out everywhere"
 msgstr ""
 
+#: src/components/area-screens.ts
+msgid "Sign-in"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Sign-in failed"
 msgstr ""
 
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
-#: src/routes/_signed-in/settings/route.tsx
 #: src/routes/_signed-in/settings/sign-in-methods.tsx
 msgid "Sign-in methods"
 msgstr ""
@@ -9733,6 +9762,10 @@ msgstr ""
 
 #: src/components/project-invitations.tsx
 msgid "Works until <0>{until}</0>"
+msgstr ""
+
+#: src/components/area-screens.ts
+msgid "Workspace"
 msgstr ""
 
 #: src/lib/experiments.ts

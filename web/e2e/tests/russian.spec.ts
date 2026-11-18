@@ -103,8 +103,11 @@ test.describe("the console in Russian", () => {
       page.getByRole("navigation", { name: "Настройки" }).getByRole("link", { name: "Окружения" }),
     ).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Навигационная цепочка" })).toContainText(
-      "Окружения",
+      "Настройки проекта",
     );
+    await expect(
+      page.getByRole("navigation", { name: "Настройки" }).getByText("Интеграции", { exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole("button", { name: olga.name, exact: true })).toBeVisible();
 
     // The roles holding the permission are joined as Russian joins a list.
