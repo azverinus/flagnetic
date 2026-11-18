@@ -109,3 +109,17 @@ export async function choose(page: Page, field: string, option: string): Promise
   await page.getByRole("combobox", { name: field, exact: true }).click();
   await page.getByRole("option", { name: option, exact: true }).click();
 }
+
+/** The flag's context panel: its environments with their lamps, the flag's pages and its details. */
+export const flagPanel = (page: Page) =>
+  page.getByRole("navigation", { name: /^(Environments and details|Окружения и сведения)$/ });
+
+/** An environment's link in the flag's panel, by its name. */
+export const environmentLink = (page: Page, name: string) =>
+  flagPanel(page).getByRole("link", { name: new RegExp(`^${name}(\\s|$)`) });
+
+/** Opens the page header's menu of rarer actions and picks one of its items. */
+export async function chooseFromMore(page: Page, item: string): Promise<void> {
+  await page.getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: item, exact: true }).click();
+}

@@ -94,7 +94,7 @@ export function FlagOnOff({
 
   return (
     <>
-      <section className="flex flex-wrap items-center justify-between gap-4 rounded-md border p-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Can permission="flag_configuration.update" whenMissing="disable">
             <Switch
@@ -159,7 +159,7 @@ export function FlagOnOff({
             )}
           </p>
         </ProposeDialog>
-      </section>
+      </div>
       {!environment && environmentsRead.error ? (
         <QueryError error={environmentsRead.error} onRetry={environmentsRead.retry} />
       ) : null}

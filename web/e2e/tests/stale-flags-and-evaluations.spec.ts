@@ -9,7 +9,13 @@ import {
   signIn,
   unprotectProduction,
 } from "../support/console";
-import { openFlag, seedFlag, stringFlag, writeConfiguration } from "../support/flags";
+import {
+  environmentLink,
+  openFlag,
+  seedFlag,
+  stringFlag,
+  writeConfiguration,
+} from "../support/flags";
 import { admin } from "../support/instance";
 import { postEvaluationSummary, sdkRequest, seedSdkKey } from "../support/sdk";
 
@@ -185,7 +191,7 @@ test.describe("evaluations and event volume", () => {
     await expectNoSeriousViolations(page, "a flag's evaluations");
 
     // Development has none.
-    await page.getByRole("tab", { name: "Development" }).click();
+    await environmentLink(page, "Development").click();
     const none = page.getByRole("region", { name: "Evaluations" });
     await expect(none.getByText(/^Last evaluated by an SDK:/)).toContainText("Never");
     await expect(

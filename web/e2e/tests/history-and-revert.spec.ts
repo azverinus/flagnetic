@@ -8,6 +8,7 @@ import {
   seedFlag,
   stringFlag,
   writeConfiguration,
+  flagPanel,
 } from "../support/flags";
 import { seededProject, viewer } from "../support/instance";
 
@@ -41,7 +42,7 @@ const history = (page: Page) => page.getByRole("table", { name: "History of the 
 const drawer = (page: Page) => page.getByRole("dialog", { name: "Audit entry" });
 
 async function openHistory(page: Page) {
-  await page.getByRole("tab", { name: "History" }).click();
+  await flagPanel(page).getByRole("link", { name: "History" }).click();
   await expect(page).toHaveURL(/tab=history/);
   await expect(history(page).getByRole("row")).toHaveCount(4);
 }

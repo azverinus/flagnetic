@@ -5,6 +5,9 @@ import { expectNoSeriousViolations, useTheme } from "../support/axe";
 import { managementClient, must, seedProject, unprotectProduction } from "../support/console";
 import {
   choose,
+  chooseFromMore,
+  environmentLink,
+  flagPanel,
   openFlag,
   readConfiguration,
   readFlag,
@@ -115,20 +118,20 @@ test.describe("archiving and deleting", () => {
     await seedFlag(project, stringFlag("checkout_variant"));
     await openFlag(page, project, "checkout_variant");
 
-    await page.getByRole("button", { name: "Archive", exact: true }).click();
+    await chooseFromMore(page, "Archive");
     await page.getByRole("button", { name: "Archive flag" }).click();
     await expect(page.getByText("Archived", { exact: true })).toBeVisible();
     await expect(
       page.getByText("The flag is archived. Restore it to change its configurations."),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Restore", exact: true }).click();
+    await chooseFromMore(page, "Restore");
     await page.getByRole("button", { name: "Restore flag" }).click();
     await expect(page.getByText("Archived", { exact: true })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Archive", exact: true }).click();
+    await chooseFromMore(page, "Archive");
     await page.getByRole("button", { name: "Archive flag" }).click();
-    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await chooseFromMore(page, "Delete");
     const confirm = page.getByRole("button", { name: "Delete flag" });
     await expect(confirm).toBeDisabled();
     await page.getByLabel("Type checkout_variant to confirm").fill("checkout_variant");
@@ -149,7 +152,7 @@ test.describe("archiving and deleting", () => {
     }));
     await openFlag(page, project, "payments_v2");
 
-    await page.getByRole("button", { name: "Archive", exact: true }).click();
+    await chooseFromMore(page, "Archive");
     await page.getByRole("button", { name: "Archive flag" }).click();
     await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
       "It is still in use by the flag checkout_variant in staging.",
@@ -167,7 +170,8 @@ test.describe("a member who may only read", () => {
     const edit = page.getByRole("button", { name: "Edit definition" });
     await expect(edit).toHaveAttribute("aria-disabled", "true");
     await expect(edit).toHaveAccessibleDescription(/Needs the permission to edit flags/);
-    const archive = page.getByRole("button", { name: "Archive", exact: true });
+    await page.getByRole("button", { name: "More actions" }).click();
+    const archive = page.getByRole("menuitem", { name: "Archive", exact: true });
     await expect(archive).toHaveAttribute("aria-disabled", "true");
     await expect(archive).toHaveAccessibleDescription(
       /Needs the permission to archive and delete flags/,
@@ -232,14 +236,11 @@ test.describe("the configuration draft", () => {
     await openFlag(page, project, "checkout_variant");
 
     await choose(page, "Fallthrough variation", "treatment");
-    await page.getByRole("tab", { name: "Staging" }).click();
+    await environmentLink(page, "Staging").click();
     const leave = page.getByRole("dialog", { name: "Leave without saving?" });
     await expect(leave).toBeVisible();
     await leave.getByRole("button", { name: "Leave" }).click();
-    await expect(page.getByRole("tab", { name: "Staging" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    await expect(environmentLink(page, "Staging")).toHaveAttribute("aria-current", "page");
     await expect(bar(page)).toHaveCount(0);
   });
 
@@ -342,22 +343,19 @@ test.describe("the configuration draft", () => {
   });
 });
 
-test.describe("tabs", () => {
-  test("opens an environment's tab from the address and keeps the tab in it", async ({ page }) => {
+test.describe("environments", () => {
+  test("opens an environment from the address and keeps it in the address", async ({ page }) => {
     const project = await seedProject("flag-tabs");
     await seedFlag(project, stringFlag("checkout_variant"));
     await openFlag(page, project, "checkout_variant", { environment: "production" });
 
-    await expect(page.getByRole("tab", { name: "Production" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    await page.getByRole("tab", { name: "Staging" }).click();
+    await expect(environmentLink(page, "Production")).toHaveAttribute("aria-current", "page");
+    await environmentLink(page, "Staging").click();
     await expect(page).toHaveURL(/environment=staging/);
-    await page.getByRole("tab", { name: "History" }).click();
+    await flagPanel(page).getByRole("link", { name: "History" }).click();
     await expect(page).toHaveURL(/tab=history/);
     await expect(page.getByRole("table", { name: "History of the flag" })).toBeVisible();
-    await page.getByRole("tab", { name: "Development" }).click();
+    await environmentLink(page, "Development").click();
     await expect(page).not.toHaveURL(/environment=|tab=/);
   });
 
@@ -377,7 +375,7 @@ test.describe("accessibility", () => {
       const project = await seedProject(`flag-axe-${theme}`);
       await seedFlag(project, stringFlag("checkout_variant", { tags: ["checkout"] }));
       await openFlag(page, project, "checkout_variant");
-      await expect(page.getByRole("tab", { name: "Development" })).toBeVisible();
+      await expect(environmentLink(page, "Development")).toBeVisible();
       await expectNoSeriousViolations(page, `flag page (${theme})`);
 
       await page.getByRole("button", { name: "Edit definition" }).click();

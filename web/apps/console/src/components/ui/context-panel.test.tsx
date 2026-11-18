@@ -8,6 +8,7 @@ import {
   ContextPanel,
   ContextPanelProvider,
   ContextPanelTrigger,
+  useContextPanelHidden,
   PanelGroup,
   PanelLink,
 } from "./context-panel";
@@ -192,5 +193,46 @@ describe("a list's panel", () => {
     await renderWithRouter(() => <List />);
 
     expect(await screen.findByRole("navigation", { name: "Filters" })).toBeInTheDocument();
+  });
+});
+
+describe("whether the panel is out of sight", () => {
+  function Probe() {
+    return <p>{useContextPanelHidden() ? "hidden" : "shown"}</p>;
+  }
+  const frame = (declared = true) => (
+    <ContextPanelProvider>
+      <header>
+        <ContextPanelTrigger />
+      </header>
+      {declared ? <ContextPanel label="Settings">links</ContextPanel> : null}
+      <Probe />
+    </ContextPanelProvider>
+  );
+
+  it("is not while the column is open", async () => {
+    windowWidth(1440);
+    await renderWithRouter(() => frame());
+    expect(await screen.findByText("shown")).toBeInTheDocument();
+  });
+
+  it("is once the column is folded away", async () => {
+    windowWidth(1440);
+    const user = userEvent.setup();
+    await renderWithRouter(() => frame());
+    await user.click(await screen.findByRole("button", { name: "Collapse the panel" }));
+    expect(screen.getByText("hidden")).toBeInTheDocument();
+  });
+
+  it("is where the panel is a sheet", async () => {
+    windowWidth(1000);
+    await renderWithRouter(() => frame());
+    expect(await screen.findByText("hidden")).toBeInTheDocument();
+  });
+
+  it("is not where the route declares no panel", async () => {
+    windowWidth(1000);
+    await renderWithRouter(() => frame(false));
+    expect(await screen.findByText("shown")).toBeInTheDocument();
   });
 });

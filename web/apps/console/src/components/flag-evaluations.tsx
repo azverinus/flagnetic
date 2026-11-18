@@ -6,6 +6,7 @@ import { useId, useMemo } from "react";
 import { DailyChart, DayRangeSelect } from "@/components/daily-chart";
 import { Moment } from "@/components/moment";
 import { QueryError } from "@/components/query-error";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { formatDay, formatNumber } from "@/i18n/format";
@@ -69,55 +70,54 @@ export function FlagEvaluations({
   };
 
   return (
-    <section aria-labelledby={heading} className="flex flex-col gap-4 rounded-md border p-4">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 id={heading} className="text-base font-medium">
-            <Trans>Evaluations</Trans>
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            <Trans>
-              Last evaluated by an SDK:{" "}
-              <Moment value={lastEvaluatedIn(flag.last_evaluated, environment)} />
-            </Trans>
-          </p>
-        </div>
-        <DayRangeSelect value={days} onChange={onDays} />
-      </div>
-      {evaluations.isError ? (
-        <QueryError error={evaluations.error} onRetry={() => void evaluations.refetch()} />
-      ) : evaluations.data === undefined ? (
-        <div className="flex flex-col gap-3" aria-busy>
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-40 w-full" />
-        </div>
-      ) : (
-        <>
-          {evaluationSources.map((source) => (
-            <div key={source} className="flex flex-col gap-2">
-              <h3 className="text-sm font-medium">{sourceText[source].title}</h3>
-              <p className="text-sm text-muted-foreground">{sourceText[source].description}</p>
-              <DailyChart
-                label={sourceText[source].title}
-                stacked={series[source]}
-                nameOf={variationName}
-                empty={sourceText[source].empty}
+    <Card aria-labelledby={heading}>
+      <CardHeader
+        titleId={heading}
+        title={<Trans>Evaluations</Trans>}
+        description={
+          <Trans>
+            Last evaluated by an SDK:{" "}
+            <Moment value={lastEvaluatedIn(flag.last_evaluated, environment)} />
+          </Trans>
+        }
+        actions={<DayRangeSelect value={days} onChange={onDays} />}
+      />
+      <CardContent>
+        {evaluations.isError ? (
+          <QueryError error={evaluations.error} onRetry={() => void evaluations.refetch()} />
+        ) : evaluations.data === undefined ? (
+          <div className="flex flex-col gap-3" aria-busy>
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        ) : (
+          <>
+            {evaluationSources.map((source) => (
+              <div key={source} className="flex flex-col gap-2">
+                <h3 className="text-sm font-medium">{sourceText[source].title}</h3>
+                <p className="text-sm text-muted-foreground">{sourceText[source].description}</p>
+                <DailyChart
+                  label={sourceText[source].title}
+                  stacked={series[source]}
+                  nameOf={variationName}
+                  empty={sourceText[source].empty}
+                />
+              </div>
+            ))}
+            <details className="text-sm">
+              <summary className="cursor-pointer text-muted-foreground">
+                <Trans>Show as table</Trans>
+              </summary>
+              <EvaluationsTable
+                items={evaluations.data.items}
+                sourceName={(source) => sourceText[source].title}
+                variationName={(variation) => variationName(variation ?? noVariation)}
               />
-            </div>
-          ))}
-          <details className="text-sm">
-            <summary className="cursor-pointer text-muted-foreground">
-              <Trans>Show as table</Trans>
-            </summary>
-            <EvaluationsTable
-              items={evaluations.data.items}
-              sourceName={(source) => sourceText[source].title}
-              variationName={(variation) => variationName(variation ?? noVariation)}
-            />
-          </details>
-        </>
-      )}
-    </section>
+            </details>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

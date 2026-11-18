@@ -19,6 +19,7 @@ import {
   seedFlag,
   stringFlag,
   writeConfiguration,
+  flagPanel,
 } from "../support/flags";
 
 const password = "harness-lantern-quorum-8164";
@@ -161,7 +162,7 @@ test.describe("proposing from the editors", () => {
     await protectProduction(project);
 
     await openFlag(page, project, "banner", { environment: "production" });
-    await page.getByRole("tab", { name: "History" }).click();
+    await flagPanel(page).getByRole("link", { name: "History" }).click();
     const history = page.getByRole("table", { name: "History of the flag" });
     await history.getByRole("row").nth(2).getByRole("link").click();
     const drawer = page.getByRole("dialog", { name: "Audit entry" });

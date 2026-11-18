@@ -2,7 +2,14 @@ import { expect, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
 import { seedProject, signIn, unprotectProduction } from "../support/console";
-import { openFlag, seedFlag, stringFlag, writeConfiguration } from "../support/flags";
+import {
+  environmentLink,
+  flagPanel,
+  openFlag,
+  seedFlag,
+  stringFlag,
+  writeConfiguration,
+} from "../support/flags";
 import { seededProject, viewer } from "../support/instance";
 
 test.describe("protected environments", () => {
@@ -48,8 +55,10 @@ test.describe("protected environments", () => {
     await seedFlag(project, stringFlag("checkout_variant"));
     await openFlag(page, project, "checkout_variant");
 
-    await expect(page.getByRole("tab", { name: "Production Protected" })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Staging", exact: true })).toBeVisible();
+    await expect(
+      flagPanel(page).getByRole("link", { name: /^Production\s*Protected/ }),
+    ).toBeVisible();
+    await expect(environmentLink(page, "Staging")).not.toContainText("Protected");
 
     await page.goto(`/projects/${project}/flags`);
     await expect(page.getByRole("radio", { name: "Production (protected)" })).toBeVisible();

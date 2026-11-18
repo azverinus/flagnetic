@@ -1,6 +1,6 @@
 import type { ProjectMember } from "@flagnetic/api";
 import { useQuery, useSuspenseQuery, type UseQueryResult } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import { type GrantCandidates, grantCandidates, memberNames } from "./project-members";
 import { meQuery, membersQuery, projectMembersQuery } from "./queries";
@@ -60,4 +60,10 @@ export function useKnownMembers(project: string): KnownMembers {
       : { status: "success", members: grantCandidates(projectMembers.data ?? [], known) };
 
   return { projectMembers, instanceAdmin, names, failure, candidates };
+}
+
+/** A member's name by identifier, as far as the caller can know it. */
+export function useNameOf(project: string): (member: string) => string {
+  const { names } = useKnownMembers(project);
+  return useCallback((member: string) => names?.get(member) ?? member, [names]);
 }
