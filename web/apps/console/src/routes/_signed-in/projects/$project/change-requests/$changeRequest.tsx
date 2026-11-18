@@ -1,4 +1,5 @@
 import type { ChangeRequest, ChangeRequestDecision } from "@flagnetic/api";
+import { Page } from "@/components/ui/page";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
@@ -40,17 +41,17 @@ function ChangeRequestDetail() {
     return missing ? (
       <ChangeRequestNotFound project={project} />
     ) : (
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+      <Page>
         <QueryError error={changeRequest.error} onRetry={() => void changeRequest.refetch()} />
-      </div>
+      </Page>
     );
   }
   if (changeRequest.data === undefined) {
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6" aria-busy>
+      <Page aria-busy>
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-24 w-full" />
-      </div>
+      </Page>
     );
   }
   return <ChangeRequestPage project={project} changeRequest={changeRequest.data} />;
@@ -58,7 +59,7 @@ function ChangeRequestDetail() {
 
 function ChangeRequestNotFound({ project }: { project: string }) {
   return (
-    <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
+    <Page measure="form">
       <h1 className="text-2xl/7 font-semibold">
         <Trans>Change request not found</Trans>
       </h1>
@@ -73,7 +74,7 @@ function ChangeRequestNotFound({ project }: { project: string }) {
           <Trans>Go to the change requests</Trans>
         </Link>
       </Button>
-    </div>
+    </Page>
   );
 }
 
@@ -137,7 +138,7 @@ function ChangeRequestPage({
   const authorName = author.name;
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={changeRequest.title}
         description={
@@ -302,7 +303,7 @@ function ChangeRequestPage({
           <ChangeRequestDiff changeRequest={changeRequest} current={current} />
         )}
       </section>
-    </div>
+    </Page>
   );
 }
 

@@ -93,7 +93,7 @@ export function ExperimentFields({
   };
 
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-5">
+    <div className="flex w-full measure-form flex-col gap-5">
       {reason ? (
         <p
           role="status"

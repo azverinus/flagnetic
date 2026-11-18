@@ -8,10 +8,11 @@ import { cn } from "@/lib/cn";
  * name, with nothing of the console around it.
  */
 export function SignedOutCard({
-  className,
+  size = "sm",
   children,
 }: {
-  className?: string;
+  /** "sm" for a form of a few fields, "md" for a page with more to read. */
+  size?: "sm" | "md";
   children: ReactNode;
 }) {
   return (
@@ -19,7 +20,7 @@ export function SignedOutCard({
       <div
         className={cn(
           "flex w-full flex-col gap-6 rounded-lg border bg-card p-6 shadow-sm",
-          className,
+          size === "sm" ? "max-w-sm" : "max-w-md",
         )}
       >
         <div className="flex items-center gap-2">

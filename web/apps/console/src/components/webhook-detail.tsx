@@ -1,4 +1,5 @@
 import type { Webhook } from "@flagnetic/api";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { KeyRoundIcon, PowerIcon, SendIcon, Trash2Icon, TriangleAlertIcon } from "lucide-react";
@@ -67,17 +68,17 @@ export function WebhookScreen({
     return missing ? (
       <WebhookNotFound scope={scope} />
     ) : (
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+      <Page>
         <QueryError error={webhook.error} onRetry={() => void webhook.refetch()} />
-      </div>
+      </Page>
     );
   }
   if (webhook.data === undefined) {
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6" aria-busy>
+      <Page aria-busy>
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-24 w-full" />
-      </div>
+      </Page>
     );
   }
   return <WebhookPage scope={scope} webhook={webhook.data} search={search} onSearch={onSearch} />;
@@ -86,7 +87,7 @@ export function WebhookScreen({
 function WebhookNotFound({ scope }: { scope: WebhookScope }) {
   const navigation = useWebhookNavigation(scope);
   return (
-    <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
+    <Page measure="form">
       <h1 className="text-2xl/7 font-semibold">
         <Trans>Webhook not found</Trans>
       </h1>
@@ -96,7 +97,7 @@ function WebhookNotFound({ scope }: { scope: WebhookScope }) {
       <Button variant="outline" onClick={navigation.list}>
         <Trans>Go to the webhooks</Trans>
       </Button>
-    </div>
+    </Page>
   );
 }
 
@@ -166,7 +167,7 @@ function WebhookPage({
   const name = webhook.name;
   const tab = search.tab ?? "settings";
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={webhook.name}
         description={
@@ -312,6 +313,6 @@ function WebhookPage({
           <Trans>Nothing more is sent under it. This cannot be undone.</Trans>
         </p>
       </ConfirmDialog>
-    </div>
+    </Page>
   );
 }

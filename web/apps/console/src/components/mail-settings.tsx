@@ -1,4 +1,5 @@
 import type { SmtpSettings } from "@flagnetic/api";
+import { Page } from "@/components/ui/page";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -40,7 +41,7 @@ export function MailSettingsScreen({ recipient }: { recipient: string }) {
   const { t } = useLingui();
   const settings = useQuery(mailSettingsQuery);
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <Page>
       {settings.isSuccess ? (
         <MailSettingsPage settings={settings.data} recipient={recipient} />
       ) : (
@@ -49,7 +50,7 @@ export function MailSettingsScreen({ recipient }: { recipient: string }) {
           {settings.isError ? (
             <QueryError error={settings.error} onRetry={() => void settings.refetch()} />
           ) : (
-            <div className="flex max-w-2xl flex-col gap-5" aria-busy>
+            <div className="flex measure-form flex-col gap-5" aria-busy>
               <Skeleton className="h-16 w-full" />
               <Skeleton className="h-16 w-full" />
               <Skeleton className="h-16 w-full" />
@@ -57,7 +58,7 @@ export function MailSettingsScreen({ recipient }: { recipient: string }) {
           )}
         </>
       )}
-    </div>
+    </Page>
   );
 }
 
@@ -134,7 +135,7 @@ function MailSettingsPage({
           recipient={recipient}
         />
       ) : (
-        <p className="max-w-2xl rounded-md border bg-muted p-3 text-sm">
+        <p className="measure-form rounded-md border bg-muted p-3 text-sm">
           <Trans>
             No SMTP server is configured, so the instance mails nothing, and members cannot reset a
             forgotten password themselves.

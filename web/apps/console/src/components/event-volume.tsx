@@ -1,4 +1,5 @@
 import type { EventGap } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { TriangleAlertIcon } from "lucide-react";
 import { useId, useMemo } from "react";
@@ -58,14 +59,16 @@ export function VolumeTable({
     [i18n, t, touched],
   );
   return (
-    <Table
-      className="mt-2"
-      caption={t`Events per day`}
-      hideCaption
-      columns={columns}
-      data={rows}
-      getRowId={(day) => day.day}
-    />
+    <Card>
+      <Table
+        className="mt-2"
+        caption={t`Events per day`}
+        hideCaption
+        columns={columns}
+        data={rows}
+        getRowId={(day) => day.day}
+      />
+    </Card>
   );
 }
 
@@ -136,14 +139,16 @@ export function Gaps({ gaps }: { gaps: readonly EventGap[] }) {
           reads every project's events, so a gap counts the events of every project of the instance.
         </Trans>
       </p>
-      <Table
-        caption={t`Gaps`}
-        hideCaption
-        columns={columns}
-        data={gaps}
-        empty={<Trans>No event was lost in these days.</Trans>}
-        getRowId={(gap) => `${gap.stream}/${gap.period_start}/${gap.dropped_at}`}
-      />
+      <Card>
+        <Table
+          caption={t`Gaps`}
+          hideCaption
+          columns={columns}
+          data={gaps}
+          empty={<Trans>No event was lost in these days.</Trans>}
+          getRowId={(gap) => `${gap.stream}/${gap.period_start}/${gap.dropped_at}`}
+        />
+      </Card>
     </section>
   );
 }

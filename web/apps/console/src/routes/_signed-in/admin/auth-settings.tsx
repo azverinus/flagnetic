@@ -1,4 +1,5 @@
 import { msg } from "@lingui/core/macro";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
@@ -19,7 +20,7 @@ function AuthSettingsPage() {
   const { t } = useLingui();
   const settings = useQuery(authSettingsQuery);
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Auth settings`}
         description={
@@ -36,12 +37,12 @@ function AuthSettingsPage() {
       ) : settings.isError ? (
         <QueryError error={settings.error} onRetry={() => void settings.refetch()} />
       ) : (
-        <div className="flex max-w-2xl flex-col gap-5" aria-busy>
+        <div className="flex measure-form flex-col gap-5" aria-busy>
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-16 w-full" />
         </div>
       )}
-    </div>
+    </Page>
   );
 }

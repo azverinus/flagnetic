@@ -5012,6 +5012,10 @@ msgstr "Режим: слияние"
 msgid "Mode: Replace"
 msgstr "Режим: замена"
 
+#: src/components/ui/page-header.tsx
+msgid "More actions"
+msgstr "Другие действия"
+
 #: src/components/navigation.tsx
 msgid "More than {awaitingCountLimit} change requests await your decision"
 msgstr "Вашего решения ждут больше {awaitingCountLimit} запросов на изменение"

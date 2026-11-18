@@ -1,4 +1,6 @@
 import type { StaleFlag, StaleReason } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
+import { Page } from "@/components/ui/page";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
@@ -50,7 +52,7 @@ function StaleFlags() {
   const apply = (next: StaleFlagsSearch) => void navigate({ search: next, replace: true });
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Stale flags`}
         description={
@@ -70,7 +72,7 @@ function StaleFlags() {
         onPage={(cursor) => apply({ ...search, cursor })}
         onClear={() => apply({})}
       />
-    </div>
+    </Page>
   );
 }
 
@@ -146,26 +148,30 @@ function StaleFlagsPages({
   }
   if (page.data?.items.length === 0 && !search.cursor) {
     return search.reason ? (
-      <EmptyState
-        icon={<HourglassIcon />}
-        title={<Trans>No flag is stale for these reasons.</Trans>}
-        action={
-          <Button variant="outline" onClick={onClear}>
-            <Trans>Clear filters</Trans>
-          </Button>
-        }
-      />
+      <Card list>
+        <EmptyState
+          icon={<HourglassIcon />}
+          title={<Trans>No flag is stale for these reasons.</Trans>}
+          action={
+            <Button variant="outline" onClick={onClear}>
+              <Trans>Clear filters</Trans>
+            </Button>
+          }
+        />
+      </Card>
     ) : (
-      <EmptyState
-        icon={<HourglassIcon />}
-        title={<Trans>No flag is stale.</Trans>}
-        description={
-          <Trans>
-            A flag shows up here once it outlives its expected removal, stops being evaluated, loses
-            its owner, finishes its rollout or keeps an overdue experiment.
-          </Trans>
-        }
-      />
+      <Card list>
+        <EmptyState
+          icon={<HourglassIcon />}
+          title={<Trans>No flag is stale.</Trans>}
+          description={
+            <Trans>
+              A flag shows up here once it outlives its expected removal, stops being evaluated,
+              loses its owner, finishes its rollout or keeps an overdue experiment.
+            </Trans>
+          }
+        />
+      </Card>
     );
   }
 
@@ -334,14 +340,16 @@ function StaleFlagsTable({
     [i18n, names, nameOf, project, t],
   );
   return (
-    <Table
-      caption={t`Stale flags`}
-      hideCaption
-      stickyFirstColumn
-      columns={columns}
-      data={flags}
-      loading={loading}
-      getRowId={(flag) => flag.key}
-    />
+    <Card list>
+      <Table
+        caption={t`Stale flags`}
+        hideCaption
+        stickyFirstColumn
+        columns={columns}
+        data={flags}
+        loading={loading}
+        getRowId={(flag) => flag.key}
+      />
+    </Card>
   );
 }

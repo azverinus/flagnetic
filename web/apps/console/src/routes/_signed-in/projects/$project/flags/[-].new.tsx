@@ -1,4 +1,5 @@
 import { createFlag, type FlagCreate, zFlagCreate, zFlagType, zLifetime } from "@flagnetic/api";
+import { Page } from "@/components/ui/page";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -53,7 +54,7 @@ function NewFlag() {
   const { project } = Route.useParams();
   return (
     <PermissionGate permission="flag.edit" title={t`New flag`}>
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+      <Page>
         <PageHeader
           title={t`New flag`}
           description={
@@ -64,7 +65,7 @@ function NewFlag() {
           }
         />
         <CreateFlag key={project} project={project} />
-      </div>
+      </Page>
     </PermissionGate>
   );
 }

@@ -78,7 +78,7 @@ export function CreateFromDocument() {
   const busy = dryRun.isPending || create.isPending;
 
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-5">
+    <div className="flex w-full measure-form flex-col gap-5">
       <Field
         label={t`Project document`}
         hint={t`A JSON or YAML file, such as an export of a project of this or another instance.`}

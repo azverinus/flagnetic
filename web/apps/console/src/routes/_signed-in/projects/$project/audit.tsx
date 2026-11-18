@@ -1,4 +1,5 @@
 import { msg } from "@lingui/core/macro";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
@@ -66,7 +67,7 @@ function ProjectAudit() {
   );
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Audit log`}
         description={
@@ -84,6 +85,6 @@ function ProjectAudit() {
         place={place}
       />
       <Outlet />
-    </div>
+    </Page>
   );
 }

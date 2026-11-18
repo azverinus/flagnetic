@@ -1,4 +1,5 @@
 import { type Project, updateProject } from "@flagnetic/api";
+import { Page } from "@/components/ui/page";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -95,7 +96,7 @@ function SettingsForm() {
     });
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Settings`}
         description={<Trans>What the project is called and what it is for.</Trans>}
@@ -144,6 +145,6 @@ function SettingsForm() {
       </FormPage>
       <DeleteProject project={project} />
       <UnsavedChangesBar dirty={isDirty} onDiscard={() => form.reset()} pending={save.isPending} />
-    </div>
+    </Page>
   );
 }

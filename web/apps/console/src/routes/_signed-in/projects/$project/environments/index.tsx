@@ -5,6 +5,8 @@ import {
   getEnvironment,
   updateEnvironment,
 } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
+import { Page } from "@/components/ui/page";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -87,7 +89,7 @@ function Environments() {
   }, [canManage, project, t]);
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Environments`}
         description={
@@ -107,14 +109,16 @@ function Environments() {
       {environments.isError ? (
         <QueryError error={environments.error} onRetry={() => void environments.refetch()} />
       ) : (
-        <Table
-          caption={t`Environments`}
-          hideCaption
-          columns={columns}
-          data={environments.data ?? []}
-          loading={environments.isPending}
-          getRowId={(environment) => environment.id}
-        />
+        <Card list>
+          <Table
+            caption={t`Environments`}
+            hideCaption
+            columns={columns}
+            data={environments.data ?? []}
+            loading={environments.isPending}
+            getRowId={(environment) => environment.id}
+          />
+        </Card>
       )}
 
       <Dialog open={creating} onOpenChange={setCreating} title={t`New environment`}>
@@ -157,7 +161,7 @@ function Environments() {
           </p>
         )}
       </DeleteRowDialog>
-    </div>
+    </Page>
   );
 }
 

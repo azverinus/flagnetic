@@ -1,4 +1,5 @@
 import type { Sink } from "@flagnetic/api";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -31,7 +32,7 @@ export function NewSinkScreen({ project }: { project: string }) {
   const open = (sink: string) =>
     void navigate({ to: "/projects/$project/sinks/$sink", params: { project, sink } });
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`New sink`}
         description={
@@ -59,7 +60,7 @@ export function NewSinkScreen({ project }: { project: string }) {
           setCreated(undefined);
         }}
       />
-    </div>
+    </Page>
   );
 }
 
@@ -73,17 +74,17 @@ export function SinkScreen({ project, sink: id }: { project: string; sink: strin
     return missing ? (
       <SinkNotFound project={project} />
     ) : (
-      <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
+      <Page>
         <QueryError error={sink.error} onRetry={() => void sink.refetch()} />
-      </div>
+      </Page>
     );
   }
   if (sink.data === undefined) {
     return (
-      <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6" aria-busy>
+      <Page aria-busy>
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-24 w-full" />
-      </div>
+      </Page>
     );
   }
   return <SinkPage project={project} sink={sink.data} />;
@@ -92,7 +93,7 @@ export function SinkScreen({ project, sink: id }: { project: string; sink: strin
 function SinkNotFound({ project }: { project: string }) {
   const navigate = useNavigate();
   return (
-    <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
+    <Page measure="form">
       <h1 className="text-2xl/7 font-semibold">
         <Trans>Sink not found</Trans>
       </h1>
@@ -105,7 +106,7 @@ function SinkNotFound({ project }: { project: string }) {
       >
         <Trans>Go to the sinks</Trans>
       </Button>
-    </div>
+    </Page>
   );
 }
 
@@ -159,7 +160,7 @@ function SinkPage({ project, sink }: { project: string; sink: Sink }) {
   const name = sink.name;
   const { dead_letters: deadLetters, gaps } = sink;
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={sink.name}
         description={<span>{kindName(i18n, sink.kind)}</span>}
@@ -344,7 +345,7 @@ function SinkPage({ project, sink }: { project: string; sink: Sink }) {
           </Trans>
         </p>
       </ConfirmDialog>
-    </div>
+    </Page>
   );
 }
 

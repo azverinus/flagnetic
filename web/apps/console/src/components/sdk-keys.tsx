@@ -150,7 +150,7 @@ export function SdkKeys({ project, environment }: SdkKeysProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-prose text-sm text-muted-foreground">
+        <p className="measure-prose text-sm text-muted-foreground">
           <Trans>
             A server key lets a backend SDK download this environment’s ruleset. A client key lets a
             browser or app ask for the values served to one context, and can be limited to the

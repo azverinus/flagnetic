@@ -1,4 +1,5 @@
 import { msg } from "@lingui/core/macro";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -24,7 +25,7 @@ function ImportExport() {
   const { project } = Route.useParams();
   const mayImport = useCan("project.import");
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8 p-6">
+    <Page measure="form">
       <PageHeader
         title={t`Import and export`}
         description={
@@ -72,6 +73,6 @@ function ImportExport() {
           </SettingsSection>
         </>
       ) : null}
-    </div>
+    </Page>
   );
 }

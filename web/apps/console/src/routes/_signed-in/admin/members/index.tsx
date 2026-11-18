@@ -5,6 +5,8 @@ import {
   type MemberInvite,
   type MemberStatus,
 } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -64,7 +66,7 @@ function Members() {
   const apply = (next: MemberSearch) => void navigate({ search: next, replace: true });
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Members`}
         description={
@@ -129,7 +131,7 @@ function Members() {
         }}
       />
       <InvitationLinkDialog issued={issued} kind="invited" onClose={() => setIssued(undefined)} />
-    </div>
+    </Page>
   );
 }
 
@@ -202,16 +204,18 @@ function MembersTable({
     [i18n, t],
   );
   return (
-    <Table
-      caption={t`Members`}
-      hideCaption
-      stickyFirstColumn
-      columns={columns}
-      data={members}
-      loading={loading}
-      empty={empty}
-      getRowId={(member) => member.id}
-    />
+    <Card list>
+      <Table
+        caption={t`Members`}
+        hideCaption
+        stickyFirstColumn
+        columns={columns}
+        data={members}
+        loading={loading}
+        empty={empty}
+        getRowId={(member) => member.id}
+      />
+    </Card>
   );
 }
 

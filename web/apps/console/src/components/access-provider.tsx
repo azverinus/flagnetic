@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Page } from "@/components/ui/page";
 import { type ReactNode, useMemo } from "react";
 
 import { QueryError } from "@/components/query-error";
@@ -33,9 +34,9 @@ export function AccessProvider({ project, children }: { project: string; childre
   );
   if (roles.isError && roles.data === undefined) {
     return (
-      <div className="mx-auto max-w-5xl p-6">
+      <Page>
         <QueryError error={roles.error} onRetry={() => void roles.refetch()} />
-      </div>
+      </Page>
     );
   }
   if (value === undefined) return null;

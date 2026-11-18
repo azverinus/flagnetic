@@ -1,4 +1,6 @@
 import type { Webhook } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, PowerIcon, Trash2Icon, WebhookIcon } from "lucide-react";
@@ -111,9 +113,15 @@ export function WebhookList({ scope }: { scope: WebhookScope }) {
 
   const nameOf = (id: string) => webhooks.data?.find((webhook) => webhook.id === id)?.name ?? "";
   const instance = scope === "instance";
+  const newWebhook = (
+    <Button onClick={() => setCreating(true)}>
+      <PlusIcon aria-hidden />
+      <Trans>New webhook</Trans>
+    </Button>
+  );
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={instance ? t`Instance webhooks` : t`Webhooks`}
         description={
@@ -129,34 +137,34 @@ export function WebhookList({ scope }: { scope: WebhookScope }) {
             </Trans>
           )
         }
-        actions={
-          <Button onClick={() => setCreating(true)}>
-            <PlusIcon aria-hidden />
-            <Trans>New webhook</Trans>
-          </Button>
-        }
+        actions={(webhooks.data?.length ?? 0) > 0 ? newWebhook : undefined}
       />
       {webhooks.isError ? (
         <QueryError error={webhooks.error} onRetry={() => void webhooks.refetch()} />
       ) : webhooks.data?.length === 0 ? (
-        <EmptyState
-          icon={<WebhookIcon />}
-          title={<Trans>No webhook yet.</Trans>}
-          description={
-            <Trans>
-              Create one to have events posted to a chat channel, an archive or a deployment tool.
-            </Trans>
-          }
-        />
+        <Card list>
+          <EmptyState
+            icon={<WebhookIcon />}
+            title={<Trans>No webhook yet.</Trans>}
+            description={
+              <Trans>
+                Create one to have events posted to a chat channel, an archive or a deployment tool.
+              </Trans>
+            }
+            action={newWebhook}
+          />
+        </Card>
       ) : (
-        <Table
-          caption={instance ? t`Instance webhooks` : t`Webhooks`}
-          hideCaption
-          columns={columns}
-          data={webhooks.data ?? []}
-          loading={webhooks.isPending}
-          getRowId={(webhook) => webhook.id}
-        />
+        <Card list>
+          <Table
+            caption={instance ? t`Instance webhooks` : t`Webhooks`}
+            hideCaption
+            columns={columns}
+            data={webhooks.data ?? []}
+            loading={webhooks.isPending}
+            getRowId={(webhook) => webhook.id}
+          />
+        </Card>
       )}
 
       <Dialog open={creating} onOpenChange={setCreating} title={t`New webhook`}>
@@ -196,6 +204,6 @@ export function WebhookList({ scope }: { scope: WebhookScope }) {
           </p>
         )}
       </DeleteRowDialog>
-    </div>
+    </Page>
   );
 }

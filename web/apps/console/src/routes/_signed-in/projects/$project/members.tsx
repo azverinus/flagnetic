@@ -1,4 +1,6 @@
 import { deleteGrant, type Grant, type MemberInvitation, type ProjectMember } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
+import { Page } from "@/components/ui/page";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { createFileRoute } from "@tanstack/react-router";
@@ -165,7 +167,7 @@ function Members() {
   );
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Members`}
         description={
@@ -174,32 +176,36 @@ function Members() {
             whatever any of them allows.
           </Trans>
         }
-        actions={grantRole}
+        actions={(members.data?.length ?? 0) > 0 ? grantRole : undefined}
       />
       {failure ? (
         <QueryError error={failure.error} onRetry={failure.retry} />
       ) : members.data?.length === 0 ? (
-        <EmptyState
-          icon={<UsersIcon />}
-          title={<Trans>Nobody holds a role in this project yet.</Trans>}
-          description={
-            <Trans>
-              Grant members of the instance the roles their work in it needs, or invite someone by
-              email.
-            </Trans>
-          }
-          action={grantRole}
-        />
+        <Card list>
+          <EmptyState
+            icon={<UsersIcon />}
+            title={<Trans>Nobody holds a role in this project yet.</Trans>}
+            description={
+              <Trans>
+                Grant members of the instance the roles their work in it needs, or invite someone by
+                email.
+              </Trans>
+            }
+            action={grantRole}
+          />
+        </Card>
       ) : (
-        <Table
-          caption={t`Members of the project`}
-          hideCaption
-          columns={columns}
-          data={members.data ?? []}
-          // Who made each grant is named once every member it may be is read.
-          loading={members.isPending || known.names === undefined}
-          getRowId={(member) => member.member}
-        />
+        <Card list>
+          <Table
+            caption={t`Members of the project`}
+            hideCaption
+            columns={columns}
+            data={members.data ?? []}
+            // Who made each grant is named once every member it may be is read.
+            loading={members.isPending || known.names === undefined}
+            getRowId={(member) => member.member}
+          />
+        </Card>
       )}
 
       {canManage ? (
@@ -243,7 +249,7 @@ function Members() {
         removing={removing}
         onDone={() => setRemoving(undefined)}
       />
-    </div>
+    </Page>
   );
 }
 

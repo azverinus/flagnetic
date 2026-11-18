@@ -5,6 +5,7 @@ import { TriangleAlertIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Page } from "@/components/ui/page";
 import { WebhookLink } from "@/components/webhook-link";
 import { useCan } from "@/lib/access";
 import {
@@ -65,7 +66,7 @@ export function WebhookDisabledBanner({ scope }: { scope: WebhookScope }) {
   const disabled = (webhooks.data ?? []).filter(isPlatformDisabled);
   if (disabled.length === 0) return null;
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 pt-6">
+    <Page band>
       <div
         role="status"
         className="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm"
@@ -105,6 +106,6 @@ export function WebhookDisabledBanner({ scope }: { scope: WebhookScope }) {
           </ul>
         </div>
       </div>
-    </div>
+    </Page>
   );
 }

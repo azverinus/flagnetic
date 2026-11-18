@@ -1,4 +1,5 @@
 import type { AuthProvider, AuthProviderTest } from "@flagnetic/api";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -44,17 +45,17 @@ export function AuthProviderScreen({ slug }: { slug: string }) {
     return missing ? (
       <AuthProviderNotFound />
     ) : (
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+      <Page>
         <QueryError error={provider.error} onRetry={() => void provider.refetch()} />
-      </div>
+      </Page>
     );
   }
   if (provider.data === undefined) {
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6" aria-busy>
+      <Page aria-busy>
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-24 w-full" />
-      </div>
+      </Page>
     );
   }
   return <AuthProviderPage provider={provider.data} onReload={() => void provider.refetch()} />;
@@ -63,7 +64,7 @@ export function AuthProviderScreen({ slug }: { slug: string }) {
 function AuthProviderNotFound() {
   const navigate = useNavigate();
   return (
-    <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
+    <Page measure="form">
       <h1 className="text-2xl/7 font-semibold">
         <Trans>Auth provider not found</Trans>
       </h1>
@@ -73,7 +74,7 @@ function AuthProviderNotFound() {
       <Button variant="outline" onClick={() => void navigate({ to: "/admin/auth-providers" })}>
         <Trans>Go to the auth providers</Trans>
       </Button>
-    </div>
+    </Page>
   );
 }
 
@@ -135,7 +136,7 @@ function AuthProviderPage({
   });
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={name}
         description={
@@ -256,7 +257,7 @@ function AuthProviderPage({
           </Trans>
         </p>
       </ConfirmDialog>
-    </div>
+    </Page>
   );
 }
 

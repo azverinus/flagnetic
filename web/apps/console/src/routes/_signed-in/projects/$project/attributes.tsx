@@ -7,6 +7,8 @@ import {
   updateAttribute,
   zAttributeType,
 } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
+import { Page } from "@/components/ui/page";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -129,26 +131,30 @@ function Attributes() {
       {attributes.isError ? (
         <QueryError error={attributes.error} onRetry={() => void attributes.refetch()} />
       ) : attributes.data?.length === 0 ? (
-        <EmptyState
-          icon={<TagsIcon />}
-          title={<Trans>This project has no attribute yet.</Trans>}
-          action={newAttribute}
-        />
+        <Card list>
+          <EmptyState
+            icon={<TagsIcon />}
+            title={<Trans>This project has no attribute yet.</Trans>}
+            action={newAttribute}
+          />
+        </Card>
       ) : (
-        <Table
-          caption={t`Attributes`}
-          hideCaption
-          columns={columns}
-          data={attributes.data ?? []}
-          loading={attributes.isPending}
-          getRowId={(attribute) => attribute.id}
-        />
+        <Card list>
+          <Table
+            caption={t`Attributes`}
+            hideCaption
+            columns={columns}
+            data={attributes.data ?? []}
+            loading={attributes.isPending}
+            getRowId={(attribute) => attribute.id}
+          />
+        </Card>
       )}
     </>
   );
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Attributes`}
         description={
@@ -157,7 +163,7 @@ function Attributes() {
             can be renamed but not deleted. A type never changes once declared.
           </Trans>
         }
-        actions={newAttribute}
+        actions={(attributes.data?.length ?? 0) > 0 ? newAttribute : undefined}
       />
       <Tabs
         label={t`Attribute lists`}
@@ -214,7 +220,7 @@ function Attributes() {
           </p>
         )}
       </DeleteRowDialog>
-    </div>
+    </Page>
   );
 }
 

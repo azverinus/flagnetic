@@ -1,4 +1,5 @@
 import { msg } from "@lingui/core/macro";
+import { Page } from "@/components/ui/page";
 import { useLingui } from "@lingui/react/macro";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
@@ -36,10 +37,10 @@ function ProjectTokensScreen() {
   // Who created each token is named from the members the caller can read.
   const { names, failure } = useKnownMembers(project);
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader title={t`Project tokens`} />
       {failure ? <QueryError error={failure.error} onRetry={failure.retry} /> : null}
       <ProjectTokenList project={project} roles={roles} policy={tokenPolicy(me)} names={names} />
-    </div>
+    </Page>
   );
 }

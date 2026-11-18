@@ -97,7 +97,7 @@ export function SdkInventory({ project, environment }: SdkInventoryProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="max-w-prose text-sm text-muted-foreground">
+      <p className="measure-prose text-sm text-muted-foreground">
         <Trans>
           The SDKs that have asked this environment for its ruleset or for values, most recently
           seen first. A row appears within a minute of an SDK’s request; whether an SDK is connected

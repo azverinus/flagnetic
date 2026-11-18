@@ -4,6 +4,7 @@ import {
   type DiscoveredAttribute,
   dismissDiscoveredAttribute,
 } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { CheckIcon, EyeOffIcon } from "lucide-react";
@@ -103,7 +104,7 @@ export function DiscoveredAttributes({ project }: DiscoveredAttributesProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="max-w-prose text-sm text-muted-foreground">
+      <p className="measure-prose text-sm text-muted-foreground">
         <Trans>
           Attributes SDKs sent in evaluated contexts that this project has not declared. Only the
           key and the type of each value are kept, never the value. A dismissed attribute comes back
@@ -113,24 +114,28 @@ export function DiscoveredAttributes({ project }: DiscoveredAttributesProps) {
       {discovered.isError ? (
         <QueryError error={discovered.error} onRetry={() => void discovered.refetch()} />
       ) : discovered.data?.length === 0 ? (
-        <EmptyState
-          title={<Trans>No undeclared attribute has been seen.</Trans>}
-          description={
-            <Trans>
-              Attributes in the contexts SDKs evaluate or the tester sends, that the project has not
-              declared, are listed here within a few seconds.
-            </Trans>
-          }
-        />
+        <Card list>
+          <EmptyState
+            title={<Trans>No undeclared attribute has been seen.</Trans>}
+            description={
+              <Trans>
+                Attributes in the contexts SDKs evaluate or the tester sends, that the project has
+                not declared, are listed here within a few seconds.
+              </Trans>
+            }
+          />
+        </Card>
       ) : (
-        <Table
-          caption={t`Discovered attributes`}
-          hideCaption
-          columns={columns}
-          data={discovered.data ?? []}
-          loading={discovered.isPending}
-          getRowId={(attribute) => attribute.key}
-        />
+        <Card list>
+          <Table
+            caption={t`Discovered attributes`}
+            hideCaption
+            columns={columns}
+            data={discovered.data ?? []}
+            loading={discovered.isPending}
+            getRowId={(attribute) => attribute.key}
+          />
+        </Card>
       )}
 
       <RowDialog

@@ -1,4 +1,5 @@
 import { type Experiment, updateExperiment } from "@flagnetic/api";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
@@ -65,17 +66,17 @@ function ExperimentDetail() {
       : undefined;
   if (failed) {
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+      <Page>
         <QueryError error={failed.error} onRetry={failed.retry} />
-      </div>
+      </Page>
     );
   }
   if (experiment.data === undefined || choices.state !== "ready") {
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6" aria-busy>
+      <Page aria-busy>
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-24 w-full" />
-      </div>
+      </Page>
     );
   }
   // Another experiment's page starts afresh: its form is its own.
@@ -92,7 +93,7 @@ function ExperimentDetail() {
 
 function ExperimentNotFound({ project }: { project: string }) {
   return (
-    <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
+    <Page measure="form">
       <h1 className="text-2xl/7 font-semibold">
         <Trans>Experiment not found</Trans>
       </h1>
@@ -104,7 +105,7 @@ function ExperimentNotFound({ project }: { project: string }) {
           <Trans>Go to the experiments</Trans>
         </Link>
       </Button>
-    </div>
+    </Page>
   );
 }
 
@@ -209,7 +210,7 @@ function ExperimentPage({
   };
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={base.name}
         description={
@@ -323,6 +324,6 @@ function ExperimentPage({
         onSave={() => send(conflicts.version)}
         pending={save.isPending}
       />
-    </div>
+    </Page>
   );
 }

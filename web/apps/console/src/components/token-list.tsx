@@ -1,4 +1,5 @@
 import { type ApiToken, createMyToken, revokeMyToken } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { type QueryKey, useQuery } from "@tanstack/react-query";
 import { PlusIcon, Trash2Icon } from "lucide-react";
@@ -136,15 +137,17 @@ export function TokenList({
       {tokens.isError ? (
         <QueryError error={tokens.error} onRetry={() => void tokens.refetch()} />
       ) : (
-        <Table
-          caption={t`Your API tokens`}
-          hideCaption
-          columns={columns}
-          data={tokens.data ?? []}
-          loading={tokens.isPending}
-          empty={<Trans>You have no API token yet.</Trans>}
-          getRowId={(token) => token.id}
-        />
+        <Card list>
+          <Table
+            caption={t`Your API tokens`}
+            hideCaption
+            columns={columns}
+            data={tokens.data ?? []}
+            loading={tokens.isPending}
+            empty={<Trans>You have no API token yet.</Trans>}
+            getRowId={(token) => token.id}
+          />
+        </Card>
       )}
 
       <Dialog open={creating} onOpenChange={setCreating} title={t`New API token`}>

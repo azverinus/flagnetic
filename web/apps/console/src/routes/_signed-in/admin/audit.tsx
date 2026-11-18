@@ -1,4 +1,5 @@
 import type { AuditEntry } from "@flagnetic/api";
+import { Page } from "@/components/ui/page";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
@@ -69,7 +70,7 @@ function InstanceAudit() {
   }, [projects.data, t]);
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Audit log`}
         description={
@@ -93,7 +94,7 @@ function InstanceAudit() {
         />
       </ProjectKeys.Provider>
       <Outlet />
-    </div>
+    </Page>
   );
 }
 

@@ -1,4 +1,5 @@
 import { msg } from "@lingui/core/macro";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -47,16 +48,16 @@ function MemberPage() {
         return <MemberNotFound />;
       }
       return (
-        <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+        <Page>
           <QueryError error={member.error} onRetry={() => void member.refetch()} />
-        </div>
+        </Page>
       );
     }
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6" aria-busy>
+      <Page aria-busy>
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-24 w-full" />
-      </div>
+      </Page>
     );
   }
   const shown = member.data;
@@ -64,7 +65,7 @@ function MemberPage() {
   const name = memberName(shown);
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={name}
         description={shown.email}
@@ -125,13 +126,13 @@ function MemberPage() {
           },
         ]}
       />
-    </div>
+    </Page>
   );
 }
 
 function MemberNotFound() {
   return (
-    <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
+    <Page measure="form">
       <h1 className="text-2xl/7 font-semibold">
         <Trans>Member not found</Trans>
       </h1>
@@ -143,7 +144,7 @@ function MemberNotFound() {
           <Trans>Go to the members</Trans>
         </Link>
       </Button>
-    </div>
+    </Page>
   );
 }
 

@@ -7,6 +7,7 @@ import {
   restoreFlag,
   type UnitType,
 } from "@flagnetic/api";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
@@ -32,7 +33,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
 import { WaitingChangeRequests } from "@/components/waiting-change-requests";
 import { formatDateTime } from "@/i18n/format";
-import { cn } from "@/lib/cn";
 import { type DayRange, dayRangeOf, daysSearchOf } from "@/lib/daily-counts";
 import { ApiError, unwrap } from "@/lib/errors";
 import { type FlagDetailSearch, validateFlagDetailSearch } from "@/lib/flag-detail";
@@ -75,16 +75,16 @@ function FlagDetail() {
         return <FlagNotFound project={project} />;
       }
       return (
-        <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+        <Page>
           <QueryError error={flag.error} onRetry={() => void flag.refetch()} />
-        </div>
+        </Page>
       );
     }
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6" aria-busy>
+      <Page aria-busy>
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-24 w-full" />
-      </div>
+      </Page>
     );
   }
   // Another flag's page starts afresh: its drafts and dialogs are its own.
@@ -93,7 +93,7 @@ function FlagDetail() {
 
 function FlagNotFound({ project }: { project: string }) {
   return (
-    <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
+    <Page measure="form">
       <h1 className="text-2xl/7 font-semibold">
         <Trans>Flag not found</Trans>
       </h1>
@@ -105,7 +105,7 @@ function FlagNotFound({ project }: { project: string }) {
           <Trans>Go to the flags</Trans>
         </Link>
       </Button>
-    </div>
+    </Page>
   );
 }
 
@@ -229,14 +229,7 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
   ];
 
   return (
-    <div
-      className={cn(
-        "mx-auto flex max-w-5xl flex-col gap-6 p-6",
-        // The tester sits over the bottom of a narrow screen and beside the
-        // page on a wide one, so the editor stays in reach under or beside it.
-        testerOpen && "pb-[62dvh] lg:pr-[27rem] lg:pb-6",
-      )}
-    >
+    <Page reserve={testerOpen}>
       <PageHeader
         title={flag.name}
         description={
@@ -360,7 +353,7 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
         onOpenChange={setComparing}
         initial={environment}
       />
-    </div>
+    </Page>
   );
 }
 
