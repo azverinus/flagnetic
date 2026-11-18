@@ -92,7 +92,7 @@ kubectl exec -n flagnetic deploy/flagnetic -- flagnetic admin bootstrap --email 
 
 **Argo CD** renders the chart with `helm template` and runs Helm hooks as `PreSync` hooks on every sync, so the default works: the Job runs before each sync, which is harmless because `migrate` is idempotent and takes a lock. If you would rather not run a Job on every sync, use `initContainer`. The chart's own Secret, when you let it render one, is a hook too, so under Argo CD keep the secrets in an `existingSecret`.
 
-**`helm template`** drops hooks unless asked, so render with `--set migrations.mode=initContainer` (or run `flagnetic migrate` yourself first and use `auto`).
+**`helm template`** output applied with `kubectl` creates the hook Job as an ordinary resource, at the same time as the pods rather than before them, so render with `--set migrations.mode=initContainer` (or run `flagnetic migrate` yourself first and use `auto`).
 
 A migration the new version brings only moves the schema forward, in a way the previous minor still runs against, which is what makes the rolling upgrade below safe.
 
@@ -206,7 +206,7 @@ helm upgrade flagnetic oci://ghcr.io/azverinus/charts/flagnetic -n flagnetic \
   --version <new version> -f values.yaml
 ```
 
-Pass your values file again rather than `--reuse-values`, which would keep the old release's defaults for values the new chart adds. The hook Job migrates the database, and only when it succeeds does Helm replace pods, one at a time behind the PodDisruptionBudget. A stopping pod answers `/readyz` with 503 for the drain, then finishes its requests, so the Service stops routing to it before it goes and no request is refused; the 30-second `terminationGracePeriodSeconds` covers both (see [Stopping](operations.md#stopping)). A failed migration fails the upgrade with every pod still on the old version; read the Job's log with `kubectl logs -n flagnetic job/flagnetic-migrate`, fix the cause and upgrade again.
+Pass your values file again rather than `--reuse-values`, which would keep the old release's defaults for values the new chart adds. The hook Job migrates the database, and only when it succeeds does Helm roll the Deployment, replacing the pods a few at a time while the others keep serving. A stopping pod answers `/readyz` with 503 for the drain, then finishes its requests, so the Service stops routing to it before it goes and no request is refused; the 30-second `terminationGracePeriodSeconds` covers both (see [Stopping](operations.md#stopping)). A failed migration fails the upgrade with every pod still on the old version; read the Job's log with `kubectl logs -n flagnetic job/flagnetic-migrate`, fix the cause and upgrade again.
 
 `helm rollback` returns the chart to a previous revision but not the database. Migrations only move forward and there are no down migrations, so to go back after a migration, restore the backup taken before the upgrade. The rest of the policy, and the note for each release, is in [Upgrades](install.md#upgrades) and [Compatibility](compatibility.md).
 

@@ -164,9 +164,11 @@ jobs:
       - name: Push
         id: push
         run: |
-          out="$(helm push "$RUNNER_TEMP"/chart/flagnetic-*.tgz "$CHART_REPOSITORY" 2>&1)"
-          echo "$out"
-          digest="$(sed -n 's/^Digest: \(sha256:[0-9a-f]\{64\}\)$/\1/p' <<< "$out")"
+          # tee keeps helm's own error in the log when the push fails, and
+          # pipefail still fails the step then.
+          set -o pipefail
+          helm push "$RUNNER_TEMP"/chart/flagnetic-*.tgz "$CHART_REPOSITORY" 2>&1 | tee "$RUNNER_TEMP/push.log"
+          digest="$(sed -n 's/^Digest: \(sha256:[0-9a-f]\{64\}\)$/\1/p' "$RUNNER_TEMP/push.log")"
           if [ -z "$digest" ]; then
             echo "helm push printed no digest." >&2
             exit 1
