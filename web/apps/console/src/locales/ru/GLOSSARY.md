@@ -10,80 +10,80 @@ A literal translation that nobody says is the thing to avoid; not translating is
 
 ## Kept in Latin
 
-| Term | Russian | Note |
-|---|---|---|
-| SDK, API, SSO, SAML, OIDC, SCIM, SMTP, CORS, URL, ID, JSON, YAML, CSV, UTC | as is | `ID` everywhere, never «идентификатор» |
-| SRM (sample-ratio mismatch) | **SRM**; the first mention on a screen: «SRM (доли выборки расходятся с весами)» | |
-| kill switch | **kill switch**, lower case, not declined: «Включить kill switch» | |
-| rollout | **rollout**: «Есть rollout», «rollout завершён» | |
-| override | **override**, plural **overrides**: «Добавить override», «override задан» | |
-| prerequisite | **prerequisite**, plural **prerequisites**: «Добавить prerequisite» | |
-| ruleset | **ruleset**: «Скачать ruleset» | the name of the file and the format in the SDK protocol |
-| Entity ID, ACS URL, SP, IdP, EntityDescriptor, bearer, claim, issuer | as is | what the identity provider's own screen shows |
-| S3, ClickHouse, Parquet, JSON lines | as is | |
-| evaluation reason codes (`fallthrough`, `rule_match`, `targeting_match`, `off`) | as is, in mono | they are API values |
+| Term                                                                            | Russian                                                                          | Note                                                    |
+| ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| SDK, API, SSO, SAML, OIDC, SCIM, SMTP, CORS, URL, ID, JSON, YAML, CSV, UTC      | as is                                                                            | `ID` everywhere, never «идентификатор»                  |
+| SRM (sample-ratio mismatch)                                                     | **SRM**; the first mention on a screen: «SRM (доли выборки расходятся с весами)» |                                                         |
+| kill switch                                                                     | **kill switch**, lower case, not declined: «Включить kill switch»                |                                                         |
+| rollout                                                                         | **rollout**: «Есть rollout», «rollout завершён»                                  |                                                         |
+| override                                                                        | **override**, plural **overrides**: «Добавить override», «override задан»        |                                                         |
+| prerequisite                                                                    | **prerequisite**, plural **prerequisites**: «Добавить prerequisite»              |                                                         |
+| ruleset                                                                         | **ruleset**: «Скачать ruleset»                                                   | the name of the file and the format in the SDK protocol |
+| Entity ID, ACS URL, SP, IdP, EntityDescriptor, bearer, claim, issuer            | as is                                                                            | what the identity provider's own screen shows           |
+| S3, ClickHouse, Parquet, JSON lines                                             | as is                                                                            |                                                         |
+| evaluation reason codes (`fallthrough`, `rule_match`, `targeting_match`, `off`) | as is, in mono                                                                   | they are API values                                     |
 
 ## Borrowed
 
-| Term | Russian | Not |
-|---|---|---|
-| instance | **инстанс** (m.) | экземпляр |
-| unit, unit type | **юнит**, **тип юнита** | единица (kept only as a unit of time) |
-| bucket (hash and S3) | **бакет** | корзина |
-| session | **сессия** | сеанс |
-| maintainer (role) | **мейнтейнер** | сопровождающий |
-| webhook, token, tag, hash, alias, endpoint, tenant, alert | вебхук, токен, тег, хеш, алиас, эндпоинт, тенант, алерт | «точка …» for endpoint |
-| targeting | таргетинг | |
-| rotate, rotation (key, secret) | **ротировать**, **ротация** | заменить, сменить |
-| holdout | холдаут | |
+| Term                                                      | Russian                                                 | Not                                   |
+| --------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------- |
+| instance                                                  | **инстанс** (m.)                                        | экземпляр                             |
+| unit, unit type                                           | **юнит**, **тип юнита**                                 | единица (kept only as a unit of time) |
+| bucket (hash and S3)                                      | **бакет**                                               | корзина                               |
+| session                                                   | **сессия**                                              | сеанс                                 |
+| maintainer (role)                                         | **мейнтейнер**                                          | сопровождающий                        |
+| webhook, token, tag, hash, alias, endpoint, tenant, alert | вебхук, токен, тег, хеш, алиас, эндпоинт, тенант, алерт | «точка …» for endpoint                |
+| targeting                                                 | таргетинг                                               |                                       |
+| rotate, rotation (key, secret)                            | **ротировать**, **ротация**                             | заменить, сменить                     |
+| holdout                                                   | холдаут                                                 |                                       |
 
 ## Translated
 
-| Term | Russian | Not |
-|---|---|---|
-| project, environment, flag, segment, rule, experiment, attribute, context, key, salt | проект, окружение, флаг, сегмент, правило, эксперимент, атрибут, контекст, ключ, соль | |
-| variation | **вариант** | вариация |
-| exposure | **показ**; to be exposed: «увидеть вариант», «получить показ» | экспозиция |
-| assignment | **назначение** | распределение |
-| fallthrough (a noun in prose and labels) | **остальным**; «вариант для остальных» | без совпадений. The reason code stays `fallthrough` |
-| off variation | вариант при выключении | |
-| evaluation, evaluate | вычисление, вычислить | |
-| remote evaluation | **вычисление на сервере** | удалённое вычисление (reads as "deleted") |
-| serve | отдавать | выдавать |
-| traffic allocation | охват | доля трафика |
-| inclusion, included (experiment) | **попадание в эксперимент**, попал | включение (collides with on and off) |
-| sink | **приёмник** | приёмник данных |
-| target (of a sink or webhook) | получатель | цель, целевая система |
-| batch | **пакет** | пачка |
-| dead letter | недоставленный пакет | |
-| replay / redeliver | повторить отправку / доставить повторно | |
-| retention | **срок хранения** | ретеншен, хранение |
-| gap | пропуск | |
-| member | участник | |
-| role, grant | роль; выдать, отозвать роль | |
-| owner, developer, viewer | владелец, разработчик, наблюдатель | |
-| entity (audit log) | **объект** | сущность |
-| actor (audit log) | **инициатор** | автор, which is `author` |
-| audit log, audit entry | журнал аудита, запись журнала аудита | |
-| change request | запрос на изменение | |
-| approve, reject | одобрить, отклонить | |
-| rebase (a change request) | **перенести на текущую версию** | перебазировать |
-| superseded | **неактуален** | устарел (which is `stale`), вытеснен |
-| stale flag | устаревший флаг | |
-| revert | **откатить** | вернуть |
-| protected environment | защищённое окружение | |
-| auth provider | **провайдер входа** | провайдер аутентификации |
-| identity provider | провайдер идентификации; IdP in tables and narrow labels | |
-| identity (linked) / account | привязанная учётная запись / аккаунт | |
-| provisioned (by SCIM) | заведён через SCIM | выдан, созданные |
-| group mapping | **сопоставление групп** | соответствие |
-| enforced domain | домен с обязательным входом | принудительный домен |
-| origin (CORS) | **источник**, with the Latin once in the label: «Разрешённые источники (origins)» | |
-| enabled, disabled (an object) / on, off (a flag) | включён, отключён / включён, выключен | |
-| deactivated (a member) | деактивирован | |
-| email | почта; «адрес почты» where the address is meant | |
-| kind / type | вид / тип | |
-| draft, archive | черновик, архив | |
+| Term                                                                                 | Russian                                                                               | Not                                                 |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| project, environment, flag, segment, rule, experiment, attribute, context, key, salt | проект, окружение, флаг, сегмент, правило, эксперимент, атрибут, контекст, ключ, соль |                                                     |
+| variation                                                                            | **вариант**                                                                           | вариация                                            |
+| exposure                                                                             | **показ**; to be exposed: «увидеть вариант», «получить показ»                         | экспозиция                                          |
+| assignment                                                                           | **назначение**                                                                        | распределение                                       |
+| fallthrough (a noun in prose and labels)                                             | **остальным**; «вариант для остальных»                                                | без совпадений. The reason code stays `fallthrough` |
+| off variation                                                                        | вариант при выключении                                                                |                                                     |
+| evaluation, evaluate                                                                 | вычисление, вычислить                                                                 |                                                     |
+| remote evaluation                                                                    | **вычисление на сервере**                                                             | удалённое вычисление (reads as "deleted")           |
+| serve                                                                                | отдавать                                                                              | выдавать                                            |
+| traffic allocation                                                                   | охват                                                                                 | доля трафика                                        |
+| inclusion, included (experiment)                                                     | **попадание в эксперимент**, попал                                                    | включение (collides with on and off)                |
+| sink                                                                                 | **приёмник**                                                                          | приёмник данных                                     |
+| target (of a sink or webhook)                                                        | получатель                                                                            | цель, целевая система                               |
+| batch                                                                                | **пакет**                                                                             | пачка                                               |
+| dead letter                                                                          | недоставленный пакет                                                                  |                                                     |
+| replay / redeliver                                                                   | повторить отправку / доставить повторно                                               |                                                     |
+| retention                                                                            | **срок хранения**                                                                     | ретеншен, хранение                                  |
+| gap                                                                                  | пропуск                                                                               |                                                     |
+| member                                                                               | участник                                                                              |                                                     |
+| role, grant                                                                          | роль; выдать, отозвать роль                                                           |                                                     |
+| owner, developer, viewer                                                             | владелец, разработчик, наблюдатель                                                    |                                                     |
+| entity (audit log)                                                                   | **объект**                                                                            | сущность                                            |
+| actor (audit log)                                                                    | **инициатор**                                                                         | автор, which is `author`                            |
+| audit log, audit entry                                                               | журнал аудита, запись журнала аудита                                                  |                                                     |
+| change request                                                                       | запрос на изменение                                                                   |                                                     |
+| approve, reject                                                                      | одобрить, отклонить                                                                   |                                                     |
+| rebase (a change request)                                                            | **перенести на текущую версию**                                                       | перебазировать                                      |
+| superseded                                                                           | **неактуален**                                                                        | устарел (which is `stale`), вытеснен                |
+| stale flag                                                                           | устаревший флаг                                                                       |                                                     |
+| revert                                                                               | **откатить**                                                                          | вернуть                                             |
+| protected environment                                                                | защищённое окружение                                                                  |                                                     |
+| auth provider                                                                        | **провайдер входа**                                                                   | провайдер аутентификации                            |
+| identity provider                                                                    | провайдер идентификации; IdP in tables and narrow labels                              |                                                     |
+| identity (linked) / account                                                          | привязанная учётная запись / аккаунт                                                  |                                                     |
+| provisioned (by SCIM)                                                                | заведён через SCIM                                                                    | выдан, созданные                                    |
+| group mapping                                                                        | **сопоставление групп**                                                               | соответствие                                        |
+| enforced domain                                                                      | домен с обязательным входом                                                           | принудительный домен                                |
+| origin (CORS)                                                                        | **источник**, with the Latin once in the label: «Разрешённые источники (origins)»     |                                                     |
+| enabled, disabled (an object) / on, off (a flag)                                     | включён, отключён / включён, выключен                                                 |                                                     |
+| deactivated (a member)                                                               | деактивирован                                                                         |                                                     |
+| email                                                                                | почта; «адрес почты» where the address is meant                                       |                                                     |
+| kind / type                                                                          | вид / тип                                                                             |                                                     |
+| draft, archive                                                                       | черновик, архив                                                                       |                                                     |
 
 ## Rules for a Russian string
 

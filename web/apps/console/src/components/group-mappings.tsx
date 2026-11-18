@@ -278,7 +278,7 @@ function MappingRowFields({
       <div className="grid gap-3 sm:grid-cols-2">
         <Field
           label={<Trans>Directory group</Trans>}
-          hint={<Trans>Matched exactly as the provider claims it, case included.</Trans>}
+          hint={<Trans>Matched exactly as the provider claims it, case included</Trans>}
           error={errors?.group}
           refusal={refusal}
           pointer={`${at}/group`}

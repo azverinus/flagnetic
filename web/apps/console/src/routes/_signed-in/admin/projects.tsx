@@ -125,8 +125,8 @@ function CreateProject() {
         label={<Trans>Key</Trans>}
         hint={
           <Trans>
-            How SDKs and scripts name the project: lowercase letters, digits, - and _. It never
-            changes.
+            How SDKs and scripts name the project: lowercase letters, digits, - and _; it never
+            changes
           </Trans>
         }
         error={

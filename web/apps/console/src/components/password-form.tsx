@@ -79,12 +79,7 @@ export function PasswordForm() {
       </Field>
       <Field
         label={<Trans>New password</Trans>}
-        hint={
-          <Trans>
-            At least 12 characters, or as many as this instance asks for. Length is what makes a
-            password hard to guess.
-          </Trans>
-        }
+        hint={<Trans>At least 12 characters, or as many as this instance asks for</Trans>}
         error={errors.new_password?.message}
         refusal={change.error}
         pointer="/new_password"

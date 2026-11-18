@@ -238,7 +238,7 @@ function Upload({
     <div className="flex flex-col gap-4">
       <Field
         label={t`Remote Config template`}
-        hint={t`The template as "firebase remoteconfig:get" or the Remote Config REST API returns it, a JSON file.`}
+        hint={t`The template as "firebase remoteconfig:get" or the Remote Config REST API returns it, a JSON file`}
         error={unreadable}
       >
         <Input
@@ -517,7 +517,7 @@ function Target({
     <div className="flex flex-col gap-4">
       <Field
         label={t`Environment`}
-        hint={t`The flags are on here, serving what the template says. Every other environment gets them off, serving the default.`}
+        hint={t`The flags are on here, serving what the template says; every other environment gets them off, serving the default`}
         className="w-72"
       >
         <Select
@@ -534,7 +534,7 @@ function Target({
       </Field>
       <Field
         label={t`Unit type for percent rollouts`}
-        hint={t`Firebase's percent conditions become rollouts that bucket this unit type.`}
+        hint={t`Firebase's percent conditions become rollouts that bucket this unit type`}
         className="w-72"
       >
         <Select

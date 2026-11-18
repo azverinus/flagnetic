@@ -368,7 +368,7 @@ function EditForm({
       </Field>
       <Field
         label={<Trans>Description</Trans>}
-        hint={<Trans>Why the change is needed, for whoever reviews it. Optional.</Trans>}
+        hint={<Trans>Why the change is needed, for whoever reviews it; optional</Trans>}
         refusal={refusal}
         pointer="/description"
       >
@@ -422,9 +422,9 @@ export function DecisionForm({
         label={<Trans>Comment</Trans>}
         hint={
           decision === "approve" ? (
-            <Trans>Optional; the author and the audit log see it.</Trans>
+            <Trans>Optional; the author and the audit log see it</Trans>
           ) : (
-            <Trans>Required; the author and the audit log see it.</Trans>
+            <Trans>Required; the author and the audit log see it</Trans>
           )
         }
         error={checked ? issue : undefined}

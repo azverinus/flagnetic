@@ -92,11 +92,6 @@ function Environments() {
     <Page>
       <PageHeader
         title={t`Environments`}
-        description={
-          <Trans>
-            Where the project serves from. A key is fixed once created; the name can change.
-          </Trans>
-        }
         actions={
           <Can permission={permission} whenMissing="disable">
             <Button onClick={() => setCreating(true)}>
@@ -191,7 +186,7 @@ function CreateEnvironment({ project, onDone }: { project: string; onDone: () =>
     >
       <Field
         label={<Trans>Key</Trans>}
-        hint={<Trans>Lowercase letters, digits, - and _. It never changes.</Trans>}
+        hint={<Trans>Lowercase letters, digits, - and _; it never changes</Trans>}
         error={
           errors.key?.message ??
           (taken ? t`This project already has an environment with that key.` : undefined)

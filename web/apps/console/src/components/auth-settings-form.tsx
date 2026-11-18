@@ -184,8 +184,8 @@ export function AuthSettingsForm({ settings }: { settings: AuthSettings }) {
             label={<Trans>Password minimum length</Trans>}
             hint={
               <Trans>
-                The fewest characters a password chosen from now on has, from 12 to 128. Passwords
-                set before keep working.
+                The fewest characters a password chosen from now on has, from 12 to 128; passwords
+                set before keep working
               </Trans>
             }
             error={errors.password_min_length?.message ?? serverError("password_min_length")}
@@ -234,13 +234,13 @@ export function AuthSettingsForm({ settings }: { settings: AuthSettings }) {
             render={({ field }) => (
               <SwitchField
                 label={<Trans>Local login</Trans>}
-                hint={
+                hint={<Trans>Members sign in with their email and password</Trans>}
+                details={
                   <Trans>
-                    Members sign in with their email and password. Switching it off leaves auth
-                    providers as the only way in, so it is refused unless you hold an identity at an
-                    enabled provider yourself. If a provider breaks and nobody can sign in, run
-                    "flagnetic admin unlock" on the server: it switches local login back on and
-                    lifts every enforced domain.
+                    Switching it off leaves auth providers as the only way in, so it is refused
+                    unless you hold an identity at an enabled provider yourself. If a provider
+                    breaks and nobody can sign in, run "flagnetic admin unlock" on the server: it
+                    switches local login back on and lifts every enforced domain.
                   </Trans>
                 }
                 checked={field.value}

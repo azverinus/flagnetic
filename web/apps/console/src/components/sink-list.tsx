@@ -91,16 +91,7 @@ export function SinkList({ project }: { project: string }) {
 
   return (
     <Page>
-      <PageHeader
-        title={t`Sinks`}
-        description={
-          <Trans>
-            A sink keeps a copy of the project's raw events in your own warehouse, bucket or
-            pipeline, so analysts never work on the platform's database.
-          </Trans>
-        }
-        actions={(sinks.data?.length ?? 0) > 0 ? newSink : undefined}
-      />
+      <PageHeader title={t`Sinks`} actions={(sinks.data?.length ?? 0) > 0 ? newSink : undefined} />
       {sinks.isError ? (
         <QueryError error={sinks.error} onRetry={() => void sinks.refetch()} />
       ) : sinks.data?.length === 0 ? (

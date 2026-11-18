@@ -406,7 +406,7 @@ function DefinitionForm({
           render={({ field }) => (
             <Field
               label={<Trans>Owner</Trans>}
-              hint={<Trans>The member accountable for the flag.</Trans>}
+              hint={<Trans>The member accountable for the flag</Trans>}
               error={at("/owner")}
             >
               <Select
@@ -430,7 +430,7 @@ function DefinitionForm({
           render={({ field }) => (
             <Field
               label={<Trans>Tags</Trans>}
-              hint={<Trans>Press Enter after each tag.</Trans>}
+              hint={<Trans>Press Enter after each tag</Trans>}
               error={
                 errors.tags?.message ??
                 (tagsRefusal ? flagViolationMessage(i18n, tagsRefusal) : undefined)
@@ -465,7 +465,7 @@ function DefinitionForm({
         {lifetime === "temporary" ? (
           <Field
             label={<Trans>Expected removal</Trans>}
-            hint={<Trans>Left empty, 90 days from today.</Trans>}
+            hint={<Trans>Left empty, 90 days from today</Trans>}
             error={at("/expected_removal_at")}
             className="w-56"
           >

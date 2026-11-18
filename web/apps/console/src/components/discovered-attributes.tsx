@@ -225,7 +225,7 @@ function DeclareForm({
       </p>
       <Field
         label={<Trans>Type</Trans>}
-        hint={<Trans>One of the types SDKs sent it with.</Trans>}
+        hint={<Trans>One of the types SDKs sent it with</Trans>}
         error={missing ? t`Choose a type.` : undefined}
         refusal={declare.error}
         pointer="/type"

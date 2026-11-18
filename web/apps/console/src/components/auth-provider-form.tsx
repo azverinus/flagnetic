@@ -80,7 +80,7 @@ export function AuthProviderForm({
     <>
       <Field
         label={<Trans>Name</Trans>}
-        hint={<Trans>What the sign-in button says: “Sign in with …”.</Trans>}
+        hint={<Trans>What the sign-in button says: “Sign in with …”</Trans>}
         error={error("display_name") ?? fieldViolation(i18n, refusal, "display_name")}
       >
         <Input
@@ -94,10 +94,10 @@ export function AuthProviderForm({
         hint={
           creating ? (
             <Trans>
-              Names the provider in sign-in addresses and in the redirect URI. It never changes.
+              Names the provider in sign-in addresses and in the redirect URI; it never changes
             </Trans>
           ) : (
-            <Trans>The slug never changes.</Trans>
+            <Trans>The slug never changes</Trans>
           )
         }
         error={
@@ -118,10 +118,10 @@ export function AuthProviderForm({
         label={<Trans>Issuer</Trans>}
         hint={
           <Trans>
-            The identity provider's issuer URL; its discovery document is read from it. Plain http
-            is accepted only on a loopback address.
+            The identity provider's issuer URL, from which its discovery document is read
           </Trans>
         }
+        details={<Trans>Plain http is accepted only on a loopback address.</Trans>}
         error={error("issuer") ?? fieldViolation(i18n, refusal, "issuer")}
       >
         <Input type="url" autoComplete="off" spellCheck={false} {...form.register("issuer")} />
@@ -136,13 +136,17 @@ export function AuthProviderForm({
         label={<Trans>Client secret</Trans>}
         hint={
           provider?.client_secret_set ? (
-            <Trans>
-              A secret is stored and never shown again. Leave this empty to keep it, or type a new
-              one to replace it. Changing the issuer or the client ID needs it again.
-            </Trans>
+            <Trans>A secret is stored and never shown again; leave it empty to keep it</Trans>
           ) : (
-            <Trans>Stored encrypted and never shown again.</Trans>
+            <Trans>Stored encrypted and never shown again</Trans>
           )
+        }
+        details={
+          provider?.client_secret_set ? (
+            <Trans>
+              Type a new one to replace it. Changing the issuer or the client ID needs it again.
+            </Trans>
+          ) : undefined
         }
         error={error("client_secret") ?? fieldViolation(i18n, refusal, "client_secret")}
       >
@@ -157,8 +161,12 @@ export function AuthProviderForm({
         label={<Trans>Domains</Trans>}
         hint={
           <Trans>
-            The email domains this provider vouches for, one per line or separated by spaces. A
-            subdomain is not included. Linking and creating members apply to these emails only.
+            The email domains this provider vouches for, one per line or separated by spaces
+          </Trans>
+        }
+        details={
+          <Trans>
+            A subdomain is not included. Linking and creating members apply to these emails only.
           </Trans>
         }
         error={error("domains") ?? fieldViolation(i18n, refusal, "domains")}
@@ -173,7 +181,7 @@ export function AuthProviderForm({
       </Field>
       <Field
         label={<Trans>Scopes</Trans>}
-        hint={<Trans>Separated by spaces. The defaults read the email and the name.</Trans>}
+        hint={<Trans>Separated by spaces; the defaults read the email and the name</Trans>}
         error={error("scopes") ?? fieldViolation(i18n, refusal, "scopes")}
       >
         <Input autoComplete="off" spellCheck={false} {...form.register("scopes")} />
@@ -214,10 +222,11 @@ export function AuthProviderForm({
         render={({ field }) => (
           <SwitchField
             label={<Trans>Require a verified email</Trans>}
-            hint={
+            hint={<Trans>Refuse a sign-in whose token does not say the email is verified</Trans>}
+            details={
               <Trans>
-                Refuse a sign-in whose token does not say the email is verified. Turn it off only
-                for a provider that does not send the claim and checks addresses itself.
+                Turn it off only for a provider that does not send the claim and checks addresses
+                itself.
               </Trans>
             }
             checked={field.value}
@@ -233,10 +242,13 @@ export function AuthProviderForm({
             label={<Trans>Link members by email</Trans>}
             hint={
               <Trans>
-                A first sign-in whose verified email is in the domains above is linked to the
-                existing member with that email. Anyone who controls such an address at the provider
-                then signs in as that member, so turn it on only for a provider you trust with these
-                domains.
+                Link a first sign-in from the domains above to the existing member with that email
+              </Trans>
+            }
+            details={
+              <Trans>
+                Anyone who controls such an address at the provider then signs in as that member, so
+                turn it on only for a provider you trust with these domains.
               </Trans>
             }
             checked={field.value}
@@ -252,8 +264,8 @@ export function AuthProviderForm({
             label={<Trans>Create members on first sign-in</Trans>}
             hint={
               <Trans>
-                A sign-in whose verified email is in the domains above and has no member yet creates
-                one, active, who holds no access until a project grants them a role.
+                Create a member on a first sign-in from the domains above; they hold no access until
+                a project grants a role
               </Trans>
             }
             checked={field.value}
@@ -270,7 +282,7 @@ export function AuthProviderForm({
               label={<Trans>Enabled</Trans>}
               hint={
                 <Trans>
-                  Offer the provider on the sign-in page now. Turn it off to test it first.
+                  Offer the provider on the sign-in page now; turn it off to test it first
                 </Trans>
               }
               checked={field.value}

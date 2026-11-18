@@ -321,7 +321,7 @@ function AddOverride({
         label={<Trans>Note (optional)</Trans>}
         hint={
           <Trans>
-            Why the unit has this override, such as the test it is for. Never sent to SDKs.
+            Why the unit has this override, such as the test it is for; never sent to SDKs
           </Trans>
         }
         error={(checked ? issues.note : undefined) ?? at("/note")}

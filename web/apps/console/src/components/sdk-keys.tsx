@@ -301,8 +301,8 @@ function OriginsField({
       label={<Trans>Allowed origins</Trans>}
       hint={
         <Trans>
-          The sites the key may be used from, such as https://app.example.com. Leave it empty to
-          allow any origin.
+          The sites the key may be used from, such as https://app.example.com; leave it empty to
+          allow any origin
         </Trans>
       }
       error={error ?? (refused ? violationMessage(i18n, refused) : undefined)}
@@ -386,8 +386,8 @@ function CreateKey({
             label={<Trans>Kind</Trans>}
             hint={
               <Trans>
-                A server key is for a backend; a client key is for a browser or an app. It cannot be
-                changed later.
+                A server key is for a backend; a client key is for a browser or an app; it cannot be
+                changed later
               </Trans>
             }
             refusal={create.error}
@@ -412,7 +412,7 @@ function CreateKey({
       />
       <Field
         label={<Trans>Name</Trans>}
-        hint={<Trans>What uses the key, to tell it apart later.</Trans>}
+        hint={<Trans>What uses the key, to tell it apart later</Trans>}
         error={errors.name?.message}
         refusal={create.error}
         pointer="/name"

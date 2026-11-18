@@ -120,7 +120,7 @@ export function WebhookEditor({ scope, webhook, layout, onCancel, onSaved }: Web
     <>
       <Field
         label={<Trans>Name</Trans>}
-        hint={<Trans>What receives the events, to tell the subscriptions apart.</Trans>}
+        hint={<Trans>What receives the events, to tell the subscriptions apart</Trans>}
         error={errors.name?.message}
         refusal={save.error}
         pointer="/name"
@@ -129,7 +129,7 @@ export function WebhookEditor({ scope, webhook, layout, onCancel, onSaved }: Web
       </Field>
       <Field
         label={<Trans>URL</Trans>}
-        hint={<Trans>Where every event is posted, signed with the subscription's secret.</Trans>}
+        hint={<Trans>Where every event is posted, signed with the subscription's secret</Trans>}
         error={errors.url?.message ?? (refusedField === "url" ? refusalHere : undefined)}
         refusal={save.error}
         pointer="/url"

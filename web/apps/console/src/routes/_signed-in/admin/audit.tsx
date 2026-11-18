@@ -1,7 +1,7 @@
 import type { AuditEntry } from "@flagnetic/api";
 import { Page } from "@/components/ui/page";
 import { msg } from "@lingui/core/macro";
-import { Trans, useLingui } from "@lingui/react/macro";
+import { useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { createContext, type ReactNode, useContext, useMemo } from "react";
@@ -44,15 +44,7 @@ function InstanceAudit() {
 
   return (
     <Page>
-      <PageHeader
-        title={t`Audit log`}
-        description={
-          <Trans>
-            Every change on this instance, in every project and outside them, such as members,
-            sign-ins and settings.
-          </Trans>
-        }
-      />
+      <PageHeader title={t`Audit log`} />
       {projects.isError ? (
         <QueryError error={projects.error} onRetry={() => void projects.refetch()} />
       ) : null}

@@ -81,16 +81,7 @@ function Experiments() {
 
   return (
     <Page>
-      <PageHeader
-        title={t`Experiments`}
-        description={
-          <Trans>
-            Each experiment compares variations of one flag over the units of one unit type; a
-            flag's rule serves it in the environments that hold it.
-          </Trans>
-        }
-        actions={known ? newExperiment : undefined}
-      />
+      <PageHeader title={t`Experiments`} actions={known ? newExperiment : undefined} />
       <Toolbar chips={chips} onRemoveChip={removeChip} onClearAll={clearFacets} />
       <ExperimentsPages
         project={project}

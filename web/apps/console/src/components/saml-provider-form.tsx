@@ -82,7 +82,7 @@ export function SamlProviderForm({
     <>
       <Field
         label={<Trans>Name</Trans>}
-        hint={<Trans>What the sign-in button says: “Sign in with …”.</Trans>}
+        hint={<Trans>What the sign-in button says: “Sign in with …”</Trans>}
         error={error("display_name") ?? samlFieldViolation(i18n, refusal, "display_name")}
       >
         <Input
@@ -96,11 +96,11 @@ export function SamlProviderForm({
         hint={
           creating ? (
             <Trans>
-              Names the provider in sign-in addresses, in the ACS URL and in the entity ID. It never
-              changes.
+              Names the provider in sign-in addresses, in the ACS URL and in the entity ID; it never
+              changes
             </Trans>
           ) : (
-            <Trans>The slug never changes.</Trans>
+            <Trans>The slug never changes</Trans>
           )
         }
         error={
@@ -158,12 +158,8 @@ export function SamlProviderForm({
       {source === "url" ? (
         <Field
           label={<Trans>Metadata URL</Trans>}
-          hint={
-            <Trans>
-              Where the identity provider publishes its metadata. Plain http is accepted only on a
-              loopback address.
-            </Trans>
-          }
+          hint={<Trans>Where the identity provider publishes its metadata</Trans>}
+          details={<Trans>Plain http is accepted only on a loopback address.</Trans>}
           error={error("idp_metadata_url") ?? samlFieldViolation(i18n, refusal, "idp_metadata_url")}
         >
           <Input
@@ -179,13 +175,13 @@ export function SamlProviderForm({
           hint={
             keepsDocument ? (
               <Trans>
-                The pasted metadata is stored and not shown again. Leave this empty to keep it, or
-                paste a new document to replace it.
+                The pasted metadata is stored and not shown again; leave it empty to keep it
               </Trans>
             ) : (
-              <Trans>The identity provider's metadata document, at most 1 MiB.</Trans>
+              <Trans>The identity provider's metadata document, at most 1 MiB</Trans>
             )
           }
+          details={keepsDocument ? <Trans>Paste a new document to replace it.</Trans> : undefined}
           error={error("idp_metadata_xml") ?? samlFieldViolation(i18n, refusal, "idp_metadata_xml")}
         >
           <Textarea
@@ -201,9 +197,13 @@ export function SamlProviderForm({
         label={<Trans>Domains</Trans>}
         hint={
           <Trans>
-            The email domains this provider vouches for, one per line or separated by spaces. A
-            subdomain is not included. An email counts as verified, and linking and creating members
-            apply, only inside these domains.
+            The email domains this provider vouches for, one per line or separated by spaces
+          </Trans>
+        }
+        details={
+          <Trans>
+            A subdomain is not included. An email counts as verified, and linking and creating
+            members apply, only inside these domains.
           </Trans>
         }
         error={error("domains") ?? samlFieldViolation(i18n, refusal, "domains")}
@@ -223,9 +223,12 @@ export function SamlProviderForm({
           <Field
             label={<Trans>Name identifier format</Trans>}
             hint={
+              <Trans>The name identifier format the instance asks the identity provider for</Trans>
+            }
+            details={
               <Trans>
-                The format the instance asks the identity provider for. The name identifier links
-                the person to their member; with the email address format it is also their email.
+                The name identifier links the person to their member; with the email address format
+                it is also their email.
               </Trans>
             }
             error={error("name_id_format") ?? samlFieldViolation(i18n, refusal, "name_id_format")}
@@ -283,10 +286,11 @@ export function SamlProviderForm({
         render={({ field }) => (
           <SwitchField
             label={<Trans>Sign authentication requests</Trans>}
-            hint={
+            hint={<Trans>Sign the requests the instance sends with its current key</Trans>}
+            details={
               <Trans>
-                Sign the requests the instance sends with its current key, for an identity provider
-                that checks them against the certificate in the SP metadata.
+                For an identity provider that checks them against the certificate in the SP
+                metadata.
               </Trans>
             }
             checked={field.value}
@@ -302,10 +306,13 @@ export function SamlProviderForm({
             label={<Trans>Link members by email</Trans>}
             hint={
               <Trans>
-                A first sign-in whose email is in the domains above is linked to the existing member
-                with that email. Anyone who controls such an address at the identity provider then
-                signs in as that member, so turn it on only for a provider you trust with these
-                domains.
+                Link a first sign-in from the domains above to the existing member with that email
+              </Trans>
+            }
+            details={
+              <Trans>
+                Anyone who controls such an address at the identity provider then signs in as that
+                member, so turn it on only for a provider you trust with these domains.
               </Trans>
             }
             checked={field.value}
@@ -321,8 +328,8 @@ export function SamlProviderForm({
             label={<Trans>Create members on first sign-in</Trans>}
             hint={
               <Trans>
-                A sign-in whose email is in the domains above and has no member yet creates one,
-                active, who holds no access until a project grants them a role.
+                Create a member on a first sign-in from the domains above; they hold no access until
+                a project grants a role
               </Trans>
             }
             checked={field.value}
@@ -339,7 +346,7 @@ export function SamlProviderForm({
               label={<Trans>Enabled</Trans>}
               hint={
                 <Trans>
-                  Offer the provider on the sign-in page now. Turn it off to test it first.
+                  Offer the provider on the sign-in page now; turn it off to test it first
                 </Trans>
               }
               checked={field.value}

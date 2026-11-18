@@ -1,5 +1,5 @@
 import { msg } from "@lingui/core/macro";
-import { Trans, useLingui } from "@lingui/react/macro";
+import { useLingui } from "@lingui/react/macro";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 import { ProjectAuditPanel, useProjectAuditFilters } from "@/components/audit-filters";
@@ -24,14 +24,7 @@ function ProjectAudit() {
   const filters = useProjectAuditFilters();
   return (
     <Page>
-      <PageHeader
-        title={t`Audit log`}
-        description={
-          <Trans>
-            Every change made in this project, newest first, with its values before and after.
-          </Trans>
-        }
-      />
+      <PageHeader title={t`Audit log`} />
       <AuditLog filters={filters} EntryLink={ProjectAuditEntryLink} />
       <Outlet />
     </Page>

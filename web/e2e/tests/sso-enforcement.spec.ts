@@ -171,8 +171,9 @@ test.describe("SSO enforcement", () => {
     await page.goto("/admin/auth-settings");
     const local = page.getByRole("switch", { name: "Local login" });
     await expect(local).toBeChecked();
-    // The help text names the way back in.
-    await expect(local).toHaveAccessibleDescription(/flagnetic admin unlock/);
+    // The details under the switch name the way back in.
+    await page.getByText("Details", { exact: true }).click();
+    await expect(page.getByText(/flagnetic admin unlock/)).toBeVisible();
 
     await local.click();
     await page.getByRole("button", { name: "Save", exact: true }).first().click();

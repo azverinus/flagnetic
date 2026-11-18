@@ -116,7 +116,7 @@ describe("the personal access tokens", () => {
 
     expect(
       within(dialog).getByText(
-        "This instance allows a token at most 60 days ahead, and every token must expire.",
+        "This instance allows a token at most 60 days ahead, and every token must expire",
       ),
     ).toBeInTheDocument();
     expect(within(dialog).getByRole("combobox", { name: "Expires" })).toHaveTextContent("30 days");

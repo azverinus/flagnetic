@@ -103,16 +103,7 @@ function Flags() {
 
   return (
     <Page>
-      <PageHeader
-        title={t`Flags`}
-        description={
-          <Trans>
-            Every flag exists in every environment of the project, each environment serving it by
-            its own configuration.
-          </Trans>
-        }
-        actions={known ? newFlag : null}
-      />
+      <PageHeader title={t`Flags`} actions={known ? newFlag : null} />
       {environmentsRead.isError ? (
         <QueryError
           error={environmentsRead.error}

@@ -110,12 +110,6 @@ function UnitTypes() {
     <Page>
       <PageHeader
         title={t`Unit types`}
-        description={
-          <Trans>
-            The kinds of unit a flag is served to, such as a user or a device. A key is shared with
-            the attributes and never changes.
-          </Trans>
-        }
         actions={(unitTypes.data?.length ?? 0) > 0 ? newUnitType : undefined}
       />
       {unitTypes.isError ? (
@@ -277,9 +271,9 @@ function UnitTypeForm({
         label={<Trans>Key</Trans>}
         hint={
           unitType ? (
-            <Trans>Fixed once declared.</Trans>
+            <Trans>Fixed once declared</Trans>
           ) : (
-            <Trans>Lowercase letters, digits, - and _. It never changes.</Trans>
+            <Trans>Lowercase letters, digits, - and _; it never changes</Trans>
           )
         }
         error={

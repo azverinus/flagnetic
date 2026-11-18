@@ -92,9 +92,8 @@ export function ScimTokensScreen() {
         title={t`SCIM tokens`}
         description={
           <Trans>
-            What an identity provider presents to create, update and deprovision members through
-            SCIM. A token belongs to one auth provider for life and reaches only that provider's
-            members and groups.
+            A token belongs to one auth provider for life and reaches only that provider's members
+            and groups.
           </Trans>
         }
         actions={
@@ -344,7 +343,7 @@ function ScimTokenForm({
             label={<Trans>Auth provider</Trans>}
             hint={
               <Trans>
-                The provider whose members and groups the token reaches. It cannot be changed later.
+                The provider whose members and groups the token reaches; it cannot be changed later
               </Trans>
             }
             error={errors.provider?.message}
@@ -377,7 +376,7 @@ function ScimTokenForm({
           <Field
             label={<Trans>Expires</Trans>}
             hint={
-              <Trans>After this the identity provider is refused until it gets a new token.</Trans>
+              <Trans>After this the identity provider is refused until it gets a new token</Trans>
             }
             refusal={create.error}
             pointer="/expires_at"

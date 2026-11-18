@@ -139,7 +139,7 @@ function EnableForm({
       {mode === "from" ? (
         <Field
           label={<Trans>Start from</Trans>}
-          hint={<Trans>In your time zone. A stream the sink already has keeps its place.</Trans>}
+          hint={<Trans>In your time zone; a stream the sink already has keeps its place</Trans>}
           error={missing && startFrom === undefined ? t`Choose a time.` : undefined}
           refusal={enable.error}
           pointer="/start_from"

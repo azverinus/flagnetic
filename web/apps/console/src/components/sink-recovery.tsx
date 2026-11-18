@@ -447,14 +447,14 @@ export function ReplayTab({
         <form noValidate onSubmit={submit} className="flex measure-form flex-col gap-4">
           <Field
             label={<Trans>From</Trans>}
-            hint={<Trans>In your time zone, within the retention window.</Trans>}
+            hint={<Trans>In your time zone, within the retention window</Trans>}
             error={problemAt("from")}
           >
             <Input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} />
           </Field>
           <Field
             label={<Trans>To</Trans>}
-            hint={<Trans>Leave empty to replay on into the live stream.</Trans>}
+            hint={<Trans>Leave empty to replay on into the live stream</Trans>}
             error={problemAt("to")}
           >
             <Input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} />

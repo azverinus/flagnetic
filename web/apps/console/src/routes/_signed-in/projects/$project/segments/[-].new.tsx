@@ -147,7 +147,7 @@ function CreateSegment({
       <SettingsSection title={<Trans>Segment</Trans>}>
         <Field
           label={<Trans>Key</Trans>}
-          hint={<Trans>How rules name the segment. It never changes.</Trans>}
+          hint={<Trans>How rules name the segment; it never changes</Trans>}
           error={errors.get("key")}
         >
           <Input

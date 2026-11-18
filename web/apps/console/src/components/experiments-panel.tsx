@@ -152,7 +152,7 @@ export function ExperimentsPanel() {
         />
         <PanelTextFacet
           label={t`Tag`}
-          placeholder={t`The whole tag`}
+          placeholder={t`Tag`}
           value={search.tag ?? ""}
           onChange={(tag) => filter({ tag: tag.trim() || undefined })}
         />

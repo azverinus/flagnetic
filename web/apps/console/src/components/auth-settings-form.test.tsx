@@ -177,8 +177,9 @@ describe("the auth settings form", () => {
 
       const toggle = screen.getByRole("switch", { name: "Local login" });
       expect(toggle).toBeChecked();
-      expect(toggle).toHaveAccessibleDescription(/flagnetic admin unlock/);
-      expect(toggle).toHaveAccessibleDescription(/identity at an enabled provider/);
+      const disclosure = screen.getByText(/flagnetic admin unlock/).closest("details")!;
+      expect(disclosure).not.toHaveAttribute("open");
+      expect(disclosure).toHaveTextContent(/identity at an enabled provider/);
     });
 
     it("switches local login off", async () => {

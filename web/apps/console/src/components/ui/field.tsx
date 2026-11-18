@@ -1,6 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { cloneElement, isValidElement, type ReactElement, type ReactNode, useId } from "react";
 
+import { Details } from "@/components/ui/details";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/cn";
 import { ApiError } from "@/lib/errors";
@@ -16,6 +17,11 @@ export type FieldProps = {
   label: ReactNode;
   /** A sentence under the label saying what the field takes. */
   hint?: ReactNode;
+  /**
+   * What matters beyond the one-sentence hint, such as a command or a side
+   * effect: folded under the control, closed until opened.
+   */
+  details?: ReactNode;
   /** An error the form found itself, such as a required field left empty. */
   error?: string;
   /**
@@ -34,7 +40,16 @@ export type FieldProps = {
  * error, at one spacing. The control is wired to all three, so a screen
  * reader names it by the label and reads the hint and the error with it.
  */
-export function Field({ label, hint, error, refusal, pointer, className, children }: FieldProps) {
+export function Field({
+  label,
+  hint,
+  details,
+  error,
+  refusal,
+  pointer,
+  className,
+  children,
+}: FieldProps) {
   const { i18n } = useLingui();
   const fallbackId = useId();
   const id = (isValidElement(children) && children.props.id) || fallbackId;
@@ -60,6 +75,7 @@ export function Field({ label, hint, error, refusal, pointer, className, childre
         "aria-describedby": describedBy || undefined,
         "aria-invalid": message ? true : undefined,
       })}
+      {details ? <Details>{details}</Details> : null}
       {message ? (
         <p id={errorId} className="text-sm text-destructive">
           {message}

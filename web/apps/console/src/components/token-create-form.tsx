@@ -146,7 +146,7 @@ export function TokenCreateForm(props: TokenCreateFormProps) {
     >
       <Field
         label={<Trans>Name</Trans>}
-        hint={<Trans>What uses the token, to tell it apart later.</Trans>}
+        hint={<Trans>What uses the token, to tell it apart later</Trans>}
         error={errors.name?.message}
         refusal={create.error}
         pointer="/name"
@@ -229,15 +229,14 @@ export function TokenCreateForm(props: TokenCreateFormProps) {
             hint={
               max === undefined ? (
                 expiryRequired ? (
-                  <Trans>This instance requires every token to expire.</Trans>
+                  <Trans>This instance requires every token to expire</Trans>
                 ) : undefined
               ) : expiryRequired ? (
                 <Trans>
-                  This instance allows a token at most {lifetime} ahead, and every token must
-                  expire.
+                  This instance allows a token at most {lifetime} ahead, and every token must expire
                 </Trans>
               ) : (
-                <Trans>This instance allows a token at most {lifetime} ahead.</Trans>
+                <Trans>This instance allows a token at most {lifetime} ahead</Trans>
               )
             }
             refusal={create.error}

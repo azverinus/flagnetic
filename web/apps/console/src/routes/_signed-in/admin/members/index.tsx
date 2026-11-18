@@ -69,12 +69,6 @@ function Members() {
     <Page>
       <PageHeader
         title={t`Members`}
-        description={
-          <Trans>
-            Everyone who can sign in to this instance. What they may do in a project comes from
-            their grants there.
-          </Trans>
-        }
         actions={
           <Button onClick={() => setInviting(true)}>
             <UserPlusIcon aria-hidden />

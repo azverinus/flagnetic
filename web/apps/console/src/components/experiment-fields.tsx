@@ -108,7 +108,7 @@ export function ExperimentFields({
         hint={
           <Trans>
             Names the experiment in rules and in the exposures SDKs report: letters, digits, ., -
-            and _. It never changes.
+            and _; it never changes
           </Trans>
         }
         error={issue("key")}
@@ -133,7 +133,7 @@ export function ExperimentFields({
       </Field>
       <Field
         label={<Trans>Hypothesis</Trans>}
-        hint={<Trans>What the experiment expects to find, written before it runs.</Trans>}
+        hint={<Trans>What the experiment expects to find, written before it runs</Trans>}
         error={issue("hypothesis")}
         refusal={refusal}
         pointer="/hypothesis"
@@ -147,7 +147,7 @@ export function ExperimentFields({
       </Field>
       <Field
         label={<Trans>Flag</Trans>}
-        hint={<Trans>The flag whose variations the experiment compares.</Trans>}
+        hint={<Trans>The flag whose variations the experiment compares</Trans>}
         error={issue("flag")}
         refusal={refusal}
         pointer="/flag"
@@ -167,7 +167,7 @@ export function ExperimentFields({
       </Field>
       <Field
         label={<Trans>Unit type</Trans>}
-        hint={<Trans>Whose units are split: users, accounts, devices.</Trans>}
+        hint={<Trans>Whose units are split: users, accounts, devices</Trans>}
         error={issue("unit_type")}
         refusal={refusal}
         pointer="/unit_type"
@@ -204,7 +204,7 @@ export function ExperimentFields({
         hint={
           <Trans>
             The share of units included in the experiment; the others get what the flag's other
-            rules serve.
+            rules serve
           </Trans>
         }
         error={issue("traffic_allocation")}
@@ -223,7 +223,7 @@ export function ExperimentFields({
       </Field>
       <Field
         label={<Trans>Expected end</Trans>}
-        hint={<Trans>The day the experiment is expected to have its answer.</Trans>}
+        hint={<Trans>The day the experiment is expected to have its answer</Trans>}
         error={issue("expected_end_at")}
         refusal={refusal}
         pointer="/expected_end_at"
@@ -238,7 +238,7 @@ export function ExperimentFields({
       </Field>
       <Field
         label={<Trans>Owner</Trans>}
-        hint={<Trans>The member accountable for the experiment.</Trans>}
+        hint={<Trans>The member accountable for the experiment</Trans>}
         error={issue("owner")}
         refusal={refusal}
         pointer="/owner"
@@ -257,7 +257,7 @@ export function ExperimentFields({
       </Field>
       <Field
         label={<Trans>Tags</Trans>}
-        hint={<Trans>Press Enter after each tag.</Trans>}
+        hint={<Trans>Press Enter after each tag</Trans>}
         error={issue("tags")}
         refusal={refusal}
         pointer="/tags"
