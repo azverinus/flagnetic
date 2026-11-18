@@ -2,6 +2,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useSearch } from "@tanstack/react-router";
 
+import { AccessProvider } from "@/components/access-provider";
 import { Can } from "@/components/can";
 import { Badge } from "@/components/ui/badge";
 import { ContextPanel, PanelGroup, PanelLink } from "@/components/ui/context-panel";
@@ -24,7 +25,13 @@ const flagRoute = "/_signed-in/projects/$project/flags/$flag";
 export function FlagPanel() {
   const { project, flag } = useParams({ from: flagRoute });
   const search = useSearch({ from: flagRoute });
-  return <FlagPanelContent project={project} flagKey={flag} search={search} />;
+  // The shell draws the panel outside the project's layout, which is where
+  // the caller's permissions are provided; they are read by then.
+  return (
+    <AccessProvider project={project}>
+      <FlagPanelContent project={project} flagKey={flag} search={search} />
+    </AccessProvider>
+  );
 }
 
 /** The panel for the flag of an address: the part that does not need the router's route. */

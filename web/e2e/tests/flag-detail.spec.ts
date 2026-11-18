@@ -176,6 +176,7 @@ test.describe("a member who may only read", () => {
     await expect(archive).toHaveAccessibleDescription(
       /Needs the permission to archive and delete flags/,
     );
+    await page.keyboard.press("Escape");
     await expect(page.getByRole("combobox", { name: "Fallthrough variation" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Add rule" })).toHaveCount(0);
     await expect(page.getByRole("region", { name: "Unsaved changes" })).toHaveCount(0);
