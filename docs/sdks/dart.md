@@ -1,3 +1,8 @@
+---
+title: "Dart and Flutter SDK"
+description: "The pub.dev packages flagnetic and flagnetic_flutter, the client mode on devices and the web, the Flutter widgets, and how soon each app serves a change."
+---
+
 # Dart and Flutter SDK
 
 Two packages on pub.dev, each released on its own tag:

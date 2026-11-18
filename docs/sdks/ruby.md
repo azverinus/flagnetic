@@ -1,3 +1,8 @@
+---
+title: "Ruby SDK"
+description: "The flagnetic gem with its Rails integration and test helper, and the flagnetic-openfeature provider."
+---
+
 # Ruby SDK
 
 Two gems, released on their own tags:

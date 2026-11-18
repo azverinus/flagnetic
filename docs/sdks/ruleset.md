@@ -1,3 +1,8 @@
+---
+title: "Downloading the ruleset"
+description: "The server SDK's ruleset, its versions, conditional requests, compression and schema versions."
+---
+
 # Downloading the ruleset
 
 A server SDK downloads its environment's whole ruleset, private segments included, and evaluates every flag locally.

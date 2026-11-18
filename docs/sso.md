@@ -1,3 +1,8 @@
+---
+title: "Single sign-on"
+description: "OIDC and SAML auth providers and setting them up with Keycloak, Entra ID, Okta and Google, their domains, group mappings, SSO enforcement, how a sign-in matches a member, and what each sign-in error means."
+---
+
 # Single sign-on
 
 Members sign in through an identity provider the instance admin has added as an [auth provider](access.md#auth-providers). This guide covers OpenID Connect and SAML: how to set a provider up, what a sign-in does, how a person is matched to a member, and what each error on the sign-in page means.

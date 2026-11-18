@@ -25,6 +25,8 @@
 #   chart changed     helm lint, the helm-unittest suites and kubeconform on
 #                     what the chart renders; not run without helm (with the
 #                     helm-unittest plugin) and kubeconform installed
+#   docs changed      the docs site built and its links checked, when docs/,
+#                     api/ or website/ changed
 #   console, the JavaScript, Python, Ruby, Dart and Flutter SDKs
 #                     the steps of their jobs, when their paths changed
 #   --full            the tests of the changed packages of the server, of
@@ -246,7 +248,7 @@ print_plan() {
     say "  server tests:     $(printf '%s\n' "$TEST_PKGS" | sed '/^$/d' | wc -l | tr -d ' ') packages, left to CI (--full runs them here)"
   fi
   for i in "${!MOD_PATH[@]}"; do [ "${MOD_RUN[$i]}" = 1 ] && say "  module checked:   ${MOD_REL[$i]}"; done
-  say "  migrations: $RUN_MIGRATIONS  helm: $RUN_HELM  load (CI only; task load): $RUN_LOAD  upgrade (CI only): $RUN_UPGRADE  console: $RUN_CONSOLE  sdk-js: $RUN_SDK_JS  python: $RUN_PYTHON  ruby: $RUN_RUBY  dart: $RUN_DART  flutter: $RUN_FLUTTER  workflows: $RUN_WORKFLOWS  playwright specs: $(printf '%s' "$SPECS" | tr '\n' ' ')"
+  say "  migrations: $RUN_MIGRATIONS  helm: $RUN_HELM  docs: $RUN_DOCS  load (CI only; task load): $RUN_LOAD  upgrade (CI only): $RUN_UPGRADE  console: $RUN_CONSOLE  sdk-js: $RUN_SDK_JS  python: $RUN_PYTHON  ruby: $RUN_RUBY  dart: $RUN_DART  flutter: $RUN_FLUTTER  workflows: $RUN_WORKFLOWS  playwright specs: $(printf '%s' "$SPECS" | tr '\n' ' ')"
 }
 print_plan
 [ "$PLAN_ONLY" = 1 ] && exit 0
@@ -394,7 +396,7 @@ HEAVY=0
 [ -n "$TEST_PKGS" ] && HEAVY=1
 [ "$SERVER" = 1 ] && HEAVY=1
 for i in "${!MOD_PATH[@]}"; do [ "${MOD_RUN[$i]}" = 1 ] && HEAVY=1; done
-[ "$RUN_CONSOLE$RUN_SDK_JS$RUN_PYTHON$RUN_RUBY$RUN_DART$RUN_FLUTTER" != "000000" ] && HEAVY=1
+[ "$RUN_CONSOLE$RUN_DOCS$RUN_SDK_JS$RUN_PYTHON$RUN_RUBY$RUN_DART$RUN_FLUTTER" != "0000000" ] && HEAVY=1
 WAITED=0
 if [ "$HEAVY" = 1 ]; then
   lock_acquire
@@ -473,6 +475,12 @@ if [ "$RUN_HELM" = 1 ]; then
   if need_tool "${HELM:-helm}" && need_tool "${KUBECONFORM:-kubeconform}" && "${HELM:-helm}" plugin list 2>/dev/null | grep -q '^unittest'; then
     step "helm chart" digest_tail "fix the chart; helm unittest names the failing suite" .github/scripts/check-helm.sh
   else not_run "helm chart" "helm with the helm-unittest plugin, and kubeconform, are needed"; fi
+fi
+if [ "$RUN_DOCS" = 1 ]; then
+  if need_tool pnpm; then
+    js_step "docs site: install" web "pnpm install --frozen-lockfile"
+    js_step "docs site: build and links" website "pnpm build && pnpm check-links"
+  else not_run "docs site" "pnpm is not installed"; fi
 fi
 if [ "$RUN_SDK_JS" = 1 ]; then
   if need_tool pnpm; then step "sdk-js" digest_tail "fix what the output says" task sdk-js:check

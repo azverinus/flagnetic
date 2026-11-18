@@ -1,3 +1,8 @@
+---
+title: "Experiments"
+description: "An experiment's lifecycle, the rules serving it, salts and assignment, exposures, aliases across sign-up, alerts, and what a client key learns."
+---
+
 # Experiments
 
 An experiment compares two or more variations of one [flag](flags.md) on units of a declared unit type, to learn which does better. It has a hypothesis written before it runs, an owner, the weights that split the traffic, a traffic allocation and two salts. Creating one only describes the comparison: it starts as a draft, which changes nothing any SDK receives.

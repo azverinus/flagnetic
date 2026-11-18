@@ -1,3 +1,8 @@
+---
+title: "JavaScript SDK"
+description: "The npm package flagnetic, its server mode, browser client, React bindings and OpenFeature providers, and how soon each serves a change."
+---
+
 # JavaScript SDK
 
 `flagnetic` on npm is the JavaScript and TypeScript SDK: one package with no runtime dependency, ESM and CommonJS builds with type declarations, and an entry point per place it runs. The [package README](../../sdks/js/README.md) is the API reference; this page is how to choose and deploy it.

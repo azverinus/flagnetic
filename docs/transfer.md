@@ -1,3 +1,8 @@
+---
+title: "Exporting and importing a project"
+description: "The project document field by field and its compatibility promise, create, merge and replace, dry runs and If-Match, protection and owners, the audit trail, the console, the CLI, importing from Firebase Remote Config, and the demo project."
+---
+
 # Exporting and importing a project
 
 A project's configuration can leave the platform as one file and come back. This page documents that file, the **project document**, field by field; the three ways to **import** one (create a project, merge, replace); the **dry run** that shows what an import would do; what protection, owners and the audit trail do with an import; the CLI; and the translation of a Firebase Remote Config template into flags.

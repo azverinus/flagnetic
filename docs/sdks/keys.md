@@ -1,3 +1,8 @@
+---
+title: "SDK keys"
+description: "Server and client keys, rotation with an overlap, revocation, allowed origins, calls from browsers, and which SDKs use an environment."
+---
+
 # SDK keys
 
 An SDK key identifies one environment to an SDK. Each environment has its own keys, of one of two kinds:

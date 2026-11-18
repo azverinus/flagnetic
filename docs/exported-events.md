@@ -1,3 +1,8 @@
+---
+title: "Exported events"
+description: "The export schema and its compatibility promise, the ClickHouse DDL, the object key scheme, the webhook envelope, and a SQL recipe reproducing first exposures, the sample-ratio check and assignments."
+---
+
 # Exported events
 
 A [sink](sinks.md) gives a project's analysts a durable copy of its events without any access to the platform's database: ClickHouse over its HTTP interface, S3-compatible object storage as JSON Lines or Parquet files, or a signed webhook. This page is the contract every sink kind keeps: the **export schema** and its compatibility promise, what each sink kind writes, and a SQL recipe that reproduces the experiment page's first exposures, sample-ratio check and buckets from the exported rows. How a sink is configured, guarded, recovered and monitored is on [Sinks](sinks.md).

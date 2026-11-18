@@ -1,3 +1,8 @@
+---
+title: "SDK versioning and compatibility"
+description: "Which server and schema versions each SDK version supports, and what a client key can learn."
+---
+
 # SDK versioning and compatibility
 
 Which server an SDK build can talk to, and what an SDK version promises. A build shipped years ago keeps working: the server keeps serving every SDK API path a released SDK speaks and every document schema it shipped under that path, and every SDK treats a document it cannot read as a failure of the fallback chain, never as "everything off".

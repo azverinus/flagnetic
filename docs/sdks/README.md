@@ -1,3 +1,8 @@
+---
+title: "SDKs"
+description: "Every SDK with its install line, mode, key, runtimes and propagation."
+---
+
 # SDKs
 
 Every Flagnetic SDK is in its 0.x line and speaks the same protocol: `/sdk/v1`, ruleset `schema_version` 1, server key or client key by mode. Pick the one for your language; each page covers its packages, runtimes, options and how soon a change reaches it.

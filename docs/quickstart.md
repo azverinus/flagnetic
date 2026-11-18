@@ -1,3 +1,8 @@
+---
+title: "A first flag in ten minutes"
+description: "Compose up, bootstrap, a project, a flag and an SDK key, evaluated from the Go or JavaScript SDK, then flipped and seen to change."
+---
+
 # A first flag in ten minutes
 
 This page takes you from nothing to a flag that a Go or a JavaScript program reads, and then changes the flag while the program runs. You need Docker with Compose, `curl`, and Go 1.26 or newer or Node.js 22 or newer. Everything runs on your machine; nothing here is meant for production (see [Installing Flagnetic](install.md) for that).

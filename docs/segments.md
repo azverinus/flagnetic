@@ -1,3 +1,8 @@
+---
+title: "Segments"
+description: "Reusable, named sets of conditions on context attributes that rules include with in_segment and not_in_segment."
+---
+
 # Segments
 
 A **segment** is a reusable, named set of conditions on context attributes, such as "customers on a paid plan in Europe". A rule names it with an `in_segment` or `not_in_segment` condition instead of repeating its conditions, and every rule naming it follows when it changes. Segments live under `/api/v1/projects/{project}/segments`; editing one needs `segment.edit` and deleting one `segment.delete` (see [Access](access.md#permissions)).

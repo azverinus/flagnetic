@@ -1,3 +1,8 @@
+---
+title: "Flagnetic documentation"
+description: "Documentation of Flagnetic, self-hosted feature flags and experiments: guides, SDKs, integrations and the API reference."
+---
+
 # Flagnetic documentation
 
 - [A first flag in ten minutes](quickstart.md): compose up, bootstrap, a project, a flag and an SDK key, evaluated from the Go or JavaScript SDK, then flipped and seen to change.

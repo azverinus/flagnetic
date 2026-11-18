@@ -1,3 +1,8 @@
+---
+title: "Installing Flagnetic"
+description: "Docker Compose, Kubernetes or the binary, TLS and a reverse proxy, PostgreSQL connections."
+---
+
 # Installing Flagnetic
 
 Flagnetic is one binary, `flagnetic`, with the web console built in, and PostgreSQL is the only thing it needs. This guide installs it with Docker Compose or as a binary, puts it behind TLS and a reverse proxy, sizes its PostgreSQL connections and upgrades it. [Operations](operations.md) covers running it once it is up, and the [configuration reference](configuration.md) lists every setting.

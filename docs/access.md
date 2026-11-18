@@ -1,3 +1,8 @@
+---
+title: "Access"
+description: "Permissions, roles, grants, scopes and API tokens."
+---
+
 # Access
 
 Who may do what in a Flagnetic instance: permissions, the roles that list them, the grants that give a member a role in a project, and the API tokens scripts and pipelines use.
