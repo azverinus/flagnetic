@@ -89,7 +89,7 @@ function EnvironmentNotFound({ project }: { project: string }) {
       <p className="text-sm text-muted-foreground">
         <Trans>The project has no environment with this key. It may have been deleted.</Trans>
       </p>
-      <Button asChild variant="outline">
+      <Button className="self-start" asChild variant="outline">
         <Link to="/projects/$project/environments" params={{ project }}>
           <Trans>Go to the environments</Trans>
         </Link>

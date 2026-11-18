@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
 
+import { useOnCard } from "./card";
+
 export type EmptyStateProps = {
   icon?: ReactNode;
   title: ReactNode;
@@ -13,13 +15,16 @@ export type EmptyStateProps = {
 
 /**
  * What a list shows with nothing in it: what would be here and how to add it.
- * It sits inside the list's card, which gives it the surface.
+ * Inside the list's card it takes the card's surface; anywhere else a
+ * dashed border marks where the list would be.
  */
 export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
+  const onCard = useOnCard();
   return (
     <div
       className={cn(
         "flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center",
+        !onCard && "rounded-lg border border-dashed",
         className,
       )}
     >

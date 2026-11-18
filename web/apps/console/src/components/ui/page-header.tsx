@@ -53,6 +53,11 @@ export function PageHeader({
     if (filled > 1) {
       console.error(`PageHeader "${title}" has ${filled} filled buttons; at most one is allowed.`);
     }
+    // A destructive action in a header is outlined or in the menu, so it is
+    // never the loudest thing on the page.
+    if (bar.current?.querySelector('[data-variant="destructiveFilled"]')) {
+      console.error(`PageHeader "${title}" has a filled destructive button; outline it.`);
+    }
   });
   return (
     <header className={cn("flex min-w-0 flex-col gap-2", className)}>

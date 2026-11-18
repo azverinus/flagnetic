@@ -69,7 +69,7 @@ function ChangeRequestNotFound({ project }: { project: string }) {
           proposes for is deleted.
         </Trans>
       </p>
-      <Button asChild variant="outline">
+      <Button className="self-start" asChild variant="outline">
         <Link to="/projects/$project/change-requests" params={{ project }}>
           <Trans>Go to the change requests</Trans>
         </Link>

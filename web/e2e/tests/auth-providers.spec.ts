@@ -104,7 +104,8 @@ test.describe("auth providers", () => {
     await expect(page.getByRole("alert").filter({ hasText: "could not be reached" })).toBeVisible();
 
     // Nothing depends on it, so it goes.
-    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await page.getByRole("button", { name: "More actions" }).click();
+    await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
     await page
       .getByRole("dialog", { name: "Delete Nowhere" })
       .getByRole("button", { name: "Delete provider" })

@@ -100,7 +100,7 @@ function ExperimentNotFound({ project }: { project: string }) {
       <p className="text-sm text-muted-foreground">
         <Trans>The project has no experiment with this key. It may have been deleted.</Trans>
       </p>
-      <Button asChild variant="outline">
+      <Button className="self-start" asChild variant="outline">
         <Link to="/projects/$project/experiments" params={{ project }}>
           <Trans>Go to the experiments</Trans>
         </Link>

@@ -70,9 +70,13 @@ function Experiments() {
   const filter = (patch: Partial<ExperimentsSearch>) =>
     apply({ ...search, ...patch, cursor: undefined });
 
-  // Nothing to list and nothing filtered: the empty state carries the create action.
+  // The header's create action shows once the project is known to have
+  // experiments: while the list loads, fails or is empty it would flicker
+  // away, and the empty state carries it. A filtered list or a later page
+  // implies experiments exist, so filtering keeps it in place.
   const list = useQuery(experimentsQuery(project, search));
-  const none = list.data?.items.length === 0 && !search.cursor && !isExperimentsFiltered(search);
+  const known =
+    Boolean(search.cursor) || isExperimentsFiltered(search) || (list.data?.items.length ?? 0) > 0;
 
   const newExperiment = (
     <Can permission="experiment.edit" whenMissing="disable">
@@ -95,7 +99,7 @@ function Experiments() {
             flag's rule serves it in the environments that hold it.
           </Trans>
         }
-        actions={none ? undefined : newExperiment}
+        actions={known ? newExperiment : undefined}
       />
       <ExperimentFilters project={project} search={search} onFilter={filter} owners={names} />
       <ExperimentsPages

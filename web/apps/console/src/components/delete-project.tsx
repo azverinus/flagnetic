@@ -53,8 +53,9 @@ export function DeleteProject({ project }: { project: Project }) {
   });
 
   return (
-    <Card className="border-destructive/40">
+    <Card aria-labelledby="delete-project" className="border-destructive/40">
       <CardHeader
+        titleId="delete-project"
         title={<Trans>Delete this project</Trans>}
         description={
           <Trans>

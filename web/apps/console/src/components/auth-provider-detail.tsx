@@ -30,6 +30,7 @@ import { SamlProviderForm } from "@/components/saml-provider-form";
 import { ScimGroups } from "@/components/scim-groups";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { authProviderApi, authProviderQuery, authProvidersKey } from "@/lib/auth-providers";
@@ -71,7 +72,11 @@ function AuthProviderNotFound() {
       <p className="text-sm text-muted-foreground">
         <Trans>It does not exist here, or it was deleted.</Trans>
       </p>
-      <Button variant="outline" onClick={() => void navigate({ to: "/admin/auth-providers" })}>
+      <Button
+        className="self-start"
+        variant="outline"
+        onClick={() => void navigate({ to: "/admin/auth-providers" })}
+      >
         <Trans>Go to the auth providers</Trans>
       </Button>
     </Page>
@@ -156,11 +161,16 @@ function AuthProviderPage({
               <StethoscopeIcon aria-hidden />
               {test.isPending ? <Trans>Testing…</Trans> : <Trans>Test</Trans>}
             </Button>
-            <Button variant="outline" onClick={() => setDeleting(true)}>
-              <Trash2Icon aria-hidden />
-              <Trans>Delete</Trans>
-            </Button>
           </>
+        }
+        more={
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onSelect={() => setDeleting(true)}
+          >
+            <Trash2Icon aria-hidden />
+            <Trans>Delete</Trans>
+          </DropdownMenuItem>
         }
       />
       {provider.enabled ? null : (

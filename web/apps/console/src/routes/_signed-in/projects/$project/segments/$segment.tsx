@@ -100,7 +100,7 @@ function SegmentNotFound({ project }: { project: string }) {
       <p className="text-sm text-muted-foreground">
         <Trans>The project has no segment with this key. It may have been deleted.</Trans>
       </p>
-      <Button asChild variant="outline">
+      <Button className="self-start" asChild variant="outline">
         <Link to="/projects/$project/segments" params={{ project }}>
           <Trans>Go to the segments</Trans>
         </Link>

@@ -118,9 +118,13 @@ function Flags() {
   const filter = (patch: Partial<FlagsSearch>) => apply({ ...search, ...patch, cursor: undefined });
   const shown = { ...search, environment };
 
-  // Nothing to list and nothing filtered: the empty state carries the create action.
+  // The header's create action shows once the project is known to have
+  // flags: while the list loads, fails or is empty it would flicker away,
+  // and the empty state carries it. A filtered list or a later page implies
+  // flags exist, so filtering keeps it in place.
   const list = useQuery({ ...flagsQuery(project, shown), enabled: environment !== undefined });
-  const none = list.data?.items.length === 0 && !shown.cursor && !isFlagsFiltered(shown);
+  const known =
+    Boolean(shown.cursor) || isFlagsFiltered(shown) || (list.data?.items.length ?? 0) > 0;
 
   const newFlag = (
     <Can permission="flag.edit" whenMissing="disable">
@@ -151,7 +155,7 @@ function Flags() {
                 <Trans>Stale flags</Trans>
               </Link>
             </Button>
-            {none ? null : newFlag}
+            {known ? newFlag : null}
           </>
         }
       />

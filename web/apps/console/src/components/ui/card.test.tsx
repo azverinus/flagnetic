@@ -12,7 +12,8 @@ describe("a card", () => {
     renderWithProviders(
       <Card aria-labelledby="t">
         <CardHeader
-          title={<span id="t">Webhooks</span>}
+          titleId="t"
+          title="Webhooks"
           description="Where events go."
           actions={<button type="button">Add</button>}
         />
@@ -49,6 +50,12 @@ describe("a card", () => {
     const empty = screen.getByText("Nothing yet").parentElement;
     expect(empty?.className).not.toMatch(/border/);
     expect(screen.getByRole("button", { name: "Create" })).toBeInTheDocument();
+  });
+
+  it("leaves an empty state outside a card its own dashed border", () => {
+    renderWithProviders(<EmptyState title="Nothing yet" />);
+
+    expect(screen.getByText("Nothing yet").parentElement).toHaveClass("border-dashed");
   });
 
   it("renders a settings section as a card", () => {

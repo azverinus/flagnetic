@@ -16,6 +16,7 @@ import { SinkStreams } from "@/components/sink-streams";
 import { SinkAtRisk, SinkHealthBadge } from "@/components/sink-status";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
@@ -101,6 +102,7 @@ function SinkNotFound({ project }: { project: string }) {
         <Trans>It does not exist here, or it was deleted.</Trans>
       </p>
       <Button
+        className="self-start"
         variant="outline"
         onClick={() => void navigate({ to: "/projects/$project/sinks", params: { project } })}
       >
@@ -181,16 +183,23 @@ function SinkPage({ project, sink }: { project: string; sink: Sink }) {
               <SendIcon aria-hidden />
               <Trans>Send sample</Trans>
             </Button>
+          </>
+        }
+        more={
+          <>
             {sink.kind === "webhook" ? (
-              <Button variant="outline" onClick={() => setRotating(true)}>
+              <DropdownMenuItem onSelect={() => setRotating(true)}>
                 <KeyRoundIcon aria-hidden />
                 <Trans>Rotate secret</Trans>
-              </Button>
+              </DropdownMenuItem>
             ) : null}
-            <Button variant="outline" onClick={() => setDeleting(true)}>
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={() => setDeleting(true)}
+            >
               <Trash2Icon aria-hidden />
               <Trans>Delete</Trans>
-            </Button>
+            </DropdownMenuItem>
           </>
         }
       />

@@ -139,7 +139,7 @@ function MemberNotFound() {
       <p className="text-sm text-muted-foreground">
         <Trans>No member has this identifier. The link may be mistyped or old.</Trans>
       </p>
-      <Button asChild variant="outline">
+      <Button className="self-start" asChild variant="outline">
         <Link to="/admin/members">
           <Trans>Go to the members</Trans>
         </Link>

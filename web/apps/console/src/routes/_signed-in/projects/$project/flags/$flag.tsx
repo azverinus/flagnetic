@@ -100,7 +100,7 @@ function FlagNotFound({ project }: { project: string }) {
       <p className="text-sm text-muted-foreground">
         <Trans>The project has no flag with this key. It may have been deleted.</Trans>
       </p>
-      <Button asChild variant="outline">
+      <Button className="self-start" asChild variant="outline">
         <Link to="/projects/$project/flags" params={{ project }}>
           <Trans>Go to the flags</Trans>
         </Link>

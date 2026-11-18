@@ -81,4 +81,17 @@ describe("a page header's actions", () => {
     expect(error).toHaveBeenCalledWith(expect.stringContaining("2 filled buttons"));
     error.mockRestore();
   });
+
+  it("reports a filled destructive button", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    renderWithProviders(
+      <PageHeader
+        title="Project"
+        actions={<Button variant="destructiveFilled">Delete project</Button>}
+      />,
+    );
+
+    expect(error).toHaveBeenCalledWith(expect.stringContaining("filled destructive button"));
+    error.mockRestore();
+  });
 });

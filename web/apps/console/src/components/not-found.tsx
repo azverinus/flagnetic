@@ -14,7 +14,7 @@ export function NotFound() {
       <p className="text-sm text-muted-foreground">
         <Trans>There is nothing at this address. The link may be old or mistyped.</Trans>
       </p>
-      <Button asChild variant="outline">
+      <Button className="self-start" asChild variant="outline">
         <Link to="/">
           <Trans>Go to the start page</Trans>
         </Link>

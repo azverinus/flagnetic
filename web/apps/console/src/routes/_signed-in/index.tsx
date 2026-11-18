@@ -49,20 +49,23 @@ function Projects() {
   const instanceAdmin = me.member?.instance_admin === true;
   const name = me.member?.display_name || me.member?.email || "";
 
+  const newProject = instanceAdmin ? (
+    <Button asChild>
+      <Link to="/admin/projects">
+        <Trans>New project</Trans>
+      </Link>
+    </Button>
+  ) : null;
+  // The header carries the create action once projects are known to exist:
+  // while the list loads, fails or is empty, the empty state carries it.
+  const known = (projects.data?.length ?? 0) > 0;
+
   return (
     <Page>
       <PageHeader
         title={t`Projects`}
         description={<Trans>Welcome, {name}. Choose a project to work in.</Trans>}
-        actions={
-          instanceAdmin ? (
-            <Button asChild>
-              <Link to="/admin/projects">
-                <Trans>New project</Trans>
-              </Link>
-            </Button>
-          ) : null
-        }
+        actions={known ? newProject : null}
       />
       {projects.isError ? (
         <QueryError error={projects.error} onRetry={() => void projects.refetch()} />
@@ -80,6 +83,7 @@ function Projects() {
                 </Trans>
               )
             }
+            action={newProject}
           />
         </Card>
       ) : (

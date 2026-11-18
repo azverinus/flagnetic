@@ -10,6 +10,7 @@ import { Moment } from "@/components/moment";
 import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
@@ -94,7 +95,7 @@ function WebhookNotFound({ scope }: { scope: WebhookScope }) {
       <p className="text-sm text-muted-foreground">
         <Trans>It does not exist here, or it was deleted.</Trans>
       </p>
-      <Button variant="outline" onClick={navigation.list}>
+      <Button className="self-start" variant="outline" onClick={navigation.list}>
         <Trans>Go to the webhooks</Trans>
       </Button>
     </Page>
@@ -193,14 +194,21 @@ function WebhookPage({
               <SendIcon aria-hidden />
               <Trans>Send test</Trans>
             </Button>
-            <Button variant="outline" onClick={() => setRotating(true)}>
+          </>
+        }
+        more={
+          <>
+            <DropdownMenuItem onSelect={() => setRotating(true)}>
               <KeyRoundIcon aria-hidden />
               <Trans>Rotate secret</Trans>
-            </Button>
-            <Button variant="outline" onClick={() => setDeleting(true)}>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={() => setDeleting(true)}
+            >
               <Trash2Icon aria-hidden />
               <Trans>Delete</Trans>
-            </Button>
+            </DropdownMenuItem>
           </>
         }
       />
