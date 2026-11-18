@@ -15,6 +15,7 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/can";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { FormRefusal } from "@/components/ui/form-page";
 import { Input } from "@/components/ui/input";
@@ -173,45 +174,46 @@ export function OverridesSection({
   );
 
   return (
-    <section aria-labelledby={heading} className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <h2 id={heading} className="text-base font-medium">
-          <Trans>Overrides</Trans>
-        </h2>
-        <p className="text-sm text-muted-foreground">
+    <Card aria-labelledby={heading}>
+      <CardHeader
+        titleId={heading}
+        title={<Trans>Overrides</Trans>}
+        description={
           <Trans>
             A variation pinned for one unit, checked before any rule. An override is saved as soon
             as it is added or removed.
           </Trans>
-        </p>
-      </div>
-      <Table
-        columns={columns}
-        data={configuration.overrides}
-        caption={t`Overrides in this environment`}
-        hideCaption
-        getRowId={(row) => JSON.stringify([row.unit_type, row.unit_id])}
-        empty={t`No overrides in this environment.`}
-      />
-      <FormRefusal
-        refusal={
-          remove.error instanceof ApiError && remove.error.code === "not_found"
-            ? undefined
-            : remove.error
         }
       />
-      {frozen ? null : can ? (
-        <AddOverride
-          project={project}
-          flag={flag}
-          configuration={configuration}
-          unitTypes={unitTypes}
-          onAnswered={answered}
+      <CardContent>
+        <Table
+          columns={columns}
+          data={configuration.overrides}
+          caption={t`Overrides in this environment`}
+          hideCaption
+          getRowId={(row) => JSON.stringify([row.unit_type, row.unit_id])}
+          empty={t`No overrides in this environment.`}
         />
-      ) : (
-        <p className="text-sm text-muted-foreground">{reason}</p>
-      )}
-    </section>
+        <FormRefusal
+          refusal={
+            remove.error instanceof ApiError && remove.error.code === "not_found"
+              ? undefined
+              : remove.error
+          }
+        />
+        {frozen ? null : can ? (
+          <AddOverride
+            project={project}
+            flag={flag}
+            configuration={configuration}
+            unitTypes={unitTypes}
+            onAnswered={answered}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">{reason}</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

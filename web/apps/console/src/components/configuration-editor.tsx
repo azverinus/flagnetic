@@ -16,7 +16,7 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CircleAlertIcon } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useNewerVersionNotice } from "@/lib/change-stream";
@@ -27,6 +27,7 @@ import { RuleEditor } from "@/components/rule-editor";
 import { TesterPanel } from "@/components/tester-panel";
 import { ConfigurationDiff } from "@/components/structural-diff-view";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Field } from "@/components/ui/field";
 import { Select, SelectItem } from "@/components/ui/select";
@@ -70,8 +71,12 @@ export type ConfigurationEditorProps = {
   configuration: FlagConfiguration;
   environment: { id: string; name: string };
   declarations: Declarations;
+  /** The switch and the kill switch, written on their own, at the head of the Serving card. */
+  switches: ReactNode;
   /** The overrides, written on their own, shown in their place in evaluation order. */
   overrides: ReactNode;
+  /** Whether SDKs still evaluate the flag here: the card that shares the Serving card's row. */
+  evaluations: ReactNode;
   /** Why the configuration cannot be edited here, when it cannot. */
   readOnly?: string;
   /**
@@ -109,13 +114,16 @@ export function ConfigurationEditor({
   configuration,
   environment,
   declarations,
+  switches,
   overrides,
+  evaluations,
   readOnly,
   proposes = false,
   tester,
 }: ConfigurationEditorProps) {
   const { i18n, t } = useLingui();
   const queryClient = useQueryClient();
+  const servingHeading = useId();
   const name = environment.name;
 
   const types: AttributeTypes = useMemo(
@@ -398,7 +406,7 @@ export function ConfigurationEditor({
   );
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-5">
       {conflict ? (
         <ConflictBanner
           subject="configuration"
@@ -434,44 +442,66 @@ export function ConfigurationEditor({
           }
         />
       ) : null}
-      <Field
-        label={<Trans>Off variation</Trans>}
-        hint={<Trans>Served while the flag is off, and when a prerequisite fails.</Trans>}
-        error={errors.get("off_variation")}
-      >
-        {variationSelect("offVariation", "off_variation")}
-      </Field>
-      {overrides}
-      <PrerequisitesSection
-        prerequisites={draft.prerequisites}
-        onChange={(prerequisites) => setDraft((current) => ({ ...current, prerequisites }))}
-        flags={otherFlags}
-        errors={errors}
-        disabled={readOnly !== undefined}
-      />
-      <RuleEditor
-        rules={draft.rules}
-        onChange={(rules) => setDraft((current) => ({ ...current, rules }))}
-        variations={flag.variations}
-        unitTypes={declarations.unitTypes}
-        attributes={attributes}
-        segments={declarations.segments}
-        flags={otherFlags}
-        project={project}
-        experiments={declarations.experiments}
-        errors={errors}
-        saltedRules={salted}
-        onRegenerateSalt={readOnly === undefined ? setSalting : undefined}
-        matchedRule={matched}
-        disabled={readOnly !== undefined}
-      />
-      <Field
-        label={<Trans>Fallthrough variation</Trans>}
-        hint={<Trans>Served while the flag is on and no rule matches.</Trans>}
-        error={errors.get("fallthrough")}
-      >
-        {variationSelect("fallthrough", "fallthrough")}
-      </Field>
+      {/* In evaluation order from the top; from 1280 px two columns, in which
+          Serving shares its row with Evaluations and Prerequisites with
+          Overrides, and Rules take the full width. */}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 xl:items-stretch [&>*]:min-w-0">
+        <div className="flex flex-col xl:col-start-1 xl:row-start-1 [&>section]:flex-1">
+          <Card aria-labelledby={servingHeading}>
+            <CardHeader titleId={servingHeading} title={<Trans>Serving</Trans>} />
+            <CardContent>
+              {switches}
+              <Field
+                label={<Trans>Off variation</Trans>}
+                hint={<Trans>Served while the flag is off, and when a prerequisite fails.</Trans>}
+                error={errors.get("off_variation")}
+              >
+                {variationSelect("offVariation", "off_variation")}
+              </Field>
+              <Field
+                label={<Trans>Fallthrough variation</Trans>}
+                hint={<Trans>Served while the flag is on and no rule matches.</Trans>}
+                error={errors.get("fallthrough")}
+              >
+                {variationSelect("fallthrough", "fallthrough")}
+              </Field>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="flex flex-col xl:col-start-1 xl:row-start-2 [&>section]:flex-1">
+          <PrerequisitesSection
+            prerequisites={draft.prerequisites}
+            onChange={(prerequisites) => setDraft((current) => ({ ...current, prerequisites }))}
+            flags={otherFlags}
+            errors={errors}
+            disabled={readOnly !== undefined}
+          />
+        </div>
+        <div className="flex flex-col xl:col-start-2 xl:row-start-2 [&>section]:flex-1">
+          {overrides}
+        </div>
+        <div className="flex flex-col xl:col-span-2 xl:row-start-3">
+          <RuleEditor
+            rules={draft.rules}
+            onChange={(rules) => setDraft((current) => ({ ...current, rules }))}
+            variations={flag.variations}
+            unitTypes={declarations.unitTypes}
+            attributes={attributes}
+            segments={declarations.segments}
+            flags={otherFlags}
+            project={project}
+            experiments={declarations.experiments}
+            errors={errors}
+            saltedRules={salted}
+            onRegenerateSalt={readOnly === undefined ? setSalting : undefined}
+            matchedRule={matched}
+            disabled={readOnly !== undefined}
+          />
+        </div>
+        <div className="flex flex-col xl:col-start-2 xl:row-start-1 [&>section]:flex-1">
+          {evaluations}
+        </div>
+      </div>
       {checked && issues.size > 0 ? (
         <p role="alert" className="flex items-start gap-2 text-sm">
           <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />

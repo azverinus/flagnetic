@@ -22,7 +22,7 @@ import {
   submitSignIn,
   unprotectProduction,
 } from "../support/console";
-import { choose, seedFlag, stringFlag, writeConfiguration } from "../support/flags";
+import { choose, flagPanel, seedFlag, stringFlag, writeConfiguration } from "../support/flags";
 import { admin } from "../support/instance";
 import { runningExperimentInProduction } from "../support/experiments";
 import { readKeycloak } from "../support/keycloak";
@@ -172,10 +172,10 @@ test.describe("the console in Russian", () => {
     await expect(page.getByRole("region", { name: "Правило 1", exact: true })).toBeVisible();
     await expectNoSeriousViolations(page, "the flag's page in Russian");
 
-    await page.getByRole("tab", { name: "История" }).click();
-    await expect(page.getByRole("tab", { name: "История" })).toHaveAttribute(
-      "aria-selected",
-      "true",
+    await flagPanel(page).getByRole("link", { name: "История" }).click();
+    await expect(flagPanel(page).getByRole("link", { name: "История" })).toHaveAttribute(
+      "aria-current",
+      "page",
     );
     await expect(page.getByRole("table", { name: "История флага" })).toContainText(
       "Конфигурация изменена",
@@ -238,7 +238,9 @@ test.describe("the console in Russian", () => {
 
     await signIn(page, anna, russian);
     await page.goto(`/projects/${project}/flags/${flag}?environment=production`);
-    await expect(page.getByRole("tab", { name: /Production\s+Защищено/ })).toBeVisible();
+    await expect(
+      flagPanel(page).getByRole("link", { name: /Production\s*Защищено/ }),
+    ).toBeVisible();
     await page.getByRole("button", { name: "Kill switch" }).click();
     const dialog = page.getByRole("dialog", {
       name: `Kill switch: ${flag} в окружении Production`,

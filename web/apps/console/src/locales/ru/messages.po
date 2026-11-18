@@ -1991,6 +1991,10 @@ msgstr "Выберите атрибут."
 msgid "Choose an auth provider."
 msgstr "Выберите провайдера входа."
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Choose an environment"
+msgstr "Выберите окружение"
+
 #: src/components/rule-editor.tsx
 msgid "Choose an experiment"
 msgstr "Выберите эксперимент"
@@ -2190,7 +2194,7 @@ msgid "Compare 2 to 50 variations."
 msgstr "Сравнивайте от 2 до 50 вариантов."
 
 #: src/components/compare-environments.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-panel.tsx
 msgid "Compare environments"
 msgstr "Сравнить окружения"
 
@@ -2668,7 +2672,6 @@ msgstr "Эту настройку доставка задаёт сама."
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Description"
@@ -2685,6 +2688,10 @@ msgstr "Описание изменено: было «{before}», стало «{
 #: src/components/structural-diff-view.tsx
 msgid "Description changed."
 msgstr "Описание изменено."
+
+#: src/components/flag-panel.tsx
+msgid "Details"
+msgstr "Сведения"
 
 #. The name of a built-in role.
 #: src/lib/access-names.ts
@@ -2915,7 +2922,7 @@ msgid "edit and run experiments"
 msgstr "редактировать эксперименты и запускать их"
 
 #: src/components/flag-definition-sheet.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-panel.tsx
 msgid "Edit definition"
 msgstr "Изменить определение"
 
@@ -3292,6 +3299,7 @@ msgstr "Entity ID"
 #: src/routes/_signed-in/projects/$project/audit.$entry.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Environment"
 msgstr "Окружение"
 
@@ -3325,6 +3333,7 @@ msgstr "Окружение: {environment}"
 
 #: src/components/area-screens.ts
 #: src/components/experiment-exposures.tsx
+#: src/components/flag-panel.tsx
 #: src/components/import-project.tsx
 #: src/components/sink-editor.tsx
 #: src/components/webhook-editor.tsx
@@ -3335,9 +3344,9 @@ msgstr "Окружение: {environment}"
 msgid "Environments"
 msgstr "Окружения"
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-msgid "Environments and history"
-msgstr "Окружения и история"
+#: src/components/flag-panel.tsx
+msgid "Environments and details"
+msgstr "Окружения и сведения"
 
 #: src/components/experiment-transitions.tsx
 msgid "Environments changed"
@@ -3827,6 +3836,7 @@ msgstr "Не меняется после создания проекта: по �
 #. A kind of entity in the audit log.
 #: src/components/change-requests-panel.tsx
 #: src/components/experiment-fields.tsx
+#: src/components/flag-panel.tsx
 #: src/lib/audit.ts
 #: src/lib/experiment-transitions.ts
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
@@ -4119,6 +4129,7 @@ msgstr "Состояние"
 msgid "Healthy"
 msgstr "Исправен"
 
+#: src/components/flag-panel.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "History"
 msgstr "История"
@@ -4538,6 +4549,7 @@ msgstr "Хранится в этом браузере и применяется 
 #: src/components/experiment-fields.tsx
 #: src/components/experiment-transitions.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flag-panel.tsx
 #: src/components/projects-table.tsx
 #: src/components/sdk-inventory.tsx
 #: src/components/variations-editor.tsx
@@ -4730,8 +4742,8 @@ msgid "Letters, digits, ., - and _, at most 64."
 msgstr "Буквы, цифры, ., - и _, не более 64."
 
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flag-panel.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Lifetime"
 msgstr "Срок жизни"
@@ -5309,6 +5321,10 @@ msgstr "Следующий"
 msgid "Next attempt"
 msgstr "Следующая попытка"
 
+#: src/components/rule-editor.tsx
+msgid "Next rule"
+msgstr "Следующее правило"
+
 #: src/components/sink-list.tsx
 #: src/components/sink-screen.tsx
 #: src/components/sink-status.tsx
@@ -5579,10 +5595,10 @@ msgid "none"
 msgstr "нет"
 
 #: src/components/compare-environments.tsx
+#: src/components/flag-panel.tsx
 #: src/components/scim-groups.tsx
 #: src/components/sink-editor.tsx
 #: src/components/webhook-detail.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "None"
 msgstr "Нет"
 
@@ -5926,11 +5942,11 @@ msgstr "Обзор"
 #. The name of a built-in role.
 #: src/components/experiment-fields.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flag-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/lib/access-names.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Owner"
@@ -6076,8 +6092,8 @@ msgid "permanent"
 msgstr "постоянный"
 
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flag-panel.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Permanent"
 msgstr "Постоянный"
@@ -6281,6 +6297,7 @@ msgstr "защищено"
 
 #: src/components/environment-protection.tsx
 #: src/components/protected-mark.tsx
+#: src/components/ui/panel-parts.tsx
 msgid "Protected"
 msgstr "Защищено"
 
@@ -6837,6 +6854,10 @@ msgstr "Rollout"
 msgid "Rollout salt regenerated"
 msgstr "Соль rollout сменена"
 
+#: src/components/rule-editor.tsx
+msgid "Rollout shares (rule {position})"
+msgstr "Доли rollout (правило {position})"
+
 #: src/components/sdk-keys.tsx
 msgid "Rotate {name} ({keyId})"
 msgstr "Ротировать ключ {name} ({keyId})"
@@ -7263,6 +7284,11 @@ msgstr "Есть эксперимент"
 #: src/components/experiment-transitions.tsx
 msgid "serves the winner, its conditions kept"
 msgstr "отдаёт победителя, условия сохраняются"
+
+#: src/components/configuration-editor.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Serving"
+msgstr "Выдача"
 
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
@@ -7831,9 +7857,9 @@ msgstr "Тег: {tag}"
 #: src/components/experiment-fields.tsx
 #: src/components/firebase-wizard.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flag-panel.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Tags"
 msgstr "Теги"
@@ -7859,13 +7885,13 @@ msgid "temporary"
 msgstr "временный"
 
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flag-panel.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Temporary"
 msgstr "Временный"
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-panel.tsx
 msgid "Temporary, to be removed by {expected}"
 msgstr "Временный, удалить до {expected}"
 
@@ -9354,6 +9380,7 @@ msgstr "Два ID объявлены одним и тем же юнитом."
 #: src/components/discovered-attributes.tsx
 #: src/components/firebase-wizard.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flag-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx

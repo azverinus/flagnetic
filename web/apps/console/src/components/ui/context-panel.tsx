@@ -233,6 +233,16 @@ export function ContextPanelOpener({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Whether the route's panel is out of sight, folded away or kept in a sheet
+ * by a narrow window, so a screen shows beside its title what the panel
+ * would have shown. False while the route declares no panel.
+ */
+export function useContextPanelHidden(): boolean {
+  const state = useContext(ContextPanelContext);
+  return state !== null && state.label !== null && (state.sheet || state.collapsed);
+}
+
 /** A labelled group of links in the panel; without a label, links alone. */
 export function PanelGroup({ label, children }: { label?: string; children: ReactNode }) {
   return (

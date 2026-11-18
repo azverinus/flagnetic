@@ -16,9 +16,11 @@ import { ConditionRow } from "@/components/condition-row";
 import { ExperimentStatusBadge } from "@/components/experiment-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectItem } from "@/components/ui/select";
+import { SplitBar } from "@/components/ui/split-bar";
 import { formatNumber } from "@/i18n/format";
 import { cn } from "@/lib/cn";
 import {
@@ -34,6 +36,7 @@ import {
   type Move,
   moveRule,
   newRule,
+  basisPoints,
   type RuleDraft,
   servableExperiments,
   type ServeDraft,
@@ -140,84 +143,85 @@ export function RuleEditor({
   };
 
   return (
-    <section aria-labelledby={heading} className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <h2 id={heading} className="text-base font-medium">
-          <Trans>Rules</Trans>
-        </h2>
-        <p className="text-sm text-muted-foreground">
+    <Card aria-labelledby={heading}>
+      <CardHeader
+        titleId={heading}
+        title={<Trans>Rules</Trans>}
+        description={
           <Trans>
             Checked top to bottom; the first whose conditions all hold serves. Reorder by dragging,
             with the arrows, or with Alt+Arrow Up and Down.
           </Trans>
+        }
+      />
+      <CardContent>
+        <p role="status" aria-live="polite" className="sr-only">
+          {announcement}
         </p>
-      </div>
-      <p role="status" aria-live="polite" className="sr-only">
-        {announcement}
-      </p>
-      {rules.length === 0 ? (
-        <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-          <Trans>No rules: every context receives the fallthrough variation.</Trans>
-        </p>
-      ) : (
-        <ol className="flex flex-col gap-3">
-          {rules.map((rule, index) => (
-            <RuleCard
-              key={rule.key}
-              rule={rule}
-              position={index + 1}
-              last={index === rules.length - 1}
-              onChange={(next) => onChange(withRule(rules, rule.key, () => next))}
-              onMove={(to) => move(index, to - 1)}
-              onRemove={() => remove(index)}
-              dragging={dragged === index}
-              onDragStart={() => setDragged(index)}
-              onDragEnd={() => setDragged(undefined)}
-              onDrop={(from) => {
-                move(from - 1, index);
-                setDragged(undefined);
-              }}
-              variations={variations}
-              unitTypes={unitTypes}
-              attributes={attributes}
-              segments={segments}
-              flags={flags}
-              project={project}
-              experiments={experiments}
-              errors={errors}
-              onRegenerateSalt={
-                onRegenerateSalt &&
-                rule.id &&
-                saltedRules.has(rule.id) &&
-                rule.serve.kind === "rollout"
-                  ? () => onRegenerateSalt(rule)
-                  : undefined
-              }
-              matched={matchedRule === rule.key}
-              disabled={disabled}
-            />
-          ))}
-        </ol>
-      )}
-      {disabled ? null : (
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            ref={addButton}
-            type="button"
-            variant="outline"
-            onClick={add}
-            disabled={rules.length >= maxRules}
-          >
-            <Trans>Add rule</Trans>
-          </Button>
-          {rules.length >= maxRules ? (
-            <p className="text-sm text-muted-foreground">
-              <Trans>A configuration has at most {maxRulesText} rules.</Trans>
-            </p>
-          ) : null}
-        </div>
-      )}
-    </section>
+        {rules.length === 0 ? (
+          <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+            <Trans>No rules: every context receives the fallthrough variation.</Trans>
+          </p>
+        ) : (
+          <ol className="flex flex-col gap-3">
+            {rules.map((rule, index) => (
+              <RuleCard
+                key={rule.key}
+                rule={rule}
+                position={index + 1}
+                last={index === rules.length - 1}
+                onChange={(next) => onChange(withRule(rules, rule.key, () => next))}
+                onMove={(to) => move(index, to - 1)}
+                onRemove={() => remove(index)}
+                dragging={dragged === index}
+                onDragStart={() => setDragged(index)}
+                onDragEnd={() => setDragged(undefined)}
+                onDrop={(from) => {
+                  move(from - 1, index);
+                  setDragged(undefined);
+                }}
+                variations={variations}
+                unitTypes={unitTypes}
+                attributes={attributes}
+                segments={segments}
+                flags={flags}
+                project={project}
+                experiments={experiments}
+                errors={errors}
+                onRegenerateSalt={
+                  onRegenerateSalt &&
+                  rule.id &&
+                  saltedRules.has(rule.id) &&
+                  rule.serve.kind === "rollout"
+                    ? () => onRegenerateSalt(rule)
+                    : undefined
+                }
+                matched={matchedRule === rule.key}
+                disabled={disabled}
+              />
+            ))}
+          </ol>
+        )}
+        {disabled ? null : (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              ref={addButton}
+              type="button"
+              variant="outline"
+              onClick={add}
+              disabled={rules.length >= maxRules}
+            >
+              <Trans>Add rule</Trans>
+            </Button>
+            {rules.length >= maxRules ? (
+              <p className="text-sm text-muted-foreground">
+                <Trans>A configuration has at most {maxRulesText} rules.</Trans>
+              </p>
+            ) : null}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -320,7 +324,7 @@ function RuleCard({
         ref={card}
         aria-labelledby={heading}
         className={cn(
-          "flex flex-col gap-4 rounded-lg border bg-card p-4",
+          "flex flex-col gap-4 rounded-lg border bg-background p-4",
           (rule.reapplied || matched) && "border-primary ring-1 ring-primary",
           dragging && "opacity-50",
           over && "border-primary",
@@ -677,6 +681,24 @@ function ServeEditor({
       </div>
       {serve.kind === "rollout" ? (
         <>
+          {basisPoints(serve.percent) !== undefined ? (
+            <SplitBar
+              label={t`Rollout shares (rule ${position})`}
+              segments={[
+                {
+                  key: "in",
+                  label: serve.variation || t`Variation`,
+                  weight: basisPoints(serve.percent) ?? 0,
+                  series: 1,
+                },
+                {
+                  key: "rest",
+                  label: t`Next rule`,
+                  weight: 10_000 - (basisPoints(serve.percent) ?? 0),
+                },
+              ]}
+            />
+          ) : null}
           <p id={ids.hint} className="text-sm text-muted-foreground">
             <Trans>
               Units outside the percentage continue to the next rule. Raising the percentage keeps
@@ -803,14 +825,15 @@ function ExperimentServe({
               </Trans>
             </span>
           </div>
-          <ul aria-label={t`Weights (rule ${position})`} className="flex flex-wrap gap-x-4 gap-y-1">
-            {chosen.variations.map((weight) => (
-              <li key={weight.variation}>
-                <span className="font-mono">{weight.variation}</span>{" "}
-                <span className="text-muted-foreground">{percentText(i18n, weight.weight)}%</span>
-              </li>
-            ))}
-          </ul>
+          <SplitBar
+            label={t`Weights (rule ${position})`}
+            segments={chosen.variations.map((weight, index) => ({
+              key: weight.variation,
+              label: weight.variation,
+              weight: weight.weight,
+              series: ((index % 4) + 1) as 1 | 2 | 3 | 4,
+            }))}
+          />
           <p className="text-muted-foreground">
             {chosen.status === "running" ? (
               <Trans>

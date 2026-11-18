@@ -1991,6 +1991,10 @@ msgstr ""
 msgid "Choose an auth provider."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Choose an environment"
+msgstr ""
+
 #: src/components/rule-editor.tsx
 msgid "Choose an experiment"
 msgstr ""
@@ -2190,7 +2194,7 @@ msgid "Compare 2 to 50 variations."
 msgstr ""
 
 #: src/components/compare-environments.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-panel.tsx
 msgid "Compare environments"
 msgstr ""
 
@@ -2668,7 +2672,6 @@ msgstr ""
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Description"
@@ -2684,6 +2687,10 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Description changed."
+msgstr ""
+
+#: src/components/flag-panel.tsx
+msgid "Details"
 msgstr ""
 
 #. The name of a built-in role.
@@ -2915,7 +2922,7 @@ msgid "edit and run experiments"
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-panel.tsx
 msgid "Edit definition"
 msgstr ""
 
@@ -3292,6 +3299,7 @@ msgstr ""
 #: src/routes/_signed-in/projects/$project/audit.$entry.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Environment"
 msgstr ""
 
@@ -3325,6 +3333,7 @@ msgstr ""
 
 #: src/components/area-screens.ts
 #: src/components/experiment-exposures.tsx
+#: src/components/flag-panel.tsx
 #: src/components/import-project.tsx
 #: src/components/sink-editor.tsx
 #: src/components/webhook-editor.tsx
@@ -3335,8 +3344,8 @@ msgstr ""
 msgid "Environments"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-msgid "Environments and history"
+#: src/components/flag-panel.tsx
+msgid "Environments and details"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
@@ -3827,6 +3836,7 @@ msgstr ""
 #. A kind of entity in the audit log.
 #: src/components/change-requests-panel.tsx
 #: src/components/experiment-fields.tsx
+#: src/components/flag-panel.tsx
 #: src/lib/audit.ts
 #: src/lib/experiment-transitions.ts
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
@@ -4119,6 +4129,7 @@ msgstr ""
 msgid "Healthy"
 msgstr ""
 
+#: src/components/flag-panel.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "History"
 msgstr ""
@@ -4538,6 +4549,7 @@ msgstr ""
 #: src/components/experiment-fields.tsx
 #: src/components/experiment-transitions.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flag-panel.tsx
 #: src/components/projects-table.tsx
 #: src/components/sdk-inventory.tsx
 #: src/components/variations-editor.tsx
@@ -4730,8 +4742,8 @@ msgid "Letters, digits, ., - and _, at most 64."
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flag-panel.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Lifetime"
 msgstr ""
@@ -5309,6 +5321,10 @@ msgstr ""
 msgid "Next attempt"
 msgstr ""
 
+#: src/components/rule-editor.tsx
+msgid "Next rule"
+msgstr ""
+
 #: src/components/sink-list.tsx
 #: src/components/sink-screen.tsx
 #: src/components/sink-status.tsx
@@ -5579,10 +5595,10 @@ msgid "none"
 msgstr ""
 
 #: src/components/compare-environments.tsx
+#: src/components/flag-panel.tsx
 #: src/components/scim-groups.tsx
 #: src/components/sink-editor.tsx
 #: src/components/webhook-detail.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "None"
 msgstr ""
 
@@ -5926,11 +5942,11 @@ msgstr ""
 #. The name of a built-in role.
 #: src/components/experiment-fields.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flag-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/lib/access-names.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Owner"
@@ -6076,8 +6092,8 @@ msgid "permanent"
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flag-panel.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Permanent"
 msgstr ""
@@ -6281,6 +6297,7 @@ msgstr ""
 
 #: src/components/environment-protection.tsx
 #: src/components/protected-mark.tsx
+#: src/components/ui/panel-parts.tsx
 msgid "Protected"
 msgstr ""
 
@@ -6837,6 +6854,10 @@ msgstr ""
 msgid "Rollout salt regenerated"
 msgstr ""
 
+#: src/components/rule-editor.tsx
+msgid "Rollout shares (rule {position})"
+msgstr ""
+
 #: src/components/sdk-keys.tsx
 msgid "Rotate {name} ({keyId})"
 msgstr ""
@@ -7262,6 +7283,11 @@ msgstr ""
 
 #: src/components/experiment-transitions.tsx
 msgid "serves the winner, its conditions kept"
+msgstr ""
+
+#: src/components/configuration-editor.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Serving"
 msgstr ""
 
 #. A kind of entity in the audit log.
@@ -7831,9 +7857,9 @@ msgstr ""
 #: src/components/experiment-fields.tsx
 #: src/components/firebase-wizard.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flag-panel.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Tags"
 msgstr ""
@@ -7859,13 +7885,13 @@ msgid "temporary"
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flag-panel.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Temporary"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/flag-panel.tsx
 msgid "Temporary, to be removed by {expected}"
 msgstr ""
 
@@ -9354,6 +9380,7 @@ msgstr ""
 #: src/components/discovered-attributes.tsx
 #: src/components/firebase-wizard.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flag-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx

@@ -11,18 +11,16 @@ import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArchiveIcon, FlaskConicalIcon, GitCompareArrowsIcon } from "lucide-react";
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { ArchiveIcon, FlaskConicalIcon } from "lucide-react";
+import { type ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { Can } from "@/components/can";
 import { CompareEnvironments } from "@/components/compare-environments";
 import { ConfigurationEditor } from "@/components/configuration-editor";
 import { FlagDefinitionSheet } from "@/components/flag-definition-sheet";
 import { FlagEvaluations } from "@/components/flag-evaluations";
 import { FlagHistory } from "@/components/flag-history";
 import { FlagOnOff } from "@/components/flag-on-off";
-import { EnvironmentName } from "@/components/protected-mark";
 import { OverridesSection } from "@/components/overrides-section";
 import { QueryError } from "@/components/query-error";
 import { Badge } from "@/components/ui/badge";
@@ -30,15 +28,22 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Select, SelectItem } from "@/components/ui/select";
+import { useContextPanelHidden } from "@/components/ui/context-panel";
 import { WaitingChangeRequests } from "@/components/waiting-change-requests";
-import { formatDateTime } from "@/i18n/format";
 import { type DayRange, dayRangeOf, daysSearchOf } from "@/lib/daily-counts";
+import { cn } from "@/lib/cn";
 import { ApiError, unwrap } from "@/lib/errors";
 import { type FlagDetailSearch, validateFlagDetailSearch } from "@/lib/flag-detail";
-import { flagTypeName } from "@/lib/flags";
 import { ifMatch } from "@/lib/http";
-import { AccessContext, missingPermissionReason } from "@/lib/access";
+import {
+  AccessContext,
+  missingPermissionReason,
+  useCan,
+  useMissingPermissionReason,
+} from "@/lib/access";
 import { configurationEditing } from "@/lib/change-requests";
 import {
   attributesQuery,
@@ -50,20 +55,17 @@ import {
   segmentsQuery,
   unitTypesQuery,
 } from "@/lib/queries";
-import { useKnownMembers } from "@/lib/use-known-members";
+import { useNameOf } from "@/lib/use-known-members";
+import { FlagPanel } from "@/components/flag-panel";
+import { registerFlagActions } from "@/lib/flag-actions";
+import { environmentLabel } from "@/lib/environments";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/flags/$flag")({
-  staticData: { crumb: { param: "flag" } },
+  staticData: { crumb: { param: "flag" }, panel: FlagPanel },
   validateSearch: (search: Record<string, unknown>): FlagDetailSearch =>
     validateFlagDetailSearch(search),
   component: FlagDetail,
 });
-
-/**
- * The History tab's value among the environments' keys: an environment
- * key starts with a lowercase letter, so this one is never one of them.
- */
-const historyTab = "#history";
 
 function FlagDetail() {
   const { project, flag: flagKey } = Route.useParams();
@@ -109,12 +111,6 @@ function FlagNotFound({ project }: { project: string }) {
   );
 }
 
-/** A member's name by identifier, as far as the caller can know it. */
-function useNameOf(project: string): (member: string) => string {
-  const { names } = useKnownMembers(project);
-  return useCallback((member: string) => names?.get(member) ?? member, [names]);
-}
-
 /** Where a key press is typing or choosing, which a page's shortcut leaves alone. */
 const typingPlaces = [
   "input",
@@ -134,9 +130,11 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
   const environments = useQuery(environmentsQuery(project));
   const unitTypes = useQuery(unitTypesQuery(project));
   const nameOf = useNameOf(project);
+  const panelHidden = useContextPanelHidden();
   const [editing, setEditing] = useState(false);
   const [comparing, setComparing] = useState(false);
   const testerButton = useRef<HTMLButtonElement>(null);
+  const lifecycle = useFlagLifecycle(project, flag);
   // Closing the tester returns the keyboard to the button that opens it.
   const closeTester = () => {
     setTester(false);
@@ -144,12 +142,14 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
   };
 
   const first = flag.environments[0]?.environment;
-  const environment =
-    flag.environments.find((configuration) => configuration.environment === search.environment)
-      ?.environment ?? first;
-  const open = search.tab === "history" ? historyTab : environment;
-  const testerOpen = search.tester === true && search.tab !== "history";
+  const configuration =
+    flag.environments.find((candidate) => candidate.environment === search.environment) ??
+    flag.environments[0];
+  const environment = configuration?.environment;
+  const history = search.tab === "history";
+  const testerOpen = search.tester === true && !history;
   const archived = flag.archived_at !== null;
+  const known = environments.data?.find((env) => env.key === environment);
   const setTester = useCallback(
     (tester: boolean) =>
       void navigate({
@@ -161,6 +161,13 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
         replace: true,
       }),
     [navigate],
+  );
+
+  // The panel's "Compare environments" and "Edit definition" open the
+  // dialogs this page owns.
+  useEffect(
+    () => registerFlagActions({ compare: () => setComparing(true), edit: () => setEditing(true) }),
+    [],
   );
 
   // `t` opens the tester from anywhere on the page but where it would be
@@ -177,9 +184,6 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [setTester]);
-  const expected = flag.expected_removal_at
-    ? formatDateTime(i18n, flag.expected_removal_at)
-    : undefined;
 
   const setDays = (days: DayRange) =>
     void navigate({
@@ -187,66 +191,58 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
       replace: true,
     });
 
-  const tabs = [
-    ...flag.environments.map((configuration) => {
-      const known = environments.data?.find((env) => env.key === configuration.environment);
-      return {
-        value: configuration.environment,
-        label: known ? <EnvironmentName environment={known} /> : configuration.environment,
-        content: (
-          <EnvironmentPanel
-            project={project}
-            flag={flag}
-            configuration={configuration}
-            environment={known}
-            environmentsRead={{
-              error: environments.error,
-              retry: () => void environments.refetch(),
-            }}
-            unitTypes={unitTypes.data ?? []}
-            nameOf={nameOf}
-            tester={testerOpen ? { onClose: closeTester } : undefined}
-            evaluations={{ days: dayRangeOf(search), onDays: setDays }}
-          />
-        ),
-      };
-    }),
-    {
-      value: historyTab,
-      label: t`History`,
-      content: (
-        <FlagHistory
-          project={project}
-          flag={flag}
-          entry={search.entry}
-          onCloseEntry={() =>
-            void navigate({ search: (prev) => ({ ...prev, entry: undefined }), replace: true })
-          }
-          nameOf={nameOf}
-        />
-      ),
-    },
-  ];
+  // With the panel folded away or in a sheet, the open environment is
+  // chosen beside the title, as the panel's links choose it.
+  const environmentSelect = panelHidden ? (
+    <Select
+      aria-label={t`Environment`}
+      value={history ? "" : (environment ?? "")}
+      placeholder={t`Choose an environment`}
+      onValueChange={(next) =>
+        void navigate({
+          search: (prev) => ({
+            environment: next === first ? undefined : next,
+            tester: prev.tester,
+            days: prev.days,
+          }),
+          replace: true,
+        })
+      }
+      className="w-48"
+    >
+      {flag.environments.map((candidate) => {
+        const env = environments.data?.find((item) => item.key === candidate.environment);
+        return (
+          <SelectItem key={candidate.environment} value={candidate.environment}>
+            {env ? environmentLabel(i18n, env) : candidate.environment}
+          </SelectItem>
+        );
+      })}
+    </Select>
+  ) : null;
 
   return (
     <Page reserve={testerOpen}>
       <PageHeader
         title={flag.name}
         description={
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-foreground">{flag.key}</span>
-            <span aria-hidden>·</span>
-            <span>{flagTypeName(i18n, flag.type)}</span>
-            {archived ? (
-              <Badge variant="muted">
-                <ArchiveIcon aria-hidden className="size-3" />
-                <Trans>Archived</Trans>
-              </Badge>
-            ) : null}
-          </span>
+          archived || flag.description ? (
+            <span className="flex flex-wrap items-center gap-2">
+              {archived ? (
+                <Badge variant="muted">
+                  <ArchiveIcon aria-hidden className="size-3" />
+                  <Trans>Archived</Trans>
+                </Badge>
+              ) : null}
+              {flag.description ? (
+                <span className="whitespace-pre-wrap">{flag.description}</span>
+              ) : null}
+            </span>
+          ) : undefined
         }
         actions={
           <>
+            {environmentSelect}
             <Button
               variant="outline"
               ref={testerButton}
@@ -257,87 +253,44 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
               <FlaskConicalIcon aria-hidden />
               <Trans>Tester</Trans>
             </Button>
-            {flag.environments.length > 1 ? (
-              <Button variant="outline" onClick={() => setComparing(true)}>
-                <GitCompareArrowsIcon aria-hidden />
-                <Trans>Compare environments</Trans>
-              </Button>
-            ) : null}
-            <FlagLifecycleActions project={project} flag={flag} />
-            <Can permission="flag.edit" whenMissing="disable">
-              <Button variant="outline" onClick={() => setEditing(true)}>
-                <Trans>Edit definition</Trans>
-              </Button>
-            </Can>
           </>
         }
+        more={lifecycle.menu}
       />
-      <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
-        <div className="flex flex-col gap-0.5">
-          <dt className="text-muted-foreground">
-            <Trans>Owner</Trans>
-          </dt>
-          <dd>{nameOf(flag.owner)}</dd>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <dt className="text-muted-foreground">
-            <Trans>Lifetime</Trans>
-          </dt>
-          <dd>
-            {flag.lifetime === "permanent" ? (
-              <Trans>Permanent</Trans>
-            ) : expected ? (
-              <Trans>Temporary, to be removed by {expected}</Trans>
-            ) : (
-              <Trans>Temporary</Trans>
-            )}
-          </dd>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <dt className="text-muted-foreground">
-            <Trans>Tags</Trans>
-          </dt>
-          <dd className="flex flex-wrap gap-1">
-            {flag.tags.length === 0 ? (
-              <span className="text-muted-foreground">
-                <Trans>None</Trans>
-              </span>
-            ) : (
-              flag.tags.map((tag) => (
-                <Badge key={tag} variant="muted">
-                  {tag}
-                </Badge>
-              ))
-            )}
-          </dd>
-        </div>
-        {flag.description ? (
-          <div className="flex flex-col gap-0.5 sm:col-span-3">
-            <dt className="text-muted-foreground">
-              <Trans>Description</Trans>
-            </dt>
-            <dd className="whitespace-pre-wrap">{flag.description}</dd>
-          </div>
-        ) : null}
-      </dl>
-      <Tabs
-        label={t`Environments and history`}
-        tabs={tabs}
-        value={open}
-        onValueChange={(next) => {
-          void navigate({
-            search: (prev) =>
-              next === historyTab
-                ? { ...prev, tab: "history" as const, tester: undefined }
-                : {
-                    environment: next === first ? undefined : next,
-                    tester: prev.tester,
-                    days: prev.days,
-                  },
-            replace: true,
-          });
-        }}
-      />
+      {history ? (
+        <Card list>
+          <CardHeader title={<Trans>History</Trans>} />
+          <CardContent>
+            <FlagHistory
+              project={project}
+              flag={flag}
+              entry={search.entry}
+              onCloseEntry={() =>
+                void navigate({ search: (prev) => ({ ...prev, entry: undefined }), replace: true })
+              }
+              nameOf={nameOf}
+            />
+          </CardContent>
+        </Card>
+      ) : configuration ? (
+        <EnvironmentPage
+          // Another environment starts afresh: its drafts and dialogs are its own.
+          key={configuration.environment}
+          project={project}
+          flag={flag}
+          configuration={configuration}
+          environment={known}
+          environmentsRead={{
+            error: environments.error,
+            retry: () => void environments.refetch(),
+          }}
+          unitTypes={unitTypes.data ?? []}
+          nameOf={nameOf}
+          tester={testerOpen ? { onClose: closeTester } : undefined}
+          evaluations={{ days: dayRangeOf(search), onDays: setDays }}
+        />
+      ) : null}
+      {lifecycle.dialogs}
       <FlagDefinitionSheet
         project={project}
         flag={flag}
@@ -357,17 +310,25 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
   );
 }
 
-/** Archiving, restoring and deleting: the steps of retiring a flag. */
-function FlagLifecycleActions({ project, flag }: { project: string; flag: Flag }) {
+type Retiring = "archive" | "restore" | "delete";
+
+/**
+ * Archiving, restoring and deleting: the steps of retiring a flag. The menu
+ * items go behind the header's "More actions"; the dialogs that confirm
+ * them stay outside the menu, which unmounts its items once it closes.
+ */
+function useFlagLifecycle(project: string, flag: Flag): { menu: ReactNode; dialogs: ReactNode } {
   const { t } = useLingui();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [asking, setAsking] = useState<"archive" | "restore" | "delete">();
+  const [asking, setAsking] = useState<Retiring>();
   const key = flag.key;
   const detailKey = flagQuery(project, flag.key).queryKey;
+  const can = useCan("flag.archive");
+  const reason = useMissingPermissionReason("flag.archive");
 
   const act = useMutation({
-    mutationFn: async (action: "archive" | "restore" | "delete") => {
+    mutationFn: async (action: Retiring) => {
       const options = { path: { project, flag: flag.key }, headers: ifMatch(flag.version) };
       if (action === "archive") return unwrap(archiveFlag(options));
       if (action === "restore") return unwrap(restoreFlag(options));
@@ -397,82 +358,92 @@ function FlagLifecycleActions({ project, flag }: { project: string; flag: Flag }
       }
     },
   });
-  const ask = (action: "archive" | "restore" | "delete") => {
+  const ask = (action: Retiring) => {
     act.reset();
     setAsking(action);
   };
-  const dialog = (action: "archive" | "restore" | "delete") => ({
+  const dialog = (action: Retiring) => ({
     open: asking === action,
     onOpenChange: (open: boolean) => !open && setAsking(undefined),
     pending: act.isPending,
     refusal: act.error,
     onConfirm: () => act.mutate(action),
   });
+  const item = (action: Retiring, label: ReactNode, destructive = false) => (
+    // A refused item is marked disabled rather than made disabled: a disabled
+    // menu item is skipped by the keyboard and takes no pointer, so its
+    // reason could be neither reached nor hovered.
+    <DropdownMenuItem
+      aria-disabled={can ? undefined : true}
+      title={can ? undefined : reason}
+      className={cn(destructive && "text-destructive focus:text-destructive", !can && "opacity-50")}
+      onSelect={(event) => {
+        if (!can) {
+          event.preventDefault();
+          return;
+        }
+        ask(action);
+      }}
+    >
+      {label}
+    </DropdownMenuItem>
+  );
 
-  return (
-    <>
-      {flag.archived_at === null ? (
-        <Can permission="flag.archive" whenMissing="disable">
-          <Button variant="outline" onClick={() => ask("archive")}>
-            <Trans>Archive</Trans>
-          </Button>
-        </Can>
+  return {
+    menu:
+      flag.archived_at === null ? (
+        item("archive", <Trans>Archive</Trans>)
       ) : (
         <>
-          <Can permission="flag.archive" whenMissing="disable">
-            <Button variant="outline" onClick={() => ask("restore")}>
-              <Trans>Restore</Trans>
-            </Button>
-          </Can>
-          <Can permission="flag.archive" whenMissing="disable">
-            <Button variant="destructive" onClick={() => ask("delete")}>
-              <Trans>Delete</Trans>
-            </Button>
-          </Can>
+          {item("restore", <Trans>Restore</Trans>)}
+          {item("delete", <Trans>Delete</Trans>, true)}
         </>
-      )}
-      <ConfirmDialog
-        {...dialog("archive")}
-        title={t`Archive ${key}`}
-        confirmLabel={<Trans>Archive flag</Trans>}
-      >
-        <p>
-          <Trans>
-            SDKs stop receiving the flag in every environment and code falls back to its default. It
-            can be restored later; refused while another flag requires it.
-          </Trans>
-        </p>
-      </ConfirmDialog>
-      <ConfirmDialog
-        {...dialog("restore")}
-        title={t`Restore ${key}`}
-        confirmLabel={<Trans>Restore flag</Trans>}
-      >
-        <p>
-          <Trans>
-            SDKs receive the flag again, configured in every environment as it was left.
-          </Trans>
-        </p>
-      </ConfirmDialog>
-      <ConfirmDialog
-        {...dialog("delete")}
-        title={t`Delete ${key}`}
-        confirmLabel={<Trans>Delete flag</Trans>}
-        destructive
-        typeToConfirm={flag.key}
-      >
-        <p>
-          <Trans>
-            The flag and its configuration in every environment are deleted. This cannot be taken
-            back; its audit entries stay.
-          </Trans>
-        </p>
-      </ConfirmDialog>
-    </>
-  );
+      ),
+    dialogs: (
+      <>
+        <ConfirmDialog
+          {...dialog("archive")}
+          title={t`Archive ${key}`}
+          confirmLabel={<Trans>Archive flag</Trans>}
+        >
+          <p>
+            <Trans>
+              SDKs stop receiving the flag in every environment and code falls back to its default.
+              It can be restored later; refused while another flag requires it.
+            </Trans>
+          </p>
+        </ConfirmDialog>
+        <ConfirmDialog
+          {...dialog("restore")}
+          title={t`Restore ${key}`}
+          confirmLabel={<Trans>Restore flag</Trans>}
+        >
+          <p>
+            <Trans>
+              SDKs receive the flag again, configured in every environment as it was left.
+            </Trans>
+          </p>
+        </ConfirmDialog>
+        <ConfirmDialog
+          {...dialog("delete")}
+          title={t`Delete ${key}`}
+          confirmLabel={<Trans>Delete flag</Trans>}
+          destructive
+          typeToConfirm={flag.key}
+        >
+          <p>
+            <Trans>
+              The flag and its configuration in every environment are deleted. This cannot be taken
+              back; its audit entries stay.
+            </Trans>
+          </p>
+        </ConfirmDialog>
+      </>
+    ),
+  };
 }
 
-type PanelProps = {
+type EnvironmentPageProps = {
   project: string;
   flag: Flag;
   configuration: FlagConfiguration;
@@ -493,7 +464,7 @@ type PanelProps = {
  * it: whether it is on, its off variation, overrides, prerequisites,
  * rules and fallthrough; then whether SDKs still evaluate it there.
  */
-function EnvironmentPanel(props: PanelProps) {
+function EnvironmentPage(props: EnvironmentPageProps) {
   const { i18n, t } = useLingui();
   const { project, flag, configuration, environment } = props;
   const access = useContext(AccessContext);
@@ -516,8 +487,19 @@ function EnvironmentPanel(props: PanelProps) {
   const reads = [attributes, segments, flags, experiments];
   const failed = reads.find((read) => read.isError);
 
+  const switches = <FlagOnOff {...props} frozen={frozen !== undefined} />;
+  const evaluations = (
+    <FlagEvaluations
+      project={project}
+      flag={flag}
+      environment={configuration.environment}
+      days={props.evaluations.days}
+      onDays={props.evaluations.onDays}
+    />
+  );
+
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-5">
       <WaitingChangeRequests
         project={project}
         flag={flag.key}
@@ -539,9 +521,15 @@ function EnvironmentPanel(props: PanelProps) {
           </Trans>
         </p>
       ) : null}
-      <FlagOnOff {...props} frozen={frozen !== undefined} />
       {failed ? (
-        <QueryError error={failed.error} onRetry={() => void failed.refetch()} />
+        <>
+          <Card>
+            <CardHeader title={<Trans>Serving</Trans>} />
+            <CardContent>{switches}</CardContent>
+          </Card>
+          <QueryError error={failed.error} onRetry={() => void failed.refetch()} />
+          {evaluations}
+        </>
       ) : environment && attributes.data && segments.data && flags.data && experiments.data ? (
         <ConfigurationEditor
           // A configuration of another environment starts a draft of its own.
@@ -557,24 +545,28 @@ function EnvironmentPanel(props: PanelProps) {
             flags: flags.data,
             experiments: experiments.data,
           }}
+          switches={switches}
           overrides={<OverridesSection {...props} frozen={frozen} />}
+          evaluations={evaluations}
           readOnly={frozen ?? missing}
           proposes={editing.kind === "propose"}
           tester={props.tester}
         />
       ) : (
-        <div className="flex flex-col gap-3" aria-busy>
-          <Skeleton className="h-9 w-64" />
-          <Skeleton className="h-32 w-full" />
-        </div>
+        <>
+          <Card>
+            <CardHeader title={<Trans>Serving</Trans>} />
+            <CardContent>
+              {switches}
+              <div className="flex flex-col gap-3" aria-busy>
+                <Skeleton className="h-9 w-64" />
+                <Skeleton className="h-32 w-full" />
+              </div>
+            </CardContent>
+          </Card>
+          {evaluations}
+        </>
       )}
-      <FlagEvaluations
-        project={project}
-        flag={flag}
-        environment={configuration.environment}
-        days={props.evaluations.days}
-        onDays={props.evaluations.onDays}
-      />
     </div>
   );
 }
