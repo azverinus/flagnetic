@@ -4101,6 +4101,7 @@ msgid "Healthy"
 msgstr "Исправен"
 
 #: src/components/flag-panel.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "History"
 msgstr "История"
 
