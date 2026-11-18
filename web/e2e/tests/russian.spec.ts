@@ -106,7 +106,7 @@ test.describe("the console in Russian", () => {
       "Настройки проекта",
     );
     await expect(
-      page.getByRole("navigation", { name: "Настройки" }).getByText("Интеграции", { exact: true }),
+      page.getByRole("navigation", { name: "Настройки" }).getByText("Модель", { exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: olga.name, exact: true })).toBeVisible();
 
