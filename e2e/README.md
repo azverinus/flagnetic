@@ -77,5 +77,4 @@ The generator sends on a schedule fixed before the run and measures each latency
 
 ## In CI
 
-
 The `sdk-e2e` job of `.github/workflows/ci.yml` runs on every pull request against a PostgreSQL service and runs this module's test, which brings the instance up in-process and also exercises the command. The `load` job runs the load scenarios against two replicas and PostgreSQL 18 (see above). The `upgrade` job runs the rolling upgrade (see above) in kind. A language adds steps that start `flagnetic-e2e up` in the background with `FLAGNETIC_E2E_SEED` set, wait for the seed file, and run its smoke, as the Ruby SDK's steps do.

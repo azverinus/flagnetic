@@ -949,11 +949,25 @@ jobs:
       - name: Every needed job succeeded or was skipped
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
+          UPGRADE_RESULT: ${{ needs.upgrade.result }}
+          UPGRADE_GATE: ${{ needs.plan.outputs.upgrade_gate }}
         run: |
           echo "Results: $RESULTS"
+          # The rolling-upgrade test only reports until v1.0.0 is tagged. Its
+          # continue-on-error keeps the run green, but whether a needed job's
+          # result then reads success or failure is not something to rely
+          # on, so a report-only failure, cancellation or timeout is left out
+          # here by name.
+          skip_upgrade=0
+          if [ "$UPGRADE_GATE" != true ] && [ "$UPGRADE_RESULT" != success ] && [ "$UPGRADE_RESULT" != skipped ]; then
+            echo "rolling upgrade: $UPGRADE_RESULT, report-only until v1.0.0"
+            skip_upgrade=1
+          fi
           for result in $RESULTS; do
             case "$result" in
               success|skipped) ;;
-              *) echo "a needed job ended with: $result" >&2; exit 1 ;;
+              *)
+                if [ "$skip_upgrade" = 1 ] && [ "$result" = "$UPGRADE_RESULT" ]; then skip_upgrade=0; continue; fi
+                echo "a needed job ended with: $result" >&2; exit 1 ;;
             esac
           done

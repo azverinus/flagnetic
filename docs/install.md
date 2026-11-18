@@ -246,6 +246,6 @@ Both are on the public listener. A load balancer routes only to ready replicas; 
 
 ## Upgrades
 
-[Upgrading Flagnetic](upgrades.md) has the steps: from 0.x to 1.0 you back up, stop every replica, migrate and start; between 1.x releases the upgrade is rolling and needs no downtime, with the Helm chart, Docker Compose or systemd. It also explains what "adjacent minors" means, how a rollback works (restore the backup), and has the notes of each version that needs you to act. Read the release notes of every version between yours and the new one first.
+[Upgrading Flagnetic](upgrades.md) has the steps: from 0.x to 1.0 you stop every replica, back up, migrate and start; between 1.x releases the upgrade is rolling and needs no downtime, with the Helm chart, Docker Compose or systemd. It also explains what "adjacent minors" means, how a rollback works (restore the backup), and has the notes of each version that needs you to act. Read the release notes of every version between yours and the new one first.
 
 The SDK API (`/sdk/v1`) and the ruleset format only grow, so SDKs keep working across server upgrades without being upgraded themselves.
