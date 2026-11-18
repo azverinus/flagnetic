@@ -47,8 +47,19 @@ kubectl rollout status deployment/postgres --timeout=120s
 chart="$root/deploy/helm/flagnetic"
 values="$chart/ci/default-values.yaml"
 
+# The image has no shell and no env, so `kubectl exec` cannot set the admin's
+# password for the bootstrap; the pods carry it instead, as a test value. The
+# SDK API's rate limits are off: the load comes from one address through one
+# key, which they would refuse, and what is tested is the rollout.
+admin="$("$work/flagnetic-upgrade" admin)"
+limits='["client_evaluate","client_events","client_stream_connects","client_concurrent_streams","client_streams_per_replica","server_ruleset","server_evaluate","server_events","server_concurrent_streams","failed_authentications"]'
+jq --argjson limits "$limits" '{
+  extraEnv: [{name: "FLAGNETIC_ADMIN_PASSWORD", value: .password}],
+  config: ($limits | map({key: ("rate_limit_" + .), value: "off"}) | from_entries)
+}' <<<"$admin" >"$work/test-values.json"
+
 echo "upgrade: installing the head chart with the image of $UPGRADE_FROM"
-helm install "$release" "$chart" -f "$values" \
+helm install "$release" "$chart" -f "$values" -f "$work/test-values.json" \
   --set "image.tag=$UPGRADE_FROM" --wait --wait-for-jobs --timeout 5m
 
 # A Service of the test, not of the chart: it publishes the pods on the node
@@ -70,8 +81,7 @@ spec:
       nodePort: $node_port
 YAML
 
-admin="$("$work/flagnetic-upgrade" admin)"
-kubectl exec "deploy/$release" -- env "FLAGNETIC_ADMIN_PASSWORD=$(jq -r .password <<<"$admin")" \
+kubectl exec "deploy/$release" -- \
   flagnetic admin bootstrap --email "$(jq -r .email <<<"$admin")" --name "$(jq -r .name <<<"$admin")" \
   --if-absent --token-file /tmp/bootstrap-token
 
@@ -86,7 +96,7 @@ head_repo="${head_image%:*}"
 head_tag="${head_image##*:}"
 cat >"$work/helm-upgrade.sh" <<SCRIPT
 set -euo pipefail
-helm upgrade "$release" "$chart" -f "$values" \\
+helm upgrade "$release" "$chart" -f "$values" -f "$work/test-values.json" \\
   --set "image.repository=$head_repo" --set "image.tag=$head_tag" --set image.pullPolicy=Never \\
   --wait --wait-for-jobs --timeout 5m
 # A hook Job that failed fails the upgrade above; a release whose last
