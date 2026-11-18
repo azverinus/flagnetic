@@ -40,7 +40,7 @@ function Overview() {
           )
         }
       />
-      <div className="grid items-start gap-5 xl:grid-cols-2">
+      <div className="grid items-start gap-5 xl:has-[>:nth-child(2)]:grid-cols-2">
         <Card aria-labelledby={environmentsHeading}>
           <CardHeader
             title={<Trans>Environments</Trans>}
