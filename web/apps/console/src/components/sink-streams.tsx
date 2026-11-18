@@ -45,12 +45,14 @@ export function SinkStreams({ sink }: { sink: Sink }) {
   return (
     <Card>
       <CardHeader title={<Trans>Streams</Trans>} />
-      <CardContent>
-        {sink.streams.length === 0 ? (
+      {sink.streams.length === 0 ? (
+        <CardContent>
           <p className="text-sm text-muted-foreground">
             <Trans>Each event kind gets a stream once the sink is enabled.</Trans>
           </p>
-        ) : (
+        </CardContent>
+      ) : (
+        <CardContent flush>
           <Table
             caption={t`Streams`}
             hideCaption
@@ -58,8 +60,8 @@ export function SinkStreams({ sink }: { sink: Sink }) {
             data={sink.streams}
             getRowId={(stream) => stream.event_kind}
           />
-        )}
-      </CardContent>
+        </CardContent>
+      )}
     </Card>
   );
 }

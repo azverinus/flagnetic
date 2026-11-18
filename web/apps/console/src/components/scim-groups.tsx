@@ -46,9 +46,10 @@ export function ScimGroups({ provider }: { provider: string }) {
   );
   return (
     <Card aria-labelledby="scim-groups">
-      <CardHeader titleId="scim-groups" title={<Trans>SCIM groups</Trans>} />
-      <CardContent>
-        <p className="text-sm text-muted-foreground">
+      <CardHeader
+        titleId="scim-groups"
+        title={<Trans>SCIM groups</Trans>}
+        description={
           <Trans>
             The groups the identity provider pushed through SCIM, which its group mappings can name.
             The directory owns them and who is in them, so they are read only here. Pushing groups
@@ -58,10 +59,14 @@ export function ScimGroups({ provider }: { provider: string }) {
             </Link>{" "}
             of this provider.
           </Trans>
-        </p>
-        {groups.isError ? (
+        }
+      />
+      {groups.isError ? (
+        <CardContent>
           <QueryError error={groups.error} onRetry={() => void groups.refetch()} />
-        ) : (
+        </CardContent>
+      ) : (
+        <CardContent flush>
           <Table
             caption={t`SCIM groups`}
             hideCaption
@@ -71,8 +76,8 @@ export function ScimGroups({ provider }: { provider: string }) {
             empty={<Trans>The identity provider has pushed no group.</Trans>}
             getRowId={(group) => group.id}
           />
-        )}
-      </CardContent>
+        </CardContent>
+      )}
     </Card>
   );
 }

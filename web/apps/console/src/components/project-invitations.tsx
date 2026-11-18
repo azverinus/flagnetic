@@ -13,6 +13,7 @@ import { InviteForm } from "@/components/invite-form";
 import { QueryError } from "@/components/query-error";
 import { RowAction, withRowActions } from "@/components/row-dialogs";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
 import { Table, type TableColumn } from "@/components/ui/table";
@@ -193,18 +194,18 @@ export function InvitedMembers({ project, names, namesPending, onReissued }: Inv
   const name = reissuing ? memberName(reissuing) : "";
   const role = reissuing ? roleName(i18n, reissuing.role) : "";
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="invited-members">
-      <h2 id="invited-members" className="text-base font-medium">
-        <Trans>Invited members</Trans>
-      </h2>
-      <Table
-        caption={t`Members invited to the project`}
-        hideCaption
-        columns={columns}
-        data={invited.data ?? []}
-        loading={invited.isPending || namesPending}
-        getRowId={(invitation) => invitation.member}
-      />
+    <Card aria-labelledby="invited-members">
+      <CardHeader titleId="invited-members" title={<Trans>Invited members</Trans>} />
+      <CardContent flush>
+        <Table
+          caption={t`Members invited to the project`}
+          hideCaption
+          columns={columns}
+          data={invited.data ?? []}
+          loading={invited.isPending || namesPending}
+          getRowId={(invitation) => invitation.member}
+        />
+      </CardContent>
       <ConfirmDialog
         open={reissuing !== undefined}
         onOpenChange={(open) => {
@@ -232,6 +233,6 @@ export function InvitedMembers({ project, names, namesPending, onReissued }: Inv
           </Trans>
         </p>
       </ConfirmDialog>
-    </section>
+    </Card>
   );
 }

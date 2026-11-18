@@ -252,26 +252,26 @@ export function DeadLettersTab({ project, sink }: { project: string; sink: Sink 
     return <QueryError error={letters.error} onRetry={() => void letters.refetch()} />;
   }
   return (
-    <Card>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">
-          <Trans>
-            A batch the target rejected over and over is set aside here so the stream can go on.
-            Redelivering sends its rows again, outside the stream; discarding forgets them.
-          </Trans>
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-muted-foreground">
+        <Trans>
+          A batch the target rejected over and over is set aside here so the stream can go on.
+          Redelivering sends its rows again, outside the stream; discarding forgets them.
+        </Trans>
+      </p>
+      {redeliver.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          {redeliver.error instanceof ApiError
+            ? problemMessage(i18n, redeliver.error)
+            : t`The dead letter could not be redelivered.`}
         </p>
-        {redeliver.isError ? (
-          <p role="alert" className="text-sm text-destructive">
-            {redeliver.error instanceof ApiError
-              ? problemMessage(i18n, redeliver.error)
-              : t`The dead letter could not be redelivered.`}
-          </p>
-        ) : null}
-        {rejectedAgain ? (
-          <p role="status" className="text-sm text-destructive">
-            <Trans>The target rejected the dead letter again.</Trans>
-          </p>
-        ) : null}
+      ) : null}
+      {rejectedAgain ? (
+        <p role="status" className="text-sm text-destructive">
+          <Trans>The target rejected the dead letter again.</Trans>
+        </p>
+      ) : null}
+      <Card>
         <Table
           caption={t`Dead letters`}
           hideCaption
@@ -281,30 +281,30 @@ export function DeadLettersTab({ project, sink }: { project: string; sink: Sink 
           getRowId={(letter) => letter.id}
           empty={<Trans>No dead letters.</Trans>}
         />
-        <ConfirmDialog
-          open={discarding !== undefined}
-          onOpenChange={(open) => {
-            if (!open) {
-              discard.reset();
-              setDiscarding(undefined);
-            }
-          }}
-          title={t`Discard this dead letter`}
-          confirmLabel={<Trans>Discard dead letter</Trans>}
-          destructive
-          pending={discard.isPending}
-          refusal={discard.error}
-          onConfirm={() => discarding && discard.mutate(discarding)}
-        >
-          <p>
-            <Trans>
-              Its rows are not sent to the target. They can still reach it by a replay while
-              retention holds them. This cannot be undone.
-            </Trans>
-          </p>
-        </ConfirmDialog>
-      </CardContent>
-    </Card>
+      </Card>
+      <ConfirmDialog
+        open={discarding !== undefined}
+        onOpenChange={(open) => {
+          if (!open) {
+            discard.reset();
+            setDiscarding(undefined);
+          }
+        }}
+        title={t`Discard this dead letter`}
+        confirmLabel={<Trans>Discard dead letter</Trans>}
+        destructive
+        pending={discard.isPending}
+        refusal={discard.error}
+        onConfirm={() => discarding && discard.mutate(discarding)}
+      >
+        <p>
+          <Trans>
+            Its rows are not sent to the target. They can still reach it by a replay while retention
+            holds them. This cannot be undone.
+          </Trans>
+        </p>
+      </ConfirmDialog>
+    </div>
   );
 }
 
@@ -369,15 +369,15 @@ export function GapsTab({ project, sink }: { project: string; sink: Sink }) {
   );
   if (gaps.isError) return <QueryError error={gaps.error} onRetry={() => void gaps.refetch()} />;
   return (
-    <Card>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">
-          <Trans>
-            Retention drops raw events once they are older than the retention window, whether or not
-            every sink has delivered them. A gap says which were lost; dismissing it only stops it
-            counting towards the warnings.
-          </Trans>
-        </p>
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-muted-foreground">
+        <Trans>
+          Retention drops raw events once they are older than the retention window, whether or not
+          every sink has delivered them. A gap says which were lost; dismissing it only stops it
+          counting towards the warnings.
+        </Trans>
+      </p>
+      <Card>
         <Table
           caption={t`Gaps`}
           hideCaption
@@ -387,8 +387,8 @@ export function GapsTab({ project, sink }: { project: string; sink: Sink }) {
           getRowId={(gap) => gap.id}
           empty={<Trans>No events were lost.</Trans>}
         />
-      </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }
 

@@ -70,18 +70,20 @@ function InstanceProjects() {
       </Card>
       <Card aria-labelledby={allProjects}>
         <CardHeader titleId={allProjects} title={<Trans>All projects</Trans>} />
-        <CardContent>
-          {projects.isError ? (
+        {projects.isError ? (
+          <CardContent>
             <QueryError error={projects.error} onRetry={() => void projects.refetch()} />
-          ) : (
+          </CardContent>
+        ) : (
+          <CardContent flush>
             <ProjectsTable
               caption={t`All projects`}
               projects={projects.data ?? []}
               loading={projects.isPending}
               empty={<Trans>No projects yet</Trans>}
             />
-          )}
-        </CardContent>
+          </CardContent>
+        )}
       </Card>
     </Page>
   );
