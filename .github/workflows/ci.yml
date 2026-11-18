@@ -248,6 +248,7 @@ jobs:
       workflows: ${{ steps.plan.outputs.workflows }}
       migrations: ${{ steps.plan.outputs.migrations }}
       helm: ${{ steps.plan.outputs.helm }}
+      load: ${{ steps.plan.outputs.load }}
       modules: ${{ steps.plan.outputs.modules }}
       test_shards: ${{ steps.plan.outputs.test_shards }}
       cover_packages: ${{ steps.plan.outputs.cover_packages }}
@@ -823,12 +824,53 @@ jobs:
       - name: ct install
         run: ct install --config .github/ct.yaml --all
 
+  # The SDK API's latency under load: two replicas of the real binary on
+  # PostgreSQL 18, a project of 1,000 flags, and requests sent on a fixed
+  # schedule (an open model, latency measured from the scheduled time) for
+  # remote evaluation, the ruleset, events and a change's arrival on the
+  # stream. The job fails when a scenario's p99 is above its ceiling in
+  # e2e/load/profile.json, which are generous absolute numbers: a hosted
+  # runner varies by more than a few percent, so this catches a regression of
+  # a multiple. The numbers go to the job summary. It runs nightly, on the
+  # server's release pull request and on pull requests and pushes to main
+  # touching the SDK API.
+  load:
+    name: SDK API load
+    needs: plan
+    if: needs.plan.outputs.load == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: flagnetic
+          POSTGRES_USER: flagnetic
+          POSTGRES_PASSWORD: flagnetic
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flagnetic -d flagnetic"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      DATABASE_URL: postgres://flagnetic:flagnetic@localhost:5432/flagnetic?sslmode=disable
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            e2e/go.sum
+      - name: Measure the SDK API against two replicas
+        run: .github/scripts/load.sh
+
   # The one check branch protection requires. A job above may be skipped (a
   # module matrix with nothing to run, a job behind a condition), which is
   # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
-    needs: [plan, lint, test, coverage, vuln, npm-audit, tidy, console, e2e, sdk-e2e, sdk-ruby, sdk-python, workflows, migrations, helm, docker, module, released, dart, flutter, sdk-js]
+    needs: [plan, lint, test, coverage, vuln, npm-audit, tidy, console, e2e, sdk-e2e, load, sdk-ruby, sdk-python, workflows, migrations, helm, docker, module, released, dart, flutter, sdk-js]
     if: always()
     runs-on: ubuntu-latest
     steps:

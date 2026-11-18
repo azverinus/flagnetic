@@ -1,0 +1,10 @@
+{
+  "warmup": "5s",
+  "max_error_rate": 0.001,
+  "scenarios": {
+    "evaluate": {"rate": 100, "duration": "30s", "p99_ceiling_ms": 1000},
+    "ruleset": {"rate": 100, "duration": "30s", "p99_ceiling_ms": 500},
+    "events": {"rate": 100, "duration": "30s", "p99_ceiling_ms": 1000},
+    "stream": {"subscribers": 500, "changes": 10, "p99_ceiling_ms": 3000}
+  }
+}
