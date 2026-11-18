@@ -113,7 +113,8 @@ describe("a transition refused for a protected environment", () => {
     const { requests } = protectedServer();
     await renderTransitions();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Grow traffic allocation" }));
+    await userEvent.click(await screen.findByRole("button", { name: "More actions" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Grow traffic allocation" }));
     const grow = screen.getByRole("dialog", { name: "Grow the traffic allocation of cta_copy" });
     await userEvent.type(within(grow).getByLabelText("New traffic allocation (%)"), "50");
     await userEvent.click(within(grow).getByRole("button", { name: "Grow traffic allocation" }));

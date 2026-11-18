@@ -84,14 +84,12 @@ export function DailyChart({ label, stacked, nameOf, marked, empty }: DailyChart
         ) : null}
       </ul>
       {stacked.total === 0 ? (
-        <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-          {empty}
-        </p>
+        <p className="py-6 text-sm text-muted-foreground">{empty}</p>
       ) : (
         <div className="flex gap-2">
           <div
             aria-hidden
-            className="flex h-40 flex-col justify-between text-right text-xs text-muted-foreground tabular-nums"
+            className="flex h-40 flex-col justify-between text-right font-mono text-xs text-muted-foreground tabular-nums"
           >
             <span>{formatNumber(i18n, stacked.max)}</span>
             <span>0</span>
@@ -103,8 +101,17 @@ export function DailyChart({ label, stacked, nameOf, marked, empty }: DailyChart
                 one: "over # day",
                 other: "over # days",
               })}; the table below lists every day.`}
-              className="flex h-40 items-end gap-px border-b"
+              className="relative flex h-40 items-end gap-px border-b border-border/60"
             >
+              {/* A muted line at the top and the middle, so the columns read against the axis. */}
+              {[0, 50].map((from) => (
+                <span
+                  key={from}
+                  aria-hidden
+                  className="absolute inset-x-0 border-t border-border/40"
+                  style={{ top: `${from}%` }}
+                />
+              ))}
               {stacked.days.map((day) => {
                 const date = formatDay(i18n, day.day);
                 const counts =
@@ -120,7 +127,7 @@ export function DailyChart({ label, stacked, nameOf, marked, empty }: DailyChart
                   <div
                     key={day.day}
                     title={title}
-                    className="flex h-full min-w-0 flex-1 flex-col-reverse hover:opacity-80"
+                    className="relative flex h-full min-w-0 flex-1 flex-col-reverse hover:opacity-80"
                   >
                     {stacked.keys.map((key, index) => {
                       const count = day.counts[key] ?? 0;
@@ -150,7 +157,10 @@ export function DailyChart({ label, stacked, nameOf, marked, empty }: DailyChart
                 ))}
               </div>
             ) : null}
-            <div aria-hidden className="flex justify-between text-xs text-muted-foreground">
+            <div
+              aria-hidden
+              className="flex justify-between font-mono text-xs text-muted-foreground"
+            >
               {[first, middle, last].map((day, index) =>
                 day ? <span key={index}>{formatShortDay(i18n, day)}</span> : null,
               )}

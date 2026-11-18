@@ -15,14 +15,15 @@ import { type ReactNode, useId, useMemo } from "react";
 
 import { Moment } from "@/components/moment";
 import { QueryError } from "@/components/query-error";
-import { EnvironmentName } from "@/components/protected-mark";
 import { Swatch, swatchOf } from "@/components/swatch";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Select, SelectItem } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, type TableColumn } from "@/components/ui/table";
-import { Tabs } from "@/components/ui/tabs";
 import { formatDay, formatNumber } from "@/i18n/format";
 import { cn } from "@/lib/cn";
+import { environmentLabel } from "@/lib/environments";
 import { pValueText } from "@/lib/experiment-alerts";
 import {
   exposureEnvironment,
@@ -60,57 +61,68 @@ export function ExperimentExposuresSection({
   environment: asked,
   onEnvironment,
 }: ExperimentExposuresSectionProps) {
-  const { t } = useLingui();
+  const { i18n, t } = useLingui();
   const environments = useQuery(environmentsQuery(project));
-  // Which environments hold the experiment only picks the tab opened
-  // first; without the flag the project's first environment opens.
+  // Which environments hold the experiment only picks the environment
+  // selected first; without the flag the project's first environment opens.
   const flag = useQuery(flagQuery(project, experiment.flag));
   const keys = (environments.data ?? []).map(({ key }) => key);
   const holding = flag.data ? holdingEnvironments(flag.data, experiment.key) : [];
   const first = exposureEnvironment(keys, holding, undefined);
   const open = exposureEnvironment(keys, holding, asked);
 
+  // The environment is chosen in the first card's heading: the panel lists
+  // those holding the rule, this lists them all, since a stopped
+  // experiment holds none and its exposures are still read.
+  const control =
+    open === undefined || environments.data === undefined ? undefined : (
+      <Select
+        aria-label={t`Environment`}
+        className="w-44"
+        value={open}
+        onValueChange={(next) => onEnvironment(next === first ? undefined : next)}
+      >
+        {environments.data.map((environment) => (
+          <SelectItem key={environment.key} value={environment.key}>
+            {environmentLabel(i18n, environment)}
+          </SelectItem>
+        ))}
+      </Select>
+    );
+  const waiting = (body: ReactNode) => (
+    <Card aria-labelledby="experiment-exposures">
+      <CardHeader
+        titleId="experiment-exposures"
+        title={<Trans>Exposures per variation</Trans>}
+        actions={control}
+      />
+      <CardContent>{body}</CardContent>
+    </Card>
+  );
+
+  if (environments.isError) {
+    return waiting(
+      <QueryError error={environments.error} onRetry={() => void environments.refetch()} />,
+    );
+  }
+  if (environments.data === undefined || (flag.isPending && asked === undefined)) {
+    return waiting(<Skeleton className="h-40 w-full" />);
+  }
+  if (open === undefined) {
+    return waiting(
+      <p className="text-sm text-muted-foreground">
+        <Trans>The project has no environment.</Trans>
+      </p>,
+    );
+  }
   return (
-    <section aria-labelledby="experiment-exposures" className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <h2 id="experiment-exposures" className="text-base/6 font-medium">
-          <Trans>Exposures</Trans>
-        </h2>
-        <p className="measure-prose text-sm text-muted-foreground">
-          <Trans>
-            Units first exposed to each variation against the shares its weights ask for, per day,
-            and units exposed to more than one variation. Exposures are counted about every 10
-            seconds.
-          </Trans>
-        </p>
-      </div>
-      {environments.isError ? (
-        <QueryError error={environments.error} onRetry={() => void environments.refetch()} />
-      ) : environments.data === undefined || (flag.isPending && asked === undefined) ? (
-        <Skeleton className="h-40 w-full" />
-      ) : open === undefined ? (
-        <p className="text-sm text-muted-foreground">
-          <Trans>The project has no environment.</Trans>
-        </p>
-      ) : (
-        <Tabs
-          label={t`Environments`}
-          value={open}
-          onValueChange={(next) => onEnvironment(next === first ? undefined : next)}
-          tabs={environments.data.map((environment) => ({
-            value: environment.key,
-            label: <EnvironmentName environment={environment} />,
-            content: (
-              <EnvironmentExposures
-                project={project}
-                experiment={experiment}
-                environment={environment.key}
-              />
-            ),
-          }))}
-        />
-      )}
-    </section>
+    <EnvironmentExposures
+      key={open}
+      project={project}
+      experiment={experiment}
+      environment={open}
+      control={control}
+    />
   );
 }
 
@@ -118,10 +130,12 @@ function EnvironmentExposures({
   project,
   experiment,
   environment,
+  control,
 }: {
   project: string;
   experiment: Experiment;
   environment: string;
+  control: ReactNode;
 }) {
   const summary = useQuery(experimentExposuresQuery(project, experiment.key, environment));
   const timeline = useQuery(experimentTimelineQuery(project, experiment.key, environment));
@@ -130,13 +144,23 @@ function EnvironmentExposures({
   const refresh = () => reads.forEach((read) => void read.refetch());
 
   const failed = reads.find((read) => read.isError);
-  if (failed) return <QueryError error={failed.error} onRetry={refresh} />;
+  const waiting = (body: ReactNode) => (
+    <Card aria-labelledby="experiment-exposures">
+      <CardHeader
+        titleId="experiment-exposures"
+        title={<Trans>Exposures per variation</Trans>}
+        actions={control}
+      />
+      <CardContent>{body}</CardContent>
+    </Card>
+  );
+  if (failed) return waiting(<QueryError error={failed.error} onRetry={refresh} />);
   if (!summary.data || !timeline.data || !conflicts.data) {
-    return (
+    return waiting(
       <div className="flex flex-col gap-3" aria-busy>
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-40 w-full" />
-      </div>
+      </div>,
     );
   }
   return (
@@ -148,6 +172,7 @@ function EnvironmentExposures({
       stoppedAt={experiment.stopped_at}
       refreshing={reads.some((read) => read.isFetching)}
       onRefresh={refresh}
+      control={control}
     />
   );
 }
@@ -165,6 +190,8 @@ export type ExposuresViewProps = {
   stoppedAt?: string | null;
   refreshing?: boolean;
   onRefresh?: () => void;
+  /** Chooses the environment shown, placed in the first card's heading. */
+  control?: ReactNode;
 };
 
 /** One environment's exposures, as the three reads answered them. */
@@ -176,6 +203,7 @@ export function ExposuresView({
   stoppedAt = null,
   refreshing = false,
   onRefresh,
+  control,
 }: ExposuresViewProps) {
   const { t } = useLingui();
   const total = summary.variations.reduce((sum, row) => sum + row.first_exposures, 0);
@@ -194,55 +222,75 @@ export function ExposuresView({
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">
-          {summary.as_of ? (
+    <>
+      <Card aria-labelledby="experiment-exposures">
+        <CardHeader
+          titleId="experiment-exposures"
+          title={<Trans>Exposures per variation</Trans>}
+          description={
             <Trans>
-              {firstExposed}, counted up to <Moment value={summary.as_of} />.
+              Units first exposed to each variation against the shares its weights ask for.
+              Exposures are counted about every 10 seconds.
             </Trans>
-          ) : (
-            <Trans>
-              Not counted yet: the exposures are first counted within seconds of arriving.
-            </Trans>
-          )}
-        </p>
-        {onRefresh ? (
-          <Button variant="outline" size="sm" disabled={refreshing} onClick={onRefresh}>
-            <RefreshCwIcon aria-hidden className={cn(refreshing && "animate-spin")} />
-            <Trans>Refresh</Trans>
-          </Button>
-        ) : null}
-      </div>
-      <VariationTable rows={summary.variations} />
-      <Refusals rejections={summary.rejections} />
+          }
+          actions={
+            <>
+              {control}
+              {onRefresh ? (
+                <Button variant="outline" size="sm" disabled={refreshing} onClick={onRefresh}>
+                  <RefreshCwIcon aria-hidden className={cn(refreshing && "animate-spin")} />
+                  <Trans>Refresh</Trans>
+                </Button>
+              ) : null}
+            </>
+          }
+        />
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            {summary.as_of ? (
+              <Trans>
+                {firstExposed}, counted up to <Moment value={summary.as_of} />.
+              </Trans>
+            ) : (
+              <Trans>
+                Not counted yet: the exposures are first counted within seconds of arriving.
+              </Trans>
+            )}
+          </p>
+          <VariationTable rows={summary.variations} />
+          <Refusals rejections={summary.rejections} />
+        </CardContent>
+      </Card>
       <SampleRatioResult check={summary.sample_ratio} stoppedAt={stoppedAt} />
-      <div className="flex flex-col gap-2">
-        <h3 className="font-medium">
-          <Trans>Per day</Trans>
-        </h3>
-        <TimelineTable variations={days.variations} days={days.days} expected={expected} />
-      </div>
-      <div className="flex flex-col gap-2">
-        <h3 className="font-medium">
-          <Trans>Conflicts</Trans>
-        </h3>
-        <p className="text-sm text-muted-foreground">
-          {conflictUnits === 0 ? (
-            <Trans>No unit was exposed to a variation other than its first.</Trans>
-          ) : (
-            t`${plural(conflictUnits, {
-              one: "# unit was exposed to a variation other than its first,",
-              other: "# units were exposed to a variation other than their first,",
-            })} ${plural(conflictTotal, {
-              one: "in # exposure.",
-              other: "in # exposures.",
-            })} The latest conflicts:`
-          )}
-        </p>
-        {conflictUnits === 0 ? null : <ConflictTable items={conflicts.items} />}
-      </div>
-    </div>
+      <Card aria-labelledby="experiment-per-day">
+        <CardHeader titleId="experiment-per-day" title={<Trans>Per day</Trans>} />
+        <CardContent flush>
+          <TimelineTable variations={days.variations} days={days.days} expected={expected} />
+        </CardContent>
+      </Card>
+      <Card aria-labelledby="experiment-conflicts">
+        <CardHeader
+          titleId="experiment-conflicts"
+          title={<Trans>Conflicts</Trans>}
+          description={
+            conflictUnits === 0
+              ? t`No unit was exposed to a variation other than its first.`
+              : t`${plural(conflictUnits, {
+                  one: "# unit was exposed to a variation other than its first,",
+                  other: "# units were exposed to a variation other than their first,",
+                })} ${plural(conflictTotal, {
+                  one: "in # exposure.",
+                  other: "in # exposures.",
+                })} The latest conflicts:`
+          }
+        />
+        {conflictUnits === 0 ? null : (
+          <CardContent flush>
+            <ConflictTable items={conflicts.items} />
+          </CardContent>
+        )}
+      </Card>
+    </>
   );
 }
 
@@ -381,69 +429,69 @@ function SampleRatioResult({
   const mismatch = check !== null && check.skipped_reason === null && check.active;
 
   return (
-    <section aria-labelledby={heading} className="flex flex-col gap-2">
-      <h3 id={heading} className="font-medium">
-        <Trans>Sample-ratio check</Trans>
-      </h3>
-      <div
-        className={cn(
-          "flex flex-col gap-2 rounded-md border p-3 text-sm",
-          mismatch ? "border-destructive/50 bg-destructive/5" : "bg-muted/40",
-        )}
-      >
-        <p className="flex items-start gap-2">
-          {mismatch ? (
-            <TriangleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
-          ) : null}
-          <span>{verdict}</span>
-        </p>
-        {check !== null && check.p_value !== null && check.chi_square !== null ? (
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
-            <dt className="text-muted-foreground">{t`p-value`}</dt>
-            <dd className="tabular-nums">{pValueText(i18n, check.p_value)}</dd>
-            <dt className="text-muted-foreground">{t`χ²`}</dt>
-            <dd className="tabular-nums">
-              {new Intl.NumberFormat(i18n.locale, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              }).format(check.chi_square)}
-            </dd>
-            <dt className="text-muted-foreground">{t`Units first exposed`}</dt>
-            <dd className="tabular-nums">{n}</dd>
-          </dl>
-        ) : null}
-        {check === null ? null : (
-          <p className="text-muted-foreground">
-            {finalPending ? (
-              <Trans>
-                Final check pending: this is the check the stop took on{" "}
-                <Moment value={check.checked_at} />, over the exposures rolled up by then. It is
-                replaced once every exposure received before the stop has been rolled up.
-              </Trans>
-            ) : finalAtStop ? (
-              <Trans>
-                Final check, taken at the stop on <Moment value={check.checked_at} />; it is never
-                run again.
-              </Trans>
-            ) : finalTaken ? (
-              <Trans>
-                Final check, taken <Moment value={check.checked_at} />, over every exposure received
-                before the stop; it is never run again.
-              </Trans>
-            ) : stopped ? (
-              <Trans>
-                Last checked <Moment value={check.checked_at} />, while the experiment ran; the stop
-                took no check here, as the environment no longer held its rule.
-              </Trans>
-            ) : (
-              <Trans>
-                Checked <Moment value={check.checked_at} />.
-              </Trans>
-            )}
+    <Card aria-labelledby={heading}>
+      <CardHeader titleId={heading} title={<Trans>Sample-ratio check</Trans>} />
+      <CardContent>
+        <div
+          className={cn(
+            "flex flex-col gap-2 rounded-md border p-3 text-sm",
+            mismatch ? "border-destructive/50 bg-destructive/5" : "bg-muted/40",
+          )}
+        >
+          <p className="flex items-start gap-2">
+            {mismatch ? (
+              <TriangleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
+            ) : null}
+            <span>{verdict}</span>
           </p>
-        )}
-      </div>
-    </section>
+          {check !== null && check.p_value !== null && check.chi_square !== null ? (
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
+              <dt className="text-muted-foreground">{t`p-value`}</dt>
+              <dd className="tabular-nums">{pValueText(i18n, check.p_value)}</dd>
+              <dt className="text-muted-foreground">{t`χ²`}</dt>
+              <dd className="tabular-nums">
+                {new Intl.NumberFormat(i18n.locale, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }).format(check.chi_square)}
+              </dd>
+              <dt className="text-muted-foreground">{t`Units first exposed`}</dt>
+              <dd className="tabular-nums">{n}</dd>
+            </dl>
+          ) : null}
+          {check === null ? null : (
+            <p className="text-muted-foreground">
+              {finalPending ? (
+                <Trans>
+                  Final check pending: this is the check the stop took on{" "}
+                  <Moment value={check.checked_at} />, over the exposures rolled up by then. It is
+                  replaced once every exposure received before the stop has been rolled up.
+                </Trans>
+              ) : finalAtStop ? (
+                <Trans>
+                  Final check, taken at the stop on <Moment value={check.checked_at} />; it is never
+                  run again.
+                </Trans>
+              ) : finalTaken ? (
+                <Trans>
+                  Final check, taken <Moment value={check.checked_at} />, over every exposure
+                  received before the stop; it is never run again.
+                </Trans>
+              ) : stopped ? (
+                <Trans>
+                  Last checked <Moment value={check.checked_at} />, while the experiment ran; the
+                  stop took no check here, as the environment no longer held its rule.
+                </Trans>
+              ) : (
+                <Trans>
+                  Checked <Moment value={check.checked_at} />.
+                </Trans>
+              )}
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

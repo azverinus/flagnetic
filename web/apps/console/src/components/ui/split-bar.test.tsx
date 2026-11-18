@@ -53,4 +53,18 @@ describe("SplitBar", () => {
     // Russian puts a no-break space before the sign.
     expect(screen.getByRole("listitem").textContent).toMatch(/^a100\s%$/);
   });
+
+  it("paints a part beyond the four series with the class its screen gives it", () => {
+    const { container } = renderWithProviders(
+      <SplitBar
+        label="Weights"
+        segments={[
+          { key: "a", label: "a", weight: 1, series: 1 },
+          { key: "e", label: "e", weight: 1, colorClass: "bg-fifth" },
+        ]}
+      />,
+    );
+    expect(container.querySelector("[data-segment='e']")).toHaveClass("bg-fifth");
+    expect(container.querySelector("[data-segment='a']")).toHaveClass("bg-series-1");
+  });
 });

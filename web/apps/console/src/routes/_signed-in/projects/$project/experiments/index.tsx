@@ -6,28 +6,23 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { BellIcon, ClockAlertIcon, FlaskConicalIcon, PlusIcon } from "lucide-react";
-import { type ReactNode, useId, useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
 import { Can } from "@/components/can";
 import { ExperimentStatusBadge } from "@/components/experiment-status-badge";
 import { QueryError } from "@/components/query-error";
-import { SearchField } from "@/components/search-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Toolbar } from "@/components/ui/toolbar";
+import { ExperimentsPanel, useExperimentsFilters } from "@/components/experiments-panel";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field } from "@/components/ui/field";
-import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
-import { Select, SelectItem } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { formatDay } from "@/i18n/format";
 import { environmentLabel } from "@/lib/environments";
 import { awaitingAcknowledgement, isOverdue } from "@/lib/experiment-alerts";
 import {
-  experimentStatuses,
-  experimentStatusName,
   type ExperimentsSearch,
   holdingEnvironments,
   isExperimentsFiltered,
@@ -38,37 +33,32 @@ import {
   environmentsQuery,
   experimentAlertsQuery,
   experimentsQuery,
-  flagChoicesQuery,
   flagQuery,
 } from "@/lib/queries";
-import { useKnownMembers } from "@/lib/use-known-members";
 import { useNowPassing } from "@/lib/use-now";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/experiments/")({
   validateSearch: validateExperimentsSearch,
+  staticData: { panel: ExperimentsPanel },
   component: Experiments,
 });
 
-/** The select's value for a filter left unset: Radix keeps the empty string for itself. */
-const any = "any";
-
 /**
- * A project's experiments, filtered by what the address holds and read a
- * page at a time; creating one is offered to those who may.
+ * A project's experiments, filtered by what the address holds, whose facets
+ * are in the context panel and their chips in the toolbar, and read a page
+ * at a time; creating one is offered to those who may.
  */
 function Experiments() {
   const { t } = useLingui();
-  const { project } = Route.useParams();
-  const search = Route.useSearch();
-  const navigate = Route.useNavigate();
-  const { names } = useKnownMembers(project);
-
-  // Filters and pages replace the address rather than adding to the
-  // history, since the pages seen are remembered on the screen: going
-  // back leaves the list instead of walking through its pages.
-  const apply = (next: ExperimentsSearch) => void navigate({ search: next, replace: true });
-  const filter = (patch: Partial<ExperimentsSearch>) =>
-    apply({ ...search, ...patch, cursor: undefined });
+  const {
+    project,
+    search,
+    owners: names,
+    apply,
+    chips,
+    removeChip,
+    clearFacets,
+  } = useExperimentsFilters();
 
   // The header's create action shows once the project is known to have
   // experiments: while the list loads, fails or is empty it would flicker
@@ -101,139 +91,19 @@ function Experiments() {
         }
         actions={known ? newExperiment : undefined}
       />
-      <ExperimentFilters project={project} search={search} onFilter={filter} owners={names} />
+      <Toolbar chips={chips} onRemoveChip={removeChip} onClearAll={clearFacets} />
       <ExperimentsPages
         project={project}
         search={search}
+        // Filters and pages replace the address rather than adding to the
+        // history, since the pages seen are remembered on the screen: going
+        // back leaves the list instead of walking through its pages.
         onPage={(cursor) => apply({ ...search, cursor })}
-        onClear={() => apply({})}
+        onClear={clearFacets}
         newExperiment={newExperiment}
         owners={names}
       />
     </Page>
-  );
-}
-
-function ExperimentFilters({
-  project,
-  search,
-  onFilter,
-  owners,
-}: {
-  project: string;
-  search: ExperimentsSearch;
-  onFilter: (patch: Partial<ExperimentsSearch>) => void;
-  owners: ReadonlyMap<string, string> | undefined;
-}) {
-  const { i18n, t } = useLingui();
-  const archived = useId();
-  const overdue = useId();
-  const awaiting = useId();
-  const flags = useQuery(flagChoicesQuery(project));
-  const ownerOptions = useMemo(
-    () =>
-      [...(owners ?? new Map<string, string>())]
-        .map(([value, label]) => ({ value, label }))
-        .sort((a, b) => a.label.localeCompare(b.label, i18n.locale)),
-    [owners, i18n.locale],
-  );
-  const flagKeys = (flags.data ?? []).map((flag) => flag.key);
-
-  return (
-    <div
-      role="search"
-      aria-label={t`Filter the experiments`}
-      className="flex flex-wrap items-end gap-4"
-    >
-      <Field label={<Trans>Status</Trans>} className="w-40">
-        <Select
-          value={search.status ?? any}
-          onValueChange={(value) =>
-            onFilter({ status: experimentStatuses.find((status) => status === value) })
-          }
-        >
-          <SelectItem value={any}>{t`Any status`}</SelectItem>
-          {experimentStatuses.map((status) => (
-            <SelectItem key={status} value={status}>
-              {experimentStatusName(i18n, status)}
-            </SelectItem>
-          ))}
-        </Select>
-      </Field>
-      <Field label={<Trans>Flag</Trans>} className="w-56">
-        <Select
-          value={search.flag ?? any}
-          onValueChange={(value) => onFilter({ flag: value === any ? undefined : value })}
-        >
-          <SelectItem value={any}>{t`Any flag`}</SelectItem>
-          {/* A flag the address names that is not among those read: an
-              archived one, whose experiments are still listed. */}
-          {search.flag && !flagKeys.includes(search.flag) ? (
-            <SelectItem value={search.flag}>{search.flag}</SelectItem>
-          ) : null}
-          {flagKeys.map((key) => (
-            <SelectItem key={key} value={key}>
-              {key}
-            </SelectItem>
-          ))}
-        </Select>
-      </Field>
-      <Field label={<Trans>Owner</Trans>} className="w-56">
-        <Select
-          value={search.owner ?? any}
-          onValueChange={(value) => onFilter({ owner: value === any ? undefined : value })}
-        >
-          <SelectItem value={any}>{t`Any owner`}</SelectItem>
-          {search.owner && owners && !owners.has(search.owner) ? (
-            <SelectItem value={search.owner}>{t`A member without a grant here`}</SelectItem>
-          ) : null}
-          {ownerOptions.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </Select>
-      </Field>
-      <SearchField
-        label={<Trans>Tag</Trans>}
-        placeholder={t`The whole tag`}
-        className="w-48"
-        value={search.tag ?? ""}
-        onChange={(tag) => onFilter({ tag: tag.trim() || undefined })}
-      />
-      <div className="flex h-9 items-center gap-2">
-        <Switch
-          id={archived}
-          checked={search.archived === true}
-          onCheckedChange={(checked) => onFilter({ archived: checked ? true : undefined })}
-        />
-        <Label htmlFor={archived}>
-          <Trans>Include archived experiments</Trans>
-        </Label>
-      </div>
-      <div className="flex h-9 items-center gap-2">
-        <Switch
-          id={overdue}
-          checked={search.past_expected_end === true}
-          onCheckedChange={(checked) => onFilter({ past_expected_end: checked ? true : undefined })}
-        />
-        <Label htmlFor={overdue}>
-          <Trans>Past expected end</Trans>
-        </Label>
-      </div>
-      <div className="flex h-9 items-center gap-2">
-        <Switch
-          id={awaiting}
-          checked={search.awaiting_code_removal === true}
-          onCheckedChange={(checked) =>
-            onFilter({ awaiting_code_removal: checked ? true : undefined })
-          }
-        />
-        <Label htmlFor={awaiting}>
-          <Trans>Awaiting code removal</Trans>
-        </Label>
-      </div>
-    </div>
   );
 }
 

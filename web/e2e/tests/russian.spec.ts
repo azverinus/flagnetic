@@ -417,6 +417,12 @@ test.describe("the console in Russian", () => {
       "aria-disabled",
       "true",
     );
+    // The list's facets are in the panel, in Russian.
+    await expect(
+      page
+        .getByRole("navigation", { name: "Фильтр экспериментов" })
+        .getByRole("radio", { name: "Черновик", exact: true }),
+    ).toBeVisible();
     await expectNoSeriousViolations(page, "the experiments in Russian");
 
     // The admin starts and stops it through dialogs that name what changes.
@@ -425,6 +431,15 @@ test.describe("the console in Russian", () => {
     await page.goto(`/projects/${own}/experiments/cta_copy`);
     await expect(page.getByRole("heading", { name: "Текст кнопки", level: 1 })).toBeVisible();
     await expect(page.getByLabel("Гипотеза")).toBeVisible();
+    // The panel lists the environment holding the rule; the cards and the
+    // "more" menu read in Russian too.
+    await expect(
+      page
+        .getByRole("navigation", { name: "Окружения и сведения" })
+        .getByRole("link", { name: /^Development/ }),
+    ).toBeVisible();
+    await expect(page.getByRole("region", { name: "Назначение" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Другие действия" })).toBeVisible();
     await expectNoSeriousViolations(page, "a draft experiment in Russian");
 
     await page.getByRole("button", { name: "Запустить", exact: true }).click();
