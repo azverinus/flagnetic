@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Moment } from "@/components/moment";
 import { QueryError } from "@/components/query-error";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
@@ -251,7 +252,7 @@ export function DeadLettersTab({ project, sink }: { project: string; sink: Sink 
     return <QueryError error={letters.error} onRetry={() => void letters.refetch()} />;
   }
   return (
-    <section className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3">
       <p className="text-sm text-muted-foreground">
         <Trans>
           A batch the target rejected over and over is set aside here so the stream can go on.
@@ -270,15 +271,17 @@ export function DeadLettersTab({ project, sink }: { project: string; sink: Sink 
           <Trans>The target rejected the dead letter again.</Trans>
         </p>
       ) : null}
-      <Table
-        caption={t`Dead letters`}
-        hideCaption
-        columns={columns}
-        data={letters.data ?? []}
-        loading={letters.isPending}
-        getRowId={(letter) => letter.id}
-        empty={<Trans>No dead letters.</Trans>}
-      />
+      <Card>
+        <Table
+          caption={t`Dead letters`}
+          hideCaption
+          columns={columns}
+          data={letters.data ?? []}
+          loading={letters.isPending}
+          getRowId={(letter) => letter.id}
+          empty={<Trans>No dead letters.</Trans>}
+        />
+      </Card>
       <ConfirmDialog
         open={discarding !== undefined}
         onOpenChange={(open) => {
@@ -301,7 +304,7 @@ export function DeadLettersTab({ project, sink }: { project: string; sink: Sink 
           </Trans>
         </p>
       </ConfirmDialog>
-    </section>
+    </div>
   );
 }
 
@@ -366,7 +369,7 @@ export function GapsTab({ project, sink }: { project: string; sink: Sink }) {
   );
   if (gaps.isError) return <QueryError error={gaps.error} onRetry={() => void gaps.refetch()} />;
   return (
-    <section className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3">
       <p className="text-sm text-muted-foreground">
         <Trans>
           Retention drops raw events once they are older than the retention window, whether or not
@@ -374,16 +377,18 @@ export function GapsTab({ project, sink }: { project: string; sink: Sink }) {
           counting towards the warnings.
         </Trans>
       </p>
-      <Table
-        caption={t`Gaps`}
-        hideCaption
-        columns={columns}
-        data={gaps.data ?? []}
-        loading={gaps.isPending}
-        getRowId={(gap) => gap.id}
-        empty={<Trans>No events were lost.</Trans>}
-      />
-    </section>
+      <Card>
+        <Table
+          caption={t`Gaps`}
+          hideCaption
+          columns={columns}
+          data={gaps.data ?? []}
+          loading={gaps.isPending}
+          getRowId={(gap) => gap.id}
+          empty={<Trans>No events were lost.</Trans>}
+        />
+      </Card>
+    </div>
   );
 }
 
@@ -431,85 +436,87 @@ export function ReplayTab({
   };
   const { name } = sink;
   return (
-    <section className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          Sends the events received since a time again, in order, then the stream goes on. Use it to
-          fill a target after it lost data or after a dead letter was discarded.
-        </Trans>
-      </p>
-      <form noValidate onSubmit={submit} className="flex measure-form flex-col gap-4">
-        <Field
-          label={<Trans>From</Trans>}
-          hint={<Trans>In your time zone, within the retention window.</Trans>}
-          error={problemAt("from")}
-        >
-          <Input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} />
-        </Field>
-        <Field
-          label={<Trans>To</Trans>}
-          hint={<Trans>Leave empty to replay on into the live stream.</Trans>}
-          error={problemAt("to")}
-        >
-          <Input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} />
-        </Field>
-        <fieldset className="flex flex-col gap-2">
-          <legend className="text-sm font-medium">
-            <Trans>Event kinds</Trans>
-          </legend>
-          <p className="text-sm text-muted-foreground">
-            <Trans>None ticked means every kind the sink exports.</Trans>
-          </p>
-          {exported.map((kind) => (
-            <label key={kind} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={chosen.includes(kind)}
-                onChange={(event) =>
-                  setChosen(
-                    event.target.checked
-                      ? [...chosen, kind]
-                      : chosen.filter((item) => item !== kind),
-                  )
-                }
-                className="size-4 accent-primary"
-              />
-              {eventKindName(i18n, kind)}
-            </label>
-          ))}
-        </fieldset>
-        <div>
-          <Button type="submit">
-            <Trans>Replay…</Trans>
-          </Button>
-        </div>
-      </form>
-      <Dialog
-        open={body !== undefined}
-        onOpenChange={(open) => {
-          if (!open) {
-            replay.reset();
-            setBody(undefined);
-          }
-        }}
-        title={t`Replay ${name}`}
-      >
-        {body ? (
-          <DialogForm
-            onSubmit={(event) => {
-              event.preventDefault();
-              replay.mutate(body);
-            }}
-            onCancel={() => setBody(undefined)}
-            submitLabel={<Trans>Replay</Trans>}
-            pending={replay.isPending}
-            refusal={replay.error}
+    <Card>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">
+          <Trans>
+            Sends the events received since a time again, in order, then the stream goes on. Use it
+            to fill a target after it lost data or after a dead letter was discarded.
+          </Trans>
+        </p>
+        <form noValidate onSubmit={submit} className="flex measure-form flex-col gap-4">
+          <Field
+            label={<Trans>From</Trans>}
+            hint={<Trans>In your time zone, within the retention window.</Trans>}
+            error={problemAt("from")}
           >
-            <ReplayWarning body={body} exported={exported} />
-          </DialogForm>
-        ) : null}
-      </Dialog>
-    </section>
+            <Input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </Field>
+          <Field
+            label={<Trans>To</Trans>}
+            hint={<Trans>Leave empty to replay on into the live stream.</Trans>}
+            error={problemAt("to")}
+          >
+            <Input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} />
+          </Field>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-sm font-medium">
+              <Trans>Event kinds</Trans>
+            </legend>
+            <p className="text-sm text-muted-foreground">
+              <Trans>None ticked means every kind the sink exports.</Trans>
+            </p>
+            {exported.map((kind) => (
+              <label key={kind} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={chosen.includes(kind)}
+                  onChange={(event) =>
+                    setChosen(
+                      event.target.checked
+                        ? [...chosen, kind]
+                        : chosen.filter((item) => item !== kind),
+                    )
+                  }
+                  className="size-4 accent-primary"
+                />
+                {eventKindName(i18n, kind)}
+              </label>
+            ))}
+          </fieldset>
+          <div>
+            <Button type="submit">
+              <Trans>Replay…</Trans>
+            </Button>
+          </div>
+        </form>
+        <Dialog
+          open={body !== undefined}
+          onOpenChange={(open) => {
+            if (!open) {
+              replay.reset();
+              setBody(undefined);
+            }
+          }}
+          title={t`Replay ${name}`}
+        >
+          {body ? (
+            <DialogForm
+              onSubmit={(event) => {
+                event.preventDefault();
+                replay.mutate(body);
+              }}
+              onCancel={() => setBody(undefined)}
+              submitLabel={<Trans>Replay</Trans>}
+              pending={replay.isPending}
+              refusal={replay.error}
+            >
+              <ReplayWarning body={body} exported={exported} />
+            </DialogForm>
+          ) : null}
+        </Dialog>
+      </CardContent>
+    </Card>
   );
 }
 

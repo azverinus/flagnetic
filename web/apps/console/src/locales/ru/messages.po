@@ -1278,6 +1278,7 @@ msgstr "API-токен создан"
 msgid "API token revoked"
 msgstr "API-токен отозван"
 
+#: src/components/auth-settings-form.tsx
 #: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/settings/tokens.tsx
@@ -2503,6 +2504,7 @@ msgstr "После объявления {key} его можно использо
 
 #: src/lib/change-requests.ts
 #: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Definition"
 msgstr "Определение"
 
@@ -5958,6 +5960,10 @@ msgstr "Пароль изменён"
 msgid "Password minimum length"
 msgstr "Минимальная длина пароля"
 
+#: src/components/auth-settings-form.tsx
+msgid "Passwords"
+msgstr "Пароли"
+
 #: src/lib/experiment-alerts.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Past expected end"
@@ -6132,6 +6138,7 @@ msgstr "Профиль"
 #: src/lib/audit.ts
 #: src/routes/_signed-in/admin/audit.$entry.tsx
 #: src/routes/_signed-in/admin/audit.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "Project"
 msgstr "Проект"
 
@@ -7041,6 +7048,7 @@ msgstr "Открыть пропуски"
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+#: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Segment"
 msgstr "Сегмент"
@@ -7201,6 +7209,7 @@ msgstr "Сессия завершена"
 msgid "Session idle timeout"
 msgstr "Тайм-аут бездействия сессии"
 
+#: src/components/auth-settings-form.tsx
 #: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/settings/sessions.tsx
@@ -7322,6 +7331,7 @@ msgid "Sign yourself out everywhere"
 msgstr "Завершить все свои сессии"
 
 #: src/components/area-screens.ts
+#: src/components/auth-settings-form.tsx
 msgid "Sign-in"
 msgstr "Вход"
 
@@ -7411,6 +7421,10 @@ msgstr "Пропущена: для проверки нужно 1 000 юнито�
 #: src/components/saml-provider-form.tsx
 msgid "Slug"
 msgstr "Слаг"
+
+#: src/components/mail-settings.tsx
+msgid "SMTP server"
+msgstr "SMTP-сервер"
 
 #: src/components/experiment-exposures.tsx
 msgid "Some exposures were refused and are not counted above. An SDK sends exposures the experiment does not take:"

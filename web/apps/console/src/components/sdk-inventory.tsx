@@ -5,6 +5,7 @@ import { useMemo } from "react";
 
 import { Moment } from "@/components/moment";
 import { QueryError } from "@/components/query-error";
+import { Card } from "@/components/ui/card";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { kindName } from "@/lib/sdk-keys";
 import { sdkInventoryQuery } from "@/lib/queries";
@@ -107,19 +108,21 @@ export function SdkInventory({ project, environment }: SdkInventoryProps) {
       {inventory.isError ? (
         <QueryError error={inventory.error} onRetry={() => void inventory.refetch()} />
       ) : (
-        <Table
-          caption={t`SDKs`}
-          hideCaption
-          columns={columns}
-          data={inventory.data ?? []}
-          loading={inventory.isPending}
-          empty={
-            <Trans>
-              No SDK has used this environment yet. SDKs appear here after their first request, made
-              with one of its SDK keys.
-            </Trans>
-          }
-        />
+        <Card>
+          <Table
+            caption={t`SDKs`}
+            hideCaption
+            columns={columns}
+            data={inventory.data ?? []}
+            loading={inventory.isPending}
+            empty={
+              <Trans>
+                No SDK has used this environment yet. SDKs appear here after their first request,
+                made with one of its SDK keys.
+              </Trans>
+            }
+          />
+        </Card>
       )}
     </div>
   );

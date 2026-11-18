@@ -3,6 +3,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { useMemo } from "react";
 
 import { Moment } from "@/components/moment";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { eventKindName, failureText } from "@/lib/sinks";
 
@@ -42,23 +43,25 @@ export function SinkStreams({ sink }: { sink: Sink }) {
     [i18n, t],
   );
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-base/6 font-medium">
-        <Trans>Streams</Trans>
-      </h2>
+    <Card>
+      <CardHeader title={<Trans>Streams</Trans>} />
       {sink.streams.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          <Trans>Each event kind gets a stream once the sink is enabled.</Trans>
-        </p>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            <Trans>Each event kind gets a stream once the sink is enabled.</Trans>
+          </p>
+        </CardContent>
       ) : (
-        <Table
-          caption={t`Streams`}
-          hideCaption
-          columns={columns}
-          data={sink.streams}
-          getRowId={(stream) => stream.event_kind}
-        />
+        <CardContent flush>
+          <Table
+            caption={t`Streams`}
+            hideCaption
+            columns={columns}
+            data={sink.streams}
+            getRowId={(stream) => stream.event_kind}
+          />
+        </CardContent>
       )}
-    </section>
+    </Card>
   );
 }

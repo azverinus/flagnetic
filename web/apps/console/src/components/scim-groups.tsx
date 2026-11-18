@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 
 import { QueryError } from "@/components/query-error";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { formatNumber } from "@/i18n/format";
 import { scimGroupsQuery } from "@/lib/scim";
@@ -44,34 +45,39 @@ export function ScimGroups({ provider }: { provider: string }) {
     [i18n, t],
   );
   return (
-    <section aria-labelledby="scim-groups" className="flex flex-col gap-3">
-      <h2 id="scim-groups" className="text-base font-medium">
-        <Trans>SCIM groups</Trans>
-      </h2>
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          The groups the identity provider pushed through SCIM, which its group mappings can name.
-          The directory owns them and who is in them, so they are read only here. Pushing groups
-          needs a{" "}
-          <Link to="/admin/scim-tokens" className="underline">
-            SCIM token
-          </Link>{" "}
-          of this provider.
-        </Trans>
-      </p>
+    <Card aria-labelledby="scim-groups">
+      <CardHeader
+        titleId="scim-groups"
+        title={<Trans>SCIM groups</Trans>}
+        description={
+          <Trans>
+            The groups the identity provider pushed through SCIM, which its group mappings can name.
+            The directory owns them and who is in them, so they are read only here. Pushing groups
+            needs a{" "}
+            <Link to="/admin/scim-tokens" className="underline">
+              SCIM token
+            </Link>{" "}
+            of this provider.
+          </Trans>
+        }
+      />
       {groups.isError ? (
-        <QueryError error={groups.error} onRetry={() => void groups.refetch()} />
+        <CardContent>
+          <QueryError error={groups.error} onRetry={() => void groups.refetch()} />
+        </CardContent>
       ) : (
-        <Table
-          caption={t`SCIM groups`}
-          hideCaption
-          columns={columns}
-          data={groups.data ?? []}
-          loading={groups.isPending}
-          empty={<Trans>The identity provider has pushed no group.</Trans>}
-          getRowId={(group) => group.id}
-        />
+        <CardContent flush>
+          <Table
+            caption={t`SCIM groups`}
+            hideCaption
+            columns={columns}
+            data={groups.data ?? []}
+            loading={groups.isPending}
+            empty={<Trans>The identity provider has pushed no group.</Trans>}
+            getRowId={(group) => group.id}
+          />
+        </CardContent>
       )}
-    </section>
+    </Card>
   );
 }

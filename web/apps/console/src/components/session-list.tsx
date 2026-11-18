@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { QueryError } from "@/components/query-error";
 import { RowAction, withRowActions } from "@/components/row-dialogs";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -157,14 +158,16 @@ export function SessionList() {
           <Trans>Revoke all other sessions</Trans>
         </Button>
       </div>
-      <Table
-        caption={t`The devices you are signed in on`}
-        hideCaption
-        columns={columns}
-        data={rows}
-        loading={sessions.isPending}
-        getRowId={(session) => session.id}
-      />
+      <Card>
+        <Table
+          caption={t`The devices you are signed in on`}
+          hideCaption
+          columns={columns}
+          data={rows}
+          loading={sessions.isPending}
+          getRowId={(session) => session.id}
+        />
+      </Card>
 
       <ConfirmDialog
         open={revoking !== undefined}

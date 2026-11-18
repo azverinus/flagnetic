@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { QueryError } from "@/components/query-error";
 import { currentFirst, useSessionColumns } from "@/components/session-list";
 import { useRevocableTokens } from "@/components/token-list";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table } from "@/components/ui/table";
@@ -48,15 +49,17 @@ export function MemberSessions({ member, self }: { member: Member; self: boolean
           <Trans>Revoke all sessions</Trans>
         </Button>
       </div>
-      <Table
-        caption={t`The devices ${name} is signed in on`}
-        hideCaption
-        columns={columns}
-        data={rows}
-        loading={sessions.isPending}
-        empty={<Trans>{name} is not signed in anywhere.</Trans>}
-        getRowId={(session) => session.id}
-      />
+      <Card>
+        <Table
+          caption={t`The devices ${name} is signed in on`}
+          hideCaption
+          columns={columns}
+          data={rows}
+          loading={sessions.isPending}
+          empty={<Trans>{name} is not signed in anywhere.</Trans>}
+          getRowId={(session) => session.id}
+        />
+      </Card>
       <ConfirmDialog
         open={revoking}
         onOpenChange={(open) => {
@@ -122,15 +125,17 @@ export function MemberTokens({ member }: { member: Member }) {
           not to them.
         </Trans>
       </p>
-      <Table
-        caption={t`The API tokens of ${name}`}
-        hideCaption
-        columns={columns}
-        data={tokens.data ?? []}
-        loading={tokens.isPending}
-        empty={<Trans>{name} has no API token.</Trans>}
-        getRowId={(token) => token.id}
-      />
+      <Card>
+        <Table
+          caption={t`The API tokens of ${name}`}
+          hideCaption
+          columns={columns}
+          data={tokens.data ?? []}
+          loading={tokens.isPending}
+          empty={<Trans>{name} has no API token.</Trans>}
+          getRowId={(token) => token.id}
+        />
+      </Card>
       {revokeDialog}
     </div>
   );

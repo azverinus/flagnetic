@@ -1,4 +1,5 @@
 import type { Webhook } from "@flagnetic/api";
+import { Card, CardContent } from "@/components/ui/card";
 import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -227,22 +228,26 @@ function WebhookPage({
           </p>
         </div>
       ) : null}
-      <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Fact term={<Trans>Sent</Trans>}>{describeEvents(i18n, webhook.events)}</Fact>
-        <Fact term={<Trans>Last success</Trans>}>
-          <Moment value={webhook.last_success_at} />
-        </Fact>
-        <Fact term={<Trans>Failures in a row</Trans>}>{webhook.consecutive_failures}</Fact>
-        <Fact term={<Trans>Previous secret</Trans>}>
-          {webhook.previous_secret_expires_at ? (
-            <Trans>
-              Signs until <Moment value={webhook.previous_secret_expires_at} />
-            </Trans>
-          ) : (
-            <Trans>None</Trans>
-          )}
-        </Fact>
-      </dl>
+      <Card>
+        <CardContent>
+          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Fact term={<Trans>Sent</Trans>}>{describeEvents(i18n, webhook.events)}</Fact>
+            <Fact term={<Trans>Last success</Trans>}>
+              <Moment value={webhook.last_success_at} />
+            </Fact>
+            <Fact term={<Trans>Failures in a row</Trans>}>{webhook.consecutive_failures}</Fact>
+            <Fact term={<Trans>Previous secret</Trans>}>
+              {webhook.previous_secret_expires_at ? (
+                <Trans>
+                  Signs until <Moment value={webhook.previous_secret_expires_at} />
+                </Trans>
+              ) : (
+                <Trans>None</Trans>
+              )}
+            </Fact>
+          </dl>
+        </CardContent>
+      </Card>
       <Tabs
         label={t`Webhook`}
         value={tab}
@@ -252,18 +257,24 @@ function WebhookPage({
             value: "settings",
             label: t`Settings`,
             content: (
-              // A new version starts the form over from what was saved.
-              <WebhookEditor
-                key={webhook.version}
-                scope={scope}
-                webhook={webhook}
-                layout="page"
-                onSaved={(saved) => {
-                  remember(saved);
-                  const { name: savedName } = saved;
-                  toast.success(t`${savedName} is saved.`);
-                }}
-              />
+              <div className="measure-form">
+                <Card>
+                  <CardContent>
+                    {/* A new version starts the form over from what was saved. */}
+                    <WebhookEditor
+                      key={webhook.version}
+                      scope={scope}
+                      webhook={webhook}
+                      layout="page"
+                      onSaved={(saved) => {
+                        remember(saved);
+                        const { name: savedName } = saved;
+                        toast.success(t`${savedName} is saved.`);
+                      }}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
             ),
           },
           {

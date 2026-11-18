@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Moment } from "@/components/moment";
 import { QueryError } from "@/components/query-error";
 import { RowAction, withRowActions } from "@/components/row-dialogs";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -178,21 +179,23 @@ export function WebhookDeliveries({
       {log.isError ? (
         <QueryError error={log.error} onRetry={() => void log.refetch()} />
       ) : (
-        <Table
-          caption={t`Deliveries`}
-          hideCaption
-          columns={columns}
-          data={deliveries}
-          loading={log.isPending}
-          empty={
-            filtered ? (
-              <Trans>No delivery matches the filters.</Trans>
-            ) : (
-              <Trans>Nothing has been sent to this webhook yet.</Trans>
-            )
-          }
-          getRowId={(delivery) => delivery.id}
-        />
+        <Card>
+          <Table
+            caption={t`Deliveries`}
+            hideCaption
+            columns={columns}
+            data={deliveries}
+            loading={log.isPending}
+            empty={
+              filtered ? (
+                <Trans>No delivery matches the filters.</Trans>
+              ) : (
+                <Trans>Nothing has been sent to this webhook yet.</Trans>
+              )
+            }
+            getRowId={(delivery) => delivery.id}
+          />
+        </Card>
       )}
       {log.hasNextPage ? (
         <div>

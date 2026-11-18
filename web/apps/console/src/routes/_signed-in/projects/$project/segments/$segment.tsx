@@ -6,7 +6,9 @@ import {
   updateSegment,
   type Violation,
 } from "@flagnetic/api";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Page } from "@/components/ui/page";
+import { SettingsSection } from "@/components/ui/settings-section";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
@@ -362,7 +364,7 @@ function SegmentPage({
   );
 
   return (
-    <Page>
+    <Page measure="form">
       <PageHeader
         title={segment.name}
         description={<code className="font-mono text-sm">{segment.key}</code>}
@@ -409,23 +411,23 @@ function SegmentPage({
           }
         />
       ) : null}
-      <section aria-labelledby={usagesHeading} className="flex flex-col gap-2">
-        <h2 id={usagesHeading} className="text-sm font-medium">
-          <Trans>Used by</Trans>
-        </h2>
-        {usages.isError ? (
-          <QueryError error={usages.error} onRetry={() => void usages.refetch()} />
-        ) : usages.data === undefined ? (
-          <Skeleton className="h-5 w-48" />
-        ) : usages.data.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            <Trans>No flag's rules use this segment.</Trans>
-          </p>
-        ) : (
-          usageList
-        )}
-      </section>
-      <div className="flex w-full measure-form flex-col gap-5">
+      <Card aria-labelledby={usagesHeading}>
+        <CardHeader titleId={usagesHeading} title={<Trans>Used by</Trans>} />
+        <CardContent className="pt-3">
+          {usages.isError ? (
+            <QueryError error={usages.error} onRetry={() => void usages.refetch()} />
+          ) : usages.data === undefined ? (
+            <Skeleton className="h-5 w-48" />
+          ) : usages.data.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              <Trans>No flag's rules use this segment.</Trans>
+            </p>
+          ) : (
+            usageList
+          )}
+        </CardContent>
+      </Card>
+      <SettingsSection title={<Trans>Definition</Trans>}>
         <SegmentFields
           draft={draft}
           onChange={(next) => {
@@ -439,7 +441,7 @@ function SegmentPage({
           errors={errors}
           disabled={!canEdit}
         />
-      </div>
+      </SettingsSection>
       {checked && issues.size > 0 ? (
         <p role="alert" className="flex items-start gap-2 text-sm">
           <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />

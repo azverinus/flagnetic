@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_signed-in/settings/profile")({
 function Profile() {
   const { data: me } = useSuspenseQuery(meQuery);
   return (
-    <div className="flex flex-col gap-10">
+    <div className="flex measure-form flex-col gap-5">
       {me.member ? (
         <SettingsSection title={<Trans>Profile</Trans>}>
           <ProfileForm member={me.member} />

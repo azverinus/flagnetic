@@ -6,6 +6,7 @@ import { type FormEvent, useState } from "react";
 
 import { QueryError } from "@/components/query-error";
 import { RoleField } from "@/components/role-field";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
@@ -46,30 +47,32 @@ export function GroupMappingsSection({ provider }: { provider: string }) {
   );
 
   return (
-    <section aria-labelledby="group-mappings" className="flex flex-col gap-4">
-      <h2 id="group-mappings" className="text-base font-medium">
-        <Trans>Group mappings</Trans>
-      </h2>
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          Members of a directory group hold the role in the project, or are instance admins, that
-          the group maps to. A sign-in through the provider grants what the member's groups map to
-          and removes what they no longer map to. A grant made this way can be removed only here.
-        </Trans>
-      </p>
-      {failed ? (
-        <QueryError error={failed.error} onRetry={() => void failed.refetch()} />
-      ) : mappings.data === undefined || projects.data === undefined || roles.data === undefined ? (
-        <Skeleton aria-busy className="h-24 w-full" />
-      ) : (
-        <GroupMappingsForm
-          provider={provider}
-          saved={mappings.data}
-          projects={projects.data}
-          roles={roles.data}
-        />
-      )}
-    </section>
+    <Card aria-labelledby="group-mappings">
+      <CardHeader titleId="group-mappings" title={<Trans>Group mappings</Trans>} />
+      <CardContent>
+        <p className="text-sm text-muted-foreground">
+          <Trans>
+            Members of a directory group hold the role in the project, or are instance admins, that
+            the group maps to. A sign-in through the provider grants what the member's groups map to
+            and removes what they no longer map to. A grant made this way can be removed only here.
+          </Trans>
+        </p>
+        {failed ? (
+          <QueryError error={failed.error} onRetry={() => void failed.refetch()} />
+        ) : mappings.data === undefined ||
+          projects.data === undefined ||
+          roles.data === undefined ? (
+          <Skeleton aria-busy className="h-24 w-full" />
+        ) : (
+          <GroupMappingsForm
+            provider={provider}
+            saved={mappings.data}
+            projects={projects.data}
+            roles={roles.data}
+          />
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

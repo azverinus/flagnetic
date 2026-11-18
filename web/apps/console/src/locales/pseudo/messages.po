@@ -1278,6 +1278,7 @@ msgstr ""
 msgid "API token revoked"
 msgstr ""
 
+#: src/components/auth-settings-form.tsx
 #: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/settings/tokens.tsx
@@ -2503,6 +2504,7 @@ msgstr ""
 
 #: src/lib/change-requests.ts
 #: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Definition"
 msgstr ""
 
@@ -5958,6 +5960,10 @@ msgstr ""
 msgid "Password minimum length"
 msgstr ""
 
+#: src/components/auth-settings-form.tsx
+msgid "Passwords"
+msgstr ""
+
 #: src/lib/experiment-alerts.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Past expected end"
@@ -6132,6 +6138,7 @@ msgstr ""
 #: src/lib/audit.ts
 #: src/routes/_signed-in/admin/audit.$entry.tsx
 #: src/routes/_signed-in/admin/audit.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "Project"
 msgstr ""
 
@@ -7041,6 +7048,7 @@ msgstr ""
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+#: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Segment"
 msgstr ""
@@ -7201,6 +7209,7 @@ msgstr ""
 msgid "Session idle timeout"
 msgstr ""
 
+#: src/components/auth-settings-form.tsx
 #: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/settings/sessions.tsx
@@ -7322,6 +7331,7 @@ msgid "Sign yourself out everywhere"
 msgstr ""
 
 #: src/components/area-screens.ts
+#: src/components/auth-settings-form.tsx
 msgid "Sign-in"
 msgstr ""
 
@@ -7410,6 +7420,10 @@ msgstr ""
 #: src/components/auth-provider-list.tsx
 #: src/components/saml-provider-form.tsx
 msgid "Slug"
+msgstr ""
+
+#: src/components/mail-settings.tsx
+msgid "SMTP server"
 msgstr ""
 
 #: src/components/experiment-exposures.tsx

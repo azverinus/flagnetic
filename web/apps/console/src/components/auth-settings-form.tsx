@@ -11,6 +11,7 @@ import { EnforcedDomainsField, type EnforcedRowErrors } from "@/components/enfor
 import { QueryError } from "@/components/query-error";
 import { Field } from "@/components/ui/field";
 import { FormPage } from "@/components/ui/form-page";
+import { SettingsSection } from "@/components/ui/settings-section";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -132,132 +133,140 @@ export function AuthSettingsForm({ settings }: { settings: AuthSettings }) {
         pending={save.isPending}
         refusal={formRefusal(save.error, [...Object.values(pointerOf), ...rowPointers])}
       >
-        {duration(
-          "session_idle_timeout",
-          t`Session idle timeout`,
-          t`Unit of the session idle timeout`,
-          t`A session ends this long after its last request.`,
-        )}
-        {duration(
-          "session_absolute_timeout",
-          t`Session absolute timeout`,
-          t`Unit of the session absolute timeout`,
-          t`A session ends this long after it opened, however much it is used. Lowering it ends the sessions already older.`,
-        )}
-        {duration(
-          "token_max_lifetime",
-          t`Maximum token lifetime`,
-          t`Unit of the maximum token lifetime`,
-          t`The furthest ahead a new API token may expire. Tokens created before keep their expiry.`,
-        )}
-        <Controller
-          control={form.control}
-          name="token_expiry_required"
-          render={({ field }) => (
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor={expiryRequired}>
-                  <Trans>Token expiry required</Trans>
-                </Label>
-                <p id={`${expiryRequired}-hint`} className="text-sm text-muted-foreground">
-                  <Trans>Every new API token must have an expiry; none may live forever.</Trans>
-                </p>
-              </div>
-              <Switch
-                id={expiryRequired}
-                aria-describedby={`${expiryRequired}-hint`}
-                ref={field.ref}
-                checked={field.value}
-                onCheckedChange={field.onChange}
-                onBlur={field.onBlur}
-              />
-            </div>
+        <SettingsSection title={<Trans>Sessions</Trans>}>
+          {duration(
+            "session_idle_timeout",
+            t`Session idle timeout`,
+            t`Unit of the session idle timeout`,
+            t`A session ends this long after its last request.`,
           )}
-        />
-        <Field
-          label={<Trans>Password minimum length</Trans>}
-          hint={
-            <Trans>
-              The fewest characters a password chosen from now on has, from 12 to 128. Passwords set
-              before keep working.
-            </Trans>
-          }
-          error={errors.password_min_length?.message ?? serverError("password_min_length")}
-        >
-          <Input
-            inputMode="numeric"
-            autoComplete="off"
-            className="w-32"
-            {...form.register("password_min_length")}
+          {duration(
+            "session_absolute_timeout",
+            t`Session absolute timeout`,
+            t`Unit of the session absolute timeout`,
+            t`A session ends this long after it opened, however much it is used. Lowering it ends the sessions already older.`,
+          )}
+        </SettingsSection>
+        <SettingsSection title={<Trans>API tokens</Trans>}>
+          {duration(
+            "token_max_lifetime",
+            t`Maximum token lifetime`,
+            t`Unit of the maximum token lifetime`,
+            t`The furthest ahead a new API token may expire. Tokens created before keep their expiry.`,
+          )}
+          <Controller
+            control={form.control}
+            name="token_expiry_required"
+            render={({ field }) => (
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor={expiryRequired}>
+                    <Trans>Token expiry required</Trans>
+                  </Label>
+                  <p id={`${expiryRequired}-hint`} className="text-sm text-muted-foreground">
+                    <Trans>Every new API token must have an expiry; none may live forever.</Trans>
+                  </p>
+                </div>
+                <Switch
+                  id={expiryRequired}
+                  aria-describedby={`${expiryRequired}-hint`}
+                  ref={field.ref}
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
+              </div>
+            )}
           />
-        </Field>
-        <Controller
-          control={form.control}
-          name="self_service_password_reset"
-          render={({ field }) => (
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor={selfServiceReset}>
-                  <Trans>Self-service password reset</Trans>
-                </Label>
-                <p id={`${selfServiceReset}-hint`} className="text-sm text-muted-foreground">
-                  <Trans>
-                    A member who forgot their password asks for a password reset by mail from the
-                    sign-in page. It works only while an SMTP server is configured under Mail in the
-                    instance navigation. An instance admin can issue a password reset link from a
-                    member's page either way.
-                  </Trans>
-                </p>
+        </SettingsSection>
+        <SettingsSection title={<Trans>Passwords</Trans>}>
+          <Field
+            label={<Trans>Password minimum length</Trans>}
+            hint={
+              <Trans>
+                The fewest characters a password chosen from now on has, from 12 to 128. Passwords
+                set before keep working.
+              </Trans>
+            }
+            error={errors.password_min_length?.message ?? serverError("password_min_length")}
+          >
+            <Input
+              inputMode="numeric"
+              autoComplete="off"
+              className="w-32"
+              {...form.register("password_min_length")}
+            />
+          </Field>
+          <Controller
+            control={form.control}
+            name="self_service_password_reset"
+            render={({ field }) => (
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor={selfServiceReset}>
+                    <Trans>Self-service password reset</Trans>
+                  </Label>
+                  <p id={`${selfServiceReset}-hint`} className="text-sm text-muted-foreground">
+                    <Trans>
+                      A member who forgot their password asks for a password reset by mail from the
+                      sign-in page. It works only while an SMTP server is configured under Mail in
+                      the instance navigation. An instance admin can issue a password reset link
+                      from a member's page either way.
+                    </Trans>
+                  </p>
+                </div>
+                <Switch
+                  id={selfServiceReset}
+                  aria-describedby={`${selfServiceReset}-hint`}
+                  ref={field.ref}
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
               </div>
-              <Switch
-                id={selfServiceReset}
-                aria-describedby={`${selfServiceReset}-hint`}
-                ref={field.ref}
+            )}
+          />
+        </SettingsSection>
+        <SettingsSection title={<Trans>Sign-in</Trans>}>
+          <Controller
+            control={form.control}
+            name="local_login_enabled"
+            render={({ field }) => (
+              <SwitchField
+                label={<Trans>Local login</Trans>}
+                hint={
+                  <Trans>
+                    Members sign in with their email and password. Switching it off leaves auth
+                    providers as the only way in, so it is refused unless you hold an identity at an
+                    enabled provider yourself. If a provider breaks and nobody can sign in, run
+                    "flagnetic admin unlock" on the server: it switches local login back on and
+                    lifts every enforced domain.
+                  </Trans>
+                }
                 checked={field.value}
                 onCheckedChange={field.onChange}
-                onBlur={field.onBlur}
               />
-            </div>
-          )}
-        />
-        <Controller
-          control={form.control}
-          name="local_login_enabled"
-          render={({ field }) => (
-            <SwitchField
-              label={<Trans>Local login</Trans>}
-              hint={
-                <Trans>
-                  Members sign in with their email and password. Switching it off leaves auth
-                  providers as the only way in, so it is refused unless you hold an identity at an
-                  enabled provider yourself. If a provider breaks and nobody can sign in, run
-                  "flagnetic admin unlock" on the server: it switches local login back on and lifts
-                  every enforced domain.
-                </Trans>
-              }
-              checked={field.value}
-              onCheckedChange={field.onChange}
-            />
-          )}
-        />
-        <Controller
-          control={form.control}
-          name="sso_enforced_domains"
-          render={({ field }) =>
-            providers.data ? (
-              <EnforcedDomainsField
-                value={field.value}
-                onChange={field.onChange}
-                providers={providers.data}
-                errors={enforcedErrors}
-              />
-            ) : providers.isError ? (
-              <QueryError error={providers.error} onRetry={() => void providers.refetch()} />
-            ) : (
-              <Skeleton aria-busy className="h-16 w-full" />
-            )
-          }
-        />
+            )}
+          />
+          <Controller
+            control={form.control}
+            name="sso_enforced_domains"
+            render={({ field }) =>
+              providers.data ? (
+                <EnforcedDomainsField
+                  value={field.value}
+                  onChange={field.onChange}
+                  providers={providers.data}
+                  errors={enforcedErrors}
+                />
+              ) : providers.isError ? (
+                <QueryError error={providers.error} onRetry={() => void providers.refetch()} />
+              ) : (
+                <Skeleton aria-busy className="h-16 w-full" />
+              )
+            }
+          />
+        </SettingsSection>
       </FormPage>
       <UnsavedChangesBar
         dirty={isDirty}

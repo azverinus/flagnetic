@@ -1,4 +1,5 @@
 import { type LinkedIdentity, type Member, unlinkMemberIdentity } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -40,12 +41,14 @@ export function MemberIdentities({ member }: { member: Member }) {
           <Trans>{name} holds no password.</Trans>
         )}
       </p>
-      <IdentityList
-        identities={methods.data?.identities}
-        caption={t`The identities ${name} linked`}
-        empty={<Trans>{name} has linked no identity.</Trans>}
-        onUnlink={setUnlinking}
-      />
+      <Card>
+        <IdentityList
+          identities={methods.data?.identities}
+          caption={t`The identities ${name} linked`}
+          empty={<Trans>{name} has linked no identity.</Trans>}
+          onUnlink={setUnlinking}
+        />
+      </Card>
       <UnlinkIdentityDialog
         identity={unlinking}
         onClose={() => setUnlinking(undefined)}

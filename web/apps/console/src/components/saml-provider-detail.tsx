@@ -6,6 +6,7 @@ import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 
 import { CopyableValue } from "@/components/copyable-value";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -24,51 +25,54 @@ export function SamlRegistration({ provider }: { provider: AuthProvider }) {
   const { t } = useLingui();
   const { acs_url: acs, entity_id: entity, metadata_url: metadata } = provider;
   return (
-    <section aria-labelledby="register" className="flex flex-col gap-3">
-      <h2 id="register" className="text-base font-medium">
-        <Trans>Register the instance at the identity provider</Trans>
-      </h2>
-      {acs && entity && metadata ? (
-        <>
-          <p className="text-sm text-muted-foreground">
-            <Trans>
-              Import the SP metadata at the identity provider, or enter the ACS URL and the entity
-              ID by hand.
-            </Trans>
-          </p>
-          <CopyableValue label={t`ACS URL`} value={acs} />
-          <CopyableValue label={t`Entity ID`} value={entity} />
-          <CopyableValue label={t`SP metadata URL`} value={metadata} />
-          {provider.enabled ? (
-            <div>
-              <Button variant="outline" asChild>
-                <a
-                  href={spMetadataPath(provider.slug)}
-                  download={`${provider.slug}-sp-metadata.xml`}
-                >
-                  <DownloadIcon aria-hidden />
-                  <Trans>Download SP metadata</Trans>
-                </a>
-              </Button>
-            </div>
-          ) : (
+    <Card aria-labelledby="register">
+      <CardHeader
+        titleId="register"
+        title={<Trans>Register the instance at the identity provider</Trans>}
+      />
+      <CardContent>
+        {acs && entity && metadata ? (
+          <>
             <p className="text-sm text-muted-foreground">
               <Trans>
-                The instance serves the SP metadata only while the provider is enabled. Enable it to
-                download the metadata or let the identity provider fetch it.
+                Import the SP metadata at the identity provider, or enter the ACS URL and the entity
+                ID by hand.
               </Trans>
             </p>
-          )}
-        </>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          <Trans>
-            The ACS URL and the entity ID are built from the instance's public address
-            (FLAGNETIC_BASE_URL), which is not set. Set it, and the addresses show here.
-          </Trans>
-        </p>
-      )}
-    </section>
+            <CopyableValue label={t`ACS URL`} value={acs} />
+            <CopyableValue label={t`Entity ID`} value={entity} />
+            <CopyableValue label={t`SP metadata URL`} value={metadata} />
+            {provider.enabled ? (
+              <div>
+                <Button variant="outline" asChild>
+                  <a
+                    href={spMetadataPath(provider.slug)}
+                    download={`${provider.slug}-sp-metadata.xml`}
+                  >
+                    <DownloadIcon aria-hidden />
+                    <Trans>Download SP metadata</Trans>
+                  </a>
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                <Trans>
+                  The instance serves the SP metadata only while the provider is enabled. Enable it
+                  to download the metadata or let the identity provider fetch it.
+                </Trans>
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            <Trans>
+              The ACS URL and the entity ID are built from the instance's public address
+              (FLAGNETIC_BASE_URL), which is not set. Set it, and the addresses show here.
+            </Trans>
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -82,39 +86,41 @@ export function SamlIdentityProvider({ provider }: { provider: AuthProvider }) {
   const pasted = pastedMetadata(provider);
   const read = provider.idp_metadata_refreshed_at;
   return (
-    <section aria-labelledby="identity-provider" className="flex flex-col gap-3">
-      <h2 id="identity-provider" className="text-base font-medium">
-        <Trans>Identity provider</Trans>
-      </h2>
-      <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
-        <Row term={<Trans>Metadata</Trans>}>
-          {pasted ? (
-            <Trans>Pasted</Trans>
-          ) : (
-            <code className="font-mono text-xs break-all">{provider.idp_metadata_url}</code>
-          )}
-        </Row>
-        <Row term={<Trans>Last read</Trans>}>
-          {read ? formatDateTime(i18n, read) : null}{" "}
-          <span className="text-muted-foreground">
+    <Card aria-labelledby="identity-provider">
+      <CardHeader titleId="identity-provider" title={<Trans>Identity provider</Trans>} />
+      <CardContent>
+        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
+          <Row term={<Trans>Metadata</Trans>}>
             {pasted ? (
-              <Trans>Pasted metadata is never read again; paste a new document to change it.</Trans>
+              <Trans>Pasted</Trans>
             ) : (
-              <Trans>Metadata from a URL is read again every day.</Trans>
+              <code className="font-mono text-xs break-all">{provider.idp_metadata_url}</code>
             )}
-          </span>
-        </Row>
-        <Row term={<Trans>Entity ID</Trans>}>
-          <Code value={provider.idp_entity_id} />
-        </Row>
-        <Row term={<Trans>Sign-on URL</Trans>}>
-          <Code value={provider.idp_sso_url} />
-        </Row>
-        <Row term={<Trans>Signing certificates</Trans>}>
-          <IdPCertificates certificates={provider.idp_certificates ?? []} />
-        </Row>
-      </dl>
-    </section>
+          </Row>
+          <Row term={<Trans>Last read</Trans>}>
+            {read ? formatDateTime(i18n, read) : null}{" "}
+            <span className="text-muted-foreground">
+              {pasted ? (
+                <Trans>
+                  Pasted metadata is never read again; paste a new document to change it.
+                </Trans>
+              ) : (
+                <Trans>Metadata from a URL is read again every day.</Trans>
+              )}
+            </span>
+          </Row>
+          <Row term={<Trans>Entity ID</Trans>}>
+            <Code value={provider.idp_entity_id} />
+          </Row>
+          <Row term={<Trans>Sign-on URL</Trans>}>
+            <Code value={provider.idp_sso_url} />
+          </Row>
+          <Row term={<Trans>Signing certificates</Trans>}>
+            <IdPCertificates certificates={provider.idp_certificates ?? []} />
+          </Row>
+        </dl>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -190,89 +196,89 @@ export function SamlCertificates({
   });
 
   return (
-    <section aria-labelledby="certificates" className="flex flex-col gap-3">
-      <h2 id="certificates" className="text-base font-medium">
-        <Trans>Certificates</Trans>
-      </h2>
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          The instance signs its requests with the current certificate's key and decrypts assertions
-          encrypted to any certificate listed here. The SP metadata lists them all.
-        </Trans>
-      </p>
-      <ul aria-label={t`SP certificates`} className="flex flex-col gap-2">
-        {(provider.sp_certificates ?? []).map((certificate) => (
-          <SpCertificateItem key={certificate.sha256} certificate={certificate} />
-        ))}
-      </ul>
-      {pending ? (
-        <p role="status" className="rounded-md border bg-muted p-3 text-sm">
+    <Card aria-labelledby="certificates">
+      <CardHeader titleId="certificates" title={<Trans>Certificates</Trans>} />
+      <CardContent>
+        <p className="text-sm text-muted-foreground">
           <Trans>
-            A rotation is pending. Import the SP metadata at the identity provider again, so that it
-            knows the next certificate, then complete the rotation. Until then nothing changes for
-            the identity provider.
+            The instance signs its requests with the current certificate's key and decrypts
+            assertions encrypted to any certificate listed here. The SP metadata lists them all.
           </Trans>
-          {provider.enabled ? null : (
-            <>
-              {" "}
-              <Trans>
-                The provider is disabled, so the instance does not serve its SP metadata: enable it
-                before the identity provider imports the metadata.
-              </Trans>
-            </>
-          )}
         </p>
-      ) : null}
-      <div>
+        <ul aria-label={t`SP certificates`} className="flex flex-col gap-2">
+          {(provider.sp_certificates ?? []).map((certificate) => (
+            <SpCertificateItem key={certificate.sha256} certificate={certificate} />
+          ))}
+        </ul>
         {pending ? (
-          <Button variant="outline" onClick={() => setStep("complete")}>
-            <KeyRoundIcon aria-hidden />
-            <Trans>Complete rotation</Trans>
-          </Button>
-        ) : (
-          <Button variant="outline" onClick={() => setStep("start")}>
-            <RotateCwIcon aria-hidden />
-            <Trans>Start certificate rotation</Trans>
-          </Button>
-        )}
-      </div>
-      <ConfirmDialog
-        open={step === "start"}
-        onOpenChange={(open) => (open ? undefined : close())}
-        title={t`Start certificate rotation`}
-        confirmLabel={<Trans>Generate next certificate</Trans>}
-        pending={rotation.isPending}
-        refusal={rotation.error}
-        onConfirm={() => rotation.mutate("start")}
-      >
-        <p>
-          <Trans>
-            A new key pair is generated beside the current one, valid for three years. The SP
-            metadata lists both certificates, and assertions encrypted to either are accepted, so
-            sign-ins keep working while the identity provider imports the new metadata.
-          </Trans>
-        </p>
-      </ConfirmDialog>
-      <ConfirmDialog
-        open={step === "complete"}
-        onOpenChange={(open) => (open ? undefined : close())}
-        title={t`Complete certificate rotation`}
-        confirmLabel={<Trans>Complete rotation</Trans>}
-        destructive
-        pending={rotation.isPending}
-        refusal={rotation.error}
-        onConfirm={() => rotation.mutate("complete")}
-      >
-        <p>
-          <Trans>
-            The next certificate becomes current and the old key is destroyed. An identity provider
-            that still encrypts assertions to the old certificate can no longer sign anyone in, so
-            complete the rotation only once it has imported the new SP metadata. This cannot be
-            undone.
-          </Trans>
-        </p>
-      </ConfirmDialog>
-    </section>
+          <p role="status" className="rounded-md border bg-muted p-3 text-sm">
+            <Trans>
+              A rotation is pending. Import the SP metadata at the identity provider again, so that
+              it knows the next certificate, then complete the rotation. Until then nothing changes
+              for the identity provider.
+            </Trans>
+            {provider.enabled ? null : (
+              <>
+                {" "}
+                <Trans>
+                  The provider is disabled, so the instance does not serve its SP metadata: enable
+                  it before the identity provider imports the metadata.
+                </Trans>
+              </>
+            )}
+          </p>
+        ) : null}
+        <div>
+          {pending ? (
+            <Button variant="outline" onClick={() => setStep("complete")}>
+              <KeyRoundIcon aria-hidden />
+              <Trans>Complete rotation</Trans>
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => setStep("start")}>
+              <RotateCwIcon aria-hidden />
+              <Trans>Start certificate rotation</Trans>
+            </Button>
+          )}
+        </div>
+        <ConfirmDialog
+          open={step === "start"}
+          onOpenChange={(open) => (open ? undefined : close())}
+          title={t`Start certificate rotation`}
+          confirmLabel={<Trans>Generate next certificate</Trans>}
+          pending={rotation.isPending}
+          refusal={rotation.error}
+          onConfirm={() => rotation.mutate("start")}
+        >
+          <p>
+            <Trans>
+              A new key pair is generated beside the current one, valid for three years. The SP
+              metadata lists both certificates, and assertions encrypted to either are accepted, so
+              sign-ins keep working while the identity provider imports the new metadata.
+            </Trans>
+          </p>
+        </ConfirmDialog>
+        <ConfirmDialog
+          open={step === "complete"}
+          onOpenChange={(open) => (open ? undefined : close())}
+          title={t`Complete certificate rotation`}
+          confirmLabel={<Trans>Complete rotation</Trans>}
+          destructive
+          pending={rotation.isPending}
+          refusal={rotation.error}
+          onConfirm={() => rotation.mutate("complete")}
+        >
+          <p>
+            <Trans>
+              The next certificate becomes current and the old key is destroyed. An identity
+              provider that still encrypts assertions to the old certificate can no longer sign
+              anyone in, so complete the rotation only once it has imported the new SP metadata.
+              This cannot be undone.
+            </Trans>
+          </p>
+        </ConfirmDialog>
+      </CardContent>
+    </Card>
   );
 }
 
