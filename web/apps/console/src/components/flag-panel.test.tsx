@@ -81,6 +81,16 @@ describe("the flag's context panel", () => {
     expect(screen.getByRole("link", { name: /^Development/ })).not.toHaveAttribute("aria-current");
   });
 
+  it("keeps the open environment and the days on the way to History", async () => {
+    await show({ environment: "production", days: 30, tester: "t1" } as never);
+    const history = await screen.findByRole("link", { name: "History" });
+    const target = new URL(history.getAttribute("href")!, "http://console.test");
+    expect(target.searchParams.get("tab")).toBe("history");
+    expect(target.searchParams.get("environment")).toBe("production");
+    expect(target.searchParams.get("days")).toBe("30");
+    expect(target.searchParams.get("tester")).toBeNull();
+  });
+
   it("gives the flag's definition as facts beside the configuration", async () => {
     await show();
     await screen.findByRole("link", { name: /^Development/ });

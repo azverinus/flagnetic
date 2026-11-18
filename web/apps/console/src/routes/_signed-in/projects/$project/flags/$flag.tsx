@@ -34,6 +34,7 @@ import { Select, SelectItem } from "@/components/ui/select";
 import { useContextPanelHidden } from "@/components/ui/context-panel";
 import { WaitingChangeRequests } from "@/components/waiting-change-requests";
 import { type DayRange, dayRangeOf, daysSearchOf } from "@/lib/daily-counts";
+import { cn } from "@/lib/cn";
 import { ApiError, unwrap } from "@/lib/errors";
 import { type FlagDetailSearch, validateFlagDetailSearch } from "@/lib/flag-detail";
 import { ifMatch } from "@/lib/http";
@@ -369,11 +370,20 @@ function useFlagLifecycle(project: string, flag: Flag): { menu: ReactNode; dialo
     onConfirm: () => act.mutate(action),
   });
   const item = (action: Retiring, label: ReactNode, destructive = false) => (
+    // A refused item is marked disabled rather than made disabled: a disabled
+    // menu item is skipped by the keyboard and takes no pointer, so its
+    // reason could be neither reached nor hovered.
     <DropdownMenuItem
-      disabled={!can}
+      aria-disabled={can ? undefined : true}
       title={can ? undefined : reason}
-      className={destructive ? "text-destructive focus:text-destructive" : undefined}
-      onSelect={() => ask(action)}
+      className={cn(destructive && "text-destructive focus:text-destructive", !can && "opacity-50")}
+      onSelect={(event) => {
+        if (!can) {
+          event.preventDefault();
+          return;
+        }
+        ask(action);
+      }}
     >
       {label}
     </DropdownMenuItem>

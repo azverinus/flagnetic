@@ -63,8 +63,9 @@ export function FlagPanelContent({
               key={configuration.environment}
               to="/projects/$project/flags/$flag"
               params={{ project, flag: flagKey }}
-              // Another environment of the same flag keeps the tester and the
-              // days the evaluations cover, as the tabs did.
+              // Moving to another environment of the same flag keeps the tester
+              // and the days the evaluations cover, so the comparison the member
+              // is making carries over.
               search={{
                 environment:
                   configuration.environment === first ? undefined : configuration.environment,
@@ -85,7 +86,10 @@ export function FlagPanelContent({
             <PanelLink
               to="/projects/$project/flags/$flag"
               params={{ project, flag: flagKey }}
-              search={{ tab: "history" }}
+              // History keeps the open environment and the days, so coming back
+              // from it returns to the same view; the tester is left behind
+              // because the history is the flag's, not one context's.
+              search={{ tab: "history", environment: search.environment, days: search.days }}
               current={search.tab === "history"}
             >
               {t`History`}
