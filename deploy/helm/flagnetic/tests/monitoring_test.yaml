@@ -1,0 +1,98 @@
+suite: ServiceMonitor and PrometheusRule
+templates:
+  - templates/servicemonitor.yaml
+  - templates/prometheusrule.yaml
+set:
+  secrets.existingSecret: mine
+release:
+  name: flags
+  namespace: ops
+tests:
+  - it: renders neither by default
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: scrapes the metrics Service
+    template: templates/servicemonitor.yaml
+    set:
+      serviceMonitor:
+        enabled: true
+        labels:
+          release: prometheus
+        scrapeTimeout: 10s
+    asserts:
+      - equal:
+          path: metadata.labels.release
+          value: prometheus
+      - equal:
+          path: spec.namespaceSelector.matchNames
+          value: [ops]
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app.kubernetes.io/name: flagnetic
+            app.kubernetes.io/instance: flags
+            app.kubernetes.io/component: metrics
+      - equal:
+          path: spec.endpoints[0]
+          value:
+            port: metrics
+            path: /metrics
+            interval: 30s
+            scrapeTimeout: 10s
+      - notExists:
+          path: metadata.namespace
+  - it: puts the ServiceMonitor in the namespace asked for
+    template: templates/servicemonitor.yaml
+    set:
+      serviceMonitor.enabled: true
+      serviceMonitor.namespace: monitoring
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: monitoring
+  - it: alerts on the four conditions with documented metrics
+    template: templates/prometheusrule.yaml
+    set:
+      prometheusRule.enabled: true
+      prometheusRule.labels.release: prometheus
+    asserts:
+      - equal:
+          path: metadata.labels.release
+          value: prometheus
+      - equal:
+          path: spec.groups[0].rules[0].alert
+          value: FlagneticListenerDown
+      - equal:
+          path: spec.groups[0].rules[1].alert
+          value: FlagneticRulesetPropagationSlow
+      - equal:
+          path: spec.groups[0].rules[2].alert
+          value: FlagneticSinkStopped
+      - equal:
+          path: spec.groups[0].rules[3].alert
+          value: FlagneticWebhookDeliveriesFailing
+      - equal:
+          path: spec.groups[0].rules[0].expr
+          value: flagnetic_listener_up{job="flags-flagnetic-metrics", namespace="ops"} == 0
+      - matchRegex:
+          path: spec.groups[0].rules[1].expr
+          pattern: flagnetic_ruleset_propagation_seconds_bucket.* > 2$
+      - matchRegex:
+          path: spec.groups[0].rules[2].expr
+          pattern: ^max by \(sink\) \(flagnetic_sink_dead_letters\{job="flags-flagnetic-metrics", namespace="ops"\}\) > 0$
+      - matchRegex:
+          path: spec.groups[0].rules[3].expr
+          pattern: flagnetic_webhook_deliveries_total\{job="flags-flagnetic-metrics", namespace="ops", status=~"failed\|exhausted"\}
+      - matchRegex:
+          path: spec.groups[0].rules[1].expr
+          pattern: flagnetic_ruleset_propagation_seconds_bucket\{job="flags-flagnetic-metrics", namespace="ops"\}
+  - it: takes the propagation threshold from the values
+    template: templates/prometheusrule.yaml
+    set:
+      prometheusRule.enabled: true
+      prometheusRule.propagationSeconds: 5
+    asserts:
+      - matchRegex:
+          path: spec.groups[0].rules[1].expr
+          pattern: " > 5$"

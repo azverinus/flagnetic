@@ -1,0 +1,28 @@
+{{- if .Values.autoscaling.enabled }}
+{{- if lt (int .Values.autoscaling.maxReplicas) (int .Values.autoscaling.minReplicas) }}
+{{- fail "flagnetic: autoscaling.maxReplicas must not be below autoscaling.minReplicas" }}
+{{- end }}
+{{- if not (dig "requests" "cpu" "" (.Values.resources | default dict)) }}
+{{- fail "flagnetic: autoscaling needs resources.requests.cpu, which CPU utilization is measured against" }}
+{{- end }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "flagnetic.fullname" . }}
+  labels:
+    {{- include "flagnetic.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "flagnetic.fullname" . }}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}

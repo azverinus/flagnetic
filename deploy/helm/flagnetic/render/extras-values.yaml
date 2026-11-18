@@ -1,0 +1,63 @@
+# Every optional resource on. Rendered by the lint and kubeconform checks only:
+# `ct install` would need the Gateway API and Prometheus Operator CRDs in kind,
+# so these values stay out of ci/.
+secrets:
+  existingSecret: flagnetic
+ingress:
+  enabled: true
+  className: nginx
+  hosts: [flags.example.com]
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+  tls:
+    - secretName: flagnetic-tls
+      hosts: [flags.example.com]
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: gateways
+  hostnames: [flags.example.com]
+serviceMonitor:
+  enabled: true
+  labels:
+    release: prometheus
+  scrapeTimeout: 10s
+prometheusRule:
+  enabled: true
+  labels:
+    release: prometheus
+autoscaling:
+  enabled: true
+networkPolicy:
+  enabled: true
+  ingress:
+    http:
+      from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+    metrics:
+      from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+  egress:
+    dns:
+      to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+    postgresql:
+      to:
+        - ipBlock:
+            cidr: 10.20.0.0/16
+    rules:
+      - to:
+          - ipBlock:
+              cidr: 0.0.0.0/0
+              except: [10.0.0.0/8]
+        ports:
+          - port: 443
+            protocol: TCP

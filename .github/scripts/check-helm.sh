@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Checks the Helm chart without a cluster: helm lint, the helm-unittest suites,
 # and kubeconform on what the chart renders for every values file in
-# deploy/helm/flagnetic/ci, against each supported Kubernetes minor. CI runs it
+# deploy/helm/flagnetic/ci and render, against each supported Kubernetes minor,
+# and the Gateway API and Prometheus Operator custom resources against the
+# schemas of the Datree CRDs catalog. CI runs it
 # with Helm 3 and Helm 4; `task pr:check` runs it with the Helm on the PATH.
 #
 #   check-helm.sh
@@ -19,7 +21,13 @@ versions="${KUBERNETES_VERSIONS:-1.35.0,1.36.0,1.37.0}"
 
 echo "== $("$helm" version --short)"
 
-for values in "$chart"/ci/*-values.yaml; do
+# ci/ holds what `ct install` installs; render/ holds values that need CRDs a
+# kind cluster lacks, so they are rendered and checked but never installed.
+values_files=("$chart"/ci/*-values.yaml "$chart"/render/*-values.yaml)
+# The catalog is pinned to a commit so a change there cannot change the result.
+crds='https://raw.githubusercontent.com/datreeio/CRDs-catalog/784ec895547a36e548e6810b41f27baade3a0890/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+
+for values in "${values_files[@]}"; do
   echo "== helm lint $values"
   "$helm" lint --strict "$chart" -f "$values"
 done
@@ -27,12 +35,12 @@ done
 echo "== helm unittest"
 "$helm" unittest "$chart"
 
-for values in "$chart"/ci/*-values.yaml; do
+for values in "${values_files[@]}"; do
   echo "== kubeconform $values ($versions)"
-  # The chart renders core resources only; a missing schema is an error.
+  # A missing schema is an error.
   for v in $(echo "$versions" | tr ',' ' '); do
     "$helm" template flags "$chart" -f "$values" --kube-version "$v" |
-      "$kubeconform" -strict -kubernetes-version "$v" -schema-location default -
+      "$kubeconform" -strict -kubernetes-version "$v" -schema-location default -schema-location "$crds" -
   done
 done
 echo "ok: the chart passes lint, its unit tests and kubeconform"
