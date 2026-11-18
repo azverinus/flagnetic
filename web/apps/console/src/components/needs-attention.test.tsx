@@ -141,6 +141,23 @@ describe("the overview's needs attention card", () => {
     expect(await screen.findByRole("link", { name: /2\+ stale flags/ })).toBeInTheDocument();
   });
 
+  it("says there are more when the change requests awaiting a decision run past the count", async () => {
+    server(all, {
+      "GET /projects/checkout/change-requests": {
+        status: 200,
+        body: {
+          items: Array.from({ length: 100 }, (_, index) => changeRequest(String(index))),
+          next_cursor: "next",
+        },
+      },
+    });
+    await render();
+
+    expect(
+      await screen.findByRole("link", { name: /More than 99 change requests await your decision/ }),
+    ).toHaveAttribute("href", "/projects/checkout/change-requests?tab=awaiting");
+  });
+
   it("leaves out the row of a list that failed to read", async () => {
     server(all, { "GET /projects/checkout/sinks": problem(500, "internal") });
     await render();
