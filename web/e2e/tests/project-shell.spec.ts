@@ -705,7 +705,14 @@ test.describe("the context panel", () => {
       "page",
     );
     // An environment's own page keeps its screen current.
-    await page.goto(`/projects/${seededProject.key}/environments`);
+    await page.goto(`/projects/${seededProject.key}/environments/production`);
+    await expect(screens.getByRole("link", { name: "Environments" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText(
+      "Project settings",
+    );
     await expect(screens.getByRole("link", { name: "Webhooks" })).toBeVisible();
     await expect(screens.getByRole("link", { name: "Sinks" })).toBeVisible();
   });
