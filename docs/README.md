@@ -4,6 +4,7 @@
 - [Installing Flagnetic](install.md): Docker Compose, Kubernetes or the binary, TLS and a reverse proxy, PostgreSQL connections.
 - [Running on Kubernetes](kubernetes.md): the Helm chart, PostgreSQL, the Secret, migration modes, routes, metrics, scaling, network policy and upgrades.
 - [Upgrading Flagnetic](upgrades.md): from 0.x to 1.0, rolling upgrades between 1.x releases with the chart, Compose or systemd, what adjacent minors means, and going back.
+- [Verifying a release](verify.md): checking the image, the chart and each SDK package's attestation, downloading the SBOM, and what protects Go modules.
 - [Glossary](glossary.md): the vocabulary the code, the API, the docs and the console use.
 - [Access](access.md): permissions, roles, grants, scopes and API tokens.
 - [Flags](flags.md): flag definitions, configurations per environment, rules, rollouts, overrides, prerequisites, the kill switch, revert, copy and compare.
