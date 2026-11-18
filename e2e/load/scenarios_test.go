@@ -74,7 +74,7 @@ func fake(t *testing.T, rejectEvents bool) (*Target, *atomic.Int64, *atomic.Int6
 		}
 		_, _ = w.Write([]byte(`{"flags":{}}`))
 	})
-	mux.HandleFunc("/sdk/v1/events", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/sdk/v1/events", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 		if rejectEvents {
 			_, _ = w.Write([]byte(`{"accepted":0,"rejected":[{"index":3,"code":"unknown_experiment","detail":"no such experiment"}]}`))
