@@ -1,3 +1,8 @@
+---
+title: "Governance"
+description: "Protected environments, which writes they refuse, and the kill switch exception."
+---
+
 # Governance
 
 Governance is how a team controls changes to what its SDKs receive: which environments need a second pair of eyes, and how a change reaches them. This page covers protected environments and how a change reaches one; [change requests](change-requests.md) covers each operation in full.

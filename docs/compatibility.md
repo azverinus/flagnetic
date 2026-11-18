@@ -1,3 +1,8 @@
+---
+title: "Compatibility and support"
+description: "What 1.0 promises for each surface, how a deprecation is announced on the wire, which versions get fixes, and what is not a contract."
+---
+
 # Compatibility and support
 
 What Flagnetic promises from 1.0 on, for each surface a script, an SDK, a pipeline or an operator can depend on; how a removal is announced; and which versions get fixes. The SDKs' half, which server an SDK build speaks to, is on [Versioning and compatibility](sdks/compatibility.md).

@@ -1,3 +1,8 @@
+---
+title: "Operations"
+description: "Running the server, how changes reach SDKs across replicas, and what to watch."
+---
+
 # Operations
 
 How to run Flagnetic in production: what it needs, how it starts and stops, how changes reach SDKs, and what to watch. [Installing Flagnetic](install.md) gets an instance running; every setting named here is listed in the [configuration reference](configuration.md).

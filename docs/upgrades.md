@@ -1,3 +1,8 @@
+---
+title: "Upgrading Flagnetic"
+description: "From 0.x to 1.0, rolling upgrades between 1.x releases with the chart, Compose or systemd, what adjacent minors means, and going back."
+---
+
 # Upgrading Flagnetic
 
 Read the release notes of every version between yours and the new one first: a change that needs you to act is marked there. Then follow the part of this page for the version you run:

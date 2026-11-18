@@ -1,3 +1,8 @@
+---
+title: "Events"
+description: "Evaluation summaries, aliases and exposures an SDK posts, each judged on its own and stored once."
+---
+
 # Events
 
 SDKs post what they observed in batches: evaluation summaries (how often each flag served each variation, and why), aliases (the unit ID in use before sign-up linked to the one after) and exposures.

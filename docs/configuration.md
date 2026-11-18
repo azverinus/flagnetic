@@ -1,3 +1,8 @@
+---
+title: "Configuration reference"
+description: "Every FLAGNETIC_* environment variable and flag of the server with its default, generated from the settings table."
+---
+
 # Configuration reference
 
 <!-- Generated from the settings table in internal/infra/config by `task generate`. Do not edit. -->

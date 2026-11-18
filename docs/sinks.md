@@ -1,3 +1,8 @@
+---
+title: "Sinks"
+description: "A project's copy of its raw events in ClickHouse, object storage or a signed webhook: configuring, guarding, testing and enabling a sink, health, failure classes, dead letters, replay, at risk and gaps, the console's screens, metrics."
+---
+
 # Sinks
 
 A **sink** is a project's durable, at-least-once copy of its raw events (exposures, aliases and evaluation summaries) delivered to a target of your own, so that analysts work in their warehouse and never on the platform's database. This page is for the people who set sinks up and keep them running; the rows a sink writes, the ClickHouse tables, the object keys, the webhook envelope and a SQL recipe are on [Exported events](exported-events.md).

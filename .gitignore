@@ -22,6 +22,11 @@ go.work.sum
 # Local environment
 .env
 
+# The docs site's build and Astro's cache
+/website/dist/
+/website/.astro/
+/website/node_modules/
+
 # The console's build, embedded by the binary; the marker keeps the
 # directory in a fresh clone.
 /internal/infra/in/http/console/dist/*

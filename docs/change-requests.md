@@ -1,3 +1,8 @@
+---
+title: "Change requests"
+description: "Proposing a flag's configuration for review, its diff and its states."
+---
+
 # Change requests
 
 A change request proposes a change for someone to review before it is made: one [flag](flags.md)'s configuration in one environment, a flag's or a [segment](segments.md)'s definition in every environment, or an [experiment](experiments.md)'s start, stop or traffic allocation growth in every environment holding its rule; what it would be, and the diff from what it is now. Proposing changes nothing any SDK receives; a member who is not the author approves it, and applying it makes the change.

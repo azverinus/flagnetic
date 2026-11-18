@@ -73,6 +73,7 @@ tasks:
       - web/package.json
       - web/*/*/package.json
       - web/e2e/package.json
+      - website/package.json
     cmds:
       - pnpm --dir web install --frozen-lockfile
 
@@ -115,6 +116,21 @@ tasks:
     deps: [web:install]
     cmds:
       - pnpm --dir web i18n:extract
+
+  # --- Docs site (website/, built from docs/ and api/) ---
+
+  docs:
+    desc: Preview the docs site with live reload at http://localhost:4321/flagnetic/
+    deps: [web:install]
+    cmds:
+      - pnpm --dir web --filter @flagnetic/website dev
+
+  docs:build:
+    desc: Build the docs site into website/dist and check its links
+    deps: [web:install]
+    cmds:
+      - pnpm --dir web --filter @flagnetic/website build
+      - pnpm --dir web --filter @flagnetic/website check-links
 
   # --- JavaScript SDK (sdks/js/, needs Node and pnpm) ---
 

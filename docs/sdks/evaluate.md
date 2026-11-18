@@ -1,3 +1,8 @@
+---
+title: "Remote evaluation"
+description: "Served values for a context posted by an SDK that holds no ruleset, what each key learns, and the context's limits."
+---
+
 # Remote evaluation
 
 An SDK that holds no ruleset, such as a browser or a mobile app with a client key, posts a context and receives the served value of every flag.

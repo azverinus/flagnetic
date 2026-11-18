@@ -1,3 +1,8 @@
+---
+title: "Webhooks"
+description: "Subscribing a receiver to a project's events, its secret, the targets the platform calls, and the event catalogue."
+---
+
 # Webhooks
 
 A webhook subscription is a project's standing request to be sent chosen events over signed HTTP (or an instance's, for its own audit entries: see [Instance subscriptions](#instance-subscriptions)), so that chat channels, audit archives and deployment tooling learn of changes without polling. Managing a project's subscriptions, reading them included, needs the `webhook.manage` permission, which maintainers and owners hold (see [Access](access.md)).

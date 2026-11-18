@@ -1,3 +1,8 @@
+---
+title: "Flags"
+description: "Flag definitions, configurations per environment, rules, rollouts, overrides, prerequisites, the kill switch, revert, copy and compare."
+---
+
 # Flags
 
 A **flag** is a named, typed switch defined once per project. What it is lives in its **flag definition**, the same in every environment; what it serves lives in its **flag configuration**, one per environment, each changed on its own. This page describes both through the management API (`/api/v1/projects/{project}/flags`), which the console is built on. Conditions and their operators are in [Targeting](targeting.md), reusable sets of conditions in [Segments](segments.md), and the permissions every operation needs in [Access](access.md#permissions).

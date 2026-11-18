@@ -191,6 +191,48 @@ jobs:
           DIGEST: ${{ steps.push.outputs.digest }}
         run: echo "Pushed $CHART_REF:$VERSION ($DIGEST) with a build attestation." >> "$GITHUB_STEP_SUMMARY"
 
+  # The docs site describes the latest server release, so it is built from the
+  # release tag and published to GitHub Pages with it. Pages must be set to
+  # deploy from GitHub Actions in the repository's settings (CONTRIBUTING.md).
+  docs-site:
+    name: docs site
+    needs: release-please
+    if: needs.release-please.outputs.server_released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.release-please.outputs.server_tag }}
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        working-directory: web
+        run: pnpm --filter @flagnetic/website build
+      - name: Links resolve
+        working-directory: web
+        run: pnpm --filter @flagnetic/website check-links
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: website/dist
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
   # A Go module is published by its tag alone. The SDK reports its version in
   # every User-Agent and summary envelope, so the tagged tree's Version must
   # be the tag's; release-please keeps them in step, and this proves it.

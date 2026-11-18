@@ -1,3 +1,8 @@
+---
+title: "Mail"
+description: "The SMTP server and setting up common relays, its TLS modes, the test mail, what is mailed and in which language, and troubleshooting by failure class."
+---
+
 # Mail
 
 An instance admin configures one SMTP server, and the instance sends its mail through it: a test mail to whoever asks for one, the password reset a member asks for, and every invitation, which would otherwise be shown as a link. Mail is optional. Without an SMTP server nothing is mailed and every link is shown to whoever made it.

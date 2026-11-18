@@ -1,3 +1,8 @@
+---
+title: "Targeting"
+description: "The conditions over an evaluation context, the operators of each attribute type, and their limits."
+---
+
 # Targeting
 
 Who receives what is decided by **conditions** over the **context** an SDK evaluates a flag for. A rule matches when all its conditions hold, and a [segment](segments.md) holds a context when all its conditions do. This page lists the conditions, the operators of each attribute type and the limits; how rules, rollouts, overrides and prerequisites use them is in [Flags](flags.md).

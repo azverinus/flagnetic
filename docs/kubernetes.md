@@ -1,3 +1,8 @@
+---
+title: "Running Flagnetic on Kubernetes"
+description: "The Helm chart, PostgreSQL, the Secret, migration modes, routes, metrics, scaling, network policy and upgrades."
+---
+
 # Running Flagnetic on Kubernetes
 
 The Helm chart in [`deploy/helm/flagnetic`](../deploy/helm/flagnetic/README.md) runs Flagnetic on Kubernetes: two replicas behind a Service, a PodDisruptionBudget, a Job that migrates the database before every install and upgrade, and, when you turn them on, an Ingress or Gateway API route, Prometheus rules, an autoscaler and a network policy. This guide takes you from an empty cluster to a running instance and through its upgrades. The chart's README lists every value; [Installing Flagnetic](install.md) covers Docker Compose and the binary, and [Operations](operations.md) covers running the server once it is up.

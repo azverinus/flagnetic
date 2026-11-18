@@ -1,3 +1,8 @@
+---
+title: "Provisioning members with SCIM"
+description: "SCIM tokens, setting up Entra ID and Okta, how Users are created, adopted, updated and deprovisioned, and what a provisioned member's directory decides."
+---
+
 # Provisioning members with SCIM
 
 An identity provider (Microsoft Entra ID, Okta, or any SCIM 2.0 client) can create, update and deprovision the instance's members through `/scim/v2`, so that people arrive when the company hires them and lose their access when it lets them go, without an instance admin noticing in between. The server speaks SCIM 2.0 ([RFC 7643](https://www.rfc-editor.org/rfc/rfc7643) and [RFC 7644](https://www.rfc-editor.org/rfc/rfc7644)) for **Users** and **Groups**, and the provider's [group mappings](sso.md#group-mappings) turn the groups into roles.

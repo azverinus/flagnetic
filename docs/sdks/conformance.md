@@ -1,3 +1,8 @@
+---
+title: "Implementing a Flagnetic SDK against the conformance suite"
+description: "The conformance suite in the order an SDK author works through it."
+---
+
 # Implementing a Flagnetic SDK against the conformance suite
 
 A Flagnetic SDK in a new language is right when it passes [`conformance/`](../../conformance) with no file, case or scenario skipped. Behaviour two SDKs must agree on is pinned there, never left to a judgement call: drift between SDKs does not fail loudly, it silently serves different values to the same user and biases experiments. This page is the order to work through it.

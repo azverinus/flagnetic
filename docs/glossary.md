@@ -1,3 +1,8 @@
+---
+title: "Flagnetic glossary"
+description: "The vocabulary the code, the API, the docs and the console use, with the terms to avoid."
+---
+
 # Flagnetic glossary
 
 This is the vocabulary of Flagnetic, a self-hosted platform for feature flags and experiments. The code, API, documentation and UI use these terms verbatim and avoid the alternatives listed under each term.

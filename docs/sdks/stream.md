@@ -1,3 +1,8 @@
+---
+title: "The ruleset stream"
+description: "Each new ruleset version as soon as a replica has it, heartbeats, reconnection and propagation."
+---
+
 # The ruleset stream
 
 An SDK holds the ruleset stream to learn of each new ruleset version of its environment within seconds, instead of waiting for its next poll.

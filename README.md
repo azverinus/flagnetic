@@ -60,6 +60,8 @@ docker compose exec flagnetic flagnetic admin bootstrap --email you@example.com
 
 ## Documentation
 
+Read it as a site with search and the API reference at <https://azverinus.github.io/flagnetic/>; the pages below are the same Markdown.
+
 - [A first flag in ten minutes](docs/quickstart.md): compose up to a flag an SDK evaluates.
 - [Installing Flagnetic](docs/install.md): Docker Compose or the binary, TLS and a reverse proxy, PostgreSQL, upgrades.
 - [Operations](docs/operations.md) and the [configuration reference](docs/configuration.md).

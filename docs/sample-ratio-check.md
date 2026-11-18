@@ -1,3 +1,8 @@
+---
+title: "The sample-ratio check"
+description: "The statistic, when it is skipped, its two thresholds, a worked example and the warehouse SQL reproducing it."
+---
+
 # The sample-ratio check
 
 A sample-ratio mismatch is an experiment whose units do not reach its variations in the proportions its weights ask for. The hash splits units evenly (the [uniformity check](experiments.md#the-uniformity-check) shows it on your own IDs), so a mismatch nearly always means exposures are lost or added for one variation on the way: a redirect or a crash before the exposure is recorded, an exposure recorded on one branch of the code only, a bot filtered from one variation. Whatever the experiment then measures compares two populations that differ in more than the variation, and its result cannot be trusted. Flagnetic checks every running experiment for it, and this page shows how, so that you can reproduce the check from the exposures in your warehouse.
