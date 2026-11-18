@@ -6,6 +6,7 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Details } from "@/components/ui/details";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useCan, useMissingPermissionReason } from "@/lib/access";
@@ -67,9 +68,12 @@ export function EnvironmentProtection({
             <p id={`${label}-hint`} className="text-sm text-muted-foreground">
               <Trans>
                 A change to what SDKs receive from a protected environment goes through a change
-                request that someone else approves. The kill switch and import skip it.
+                request that someone else approves
               </Trans>
             </p>
+            <Details>
+              <Trans>The kill switch and import skip it.</Trans>
+            </Details>
             {can ? null : <p className="text-sm text-muted-foreground">{reason}</p>}
           </div>
           <Switch

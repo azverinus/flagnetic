@@ -138,9 +138,9 @@ function KillSwitch({
         />
         <p id={`${field}-hint`} className="text-sm text-muted-foreground">
           {missing > 0 ? (
-            <Trans>Recorded in the audit log. Characters still needed: {missing}.</Trans>
+            <Trans>Recorded in the audit log; characters still needed: {missing}</Trans>
           ) : (
-            <Trans>Recorded in the audit log.</Trans>
+            <Trans>Recorded in the audit log</Trans>
           )}
         </p>
       </div>
@@ -158,7 +158,7 @@ function KillSwitch({
           />
           <p id={`${keyField}-hint`} className="text-sm text-muted-foreground">
             <Trans>
-              {name} is protected. The kill switch skips the change request it would need.
+              {name} is protected; the kill switch skips the change request it would need
             </Trans>
           </p>
         </div>

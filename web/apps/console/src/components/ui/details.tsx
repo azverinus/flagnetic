@@ -18,7 +18,7 @@ export function Details({ children, className }: DetailsProps) {
   return (
     <details className={cn("text-sm text-muted-foreground", className)}>
       <summary className="w-fit cursor-pointer select-none">
-        <Trans>Details</Trans>
+        <Trans context="disclosure">Details</Trans>
       </summary>
       <div className="mt-1">{children}</div>
     </details>

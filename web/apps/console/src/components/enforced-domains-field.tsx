@@ -4,6 +4,7 @@ import { PlusIcon, XIcon } from "lucide-react";
 import { useId } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Details } from "@/components/ui/details";
 import { Label } from "@/components/ui/label";
 import { Select, SelectItem } from "@/components/ui/select";
 import { enforceableDomains, providersVouchingFor } from "@/lib/auth-settings";
@@ -48,12 +49,16 @@ export function EnforcedDomainsField({
         </Label>
         <p id={`${id}-hint`} className="text-sm text-muted-foreground">
           <Trans>
-            Everyone with an email address in an enforced domain signs in through its provider only:
-            no password, no other provider, and the sign-in page sends the address to the provider.
+            Everyone with an email address in an enforced domain signs in through its provider only
+          </Trans>
+        </p>
+        <Details>
+          <Trans>
+            No password, no other provider, and the sign-in page sends the address to the provider.
             A domain is offered once an enabled auth provider lists it among its domains. Instance
             admins are not exempt.
           </Trans>
-        </p>
+        </Details>
       </div>
       {value.length === 0 ? (
         <p className="text-sm text-muted-foreground">

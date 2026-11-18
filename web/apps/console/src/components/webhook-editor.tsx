@@ -246,7 +246,7 @@ function EnabledSwitch({
           <Trans>Enabled</Trans>
         </Label>
         <p id={`${id}-hint`} className="text-sm text-muted-foreground">
-          <Trans>A disabled subscription is sent nothing until it is enabled again.</Trans>
+          <Trans>A disabled subscription is sent nothing until it is enabled again</Trans>
         </p>
       </div>
       <Switch

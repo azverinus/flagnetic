@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { DurationInput } from "@/components/duration-input";
 import { EnforcedDomainsField, type EnforcedRowErrors } from "@/components/enforced-domains-field";
 import { QueryError } from "@/components/query-error";
+import { Details } from "@/components/ui/details";
 import { Field } from "@/components/ui/field";
 import { FormPage } from "@/components/ui/form-page";
 import { SettingsSection } from "@/components/ui/settings-section";
@@ -107,12 +108,23 @@ export function AuthSettingsForm({ settings }: { settings: AuthSettings }) {
     if (domain || provider) enforcedErrors[index] = { ...enforcedErrors[index], domain, provider };
   });
 
-  const duration = (field: DurationField, label: string, unitLabel: string, hint: string) => (
+  const duration = (
+    field: DurationField,
+    label: string,
+    unitLabel: string,
+    hint: string,
+    details?: string,
+  ) => (
     <Controller
       control={form.control}
       name={field}
       render={({ field: control }) => (
-        <Field label={label} hint={hint} error={errors[field]?.message ?? serverError(field)}>
+        <Field
+          label={label}
+          hint={hint}
+          details={details}
+          error={errors[field]?.message ?? serverError(field)}
+        >
           <DurationInput
             ref={control.ref}
             value={control.value}
@@ -138,13 +150,14 @@ export function AuthSettingsForm({ settings }: { settings: AuthSettings }) {
             "session_idle_timeout",
             t`Session idle timeout`,
             t`Unit of the session idle timeout`,
-            t`A session ends this long after its last request.`,
+            t`A session ends this long after its last request`,
           )}
           {duration(
             "session_absolute_timeout",
             t`Session absolute timeout`,
             t`Unit of the session absolute timeout`,
-            t`A session ends this long after it opened, however much it is used. Lowering it ends the sessions already older.`,
+            t`A session ends this long after it opened, however much it is used`,
+            t`Lowering it ends the sessions already older.`,
           )}
         </SettingsSection>
         <SettingsSection title={<Trans>API tokens</Trans>}>
@@ -152,7 +165,8 @@ export function AuthSettingsForm({ settings }: { settings: AuthSettings }) {
             "token_max_lifetime",
             t`Maximum token lifetime`,
             t`Unit of the maximum token lifetime`,
-            t`The furthest ahead a new API token may expire. Tokens created before keep their expiry.`,
+            t`The furthest ahead a new API token may expire`,
+            t`Tokens created before keep their expiry.`,
           )}
           <Controller
             control={form.control}
@@ -164,7 +178,7 @@ export function AuthSettingsForm({ settings }: { settings: AuthSettings }) {
                     <Trans>Token expiry required</Trans>
                   </Label>
                   <p id={`${expiryRequired}-hint`} className="text-sm text-muted-foreground">
-                    <Trans>Every new API token must have an expiry; none may live forever.</Trans>
+                    <Trans>Every new API token must have an expiry; none may live forever</Trans>
                   </p>
                 </div>
                 <Switch
@@ -209,11 +223,16 @@ export function AuthSettingsForm({ settings }: { settings: AuthSettings }) {
                   <p id={`${selfServiceReset}-hint`} className="text-sm text-muted-foreground">
                     <Trans>
                       A member who forgot their password asks for a password reset by mail from the
-                      sign-in page. It works only while an SMTP server is configured under Mail in
-                      the instance navigation. An instance admin can issue a password reset link
-                      from a member's page either way.
+                      sign-in page
                     </Trans>
                   </p>
+                  <Details>
+                    <Trans>
+                      It works only while an SMTP server is configured under Mail in the instance
+                      navigation. An instance admin can issue a password reset link from a member's
+                      page either way.
+                    </Trans>
+                  </Details>
                 </div>
                 <Switch
                   id={selfServiceReset}

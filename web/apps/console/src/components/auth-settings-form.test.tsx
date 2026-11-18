@@ -161,7 +161,11 @@ describe("the auth settings form", () => {
 
     const toggle = screen.getByRole("switch", { name: "Self-service password reset" });
     expect(toggle).toBeChecked();
-    expect(toggle).toHaveAccessibleDescription(/only while an SMTP server is configured/);
+    expect(toggle).toHaveAccessibleDescription(/password reset by mail/);
+    const disclosure = screen
+      .getByText(/only while an SMTP server is configured/)
+      .closest("details")!;
+    expect(disclosure).not.toHaveAttribute("open");
     const user = userEvent.setup();
     await user.click(toggle);
     await user.click(screen.getByRole("button", { name: "Save" }));

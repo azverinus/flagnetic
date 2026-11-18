@@ -491,7 +491,7 @@ function DefinitionForm({
                 <p id={`${exposureId}-hint`} className="text-sm text-muted-foreground">
                   <Trans>
                     SDKs record an exposure after every evaluation whose result carries an
-                    experiment.
+                    experiment
                   </Trans>
                 </p>
               </div>

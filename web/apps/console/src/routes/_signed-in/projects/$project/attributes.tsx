@@ -163,6 +163,11 @@ function Attributes() {
     <Page>
       <PageHeader
         title={t`Attributes`}
+        description={
+          <Trans>
+            The standard attributes are in every project; they can be renamed but not deleted.
+          </Trans>
+        }
         actions={(attributes.data?.length ?? 0) > 0 ? newAttribute : undefined}
       />
       <Tabs
@@ -297,7 +302,7 @@ function AttributeForm({
     });
   const taken = save.error instanceof ApiError && save.error.code === "already_exists";
   const { errors } = form.formState;
-  const fixed = <Trans>Fixed once declared.</Trans>;
+  const fixed = <Trans>Fixed once declared</Trans>;
 
   return (
     <DialogForm

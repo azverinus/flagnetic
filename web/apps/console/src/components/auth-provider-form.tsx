@@ -242,7 +242,8 @@ export function AuthProviderForm({
             label={<Trans>Link members by email</Trans>}
             hint={
               <Trans>
-                Link a first sign-in from the domains above to the existing member with that email
+                Link a first sign-in with a verified email from the domains above to the existing
+                member with that email
               </Trans>
             }
             details={
@@ -264,10 +265,11 @@ export function AuthProviderForm({
             label={<Trans>Create members on first sign-in</Trans>}
             hint={
               <Trans>
-                Create a member on a first sign-in from the domains above; they hold no access until
-                a project grants a role
+                Create an active member on a first sign-in with a verified email from the domains
+                above
               </Trans>
             }
+            details={<Trans>They hold no access until a project grants them a role.</Trans>}
             checked={field.value}
             onCheckedChange={field.onChange}
           />

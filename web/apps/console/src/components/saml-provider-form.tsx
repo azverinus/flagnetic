@@ -326,12 +326,8 @@ export function SamlProviderForm({
         render={({ field }) => (
           <SwitchField
             label={<Trans>Create members on first sign-in</Trans>}
-            hint={
-              <Trans>
-                Create a member on a first sign-in from the domains above; they hold no access until
-                a project grants a role
-              </Trans>
-            }
+            hint={<Trans>Create an active member on a first sign-in from the domains above</Trans>}
+            details={<Trans>They hold no access until a project grants them a role.</Trans>}
             checked={field.value}
             onCheckedChange={field.onChange}
           />

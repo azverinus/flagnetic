@@ -47,7 +47,10 @@ function StaleFlags() {
 
   return (
     <Page>
-      <PageHeader title={t`Stale flags`} />
+      <PageHeader
+        title={t`Stale flags`}
+        description={<Trans>Archived flags are never listed.</Trans>}
+      />
       <Toolbar chips={chips} onRemoveChip={removeChip} onClearAll={clearFacets} />
       <StaleFlagsPages
         project={project}
