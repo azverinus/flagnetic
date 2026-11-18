@@ -12,6 +12,7 @@ import { z } from "zod";
 import { CreateFromDocument } from "@/components/create-from-document";
 import { ProjectsTable } from "@/components/projects-table";
 import { QueryError } from "@/components/query-error";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { FormPage } from "@/components/ui/form-page";
 import { Input } from "@/components/ui/input";
@@ -48,40 +49,40 @@ function InstanceProjects() {
           </Trans>
         }
       />
-      <section aria-labelledby={newProject} className="flex flex-col gap-4">
-        <h2 id={newProject} className="text-base font-medium">
-          <Trans>New project</Trans>
-        </h2>
-        <CreateProject />
-      </section>
-      <section aria-labelledby={fromDocument} className="flex flex-col gap-4">
-        <h2 id={fromDocument} className="text-base font-medium">
-          <Trans>Create from a document</Trans>
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          <Trans>
-            Starts a project from a project document, such as the export of a project of this or
-            another instance. The project holds exactly what the document names, plus the standard
-            attributes.
-          </Trans>
-        </p>
-        <CreateFromDocument />
-      </section>
-      <section aria-labelledby={allProjects} className="flex flex-col gap-4">
-        <h2 id={allProjects} className="text-base font-medium">
-          <Trans>All projects</Trans>
-        </h2>
-        {projects.isError ? (
-          <QueryError error={projects.error} onRetry={() => void projects.refetch()} />
-        ) : (
-          <ProjectsTable
-            caption={t`All projects`}
-            projects={projects.data ?? []}
-            loading={projects.isPending}
-            empty={<Trans>No projects yet</Trans>}
-          />
-        )}
-      </section>
+      <Card aria-labelledby={newProject}>
+        <CardHeader titleId={newProject} title={<Trans>New project</Trans>} />
+        <CardContent>
+          <CreateProject />
+        </CardContent>
+      </Card>
+      <Card aria-labelledby={fromDocument}>
+        <CardHeader titleId={fromDocument} title={<Trans>Create from a document</Trans>} />
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            <Trans>
+              Starts a project from a project document, such as the export of a project of this or
+              another instance. The project holds exactly what the document names, plus the standard
+              attributes.
+            </Trans>
+          </p>
+          <CreateFromDocument />
+        </CardContent>
+      </Card>
+      <Card aria-labelledby={allProjects}>
+        <CardHeader titleId={allProjects} title={<Trans>All projects</Trans>} />
+        <CardContent>
+          {projects.isError ? (
+            <QueryError error={projects.error} onRetry={() => void projects.refetch()} />
+          ) : (
+            <ProjectsTable
+              caption={t`All projects`}
+              projects={projects.data ?? []}
+              loading={projects.isPending}
+              empty={<Trans>No projects yet</Trans>}
+            />
+          )}
+        </CardContent>
+      </Card>
     </Page>
   );
 }

@@ -1,5 +1,6 @@
 import { createSegment } from "@flagnetic/api";
 import { Page } from "@/components/ui/page";
+import { SettingsSection } from "@/components/ui/settings-section";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -45,7 +46,7 @@ function NewSegment() {
   const declarations = useConditionAttributes(project);
   return (
     <PermissionGate permission="segment.edit" title={t`New segment`}>
-      <Page>
+      <Page measure="form">
         <PageHeader
           title={t`New segment`}
           description={
@@ -143,31 +144,33 @@ function CreateSegment({
       pending={create.isPending}
       refusal={shownInPlace ? undefined : create.error}
     >
-      <Field
-        label={<Trans>Key</Trans>}
-        hint={<Trans>How rules name the segment. It never changes.</Trans>}
-        error={errors.get("key")}
-      >
-        <Input
-          autoComplete="off"
-          autoFocus
-          className="font-mono"
-          value={key}
-          onChange={(event) => setKey(event.target.value)}
+      <SettingsSection title={<Trans>Segment</Trans>}>
+        <Field
+          label={<Trans>Key</Trans>}
+          hint={<Trans>How rules name the segment. It never changes.</Trans>}
+          error={errors.get("key")}
+        >
+          <Input
+            autoComplete="off"
+            autoFocus
+            className="font-mono"
+            value={key}
+            onChange={(event) => setKey(event.target.value)}
+          />
+        </Field>
+        <SegmentFields
+          draft={draft}
+          onChange={(next) => {
+            // A refusal points at conditions by their places, which adding
+            // or removing one moves; it is dropped rather than shown on a
+            // condition it was not about.
+            if (next.conditions.length !== draft.conditions.length) create.reset();
+            setDraft(next);
+          }}
+          attributes={attributes}
+          errors={errors}
         />
-      </Field>
-      <SegmentFields
-        draft={draft}
-        onChange={(next) => {
-          // A refusal points at conditions by their places, which adding
-          // or removing one moves; it is dropped rather than shown on a
-          // condition it was not about.
-          if (next.conditions.length !== draft.conditions.length) create.reset();
-          setDraft(next);
-        }}
-        attributes={attributes}
-        errors={errors}
-      />
+      </SettingsSection>
     </FormPage>
   );
 }

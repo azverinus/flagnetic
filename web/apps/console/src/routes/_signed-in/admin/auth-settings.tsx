@@ -20,7 +20,7 @@ function AuthSettingsPage() {
   const { t } = useLingui();
   const settings = useQuery(authSettingsQuery);
   return (
-    <Page>
+    <Page measure="form">
       <PageHeader
         title={t`Auth settings`}
         description={

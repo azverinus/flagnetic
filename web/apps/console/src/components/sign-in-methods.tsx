@@ -58,7 +58,7 @@ export function SignInMethods({
   const identities = methods.data?.identities;
 
   return (
-    <div className="flex flex-col gap-10">
+    <div className="flex measure-form flex-col gap-5">
       {error ? (
         <p
           role="alert"

@@ -1,4 +1,5 @@
 import { msg } from "@lingui/core/macro";
+import { Card, CardContent } from "@/components/ui/card";
 import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
@@ -76,36 +77,42 @@ function MemberPage() {
           <ProvisionedReason provider={shown.provider} />
         </p>
       )}
-      <dl className="grid grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-        <Detail term={<Trans>Status</Trans>}>{memberStatusName(i18n, shown.status)}</Detail>
-        {shown.provider === null ? null : (
-          <Detail term={<Trans>Provisioned by</Trans>}>
-            <Link
-              to="/admin/auth-providers/$provider"
-              params={{ provider: shown.provider }}
-              className="hover:underline"
-            >
-              {shown.provider}
-            </Link>
-          </Detail>
-        )}
-        <Detail term={<Trans>Instance admin</Trans>}>
-          {shown.instance_admin ? t`Yes` : t`No`}
-        </Detail>
-        <Detail term={<Trans>Projects</Trans>}>{formatNumber(i18n, shown.project_count)}</Detail>
-        <Detail term={<Trans>Last sign-in</Trans>}>
-          {shown.last_sign_in_at ? (
-            <time dateTime={shown.last_sign_in_at}>
-              {formatDateTime(i18n, shown.last_sign_in_at)}
-            </time>
-          ) : (
-            t`Never`
-          )}
-        </Detail>
-        <Detail term={<Trans>Member since</Trans>}>
-          <time dateTime={shown.created_at}>{formatDateTime(i18n, shown.created_at)}</time>
-        </Detail>
-      </dl>
+      <Card>
+        <CardContent>
+          <dl className="grid grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            <Detail term={<Trans>Status</Trans>}>{memberStatusName(i18n, shown.status)}</Detail>
+            {shown.provider === null ? null : (
+              <Detail term={<Trans>Provisioned by</Trans>}>
+                <Link
+                  to="/admin/auth-providers/$provider"
+                  params={{ provider: shown.provider }}
+                  className="hover:underline"
+                >
+                  {shown.provider}
+                </Link>
+              </Detail>
+            )}
+            <Detail term={<Trans>Instance admin</Trans>}>
+              {shown.instance_admin ? t`Yes` : t`No`}
+            </Detail>
+            <Detail term={<Trans>Projects</Trans>}>
+              {formatNumber(i18n, shown.project_count)}
+            </Detail>
+            <Detail term={<Trans>Last sign-in</Trans>}>
+              {shown.last_sign_in_at ? (
+                <time dateTime={shown.last_sign_in_at}>
+                  {formatDateTime(i18n, shown.last_sign_in_at)}
+                </time>
+              ) : (
+                t`Never`
+              )}
+            </Detail>
+            <Detail term={<Trans>Member since</Trans>}>
+              <time dateTime={shown.created_at}>{formatDateTime(i18n, shown.created_at)}</time>
+            </Detail>
+          </dl>
+        </CardContent>
+      </Card>
       <Tabs
         label={t`What ${name} holds`}
         tabs={[

@@ -1,4 +1,5 @@
 import type { AuthProvider, AuthProviderTest } from "@flagnetic/api";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -141,7 +142,7 @@ function AuthProviderPage({
   });
 
   return (
-    <Page>
+    <Page measure="form">
       <PageHeader
         title={name}
         description={
@@ -182,29 +183,32 @@ function AuthProviderPage({
         </p>
       )}
       {provider.kind === "oidc" ? (
-        <section aria-labelledby="register" className="flex flex-col gap-3">
-          <h2 id="register" className="text-base font-medium">
-            <Trans>Register the instance at the identity provider</Trans>
-          </h2>
-          {provider.redirect_uri ? (
-            <>
+        <Card aria-labelledby="register">
+          <CardHeader
+            titleId="register"
+            title={<Trans>Register the instance at the identity provider</Trans>}
+          />
+          <CardContent>
+            {provider.redirect_uri ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  <Trans>
+                    Add this as an allowed redirect (callback) URI of the client, with the client ID
+                    and secret below.
+                  </Trans>
+                </p>
+                <CopyableValue label={t`Redirect URI`} value={provider.redirect_uri} />
+              </>
+            ) : (
               <p className="text-sm text-muted-foreground">
                 <Trans>
-                  Add this as an allowed redirect (callback) URI of the client, with the client ID
-                  and secret below.
+                  The redirect URI is built from the instance's public address (FLAGNETIC_BASE_URL),
+                  which is not set. Set it, and the address shows here.
                 </Trans>
               </p>
-              <CopyableValue label={t`Redirect URI`} value={provider.redirect_uri} />
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              <Trans>
-                The redirect URI is built from the instance's public address (FLAGNETIC_BASE_URL),
-                which is not set. Set it, and the address shows here.
-              </Trans>
-            </p>
-          )}
-        </section>
+            )}
+          </CardContent>
+        </Card>
       ) : (
         <SamlRegistration provider={provider} />
       )}
@@ -220,29 +224,29 @@ function AuthProviderPage({
         </>
       ) : null}
       <ScimGroups provider={provider.slug} />
-      <section aria-labelledby="settings" className="flex flex-col gap-4">
-        <h2 id="settings" className="text-base font-medium">
-          <Trans>Settings</Trans>
-        </h2>
-        {/* A new version starts the form over from what was saved. */}
-        {provider.kind === "oidc" ? (
-          <AuthProviderForm
-            key={provider.version}
-            provider={provider}
-            layout="page"
-            onSaved={settingsSaved}
-            onReload={onReload}
-          />
-        ) : (
-          <SamlProviderForm
-            key={provider.version}
-            provider={provider}
-            layout="page"
-            onSaved={settingsSaved}
-            onReload={onReload}
-          />
-        )}
-      </section>
+      <Card aria-labelledby="settings">
+        <CardHeader titleId="settings" title={<Trans>Settings</Trans>} />
+        <CardContent>
+          {/* A new version starts the form over from what was saved. */}
+          {provider.kind === "oidc" ? (
+            <AuthProviderForm
+              key={provider.version}
+              provider={provider}
+              layout="page"
+              onSaved={settingsSaved}
+              onReload={onReload}
+            />
+          ) : (
+            <SamlProviderForm
+              key={provider.version}
+              provider={provider}
+              layout="page"
+              onSaved={settingsSaved}
+              onReload={onReload}
+            />
+          )}
+        </CardContent>
+      </Card>
       <GroupMappingsSection provider={provider.slug} />
       <ConfirmDialog
         open={deleting}
@@ -309,54 +313,68 @@ function TestResult({
   if (!result) return null;
   if (result.idp_entity_id !== undefined) {
     return (
-      <section aria-labelledby="test-result" className="flex flex-col gap-3">
-        <h2 id="test-result" className="flex items-center gap-2 text-base font-medium">
-          <CircleCheckIcon aria-hidden className="size-4 text-primary-ink" />
-          <Trans>The identity provider answered</Trans>
-        </h2>
-        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
-          <Row term={<Trans>Entity ID</Trans>} value={result.idp_entity_id} />
-          <Row term={<Trans>Sign-on URL</Trans>} value={result.idp_sso_url} />
-          <dt className="text-muted-foreground">
-            <Trans>Signing certificates</Trans>
-          </dt>
-          <dd>
-            <IdPCertificates certificates={result.idp_certificates ?? []} />
-          </dd>
-        </dl>
-      </section>
+      <Card aria-labelledby="test-result">
+        <CardHeader
+          titleId="test-result"
+          title={
+            <span className="flex items-center gap-2">
+              <CircleCheckIcon aria-hidden className="size-4 text-primary-ink" />
+              <Trans>The identity provider answered</Trans>
+            </span>
+          }
+        />
+        <CardContent>
+          <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
+            <Row term={<Trans>Entity ID</Trans>} value={result.idp_entity_id} />
+            <Row term={<Trans>Sign-on URL</Trans>} value={result.idp_sso_url} />
+            <dt className="text-muted-foreground">
+              <Trans>Signing certificates</Trans>
+            </dt>
+            <dd>
+              <IdPCertificates certificates={result.idp_certificates ?? []} />
+            </dd>
+          </dl>
+        </CardContent>
+      </Card>
     );
   }
   const methods = result.code_challenge_methods_supported;
   const lacksS256 = methods !== undefined && !methods.includes("S256");
   return (
-    <section aria-labelledby="test-result" className="flex flex-col gap-3">
-      <h2 id="test-result" className="flex items-center gap-2 text-base font-medium">
-        <CircleCheckIcon aria-hidden className="size-4 text-primary-ink" />
-        <Trans>The identity provider answered</Trans>
-      </h2>
-      <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
-        <Row term={<Trans>Issuer</Trans>} value={result.issuer} />
-        <Row term={<Trans>Authorization endpoint</Trans>} value={result.authorization_endpoint} />
-        <Row term={<Trans>Token endpoint</Trans>} value={result.token_endpoint} />
-        <Row term={<Trans>Keys</Trans>} value={result.jwks_uri} />
-        <Row term={<Trans>User info endpoint</Trans>} value={result.userinfo_endpoint} />
-        <Row term={<Trans>Scopes it lists</Trans>} value={result.scopes_supported?.join(" ")} />
-        <Row term={<Trans>PKCE methods</Trans>} value={methods?.join(" ")} />
-      </dl>
-      {lacksS256 ? (
-        <p
-          role="status"
-          className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
-        >
-          <TriangleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
-          <Trans>
-            The provider does not list the S256 PKCE method, which sign-in needs. Sign-ins through
-            it will fail.
-          </Trans>
-        </p>
-      ) : null}
-    </section>
+    <Card aria-labelledby="test-result">
+      <CardHeader
+        titleId="test-result"
+        title={
+          <span className="flex items-center gap-2">
+            <CircleCheckIcon aria-hidden className="size-4 text-primary-ink" />
+            <Trans>The identity provider answered</Trans>
+          </span>
+        }
+      />
+      <CardContent>
+        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
+          <Row term={<Trans>Issuer</Trans>} value={result.issuer} />
+          <Row term={<Trans>Authorization endpoint</Trans>} value={result.authorization_endpoint} />
+          <Row term={<Trans>Token endpoint</Trans>} value={result.token_endpoint} />
+          <Row term={<Trans>Keys</Trans>} value={result.jwks_uri} />
+          <Row term={<Trans>User info endpoint</Trans>} value={result.userinfo_endpoint} />
+          <Row term={<Trans>Scopes it lists</Trans>} value={result.scopes_supported?.join(" ")} />
+          <Row term={<Trans>PKCE methods</Trans>} value={methods?.join(" ")} />
+        </dl>
+        {lacksS256 ? (
+          <p
+            role="status"
+            className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
+          >
+            <TriangleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
+            <Trans>
+              The provider does not list the S256 PKCE method, which sign-in needs. Sign-ins through
+              it will fail.
+            </Trans>
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 

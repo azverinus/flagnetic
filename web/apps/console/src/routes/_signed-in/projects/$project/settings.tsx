@@ -16,6 +16,7 @@ import { Field } from "@/components/ui/field";
 import { FormPage } from "@/components/ui/form-page";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
+import { SettingsSection } from "@/components/ui/settings-section";
 import { Textarea } from "@/components/ui/textarea";
 import { UnsavedChangesBar } from "@/components/ui/unsaved-changes-bar";
 import { unwrap } from "@/lib/errors";
@@ -102,7 +103,7 @@ function SettingsForm() {
     });
 
   return (
-    <Page>
+    <Page measure="form">
       <PageHeader
         title={t`Settings`}
         description={<Trans>What the project is called and what it is for.</Trans>}
@@ -126,28 +127,30 @@ function SettingsForm() {
         pending={save.isPending}
         refusal={conflicts.refusal(save.error)}
       >
-        <Field
-          label={<Trans>Key</Trans>}
-          hint={<Trans>Fixed once the project is created, since SDKs and scripts use it.</Trans>}
-        >
-          <Input value={project.key} disabled readOnly />
-        </Field>
-        <Field
-          label={<Trans>Name</Trans>}
-          error={errors.name?.message}
-          refusal={save.error}
-          pointer="/name"
-        >
-          <Input autoComplete="off" {...form.register("name")} />
-        </Field>
-        <Field
-          label={<Trans>Description</Trans>}
-          error={errors.description?.message}
-          refusal={save.error}
-          pointer="/description"
-        >
-          <Textarea rows={4} {...form.register("description")} />
-        </Field>
+        <SettingsSection title={<Trans>Project</Trans>}>
+          <Field
+            label={<Trans>Key</Trans>}
+            hint={<Trans>Fixed once the project is created, since SDKs and scripts use it.</Trans>}
+          >
+            <Input value={project.key} disabled readOnly />
+          </Field>
+          <Field
+            label={<Trans>Name</Trans>}
+            error={errors.name?.message}
+            refusal={save.error}
+            pointer="/name"
+          >
+            <Input autoComplete="off" {...form.register("name")} />
+          </Field>
+          <Field
+            label={<Trans>Description</Trans>}
+            error={errors.description?.message}
+            refusal={save.error}
+            pointer="/description"
+          >
+            <Textarea rows={4} {...form.register("description")} />
+          </Field>
+        </SettingsSection>
       </FormPage>
       <DeleteProject project={project} />
       <UnsavedChangesBar dirty={isDirty} onDiscard={() => form.reset()} pending={save.isPending} />

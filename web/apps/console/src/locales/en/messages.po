@@ -1278,6 +1278,7 @@ msgstr "API token created"
 msgid "API token revoked"
 msgstr "API token revoked"
 
+#: src/components/auth-settings-form.tsx
 #: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/settings/tokens.tsx
@@ -2503,6 +2504,7 @@ msgstr "Declaring {key} makes it usable in rules. Its type is fixed once declare
 
 #: src/lib/change-requests.ts
 #: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Definition"
 msgstr "Definition"
 
@@ -5958,6 +5960,10 @@ msgstr "Password changed"
 msgid "Password minimum length"
 msgstr "Password minimum length"
 
+#: src/components/auth-settings-form.tsx
+msgid "Passwords"
+msgstr "Passwords"
+
 #: src/lib/experiment-alerts.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Past expected end"
@@ -6132,6 +6138,7 @@ msgstr "Profile"
 #: src/lib/audit.ts
 #: src/routes/_signed-in/admin/audit.$entry.tsx
 #: src/routes/_signed-in/admin/audit.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "Project"
 msgstr "Project"
 
@@ -7041,6 +7048,7 @@ msgstr "See the gaps"
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+#: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Segment"
 msgstr "Segment"
@@ -7201,6 +7209,7 @@ msgstr "Session ended"
 msgid "Session idle timeout"
 msgstr "Session idle timeout"
 
+#: src/components/auth-settings-form.tsx
 #: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/settings/sessions.tsx
@@ -7322,6 +7331,7 @@ msgid "Sign yourself out everywhere"
 msgstr "Sign yourself out everywhere"
 
 #: src/components/area-screens.ts
+#: src/components/auth-settings-form.tsx
 msgid "Sign-in"
 msgstr "Sign-in"
 
@@ -7411,6 +7421,10 @@ msgstr "Skipped: the check needs 1,000 units first exposed; units first exposed 
 #: src/components/saml-provider-form.tsx
 msgid "Slug"
 msgstr "Slug"
+
+#: src/components/mail-settings.tsx
+msgid "SMTP server"
+msgstr "SMTP server"
 
 #: src/components/experiment-exposures.tsx
 msgid "Some exposures were refused and are not counted above. An SDK sends exposures the experiment does not take:"

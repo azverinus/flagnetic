@@ -21,6 +21,7 @@ import { Moment } from "@/components/moment";
 import { QueryError } from "@/components/query-error";
 import { RowAction, RowDialog, withRowActions } from "@/components/row-dialogs";
 import { TagsInput } from "@/components/tags-input";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -167,15 +168,17 @@ export function SdkKeys({ project, environment }: SdkKeysProps) {
       {keys.isError ? (
         <QueryError error={keys.error} onRetry={() => void keys.refetch()} />
       ) : (
-        <Table
-          caption={t`SDK keys`}
-          hideCaption
-          columns={columns}
-          data={keys.data ?? []}
-          loading={keys.isPending}
-          empty={<Trans>This environment has no SDK key yet.</Trans>}
-          getRowId={(key) => key.id}
-        />
+        <Card>
+          <Table
+            caption={t`SDK keys`}
+            hideCaption
+            columns={columns}
+            data={keys.data ?? []}
+            loading={keys.isPending}
+            empty={<Trans>This environment has no SDK key yet.</Trans>}
+            getRowId={(key) => key.id}
+          />
+        </Card>
       )}
 
       <Dialog open={creating} onOpenChange={setCreating} title={t`New SDK key`}>

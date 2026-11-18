@@ -1,4 +1,5 @@
 import type { Sink } from "@flagnetic/api";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -33,7 +34,7 @@ export function NewSinkScreen({ project }: { project: string }) {
   const open = (sink: string) =>
     void navigate({ to: "/projects/$project/sinks/$sink", params: { project, sink } });
   return (
-    <Page>
+    <Page measure="form">
       <PageHeader
         title={t`New sink`}
         description={
@@ -43,16 +44,20 @@ export function NewSinkScreen({ project }: { project: string }) {
           </Trans>
         }
       />
-      <SinkEditor
-        project={project}
-        onSaved={(saved) => {
-          if ("secret" in saved && saved.secret) {
-            setCreated({ id: saved.id, secret: saved.secret });
-          } else {
-            open(saved.id);
-          }
-        }}
-      />
+      <Card>
+        <CardContent>
+          <SinkEditor
+            project={project}
+            onSaved={(saved) => {
+              if ("secret" in saved && saved.secret) {
+                setCreated({ id: saved.id, secret: saved.secret });
+              } else {
+                open(saved.id);
+              }
+            }}
+          />
+        </CardContent>
+      </Card>
       <SinkSecretDialog
         secret={created?.secret}
         rotated={false}
@@ -203,22 +208,26 @@ function SinkPage({ project, sink }: { project: string; sink: Sink }) {
           </>
         }
       />
-      <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-        <Fact label={<Trans>Health</Trans>}>
-          <SinkHealthBadge sink={sink} />
-        </Fact>
-        <Fact label={<Trans>Enabled</Trans>}>{sink.enabled ? t`Yes` : t`No`}</Fact>
-        <Fact label={<Trans>Lag</Trans>}>
-          {sink.lag_seconds === null ? (
-            <span className="text-muted-foreground">—</span>
-          ) : (
-            formatLag(i18n, sink.lag_seconds)
-          )}
-        </Fact>
-        <Fact label={<Trans>At risk</Trans>}>
-          <SinkAtRisk sink={sink} />
-        </Fact>
-      </dl>
+      <Card>
+        <CardContent>
+          <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+            <Fact label={<Trans>Health</Trans>}>
+              <SinkHealthBadge sink={sink} />
+            </Fact>
+            <Fact label={<Trans>Enabled</Trans>}>{sink.enabled ? t`Yes` : t`No`}</Fact>
+            <Fact label={<Trans>Lag</Trans>}>
+              {sink.lag_seconds === null ? (
+                <span className="text-muted-foreground">—</span>
+              ) : (
+                formatLag(i18n, sink.lag_seconds)
+              )}
+            </Fact>
+            <Fact label={<Trans>At risk</Trans>}>
+              <SinkAtRisk sink={sink} />
+            </Fact>
+          </dl>
+        </CardContent>
+      </Card>
       <SinkAlerts project={project} sink={sink} onResumed={remember} />
       <Tabs
         label={t`Sink`}
@@ -227,31 +236,37 @@ function SinkPage({ project, sink }: { project: string; sink: Sink }) {
             value: "settings",
             label: <Trans>Settings</Trans>,
             content: (
-              <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-5">
                 {sink.warnings.length > 0 ? (
-                  <section className="flex flex-col gap-1 text-sm">
-                    <h2 className="font-medium">
-                      <Trans>What the last check found</Trans>
-                    </h2>
-                    <ul className="list-disc pl-5 text-muted-foreground">
-                      {sink.warnings.map((warning) => (
-                        <li key={warning}>{warning}</li>
-                      ))}
-                    </ul>
-                  </section>
+                  <Card>
+                    <CardHeader title={<Trans>What the last check found</Trans>} />
+                    <CardContent className="pt-3">
+                      <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                        {sink.warnings.map((warning) => (
+                          <li key={warning}>{warning}</li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
                 ) : null}
                 <SinkStreams sink={sink} />
-                {/* A new version starts the form over from what was saved. */}
-                <SinkEditor
-                  key={sink.version}
-                  project={project}
-                  sink={sink}
-                  onSaved={(saved) => {
-                    remember(saved);
-                    const { name: savedName } = saved;
-                    toast.success(t`${savedName} is saved.`);
-                  }}
-                />
+                <div className="measure-form">
+                  <Card>
+                    <CardContent>
+                      {/* A new version starts the form over from what was saved. */}
+                      <SinkEditor
+                        key={sink.version}
+                        project={project}
+                        sink={sink}
+                        onSaved={(saved) => {
+                          remember(saved);
+                          const { name: savedName } = saved;
+                          toast.success(t`${savedName} is saved.`);
+                        }}
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
             ),
           },
