@@ -383,7 +383,7 @@ test.describe("a rule serving an experiment", () => {
     await expect(rule(page, 1).getByText("Draft", { exact: true })).toBeVisible();
     await expect(rule(page, 1).getByText("25.00% of user units included")).toBeVisible();
     const weights = rule(page, 1).getByRole("list", { name: "Weights (rule 1)" });
-    await expect(weights.getByRole("listitem")).toHaveText(["control 50.00%", "treatment 50.00%"]);
+    await expect(weights.getByRole("listitem")).toHaveText(["control50%", "treatment50%"]);
     await expect(rule(page, 1).getByText(/SDKs do not receive this rule/)).toBeVisible();
     await expect(rule(page, 1).getByRole("link", { name: "Shorter checkout" })).toHaveAttribute(
       "href",
