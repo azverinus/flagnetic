@@ -72,7 +72,7 @@ export default defineConfig({
         },
         {
           label: 'Reference',
-          items: ['glossary', 'configuration', 'compatibility', ...openAPISidebarGroups],
+          items: ['glossary', 'configuration', 'compatibility', 'verify', ...openAPISidebarGroups],
         },
       ],
     }),

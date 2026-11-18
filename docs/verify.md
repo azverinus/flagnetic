@@ -1,3 +1,8 @@
+---
+title: "Verifying a release"
+description: "Checking the image, the chart and each SDK package's attestation, downloading the SBOM, and what protects Go modules."
+---
+
 # Verifying a release
 
 Every release is built by the release workflow of this repository, and most of what it publishes carries a statement, signed by that workflow's identity, of what it was built from. This page shows how to check each artifact before you run it. Repository: `azverinus/flagnetic`; workflow: `.github/workflows/release.yml`.
