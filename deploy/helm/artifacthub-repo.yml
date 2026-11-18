@@ -1,0 +1,5 @@
+# Artifact Hub's metadata for the chart's repository, pushed to the chart's
+# `artifacthub.io` tag by the release. Registering the repository on
+# artifacthub.io yields its repositoryID; add it here (and `owners`) to claim
+# verified publisher status.
+owners: []
