@@ -2,6 +2,7 @@ import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
 import { seedProject, signIn } from "../support/console";
+import { admin } from "../support/instance";
 import { seedFlag, stringFlag } from "../support/flags";
 
 /**
@@ -9,6 +10,13 @@ import { seedFlag, stringFlag } from "../support/flags";
  * the same left edge on a list and on the object it opens, and a list
  * fills the width instead of sitting in a centred column.
  */
+
+const russian = {
+  email: "Электронная почта",
+  password: "Пароль",
+  submit: "Войти",
+  next: "Продолжить",
+};
 
 const left = (page: Page) =>
   page
@@ -66,7 +74,7 @@ test.describe("the page and its cards", () => {
 
     test("renders a list and its card", async ({ page }) => {
       await page.setViewportSize({ width: 1440, height: 900 });
-      await signIn(page);
+      await signIn(page, admin, russian);
       await page.goto(`/projects/${project}/flags`);
 
       await expect(page.locator("html")).toHaveAttribute("lang", "ru");

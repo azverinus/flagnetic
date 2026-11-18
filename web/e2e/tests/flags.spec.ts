@@ -303,8 +303,8 @@ test.describe("the flags list", () => {
     await openFlags(page, projectKey);
 
     await expect(page.getByText("This project has no flag yet.")).toBeVisible();
-    // The header's and the empty state's.
-    await expect(page.getByRole("link", { name: "New flag" })).toHaveCount(2);
+    // The empty state carries the create action; the header has none.
+    await expect(page.getByRole("link", { name: "New flag" })).toHaveCount(1);
 
     await page.goto(`/projects/${projectKey}/flags?type=json`);
     await expect(page.getByText("No flag matches these filters.")).toBeVisible();
