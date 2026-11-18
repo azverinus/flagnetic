@@ -72,6 +72,7 @@ msgid "{conflictUnits, plural, one {# unit was exposed to a variation other than
 msgstr "{conflictUnits, plural, one {# юнит получил показ другого варианта, не первого,} few {# юнита получили показ другого варианта, не первого,} many {# юнитов получили показ другого варианта, не первого,} other {# юнита получили показ другого варианта, не первого,}} {conflictTotal, plural, one {в # показе.} few {в # показах.} many {в # показах.} other {в # показа.}} Последние конфликты:"
 
 #: src/components/navigation.tsx
+#: src/components/needs-attention.tsx
 msgid "{count, plural, one {# change request awaits your decision} other {# change requests await your decision}}"
 msgstr "{count, plural, one {# запрос на изменение ждёт вашего решения} few {# запроса на изменение ждут вашего решения} many {# запросов на изменение ждут вашего решения} other {# запроса на изменение ждут вашего решения}}"
 
@@ -437,6 +438,18 @@ msgstr "{revoked, plural, one {Отозвана # сессия.} few {Отозв
 msgid "{savedName} is saved."
 msgstr "{savedName} сохранён."
 
+#: src/components/needs-attention.tsx
+msgid "{sinkCount, plural, one {# sink needs attention} other {# sinks need attention}}"
+msgstr "{sinkCount, plural, one {# приёмник требует внимания} few {# приёмника требуют внимания} many {# приёмников требуют внимания} other {# приёмника требуют внимания}}"
+
+#: src/components/needs-attention.tsx
+msgid "{staleCount, plural, one {# stale flag may be ready to remove} other {# stale flags may be ready to remove}}"
+msgstr "{staleCount, plural, one {# устаревший флаг, возможно, пора удалить} few {# устаревших флага, возможно, пора удалить} many {# устаревших флагов, возможно, пора удалить} other {# устаревшего флага, возможно, пора удалить}}"
+
+#: src/components/needs-attention.tsx
+msgid "{staleCount}+ stale flags may be ready to remove"
+msgstr "{staleCount}+ устаревших флагов, возможно, пора удалить"
+
 #: src/components/compare-environments.tsx
 msgid "{to} takes the rules of {source} with their identifiers and salts, its prerequisites and its off and fallthrough variations. {to} stays off."
 msgstr "{to} получает правила {source} с их ID и солями, prerequisites, вариант при выключении и вариант для остальных. {to} остаётся выключенным."
@@ -468,6 +481,10 @@ msgstr "{variation} для {percent}% юнитов {unitType}"
 #: src/components/experiment-assignment.tsx
 msgid "{variationBucket}, the bucket it would take should the allocation grow"
 msgstr "{variationBucket} — бакет, который он получит, если охват вырастет"
+
+#: src/components/needs-attention.tsx
+msgid "{webhookCount, plural, one {# webhook disabled by the platform} other {# webhooks disabled by the platform}}"
+msgstr "{webhookCount, plural, one {# вебхук отключён платформой} few {# вебхука отключены платформой} many {# вебхуков отключены платформой} other {# вебхука отключены платформой}}"
 
 #: src/lib/problem-messages.ts
 msgid "{what} in {environment}"
@@ -5056,6 +5073,7 @@ msgid "More actions"
 msgstr "Другие действия"
 
 #: src/components/navigation.tsx
+#: src/components/needs-attention.tsx
 msgid "More than {awaitingCountLimit} change requests await your decision"
 msgstr "Вашего решения ждут больше {awaitingCountLimit} запросов на изменение"
 
@@ -5143,6 +5161,7 @@ msgstr "Имя провайдера в адресах входа и в URI пе�
 msgid "Names the provider in sign-in addresses, in the ACS URL and in the entity ID. It never changes."
 msgstr "Имя провайдера в адресах входа, в URL ACS и в entity ID. Никогда не меняется."
 
+#: src/components/needs-attention.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Needs attention"
 msgstr "Требует внимания"

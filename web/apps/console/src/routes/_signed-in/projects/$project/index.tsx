@@ -5,8 +5,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useId } from "react";
 
 import { RecentActivity } from "@/components/project-audit";
+import { NeedsAttention } from "@/components/needs-attention";
 import { QueryError } from "@/components/query-error";
 import { EnvironmentName } from "@/components/protected-mark";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { environmentsQuery, projectQuery } from "@/lib/queries";
@@ -16,8 +18,8 @@ export const Route = createFileRoute("/_signed-in/projects/$project/")({
 });
 
 /**
- * The project at a glance: what it is called, where it serves from and
- * what changed in it last.
+ * The project at a glance: where it serves from, what waits on the member
+ * and what changed in it last.
  */
 function Overview() {
   const { t } = useLingui();
@@ -38,39 +40,50 @@ function Overview() {
           )
         }
       />
-      <section aria-labelledby={environmentsHeading} className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-4">
-          <h2 id={environmentsHeading} className="text-base font-medium">
-            <Trans>Environments</Trans>
-          </h2>
-          <Link
-            to="/projects/$project/environments"
-            params={{ project: key }}
-            className="text-sm text-muted-foreground hover:text-foreground hover:underline"
-          >
-            <Trans>View all environments</Trans>
-          </Link>
-        </div>
-        {environments.isError ? (
-          <QueryError error={environments.error} onRetry={() => void environments.refetch()} />
-        ) : environments.isPending ? (
-          <Skeleton className="h-16 w-full" />
-        ) : (
-          <ul aria-label={t`Environments`} className="flex flex-wrap gap-3">
-            {environments.data.map((environment) => (
-              <li
-                key={environment.id}
-                className="flex min-w-40 flex-col gap-0.5 rounded-md border bg-card px-4 py-3"
+      <div className="grid items-start gap-5 xl:grid-cols-2">
+        <Card aria-labelledby={environmentsHeading}>
+          <CardHeader
+            title={<Trans>Environments</Trans>}
+            titleId={environmentsHeading}
+            actions={
+              <Link
+                to="/projects/$project/environments"
+                params={{ project: key }}
+                className="text-sm text-muted-foreground hover:text-foreground hover:underline"
               >
-                <span className="font-medium">
-                  <EnvironmentName environment={environment} />
-                </span>
-                <code className="font-mono text-xs text-muted-foreground">{environment.key}</code>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                <Trans>View all environments</Trans>
+              </Link>
+            }
+          />
+          <CardContent>
+            {environments.isError ? (
+              <QueryError error={environments.error} onRetry={() => void environments.refetch()} />
+            ) : environments.isPending ? (
+              <Skeleton className="h-16 w-full" />
+            ) : (
+              <ul aria-label={t`Environments`} className="-mx-3 flex flex-col">
+                {environments.data.map((environment) => (
+                  <li key={environment.id}>
+                    <Link
+                      to="/projects/$project/environments/$environment"
+                      params={{ project: key, environment: environment.key }}
+                      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md px-3 py-2 text-sm hover:bg-accent"
+                    >
+                      <span className="font-medium">
+                        <EnvironmentName environment={environment} />
+                      </span>
+                      <code className="font-mono text-xs text-muted-foreground">
+                        {environment.key}
+                      </code>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+        <NeedsAttention project={key} />
+      </div>
       <RecentActivity project={key} />
     </Page>
   );
