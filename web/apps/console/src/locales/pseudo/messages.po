@@ -72,6 +72,7 @@ msgid "{conflictUnits, plural, one {# unit was exposed to a variation other than
 msgstr ""
 
 #: src/components/navigation.tsx
+#: src/components/needs-attention.tsx
 msgid "{count, plural, one {# change request awaits your decision} other {# change requests await your decision}}"
 msgstr ""
 
@@ -437,6 +438,18 @@ msgstr ""
 msgid "{savedName} is saved."
 msgstr ""
 
+#: src/components/needs-attention.tsx
+msgid "{sinkCount, plural, one {# sink needs attention} other {# sinks need attention}}"
+msgstr ""
+
+#: src/components/needs-attention.tsx
+msgid "{staleCount, plural, one {# stale flag may be ready to remove} other {# stale flags may be ready to remove}}"
+msgstr ""
+
+#: src/components/needs-attention.tsx
+msgid "{staleCount}+ stale flags may be ready to remove"
+msgstr ""
+
 #: src/components/compare-environments.tsx
 msgid "{to} takes the rules of {source} with their identifiers and salts, its prerequisites and its off and fallthrough variations. {to} stays off."
 msgstr ""
@@ -467,6 +480,10 @@ msgstr ""
 
 #: src/components/experiment-assignment.tsx
 msgid "{variationBucket}, the bucket it would take should the allocation grow"
+msgstr ""
+
+#: src/components/needs-attention.tsx
+msgid "{webhookCount, plural, one {# webhook disabled by the platform} other {# webhooks disabled by the platform}}"
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -5072,6 +5089,7 @@ msgid "More actions"
 msgstr ""
 
 #: src/components/navigation.tsx
+#: src/components/needs-attention.tsx
 msgid "More than {awaitingCountLimit} change requests await your decision"
 msgstr ""
 
@@ -5159,6 +5177,7 @@ msgstr ""
 msgid "Names the provider in sign-in addresses, in the ACS URL and in the entity ID. It never changes."
 msgstr ""
 
+#: src/components/needs-attention.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Needs attention"
 msgstr ""

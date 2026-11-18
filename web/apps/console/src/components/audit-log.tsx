@@ -6,6 +6,7 @@ import { HistoryIcon } from "lucide-react";
 import { type ComponentType, type FormEvent, type ReactNode, useMemo, useState } from "react";
 
 import { DownloadAudit } from "@/components/download-audit";
+import { Moment } from "@/components/moment";
 import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -67,6 +68,8 @@ export type AuditEntriesTableProps = {
   loading: boolean;
   EntryLink: EntryLinkComponent;
   place: Place;
+  /** Show when as how long ago, with the full time on hover, for a short list of recent entries. */
+  relativeTimes?: boolean;
 };
 
 /** Audit entries in the order given: when, who, what, on which entity, and where. */
@@ -76,6 +79,7 @@ export function AuditEntriesTable({
   loading,
   EntryLink,
   place,
+  relativeTimes = false,
 }: AuditEntriesTableProps) {
   const { i18n, t } = useLingui();
   const columns = useMemo<TableColumn<AuditEntry>[]>(
@@ -83,15 +87,18 @@ export function AuditEntriesTable({
       {
         id: "time",
         header: t`Time`,
-        cell: ({ row }) => (
-          <time
-            dateTime={row.original.occurred_at}
-            title={row.original.occurred_at}
-            className="whitespace-nowrap"
-          >
-            {formatInstant(i18n, row.original.occurred_at)}
-          </time>
-        ),
+        cell: ({ row }) =>
+          relativeTimes ? (
+            <Moment value={row.original.occurred_at} relative />
+          ) : (
+            <time
+              dateTime={row.original.occurred_at}
+              title={row.original.occurred_at}
+              className="whitespace-nowrap"
+            >
+              {formatInstant(i18n, row.original.occurred_at)}
+            </time>
+          ),
       },
       {
         id: "actor",
@@ -122,7 +129,7 @@ export function AuditEntriesTable({
       },
       { id: "place", header: place.label, cell: ({ row }) => place.of(row.original) },
     ],
-    [EntryLink, i18n, place, t],
+    [EntryLink, i18n, place, relativeTimes, t],
   );
   return (
     <Card list>
