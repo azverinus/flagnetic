@@ -172,7 +172,7 @@ test.describe("SSO enforcement", () => {
     const local = page.getByRole("switch", { name: "Local login" });
     await expect(local).toBeChecked();
     // The details under the switch name the way back in.
-    await page.getByText("Details", { exact: true }).click();
+    await page.locator("details", { hasText: "flagnetic admin unlock" }).locator("summary").click();
     await expect(page.getByText(/flagnetic admin unlock/)).toBeVisible();
 
     await local.click();
