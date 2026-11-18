@@ -63,8 +63,8 @@ export function ExperimentExposuresSection({
 }: ExperimentExposuresSectionProps) {
   const { i18n, t } = useLingui();
   const environments = useQuery(environmentsQuery(project));
-  // Which environments hold the experiment only picks the tab opened
-  // first; without the flag the project's first environment opens.
+  // Which environments hold the experiment only picks the environment
+  // selected first; without the flag the project's first environment opens.
   const flag = useQuery(flagQuery(project, experiment.flag));
   const keys = (environments.data ?? []).map(({ key }) => key);
   const holding = flag.data ? holdingEnvironments(flag.data, experiment.key) : [];

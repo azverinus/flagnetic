@@ -112,6 +112,24 @@ describe("the experiment's context panel", () => {
     expect(await screen.findByText("No rule serves it")).toBeInTheDocument();
   });
 
+  it("does not claim no rule serves it when the flag cannot be read", async () => {
+    fakeServer({
+      "GET /projects/shop/experiments/cta_copy": { status: 200, body: experiment },
+      "GET /projects/shop/flags/checkout": { status: 500, body: { code: "internal" } },
+      "GET /projects/shop/environments": { status: 200, body: { items: environments } },
+      "GET /projects/shop/members": { status: 200, body: { items: [] } },
+      "GET /me": {
+        status: 200,
+        body: { credential: { token_name: "" }, member: { instance_admin: false } },
+      },
+    });
+    await show();
+    await screen.findByText("Key");
+    // Let the failed flag request settle before checking what the group says.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByText("No rule serves it")).not.toBeInTheDocument();
+  });
+
   it("gives the key, the flag, both salts and the creation as facts", async () => {
     await show();
     await screen.findByRole("link", { name: /^Development/ });

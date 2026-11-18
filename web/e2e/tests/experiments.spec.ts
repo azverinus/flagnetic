@@ -162,6 +162,7 @@ test.describe("experiments", () => {
     );
     await expect(rowFor(page, "ranking_v2")).toBeVisible();
     await expect(rowFor(page, "cta_copy")).toHaveCount(0);
+    await expectNoSeriousViolations(page, "the experiments' facets and filter chips");
 
     await panel.getByRole("radio", { name: "Running", exact: true }).check();
     await expect(page.getByText("No experiment matches these filters.")).toBeVisible();

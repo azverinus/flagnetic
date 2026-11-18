@@ -7,6 +7,7 @@ import { ContextPanel, PanelGroup } from "@/components/ui/context-panel";
 import { PanelEnvironment, PanelFact, PanelFacts } from "@/components/ui/panel-parts";
 import { formatDateTime } from "@/i18n/format";
 import { exposureEnvironment, type ExperimentSearch } from "@/lib/experiment-health";
+import { holdingEnvironments } from "@/lib/experiments";
 import { environmentsQuery, experimentQuery, flagQuery } from "@/lib/queries";
 import { useNameOf } from "@/lib/use-known-members";
 
@@ -51,18 +52,20 @@ export function ExperimentPanelContent({
   const nameOf = useNameOf(project);
 
   const flagKey = experiment.data?.flag;
-  const configurations = (flag.data?.environments ?? []).filter((configuration) =>
-    configuration.rules.some(
-      (rule) => rule.serve.kind === "experiment" && rule.serve.experiment === experimentKey,
-    ),
+  // The same holding environments the exposures read, so the panel and the
+  // card cannot disagree on which environment is open.
+  const holding = flag.data ? holdingEnvironments(flag.data, experimentKey) : [];
+  const configurations = (flag.data?.environments ?? []).filter(({ environment }) =>
+    holding.includes(environment),
   );
   // The same environment the exposures open on, so the current link is the
   // one whose numbers the page shows; the first is the address without one.
   const keys = (environments.data ?? []).map(({ key }) => key);
-  const holding = configurations.map(({ environment }) => environment);
   const first = exposureEnvironment(keys, holding, undefined);
   const open = exposureEnvironment(keys, holding, search.environment);
-  const loading = flag.isPending || environments.isPending;
+  // Only a flag that was read can say no rule serves the experiment: one that
+  // failed to load would otherwise claim it is held nowhere.
+  const settled = flag.isSuccess && environments.isSuccess;
 
   return (
     <ContextPanel label={t`Environments and details`}>
@@ -85,7 +88,7 @@ export function ExperimentPanelContent({
             />
           );
         })}
-        {!loading && configurations.length === 0 ? (
+        {settled && configurations.length === 0 ? (
           <p className="px-2 py-1 text-sm text-muted-foreground">
             <Trans>No rule serves it</Trans>
           </p>
