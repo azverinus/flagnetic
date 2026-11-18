@@ -145,3 +145,52 @@ describe("the context panel", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
+
+describe("a panel link given its current state", () => {
+  function Views({ current }: { current: boolean }) {
+    return (
+      <ContextPanelProvider>
+        <ContextPanel label="Views">
+          {/* Both are the page the router shows, apart from their search. */}
+          <PanelLink to="/" search={{ archived: true } as never} current={current}>
+            Archived
+          </PanelLink>
+          <PanelLink to="/" current={!current}>
+            All flags
+          </PanelLink>
+        </ContextPanel>
+      </ContextPanelProvider>
+    );
+  }
+
+  it("marks the one the screen shows, whatever the router makes of the address", async () => {
+    windowWidth(1440);
+    await renderWithRouter(() => <Views current />);
+
+    expect(await screen.findByRole("link", { name: "Archived" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.getByRole("link", { name: "All flags" })).not.toHaveAttribute("aria-current");
+  });
+});
+
+describe("a list's panel", () => {
+  function List() {
+    return (
+      <ContextPanelProvider>
+        <ContextPanel label="Filters" startsOpenWide>
+          <PanelGroup>facets</PanelGroup>
+        </ContextPanel>
+      </ContextPanelProvider>
+    );
+  }
+
+  it("remembers a choice over where the window's width starts it", async () => {
+    windowWidth(1100);
+    localStorage.setItem("flagnetic.context-panel-collapsed", "false");
+    await renderWithRouter(() => <List />);
+
+    expect(await screen.findByRole("navigation", { name: "Filters" })).toBeInTheDocument();
+  });
+});

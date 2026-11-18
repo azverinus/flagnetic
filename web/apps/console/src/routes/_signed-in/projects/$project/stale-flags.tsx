@@ -1,6 +1,8 @@
-import type { StaleFlag, StaleReason } from "@flagnetic/api";
+import type { StaleFlag } from "@flagnetic/api";
 import { Card } from "@/components/ui/card";
 import { Page } from "@/components/ui/page";
+import { StaleFlagsPanel, useStaleFlagsFilters } from "@/components/flags-panel";
+import { Toolbar } from "@/components/ui/toolbar";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
@@ -22,34 +24,26 @@ import { environmentsQuery, staleFlagsQuery } from "@/lib/queries";
 import {
   staleReasonDescription,
   staleReasonName,
-  staleReasons,
   type StaleFlagsSearch,
-  toggleReason,
   validateStaleFlagsSearch,
 } from "@/lib/stale-flags";
 import { useKnownMembers } from "@/lib/use-known-members";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/stale-flags")({
   validateSearch: validateStaleFlagsSearch,
-  staticData: { crumb: msg`Stale flags` },
+  staticData: { crumb: msg`Stale flags`, panel: StaleFlagsPanel },
   component: StaleFlags,
 });
 
 /**
  * The project's stale flags with why each is stale, to work through: each
  * links to its flag, where it is cleaned up or archived. Filtered by the
- * reasons the address holds, read a page at a time.
+ * reasons the address holds, which the context panel offers as facets, and
+ * read a page at a time.
  */
 function StaleFlags() {
   const { t } = useLingui();
-  const { project } = Route.useParams();
-  const search = Route.useSearch();
-  const navigate = Route.useNavigate();
-
-  // Filters and pages replace the address rather than adding to the
-  // history, since the pages seen are remembered on the screen: going
-  // back leaves the list instead of walking through its pages.
-  const apply = (next: StaleFlagsSearch) => void navigate({ search: next, replace: true });
+  const { project, search, apply, chips, removeChip, clearFacets } = useStaleFlagsFilters();
 
   return (
     <Page>
@@ -62,55 +56,17 @@ function StaleFlags() {
           </Trans>
         }
       />
-      <ReasonFilter
-        reasons={search.reason}
-        onToggle={(reason) => apply({ reason: toggleReason(search.reason, reason) })}
-      />
+      <Toolbar chips={chips} onRemoveChip={removeChip} onClearAll={clearFacets} />
       <StaleFlagsPages
         project={project}
         search={search}
+        // Filters and pages replace the address rather than adding to the
+        // history, since the pages seen are remembered on the screen: going
+        // back leaves the list instead of walking through its pages.
         onPage={(cursor) => apply({ ...search, cursor })}
-        onClear={() => apply({})}
+        onClear={clearFacets}
       />
     </Page>
-  );
-}
-
-/** One toggle per reason: a flag is listed when it is stale for any reason pressed, every flag when none is. */
-function ReasonFilter({
-  reasons,
-  onToggle,
-}: {
-  reasons: readonly StaleReason[] | undefined;
-  onToggle: (reason: StaleReason) => void;
-}) {
-  const { i18n, t } = useLingui();
-  return (
-    <div role="group" aria-label={t`Stale for`} className="flex flex-col gap-2">
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          Show flags stale for any of these reasons; none pressed shows every stale flag.
-        </Trans>
-      </p>
-      <ul className="flex flex-wrap gap-2">
-        {staleReasons.map((reason) => {
-          const pressed = reasons?.includes(reason) ?? false;
-          return (
-            <li key={reason}>
-              <Button
-                variant={pressed ? "default" : "outline"}
-                size="sm"
-                aria-pressed={pressed}
-                title={staleReasonDescription(i18n, reason)}
-                onClick={() => onToggle(reason)}
-              >
-                {staleReasonName(i18n, reason)}
-              </Button>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
   );
 }
 

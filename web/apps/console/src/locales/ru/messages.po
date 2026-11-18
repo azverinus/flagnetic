@@ -157,7 +157,7 @@ msgstr "{exposures, plural, one {# показ, из них по override: {overr
 msgid "{exposures, plural, one {# exposure} other {# exposures}}"
 msgstr "{exposures, plural, one {# показ} few {# показа} many {# показов} other {# показа}}"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "{first} and {second}"
 msgstr "{first} и {second}"
 
@@ -618,9 +618,9 @@ msgstr "Ключ, однажды заданный, больше не меняе�
 msgid "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
 msgstr "Участник, забывший пароль, запрашивает сброс пароля по почте со страницы входа. Это работает, только пока SMTP-сервер настроен в разделе «Почта» навигации инстанса. Администратор инстанса может выпустить ссылку для сброса пароля на странице участника в любом случае."
 
+#: src/components/flags-panel.tsx
 #: src/lib/project-members.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "A member without a grant here"
 msgstr "Участник без роли в этом проекте"
 
@@ -1108,6 +1108,10 @@ msgstr "Алиасы"
 msgid "All"
 msgstr "Все"
 
+#: src/components/flags-panel.tsx
+msgid "All flags"
+msgstr "Все флаги"
+
 #: src/components/project-switcher.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "All projects"
@@ -1216,7 +1220,7 @@ msgstr "Любой автор"
 msgid "Any environment"
 msgstr "Любое окружение"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "Any environments"
 msgstr "Любые окружения"
 
@@ -1237,8 +1241,8 @@ msgstr "Любой вид"
 msgid "Any origin"
 msgstr "Любой источник"
 
+#: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any owner"
 msgstr "Любой владелец"
 
@@ -1246,8 +1250,8 @@ msgstr "Любой владелец"
 msgid "Any schedule"
 msgstr "Любое расписание"
 
+#: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any state"
 msgstr "Любое состояние"
 
@@ -1256,7 +1260,7 @@ msgstr "Любое состояние"
 msgid "Any status"
 msgstr "Любой статус"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "Any type"
 msgstr "Любой тип"
 
@@ -1374,14 +1378,11 @@ msgid "Archive the flag first; only an archived flag can be deleted."
 msgstr "Сначала архивируйте флаг: удалить можно только архивный."
 
 #: src/components/experiment-transitions.tsx
+#: src/components/flags-panel.tsx
 #: src/lib/experiments.ts
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Archived"
 msgstr "В архиве"
-
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
-msgid "Archived flags instead"
-msgstr "Только архивные флаги"
 
 #: src/components/structural-diff-view.tsx
 msgid "Archived."
@@ -2065,6 +2066,10 @@ msgstr "Выбран: <0>{name}</0>"
 msgid "Claims"
 msgstr "Claims"
 
+#: src/components/ui/toolbar.tsx
+msgid "Clear all"
+msgstr "Сбросить всё"
+
 #: src/components/audit-log.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -2672,9 +2677,13 @@ msgstr "Устройство"
 msgid "Differs"
 msgstr "Отличается"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "Differs between"
 msgstr "Различается в"
+
+#: src/components/flags-panel.tsx
+msgid "Differs between {first} and {second}"
+msgstr "Различается между {first} и {second}"
 
 #: src/components/group-mappings.tsx
 msgid "Directory group"
@@ -3254,12 +3263,12 @@ msgstr "Entity ID"
 #: src/components/experiment-alerts.tsx
 #: src/components/firebase-wizard.tsx
 #: src/components/flag-history.tsx
+#: src/components/flags-panel.tsx
 #: src/components/project-audit.tsx
 #: src/lib/audit.ts
 #: src/routes/_signed-in/projects/$project/audit.$entry.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Environment"
 msgstr "Окружение"
 
@@ -3561,6 +3570,7 @@ msgstr "Ожидаемое окончание — {day}. Остановите э
 #: src/lib/change-requests.ts
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Experiment"
 msgstr "Эксперимент"
 
@@ -3729,13 +3739,18 @@ msgstr "Фильтр доставок"
 msgid "Filter the experiments"
 msgstr "Фильтр экспериментов"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
-msgid "Filter the flags"
-msgstr "Фильтр флагов"
-
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Filter the segments"
 msgstr "Фильтр сегментов"
+
+#: src/components/flags-panel.tsx
+#: src/components/ui/toolbar.tsx
+msgid "Filters"
+msgstr "Фильтры"
+
+#: src/components/ui/toolbar.tsx
+msgid "Filters in force"
+msgstr "Действующие фильтры"
 
 #: src/components/experiment-exposures.tsx
 msgid "Final check pending: this is the check the stop took on <0/>, over the exposures rolled up by then. It is replaced once every exposure received before the stop has been rolled up."
@@ -4046,11 +4061,11 @@ msgstr "Увеличить охват"
 msgid "Grows the traffic allocation to {allocation} %."
 msgstr "Увеличивает охват до {allocation} %."
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "Has a rollout"
 msgstr "Есть rollout"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "Has rules"
 msgstr "Есть правила"
 
@@ -4206,7 +4221,7 @@ msgstr "В действии, ключе объекта и имени иници�
 msgid "in the segment {segment}"
 msgstr "в сегменте {segment}"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "In what SDKs receive."
 msgstr "По тому, что получают SDK."
 
@@ -5342,6 +5357,10 @@ msgstr "Нет показов с запуска, <0/>."
 msgid "No exposures"
 msgstr "Нет показов"
 
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "No flag is archived."
+msgstr "Архивных флагов нет."
+
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "No flag is stale for these reasons."
 msgstr "Флагов, устаревших по этим причинам, нет."
@@ -5656,8 +5675,9 @@ msgstr "Наблюдаемая доля"
 
 #: src/components/compare-environments.tsx
 #: src/components/flag-on-off.tsx
+#: src/components/flags-panel.tsx
 #: src/components/tester-panel.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/ui/lamp.tsx
 msgid "Off"
 msgstr "Выключен"
 
@@ -5682,7 +5702,8 @@ msgstr "Более старые записи"
 
 #: src/components/compare-environments.tsx
 #: src/components/flag-on-off.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
+#: src/components/ui/lamp.tsx
 msgid "On"
 msgstr "Включён"
 
@@ -5870,6 +5891,7 @@ msgstr "Обзор"
 #. The name of a built-in role.
 #: src/components/experiment-fields.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flags-panel.tsx
 #: src/lib/access-names.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
@@ -5886,6 +5908,10 @@ msgstr "Владелец изменён: был {before}, стал {after}."
 #: src/lib/stale-flags.ts
 msgid "Owner inactive"
 msgstr "Владелец неактивен"
+
+#: src/components/flags-panel.tsx
+msgid "Owner: {owner}"
+msgstr "Владелец: {owner}"
 
 #: src/components/experiment-exposures.tsx
 msgid "p-value"
@@ -6504,6 +6530,10 @@ msgstr "Удалить SMTP-сервер"
 msgid "Remove tag {tag}"
 msgstr "Удалить тег {tag}"
 
+#: src/components/ui/toolbar.tsx
+msgid "Remove the filter {label}"
+msgstr "Убрать фильтр {label}"
+
 #: src/components/sink-editor.tsx
 msgid "Remove the header {name}"
 msgstr "Удалить заголовок {name}"
@@ -6764,6 +6794,7 @@ msgstr "Роль после принятия"
 
 #: src/components/rule-editor.tsx
 #: src/components/tester-panel.tsx
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Rollout"
 msgstr "Rollout"
 
@@ -6853,6 +6884,7 @@ msgid "Rule {position}, new in the draft"
 msgstr "Правило {position}, новое в черновике"
 
 #: src/components/rule-editor.tsx
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Rules"
 msgstr "Правила"
 
@@ -7184,7 +7216,7 @@ msgstr "Отдаёт <0/> вместо <1/>."
 msgid "Serves <0>{serves}</0>"
 msgstr "Отдаёт <0>{serves}</0>"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "Serves an experiment"
 msgstr "Есть эксперимент"
 
@@ -7274,9 +7306,9 @@ msgstr "Выкачен {winner}: его отдают правила экспер
 msgid "Show as table"
 msgstr "Показать таблицей"
 
-#: src/routes/_signed-in/projects/$project/stale-flags.tsx
-msgid "Show flags stale for any of these reasons; none pressed shows every stale flag."
-msgstr "Показать флаги, устаревшие по любой из этих причин; если ни одна не выбрана, показываются все устаревшие флаги."
+#: src/components/flags-panel.tsx
+msgid "Show flags stale for any of these reasons; none checked shows every stale flag."
+msgstr "Показать флаги, устаревшие по любой из этих причин; если ни одна не отмечена, показываются все устаревшие флаги."
 
 #: src/components/group-mappings.tsx
 msgid "Show the current mappings"
@@ -7462,7 +7494,7 @@ msgstr "Человек без учётной записи присоединит
 msgid "Something went wrong on the server."
 msgstr "На сервере что-то пошло не так."
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/ui/toolbar.tsx
 msgid "Sort by"
 msgstr "Сортировка"
 
@@ -7486,14 +7518,19 @@ msgstr "Разделить поровну"
 msgid "SSO: {provider}"
 msgstr "SSO: {provider}"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Stale flags"
 msgstr "Устаревшие флаги"
 
+#: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Stale for"
 msgstr "Причины устаревания"
+
+#: src/components/flags-panel.tsx
+msgid "Stale for: {name}"
+msgstr "Причина устаревания: {name}"
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Standard"
@@ -7565,12 +7602,20 @@ msgstr "STARTTLS и TLS требуют TLS 1.2 или новее и провер
 msgid "STARTTLS, usually port 587"
 msgstr "STARTTLS, обычно порт 587"
 
+#: src/components/flags-panel.tsx
 #: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "State"
 msgstr "Состояние"
+
+#: src/components/flags-panel.tsx
+msgid "State in"
+msgstr "Состояние в"
+
+#: src/components/flags-panel.tsx
+msgid "State in {where}: {state}"
+msgstr "Состояние в {where}: {state}"
 
 #: src/components/sdk-keys.tsx
 #: src/components/sink-recovery.tsx
@@ -7717,8 +7762,8 @@ msgstr "Как в системе"
 msgid "Table prefix"
 msgstr "Префикс таблиц"
 
+#: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Tag"
 msgstr "Тег"
 
@@ -7729,6 +7774,10 @@ msgstr "Добавлен тег <0>{tag}</0>."
 #: src/components/structural-diff-view.tsx
 msgid "Tag removed: <0>{tag}</0>."
 msgstr "Удалён тег <0>{tag}</0>."
+
+#: src/components/flags-panel.tsx
+msgid "Tag: {tag}"
+msgstr "Тег: {tag}"
 
 #: src/components/experiment-fields.tsx
 #: src/components/firebase-wizard.tsx
@@ -8857,8 +8906,8 @@ msgstr "Сумма весов должна быть 100,00 %."
 msgid "The weights sum to {sum} %; they must sum to {whole} %."
 msgstr "Сумма весов {sum} %, а должна быть {whole} %."
 
+#: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "The whole tag"
 msgstr "Тег целиком"
 
@@ -9256,6 +9305,7 @@ msgstr "Два ID объявлены одним и тем же юнитом."
 #: src/components/discovered-attributes.tsx
 #: src/components/firebase-wizard.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -9269,6 +9319,10 @@ msgstr "Введите {flagKey} для подтверждения"
 #: src/components/ui/confirm-dialog.tsx
 msgid "Type {typeToConfirm} to confirm"
 msgstr "Введите {typeToConfirm} для подтверждения"
+
+#: src/components/flags-panel.tsx
+msgid "Type: {type}"
+msgstr "Тип: {type}"
 
 #: src/components/discovered-attributes.tsx
 msgid "Types seen"
@@ -9567,6 +9621,14 @@ msgstr "просматривать проект"
 #: src/lib/access-names.ts
 msgid "Viewer"
 msgstr "Наблюдатель"
+
+#: src/components/flags-panel.tsx
+msgid "Views"
+msgstr "Представления"
+
+#: src/components/flags-panel.tsx
+msgid "Views and filters"
+msgstr "Представления и фильтры"
 
 #: src/components/waiting-change-requests.tsx
 msgid "Waiting change requests"

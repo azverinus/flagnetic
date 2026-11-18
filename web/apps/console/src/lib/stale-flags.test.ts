@@ -7,7 +7,7 @@ import {
   listStaleFlagsQueryOf,
   staleReasonName,
   staleReasons,
-  toggleReason,
+  reasonsInOrder,
   validateStaleFlagsSearch,
 } from "./stale-flags";
 
@@ -37,19 +37,16 @@ describe("the address of the stale flags", () => {
   });
 });
 
-describe("toggling a reason", () => {
-  it("adds it in the report's order", () => {
-    expect(toggleReason(["owner_inactive"], "lifetime_exceeded")).toEqual([
+describe("the reasons asked for", () => {
+  it("come in the report's order, once each", () => {
+    expect(reasonsInOrder(["owner_inactive", "lifetime_exceeded", "owner_inactive"])).toEqual([
       "lifetime_exceeded",
       "owner_inactive",
     ]);
   });
 
-  it("removes it, and leaves no list when none is left", () => {
-    expect(toggleReason(["owner_inactive", "not_evaluated"], "owner_inactive")).toEqual([
-      "not_evaluated",
-    ]);
-    expect(toggleReason(["owner_inactive"], "owner_inactive")).toBeUndefined();
+  it("leave no list when none is asked for", () => {
+    expect(reasonsInOrder([])).toBeUndefined();
   });
 });
 

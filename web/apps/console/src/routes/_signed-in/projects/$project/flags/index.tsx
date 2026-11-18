@@ -1,75 +1,42 @@
-import { type Environment, type FlagListItem, type FlagState, zFlagType } from "@flagnetic/api";
-import { Card } from "@/components/ui/card";
-import { Page } from "@/components/ui/page";
+import { type Environment, type FlagListItem, type FlagState } from "@flagnetic/api";
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  FlagIcon,
-  FlaskConicalIcon,
-  HourglassIcon,
-  ListChecksIcon,
-  PercentIcon,
-  PlusIcon,
-} from "lucide-react";
-import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
+import { FlagIcon, PlusIcon } from "lucide-react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { Can } from "@/components/can";
+import { FlagsPanel, useFlagsFilters } from "@/components/flags-panel";
+import { Moment } from "@/components/moment";
 import { QueryError } from "@/components/query-error";
-import { SearchField } from "@/components/search-field";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field } from "@/components/ui/field";
-import { Label } from "@/components/ui/label";
+import { Lamp } from "@/components/ui/lamp";
+import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
-import { Select, SelectItem } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Table, type TableColumn } from "@/components/ui/table";
-import { formatInstant } from "@/i18n/format";
-import { cn } from "@/lib/cn";
+import { Toolbar } from "@/components/ui/toolbar";
+import { environmentLabel } from "@/lib/environments";
 import {
-  comparedEnvironments,
-  type FlagStateFilter,
-  flagStateFilters,
   flagTypeName,
-  flagTypes,
   type FlagsSearch,
   type FlagsSort,
   flagsSorts,
   isFlagsFiltered,
-  resolveEnvironment,
   validateFlagsSearch,
 } from "@/lib/flags";
-import { environmentLabel } from "@/lib/environments";
-import { lastEnvironment, rememberLastEnvironment } from "@/lib/preferences";
+import { rememberLastEnvironment } from "@/lib/preferences";
 import { madeBy } from "@/lib/project-members";
-import { environmentsQuery, flagsQuery } from "@/lib/queries";
-import { useKnownMembers } from "@/lib/use-known-members";
+import { flagsQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/flags/")({
   validateSearch: validateFlagsSearch,
+  staticData: { panel: FlagsPanel },
   component: Flags,
 });
-
-/** The select's value for a filter left unset: Radix keeps the empty string for itself. */
-const any = "any";
-
-function stateFilterName(i18n: I18n, state: FlagStateFilter): string {
-  switch (state) {
-    case "on":
-      return i18n._(msg`On`);
-    case "off":
-      return i18n._(msg`Off`);
-    case "rules":
-      return i18n._(msg`Has rules`);
-    case "rollout":
-      return i18n._(msg`Has a rollout`);
-    case "experiment":
-      return i18n._(msg`Serves an experiment`);
-  }
-}
 
 function sortName(i18n: I18n, sort: FlagsSort): string {
   switch (sort) {
@@ -83,48 +50,45 @@ function sortName(i18n: I18n, sort: FlagsSort): string {
 }
 
 /**
- * A project's flags, filtered by what the address holds and read a page
- * at a time; creating one is offered to those who may. The address
+ * A project's flags, narrowed by the facets in the context panel and read
+ * a page at a time; creating one is offered to those who may. The address
  * always names the environment the list shows: the one asked for, else
  * the one this browser showed last in the project, else the first.
  */
 function Flags() {
-  const { t } = useLingui();
+  const { i18n, t } = useLingui();
   const { project } = Route.useParams();
-  const search = Route.useSearch();
+  const asked = Route.useSearch();
   const navigate = Route.useNavigate();
-  const { names } = useKnownMembers(project);
-  const environments = useQuery(environmentsQuery(project));
-  const environment = environments.data
-    ? resolveEnvironment(
-        environments.data.map((env) => env.key),
-        search.environment,
-        lastEnvironment(project),
-      )
-    : undefined;
+  const {
+    search,
+    environmentsRead,
+    environments,
+    owners,
+    apply,
+    filter,
+    chips,
+    removeChip,
+    clearFacets,
+  } = useFlagsFilters();
+  const environment = search.environment;
+  const environmentsKnown = environments.length > 0;
 
   useEffect(() => {
-    if (environment === undefined) return;
+    if (environment === undefined || !environmentsKnown) return;
     rememberLastEnvironment(project, environment);
-    if (environment !== search.environment) {
+    if (environment !== asked.environment) {
       void navigate({ search: (prev) => ({ ...prev, environment }), replace: true });
     }
-  }, [environment, navigate, project, search.environment]);
-
-  // Filters and pages replace the address rather than adding to the
-  // history, since the pages seen are remembered on the screen: going
-  // back leaves the list instead of walking through its pages.
-  const apply = (next: FlagsSearch) => void navigate({ search: next, replace: true });
-  const filter = (patch: Partial<FlagsSearch>) => apply({ ...search, ...patch, cursor: undefined });
-  const shown = { ...search, environment };
+  }, [environment, environmentsKnown, navigate, project, asked.environment]);
 
   // The header's create action shows once the project is known to have
   // flags: while the list loads, fails or is empty it would flicker away,
   // and the empty state carries it. A filtered list or a later page implies
   // flags exist, so filtering keeps it in place.
-  const list = useQuery({ ...flagsQuery(project, shown), enabled: environment !== undefined });
+  const list = useQuery({ ...flagsQuery(project, search), enabled: environmentsKnown });
   const known =
-    Boolean(shown.cursor) || isFlagsFiltered(shown) || (list.data?.items.length ?? 0) > 0;
+    Boolean(search.cursor) || isFlagsFiltered(search) || (list.data?.items.length ?? 0) > 0;
 
   const newFlag = (
     <Can permission="flag.edit" whenMissing="disable">
@@ -147,199 +111,48 @@ function Flags() {
             its own configuration.
           </Trans>
         }
-        actions={
-          <>
-            <Button asChild variant="outline">
-              <Link to="/projects/$project/stale-flags" params={{ project }}>
-                <HourglassIcon aria-hidden />
-                <Trans>Stale flags</Trans>
-              </Link>
-            </Button>
-            {known ? newFlag : null}
-          </>
-        }
+        actions={known ? newFlag : null}
       />
-      {environments.isError ? (
-        <QueryError error={environments.error} onRetry={() => void environments.refetch()} />
+      {environmentsRead.isError ? (
+        <QueryError
+          error={environmentsRead.error}
+          onRetry={() => void environmentsRead.refetch()}
+        />
       ) : (
         <>
-          <FlagFilters
-            search={shown}
-            onFilter={filter}
-            owners={names}
-            environments={environments.data ?? []}
+          <Toolbar
+            search={{
+              value: search.q ?? "",
+              placeholder: t`Key or name`,
+              onChange: (q) => filter({ q: q.trim() || undefined }),
+            }}
+            sort={{
+              value: search.sort ?? "key",
+              options: flagsSorts.map((sort) => ({ value: sort, label: sortName(i18n, sort) })),
+              onChange: (value) => {
+                const sort = flagsSorts.find((candidate) => candidate === value);
+                filter({ sort: sort === "key" ? undefined : sort });
+              },
+            }}
+            chips={chips}
+            onRemoveChip={removeChip}
+            onClearAll={clearFacets}
           />
           <FlagsPages
             project={project}
-            search={shown}
-            ready={environment !== undefined}
+            search={search}
+            ready={environmentsKnown}
             onPage={(cursor) => apply({ ...search, cursor })}
-            // The environment and the order are how the flags are shown,
-            // not which: clearing the filters keeps both.
-            onClear={() => apply({ environment, sort: search.sort })}
+            // Clearing the filters from the empty list keeps the view, as
+            // "Clear all" does: the archived flags stay the archived ones.
+            onClear={clearFacets}
             newFlag={newFlag}
-            owners={names}
-            environments={environments.data ?? []}
+            owners={owners}
+            environments={environments}
           />
         </>
       )}
     </Page>
-  );
-}
-
-function FlagFilters({
-  search,
-  onFilter,
-  owners,
-  environments,
-}: {
-  search: FlagsSearch;
-  onFilter: (patch: Partial<FlagsSearch>) => void;
-  owners: ReadonlyMap<string, string> | undefined;
-  environments: readonly Environment[];
-}) {
-  const { i18n, t } = useLingui();
-  const archived = useId();
-  const ownerOptions = useMemo(
-    () =>
-      [...(owners ?? new Map<string, string>())]
-        .map(([value, label]) => ({ value, label }))
-        .sort((a, b) => a.label.localeCompare(b.label, i18n.locale)),
-    [owners, i18n.locale],
-  );
-  // Every pair of environments once, in the environments' order.
-  const pairs = environments.flatMap((a, i) =>
-    environments.slice(i + 1).map((b) => {
-      const [first, second] = [a.name, b.name];
-      return { value: `${a.key},${b.key}`, label: t`${first} and ${second}` };
-    }),
-  );
-  // The pair the address names, in whichever order, as the select offers it.
-  const named = comparedEnvironments(search);
-  const compared = named
-    ? (pairs.find((pair) => named.every((key) => pair.value.split(",").includes(key)))?.value ??
-      named.join(","))
-    : undefined;
-
-  return (
-    <div role="search" aria-label={t`Filter the flags`} className="flex flex-wrap items-end gap-4">
-      <Field label={<Trans>Environment</Trans>} className="w-44">
-        <Select
-          value={search.environment ?? ""}
-          disabled={environments.length === 0}
-          onValueChange={(environment) => onFilter({ environment })}
-        >
-          {environments.map((environment) => (
-            <SelectItem key={environment.key} value={environment.key}>
-              {environmentLabel(i18n, environment)}
-            </SelectItem>
-          ))}
-        </Select>
-      </Field>
-      <Field label={<Trans>State</Trans>} className="w-40">
-        <Select
-          value={search.state ?? any}
-          onValueChange={(value) =>
-            onFilter({ state: flagStateFilters.find((state) => state === value) })
-          }
-        >
-          <SelectItem value={any}>{t`Any state`}</SelectItem>
-          {flagStateFilters.map((state) => (
-            <SelectItem key={state} value={state}>
-              {stateFilterName(i18n, state)}
-            </SelectItem>
-          ))}
-        </Select>
-      </Field>
-      <SearchField
-        value={search.q ?? ""}
-        placeholder={t`Key or name`}
-        onChange={(q) => onFilter({ q: q.trim() || undefined })}
-      />
-      <Field label={<Trans>Type</Trans>} className="w-40">
-        <Select
-          value={search.type ?? any}
-          onValueChange={(value) => onFilter({ type: zFlagType.safeParse(value).data })}
-        >
-          <SelectItem value={any}>{t`Any type`}</SelectItem>
-          {flagTypes.map((type) => (
-            <SelectItem key={type} value={type}>
-              {flagTypeName(i18n, type)}
-            </SelectItem>
-          ))}
-        </Select>
-      </Field>
-      <SearchField
-        label={<Trans>Tag</Trans>}
-        placeholder={t`The whole tag`}
-        className="w-48"
-        value={search.tag ?? ""}
-        onChange={(tag) => onFilter({ tag: tag.trim() || undefined })}
-      />
-      <Field label={<Trans>Owner</Trans>} className="w-56">
-        <Select
-          value={search.owner ?? any}
-          onValueChange={(value) => onFilter({ owner: value === any ? undefined : value })}
-        >
-          <SelectItem value={any}>{t`Any owner`}</SelectItem>
-          {/* An owner the address names who is not among the members
-              read: one without a grant here, once the members are read. */}
-          {search.owner && owners && !owners.has(search.owner) ? (
-            <SelectItem value={search.owner}>{t`A member without a grant here`}</SelectItem>
-          ) : null}
-          {ownerOptions.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </Select>
-      </Field>
-      <Field
-        label={<Trans>Differs between</Trans>}
-        hint={<Trans>In what SDKs receive.</Trans>}
-        className="w-64"
-      >
-        <Select
-          value={compared ?? any}
-          disabled={pairs.length === 0}
-          onValueChange={(value) =>
-            onFilter({ differs_between: value === any ? undefined : value })
-          }
-        >
-          <SelectItem value={any}>{t`Any environments`}</SelectItem>
-          {pairs.map((pair) => (
-            <SelectItem key={pair.value} value={pair.value}>
-              {pair.label}
-            </SelectItem>
-          ))}
-        </Select>
-      </Field>
-      <Field label={<Trans>Sort by</Trans>} className="w-40">
-        <Select
-          value={search.sort ?? "key"}
-          onValueChange={(value) => {
-            const sort = flagsSorts.find((candidate) => candidate === value);
-            onFilter({ sort: sort === "key" ? undefined : sort });
-          }}
-        >
-          {flagsSorts.map((sort) => (
-            <SelectItem key={sort} value={sort}>
-              {sortName(i18n, sort)}
-            </SelectItem>
-          ))}
-        </Select>
-      </Field>
-      <div className="flex h-9 items-center gap-2">
-        <Switch
-          id={archived}
-          checked={search.archived === true}
-          onCheckedChange={(checked) => onFilter({ archived: checked ? true : undefined })}
-        />
-        <Label htmlFor={archived}>
-          <Trans>Archived flags instead</Trans>
-        </Label>
-      </div>
-    </div>
   );
 }
 
@@ -390,6 +203,15 @@ function FlagsPages({
     return <QueryError error={page.error} onRetry={() => void page.refetch()} />;
   }
   if (page.data?.items.length === 0 && !search.cursor) {
+    // The archived flags are a view, not a filter: with nothing else set,
+    // an empty one says there are none rather than offering to clear it.
+    if (search.archived && !isFlagsFiltered({ ...search, archived: undefined })) {
+      return (
+        <Card list>
+          <EmptyState icon={<FlagIcon />} title={<Trans>No flag is archived.</Trans>} />
+        </Card>
+      );
+    }
     return isFlagsFiltered(search) ? (
       <Card list>
         <EmptyState
@@ -454,37 +276,24 @@ function FlagsPages({
   );
 }
 
-/** What a flag serves in one environment at a glance: on or off, rules, a rollout, an experiment. */
+/**
+ * What a flag serves in one environment at a glance: the state lamp, then
+ * in muted words what the list's answer carries of how: rules, a rollout,
+ * an experiment.
+ */
 function StateCell({ state }: { state: FlagState | undefined }) {
   const { t } = useLingui();
   if (!state) return <span className="text-muted-foreground">—</span>;
+  const how = [
+    state.has_rules ? t`Rules` : null,
+    state.has_rollout ? t`Rollout` : null,
+    state.has_experiment ? t`Experiment` : null,
+  ].filter((word) => word !== null);
   return (
-    <span className="flex items-center gap-1.5">
-      <span
-        className={cn(
-          "rounded-sm px-1.5 py-0.5 text-xs font-medium",
-          state.on ? "bg-primary/10 text-primary-ink" : "bg-muted text-muted-foreground",
-        )}
-      >
-        {state.on ? <Trans>On</Trans> : <Trans>Off</Trans>}
-      </span>
-      {state.has_rules ? (
-        <span title={t`Has rules`} className="text-muted-foreground">
-          <ListChecksIcon aria-hidden className="size-4" />
-          <span className="sr-only">{t`Has rules`}</span>
-        </span>
-      ) : null}
-      {state.has_rollout ? (
-        <span title={t`Has a rollout`} className="text-muted-foreground">
-          <PercentIcon aria-hidden className="size-4" />
-          <span className="sr-only">{t`Has a rollout`}</span>
-        </span>
-      ) : null}
-      {state.has_experiment ? (
-        <span title={t`Serves an experiment`} className="text-muted-foreground">
-          <FlaskConicalIcon aria-hidden className="size-4" />
-          <span className="sr-only">{t`Serves an experiment`}</span>
-        </span>
+    <span className="flex flex-col gap-0.5">
+      <Lamp on={state.on} />
+      {how.length > 0 ? (
+        <span className="text-xs text-muted-foreground">{how.join(" · ")}</span>
       ) : null}
     </span>
   );
@@ -554,15 +363,7 @@ function FlagsTable({
       {
         id: "updated",
         header: t`Updated`,
-        cell: ({ row }) => (
-          <time
-            dateTime={row.original.updated_at}
-            title={row.original.updated_at}
-            className="whitespace-nowrap"
-          >
-            {formatInstant(i18n, row.original.updated_at)}
-          </time>
-        ),
+        cell: ({ row }) => <Moment value={row.original.updated_at} relative />,
       },
     ],
     [environment, environments, i18n, owners, project, t],

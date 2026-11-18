@@ -157,7 +157,7 @@ msgstr "{exposures, plural, one {# exposure, {overridden} overridden} other {# e
 msgid "{exposures, plural, one {# exposure} other {# exposures}}"
 msgstr "{exposures, plural, one {# exposure} other {# exposures}}"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "{first} and {second}"
 msgstr "{first} and {second}"
 
@@ -618,9 +618,9 @@ msgstr "A key never changes once it is set."
 msgid "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
 msgstr "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
 
+#: src/components/flags-panel.tsx
 #: src/lib/project-members.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "A member without a grant here"
 msgstr "A member without a grant here"
 
@@ -1108,6 +1108,10 @@ msgstr "Aliases"
 msgid "All"
 msgstr "All"
 
+#: src/components/flags-panel.tsx
+msgid "All flags"
+msgstr "All flags"
+
 #: src/components/project-switcher.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "All projects"
@@ -1216,7 +1220,7 @@ msgstr "Any author"
 msgid "Any environment"
 msgstr "Any environment"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "Any environments"
 msgstr "Any environments"
 
@@ -1237,8 +1241,8 @@ msgstr "Any kind"
 msgid "Any origin"
 msgstr "Any origin"
 
+#: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any owner"
 msgstr "Any owner"
 
@@ -1246,8 +1250,8 @@ msgstr "Any owner"
 msgid "Any schedule"
 msgstr "Any schedule"
 
+#: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any state"
 msgstr "Any state"
 
@@ -1256,7 +1260,7 @@ msgstr "Any state"
 msgid "Any status"
 msgstr "Any status"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "Any type"
 msgstr "Any type"
 
@@ -1374,14 +1378,11 @@ msgid "Archive the flag first; only an archived flag can be deleted."
 msgstr "Archive the flag first; only an archived flag can be deleted."
 
 #: src/components/experiment-transitions.tsx
+#: src/components/flags-panel.tsx
 #: src/lib/experiments.ts
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Archived"
 msgstr "Archived"
-
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
-msgid "Archived flags instead"
-msgstr "Archived flags instead"
 
 #: src/components/structural-diff-view.tsx
 msgid "Archived."
@@ -2065,6 +2066,10 @@ msgstr "Chosen: <0>{name}</0>"
 msgid "Claims"
 msgstr "Claims"
 
+#: src/components/ui/toolbar.tsx
+msgid "Clear all"
+msgstr "Clear all"
+
 #: src/components/audit-log.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -2672,9 +2677,13 @@ msgstr "Device"
 msgid "Differs"
 msgstr "Differs"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "Differs between"
 msgstr "Differs between"
+
+#: src/components/flags-panel.tsx
+msgid "Differs between {first} and {second}"
+msgstr "Differs between {first} and {second}"
 
 #: src/components/group-mappings.tsx
 msgid "Directory group"
@@ -3254,12 +3263,12 @@ msgstr "Entity ID"
 #: src/components/experiment-alerts.tsx
 #: src/components/firebase-wizard.tsx
 #: src/components/flag-history.tsx
+#: src/components/flags-panel.tsx
 #: src/components/project-audit.tsx
 #: src/lib/audit.ts
 #: src/routes/_signed-in/projects/$project/audit.$entry.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Environment"
 msgstr "Environment"
 
@@ -3561,6 +3570,7 @@ msgstr "Expected to end on {day}. Stop it with a decision, or move its expected 
 #: src/lib/change-requests.ts
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Experiment"
 msgstr "Experiment"
 
@@ -3729,13 +3739,18 @@ msgstr "Filter the deliveries"
 msgid "Filter the experiments"
 msgstr "Filter the experiments"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
-msgid "Filter the flags"
-msgstr "Filter the flags"
-
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Filter the segments"
 msgstr "Filter the segments"
+
+#: src/components/flags-panel.tsx
+#: src/components/ui/toolbar.tsx
+msgid "Filters"
+msgstr "Filters"
+
+#: src/components/ui/toolbar.tsx
+msgid "Filters in force"
+msgstr "Filters in force"
 
 #: src/components/experiment-exposures.tsx
 msgid "Final check pending: this is the check the stop took on <0/>, over the exposures rolled up by then. It is replaced once every exposure received before the stop has been rolled up."
@@ -4046,11 +4061,11 @@ msgstr "Grow traffic allocation"
 msgid "Grows the traffic allocation to {allocation} %."
 msgstr "Grows the traffic allocation to {allocation} %."
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "Has a rollout"
 msgstr "Has a rollout"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "Has rules"
 msgstr "Has rules"
 
@@ -4206,7 +4221,7 @@ msgstr "In the action, the entity's key and the actor's name."
 msgid "in the segment {segment}"
 msgstr "in the segment {segment}"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "In what SDKs receive."
 msgstr "In what SDKs receive."
 
@@ -5342,6 +5357,10 @@ msgstr "No exposure since the start, <0/>."
 msgid "No exposures"
 msgstr "No exposures"
 
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "No flag is archived."
+msgstr "No flag is archived."
+
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "No flag is stale for these reasons."
 msgstr "No flag is stale for these reasons."
@@ -5656,8 +5675,9 @@ msgstr "Observed share"
 
 #: src/components/compare-environments.tsx
 #: src/components/flag-on-off.tsx
+#: src/components/flags-panel.tsx
 #: src/components/tester-panel.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/ui/lamp.tsx
 msgid "Off"
 msgstr "Off"
 
@@ -5682,7 +5702,8 @@ msgstr "Older entries"
 
 #: src/components/compare-environments.tsx
 #: src/components/flag-on-off.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
+#: src/components/ui/lamp.tsx
 msgid "On"
 msgstr "On"
 
@@ -5870,6 +5891,7 @@ msgstr "Overview"
 #. The name of a built-in role.
 #: src/components/experiment-fields.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flags-panel.tsx
 #: src/lib/access-names.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
@@ -5886,6 +5908,10 @@ msgstr "Owner changed from {before} to {after}."
 #: src/lib/stale-flags.ts
 msgid "Owner inactive"
 msgstr "Owner inactive"
+
+#: src/components/flags-panel.tsx
+msgid "Owner: {owner}"
+msgstr "Owner: {owner}"
 
 #: src/components/experiment-exposures.tsx
 msgid "p-value"
@@ -6504,6 +6530,10 @@ msgstr "Remove SMTP server"
 msgid "Remove tag {tag}"
 msgstr "Remove tag {tag}"
 
+#: src/components/ui/toolbar.tsx
+msgid "Remove the filter {label}"
+msgstr "Remove the filter {label}"
+
 #: src/components/sink-editor.tsx
 msgid "Remove the header {name}"
 msgstr "Remove the header {name}"
@@ -6764,6 +6794,7 @@ msgstr "Role on acceptance"
 
 #: src/components/rule-editor.tsx
 #: src/components/tester-panel.tsx
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Rollout"
 msgstr "Rollout"
 
@@ -6853,6 +6884,7 @@ msgid "Rule {position}, new in the draft"
 msgstr "Rule {position}, new in the draft"
 
 #: src/components/rule-editor.tsx
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Rules"
 msgstr "Rules"
 
@@ -7184,7 +7216,7 @@ msgstr "Serves <0/> instead of <1/>."
 msgid "Serves <0>{serves}</0>"
 msgstr "Serves <0>{serves}</0>"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 msgid "Serves an experiment"
 msgstr "Serves an experiment"
 
@@ -7274,9 +7306,9 @@ msgstr "Shipped {winner}: its rules serve it."
 msgid "Show as table"
 msgstr "Show as table"
 
-#: src/routes/_signed-in/projects/$project/stale-flags.tsx
-msgid "Show flags stale for any of these reasons; none pressed shows every stale flag."
-msgstr "Show flags stale for any of these reasons; none pressed shows every stale flag."
+#: src/components/flags-panel.tsx
+msgid "Show flags stale for any of these reasons; none checked shows every stale flag."
+msgstr "Show flags stale for any of these reasons; none checked shows every stale flag."
 
 #: src/components/group-mappings.tsx
 msgid "Show the current mappings"
@@ -7462,7 +7494,7 @@ msgstr "Someone without an account here joins the instance through the invitatio
 msgid "Something went wrong on the server."
 msgstr "Something went wrong on the server."
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/ui/toolbar.tsx
 msgid "Sort by"
 msgstr "Sort by"
 
@@ -7486,14 +7518,19 @@ msgstr "Split evenly"
 msgid "SSO: {provider}"
 msgstr "SSO: {provider}"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Stale flags"
 msgstr "Stale flags"
 
+#: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Stale for"
 msgstr "Stale for"
+
+#: src/components/flags-panel.tsx
+msgid "Stale for: {name}"
+msgstr "Stale for: {name}"
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Standard"
@@ -7565,12 +7602,20 @@ msgstr "STARTTLS and TLS need TLS 1.2 or later and verify the server's certifica
 msgid "STARTTLS, usually port 587"
 msgstr "STARTTLS, usually port 587"
 
+#: src/components/flags-panel.tsx
 #: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "State"
 msgstr "State"
+
+#: src/components/flags-panel.tsx
+msgid "State in"
+msgstr "State in"
+
+#: src/components/flags-panel.tsx
+msgid "State in {where}: {state}"
+msgstr "State in {where}: {state}"
 
 #: src/components/sdk-keys.tsx
 #: src/components/sink-recovery.tsx
@@ -7717,8 +7762,8 @@ msgstr "System"
 msgid "Table prefix"
 msgstr "Table prefix"
 
+#: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Tag"
 msgstr "Tag"
 
@@ -7729,6 +7774,10 @@ msgstr "Tag added: <0>{tag}</0>."
 #: src/components/structural-diff-view.tsx
 msgid "Tag removed: <0>{tag}</0>."
 msgstr "Tag removed: <0>{tag}</0>."
+
+#: src/components/flags-panel.tsx
+msgid "Tag: {tag}"
+msgstr "Tag: {tag}"
 
 #: src/components/experiment-fields.tsx
 #: src/components/firebase-wizard.tsx
@@ -8857,8 +8906,8 @@ msgstr "The weights must sum to 100.00 %."
 msgid "The weights sum to {sum} %; they must sum to {whole} %."
 msgstr "The weights sum to {sum} %; they must sum to {whole} %."
 
+#: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "The whole tag"
 msgstr "The whole tag"
 
@@ -9256,6 +9305,7 @@ msgstr "Two identifiers were declared to be the same unit."
 #: src/components/discovered-attributes.tsx
 #: src/components/firebase-wizard.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/components/flags-panel.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -9269,6 +9319,10 @@ msgstr "Type {flagKey} to confirm"
 #: src/components/ui/confirm-dialog.tsx
 msgid "Type {typeToConfirm} to confirm"
 msgstr "Type {typeToConfirm} to confirm"
+
+#: src/components/flags-panel.tsx
+msgid "Type: {type}"
+msgstr "Type: {type}"
 
 #: src/components/discovered-attributes.tsx
 msgid "Types seen"
@@ -9567,6 +9621,14 @@ msgstr "view the project"
 #: src/lib/access-names.ts
 msgid "Viewer"
 msgstr "Viewer"
+
+#: src/components/flags-panel.tsx
+msgid "Views"
+msgstr "Views"
+
+#: src/components/flags-panel.tsx
+msgid "Views and filters"
+msgstr "Views and filters"
 
 #: src/components/waiting-change-requests.tsx
 msgid "Waiting change requests"

@@ -37,7 +37,7 @@ export type StaleFlagsSearch = {
 };
 
 /** The reasons asked for, once each, in the report's order; none as no list. */
-function inOrder(reasons: Iterable<StaleReason>): StaleReason[] | undefined {
+export function reasonsInOrder(reasons: Iterable<StaleReason>): StaleReason[] | undefined {
   const asked = new Set(reasons);
   const out = staleReasons.filter((reason) => asked.has(reason));
   return out.length > 0 ? out : undefined;
@@ -50,7 +50,7 @@ function inOrder(reasons: Iterable<StaleReason>): StaleReason[] | undefined {
 export function validateStaleFlagsSearch(search: Record<string, unknown>): StaleFlagsSearch {
   const out: StaleFlagsSearch = {};
   const given = Array.isArray(search.reason) ? search.reason : [search.reason];
-  const reason = inOrder(
+  const reason = reasonsInOrder(
     given.flatMap((value) => {
       const parsed = zStaleReason.safeParse(value);
       return parsed.success ? [parsed.data] : [];
@@ -61,17 +61,6 @@ export function validateStaleFlagsSearch(search: Record<string, unknown>): Stale
     out.cursor = search.cursor.trim();
   }
   return out;
-}
-
-/** The reasons asked for with one added, or taken away when it was asked for already. */
-export function toggleReason(
-  reasons: readonly StaleReason[] | undefined,
-  reason: StaleReason,
-): StaleReason[] | undefined {
-  const current = reasons ?? [];
-  return inOrder(
-    current.includes(reason) ? current.filter((other) => other !== reason) : [...current, reason],
-  );
 }
 
 /** The list request of a search. */

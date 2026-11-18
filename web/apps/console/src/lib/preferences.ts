@@ -20,8 +20,10 @@ export function rememberSidebarCollapsed(collapsed: boolean): void {
   writeStored(keys.sidebarCollapsed, collapsed ? "true" : "false");
 }
 
-export function contextPanelCollapsed(): boolean {
-  return readStored(keys.contextPanelCollapsed) === "true";
+/** Whether this browser folded the panel away or opened it, or null when it never chose. */
+export function contextPanelCollapsed(): boolean | null {
+  const stored = readStored(keys.contextPanelCollapsed);
+  return stored === null ? null : stored === "true";
 }
 
 export function rememberContextPanelCollapsed(collapsed: boolean): void {
