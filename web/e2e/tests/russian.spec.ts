@@ -327,10 +327,11 @@ test.describe("the console in Russian", () => {
     await expect(
       page.getByRole("heading", { name: "Запросы на изменение", level: 1 }),
     ).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Ждут моего решения" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    await expect(
+      page
+        .getByRole("navigation", { name: "Представления и фильтры" })
+        .getByRole("link", { name: "Ждут моего решения" }),
+    ).toHaveAttribute("aria-current", "page");
     await expect(
       page
         .getByRole("navigation", { name: "Проект" })
@@ -543,7 +544,7 @@ test.describe("the console in Russian", () => {
     await expectNoSeriousViolations(page, "an experiment change request in Russian");
 
     await page.goto(`/projects/${stopping}/change-requests`);
-    await expect(page.getByRole("combobox", { name: "Расписание", exact: true })).toBeVisible();
+    await expect(page.getByRole("radiogroup", { name: "Расписание", exact: true })).toBeVisible();
     await expectNoSeriousViolations(
       page,
       "the change requests with the schedule filter in Russian",

@@ -12,70 +12,32 @@ import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
 import { EnvironmentName } from "@/components/protected-mark";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
-import { Select, SelectItem } from "@/components/ui/select";
-import { environmentLabel } from "@/lib/environments";
 import { Table, type TableColumn } from "@/components/ui/table";
-import { Tabs } from "@/components/ui/tabs";
+import { Toolbar } from "@/components/ui/toolbar";
+import { ChangeRequestsPanel, useChangeRequestsFilters } from "@/components/change-requests-panel";
 import { formatDateTime } from "@/i18n/format";
 import { useCan, useMissingPermissionReason } from "@/lib/access";
 import {
-  changeRequestKindName,
-  changeRequestKinds,
   type ChangeRequestsSearch,
-  changeRequestStateName,
-  changeRequestStates,
-  type ChangeRequestsTab,
   isChangeRequestsFiltered,
   validateChangeRequestsSearch,
 } from "@/lib/change-requests";
-import {
-  changeRequestsQuery,
-  environmentsQuery,
-  flagChoicesQuery,
-  meQuery,
-  projectMembersQuery,
-} from "@/lib/queries";
+import { changeRequestsQuery, environmentsQuery, meQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/change-requests/")({
   validateSearch: validateChangeRequestsSearch,
+  staticData: { panel: ChangeRequestsPanel },
   component: ChangeRequests,
 });
 
-/** The select's value for a filter left unset: Radix keeps the empty string for itself. */
-const any = "any";
-
 /**
- * A project's change requests in three tabs: those awaiting the caller's
- * decision, the caller's own, and all of them; each filtered by what the
- * address holds and read a page at a time.
+ * A project's change requests: the view and the facets are in the context
+ * panel, their chips in the toolbar; the list is read a page at a time.
  */
 function ChangeRequests() {
   const { t } = useLingui();
-  const { project } = Route.useParams();
-  const search = Route.useSearch();
-  const navigate = Route.useNavigate();
-
-  // Filters and pages replace the address rather than adding to the
-  // history, since the pages seen are remembered on the screen: going
-  // back leaves the list instead of walking through its pages.
-  const apply = (next: ChangeRequestsSearch) => void navigate({ search: next, replace: true });
-  const filter = (patch: Partial<ChangeRequestsSearch>) =>
-    apply({ ...search, ...patch, cursor: undefined });
-  const tab: ChangeRequestsTab = search.tab ?? "all";
-
-  const content = (
-    <div className="flex flex-col gap-6">
-      <ChangeRequestFilters project={project} search={search} onFilter={filter} />
-      <ChangeRequestPages
-        project={project}
-        search={search}
-        onPage={(cursor) => apply({ ...search, cursor })}
-        onClear={() => apply({ tab: search.tab })}
-      />
-    </div>
-  );
+  const { project, search, apply, chips, removeChip, clearFacets } = useChangeRequestsFilters();
   return (
     <Page>
       <PageHeader
@@ -87,148 +49,17 @@ function ChangeRequests() {
           </Trans>
         }
       />
-      <Tabs
-        label={t`Which change requests`}
-        value={tab}
-        onValueChange={(next) =>
-          filter({
-            tab: next === "awaiting" || next === "mine" ? next : undefined,
-            // Only open change requests await a decision, and the
-            // caller's own are those the caller wrote.
-            ...(next === "awaiting" ? { state: undefined } : {}),
-            ...(next === "mine" ? { author: undefined } : {}),
-          })
-        }
-        tabs={[
-          { value: "awaiting", label: t`Awaiting my decision`, content },
-          { value: "mine", label: t`Mine`, content },
-          { value: "all", label: t`All`, content },
-        ]}
+      <Toolbar chips={chips} onRemoveChip={removeChip} onClearAll={clearFacets} />
+      <ChangeRequestPages
+        project={project}
+        search={search}
+        // Filters and pages replace the address rather than adding to the
+        // history, since the pages seen are remembered on the screen: going
+        // back leaves the list instead of walking through its pages.
+        onPage={(cursor) => apply({ ...search, cursor })}
+        onClear={clearFacets}
       />
     </Page>
-  );
-}
-
-function ChangeRequestFilters({
-  project,
-  search,
-  onFilter,
-}: {
-  project: string;
-  search: ChangeRequestsSearch;
-  onFilter: (patch: Partial<ChangeRequestsSearch>) => void;
-}) {
-  const { i18n, t } = useLingui();
-  const flags = useQuery(flagChoicesQuery(project));
-  const environments = useQuery(environmentsQuery(project));
-  const members = useQuery(projectMembersQuery(project));
-  const flagKeys = (flags.data ?? []).map((flag) => flag.key);
-  const memberIds = (members.data ?? []).map((member) => member.member);
-
-  return (
-    <div
-      role="search"
-      aria-label={t`Filter the change requests`}
-      className="flex flex-wrap items-end gap-4"
-    >
-      {search.tab === "awaiting" ? null : (
-        <Field label={<Trans>State</Trans>} className="w-40">
-          <Select
-            value={search.state ?? any}
-            onValueChange={(value) =>
-              onFilter({ state: changeRequestStates.find((state) => state === value) })
-            }
-          >
-            <SelectItem value={any}>{t`Any state`}</SelectItem>
-            {changeRequestStates.map((state) => (
-              <SelectItem key={state} value={state}>
-                {changeRequestStateName(i18n, state)}
-              </SelectItem>
-            ))}
-          </Select>
-        </Field>
-      )}
-      <Field label={<Trans>Kind</Trans>} className="w-48">
-        <Select
-          value={search.kind ?? any}
-          onValueChange={(value) =>
-            onFilter({ kind: changeRequestKinds.find((kind) => kind === value) })
-          }
-        >
-          <SelectItem value={any}>{t`Any kind`}</SelectItem>
-          {changeRequestKinds.map((kind) => (
-            <SelectItem key={kind} value={kind}>
-              {changeRequestKindName(i18n, kind)}
-            </SelectItem>
-          ))}
-        </Select>
-      </Field>
-      <Field label={<Trans>Flag</Trans>} className="w-56">
-        <Select
-          value={search.flag ?? any}
-          onValueChange={(value) => onFilter({ flag: value === any ? undefined : value })}
-        >
-          <SelectItem value={any}>{t`Any flag`}</SelectItem>
-          {/* A flag the address names that is not among those read: an
-              archived one, whose change requests are still listed. */}
-          {search.flag && !flagKeys.includes(search.flag) ? (
-            <SelectItem value={search.flag}>{search.flag}</SelectItem>
-          ) : null}
-          {flagKeys.map((key) => (
-            <SelectItem key={key} value={key}>
-              {key}
-            </SelectItem>
-          ))}
-        </Select>
-      </Field>
-      <Field label={<Trans>Environment</Trans>} className="w-48">
-        <Select
-          value={search.environment ?? any}
-          onValueChange={(value) => onFilter({ environment: value === any ? undefined : value })}
-        >
-          <SelectItem value={any}>{t`Any environment`}</SelectItem>
-          {(environments.data ?? []).map((environment) => (
-            <SelectItem key={environment.key} value={environment.key}>
-              {environmentLabel(i18n, environment)}
-            </SelectItem>
-          ))}
-        </Select>
-      </Field>
-      <Field label={<Trans>Schedule</Trans>} className="w-48">
-        <Select
-          value={
-            search.scheduled === undefined ? any : search.scheduled ? "scheduled" : "unscheduled"
-          }
-          onValueChange={(value) =>
-            onFilter({ scheduled: value === any ? undefined : value === "scheduled" })
-          }
-        >
-          <SelectItem value={any}>{t`Any schedule`}</SelectItem>
-          <SelectItem value="scheduled">{t`Scheduled`}</SelectItem>
-          <SelectItem value="unscheduled">{t`Not scheduled`}</SelectItem>
-        </Select>
-      </Field>
-      {search.tab === "mine" ? null : (
-        <Field label={<Trans>Author</Trans>} className="w-56">
-          <Select
-            value={search.author ?? any}
-            onValueChange={(value) => onFilter({ author: value === any ? undefined : value })}
-          >
-            <SelectItem value={any}>{t`Any author`}</SelectItem>
-            {/* An author the address names who is not among the project's
-                members: a project token, or a member whose grant is gone. */}
-            {search.author && !memberIds.includes(search.author) ? (
-              <SelectItem value={search.author}>{search.author}</SelectItem>
-            ) : null}
-            {(members.data ?? []).map((member) => (
-              <SelectItem key={member.member} value={member.member}>
-                {member.display_name}
-              </SelectItem>
-            ))}
-          </Select>
-        </Field>
-      )}
-    </div>
   );
 }
 

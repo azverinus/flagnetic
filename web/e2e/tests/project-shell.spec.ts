@@ -738,7 +738,7 @@ test.describe("the context panel", () => {
     const links = panel(page, "Personal settings").getByRole("link");
     await expect(links).toHaveText(["Profile", "Sign-in methods", "Sessions", "API tokens"]);
 
-    await page.goto(`/projects/${seededProject.key}/flags`);
+    await page.goto(`/projects/${seededProject.key}/segments`);
     await expect(page.getByRole("button", { name: /the panel$/ })).toHaveCount(0);
   });
 

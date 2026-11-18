@@ -1104,7 +1104,7 @@ msgstr ""
 msgid "Aliases"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "All"
 msgstr ""
 
@@ -1212,11 +1212,11 @@ msgstr ""
 msgid "Any"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Any author"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Any environment"
 msgstr ""
 
@@ -1228,12 +1228,12 @@ msgstr ""
 msgid "Any event type"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Any flag"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Any kind"
 msgstr ""
 
@@ -1246,12 +1246,12 @@ msgstr ""
 msgid "Any owner"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Any schedule"
 msgstr ""
 
+#: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Any state"
 msgstr ""
 
@@ -1561,9 +1561,14 @@ msgstr ""
 msgid "Authentication settings updated"
 msgstr ""
 
+#: src/components/change-requests-panel.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Author"
+msgstr ""
+
+#: src/components/change-requests-panel.tsx
+msgid "Author: {author}"
 msgstr ""
 
 #: src/components/auth-provider-detail.tsx
@@ -1589,7 +1594,7 @@ msgstr ""
 msgid "Awaiting code removal"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Awaiting my decision"
 msgstr ""
 
@@ -3260,6 +3265,7 @@ msgid "Entity ID"
 msgstr ""
 
 #. A kind of entity in the audit log.
+#: src/components/change-requests-panel.tsx
 #: src/components/experiment-alerts.tsx
 #: src/components/firebase-wizard.tsx
 #: src/components/flag-history.tsx
@@ -3294,6 +3300,10 @@ msgstr ""
 
 #: src/lib/audit.ts
 msgid "Environment updated"
+msgstr ""
+
+#: src/components/change-requests-panel.tsx
+msgid "Environment: {environment}"
 msgstr ""
 
 #: src/components/area-screens.ts
@@ -3727,10 +3737,6 @@ msgstr ""
 msgid "Filter the audit log"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
-msgid "Filter the change requests"
-msgstr ""
-
 #: src/components/webhook-deliveries.tsx
 msgid "Filter the deliveries"
 msgstr ""
@@ -3743,6 +3749,7 @@ msgstr ""
 msgid "Filter the segments"
 msgstr ""
 
+#: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/components/ui/toolbar.tsx
 msgid "Filters"
@@ -3801,6 +3808,7 @@ msgid "Fixed once the project is created, since SDKs and scripts use it."
 msgstr ""
 
 #. A kind of entity in the audit log.
+#: src/components/change-requests-panel.tsx
 #: src/components/experiment-fields.tsx
 #: src/lib/audit.ts
 #: src/lib/experiment-transitions.ts
@@ -3854,6 +3862,10 @@ msgstr ""
 
 #: src/lib/audit.ts
 msgid "Flag restored"
+msgstr ""
+
+#: src/components/change-requests-panel.tsx
+msgid "Flag: {flag}"
 msgstr ""
 
 #: src/components/area-screens.ts
@@ -4553,11 +4565,15 @@ msgid "Kill switch: {flagKey} in {name}"
 msgstr ""
 
 #: src/components/auth-provider-list.tsx
+#: src/components/change-requests-panel.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/sink-editor.tsx
 #: src/components/sink-list.tsx
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Kind"
+msgstr ""
+
+#: src/components/change-requests-panel.tsx
+msgid "Kind: {kind}"
 msgstr ""
 
 #: src/components/sink-list.tsx
@@ -5023,7 +5039,7 @@ msgstr ""
 msgid "Metadata URL"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Mine"
 msgstr ""
 
@@ -5595,7 +5611,7 @@ msgstr ""
 msgid "Not recorded"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Not scheduled"
 msgstr ""
 
@@ -6986,11 +7002,16 @@ msgstr ""
 msgid "Say why, so the author knows what to change."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 msgid "Schedule"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
+msgid "Schedule: {schedule}"
+msgstr ""
+
+#: src/components/change-requests-panel.tsx
 msgid "Scheduled"
 msgstr ""
 
@@ -7602,6 +7623,7 @@ msgstr ""
 msgid "STARTTLS, usually port 587"
 msgstr ""
 
+#: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
@@ -7615,6 +7637,10 @@ msgstr ""
 
 #: src/components/flags-panel.tsx
 msgid "State in {where}: {state}"
+msgstr ""
+
+#: src/components/change-requests-panel.tsx
+msgid "State: {state}"
 msgstr ""
 
 #: src/components/sdk-keys.tsx
@@ -7706,6 +7732,10 @@ msgstr ""
 
 #: src/lib/webhooks.ts
 msgid "Succeeded"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "Summary"
 msgstr ""
 
 #: src/lib/change-requests.ts
@@ -9622,10 +9652,12 @@ msgstr ""
 msgid "Viewer"
 msgstr ""
 
+#: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
 msgid "Views"
 msgstr ""
 
+#: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
 msgid "Views and filters"
 msgstr ""
@@ -9781,10 +9813,6 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Where the project serves from. A key is fixed once created; the name can change."
-msgstr ""
-
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
-msgid "Which change requests"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx

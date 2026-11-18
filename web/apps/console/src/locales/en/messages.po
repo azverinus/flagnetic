@@ -1104,7 +1104,7 @@ msgstr "Alerts"
 msgid "Aliases"
 msgstr "Aliases"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "All"
 msgstr "All"
 
@@ -1212,11 +1212,11 @@ msgstr "Another variation has this key."
 msgid "Any"
 msgstr "Any"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Any author"
 msgstr "Any author"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Any environment"
 msgstr "Any environment"
 
@@ -1228,12 +1228,12 @@ msgstr "Any environments"
 msgid "Any event type"
 msgstr "Any event type"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Any flag"
 msgstr "Any flag"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Any kind"
 msgstr "Any kind"
 
@@ -1246,12 +1246,12 @@ msgstr "Any origin"
 msgid "Any owner"
 msgstr "Any owner"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Any schedule"
 msgstr "Any schedule"
 
+#: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Any state"
 msgstr "Any state"
 
@@ -1561,10 +1561,15 @@ msgstr "Authentication settings"
 msgid "Authentication settings updated"
 msgstr "Authentication settings updated"
 
+#: src/components/change-requests-panel.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Author"
 msgstr "Author"
+
+#: src/components/change-requests-panel.tsx
+msgid "Author: {author}"
+msgstr "Author: {author}"
 
 #: src/components/auth-provider-detail.tsx
 msgid "Authorization endpoint"
@@ -1589,7 +1594,7 @@ msgstr "Automatic exposure switched on."
 msgid "Awaiting code removal"
 msgstr "Awaiting code removal"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Awaiting my decision"
 msgstr "Awaiting my decision"
 
@@ -3260,6 +3265,7 @@ msgid "Entity ID"
 msgstr "Entity ID"
 
 #. A kind of entity in the audit log.
+#: src/components/change-requests-panel.tsx
 #: src/components/experiment-alerts.tsx
 #: src/components/firebase-wizard.tsx
 #: src/components/flag-history.tsx
@@ -3295,6 +3301,10 @@ msgstr "Environment unprotected"
 #: src/lib/audit.ts
 msgid "Environment updated"
 msgstr "Environment updated"
+
+#: src/components/change-requests-panel.tsx
+msgid "Environment: {environment}"
+msgstr "Environment: {environment}"
 
 #: src/components/area-screens.ts
 #: src/components/experiment-exposures.tsx
@@ -3727,10 +3737,6 @@ msgstr "Field"
 msgid "Filter the audit log"
 msgstr "Filter the audit log"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
-msgid "Filter the change requests"
-msgstr "Filter the change requests"
-
 #: src/components/webhook-deliveries.tsx
 msgid "Filter the deliveries"
 msgstr "Filter the deliveries"
@@ -3743,6 +3749,7 @@ msgstr "Filter the experiments"
 msgid "Filter the segments"
 msgstr "Filter the segments"
 
+#: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/components/ui/toolbar.tsx
 msgid "Filters"
@@ -3801,6 +3808,7 @@ msgid "Fixed once the project is created, since SDKs and scripts use it."
 msgstr "Fixed once the project is created, since SDKs and scripts use it."
 
 #. A kind of entity in the audit log.
+#: src/components/change-requests-panel.tsx
 #: src/components/experiment-fields.tsx
 #: src/lib/audit.ts
 #: src/lib/experiment-transitions.ts
@@ -3855,6 +3863,10 @@ msgstr "Flag not found"
 #: src/lib/audit.ts
 msgid "Flag restored"
 msgstr "Flag restored"
+
+#: src/components/change-requests-panel.tsx
+msgid "Flag: {flag}"
+msgstr "Flag: {flag}"
 
 #: src/components/area-screens.ts
 #: src/components/firebase-wizard.tsx
@@ -4553,12 +4565,16 @@ msgid "Kill switch: {flagKey} in {name}"
 msgstr "Kill switch: {flagKey} in {name}"
 
 #: src/components/auth-provider-list.tsx
+#: src/components/change-requests-panel.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/sink-editor.tsx
 #: src/components/sink-list.tsx
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Kind"
 msgstr "Kind"
+
+#: src/components/change-requests-panel.tsx
+msgid "Kind: {kind}"
+msgstr "Kind: {kind}"
 
 #: src/components/sink-list.tsx
 #: src/components/sink-screen.tsx
@@ -5023,7 +5039,7 @@ msgstr "Metadata from a URL is read again every day."
 msgid "Metadata URL"
 msgstr "Metadata URL"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Mine"
 msgstr "Mine"
 
@@ -5595,7 +5611,7 @@ msgstr "Not private"
 msgid "Not recorded"
 msgstr "Not recorded"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
 msgid "Not scheduled"
 msgstr "Not scheduled"
 
@@ -6986,11 +7002,16 @@ msgstr "Saving…"
 msgid "Say why, so the author knows what to change."
 msgstr "Say why, so the author knows what to change."
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 msgid "Schedule"
 msgstr "Schedule"
 
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/components/change-requests-panel.tsx
+msgid "Schedule: {schedule}"
+msgstr "Schedule: {schedule}"
+
+#: src/components/change-requests-panel.tsx
 msgid "Scheduled"
 msgstr "Scheduled"
 
@@ -7602,6 +7623,7 @@ msgstr "STARTTLS and TLS need TLS 1.2 or later and verify the server's certifica
 msgid "STARTTLS, usually port 587"
 msgstr "STARTTLS, usually port 587"
 
+#: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/components/scim-tokens.tsx
 #: src/components/token-list.tsx
@@ -7616,6 +7638,10 @@ msgstr "State in"
 #: src/components/flags-panel.tsx
 msgid "State in {where}: {state}"
 msgstr "State in {where}: {state}"
+
+#: src/components/change-requests-panel.tsx
+msgid "State: {state}"
+msgstr "State: {state}"
 
 #: src/components/sdk-keys.tsx
 #: src/components/sink-recovery.tsx
@@ -7707,6 +7733,10 @@ msgstr "String"
 #: src/lib/webhooks.ts
 msgid "Succeeded"
 msgstr "Succeeded"
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "Summary"
+msgstr "Summary"
 
 #: src/lib/change-requests.ts
 msgid "Superseded"
@@ -9622,10 +9652,12 @@ msgstr "view the project"
 msgid "Viewer"
 msgstr "Viewer"
 
+#: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
 msgid "Views"
 msgstr "Views"
 
+#: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
 msgid "Views and filters"
 msgstr "Views and filters"
@@ -9782,10 +9814,6 @@ msgstr "Where the identity provider publishes its metadata. Plain http is accept
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Where the project serves from. A key is fixed once created; the name can change."
 msgstr "Where the project serves from. A key is fixed once created; the name can change."
-
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
-msgid "Which change requests"
-msgstr "Which change requests"
 
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Which flags use the segment could not be read; the rules of any that do evaluate by what it holds once saved."

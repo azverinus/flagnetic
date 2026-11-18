@@ -1,4 +1,5 @@
 import type { ChangeRequest, ChangeRequestDecision } from "@flagnetic/api";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Page } from "@/components/ui/page";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -137,6 +138,12 @@ function ChangeRequestPage({
   const baseVersion = changeRequest.base_version;
   const authorName = author.name;
 
+  // Only a change request that can still apply has a time ahead of it.
+  const showSchedule =
+    (changeRequest.apply_at !== null && waiting) ||
+    applied_at !== null ||
+    changeRequest.schedule_failure !== null;
+
   return (
     <Page>
       <PageHeader
@@ -178,131 +185,145 @@ function ChangeRequestPage({
         </p>
       ) : null}
 
-      <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
-        {changeRequest.flag ? (
-          <Fact term={<Trans>Flag</Trans>}>
-            <Link
-              to="/projects/$project/flags/$flag"
-              params={{ project, flag: changeRequest.flag }}
-              className="font-mono text-xs hover:underline"
-            >
-              {changeRequest.flag}
-            </Link>
-          </Fact>
-        ) : null}
-        {changeRequest.segment ? (
-          <Fact term={<Trans>Segment</Trans>}>
-            <Link
-              to="/projects/$project/segments/$segment"
-              params={{ project, segment: changeRequest.segment }}
-              className="font-mono text-xs hover:underline"
-            >
-              {changeRequest.segment}
-            </Link>
-          </Fact>
-        ) : null}
-        {changeRequest.experiment ? (
-          <Fact term={<Trans>Experiment</Trans>}>
-            <Link
-              to="/projects/$project/experiments/$experiment"
-              params={{ project, experiment: changeRequest.experiment }}
-              className="font-mono text-xs hover:underline"
-            >
-              {changeRequest.experiment}
-            </Link>
-          </Fact>
-        ) : null}
-        {changeRequest.environment ? (
-          <Fact term={<Trans>Environment</Trans>}>
-            <Link
-              to="/projects/$project/environments/$environment"
-              params={{ project, environment: changeRequest.environment }}
-              className="hover:underline"
-            >
-              {environmentName(changeRequest.environment)}
-            </Link>
-            {environmentProtected(changeRequest.environment) ? (
-              <>
-                {" "}
-                <ProtectedMark />
-              </>
+      <Card aria-labelledby="summary">
+        <CardHeader title={<Trans>Summary</Trans>} titleId="summary" />
+        <CardContent>
+          <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
+            {changeRequest.flag ? (
+              <Fact term={<Trans>Flag</Trans>}>
+                <Link
+                  to="/projects/$project/flags/$flag"
+                  params={{ project, flag: changeRequest.flag }}
+                  className="font-mono text-xs hover:underline"
+                >
+                  {changeRequest.flag}
+                </Link>
+              </Fact>
             ) : null}
-          </Fact>
-        ) : null}
-        <Fact term={<Trans>Based on</Trans>}>
-          <Trans>Version {baseVersion}</Trans>
-        </Fact>
-        <Fact term={<Trans>Author</Trans>}>
-          {author.kind === "token" ? <Trans>{authorName} (project token)</Trans> : authorName}
-        </Fact>
-        <Fact term={<Trans>Created</Trans>}>
-          <Moment at={changeRequest.created_at} />
-        </Fact>
-        {/* Only a change request that can still apply has a time ahead of it. */}
-        {changeRequest.apply_at !== null && waiting ? (
-          <Fact term={<Trans>Applies at</Trans>}>
-            <Moment at={changeRequest.apply_at} />
-            {state === "open" || state === "draft" ? (
-              <>
-                {" · "}
-                <Trans>once approved</Trans>
-              </>
+            {changeRequest.segment ? (
+              <Fact term={<Trans>Segment</Trans>}>
+                <Link
+                  to="/projects/$project/segments/$segment"
+                  params={{ project, segment: changeRequest.segment }}
+                  className="font-mono text-xs hover:underline"
+                >
+                  {changeRequest.segment}
+                </Link>
+              </Fact>
             ) : null}
-          </Fact>
-        ) : null}
-        {applied_at !== null ? (
-          <Fact term={<Trans>Applied</Trans>}>
-            <Moment at={applied_at} />
-            {applied_by ? (
-              <>
-                {" · "}
-                {applied_by.kind === "system" ? t`at its scheduled time` : applied_by.name}
-              </>
+            {changeRequest.experiment ? (
+              <Fact term={<Trans>Experiment</Trans>}>
+                <Link
+                  to="/projects/$project/experiments/$experiment"
+                  params={{ project, experiment: changeRequest.experiment }}
+                  className="font-mono text-xs hover:underline"
+                >
+                  {changeRequest.experiment}
+                </Link>
+              </Fact>
             ) : null}
-          </Fact>
-        ) : null}
-        {changeRequest.description ? (
-          <div className="flex flex-col gap-0.5 sm:col-span-3">
-            <dt className="text-muted-foreground">
-              <Trans>Description</Trans>
-            </dt>
-            <dd className="whitespace-pre-wrap">{changeRequest.description}</dd>
-          </div>
-        ) : null}
-      </dl>
+            {changeRequest.environment ? (
+              <Fact term={<Trans>Environment</Trans>}>
+                <Link
+                  to="/projects/$project/environments/$environment"
+                  params={{ project, environment: changeRequest.environment }}
+                  className="hover:underline"
+                >
+                  {environmentName(changeRequest.environment)}
+                </Link>
+                {environmentProtected(changeRequest.environment) ? (
+                  <>
+                    {" "}
+                    <ProtectedMark />
+                  </>
+                ) : null}
+              </Fact>
+            ) : null}
+            <Fact term={<Trans>Based on</Trans>}>
+              <Trans>Version {baseVersion}</Trans>
+            </Fact>
+            <Fact term={<Trans>Author</Trans>}>
+              {author.kind === "token" ? <Trans>{authorName} (project token)</Trans> : authorName}
+            </Fact>
+            <Fact term={<Trans>Created</Trans>}>
+              <Moment at={changeRequest.created_at} />
+            </Fact>
+            {changeRequest.description ? (
+              <div className="flex flex-col gap-0.5 sm:col-span-3">
+                <dt className="text-muted-foreground">
+                  <Trans>Description</Trans>
+                </dt>
+                <dd className="whitespace-pre-wrap">{changeRequest.description}</dd>
+              </div>
+            ) : null}
+          </dl>
+        </CardContent>
+      </Card>
 
-      {changeRequest.schedule_failure !== null ? (
-        <ScheduleFailureNotice failure={changeRequest.schedule_failure} state={state} />
+      {showSchedule ? (
+        <Card aria-labelledby="schedule">
+          <CardHeader title={<Trans>Schedule</Trans>} titleId="schedule" />
+          <CardContent>
+            <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
+              {/* Only a change request that can still apply has a time ahead of it. */}
+              {changeRequest.apply_at !== null && waiting ? (
+                <Fact term={<Trans>Applies at</Trans>}>
+                  <Moment at={changeRequest.apply_at} />
+                  {state === "open" || state === "draft" ? (
+                    <>
+                      {" · "}
+                      <Trans>once approved</Trans>
+                    </>
+                  ) : null}
+                </Fact>
+              ) : null}
+              {applied_at !== null ? (
+                <Fact term={<Trans>Applied</Trans>}>
+                  <Moment at={applied_at} />
+                  {applied_by ? (
+                    <>
+                      {" · "}
+                      {applied_by.kind === "system" ? t`at its scheduled time` : applied_by.name}
+                    </>
+                  ) : null}
+                </Fact>
+              ) : null}
+            </dl>
+            {changeRequest.schedule_failure !== null ? (
+              <ScheduleFailureNotice failure={changeRequest.schedule_failure} state={state} />
+            ) : null}
+          </CardContent>
+        </Card>
       ) : null}
 
       {approval || rejection ? (
-        <section aria-labelledby="decisions" className="flex flex-col gap-2">
-          <h2 id="decisions" className="text-base font-medium">
-            <Trans>Decision</Trans>
-          </h2>
-          {approval ? <Decision decision={approval} approved /> : null}
-          {rejection ? <Decision decision={rejection} approved={false} /> : null}
-        </section>
+        <Card aria-labelledby="decisions">
+          <CardHeader title={<Trans>Decision</Trans>} titleId="decisions" />
+          <CardContent>
+            {approval ? <Decision decision={approval} approved /> : null}
+            {rejection ? <Decision decision={rejection} approved={false} /> : null}
+          </CardContent>
+        </Card>
       ) : null}
 
-      <section aria-labelledby="changes" className="flex flex-col gap-2">
-        <h2 id="changes" className="text-base font-medium">
-          <Trans>Changes</Trans>
-        </h2>
-        {changeRequest.kind === "experiment" ? (
-          <ChangeRequestDiff
-            changeRequest={changeRequest}
-            current={undefined}
-            environmentName={environmentName}
-          />
-        ) : subject.isError ? (
-          <QueryError error={subject.error} onRetry={() => void subject.refetch()} />
-        ) : subject.isPending && subject.fetchStatus !== "idle" ? (
-          <Skeleton className="h-16 w-full" />
-        ) : (
-          <ChangeRequestDiff changeRequest={changeRequest} current={current} />
-        )}
-      </section>
+      <Card aria-labelledby="changes">
+        <CardHeader title={<Trans>Changes</Trans>} titleId="changes" />
+        <CardContent>
+          {changeRequest.kind === "experiment" ? (
+            <ChangeRequestDiff
+              changeRequest={changeRequest}
+              current={undefined}
+              environmentName={environmentName}
+            />
+          ) : subject.isError ? (
+            <QueryError error={subject.error} onRetry={() => void subject.refetch()} />
+          ) : subject.isPending && subject.fetchStatus !== "idle" ? (
+            <Skeleton className="h-16 w-full" />
+          ) : (
+            <ChangeRequestDiff changeRequest={changeRequest} current={current} />
+          )}
+        </CardContent>
+      </Card>
     </Page>
   );
 }
