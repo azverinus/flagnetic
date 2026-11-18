@@ -72,6 +72,11 @@ RE_HELM='^deploy/helm/|^\.github/(ct\.yaml$|scripts/check-helm\.sh$)'
 # request or a push to main runs it for these alone; the nightly run and the
 # server's release pull request always do.
 RE_LOAD='^(internal/(domain|app)/(delivery|events)/|internal/infra/(in/http/sdk/|in/http/[^/]+\.go$|out/postgres/(delivery|events)/|out/postgres/listen\.go$)|internal/pkg/pglisten/|cmd/|eval/|api/sdk\.yaml$|e2e/|\.github/scripts/load\.sh$)'
+# The rolling-upgrade test: a migration, since it is the change that can break
+# the previous release's replicas, the chart it installs and upgrades, and the
+# driver and script that run it. The nightly run and the server's release pull
+# request always run it.
+RE_UPGRADE='^(internal/infra/out/postgres/migrations/.*\.sql$|deploy/helm/|e2e/(upgrade/|cmd/flagnetic-upgrade/)|\.github/scripts/upgrade\.sh$)'
 RE_WORKFLOWS='^\.github/(workflows/|actionlint\.yaml$|scripts/check-ci-ok\.sh$)'
 
 # Merging the server's release pull request publishes the image, so it is
@@ -211,7 +216,7 @@ EOF
   CHANGED_ROOT_DIRS="$(printf '%s' "$CHANGED_ROOT_DIRS" | sort -u | sed '/^$/d')"
 
   ANY_GO=0; SERVER=0
-  RUN_CONSOLE=0; RUN_CONSOLE_E2E=0; RUN_SDK_JS=0; RUN_PYTHON=0; RUN_RUBY=0; RUN_DART=0; RUN_FLUTTER=0; RUN_WORKFLOWS=0; RUN_MIGRATIONS=0; RUN_HELM=0; RUN_LOAD=0
+  RUN_CONSOLE=0; RUN_CONSOLE_E2E=0; RUN_SDK_JS=0; RUN_PYTHON=0; RUN_RUBY=0; RUN_DART=0; RUN_FLUTTER=0; RUN_WORKFLOWS=0; RUN_MIGRATIONS=0; RUN_HELM=0; RUN_LOAD=0; RUN_UPGRADE=0
   changed "$RE_GO" && ANY_GO=1
   changed "$RE_SERVER" && SERVER=1
   [ -n "$CHANGED_ROOT_DIRS" ] && SERVER=1
@@ -227,12 +232,13 @@ EOF
   changed "$RE_MIGRATIONS" && RUN_MIGRATIONS=1
   changed "$RE_HELM" && RUN_HELM=1
   changed "$RE_LOAD" && RUN_LOAD=1
+  changed "$RE_UPGRADE" && RUN_UPGRADE=1
   # A run that checks everything because of the event (nightly, the release
   # pull request) or because the workflow or this plan changed, which can
   # change the load job itself, measures the load too; one that does so
   # because a server change reached main does not, since the paths above ask
   # for it already.
-  if [ "$PLAN_MODE" = full ] || changed "$RE_FULL"; then RUN_LOAD=1; fi
+  if [ "$PLAN_MODE" = full ] || changed "$RE_FULL"; then RUN_LOAD=1; RUN_UPGRADE=1; fi
 
   # The server's packages that can see a change: those that changed and those
   # whose tests depend on one, in the server or in a module it imports (their
@@ -374,6 +380,7 @@ plan_print() {
   echo "migrations=$(bool "$RUN_MIGRATIONS")"
   echo "helm=$(bool "$RUN_HELM")"
   echo "load=$(bool "$RUN_LOAD")"
+  echo "upgrade=$(bool "$RUN_UPGRADE")"
   echo "modules=$modules"
   echo "test_shards=$shards"
   echo "cover_packages=$COVER_PKGS"

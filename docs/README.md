@@ -1,8 +1,9 @@
 # Flagnetic documentation
 
 - [A first flag in ten minutes](quickstart.md): compose up, bootstrap, a project, a flag and an SDK key, evaluated from the Go or JavaScript SDK, then flipped and seen to change.
-- [Installing Flagnetic](install.md): Docker Compose or the binary, TLS and a reverse proxy, PostgreSQL connections, upgrades.
+- [Installing Flagnetic](install.md): Docker Compose, Kubernetes or the binary, TLS and a reverse proxy, PostgreSQL connections.
 - [Running on Kubernetes](kubernetes.md): the Helm chart, PostgreSQL, the Secret, migration modes, routes, metrics, scaling, network policy and upgrades.
+- [Upgrading Flagnetic](upgrades.md): from 0.x to 1.0, rolling upgrades between 1.x releases with the chart, Compose or systemd, what adjacent minors means, and going back.
 - [Glossary](glossary.md): the vocabulary the code, the API, the docs and the console use.
 - [Access](access.md): permissions, roles, grants, scopes and API tokens.
 - [Flags](flags.md): flag definitions, configurations per environment, rules, rollouts, overrides, prerequisites, the kill switch, revert, copy and compare.

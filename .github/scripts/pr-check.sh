@@ -246,7 +246,7 @@ print_plan() {
     say "  server tests:     $(printf '%s\n' "$TEST_PKGS" | sed '/^$/d' | wc -l | tr -d ' ') packages, left to CI (--full runs them here)"
   fi
   for i in "${!MOD_PATH[@]}"; do [ "${MOD_RUN[$i]}" = 1 ] && say "  module checked:   ${MOD_REL[$i]}"; done
-  say "  migrations: $RUN_MIGRATIONS  helm: $RUN_HELM  load (CI only; task load): $RUN_LOAD  console: $RUN_CONSOLE  sdk-js: $RUN_SDK_JS  python: $RUN_PYTHON  ruby: $RUN_RUBY  dart: $RUN_DART  flutter: $RUN_FLUTTER  workflows: $RUN_WORKFLOWS  playwright specs: $(printf '%s' "$SPECS" | tr '\n' ' ')"
+  say "  migrations: $RUN_MIGRATIONS  helm: $RUN_HELM  load (CI only; task load): $RUN_LOAD  upgrade (CI only): $RUN_UPGRADE  console: $RUN_CONSOLE  sdk-js: $RUN_SDK_JS  python: $RUN_PYTHON  ruby: $RUN_RUBY  dart: $RUN_DART  flutter: $RUN_FLUTTER  workflows: $RUN_WORKFLOWS  playwright specs: $(printf '%s' "$SPECS" | tr '\n' ' ')"
 }
 print_plan
 [ "$PLAN_ONLY" = 1 ] && exit 0

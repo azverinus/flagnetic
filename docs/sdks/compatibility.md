@@ -11,7 +11,7 @@ Every SDK is in its 0.x line: until 1.0.0 a minor release may still change the S
 Flagnetic is a developer preview. From 0.1.0, its first release, on:
 
 - **The SDK API and the ruleset format only grow.** `/sdk/v1`, its headers, answers and problem codes, and the ruleset document change only additively, under the degradation rules below, so an SDK released with 0.1 keeps working with every later 0.x and 1.x server. Anything an older SDK could not read is served only to an SDK that asks for it, as a new `schema_version` or under a new SDK API path beside `/sdk/v1`.
-- **Upgrades only migrate forward, without data loss.** Migrations are never edited once released and there are no down migrations; upgrading a server keeps every flag, segment, key and audit entry. Take a database backup before an upgrade and upgrade all replicas together; 0.x does not promise that an older version runs against a database a newer one migrated, nor that two versions serve side by side (see [Upgrades](../install.md#upgrades)).
+- **Upgrades only migrate forward, without data loss.** Migrations are never edited once released and there are no down migrations; upgrading a server keeps every flag, segment, key and audit entry. Take a database backup before an upgrade and upgrade all replicas together; 0.x does not promise that an older version runs against a database a newer one migrated, nor that two versions serve side by side (see [Upgrades](../upgrades.md)).
 - **The management API and the console may still change.** `/api/v1` and the console may change incompatibly in a 0.x minor release; every such change is marked as breaking in the release notes.
 
 Single sign-on is not there yet. The server needs PostgreSQL 16 or later.

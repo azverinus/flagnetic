@@ -71,6 +71,11 @@ Each reads the state `up` wrote (`FLAGNETIC_E2E_STATE`, a file in the system tem
 
 The generator sends on a schedule fixed before the run and measures each latency from the scheduled send time, so a slow server cannot hide the queue behind it. `load/profile.json` holds the rates, the durations and the p99 ceilings, which are generous absolute numbers that catch a regression of a multiple: a hosted runner varies by more than a few percent.
 
+## The rolling-upgrade run
+
+`flagnetic-upgrade run --url <base URL> -- <command>` judges an upgrade of an instance that is already running, such as the chart in kind: it seeds the project through the management API, holds a Go SDK on the change stream, sends remote evaluations and ruleset fetches at a low rate, runs the command (a `helm upgrade`) under them, keeps the load going for `--settle` after the command returns, then switches a flag off and waits for the SDK to serve it off. It exits 1 on a failed command, any failed request, an evaluation the SDK did not serve from its ruleset, or a change that never arrives. `flagnetic-upgrade admin` prints the harness's instance admin as JSON for the command that bootstraps it. `.github/scripts/upgrade.sh` runs all of it in a kind cluster (see the header of the script for the environment it reads); the unit tests in `upgrade/` cover the totals and the verdict.
+
 ## In CI
 
-The `sdk-e2e` job of `.github/workflows/ci.yml` runs on every pull request against a PostgreSQL service and runs this module's test, which brings the instance up in-process and also exercises the command. The `load` job runs the load scenarios against two replicas and PostgreSQL 18 (see above). A language adds steps that start `flagnetic-e2e up` in the background with `FLAGNETIC_E2E_SEED` set, wait for the seed file, and run its smoke, as the Ruby SDK's steps do.
+
+The `sdk-e2e` job of `.github/workflows/ci.yml` runs on every pull request against a PostgreSQL service and runs this module's test, which brings the instance up in-process and also exercises the command. The `load` job runs the load scenarios against two replicas and PostgreSQL 18 (see above). The `upgrade` job runs the rolling upgrade (see above) in kind. A language adds steps that start `flagnetic-e2e up` in the background with `FLAGNETIC_E2E_SEED` set, wait for the seed file, and run its smoke, as the Ruby SDK's steps do.

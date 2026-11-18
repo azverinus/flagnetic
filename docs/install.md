@@ -246,22 +246,6 @@ Both are on the public listener. A load balancer routes only to ready replicas; 
 
 ## Upgrades
 
-Read the release notes of every version between yours and the new one: a change that needs you to act is marked there.
+[Upgrading Flagnetic](upgrades.md) has the steps: from 0.x to 1.0 you back up, stop every replica, migrate and start; between 1.x releases the upgrade is rolling and needs no downtime, with the Helm chart, Docker Compose or systemd. It also explains what "adjacent minors" means, how a rollback works (restore the backup), and has the notes of each version that needs you to act. Read the release notes of every version between yours and the new one first.
 
-1. **Back up the database.** A backup taken before the upgrade is the way back if anything goes wrong.
-2. **Stop every replica.** In this developer preview, upgrade all replicas together and accept a brief downtime: 0.x does not promise that two versions serve side by side.
-3. **Migrate.** Run `flagnetic migrate` with the new version, as a job. Or leave `FLAGNETIC_AUTO_MIGRATE` on: the first new replica migrates, and replicas starting together take turns. With Compose, set the new `FLAGNETIC_VERSION` in `.env` and run `docker compose pull && docker compose up -d`: the `migrate` job runs again before the new server starts.
-4. **Start the new replicas.**
-
-From 0.1.0 on, migrations only move forward, without data loss: a migration is never edited once released, and there are no down migrations. 0.x does not promise that an older version keeps working against a database a newer one migrated: to go back, restore the backup taken before the upgrade and deploy the previous version. A replica never runs against a schema older than its own: with auto-migration off it refuses to start until `flagnetic migrate` has run (see [Migrations](operations.md#migrations)).
-
-### Upgrading to 0.5
-
-Two changes need a look before the upgrade:
-
-- **The metrics listener answers on this host only.** `FLAGNETIC_METRICS_LISTEN_ADDR` now defaults to `127.0.0.1:9090`. The container image and the Compose file are unchanged in effect (the image sets `:9090`, and Compose publishes it on the host's loopback). A binary install that a Prometheus on another host scrapes sets the address of an interface it can reach, for example `10.0.0.5:9090`. See [Metrics](operations.md#metrics).
-- **A script's API token can no longer create or widen access.** Granting a role, inviting a member to the instance or a project, reactivating or editing a member, and issuing a password reset need a signed-in session, as creating a token already did; a token is refused `403 session_required`. See [Only a session creates a credential](access.md#only-a-session-creates-a-credential).
-
-Secrets sealed before 0.5 keep opening and are bound to their row the next time it is stored ([Operations](operations.md#the-secret-key)).
-
-The SDK API (`/sdk/v1`) and the ruleset format only grow, so SDKs keep working across server upgrades without being upgraded themselves. The management API (`/api/v1`) and the console may still change incompatibly between 0.x releases, each such change marked as breaking in the release notes; scripts using the management API should be checked against them.
+The SDK API (`/sdk/v1`) and the ruleset format only grow, so SDKs keep working across server upgrades without being upgraded themselves.

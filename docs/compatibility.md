@@ -47,7 +47,7 @@ A thing to remove is deprecated in a minor release and removed only in the next 
 
 ## Support
 
-Only the latest minor release is supported. Fixes, security fixes included, ship in the next patch or minor release from `main`; there are no release branches and no backports. Upgrades between minors are rolling and need no downtime, so moving to the latest minor is cheap; see [Upgrades](install.md#upgrades). Every SDK is versioned and supported the same way, on its own line.
+Only the latest minor release is supported. Fixes, security fixes included, ship in the next patch or minor release from `main`; there are no release branches and no backports. Upgrades between minors are rolling and need no downtime, so moving to the latest minor is cheap; see [Upgrades](upgrades.md). Every SDK is versioned and supported the same way, on its own line.
 
 ## What is not a contract
 
