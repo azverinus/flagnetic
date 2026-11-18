@@ -3,10 +3,16 @@ import { useLingui } from "@lingui/react/macro";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 import { PermissionGate } from "@/components/can";
+import { projectSettingsArea } from "@/components/area-screens";
+import { ProjectSettingsPanel } from "@/components/settings-panels";
 
 /** A project's sinks: the list, a new sink and one sink under it. */
 export const Route = createFileRoute("/_signed-in/projects/$project/sinks")({
-  staticData: { crumb: msg`Sinks` },
+  staticData: {
+    crumb: msg`Sinks`,
+    area: projectSettingsArea,
+    panel: ProjectSettingsPanel,
+  },
   component: Sinks,
 });
 

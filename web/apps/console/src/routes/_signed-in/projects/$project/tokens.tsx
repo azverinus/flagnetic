@@ -13,9 +13,15 @@ import { AccessContext } from "@/lib/access";
 import { tokenPolicy } from "@/lib/personal-tokens";
 import { meQuery } from "@/lib/queries";
 import { useKnownMembers } from "@/lib/use-known-members";
+import { projectSettingsArea } from "@/components/area-screens";
+import { ProjectSettingsPanel } from "@/components/settings-panels";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/tokens")({
-  staticData: { crumb: msg`Project tokens` },
+  staticData: {
+    crumb: msg`Project tokens`,
+    area: projectSettingsArea,
+    panel: ProjectSettingsPanel,
+  },
   component: ProjectTokens,
 });
 

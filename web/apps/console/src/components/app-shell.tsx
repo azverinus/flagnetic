@@ -1,12 +1,12 @@
 import { Trans } from "@lingui/react/macro";
-import { useRouterState } from "@tanstack/react-router";
+import { useMatches, useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useEffect } from "react";
 
-import { AreaNavigation } from "@/components/area-navigation";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { InstanceLink, ProjectNavigation } from "@/components/navigation";
 import { PersonalMenu } from "@/components/personal-menu";
 import { ProjectSwitcher } from "@/components/project-switcher";
+import { ContextPanelProvider, ContextPanelTrigger } from "@/components/ui/context-panel";
 import {
   Sidebar,
   SidebarInset,
@@ -26,27 +26,41 @@ import { useShellProject } from "@/lib/use-shell-project";
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <SidebarProvider>
-      <div className="flex h-dvh overflow-hidden bg-sidebar">
-        <a
-          href="#main"
-          className="sr-only z-50 rounded-md bg-background px-3 py-2 focus:not-sr-only focus:absolute focus:top-2 focus:left-2"
-        >
-          <Trans>Skip to content</Trans>
-        </a>
-        <ShellSidebar />
-        <SidebarInset>
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
-            <SidebarTrigger />
-            <Breadcrumb />
-          </header>
-          <AreaNavigation />
-          <main id="main" tabIndex={-1} className="relative min-w-0 flex-1 overflow-auto">
-            {children}
-          </main>
-        </SidebarInset>
-      </div>
+      <ContextPanelProvider>
+        <div className="flex h-dvh overflow-hidden bg-sidebar">
+          <a
+            href="#main"
+            className="sr-only z-50 rounded-md bg-background px-3 py-2 focus:not-sr-only focus:absolute focus:top-2 focus:left-2"
+          >
+            <Trans>Skip to content</Trans>
+          </a>
+          <ShellSidebar />
+          <SidebarInset>
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+              <SidebarTrigger />
+              <ContextPanelTrigger />
+              <Breadcrumb />
+            </header>
+            <div className="flex min-h-0 flex-1">
+              <DeclaredPanel />
+              <main id="main" tabIndex={-1} className="relative min-w-0 flex-1 overflow-auto">
+                {children}
+              </main>
+            </div>
+          </SidebarInset>
+        </div>
+      </ContextPanelProvider>
     </SidebarProvider>
   );
+}
+
+/**
+ * The panel the deepest matched route declares, if any: a route without
+ * one leaves the page the whole card.
+ */
+function DeclaredPanel() {
+  const Panel = useMatches().findLast((match) => match.staticData.panel)?.staticData.panel;
+  return Panel ? <Panel /> : null;
 }
 
 /**

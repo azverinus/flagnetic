@@ -1,6 +1,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
+import type { ComponentType } from "react";
 
 import type { ParamCrumb, projectNameCrumb } from "@/components/breadcrumb";
 import { Toaster } from "@/components/toaster";
@@ -14,6 +15,17 @@ declare module "@tanstack/react-router" {
      * path parameter that holds the entity's key.
      */
     crumb?: MessageDescriptor | typeof projectNameCrumb | ParamCrumb;
+    /**
+     * The area a screen belongs to, which the breadcrumb names between
+     * the project and the screen without the address changing.
+     */
+    area?: MessageDescriptor;
+    /**
+     * The second column of the shell for this route and those under it,
+     * which renders a `ContextPanel`; a route without one gives the page
+     * the whole card. The deepest route that declares one wins.
+     */
+    panel?: ComponentType;
   }
 }
 

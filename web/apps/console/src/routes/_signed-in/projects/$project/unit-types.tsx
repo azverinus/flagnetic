@@ -41,9 +41,15 @@ import { useListMutation } from "@/lib/mutations";
 import { unitTypesQuery } from "@/lib/queries";
 import { useNewerVersionNotice } from "@/lib/change-stream";
 import { useFormConflict } from "@/lib/use-form-conflict";
+import { projectSettingsArea } from "@/components/area-screens";
+import { ProjectSettingsPanel } from "@/components/settings-panels";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/unit-types")({
-  staticData: { crumb: msg`Unit types` },
+  staticData: {
+    crumb: msg`Unit types`,
+    area: projectSettingsArea,
+    panel: ProjectSettingsPanel,
+  },
   component: UnitTypes,
 });
 

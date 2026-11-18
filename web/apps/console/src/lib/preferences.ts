@@ -7,6 +7,7 @@ import { readStored, writeStored } from "./storage";
  */
 const keys = {
   sidebarCollapsed: "flagnetic.sidebar-collapsed",
+  contextPanelCollapsed: "flagnetic.context-panel-collapsed",
   lastProject: "flagnetic.last-project",
   lastEnvironment: (project: string) => `flagnetic.last-environment.${project}`,
 } as const;
@@ -17,6 +18,14 @@ export function sidebarCollapsed(): boolean {
 
 export function rememberSidebarCollapsed(collapsed: boolean): void {
   writeStored(keys.sidebarCollapsed, collapsed ? "true" : "false");
+}
+
+export function contextPanelCollapsed(): boolean {
+  return readStored(keys.contextPanelCollapsed) === "true";
+}
+
+export function rememberContextPanelCollapsed(collapsed: boolean): void {
+  writeStored(keys.contextPanelCollapsed, collapsed ? "true" : "false");
 }
 
 /** The key of the project this browser showed last, which the start page reopens. */

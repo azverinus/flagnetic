@@ -23,16 +23,23 @@ export type ParamCrumb = { param: string };
 export function Breadcrumb() {
   const { i18n, t } = useLingui();
   const { key, project } = useProjectInAddress();
-  const crumbs = useMatches().flatMap((match) => {
+  const matches = useMatches();
+  const areaMatch = matches.find((match) => match.staticData.area !== undefined);
+  const crumbs = matches.flatMap((match) => {
     const crumb = match.staticData.crumb;
-    if (crumb === undefined) return [];
+    // The area stands between the project and its first screen, as text:
+    // it is a name for the group, not a route of its own.
+    const area = match === areaMatch ? match.staticData.area : undefined;
+    const areaCrumbs =
+      area === undefined ? [] : [{ id: `${match.id}#area`, to: null, label: i18n._(area) }];
+    if (crumb === undefined) return areaCrumbs;
     const label =
       crumb === projectNameCrumb
         ? (project?.name ?? key ?? "")
         : "param" in crumb
           ? String((match.params as Record<string, unknown>)[crumb.param] ?? "")
           : i18n._(crumb);
-    return [{ id: match.id, to: match.pathname, label }];
+    return [...areaCrumbs, { id: match.id, to: match.pathname, label }];
   });
   if (crumbs.length === 0) return null;
   return (
@@ -47,6 +54,10 @@ export function Breadcrumb() {
               ) : null}
               {last ? (
                 <span aria-current="page" className="truncate font-medium" title={crumb.label}>
+                  {crumb.label}
+                </span>
+              ) : crumb.to === null ? (
+                <span className="truncate text-muted-foreground" title={crumb.label}>
                   {crumb.label}
                 </span>
               ) : (

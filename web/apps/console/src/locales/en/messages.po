@@ -917,6 +917,10 @@ msgstr "Accept with a provider"
 msgid "Accept your invitation"
 msgstr "Accept your invitation"
 
+#: src/components/area-screens.ts
+msgid "Access"
+msgstr "Access"
+
 #: src/components/sink-editor.tsx
 msgid "Access key ID"
 msgstr "Access key ID"
@@ -1274,8 +1278,8 @@ msgstr "API token created"
 msgid "API token revoked"
 msgstr "API token revoked"
 
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
-#: src/routes/_signed-in/settings/route.tsx
 #: src/routes/_signed-in/settings/tokens.tsx
 msgid "API tokens"
 msgstr "API tokens"
@@ -2128,6 +2132,10 @@ msgstr "Close the tester"
 msgid "Code"
 msgstr "Code"
 
+#: src/components/ui/context-panel.tsx
+msgid "Collapse the panel"
+msgstr "Collapse the panel"
+
 #: src/components/ui/sidebar.tsx
 msgid "Collapse the sidebar"
 msgstr "Collapse the sidebar"
@@ -2609,6 +2617,7 @@ msgstr "Deleting removes the project with its flags, segments, experiments, envi
 msgid "Deliveries"
 msgstr "Deliveries"
 
+#: src/components/area-screens.ts
 #: src/components/webhook-delivery-sheet.tsx
 msgid "Delivery"
 msgstr "Delivery"
@@ -3510,6 +3519,10 @@ msgstr "Everything in the project is deleted at once, its SDK keys stop working,
 msgid "Exhausted"
 msgstr "Exhausted"
 
+#: src/components/ui/context-panel.tsx
+msgid "Expand the panel"
+msgstr "Expand the panel"
+
 #: src/components/ui/sidebar.tsx
 msgid "Expand the sidebar"
 msgstr "Expand the sidebar"
@@ -4229,8 +4242,9 @@ msgstr "Inserts events into tables of your ClickHouse database over its HTTP int
 
 #. An audit entry that belongs to no project.
 #. An audit entry that belongs to no project.
-#: src/components/area-navigation.tsx
+#: src/components/area-screens.ts
 #: src/components/navigation.tsx
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/audit.$entry.tsx
 #: src/routes/_signed-in/admin/audit.tsx
 msgid "Instance"
@@ -4253,6 +4267,10 @@ msgstr "Instance administration"
 #: src/components/webhook-list.tsx
 msgid "Instance webhooks"
 msgstr "Instance webhooks"
+
+#: src/components/area-screens.ts
+msgid "Integrations"
+msgstr "Integrations"
 
 #: src/lib/audit.ts
 msgid "Invitation accepted"
@@ -5011,6 +5029,10 @@ msgstr "Mode: Merge"
 #: src/components/import-project.tsx
 msgid "Mode: Replace"
 msgstr "Mode: Replace"
+
+#: src/components/area-screens.ts
+msgid "Model"
+msgstr "Model"
 
 #: src/components/ui/page-header.tsx
 msgid "More actions"
@@ -5998,6 +6020,7 @@ msgid "Persistent: the same at every sign-in"
 msgstr "Persistent: the same at every sign-in"
 
 #: src/components/personal-menu.tsx
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/settings/route.tsx
 msgid "Personal settings"
 msgstr "Personal settings"
@@ -6096,12 +6119,13 @@ msgstr "Private only"
 msgid "Private: evaluated on the server only."
 msgstr "Private: evaluated on the server only."
 
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/settings/profile.tsx
-#: src/routes/_signed-in/settings/route.tsx
 msgid "Profile"
 msgstr "Profile"
 
 #. A kind of entity in the audit log.
+#: src/components/area-screens.ts
 #: src/components/group-mappings.tsx
 #: src/components/invite-form.tsx
 #: src/components/navigation.tsx
@@ -6128,6 +6152,7 @@ msgstr "Project imported"
 msgid "Project not found"
 msgstr "Project not found"
 
+#: src/components/area-screens.ts
 #: src/components/navigation.tsx
 msgid "Project settings"
 msgstr "Project settings"
@@ -7176,8 +7201,8 @@ msgstr "Session ended"
 msgid "Session idle timeout"
 msgstr "Session idle timeout"
 
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
-#: src/routes/_signed-in/settings/route.tsx
 #: src/routes/_signed-in/settings/sessions.tsx
 msgid "Sessions"
 msgstr "Sessions"
@@ -7206,8 +7231,8 @@ msgstr "Setting name"
 msgid "Setting value"
 msgstr "Setting value"
 
-#: src/components/area-navigation.tsx
 #: src/components/auth-provider-detail.tsx
+#: src/components/settings-panels.tsx
 #: src/components/sink-editor.tsx
 #: src/components/sink-screen.tsx
 #: src/components/webhook-detail.tsx
@@ -7296,12 +7321,16 @@ msgstr "Sign the requests the instance sends with its current key, for an identi
 msgid "Sign yourself out everywhere"
 msgstr "Sign yourself out everywhere"
 
+#: src/components/area-screens.ts
+msgid "Sign-in"
+msgstr "Sign-in"
+
 #: src/lib/audit.ts
 msgid "Sign-in failed"
 msgstr "Sign-in failed"
 
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
-#: src/routes/_signed-in/settings/route.tsx
 #: src/routes/_signed-in/settings/sign-in-methods.tsx
 msgid "Sign-in methods"
 msgstr "Sign-in methods"
@@ -9734,6 +9763,10 @@ msgstr "With"
 #: src/components/project-invitations.tsx
 msgid "Works until <0>{until}</0>"
 msgstr "Works until <0>{until}</0>"
+
+#: src/components/area-screens.ts
+msgid "Workspace"
+msgstr "Workspace"
 
 #: src/lib/experiments.ts
 msgid "Write the hypothesis: an experiment starts only with one."

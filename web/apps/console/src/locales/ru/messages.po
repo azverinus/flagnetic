@@ -917,6 +917,10 @@ msgstr "Принять через провайдера"
 msgid "Accept your invitation"
 msgstr "Примите приглашение"
 
+#: src/components/area-screens.ts
+msgid "Access"
+msgstr "Доступ"
+
 #: src/components/sink-editor.tsx
 msgid "Access key ID"
 msgstr "ID ключа доступа"
@@ -1274,8 +1278,8 @@ msgstr "API-токен создан"
 msgid "API token revoked"
 msgstr "API-токен отозван"
 
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
-#: src/routes/_signed-in/settings/route.tsx
 #: src/routes/_signed-in/settings/tokens.tsx
 msgid "API tokens"
 msgstr "API-токены"
@@ -2128,6 +2132,10 @@ msgstr "Закрыть тестер"
 msgid "Code"
 msgstr "Код"
 
+#: src/components/ui/context-panel.tsx
+msgid "Collapse the panel"
+msgstr "Свернуть контекстную панель"
+
 #: src/components/ui/sidebar.tsx
 msgid "Collapse the sidebar"
 msgstr "Свернуть боковую панель"
@@ -2609,6 +2617,7 @@ msgstr "Удаление разом убирает проект вместе с 
 msgid "Deliveries"
 msgstr "Доставки"
 
+#: src/components/area-screens.ts
 #: src/components/webhook-delivery-sheet.tsx
 msgid "Delivery"
 msgstr "Доставка"
@@ -3510,6 +3519,10 @@ msgstr "Всё в проекте удаляется разом, его SDK-кл�
 msgid "Exhausted"
 msgstr "Попытки исчерпаны"
 
+#: src/components/ui/context-panel.tsx
+msgid "Expand the panel"
+msgstr "Развернуть контекстную панель"
+
 #: src/components/ui/sidebar.tsx
 msgid "Expand the sidebar"
 msgstr "Развернуть боковую панель"
@@ -4229,8 +4242,9 @@ msgstr "Вставляет события в таблицы вашей базы 
 
 #. An audit entry that belongs to no project.
 #. An audit entry that belongs to no project.
-#: src/components/area-navigation.tsx
+#: src/components/area-screens.ts
 #: src/components/navigation.tsx
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/audit.$entry.tsx
 #: src/routes/_signed-in/admin/audit.tsx
 msgid "Instance"
@@ -4253,6 +4267,10 @@ msgstr "Администрирование инстанса"
 #: src/components/webhook-list.tsx
 msgid "Instance webhooks"
 msgstr "Вебхуки инстанса"
+
+#: src/components/area-screens.ts
+msgid "Integrations"
+msgstr "Интеграции"
 
 #: src/lib/audit.ts
 msgid "Invitation accepted"
@@ -5011,6 +5029,10 @@ msgstr "Режим: слияние"
 #: src/components/import-project.tsx
 msgid "Mode: Replace"
 msgstr "Режим: замена"
+
+#: src/components/area-screens.ts
+msgid "Model"
+msgstr "Модель"
 
 #: src/components/ui/page-header.tsx
 msgid "More actions"
@@ -5998,6 +6020,7 @@ msgid "Persistent: the same at every sign-in"
 msgstr "Постоянный: один и тот же при каждом входе"
 
 #: src/components/personal-menu.tsx
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/settings/route.tsx
 msgid "Personal settings"
 msgstr "Личные настройки"
@@ -6096,12 +6119,13 @@ msgstr "Только приватные"
 msgid "Private: evaluated on the server only."
 msgstr "Приватный: вычисляется только на сервере."
 
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/settings/profile.tsx
-#: src/routes/_signed-in/settings/route.tsx
 msgid "Profile"
 msgstr "Профиль"
 
 #. A kind of entity in the audit log.
+#: src/components/area-screens.ts
 #: src/components/group-mappings.tsx
 #: src/components/invite-form.tsx
 #: src/components/navigation.tsx
@@ -6128,6 +6152,7 @@ msgstr "Проект импортирован"
 msgid "Project not found"
 msgstr "Проект не найден"
 
+#: src/components/area-screens.ts
 #: src/components/navigation.tsx
 msgid "Project settings"
 msgstr "Настройки проекта"
@@ -7176,8 +7201,8 @@ msgstr "Сессия завершена"
 msgid "Session idle timeout"
 msgstr "Тайм-аут бездействия сессии"
 
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
-#: src/routes/_signed-in/settings/route.tsx
 #: src/routes/_signed-in/settings/sessions.tsx
 msgid "Sessions"
 msgstr "Сессии"
@@ -7206,8 +7231,8 @@ msgstr "Имя настройки"
 msgid "Setting value"
 msgstr "Значение настройки"
 
-#: src/components/area-navigation.tsx
 #: src/components/auth-provider-detail.tsx
+#: src/components/settings-panels.tsx
 #: src/components/sink-editor.tsx
 #: src/components/sink-screen.tsx
 #: src/components/webhook-detail.tsx
@@ -7296,12 +7321,16 @@ msgstr "Подписывать отправляемые инстансом за�
 msgid "Sign yourself out everywhere"
 msgstr "Завершить все свои сессии"
 
+#: src/components/area-screens.ts
+msgid "Sign-in"
+msgstr "Вход"
+
 #: src/lib/audit.ts
 msgid "Sign-in failed"
 msgstr "Неудачный вход"
 
+#: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
-#: src/routes/_signed-in/settings/route.tsx
 #: src/routes/_signed-in/settings/sign-in-methods.tsx
 msgid "Sign-in methods"
 msgstr "Способы входа"
@@ -9734,6 +9763,10 @@ msgstr "С"
 #: src/components/project-invitations.tsx
 msgid "Works until <0>{until}</0>"
 msgstr "Действует до <0>{until}</0>"
+
+#: src/components/area-screens.ts
+msgid "Workspace"
+msgstr "Рабочее пространство"
 
 #: src/lib/experiments.ts
 msgid "Write the hypothesis: an experiment starts only with one."
