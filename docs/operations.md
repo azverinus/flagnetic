@@ -211,7 +211,7 @@ Above a second or two for minutes, it points at a `rulesets` listener that is do
 
 ## Performance
 
-Flagnetic measures the SDK API's latency under load on every nightly run, on the server's release pull request and on pull requests that touch what answers an SDK: two replicas of the real binary on one PostgreSQL 18, a project of 1,000 flags, and requests sent on a schedule fixed before the run. The generator is an open model: a request is sent at its scheduled time whether or not earlier ones were answered, and its latency is measured from that scheduled time, so a slow server cannot hide the queue behind it. Each scenario runs after a 5-second warm-up that is not counted.
+Flagnetic measures the SDK API's latency under load on every nightly run, on the server's release pull request and on pull requests and pushes to `main` that touch what answers an SDK: two replicas of the real binary on one PostgreSQL 18, a project of 1,000 flags, and requests sent on a schedule fixed before the run. The generator is an open model: a request is sent at its scheduled time whether or not earlier ones were answered, and its latency is measured from that scheduled time, so a slow server cannot hide the queue behind it. Each scenario runs after a 5-second warm-up that is not counted.
 
 | Scenario | What is sent | Shape | p99 target |
 |---|---|---|---|
@@ -231,7 +231,7 @@ task load
 task load -- --scenario evaluate --report-only
 ```
 
-`--scenario` takes a comma-separated list of scenarios, `--profile` a profile file of your own with other rates and ceilings, and `--report-only` prints the numbers without failing on a ceiling. Set `DATABASE_URL` to a test database to use one of your own; the run migrates and seeds whatever it names.
+`--scenario` takes a comma-separated list of scenarios, `--profile` a profile file of your own with other rates and ceilings, and `--report-only` prints the numbers without failing on a ceiling. `task load` always starts a throwaway PostgreSQL; to use a test database of your own, set `DATABASE_URL` and run `.github/scripts/load.sh` with the same flags. The run migrates and seeds whatever database it names.
 
 ## What a client key still learns
 

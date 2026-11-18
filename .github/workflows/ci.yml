@@ -832,7 +832,8 @@ jobs:
   # e2e/load/profile.json, which are generous absolute numbers: a hosted
   # runner varies by more than a few percent, so this catches a regression of
   # a multiple. The numbers go to the job summary. It runs nightly, on the
-  # server's release pull request and on pull requests touching the SDK API.
+  # server's release pull request and on pull requests and pushes to main
+  # touching the SDK API.
   load:
     name: SDK API load
     needs: plan

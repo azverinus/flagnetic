@@ -66,10 +66,12 @@ RE_MIGRATIONS='^internal/infra/out/postgres/migrations/.*\.sql$|^\.squawk\.toml$
 # change to the server does not run these checks.
 RE_HELM='^deploy/helm/|^\.github/(ct\.yaml$|scripts/check-helm\.sh$)'
 # The SDK API load run: what answers an SDK's request (the delivery and events
-# code and the SDK handler), the evaluator, the SDK contract, and the load
-# generator with the harness it runs on. A pull request runs it for these
-# alone; the nightly run and the server's release pull request always do.
-RE_LOAD='^(internal/(domain|app)/(delivery|events)/|internal/infra/(in/http/sdk|out/postgres/(delivery|events))/|eval/|api/sdk\.yaml$|e2e/|\.github/scripts/load\.sh$)'
+# code, the SDK handler and the HTTP server around it, the listener that fans
+# a change out to the streams, and the binary's wiring), the evaluator, the
+# SDK contract, and the load generator with the harness it runs on. A pull
+# request or a push to main runs it for these alone; the nightly run and the
+# server's release pull request always do.
+RE_LOAD='^(internal/(domain|app)/(delivery|events)/|internal/infra/(in/http/sdk/|in/http/[^/]+\.go$|out/postgres/(delivery|events)/|out/postgres/listen\.go$)|internal/pkg/pglisten/|cmd/|eval/|api/sdk\.yaml$|e2e/|\.github/scripts/load\.sh$)'
 RE_WORKFLOWS='^\.github/(workflows/|actionlint\.yaml$|scripts/check-ci-ok\.sh$)'
 
 # Merging the server's release pull request publishes the image, so it is
@@ -226,8 +228,10 @@ EOF
   changed "$RE_HELM" && RUN_HELM=1
   changed "$RE_LOAD" && RUN_LOAD=1
   # A run that checks everything because of the event (nightly, the release
-  # pull request) measures the load too; one that does so because a server
-  # change reached main does not, since the paths above ask for it already.
+  # pull request) or because the workflow or this plan changed, which can
+  # change the load job itself, measures the load too; one that does so
+  # because a server change reached main does not, since the paths above ask
+  # for it already.
   if [ "$PLAN_MODE" = full ] || changed "$RE_FULL"; then RUN_LOAD=1; fi
 
   # The server's packages that can see a change: those that changed and those
