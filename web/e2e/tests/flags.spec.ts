@@ -339,6 +339,14 @@ test.describe("the flags list", () => {
     await page.getByRole("button", { name: "Clear filters" }).click();
     await expect(page.getByText("This project has no flag yet.")).toBeVisible();
     await expect(page).not.toHaveURL(/type=/);
+
+    // The archived flags are a view: clearing the filters keeps it.
+    await page.goto(`/projects/${projectKey}/flags?archived=true&type=json`);
+    await expect(page.getByText("No flag matches these filters.")).toBeVisible();
+    await page.getByRole("button", { name: "Clear filters" }).click();
+    await expect(page.getByText("No flag is archived.")).toBeVisible();
+    await expect(page).toHaveURL(/archived=true/);
+    await expect(page).not.toHaveURL(/type=/);
   });
 
   test("pages forward and back through 60 flags", async ({ page }) => {

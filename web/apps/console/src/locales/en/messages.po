@@ -5357,6 +5357,10 @@ msgstr "No exposure since the start, <0/>."
 msgid "No exposures"
 msgstr "No exposures"
 
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "No flag is archived."
+msgstr "No flag is archived."
+
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "No flag is stale for these reasons."
 msgstr "No flag is stale for these reasons."

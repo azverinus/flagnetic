@@ -5357,6 +5357,10 @@ msgstr "Нет показов с запуска, <0/>."
 msgid "No exposures"
 msgstr "Нет показов"
 
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "No flag is archived."
+msgstr "Архивных флагов нет."
+
 #: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "No flag is stale for these reasons."
 msgstr "Флагов, устаревших по этим причинам, нет."

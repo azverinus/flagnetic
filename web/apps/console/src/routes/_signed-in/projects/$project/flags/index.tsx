@@ -143,9 +143,9 @@ function Flags() {
             search={search}
             ready={environmentsKnown}
             onPage={(cursor) => apply({ ...search, cursor })}
-            // The environment and the order are how the flags are shown, not
-            // which: clearing the filters keeps both.
-            onClear={() => apply({ environment, sort: search.sort })}
+            // Clearing the filters from the empty list keeps the view, as
+            // "Clear all" does: the archived flags stay the archived ones.
+            onClear={clearFacets}
             newFlag={newFlag}
             owners={owners}
             environments={environments}
@@ -203,6 +203,15 @@ function FlagsPages({
     return <QueryError error={page.error} onRetry={() => void page.refetch()} />;
   }
   if (page.data?.items.length === 0 && !search.cursor) {
+    // The archived flags are a view, not a filter: with nothing else set,
+    // an empty one says there are none rather than offering to clear it.
+    if (search.archived && !isFlagsFiltered({ ...search, archived: undefined })) {
+      return (
+        <Card list>
+          <EmptyState icon={<FlagIcon />} title={<Trans>No flag is archived.</Trans>} />
+        </Card>
+      );
+    }
     return isFlagsFiltered(search) ? (
       <Card list>
         <EmptyState
