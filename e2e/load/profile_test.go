@@ -6,7 +6,7 @@ import (
 )
 
 func TestTheCheckedInProfileIsValid(t *testing.T) {
-	p, err := LoadProfile("")
+	p, err := ReadProfile("")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestParseProfileRefusesWhatWouldTurnTheGateOff(t *testing.T) {
 }
 
 func TestCheck(t *testing.T) {
-	p, err := LoadProfile("")
+	p, err := ReadProfile("")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestCheck(t *testing.T) {
 }
 
 func TestMarkdownHasARowPerResult(t *testing.T) {
-	p, _ := LoadProfile("")
+	p, _ := ReadProfile("")
 	md := p.Markdown([]Result{{Scenario: Evaluate, Target: 100, Sent: 3000, P99: 12.34}, {Scenario: Stream, Sent: 500}})
 	for _, want := range []string{"| evaluate | 100/s |", "| stream | - |", "12.3"} {
 		if !strings.Contains(md, want) {

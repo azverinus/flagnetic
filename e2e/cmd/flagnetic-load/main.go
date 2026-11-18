@@ -66,7 +66,7 @@ Flags:
 			return 2
 		}
 	}
-	profile, err := load.LoadProfile(*profilePath)
+	profile, err := load.ReadProfile(*profilePath)
 	if err != nil {
 		fmt.Fprintf(stderr, "flagnetic-load: %v\n", err)
 		return 2

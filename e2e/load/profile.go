@@ -57,6 +57,7 @@ type Shape struct {
 // Duration is a time.Duration written as a string in JSON, such as "30s".
 type Duration time.Duration
 
+// UnmarshalJSON reads a duration written as a string, such as "30s".
 func (d *Duration) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
@@ -70,11 +71,12 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// MarshalJSON writes the duration as a string, such as "30s".
 func (d Duration) MarshalJSON() ([]byte, error) { return json.Marshal(time.Duration(d).String()) }
 
-// LoadProfile reads the profile in the file at path, or the one checked in
+// ReadProfile reads the profile in the file at path, or the one checked in
 // when path is empty.
-func LoadProfile(path string) (Profile, error) {
+func ReadProfile(path string) (Profile, error) {
 	b := defaultProfile
 	if path != "" {
 		var err error
