@@ -10,6 +10,7 @@ image:
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 
+# Ignored while autoscaling.enabled is true: the autoscaler owns the count.
 replicaCount: 2
 
 # PostgreSQL and the instance's secret key. The chart never generates them: a
@@ -84,6 +85,107 @@ service:
 podDisruptionBudget:
   enabled: true
   maxUnavailable: 1
+
+# Traffic comes in through an Ingress or a Gateway API HTTPRoute; neither is
+# on by default, and both may be on at once. Streams stay open for up to an hour
+# and the server sends a heartbeat every 15 seconds, so the proxy in front needs
+# response buffering off for /sdk/v1/stream and an idle (read) timeout above
+# the heartbeat. For ingress-nginx:
+#   ingress:
+#     enabled: true
+#     className: nginx
+#     hosts: [flags.example.com]
+#     annotations:
+#       nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+#       nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+#       nginx.ingress.kubernetes.io/proxy-buffering: "off"
+#     tls:
+#       - secretName: flagnetic-tls
+#         hosts: [flags.example.com]
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  # Hosts the Ingress routes to the http Service.
+  hosts: []
+  # TLS entries, as in an Ingress spec.
+  tls: []
+
+# A Gateway API route to the http Service. The Gateway's own timeouts apply:
+# raise its request and idle timeouts above 15 seconds in the implementation's
+# way (for Envoy Gateway, a BackendTrafficPolicy; for Istio, a DestinationRule).
+#   httpRoute:
+#     enabled: true
+#     parentRefs:
+#       - name: public
+#         namespace: gateways
+#     hostnames: [flags.example.com]
+httpRoute:
+  enabled: false
+  annotations: {}
+  # Gateways the route attaches to, as in an HTTPRoute spec. Required.
+  parentRefs: []
+  hostnames: []
+
+# Prometheus Operator resources, rendered only when enabled. The CRDs must
+# exist in the cluster.
+serviceMonitor:
+  enabled: false
+  # Namespace of the ServiceMonitor; the release's when empty.
+  namespace: ""
+  # Labels the Prometheus instance selects ServiceMonitors by.
+  labels: {}
+  interval: 30s
+  scrapeTimeout: ""
+
+prometheusRule:
+  enabled: false
+  # Namespace of the PrometheusRule; the release's when empty.
+  namespace: ""
+  # Labels the Prometheus instance selects rules by.
+  labels: {}
+  # The 99th percentile of ruleset propagation above which the alert fires.
+  # The server declares 2 seconds.
+  propagationSeconds: 2
+
+# Scales the Deployment on CPU against resources.requests.cpu.
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+# Restricts the server's pods. The migration Job and the helm test Pod are
+# not selected. Needs a network plugin that enforces NetworkPolicy.
+networkPolicy:
+  enabled: false
+  ingress:
+    http:
+      # Peers admitted to the http port, as in a NetworkPolicy `from`. Empty
+      # admits every source.
+      from: []
+    metrics:
+      # Peers admitted to the metrics port, such as the Prometheus pods.
+      # Empty admits none.
+      from: []
+  egress:
+    dns:
+      # Peers the DNS port is open to; empty is every destination.
+      to: []
+    postgresql:
+      port: 5432
+      # Peers the PostgreSQL port is open to; empty is every destination.
+      to: []
+    # Further egress rules, as in a NetworkPolicy `egress`, for what the
+    # instance reaches: webhook receivers, sinks, SMTP and identity providers.
+    #   rules:
+    #     - to:
+    #         - ipBlock:
+    #             cidr: 203.0.113.0/24
+    #       ports:
+    #         - port: 443
+    #           protocol: TCP
+    rules: []
 
 # Soft constraints that spread replicas over zones and hosts.
 topologySpreadConstraints:

@@ -3,3 +3,4 @@
 *.go
 /tests/
 /ci/
+/render/

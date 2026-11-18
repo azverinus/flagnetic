@@ -1,0 +1,134 @@
+suite: autoscaling and network policy
+templates:
+  - templates/hpa.yaml
+  - templates/networkpolicy.yaml
+  - templates/deployment.yaml
+set:
+  secrets.existingSecret: mine
+tests:
+  - it: renders neither by default, and the Deployment keeps its count
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/hpa.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/networkpolicy.yaml
+      - equal:
+          path: spec.replicas
+          value: 2
+        template: templates/deployment.yaml
+  - it: scales on CPU and leaves the replica count to the autoscaler
+    set:
+      autoscaling.enabled: true
+      autoscaling.maxReplicas: 8
+    asserts:
+      - equal:
+          path: spec.minReplicas
+          value: 2
+        template: templates/hpa.yaml
+      - equal:
+          path: spec.maxReplicas
+          value: 8
+        template: templates/hpa.yaml
+      - equal:
+          path: spec.metrics[0].resource
+          value:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 70
+        template: templates/hpa.yaml
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: RELEASE-NAME-flagnetic
+        template: templates/hpa.yaml
+      - notExists:
+          path: spec.replicas
+        template: templates/deployment.yaml
+  - it: refuses a maximum below the minimum
+    template: templates/hpa.yaml
+    set:
+      autoscaling.enabled: true
+      autoscaling.minReplicas: 4
+      autoscaling.maxReplicas: 3
+    asserts:
+      - failedTemplate:
+          errorPattern: maxReplicas
+  - it: admits any source to http, none to metrics and opens DNS and PostgreSQL
+    template: templates/networkpolicy.yaml
+    set:
+      networkPolicy.enabled: true
+    asserts:
+      - equal:
+          path: spec.podSelector.matchLabels
+          value:
+            app.kubernetes.io/name: flagnetic
+            app.kubernetes.io/instance: RELEASE-NAME
+            app.kubernetes.io/component: server
+      - equal:
+          path: spec.ingress
+          value:
+            - ports:
+                - port: 8080
+                  protocol: TCP
+      - equal:
+          path: spec.egress
+          value:
+            - ports:
+                - port: 53
+                  protocol: UDP
+                - port: 53
+                  protocol: TCP
+            - ports:
+                - port: 5432
+                  protocol: TCP
+  - it: restricts the sources, the destinations and adds listed egress
+    template: templates/networkpolicy.yaml
+    set:
+      networkPolicy:
+        enabled: true
+        ingress:
+          http:
+            from:
+              - namespaceSelector:
+                  matchLabels: {kubernetes.io/metadata.name: ingress-nginx}
+          metrics:
+            from:
+              - podSelector:
+                  matchLabels: {app.kubernetes.io/name: prometheus}
+        egress:
+          postgresql:
+            port: 6432
+            to:
+              - ipBlock: {cidr: 10.20.0.0/16}
+          rules:
+            - to:
+                - ipBlock: {cidr: 203.0.113.0/24}
+              ports:
+                - port: 443
+                  protocol: TCP
+    asserts:
+      - equal:
+          path: spec.ingress[0].from[0].namespaceSelector.matchLabels
+          value: {kubernetes.io/metadata.name: ingress-nginx}
+      - equal:
+          path: spec.ingress[1]
+          value:
+            ports:
+              - port: 9090
+                protocol: TCP
+            from:
+              - podSelector:
+                  matchLabels: {app.kubernetes.io/name: prometheus}
+      - equal:
+          path: spec.egress[1]
+          value:
+            ports:
+              - port: 6432
+                protocol: TCP
+            to:
+              - ipBlock: {cidr: 10.20.0.0/16}
+      - equal:
+          path: spec.egress[2].to[0].ipBlock.cidr
+          value: 203.0.113.0/24

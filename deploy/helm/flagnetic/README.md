@@ -43,6 +43,45 @@ The chart's own Secret, when you use one, is a Helm hook, so `helm uninstall` le
 
 Pods are replaced one at a time behind a PodDisruptionBudget. A stopping pod keeps serving for `FLAGNETIC_SHUTDOWN_DRAIN` while `/readyz` answers 503, then finishes in-flight requests within `FLAGNETIC_SHUTDOWN_GRACE`; the 30 s grace period of the pod covers both.
 
+## Traffic
+
+Neither the Ingress nor the HTTPRoute is on by default. An SDK holds a ruleset stream open for up to an hour and the server sends a heartbeat every 15 seconds, so the proxy in front must not buffer `/sdk/v1/stream` and must time out an idle connection above 15 seconds; an hour is a safe value. For ingress-nginx:
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  hosts: [flags.example.com]
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+  tls:
+    - secretName: flagnetic-tls
+      hosts: [flags.example.com]
+```
+
+With the Gateway API, attach the route to your Gateway and raise the Gateway's request and idle timeouts in your implementation's own way:
+
+```yaml
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: gateways
+  hostnames: [flags.example.com]
+```
+
+Metrics are on a Service of their own that neither the Ingress nor the HTTPRoute reaches.
+
+## Monitoring, scaling and network policy
+
+`serviceMonitor.enabled` and `prometheusRule.enabled` render Prometheus Operator resources, so the operator's CRDs must exist first. The alerts use the metrics in [the operations guide](../../../docs/operations.md#metrics).
+
+`autoscaling.enabled` replaces the Deployment's replica count with a HorizontalPodAutoscaler on CPU; the pods request CPU by default, which the autoscaler needs.
+
+`networkPolicy.enabled` restricts the server's pods to the `http` port from `networkPolicy.ingress.http.from` and the `metrics` port from `networkPolicy.ingress.metrics.from`, and to DNS, PostgreSQL and the rules in `networkPolicy.egress.rules`. List there what the instance reaches: webhook receivers, sinks, SMTP servers and identity providers (OIDC and SAML). The migration Job and the `helm test` Pod are not selected.
+
 ## Supported versions
 
 | | Supported |
@@ -99,6 +138,35 @@ The chart's `version` and `appVersion` are the server's: a chart installs the im
 | `podDisruptionBudget.maxUnavailable` | `1` | Pods that may be unavailable during a voluntary disruption. |
 | `topologySpreadConstraints.enabled` | `true` | Spread replicas over zones and hosts. The constraints are soft: a cluster with one zone or one node still schedules every replica. |
 | `topologySpreadConstraints.maxSkew` | `1` | Largest difference in replicas between two zones or two hosts. |
+| `ingress.enabled` | `false` | Render an Ingress to the `http` Service. Needs `ingress.hosts`. |
+| `ingress.className` | `""` | The `ingressClassName`. |
+| `ingress.annotations` | `{}` | Annotations of the Ingress: the controller's timeouts and buffering, see [Traffic](#traffic). |
+| `ingress.hosts` | `[]` | Hosts the Ingress routes to the Service. |
+| `ingress.tls` | `[]` | TLS entries, as in an Ingress spec. |
+| `httpRoute.enabled` | `false` | Render a Gateway API HTTPRoute to the `http` Service. Needs `httpRoute.parentRefs`. |
+| `httpRoute.annotations` | `{}` | Annotations of the HTTPRoute. |
+| `httpRoute.parentRefs` | `[]` | Gateways the route attaches to, as in an HTTPRoute spec. |
+| `httpRoute.hostnames` | `[]` | Hostnames the route answers for. |
+| `serviceMonitor.enabled` | `false` | Render a Prometheus Operator ServiceMonitor for the `metrics` Service. Needs the CRD. |
+| `serviceMonitor.namespace` | `""` | Namespace of the ServiceMonitor; the release's when empty. |
+| `serviceMonitor.labels` | `{}` | Labels the Prometheus instance selects ServiceMonitors by. |
+| `serviceMonitor.interval` | `30s` | Scrape interval. |
+| `serviceMonitor.scrapeTimeout` | `""` | Scrape timeout; Prometheus's default when empty. |
+| `prometheusRule.enabled` | `false` | Render a PrometheusRule with four alerts: a listener down, ruleset propagation slow, a sink with dead letters, webhook deliveries failing. Needs the CRD. |
+| `prometheusRule.namespace` | `""` | Namespace of the PrometheusRule; the release's when empty. |
+| `prometheusRule.labels` | `{}` | Labels the Prometheus instance selects rules by. |
+| `prometheusRule.propagationSeconds` | `2` | The 99th percentile of ruleset propagation above which its alert fires. |
+| `autoscaling.enabled` | `false` | Render a HorizontalPodAutoscaler on CPU; `replicaCount` is then ignored. |
+| `autoscaling.minReplicas` | `2` | Fewest replicas. |
+| `autoscaling.maxReplicas` | `6` | Most replicas; each holds its own PostgreSQL pool, so keep the total within `max_connections`. |
+| `autoscaling.targetCPUUtilizationPercentage` | `70` | Average CPU, as a share of `resources.requests.cpu`, the autoscaler aims for. |
+| `networkPolicy.enabled` | `false` | Render a NetworkPolicy for the server's pods. The cluster's network plugin must enforce it. |
+| `networkPolicy.ingress.http.from` | `[]` | Peers admitted to the `http` port, as in a NetworkPolicy `from`. Empty admits every source. |
+| `networkPolicy.ingress.metrics.from` | `[]` | Peers admitted to the `metrics` port, such as the Prometheus pods. Empty admits none. |
+| `networkPolicy.egress.dns.to` | `[]` | Peers port 53 is open to. Empty is every destination. |
+| `networkPolicy.egress.postgresql.port` | `5432` | The PostgreSQL port. |
+| `networkPolicy.egress.postgresql.to` | `[]` | Peers the PostgreSQL port is open to. Empty is every destination. |
+| `networkPolicy.egress.rules` | `[]` | Further egress rules, as in a NetworkPolicy `egress`: webhook receivers, sinks, SMTP and identity providers. |
 | `nodeSelector` | `{}` | Node selector of the pods. |
 | `tolerations` | `[]` | Tolerations of the pods. |
 | `affinity` | `{}` | Affinity of the pods. |

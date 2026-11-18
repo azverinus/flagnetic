@@ -1,0 +1,54 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "flagnetic.fullname" . }}
+  labels:
+    {{- include "flagnetic.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "flagnetic.serverSelectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # An empty list admits every source: the Ingress controller, the Gateway
+    # and the clients' own network all differ between clusters.
+    - ports:
+        - port: {{ .Values.service.port }}
+          protocol: TCP
+      {{- with .Values.networkPolicy.ingress.http.from }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    # Metrics name the instance's routes and environments: no source is
+    # admitted until the scraper is named.
+    {{- with .Values.networkPolicy.ingress.metrics.from }}
+    - ports:
+        - port: {{ $.Values.service.metrics.port }}
+          protocol: TCP
+      from:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+      {{- with .Values.networkPolicy.egress.dns.to }}
+      to:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    - ports:
+        - port: {{ .Values.networkPolicy.egress.postgresql.port }}
+          protocol: TCP
+      {{- with .Values.networkPolicy.egress.postgresql.to }}
+      to:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.networkPolicy.egress.rules }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,79 @@
+suite: ingress and Gateway API route
+templates:
+  - templates/ingress.yaml
+  - templates/httproute.yaml
+set:
+  secrets.existingSecret: mine
+release:
+  name: flags
+tests:
+  - it: renders neither by default
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: renders an Ingress with class, annotations and TLS
+    template: templates/ingress.yaml
+    set:
+      ingress:
+        enabled: true
+        className: nginx
+        hosts: [flags.example.com]
+        annotations:
+          nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+        tls:
+          - secretName: flagnetic-tls
+            hosts: [flags.example.com]
+    asserts:
+      - equal:
+          path: spec.ingressClassName
+          value: nginx
+      - equal:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/proxy-read-timeout"]
+          value: "3600"
+      - equal:
+          path: spec.tls[0].secretName
+          value: flagnetic-tls
+      - equal:
+          path: spec.rules[0].host
+          value: flags.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service
+          value:
+            name: flags-flagnetic
+            port:
+              name: http
+  - it: refuses an Ingress without hosts
+    template: templates/ingress.yaml
+    set:
+      ingress.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: ingress.hosts
+  - it: renders an HTTPRoute with parent refs and hostnames
+    template: templates/httproute.yaml
+    set:
+      httpRoute:
+        enabled: true
+        parentRefs:
+          - name: public
+            namespace: gateways
+        hostnames: [flags.example.com]
+    asserts:
+      - equal:
+          path: spec.parentRefs[0].name
+          value: public
+      - equal:
+          path: spec.hostnames[0]
+          value: flags.example.com
+      - equal:
+          path: spec.rules[0].backendRefs[0]
+          value:
+            name: flags-flagnetic
+            port: 8080
+  - it: refuses an HTTPRoute without parent refs
+    template: templates/httproute.yaml
+    set:
+      httpRoute.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: httpRoute.parentRefs

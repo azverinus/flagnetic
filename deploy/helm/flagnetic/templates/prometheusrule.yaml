@@ -1,0 +1,66 @@
+{{- if .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "flagnetic.fullname" . }}
+  {{- with .Values.prometheusRule.namespace }}
+  namespace: {{ . }}
+  {{- end }}
+  labels:
+    {{- include "flagnetic.labels" . | nindent 4 }}
+    {{- with .Values.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: {{ include "flagnetic.fullname" . }}
+      rules:
+        - alert: FlagneticListenerDown
+          expr: flagnetic_listener_up == 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: A replica is not listening for changes on PostgreSQL
+            description: >-
+              Replica {{ "{{ $labels.instance }}" }} has not listened on the
+              {{ "{{ $labels.channel }}" }} notification channel for a minute, so it cannot
+              trust what it caches and reads PostgreSQL directly. A connection
+              pooler in transaction mode is a common cause.
+        - alert: FlagneticRulesetPropagationSlow
+          expr: >-
+            histogram_quantile(0.99,
+            sum by (le) (rate(flagnetic_ruleset_propagation_seconds_bucket[5m])))
+            > {{ .Values.prometheusRule.propagationSeconds }}
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Changes reach the replicas slowly
+            description: >-
+              The 99th percentile of the time from a change to a replica's first
+              answer carrying it has been above
+              {{ .Values.prometheusRule.propagationSeconds }} seconds for ten minutes.
+        - alert: FlagneticSinkStopped
+          expr: flagnetic_sink_dead_letters > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: A sink has dead letters
+            description: >-
+              Sink {{ "{{ $labels.sink }}" }} has had dead letters waiting for ten
+              minutes. After consecutive dead letters a sink stops delivering until
+              a member resumes it.
+        - alert: FlagneticWebhookDeliveriesFailing
+          expr: >-
+            sum(increase(flagnetic_webhook_deliveries_total{status=~"failed|exhausted"}[15m])) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Webhook deliveries are failing
+            description: >-
+              Webhook deliveries ended as failed or exhausted during the last
+              fifteen minutes; see the subscription's delivery log for the receiver.
+{{- end }}
