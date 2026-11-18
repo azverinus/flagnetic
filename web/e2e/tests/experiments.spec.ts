@@ -15,6 +15,7 @@ import { expectNoSeriousViolations } from "../support/axe";
 import { type Credentials, managementClient, must, seedProject, signIn } from "../support/console";
 import {
   choose,
+  chooseFromMore,
   readConfiguration,
   seedFlag,
   stringFlag,
@@ -29,6 +30,10 @@ async function openExperiments(page: Page, project: string, who: Credentials = a
   await page.goto(`/projects/${project}/experiments`);
   await expect(page.getByRole("heading", { level: 1, name: "Experiments" })).toBeVisible();
 }
+
+/** The experiments list's context panel, where its facets are. */
+const filterPanel = (page: Page) =>
+  page.getByRole("navigation", { name: "Filter the experiments" });
 
 /** The list's row of one experiment, by its key. */
 const rowFor = (page: Page, key: string) =>
@@ -149,14 +154,19 @@ test.describe("experiments", () => {
     await expect(rowFor(page, "ranking_v2")).toBeVisible();
     await expect(rowFor(page, "ranking_v2").getByText("No rule serves it")).toBeVisible();
 
-    await choose(page, "Flag", "search_ranking");
+    const panel = filterPanel(page);
+    await panel.getByRole("radio", { name: "search_ranking", exact: true }).check();
     await expect(page).toHaveURL(/flag=search_ranking/);
+    await expect(page.getByRole("list", { name: "Filters in force" })).toContainText(
+      "Flag: search_ranking",
+    );
     await expect(rowFor(page, "ranking_v2")).toBeVisible();
     await expect(rowFor(page, "cta_copy")).toHaveCount(0);
 
-    await choose(page, "Status", "Running");
+    await panel.getByRole("radio", { name: "Running", exact: true }).check();
     await expect(page.getByText("No experiment matches these filters.")).toBeVisible();
     await page.getByRole("button", { name: "Clear filters" }).click();
+    await expect(page.getByRole("list", { name: "Filters in force" })).toHaveCount(0);
     await expect(rowFor(page, "cta_copy")).toBeVisible();
   });
 
@@ -238,7 +248,7 @@ test.describe("experiments", () => {
 
     // The traffic allocation only grows, through its own confirmation.
     await expect(page.getByLabel("Traffic allocation (%)")).toBeDisabled();
-    await page.getByRole("button", { name: "Grow traffic allocation" }).click();
+    await chooseFromMore(page, "Grow traffic allocation");
     dialog = page.getByRole("dialog", { name: "Grow the traffic allocation of cta_copy" });
     await dialog.getByLabel("New traffic allocation (%)").fill("20");
     await dialog.getByRole("button", { name: "Grow traffic allocation" }).click();
@@ -286,7 +296,7 @@ test.describe("experiments", () => {
 
     // Clone into a new draft with new salts.
     const source = await readExperiment(project, "cta_copy");
-    await page.getByRole("button", { name: "Clone", exact: true }).click();
+    await chooseFromMore(page, "Clone");
     dialog = page.getByRole("dialog", { name: "Clone cta_copy" });
     await dialog.getByLabel("Key").fill("cta_copy_rerun");
     await dialog.getByRole("button", { name: "Clone experiment" }).click();
@@ -349,11 +359,17 @@ test.describe("experiments", () => {
 
     await signIn(page, admin);
     await page.goto(`/projects/${project}/experiments/cta_copy`);
-    const exposures = page.getByRole("region", { name: "Exposures" });
-    await expect(exposures.getByRole("tab", { name: "Staging" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    // The exposures are cards of the page, one environment's at a time.
+    const exposures = page.getByRole("region", { name: "Exposures per variation" });
+    const perDayCard = page.getByRole("region", { name: "Per day" });
+    const conflictsCard = page.getByRole("region", { name: "Conflicts" });
+    await expect(exposures.getByRole("combobox", { name: "Environment" })).toHaveText(/Staging/);
+    // The panel lists the environments holding the rule, the open one current.
+    await expect(
+      page
+        .getByRole("navigation", { name: "Environments and details" })
+        .getByRole("link", { name: /^Staging/ }),
+    ).toHaveAttribute("aria-current", "page");
     // The rollup counts what was committed about every 10 seconds; the page
     // shows its counts once it has.
     const perVariation = exposures.getByRole("table", { name: "Per variation" });
@@ -371,23 +387,23 @@ test.describe("experiments", () => {
     await expect(exposures.getByRole("list", { name: "Refused exposures" })).toHaveText(
       /unknown_variation\s*1/,
     );
-    const perDay = exposures.getByRole("table", { name: /Units first exposed per day/ });
+    const perDay = perDayCard.getByRole("table", { name: /Units first exposed per day/ });
     await expect(perDay.getByRole("img").first()).toHaveAccessibleName(/^Shares: control/);
     await expect(
-      exposures.getByText(/^1 unit was exposed to a variation other than its first/),
+      conflictsCard.getByText(/^1 unit was exposed to a variation other than its first/),
     ).toBeVisible();
     await expect(
-      exposures
+      conflictsCard
         .getByRole("table", { name: /Conflicting units/ })
         .getByRole("row", { name: /user-3/ }),
     ).toHaveText(/user-3\s*user\s*treatment\s*control/);
     await expectNoSeriousViolations(page, "an experiment's exposures");
 
     // Development holds no exposure of it.
-    await exposures.getByRole("tab", { name: "Development" }).click();
+    await choose(page, "Environment", "Development");
     await expect(page).toHaveURL(/environment=development/);
     await expect(
-      exposures.getByText("No exposure has been received in this environment yet."),
+      perDayCard.getByText("No exposure has been received in this environment yet."),
     ).toBeVisible();
 
     // The lookup answers as the API does, with its query to copy.
@@ -458,7 +474,7 @@ test.describe("experiments", () => {
 
     await signIn(page, admin);
     await page.goto(`/projects/${project}/experiments/${key}`);
-    const exposures = page.getByRole("region", { name: "Exposures" });
+    const exposures = page.getByRole("region", { name: "Exposures per variation" });
     // The rollup counts the exposures within seconds; the check every 10
     // minutes would come too late for a test, so the stop takes its check
     // over what the rollup counted.
@@ -487,8 +503,8 @@ test.describe("experiments", () => {
     );
     // The stop deleted the rule, so the page opens the project's first
     // environment; the check is Staging's.
-    await exposures.getByRole("tab", { name: "Staging" }).click();
-    const check = exposures.getByRole("region", { name: "Sample-ratio check" });
+    await choose(page, "Environment", "Staging");
+    const check = page.getByRole("region", { name: "Sample-ratio check" });
     await expect(check).toContainText("Mismatch: the units first exposed are out of line");
     // The next round of the checks would complete it, once the rollup has read
     // every exposure received before the stop.

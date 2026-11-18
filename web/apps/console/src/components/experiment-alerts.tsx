@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/can";
 import { Moment } from "@/components/moment";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -209,27 +210,28 @@ export function ExperimentAlertsSection({
   const alerts = useQuery(experimentAlertsQuery(project, experiment.key));
   const environmentName = useEnvironmentName(project);
   return (
-    <section aria-labelledby="experiment-alerts" className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <h2 id="experiment-alerts" className="text-base/6 font-medium">
-          <Trans>Alerts</Trans>
-        </h2>
-        <p className="measure-prose text-sm text-muted-foreground">
+    <Card aria-labelledby="experiment-alerts">
+      <CardHeader
+        titleId="experiment-alerts"
+        title={<Trans>Alerts</Trans>}
+        description={
           <Trans>
             A running experiment is checked every 10 minutes for a sample-ratio mismatch, a day
             without exposures, conflicting exposures and running past its expected end. An alert
             stays active until its condition clears; one returning raises a new alert.
           </Trans>
-        </p>
-      </div>
-      {alerts.isError ? (
-        <QueryError error={alerts.error} onRetry={() => void alerts.refetch()} />
-      ) : alerts.data === undefined ? (
-        <Skeleton className="h-24 w-full" />
-      ) : (
-        <AlertHistory alerts={alerts.data.items} environmentName={environmentName} />
-      )}
-    </section>
+        }
+      />
+      <CardContent>
+        {alerts.isError ? (
+          <QueryError error={alerts.error} onRetry={() => void alerts.refetch()} />
+        ) : alerts.data === undefined ? (
+          <Skeleton className="h-24 w-full" />
+        ) : (
+          <AlertHistory alerts={alerts.data.items} environmentName={environmentName} />
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

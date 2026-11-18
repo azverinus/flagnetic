@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { fakeServer } from "@/test/fake-server";
 import { activateForTests, renderWithProviders } from "@/test/render";
 
-import { ExperimentAssignmentLookup } from "./experiment-assignment";
+import { ExperimentAssignmentCard, ExperimentAssignmentLookup } from "./experiment-assignment";
 
 beforeAll(() => activateForTests("en"));
 
@@ -14,6 +14,11 @@ const experiment = {
   key: "cta_copy",
   unit_type: "user",
   version: 3,
+  traffic_allocation: 5000,
+  variations: [
+    { variation: "control", weight: 7000 },
+    { variation: "treatment", weight: 3000 },
+  ],
 } as unknown as Experiment;
 
 const answer = (over: Partial<ExperimentAssignment> = {}): ExperimentAssignment => ({
@@ -79,5 +84,16 @@ describe("the assignment lookup", () => {
 
     expect(screen.getByLabelText("Unit ID (user)")).toHaveAccessibleDescription("Enter a unit ID.");
     expect(requests).toHaveLength(0);
+  });
+
+  it("shows the weights as a split bar naming each variation with its share", () => {
+    fakeServer({});
+    renderWithProviders(<ExperimentAssignmentCard project="checkout" experiment={experiment} />);
+    const legend = screen.getByRole("list", { name: "Weights" });
+    expect(Array.from(legend.querySelectorAll("li"), (item) => item.textContent)).toEqual([
+      "control70%",
+      "treatment30%",
+    ]);
+    expect(screen.getByRole("heading", { level: 2, name: "Assignment" })).toBeInTheDocument();
   });
 });

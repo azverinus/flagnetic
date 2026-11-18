@@ -6,17 +6,56 @@ import { useId, useState } from "react";
 
 import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SplitBar } from "@/components/ui/split-bar";
 import { formatNumber } from "@/i18n/format";
+import { swatchOf } from "@/components/swatch";
 import { unitIdIssue } from "@/lib/experiment-health";
+import { percentText } from "@/lib/experiments";
 import { experimentAssignmentQuery } from "@/lib/queries";
 
 export type ExperimentAssignmentLookupProps = {
   project: string;
   experiment: Experiment;
 };
+
+/**
+ * An experiment's assignment as a card: its weights as one split bar in
+ * the series colours its exposure tables and charts use, then the lookup.
+ */
+export function ExperimentAssignmentCard({ project, experiment }: ExperimentAssignmentLookupProps) {
+  const { i18n, t } = useLingui();
+  const allocation = percentText(i18n, experiment.traffic_allocation);
+  // The first four variations take the series tokens, as the dots of the
+  // exposure tables do; the others take the palette beyond them.
+  const segments = experiment.variations.map(({ variation, weight }, index) => ({
+    key: variation,
+    label: variation,
+    weight,
+    series: index < 4 ? ((index + 1) as 1 | 2 | 3 | 4) : undefined,
+    colorClass: index < 4 ? undefined : swatchOf(index),
+  }));
+  return (
+    <Card aria-labelledby="experiment-assignment">
+      <CardHeader
+        titleId="experiment-assignment"
+        title={<Trans>Assignment</Trans>}
+        description={
+          <Trans>
+            Units are included up to the traffic allocation of {allocation}, then split by weight.
+          </Trans>
+        }
+      />
+      <CardContent className="gap-6">
+        <SplitBar label={t`Weights`} segments={segments} />
+        <ExperimentAssignmentLookup project={project} experiment={experiment} />
+      </CardContent>
+    </Card>
+  );
+}
 
 /**
  * One unit ID in, how the experiment treats it out: its two buckets,
@@ -42,11 +81,11 @@ export function ExperimentAssignmentLookup({
   });
 
   return (
-    <section aria-labelledby="experiment-assignment" className="flex flex-col gap-3">
+    <section aria-labelledby="experiment-lookup" className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <h2 id="experiment-assignment" className="text-base/6 font-medium">
+        <h3 id="experiment-lookup" className="font-medium">
           <Trans>Assignment lookup</Trans>
-        </h2>
+        </h3>
         <p className="measure-prose text-sm text-muted-foreground">
           <Trans>
             Which variation the experiment gives a unit, from its salts and traffic allocation as

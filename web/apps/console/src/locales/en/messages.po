@@ -104,10 +104,6 @@ msgstr "{count, plural, one {second} other {seconds}}"
 msgid "{count, plural, one {This import deletes # entity from the project. Deletions cannot be undone.} other {This import deletes # entities from the project. Deletions cannot be undone.}}"
 msgstr "{count, plural, one {This import deletes # entity from the project. Deletions cannot be undone.} other {This import deletes # entities from the project. Deletions cannot be undone.}}"
 
-#: src/components/experiment-transitions.tsx
-msgid "{created} by {creator}"
-msgstr "{created} by {creator}"
-
 #: src/components/daily-chart.tsx
 msgid "{date} (UTC): {counts}"
 msgstr "{date} (UTC): {counts}"
@@ -639,9 +635,9 @@ msgstr "A key never changes once it is set."
 msgid "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
 msgstr "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
 
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/lib/project-members.ts
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "A member without a grant here"
 msgstr "A member without a grant here"
 
@@ -1255,7 +1251,7 @@ msgid "Any event type"
 msgstr "Any event type"
 
 #: src/components/change-requests-panel.tsx
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+#: src/components/experiments-panel.tsx
 msgid "Any flag"
 msgstr "Any flag"
 
@@ -1267,8 +1263,8 @@ msgstr "Any kind"
 msgid "Any origin"
 msgstr "Any origin"
 
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Any owner"
 msgstr "Any owner"
 
@@ -1281,8 +1277,8 @@ msgstr "Any schedule"
 msgid "Any state"
 msgstr "Any state"
 
+#: src/components/experiments-panel.tsx
 #: src/components/webhook-deliveries.tsx
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Any status"
 msgstr "Any status"
 
@@ -1400,11 +1396,16 @@ msgid "Archive the flag first; only an archived flag can be deleted."
 msgstr "Archive the flag first; only an archived flag can be deleted."
 
 #: src/components/experiment-transitions.tsx
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/lib/experiments.ts
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Archived"
 msgstr "Archived"
+
+#: src/components/experiments-panel.tsx
+msgid "Archived experiments included"
+msgstr "Archived experiments included"
 
 #: src/components/structural-diff-view.tsx
 msgid "Archived."
@@ -1417,6 +1418,10 @@ msgstr "Ask for a new link"
 #: src/components/auth-provider-detail.tsx
 msgid "Asking the identity provider…"
 msgstr "Asking the identity provider…"
+
+#: src/components/experiment-assignment.tsx
+msgid "Assignment"
+msgstr "Assignment"
 
 #: src/components/experiment-assignment.tsx
 msgid "Assignment lookup"
@@ -1612,7 +1617,7 @@ msgstr "Automatic exposure switched off."
 msgid "Automatic exposure switched on."
 msgstr "Automatic exposure switched on."
 
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+#: src/components/experiments-panel.tsx
 msgid "Awaiting code removal"
 msgstr "Awaiting code removal"
 
@@ -2426,7 +2431,7 @@ msgstr "Create unit type"
 msgid "Create webhook"
 msgstr "Create webhook"
 
-#: src/components/experiment-transitions.tsx
+#: src/components/experiment-panel.tsx
 #: src/components/firebase-wizard.tsx
 #: src/components/import-project.tsx
 #: src/components/scim-tokens.tsx
@@ -2694,6 +2699,7 @@ msgstr "Description changed from “{before}” to “{after}”."
 msgid "Description changed."
 msgstr "Description changed."
 
+#: src/components/experiment-panel.tsx
 #: src/components/flag-panel.tsx
 msgid "Details"
 msgstr "Details"
@@ -3297,6 +3303,7 @@ msgstr "Entity ID"
 #. A kind of entity in the audit log.
 #: src/components/change-requests-panel.tsx
 #: src/components/experiment-alerts.tsx
+#: src/components/experiment-exposures.tsx
 #: src/components/firebase-wizard.tsx
 #: src/components/flag-history.tsx
 #: src/components/flags-panel.tsx
@@ -3338,7 +3345,6 @@ msgid "Environment: {environment}"
 msgstr "Environment: {environment}"
 
 #: src/components/area-screens.ts
-#: src/components/experiment-exposures.tsx
 #: src/components/flag-panel.tsx
 #: src/components/import-project.tsx
 #: src/components/sink-editor.tsx
@@ -3350,6 +3356,7 @@ msgstr "Environment: {environment}"
 msgid "Environments"
 msgstr "Environments"
 
+#: src/components/experiment-panel.tsx
 #: src/components/flag-panel.tsx
 msgid "Environments and details"
 msgstr "Environments and details"
@@ -3717,6 +3724,10 @@ msgstr "Exposure conflicts"
 msgid "Exposures"
 msgstr "Exposures"
 
+#: src/components/experiment-exposures.tsx
+msgid "Exposures per variation"
+msgstr "Exposures per variation"
+
 #: src/components/scim-groups.tsx
 msgid "External ID"
 msgstr "External ID"
@@ -3769,7 +3780,7 @@ msgstr "Field"
 msgid "Filter the deliveries"
 msgstr "Filter the deliveries"
 
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+#: src/components/experiments-panel.tsx
 msgid "Filter the experiments"
 msgstr "Filter the experiments"
 
@@ -3779,6 +3790,7 @@ msgstr "Filter the segments"
 
 #: src/components/audit-filters.tsx
 #: src/components/change-requests-panel.tsx
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/components/ui/toolbar.tsx
 msgid "Filters"
@@ -3839,6 +3851,8 @@ msgstr "Fixed once the project is created, since SDKs and scripts use it."
 #. A kind of entity in the audit log.
 #: src/components/change-requests-panel.tsx
 #: src/components/experiment-fields.tsx
+#: src/components/experiment-panel.tsx
+#: src/components/experiments-panel.tsx
 #: src/components/flag-panel.tsx
 #: src/lib/audit.ts
 #: src/lib/experiment-transitions.ts
@@ -3895,6 +3909,7 @@ msgid "Flag restored"
 msgstr "Flag restored"
 
 #: src/components/change-requests-panel.tsx
+#: src/components/experiments-panel.tsx
 msgid "Flag: {flag}"
 msgstr "Flag: {flag}"
 
@@ -4141,6 +4156,7 @@ msgstr "History"
 msgid "History of the flag"
 msgstr "History of the flag"
 
+#: src/components/experiment-panel.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Holding environments"
 msgstr "Holding environments"
@@ -4280,7 +4296,7 @@ msgstr "Include"
 msgid "Include {key}"
 msgstr "Include {key}"
 
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+#: src/components/experiments-panel.tsx
 msgid "Include archived experiments"
 msgstr "Include archived experiments"
 
@@ -4288,7 +4304,7 @@ msgstr "Include archived experiments"
 msgid "Inclusion bucket"
 msgstr "Inclusion bucket"
 
-#: src/components/experiment-transitions.tsx
+#: src/components/experiment-panel.tsx
 msgid "Inclusion salt"
 msgstr "Inclusion salt"
 
@@ -4483,6 +4499,10 @@ msgstr "It has no expected end date."
 msgid "It has no hypothesis."
 msgstr "It has no hypothesis."
 
+#: src/components/experiment-transitions.tsx
+msgid "It has not started: nothing about it is served yet."
+msgstr "It has not started: nothing about it is served yet."
+
 #: src/components/propose-dialog.tsx
 msgid "It is opened for review at once. Once a member who may approve change requests approves it, it is applied by hand or at the time given."
 msgstr "It is opened for review at once. Once a member who may approve change requests approves it, it is applied by hand or at the time given."
@@ -4546,6 +4566,7 @@ msgstr "Kept in this browser, and used on the sign-in page too. System follows y
 #: src/components/create-from-document.tsx
 #: src/components/discovered-attributes.tsx
 #: src/components/experiment-fields.tsx
+#: src/components/experiment-panel.tsx
 #: src/components/experiment-transitions.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/flag-panel.tsx
@@ -5095,6 +5116,7 @@ msgstr "Mode: Replace"
 msgid "Model"
 msgstr "Model"
 
+#: src/components/experiment-transitions.tsx
 #: src/components/ui/page-header.tsx
 msgid "More actions"
 msgstr "More actions"
@@ -5188,6 +5210,7 @@ msgstr "Names the provider in sign-in addresses and in the redirect URI. It neve
 msgid "Names the provider in sign-in addresses, in the ACS URL and in the entity ID. It never changes."
 msgstr "Names the provider in sign-in addresses, in the ACS URL and in the entity ID. It never changes."
 
+#: src/components/experiments-panel.tsx
 #: src/components/needs-attention.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Needs attention"
@@ -5498,6 +5521,7 @@ msgstr "No response"
 msgid "No rule matched: the fallthrough variation is served."
 msgstr "No rule matched: the fallthrough variation is served."
 
+#: src/components/experiment-panel.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "No rule serves it"
 msgstr "No rule serves it"
@@ -5934,12 +5958,12 @@ msgid "Overrides in this environment"
 msgstr "Overrides in this environment"
 
 #: src/components/area-screens.ts
-#: src/components/experiment-transitions.tsx
 msgid "Overview"
 msgstr "Overview"
 
 #. The name of a built-in role.
 #: src/components/experiment-fields.tsx
+#: src/components/experiments-panel.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/flag-panel.tsx
 #: src/components/flags-panel.tsx
@@ -5959,6 +5983,7 @@ msgstr "Owner changed from {before} to {after}."
 msgid "Owner inactive"
 msgstr "Owner inactive"
 
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
 msgid "Owner: {owner}"
 msgstr "Owner: {owner}"
@@ -6040,8 +6065,8 @@ msgstr "Password minimum length"
 msgid "Passwords"
 msgstr "Passwords"
 
+#: src/components/experiments-panel.tsx
 #: src/lib/experiment-alerts.ts
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Past expected end"
 msgstr "Past expected end"
 
@@ -7365,6 +7390,10 @@ msgstr "Ship a winner: its rules serve the winning variation"
 msgid "Shipped {winner}: its rules serve it."
 msgstr "Shipped {winner}: its rules serve it."
 
+#: src/components/experiments-panel.tsx
+msgid "Show"
+msgstr "Show"
+
 #: src/components/flag-evaluations.tsx
 #: src/routes/_signed-in/projects/$project/event-volume.tsx
 msgid "Show as table"
@@ -7686,6 +7715,8 @@ msgstr "State in {where}: {state}"
 msgid "State: {state}"
 msgstr "State: {state}"
 
+#: src/components/experiment-transitions.tsx
+#: src/components/experiments-panel.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/sink-recovery.tsx
 #: src/components/webhook-deliveries.tsx
@@ -7699,6 +7730,10 @@ msgstr "Status"
 #: src/components/structural-diff-view.tsx
 msgid "Status changed from {before} to {after}."
 msgstr "Status changed from {before} to {after}."
+
+#: src/components/experiments-panel.tsx
+msgid "Status: {status}"
+msgstr "Status: {status}"
 
 #: src/components/firebase-wizard.tsx
 msgid "Steps"
@@ -7835,8 +7870,8 @@ msgstr "System"
 msgid "Table prefix"
 msgstr "Table prefix"
 
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Tag"
 msgstr "Tag"
 
@@ -7848,6 +7883,7 @@ msgstr "Tag added: <0>{tag}</0>."
 msgid "Tag removed: <0>{tag}</0>."
 msgstr "Tag removed: <0>{tag}</0>."
 
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
 msgid "Tag: {tag}"
 msgstr "Tag: {tag}"
@@ -8979,8 +9015,8 @@ msgstr "The weights must sum to 100.00 %."
 msgid "The weights sum to {sum} %; they must sum to {whole} %."
 msgstr "The weights sum to {sum} %; they must sum to {whole} %."
 
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "The whole tag"
 msgstr "The whole tag"
 
@@ -9480,6 +9516,10 @@ msgstr "Unit types"
 msgid "Units"
 msgstr "Units"
 
+#: src/components/experiment-assignment.tsx
+msgid "Units are included up to the traffic allocation of {allocation}, then split by weight."
+msgstr "Units are included up to the traffic allocation of {allocation}, then split by weight."
+
 #: src/components/experiment-exposures.tsx
 msgid "Units first exposed"
 msgstr "Units first exposed"
@@ -9489,8 +9529,8 @@ msgid "Units first exposed per day and variation, with the exposures received th
 msgstr "Units first exposed per day and variation, with the exposures received that day"
 
 #: src/components/experiment-exposures.tsx
-msgid "Units first exposed to each variation against the shares its weights ask for, per day, and units exposed to more than one variation. Exposures are counted about every 10 seconds."
-msgstr "Units first exposed to each variation against the shares its weights ask for, per day, and units exposed to more than one variation. Exposures are counted about every 10 seconds."
+msgid "Units first exposed to each variation against the shares its weights ask for. Exposures are counted about every 10 seconds."
+msgstr "Units first exposed to each variation against the shares its weights ask for. Exposures are counted about every 10 seconds."
 
 #: src/components/rule-editor.tsx
 msgid "Units matching this rule are assigned to the variations by the experiment's weights. Its weights and unit type change only on the experiment's page."
@@ -9654,7 +9694,7 @@ msgstr "Variation <0>{key}</0> serves <1/> instead of <2/>."
 msgid "Variation bucket"
 msgstr "Variation bucket"
 
-#: src/components/experiment-transitions.tsx
+#: src/components/experiment-panel.tsx
 msgid "Variation salt"
 msgstr "Variation salt"
 
@@ -9754,6 +9794,7 @@ msgstr "Webhooks"
 msgid "Weight of variation {n} (%)"
 msgstr "Weight of variation {n} (%)"
 
+#: src/components/experiment-assignment.tsx
 #: src/lib/experiment-transitions.ts
 msgid "Weights"
 msgstr "Weights"

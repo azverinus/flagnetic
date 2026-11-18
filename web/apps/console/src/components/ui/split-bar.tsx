@@ -14,6 +14,11 @@ export type SplitSegment = {
    * same name; a part with none is painted neutral, as "the rest" is.
    */
   series?: 1 | 2 | 3 | 4;
+  /**
+   * A background class for a part beyond the four series, which a screen
+   * with more parts takes from its own palette; it wins over `series`.
+   */
+  colorClass?: string;
 };
 
 const seriesClass = {
@@ -22,6 +27,9 @@ const seriesClass = {
   3: "bg-series-3",
   4: "bg-series-4",
 } as const;
+
+const colorOf = (segment: SplitSegment) =>
+  segment.colorClass ?? (segment.series ? seriesClass[segment.series] : "bg-muted-foreground/30");
 
 /**
  * The shares of a whole as one 8 px bar of segments in series colours, with
@@ -52,10 +60,7 @@ export function SplitBar({
           <div
             key={segment.key}
             data-segment={segment.key}
-            className={cn(
-              "h-full min-w-0",
-              segment.series ? seriesClass[segment.series] : "bg-muted-foreground/30",
-            )}
+            className={cn("h-full min-w-0", colorOf(segment))}
             style={{ width: `${shareOf(segment) * 100}%` }}
           />
         ))}
@@ -63,13 +68,7 @@ export function SplitBar({
       <ul aria-label={label} className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
         {segments.map((segment) => (
           <li key={segment.key} className="flex items-center gap-1.5">
-            <span
-              aria-hidden
-              className={cn(
-                "size-2 shrink-0 rounded-full",
-                segment.series ? seriesClass[segment.series] : "bg-muted-foreground/30",
-              )}
-            />
+            <span aria-hidden className={cn("size-2 shrink-0 rounded-full", colorOf(segment))} />
             <span className="font-mono">{segment.label}</span>
             <span className="text-muted-foreground tabular-nums">
               {percent.format(shareOf(segment))}

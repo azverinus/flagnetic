@@ -3,16 +3,18 @@ import { cn } from "@/lib/cn";
 /**
  * One colour per series, such as a variation in its flag's or its
  * experiment's order, each stepped for its theme so neighbours stay apart
- * in both; a ninth series and on share the muted ink. The numbers beside
+ * in both. The first four are the console's series tokens, the colours a
+ * `SplitBar` paints its parts in, so a bar, a table's dots and a chart
+ * agree; a ninth series and on share the muted ink. The numbers beside
  * every bar carry the values, so no colour has to be told apart to read
  * them. Tailwind reads class names literally, so each pair is spelled out.
  */
 /* eslint-disable lingui/no-unlocalized-strings -- class names, not text */
 const swatchClassNames = [
-  "bg-[#2a78d6] dark:bg-[#3987e5]",
-  "bg-[#eb6834] dark:bg-[#d95926]",
-  "bg-[#1baf7a] dark:bg-[#199e70]",
-  "bg-[#eda100] dark:bg-[#c98500]",
+  "bg-series-1",
+  "bg-series-2",
+  "bg-series-3",
+  "bg-series-4",
   "bg-[#e87ba4] dark:bg-[#d55181]",
   "bg-[#008300] dark:bg-[#008300]",
   "bg-[#4a3aa7] dark:bg-[#9085e9]",

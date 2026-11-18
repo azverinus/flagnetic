@@ -15,7 +15,7 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { CircleAlertIcon, TriangleAlertIcon } from "lucide-react";
+import { CircleAlertIcon, EllipsisIcon, TriangleAlertIcon } from "lucide-react";
 import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 
@@ -23,14 +23,24 @@ import { Can } from "@/components/can";
 import { type Proposal, ProposeDialog } from "@/components/propose-dialog";
 import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ExperimentStatusBadge } from "@/components/experiment-status-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog, DialogActions } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { DialogForm } from "@/components/ui/dialog-form";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectItem } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDateTime, formatDay } from "@/i18n/format";
+import { useCan, useMissingPermissionReason } from "@/lib/access";
+import { cn } from "@/lib/cn";
 import { ApiError, unwrap } from "@/lib/errors";
 import {
   cloneIssues,
@@ -275,31 +285,86 @@ export function ExperimentTransitions({
     ? { error: flag.error, retry: () => void flag.refetch() }
     : undefined;
 
-  const action = (
-    name: ExperimentAction,
-    label: ReactNode,
-    variant: "default" | "outline" | "destructive" = "outline",
-  ) =>
-    actions.has(name) ? (
-      <Can
-        key={name}
-        permission={name === "delete" ? "experiment.delete" : "experiment.edit"}
-        whenMissing="disable"
-      >
-        <Button variant={variant} disabled={editing && name !== "clone"} onClick={() => ask(name)}>
-          {label}
+  // Whether the caller may write the experiment, and delete a draft.
+  const mayEdit = useCan("experiment.edit");
+  const editReason = useMissingPermissionReason("experiment.edit");
+  const mayDelete = useCan("experiment.delete");
+  const deleteReason = useMissingPermissionReason("experiment.delete");
+
+  // The header's one filled button is the next step of the lifecycle: a
+  // draft starts, a running experiment stops, a stopped one is archived.
+  // The other transitions wait in the "more" menu.
+  const next: ExperimentAction | undefined =
+    experiment.status === "draft"
+      ? "start"
+      : experiment.status === "running"
+        ? "stop"
+        : experiment.status === "stopped"
+          ? "archive"
+          : undefined;
+  const primaryLabels = {
+    start: <Trans>Start</Trans>,
+    stop: <Trans>Stop</Trans>,
+    archive: <Trans>Archive</Trans>,
+  } as const;
+  const primary =
+    next !== undefined && actions.has(next) ? (
+      <Can key={next} permission="experiment.edit" whenMissing="disable">
+        <Button disabled={editing} onClick={() => ask(next)}>
+          {primaryLabels[next as keyof typeof primaryLabels]}
         </Button>
       </Can>
     ) : null;
 
+  const item = (name: ExperimentAction, label: ReactNode, destructive = false) => {
+    if (!actions.has(name) || name === next) return null;
+    const may = name === "delete" ? mayDelete : mayEdit;
+    const reason = name === "delete" ? deleteReason : editReason;
+    const blocked = !may || (editing && name !== "clone");
+    return (
+      // A refused item is marked disabled rather than made disabled: a
+      // disabled menu item is skipped by the keyboard and takes no pointer,
+      // so its reason could be neither reached nor hovered.
+      <DropdownMenuItem
+        key={name}
+        aria-disabled={blocked ? true : undefined}
+        title={may ? undefined : reason}
+        className={cn(
+          destructive && "text-destructive focus:text-destructive",
+          blocked && "opacity-50",
+        )}
+        onSelect={(event) => {
+          if (blocked) {
+            event.preventDefault();
+            return;
+          }
+          ask(name);
+        }}
+      >
+        {label}
+      </DropdownMenuItem>
+    );
+  };
+  const items = [
+    item("grow", <Trans>Grow traffic allocation</Trans>),
+    item("clone", <Trans>Clone</Trans>),
+    item("archive", <Trans>Archive</Trans>),
+    item("delete", <Trans>Delete</Trans>, true),
+  ].filter((entry) => entry !== null);
+
   return (
     <>
-      {action("grow", <Trans>Grow traffic allocation</Trans>)}
-      {action("clone", <Trans>Clone</Trans>)}
-      {action("archive", <Trans>Archive</Trans>)}
-      {action("delete", <Trans>Delete</Trans>, "destructive")}
-      {action("stop", <Trans>Stop</Trans>, "default")}
-      {action("start", <Trans>Start</Trans>, "default")}
+      {primary}
+      {items.length > 0 ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" aria-label={t`More actions`}>
+              <EllipsisIcon aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">{items}</DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
 
       <Dialog {...dialog("start")} title={t`Start ${key}`}>
         {asking === "start" ? (
@@ -896,34 +961,30 @@ function CloneForm({
   );
 }
 
-export type ExperimentOverviewProps = {
+export type ExperimentStatusCardProps = {
   project: string;
   experiment: Experiment;
-  nameOf: (member: string) => string;
   editing: boolean;
   onChanged: (saved: Experiment) => void;
 };
 
 /**
- * What an experiment is beside its form: both salts, so an analyst can
- * recompute any unit's buckets, its dates, and once stopped the decision
- * with its note, editable while it stays stopped.
+ * Where an experiment is in its life: its status, its dates, and once
+ * stopped the decision with its note, editable while it stays stopped.
+ * What identifies it, its salts included, is in the context panel.
  */
-export function ExperimentOverview({
+export function ExperimentStatusCard({
   project,
   experiment,
-  nameOf,
   editing,
   onChanged,
-}: ExperimentOverviewProps) {
+}: ExperimentStatusCardProps) {
   const { i18n, t } = useLingui();
   const [noting, setNoting] = useState(false);
   const write = useExperimentWrite(project, experiment, onChanged);
   const at = (value: string | null) => (value ? formatDateTime(i18n, value) : undefined);
   const decision = experiment.decision;
   const winner = decision?.winner_variation;
-  const creator = experiment.created_by ? nameOf(experiment.created_by) : undefined;
-  const created = formatDateTime(i18n, experiment.created_at);
 
   const dates: [string, string | undefined][] = [
     [t`Started`, at(experiment.started_at)],
@@ -934,89 +995,70 @@ export function ExperimentOverview({
     [t`Stopped`, at(experiment.stopped_at)],
     [t`Archived`, at(experiment.archived_at)],
   ];
+  const known = dates.filter(([, value]) => value !== undefined);
 
   return (
-    <section aria-label={t`Overview`} className="flex flex-col gap-3">
-      <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
-        <div className="flex flex-col gap-0.5">
-          <dt className="text-muted-foreground">
-            <Trans>Inclusion salt</Trans>
-          </dt>
-          <dd>
-            <code className="font-mono">{experiment.inclusion_salt}</code>
-          </dd>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <dt className="text-muted-foreground">
-            <Trans>Variation salt</Trans>
-          </dt>
-          <dd>
-            <code className="font-mono">{experiment.variation_salt}</code>
-          </dd>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <dt className="text-muted-foreground">
-            <Trans>Created</Trans>
-          </dt>
-          <dd>
-            {creator ? (
-              <Trans>
-                {created} by {creator}
-              </Trans>
-            ) : (
-              created
-            )}
-          </dd>
-        </div>
-        {dates.map(([label, value]) =>
-          value ? (
+    <Card aria-labelledby="experiment-status">
+      <CardHeader
+        titleId="experiment-status"
+        title={<Trans>Status</Trans>}
+        actions={<ExperimentStatusBadge status={experiment.status} />}
+      />
+      <CardContent>
+        {known.length === 0 && !decision ? (
+          <p className="text-sm text-muted-foreground">
+            <Trans>It has not started: nothing about it is served yet.</Trans>
+          </p>
+        ) : null}
+        <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-4">
+          {known.map(([label, value]) => (
             <div key={label} className="flex flex-col gap-0.5">
               <dt className="text-muted-foreground">{label}</dt>
               <dd>{value}</dd>
             </div>
-          ) : null,
-        )}
-        {decision ? (
-          <div className="flex flex-col gap-0.5 sm:col-span-3">
-            <dt className="text-muted-foreground">
-              <Trans>Decision</Trans>
-            </dt>
-            <dd className="flex flex-col gap-1">
-              <span>
-                {decision.outcome === "winner" && winner ? (
-                  <Trans>Shipped {winner}: its rules serve it.</Trans>
-                ) : (
-                  <Trans>Removed: its rules were deleted.</Trans>
-                )}
-              </span>
-              {decision.note ? (
-                <span className="whitespace-pre-wrap">{decision.note}</span>
-              ) : (
-                <span className="text-muted-foreground">
-                  <Trans>No note.</Trans>
-                </span>
-              )}
-              {experiment.status === "stopped" ? (
+          ))}
+          {decision ? (
+            <div className="flex flex-col gap-0.5 sm:col-span-4">
+              <dt className="text-muted-foreground">
+                <Trans>Decision</Trans>
+              </dt>
+              <dd className="flex flex-col gap-1">
                 <span>
-                  <Can permission="experiment.edit" whenMissing="disable">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={editing}
-                      onClick={() => {
-                        write.reset();
-                        setNoting(true);
-                      }}
-                    >
-                      <Trans>Edit note</Trans>
-                    </Button>
-                  </Can>
+                  {decision.outcome === "winner" && winner ? (
+                    <Trans>Shipped {winner}: its rules serve it.</Trans>
+                  ) : (
+                    <Trans>Removed: its rules were deleted.</Trans>
+                  )}
                 </span>
-              ) : null}
-            </dd>
-          </div>
-        ) : null}
-      </dl>
+                {decision.note ? (
+                  <span className="whitespace-pre-wrap">{decision.note}</span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    <Trans>No note.</Trans>
+                  </span>
+                )}
+                {experiment.status === "stopped" ? (
+                  <span>
+                    <Can permission="experiment.edit" whenMissing="disable">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={editing}
+                        onClick={() => {
+                          write.reset();
+                          setNoting(true);
+                        }}
+                      >
+                        <Trans>Edit note</Trans>
+                      </Button>
+                    </Can>
+                  </span>
+                ) : null}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+      </CardContent>
       <Dialog open={noting} onOpenChange={setNoting} title={t`Decision note`}>
         {noting ? (
           <NoteForm
@@ -1030,7 +1072,7 @@ export function ExperimentOverview({
           />
         ) : null}
       </Dialog>
-    </section>
+    </Card>
   );
 }
 

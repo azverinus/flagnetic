@@ -104,10 +104,6 @@ msgstr "{count, plural, one {секунда} few {секунды} many {секу
 msgid "{count, plural, one {This import deletes # entity from the project. Deletions cannot be undone.} other {This import deletes # entities from the project. Deletions cannot be undone.}}"
 msgstr "{count, plural, one {Этот импорт удалит # объект из проекта. Удаление нельзя отменить.} few {Этот импорт удалит # объекта из проекта. Удаление нельзя отменить.} many {Этот импорт удалит # объектов из проекта. Удаление нельзя отменить.} other {Этот импорт удалит # объекта из проекта. Удаление нельзя отменить.}}"
 
-#: src/components/experiment-transitions.tsx
-msgid "{created} by {creator}"
-msgstr "{created}, {creator}"
-
 #: src/components/daily-chart.tsx
 msgid "{date} (UTC): {counts}"
 msgstr "{date} (UTC): {counts}"
@@ -639,9 +635,9 @@ msgstr "Ключ, однажды заданный, больше не меняе�
 msgid "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
 msgstr "Участник, забывший пароль, запрашивает сброс пароля по почте со страницы входа. Это работает, только пока SMTP-сервер настроен в разделе «Почта» навигации инстанса. Администратор инстанса может выпустить ссылку для сброса пароля на странице участника в любом случае."
 
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/lib/project-members.ts
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "A member without a grant here"
 msgstr "Участник без роли в этом проекте"
 
@@ -1255,7 +1251,7 @@ msgid "Any event type"
 msgstr "Любой тип события"
 
 #: src/components/change-requests-panel.tsx
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+#: src/components/experiments-panel.tsx
 msgid "Any flag"
 msgstr "Любой флаг"
 
@@ -1267,8 +1263,8 @@ msgstr "Любой вид"
 msgid "Any origin"
 msgstr "Любой источник"
 
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Any owner"
 msgstr "Любой владелец"
 
@@ -1281,8 +1277,8 @@ msgstr "Любое расписание"
 msgid "Any state"
 msgstr "Любое состояние"
 
+#: src/components/experiments-panel.tsx
 #: src/components/webhook-deliveries.tsx
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Any status"
 msgstr "Любой статус"
 
@@ -1400,11 +1396,16 @@ msgid "Archive the flag first; only an archived flag can be deleted."
 msgstr "Сначала архивируйте флаг: удалить можно только архивный."
 
 #: src/components/experiment-transitions.tsx
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/lib/experiments.ts
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Archived"
 msgstr "В архиве"
+
+#: src/components/experiments-panel.tsx
+msgid "Archived experiments included"
+msgstr "Архивные эксперименты включены"
 
 #: src/components/structural-diff-view.tsx
 msgid "Archived."
@@ -1417,6 +1418,10 @@ msgstr "Запросить новую ссылку"
 #: src/components/auth-provider-detail.tsx
 msgid "Asking the identity provider…"
 msgstr "Запрашиваем данные у провайдера идентификации…"
+
+#: src/components/experiment-assignment.tsx
+msgid "Assignment"
+msgstr "Назначение"
 
 #: src/components/experiment-assignment.tsx
 msgid "Assignment lookup"
@@ -1612,7 +1617,7 @@ msgstr "Автоматический показ выключен."
 msgid "Automatic exposure switched on."
 msgstr "Автоматический показ включён."
 
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+#: src/components/experiments-panel.tsx
 msgid "Awaiting code removal"
 msgstr "Ждут удаления кода"
 
@@ -2426,7 +2431,7 @@ msgstr "Создать тип юнита"
 msgid "Create webhook"
 msgstr "Создать вебхук"
 
-#: src/components/experiment-transitions.tsx
+#: src/components/experiment-panel.tsx
 #: src/components/firebase-wizard.tsx
 #: src/components/import-project.tsx
 #: src/components/scim-tokens.tsx
@@ -2694,6 +2699,7 @@ msgstr "Описание изменено: было «{before}», стало «{
 msgid "Description changed."
 msgstr "Описание изменено."
 
+#: src/components/experiment-panel.tsx
 #: src/components/flag-panel.tsx
 msgid "Details"
 msgstr "Сведения"
@@ -3297,6 +3303,7 @@ msgstr "Entity ID"
 #. A kind of entity in the audit log.
 #: src/components/change-requests-panel.tsx
 #: src/components/experiment-alerts.tsx
+#: src/components/experiment-exposures.tsx
 #: src/components/firebase-wizard.tsx
 #: src/components/flag-history.tsx
 #: src/components/flags-panel.tsx
@@ -3338,7 +3345,6 @@ msgid "Environment: {environment}"
 msgstr "Окружение: {environment}"
 
 #: src/components/area-screens.ts
-#: src/components/experiment-exposures.tsx
 #: src/components/flag-panel.tsx
 #: src/components/import-project.tsx
 #: src/components/sink-editor.tsx
@@ -3350,6 +3356,7 @@ msgstr "Окружение: {environment}"
 msgid "Environments"
 msgstr "Окружения"
 
+#: src/components/experiment-panel.tsx
 #: src/components/flag-panel.tsx
 msgid "Environments and details"
 msgstr "Окружения и сведения"
@@ -3717,6 +3724,10 @@ msgstr "Конфликты показов"
 msgid "Exposures"
 msgstr "Показы"
 
+#: src/components/experiment-exposures.tsx
+msgid "Exposures per variation"
+msgstr "Показы по вариантам"
+
 #: src/components/scim-groups.tsx
 msgid "External ID"
 msgstr "Внешний ID"
@@ -3769,7 +3780,7 @@ msgstr "Поле"
 msgid "Filter the deliveries"
 msgstr "Фильтр доставок"
 
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+#: src/components/experiments-panel.tsx
 msgid "Filter the experiments"
 msgstr "Фильтр экспериментов"
 
@@ -3779,6 +3790,7 @@ msgstr "Фильтр сегментов"
 
 #: src/components/audit-filters.tsx
 #: src/components/change-requests-panel.tsx
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/components/ui/toolbar.tsx
 msgid "Filters"
@@ -3839,6 +3851,8 @@ msgstr "Не меняется после создания проекта: по �
 #. A kind of entity in the audit log.
 #: src/components/change-requests-panel.tsx
 #: src/components/experiment-fields.tsx
+#: src/components/experiment-panel.tsx
+#: src/components/experiments-panel.tsx
 #: src/components/flag-panel.tsx
 #: src/lib/audit.ts
 #: src/lib/experiment-transitions.ts
@@ -3895,6 +3909,7 @@ msgid "Flag restored"
 msgstr "Флаг восстановлен"
 
 #: src/components/change-requests-panel.tsx
+#: src/components/experiments-panel.tsx
 msgid "Flag: {flag}"
 msgstr "Флаг: {flag}"
 
@@ -4141,6 +4156,7 @@ msgstr "История"
 msgid "History of the flag"
 msgstr "История флага"
 
+#: src/components/experiment-panel.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Holding environments"
 msgstr "Окружения с правилом"
@@ -4280,7 +4296,7 @@ msgstr "Импортировать"
 msgid "Include {key}"
 msgstr "Импортировать {key}"
 
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+#: src/components/experiments-panel.tsx
 msgid "Include archived experiments"
 msgstr "Показывать архивные эксперименты"
 
@@ -4288,7 +4304,7 @@ msgstr "Показывать архивные эксперименты"
 msgid "Inclusion bucket"
 msgstr "Бакет попадания в эксперимент"
 
-#: src/components/experiment-transitions.tsx
+#: src/components/experiment-panel.tsx
 msgid "Inclusion salt"
 msgstr "Соль попадания в эксперимент"
 
@@ -4483,6 +4499,10 @@ msgstr "Не указана дата ожидаемого окончания."
 msgid "It has no hypothesis."
 msgstr "Не указана гипотеза."
 
+#: src/components/experiment-transitions.tsx
+msgid "It has not started: nothing about it is served yet."
+msgstr "Он не запускался: пока ничего из него не отдаётся."
+
 #: src/components/propose-dialog.tsx
 msgid "It is opened for review at once. Once a member who may approve change requests approves it, it is applied by hand or at the time given."
 msgstr "Запрос сразу открывается на проверку. Когда участник, который может одобрять запросы на изменение, одобрит его, он применяется вручную или в указанное время."
@@ -4546,6 +4566,7 @@ msgstr "Хранится в этом браузере и применяется 
 #: src/components/create-from-document.tsx
 #: src/components/discovered-attributes.tsx
 #: src/components/experiment-fields.tsx
+#: src/components/experiment-panel.tsx
 #: src/components/experiment-transitions.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/flag-panel.tsx
@@ -5095,6 +5116,7 @@ msgstr "Режим: замена"
 msgid "Model"
 msgstr "Модель"
 
+#: src/components/experiment-transitions.tsx
 #: src/components/ui/page-header.tsx
 msgid "More actions"
 msgstr "Другие действия"
@@ -5188,6 +5210,7 @@ msgstr "Имя провайдера в адресах входа и в URI пе�
 msgid "Names the provider in sign-in addresses, in the ACS URL and in the entity ID. It never changes."
 msgstr "Имя провайдера в адресах входа, в URL ACS и в entity ID. Никогда не меняется."
 
+#: src/components/experiments-panel.tsx
 #: src/components/needs-attention.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Needs attention"
@@ -5498,6 +5521,7 @@ msgstr "Нет ответа"
 msgid "No rule matched: the fallthrough variation is served."
 msgstr "Ни одно правило не совпало: отдаётся вариант для остальных."
 
+#: src/components/experiment-panel.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "No rule serves it"
 msgstr "Ни одно правило его не отдаёт"
@@ -5934,12 +5958,12 @@ msgid "Overrides in this environment"
 msgstr "Overrides в этом окружении"
 
 #: src/components/area-screens.ts
-#: src/components/experiment-transitions.tsx
 msgid "Overview"
 msgstr "Обзор"
 
 #. The name of a built-in role.
 #: src/components/experiment-fields.tsx
+#: src/components/experiments-panel.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/flag-panel.tsx
 #: src/components/flags-panel.tsx
@@ -5959,6 +5983,7 @@ msgstr "Владелец изменён: был {before}, стал {after}."
 msgid "Owner inactive"
 msgstr "Владелец неактивен"
 
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
 msgid "Owner: {owner}"
 msgstr "Владелец: {owner}"
@@ -6040,8 +6065,8 @@ msgstr "Минимальная длина пароля"
 msgid "Passwords"
 msgstr "Пароли"
 
+#: src/components/experiments-panel.tsx
 #: src/lib/experiment-alerts.ts
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Past expected end"
 msgstr "Ожидаемое окончание прошло"
 
@@ -7365,6 +7390,10 @@ msgstr "Выкатить победителя: правила экспериме
 msgid "Shipped {winner}: its rules serve it."
 msgstr "Выкачен {winner}: его отдают правила эксперимента."
 
+#: src/components/experiments-panel.tsx
+msgid "Show"
+msgstr "Показывать"
+
 #: src/components/flag-evaluations.tsx
 #: src/routes/_signed-in/projects/$project/event-volume.tsx
 msgid "Show as table"
@@ -7686,6 +7715,8 @@ msgstr "Состояние в {where}: {state}"
 msgid "State: {state}"
 msgstr "Состояние: {state}"
 
+#: src/components/experiment-transitions.tsx
+#: src/components/experiments-panel.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/sink-recovery.tsx
 #: src/components/webhook-deliveries.tsx
@@ -7699,6 +7730,10 @@ msgstr "Статус"
 #: src/components/structural-diff-view.tsx
 msgid "Status changed from {before} to {after}."
 msgstr "Статус изменён: был «{before}», стал «{after}»."
+
+#: src/components/experiments-panel.tsx
+msgid "Status: {status}"
+msgstr "Статус: {status}"
 
 #: src/components/firebase-wizard.tsx
 msgid "Steps"
@@ -7835,8 +7870,8 @@ msgstr "Как в системе"
 msgid "Table prefix"
 msgstr "Префикс таблиц"
 
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Tag"
 msgstr "Тег"
 
@@ -7848,6 +7883,7 @@ msgstr "Добавлен тег <0>{tag}</0>."
 msgid "Tag removed: <0>{tag}</0>."
 msgstr "Удалён тег <0>{tag}</0>."
 
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
 msgid "Tag: {tag}"
 msgstr "Тег: {tag}"
@@ -8979,8 +9015,8 @@ msgstr "Сумма весов должна быть 100,00 %."
 msgid "The weights sum to {sum} %; they must sum to {whole} %."
 msgstr "Сумма весов {sum} %, а должна быть {whole} %."
 
+#: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "The whole tag"
 msgstr "Тег целиком"
 
@@ -9480,6 +9516,10 @@ msgstr "Типы юнитов"
 msgid "Units"
 msgstr "Юниты"
 
+#: src/components/experiment-assignment.tsx
+msgid "Units are included up to the traffic allocation of {allocation}, then split by weight."
+msgstr "В эксперимент попадают юниты в пределах охвата {allocation}, затем они делятся по весам."
+
 #: src/components/experiment-exposures.tsx
 msgid "Units first exposed"
 msgstr "Впервые получили показ"
@@ -9489,8 +9529,8 @@ msgid "Units first exposed per day and variation, with the exposures received th
 msgstr "Юниты, впервые получившие показ, по дням и вариантам, с показами, полученными в тот день"
 
 #: src/components/experiment-exposures.tsx
-msgid "Units first exposed to each variation against the shares its weights ask for, per day, and units exposed to more than one variation. Exposures are counted about every 10 seconds."
-msgstr "Юниты, впервые получившие показ каждого варианта, в сравнении с долями, которые задают его веса, по дням, и юниты, получившие показы нескольких вариантов. Показы подсчитываются примерно каждые 10 секунд."
+msgid "Units first exposed to each variation against the shares its weights ask for. Exposures are counted about every 10 seconds."
+msgstr "Юниты, впервые получившие показ каждого варианта, в сравнении с долями, которых требуют веса. Показы считаются примерно раз в 10 секунд."
 
 #: src/components/rule-editor.tsx
 msgid "Units matching this rule are assigned to the variations by the experiment's weights. Its weights and unit type change only on the experiment's page."
@@ -9654,7 +9694,7 @@ msgstr "Вариант <0>{key}</0> отдаёт <1/> вместо <2/>."
 msgid "Variation bucket"
 msgstr "Бакет варианта"
 
-#: src/components/experiment-transitions.tsx
+#: src/components/experiment-panel.tsx
 msgid "Variation salt"
 msgstr "Соль варианта"
 
@@ -9754,6 +9794,7 @@ msgstr "Вебхуки"
 msgid "Weight of variation {n} (%)"
 msgstr "Вес варианта {n} (%)"
 
+#: src/components/experiment-assignment.tsx
 #: src/lib/experiment-transitions.ts
 msgid "Weights"
 msgstr "Веса"

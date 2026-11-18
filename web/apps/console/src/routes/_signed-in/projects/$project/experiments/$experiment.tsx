@@ -9,15 +9,16 @@ import { toast } from "sonner";
 
 import { ConflictBanner } from "@/components/conflict-banner";
 import { ExperimentAlertBanners, ExperimentAlertsSection } from "@/components/experiment-alerts";
-import { ExperimentAssignmentLookup } from "@/components/experiment-assignment";
+import { ExperimentPanel } from "@/components/experiment-panel";
+import { ExperimentAssignmentCard } from "@/components/experiment-assignment";
 import { ExperimentExposuresSection } from "@/components/experiment-exposures";
 import { ExperimentFields } from "@/components/experiment-fields";
-import { ExperimentOverview, ExperimentTransitions } from "@/components/experiment-transitions";
+import { ExperimentStatusCard, ExperimentTransitions } from "@/components/experiment-transitions";
 import { FormRefusal } from "@/components/ui/form-page";
-import { ExperimentStatusBadge } from "@/components/experiment-status-badge";
 import { QueryError } from "@/components/query-error";
 import { ExperimentDiff } from "@/components/structural-diff-view";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UnsavedChangesBar } from "@/components/ui/unsaved-changes-bar";
@@ -42,7 +43,7 @@ import { useFormConflict } from "@/lib/use-form-conflict";
 import { useKnownMembers } from "@/lib/use-known-members";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/experiments/$experiment")({
-  staticData: { crumb: { param: "experiment" } },
+  staticData: { crumb: { param: "experiment" }, panel: ExperimentPanel },
   validateSearch: validateExperimentSearch,
   component: ExperimentDetail,
 });
@@ -213,12 +214,6 @@ function ExperimentPage({
     <Page>
       <PageHeader
         title={base.name}
-        description={
-          <span className="flex flex-wrap items-center gap-2">
-            <code className="font-mono text-sm">{base.key}</code>
-            <ExperimentStatusBadge status={base.status} />
-          </span>
-        }
         actions={
           <ExperimentTransitions
             project={project}
@@ -235,13 +230,13 @@ function ExperimentPage({
           <Trans>Save or discard your edits before changing the experiment's status.</Trans>
         </p>
       ) : null}
-      <ExperimentOverview
+      <ExperimentStatusCard
         project={project}
         experiment={base}
-        nameOf={nameOf}
         editing={dirty}
         onChanged={restart}
       />
+      <ExperimentAssignmentCard project={project} experiment={base} />
       <ExperimentExposuresSection
         project={project}
         experiment={base}
@@ -251,73 +246,77 @@ function ExperimentPage({
         }
       />
       <ExperimentAlertsSection project={project} experiment={base} />
-      <ExperimentAssignmentLookup project={project} experiment={base} />
-      <h2 className="text-base/6 font-medium">
-        <Trans>Definition</Trans>
-      </h2>
-      {canEdit ? null : (
-        <p role="status" className="rounded-md border bg-muted/40 p-3 text-sm">
-          {missing}
-        </p>
-      )}
-      {conflict ? (
-        <ConflictBanner
-          subject="form"
-          entry={conflict.entry}
-          diff={
-            <ExperimentDiff changes={diffExperiments(base, conflict.current)} nameOf={nameOf} />
-          }
-          actions={
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={save.isPending}
-                onClick={() => {
-                  queryClient.setQueryData(detailKey, conflict.current);
-                  save.reset();
-                  restart(conflict.current);
-                }}
-              >
-                <Trans>Reload and lose my edits</Trans>
-              </Button>
-              <Button
-                type="button"
-                disabled={save.isPending}
-                onClick={() => send(conflicts.keep(conflict.current))}
-              >
-                <Trans>Keep my edits</Trans>
-              </Button>
-            </>
-          }
-        />
-      ) : null}
-      <ExperimentFields
-        values={values}
-        onChange={(next) => {
-          // A refusal points at weights by their places, which a new flag
-          // or a row added or removed moves; it is dropped rather than
-          // shown on a row it was not about.
-          if (next.variations.length !== values.variations.length || next.flag !== values.flag) {
-            save.reset();
-          }
-          setValues(next);
-        }}
-        issues={checked ? issues : undefined}
-        refusal={refusal}
-        base={base}
-        flags={flags}
-        unitTypes={unitTypes}
-        owners={owners}
-        disabled={!canEdit}
-      />
-      {checked && issues.any ? (
-        <p role="alert" className="flex items-start gap-2 text-sm">
-          <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
-          <Trans>Fix what is marked above before saving.</Trans>
-        </p>
-      ) : null}
-      {shownAtFields ? null : <FormRefusal refusal={refusal} />}
+      <Card aria-labelledby="experiment-definition">
+        <CardHeader titleId="experiment-definition" title={<Trans>Definition</Trans>} />
+        <CardContent>
+          {canEdit ? null : (
+            <p role="status" className="rounded-md border bg-muted/40 p-3 text-sm">
+              {missing}
+            </p>
+          )}
+          {conflict ? (
+            <ConflictBanner
+              subject="form"
+              entry={conflict.entry}
+              diff={
+                <ExperimentDiff changes={diffExperiments(base, conflict.current)} nameOf={nameOf} />
+              }
+              actions={
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={save.isPending}
+                    onClick={() => {
+                      queryClient.setQueryData(detailKey, conflict.current);
+                      save.reset();
+                      restart(conflict.current);
+                    }}
+                  >
+                    <Trans>Reload and lose my edits</Trans>
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={save.isPending}
+                    onClick={() => send(conflicts.keep(conflict.current))}
+                  >
+                    <Trans>Keep my edits</Trans>
+                  </Button>
+                </>
+              }
+            />
+          ) : null}
+          <ExperimentFields
+            values={values}
+            onChange={(next) => {
+              // A refusal points at weights by their places, which a new flag
+              // or a row added or removed moves; it is dropped rather than
+              // shown on a row it was not about.
+              if (
+                next.variations.length !== values.variations.length ||
+                next.flag !== values.flag
+              ) {
+                save.reset();
+              }
+              setValues(next);
+            }}
+            issues={checked ? issues : undefined}
+            refusal={refusal}
+            base={base}
+            flags={flags}
+            unitTypes={unitTypes}
+            owners={owners}
+            disabled={!canEdit}
+          />
+          {checked && issues.any ? (
+            <p role="alert" className="flex items-start gap-2 text-sm">
+              <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
+              <Trans>Fix what is marked above before saving.</Trans>
+            </p>
+          ) : null}
+          {shownAtFields ? null : <FormRefusal refusal={refusal} />}
+        </CardContent>
+      </Card>
       <UnsavedChangesBar
         dirty={dirty}
         onDiscard={() => restart(base)}
