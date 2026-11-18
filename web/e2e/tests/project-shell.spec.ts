@@ -471,7 +471,7 @@ test.describe("the environment search parameter", () => {
   test("preselects the environment this project showed last", async ({ page }) => {
     await openProject(page, seededProject);
     await page.goto(`/projects/${seededProject.key}/flags?environment=staging`);
-    await expect(page.getByRole("combobox", { name: "Environment" })).toHaveText("Staging");
+    await expect(page.getByRole("radio", { name: "Staging", exact: true })).toBeChecked();
 
     await page.goto(`/projects/${seededProject.key}/flags`);
 

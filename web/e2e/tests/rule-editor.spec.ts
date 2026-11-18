@@ -423,7 +423,7 @@ test.describe("a rule serving an experiment", () => {
     await page.goto(`/projects/${project}/flags?environment=development&state=experiment`);
     await expect(page.getByRole("link", { name: "checkout_variant" })).toBeVisible();
     await expect(page.getByRole("link", { name: "payments_v2" })).toHaveCount(0);
-    await expect(page.getByTitle("Serves an experiment")).toHaveCount(1);
+    await expect(page.getByRole("table", { name: "Flags" }).getByText(/Experiment/)).toHaveCount(1);
   });
 });
 

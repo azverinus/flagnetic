@@ -45,6 +45,13 @@ async function pick(page: Page, option: string) {
   await page.getByRole("radio", { name: option, exact: true }).check();
 }
 
+/** Picks an owner: a radio up to five members, a select beyond, as many as the instance has. */
+async function pickOwner(page: Page, name: string) {
+  const select = page.getByRole("combobox", { name: "Owner" });
+  if ((await select.count()) > 0) await choose(page, "Owner", name);
+  else await pick(page, name);
+}
+
 const variation = (page: Page, n: number) => page.getByRole("group", { name: `Variation ${n}` });
 
 const flagsTable = (page: Page) => page.getByRole("table", { name: "Flags" });
@@ -292,7 +299,7 @@ test.describe("the flags list", () => {
     await expect(chips).toHaveCount(0);
     await page.getByRole("searchbox", { name: "Tag" }).fill("web");
     await expect(page).toHaveURL(/tag=web/);
-    await pick(page, linus.name);
+    await pickOwner(page, linus.name);
     await expect(keys).toHaveText(["checkout.copy"]);
     await expect(chips).toContainText("Tag: web");
     await expect(chips).toContainText(`Owner: ${linus.name}`);
@@ -302,7 +309,9 @@ test.describe("the flags list", () => {
     await page.reload();
     await expect(keys).toHaveText(["checkout.copy"]);
     await expect(page.getByRole("searchbox", { name: "Tag" })).toHaveValue("web");
-    await expect(page.getByRole("radio", { name: linus.name })).toBeChecked();
+    await expect(page.getByRole("navigation", { name: "Views and filters" })).toContainText(
+      linus.name,
+    );
     await expect(chips).toContainText("Tag: web");
 
     // A chip removes its facet alone; Clear all removes the rest.

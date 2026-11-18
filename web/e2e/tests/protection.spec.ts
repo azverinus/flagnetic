@@ -52,9 +52,8 @@ test.describe("protected environments", () => {
     await expect(page.getByRole("tab", { name: "Staging", exact: true })).toBeVisible();
 
     await page.goto(`/projects/${project}/flags`);
-    await page.getByRole("combobox", { name: "Environment", exact: true }).click();
-    await expect(page.getByRole("option", { name: "Production (protected)" })).toBeVisible();
-    await expect(page.getByRole("option", { name: "Staging", exact: true })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "Production (protected)" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "Staging", exact: true })).toBeVisible();
   });
 
   test("a viewer sees the switch disabled, with what it takes", async ({ page }) => {
