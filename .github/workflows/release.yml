@@ -223,6 +223,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build
         working-directory: web
+        env:
+          DOCS_SOURCE_REF: ${{ needs.release-please.outputs.server_tag }}
         run: pnpm --filter @flagnetic/website build
       - name: Links resolve
         working-directory: web
