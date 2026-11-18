@@ -40,6 +40,11 @@ async function choose(page: Page, field: string, option: string) {
   await page.getByRole("option", { name: option, exact: true }).click();
 }
 
+/** Picks a choice of a facet in the context panel, a radio list for up to five options. */
+async function pick(page: Page, option: string) {
+  await page.getByRole("radio", { name: option, exact: true }).check();
+}
+
 const variation = (page: Page, n: number) => page.getByRole("group", { name: `Variation ${n}` });
 
 const flagsTable = (page: Page) => page.getByRole("table", { name: "Flags" });
@@ -277,25 +282,48 @@ test.describe("the flags list", () => {
     await expect(page).toHaveURL(/q=checkout/);
     await expect(keys).toHaveText(["checkout.button", "checkout.copy"]);
 
-    await choose(page, "Type", "String");
+    await pick(page, "String");
     await expect(page).toHaveURL(/type=string/);
     await expect(keys).toHaveText(["checkout.copy"]);
+    const chips = page.getByRole("list", { name: "Filters in force" });
+    await expect(chips).toContainText("Type: String");
 
-    await choose(page, "Type", "Any type");
+    await pick(page, "Any type");
+    await expect(chips).toHaveCount(0);
     await page.getByRole("searchbox", { name: "Tag" }).fill("web");
     await expect(page).toHaveURL(/tag=web/);
-    await choose(page, "Owner", linus.name);
+    await pick(page, linus.name);
     await expect(keys).toHaveText(["checkout.copy"]);
+    await expect(chips).toContainText("Tag: web");
+    await expect(chips).toContainText(`Owner: ${linus.name}`);
 
-    // The address holds the whole view: opening it again shows the same.
+    // The address holds the whole view: opening it again shows the same,
+    // the panel's facets and the toolbar's chips included.
     await page.reload();
     await expect(keys).toHaveText(["checkout.copy"]);
     await expect(page.getByRole("searchbox", { name: "Tag" })).toHaveValue("web");
+    await expect(page.getByRole("radio", { name: linus.name })).toBeChecked();
+    await expect(chips).toContainText("Tag: web");
 
-    await page.goto(`/projects/${projectKey}/flags`);
-    await page.getByLabel("Archived flags instead").click();
+    // A chip removes its facet alone; Clear all removes the rest.
+    await page.getByRole("button", { name: "Remove the filter Tag: web" }).click();
+    await expect(page).not.toHaveURL(/tag=/);
+    await expect(page.getByRole("searchbox", { name: "Tag" })).toHaveValue("");
+    await page.getByRole("button", { name: "Clear all" }).click();
+    await expect(chips).toHaveCount(0);
+    await expect(keys).toHaveText(["checkout.button", "checkout.copy", "search.limit"]);
+
+    // The views are links: the archived flags, and back to all of them.
+    await page.getByRole("link", { name: "Archived", exact: true }).click();
     await expect(page).toHaveURL(/archived=true/);
+    await expect(page.getByRole("link", { name: "Archived", exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
     await expect(keys).toHaveText(["retired.banner"]);
+    await page.getByRole("link", { name: "All flags" }).click();
+    await expect(page).not.toHaveURL(/archived=/);
+    await expect(keys).toHaveText(["checkout.button", "checkout.copy", "search.limit"]);
   });
 
   test("tells no match from no flag, and clears the filters", async ({ page }) => {
@@ -382,32 +410,32 @@ test.describe("the flags list", () => {
     await expect(keys).toHaveText(["alpha", "beta", "gamma"]);
     await expect(flagsTable(page).getByRole("columnheader", { name: "Staging" })).toBeVisible();
     await expect(staging("beta")).toContainText("On");
-    await expect(staging("beta").getByText("Has rules")).toBeAttached();
-    await expect(staging("beta").getByText("Has a rollout")).toBeAttached();
+    await expect(staging("beta")).toContainText("Rules");
+    await expect(staging("beta")).toContainText("Rollout");
     await expect(staging("alpha")).toContainText("Off");
     await expect(rowFor(page, "alpha").getByRole("cell").last().locator("time")).toBeVisible();
 
-    await choose(page, "Environment", "Staging");
+    await pick(page, "Staging");
     await expect(page).toHaveURL(/environment=staging/);
-    await choose(page, "State", "Has a rollout");
+    await pick(page, "Has a rollout");
     await expect(page).toHaveURL(/state=rollout/);
     await expect(keys).toHaveText(["beta"]);
-    await choose(page, "State", "Off");
+    await pick(page, "Off");
     await expect(keys).toHaveText(["alpha", "gamma"]);
 
     // The same state judged in another environment.
-    await choose(page, "Environment", "Production");
+    await pick(page, "Production");
     await expect(keys).toHaveText(["alpha", "beta"]);
-    await choose(page, "State", "Any state");
+    await pick(page, "Any state");
 
-    await choose(page, "Differs between", "Staging and Production");
+    await pick(page, "Staging and Production");
     await expect(page).toHaveURL(
       /differs_between=staging%2Cproduction|differs_between=staging,production/,
     );
     await expect(keys).toHaveText(["beta", "gamma"]);
-    await choose(page, "Differs between", "Development and Staging");
+    await pick(page, "Development and Staging");
     await expect(keys).toHaveText(["beta"]);
-    await choose(page, "Differs between", "Any environments");
+    await pick(page, "Any environments");
     await expect(keys).toHaveText(["alpha", "beta", "gamma"]);
 
     await choose(page, "Sort by", "Name");
@@ -420,6 +448,57 @@ test.describe("the flags list", () => {
     // A flag opens in the environment the list shows.
     await rowFor(page, "beta").getByRole("link").click();
     await expect(page).toHaveURL(new RegExp(`/flags/beta\\?environment=production$`));
+  });
+
+  test("starts the panel folded away under 1280 px, keeping the chips and a Filters button", async ({
+    page,
+  }) => {
+    const projectKey = await seedProject("flags-panel");
+    await seedFlags(projectKey, [
+      {
+        key: "checkout.copy",
+        type: "string",
+        name: "Checkout copy",
+        variations: [{ key: "a", value: "a" }],
+      },
+      { key: "checkout.enabled", type: "boolean", name: "Checkout enabled" },
+    ]);
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await signIn(page);
+    await page.goto(`/projects/${projectKey}/flags?type=string`);
+    const panel = page.getByRole("navigation", { name: "Views and filters" });
+    const keys = flagsTable(page).locator("tbody code");
+
+    // A filtered address opened directly restores the chips and the list.
+    await expect(keys).toHaveText(["checkout.copy"]);
+    await expect(panel).toHaveCount(0);
+    await expect(
+      page.getByRole("list", { name: "Filters in force" }).getByText("Type: String"),
+    ).toBeVisible();
+
+    // The Filters button brings the panel back with the facet in force.
+    await page.getByRole("button", { name: "Filters", exact: true }).click();
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole("radio", { name: "String" })).toBeChecked();
+    await expect(page.getByRole("button", { name: "Filters", exact: true })).toHaveCount(0);
+  });
+
+  test("starts the panel open from 1280 px with the views and facets", async ({ page }) => {
+    const projectKey = await seedProject("flags-panel-wide");
+    await seedFlags(projectKey, [{ key: "checkout.enabled", type: "boolean", name: "Checkout" }]);
+    await signIn(page);
+    await page.goto(`/projects/${projectKey}/flags?tag=web`);
+    const panel = page.getByRole("navigation", { name: "Views and filters" });
+
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole("link", { name: "All flags" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(panel.getByRole("link", { name: "Stale flags" })).toBeVisible();
+    await expect(panel.getByRole("searchbox", { name: "Tag" })).toHaveValue("web");
+    await expect(page.getByRole("button", { name: "Filters", exact: true })).toHaveCount(0);
+    await expectNoSeriousViolations(page, "the flags list with its panel");
   });
 
   test("shows a viewer the list with creating a flag disabled and why", async ({ page }) => {

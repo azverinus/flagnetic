@@ -19,6 +19,28 @@ export function formatInstant(i18n: I18n, value: Date | string): string {
   );
 }
 
+const minute = 60_000;
+const hour = 60 * minute;
+const day = 24 * hour;
+
+/**
+ * How long before now an instant was, as the member's language says it
+ * ("5 minutes ago") up to seven days, and as a short date after that. An
+ * instant in the future counts as now: clocks differ.
+ */
+export function formatRelative(i18n: I18n, value: Date | string, now: Date = new Date()): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  const elapsed = Math.max(0, now.getTime() - date.getTime());
+  if (elapsed >= 7 * day) {
+    return new Intl.DateTimeFormat(i18n.locale, { dateStyle: "medium" }).format(date);
+  }
+  const words = new Intl.RelativeTimeFormat(i18n.locale, { numeric: "auto" });
+  if (elapsed >= day) return words.format(-Math.floor(elapsed / day), "day");
+  if (elapsed >= hour) return words.format(-Math.floor(elapsed / hour), "hour");
+  if (elapsed >= minute) return words.format(-Math.floor(elapsed / minute), "minute");
+  return words.format(0, "second");
+}
+
 /** A calendar day (YYYY-MM-DD) as the member's language writes a date, the same day everywhere. */
 export function formatDay(i18n: I18n, day: string): string {
   const [year, month, date] = day.split("-").map(Number) as [number, number, number];

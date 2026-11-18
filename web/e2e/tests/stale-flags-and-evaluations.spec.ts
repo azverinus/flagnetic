@@ -96,18 +96,28 @@ test.describe("stale flags", () => {
     await expect(rowFor(page, "fresh_flag")).toHaveCount(0);
     await expectNoSeriousViolations(page, "the stale flags");
 
-    // Pressing a reason lists only the flags stale for it, and the address keeps it.
+    // Checking a reason lists only the flags stale for it, the address keeps
+    // it, and a chip in the toolbar names it.
     const filter = page.getByRole("group", { name: "Stale for" });
-    await filter.getByRole("button", { name: "Finished rollout" }).click();
-    await expect(filter.getByRole("button", { name: "Finished rollout" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await filter.getByRole("checkbox", { name: "Finished rollout" }).check();
+    await expect(filter.getByRole("checkbox", { name: "Finished rollout" })).toBeChecked();
+    await expect(
+      page.getByRole("list", { name: "Filters in force" }).getByText("Stale for: Finished rollout"),
+    ).toBeVisible();
     await expect(rowFor(page, "old_cleanup")).toHaveCount(0);
     await expect(rowFor(page, "everyone_on")).toBeVisible();
     await page.reload();
+    await expect(filter.getByRole("checkbox", { name: "Finished rollout" })).toBeChecked();
     await expect(rowFor(page, "everyone_on")).toBeVisible();
     await expect(rowFor(page, "checkout_cta")).toHaveCount(0);
+
+    // Removing the chip lists every stale flag again.
+    await page
+      .getByRole("button", { name: "Remove the filter Stale for: Finished rollout" })
+      .click();
+    await expect(rowFor(page, "old_cleanup")).toBeVisible();
+    await filter.getByRole("checkbox", { name: "Finished rollout" }).check();
+    await expect(rowFor(page, "old_cleanup")).toHaveCount(0);
 
     await rowFor(page, "everyone_on")
       .getByRole("link", { name: /everyone_on/ })

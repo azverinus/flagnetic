@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/cn";
 
 /** How long typing pauses before the search is applied. */
 const searchPause = 250;
@@ -17,6 +18,8 @@ export type SearchFieldProps = {
   /** What the search finds, such as "Name or email". */
   placeholder?: string;
   className?: string;
+  /** Keeps the label for screen readers only, as a toolbar's search has no room for it. */
+  hideLabel?: boolean;
 };
 
 /**
@@ -24,7 +27,14 @@ export type SearchFieldProps = {
  * applied once typing pauses, so the address and the list follow without
  * a request for every keystroke.
  */
-export function SearchField({ value, onChange, label, placeholder, className }: SearchFieldProps) {
+export function SearchField({
+  value,
+  onChange,
+  label,
+  placeholder,
+  className,
+  hideLabel = false,
+}: SearchFieldProps) {
   const { t } = useLingui();
   const [typed, setTyped] = useState(value);
   // A search the address changes on its own, going back or following a
@@ -46,7 +56,16 @@ export function SearchField({ value, onChange, label, placeholder, className }: 
     return () => clearTimeout(timer);
   }, [typed, value]);
   return (
-    <Field label={label ?? <Trans>Search</Trans>} className={className ?? "w-72 max-w-full"}>
+    <Field
+      label={
+        hideLabel ? (
+          <span className="sr-only">{label ?? <Trans>Search</Trans>}</span>
+        ) : (
+          (label ?? <Trans>Search</Trans>)
+        )
+      }
+      className={cn(hideLabel && "gap-0", className ?? "w-72 max-w-full")}
+    >
       <Input
         type="search"
         placeholder={placeholder ?? t`Name or email`}

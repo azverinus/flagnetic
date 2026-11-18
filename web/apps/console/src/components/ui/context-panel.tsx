@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import { Link, type LinkProps, useRouterState } from "@tanstack/react-router";
-import { PanelLeftDashedIcon } from "lucide-react";
+import { type LinkProps, useLinkProps, useRouterState } from "@tanstack/react-router";
+import { ListFilterIcon, PanelLeftDashedIcon } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import {
   createContext,
@@ -24,15 +24,26 @@ import { useReturnFocus } from "@/lib/return-focus";
 // eslint-disable-next-line lingui/no-unlocalized-strings -- a media query, not text
 const sheetQuery = "(max-width: 1023px)";
 
-function subscribeToSheetWidth(notify: () => void): () => void {
-  const query = typeof window.matchMedia === "function" ? window.matchMedia(sheetQuery) : null;
-  query?.addEventListener("change", notify);
-  return () => query?.removeEventListener("change", notify);
+/** From this width a list's panel starts open: the table needs the room below it. */
+// eslint-disable-next-line lingui/no-unlocalized-strings -- a media query, not text
+const wideQuery = "(min-width: 1280px)";
+
+function subscribeTo(query: string): (notify: () => void) => () => void {
+  return (notify) => {
+    const list = typeof window.matchMedia === "function" ? window.matchMedia(query) : null;
+    list?.addEventListener("change", notify);
+    return () => list?.removeEventListener("change", notify);
+  };
 }
 
-function isSheetWidth(): boolean {
-  return typeof window.matchMedia === "function" && window.matchMedia(sheetQuery).matches;
+function matches(query: string): boolean {
+  return typeof window.matchMedia === "function" && window.matchMedia(query).matches;
 }
+
+const subscribeToSheetWidth = subscribeTo(sheetQuery);
+const subscribeToWideWidth = subscribeTo(wideQuery);
+const isSheetWidth = () => matches(sheetQuery);
+const isWideWidth = () => matches(wideQuery);
 
 type ContextPanelState = {
   /** Whether the panel is a sheet, because the window is narrow. */
@@ -47,6 +58,10 @@ type ContextPanelState = {
   /** What the mounted panel is named, or null while the route declares none. */
   label: string | null;
   setLabel: (label: string | null) => void;
+  /** Whether the mounted panel starts folded away in a window narrower than 1280 px. */
+  setStartsOpenWide: (startsOpenWide: boolean) => void;
+  /** Opens the panel wherever it is: the sheet in a narrow window, else the column. */
+  open: () => void;
 };
 
 const ContextPanelContext = createContext<ContextPanelState | null>(null);
@@ -64,7 +79,12 @@ function useContextPanel(): ContextPanelState {
  */
 export function ContextPanelProvider({ children }: { children: ReactNode }) {
   const sheet = useSyncExternalStore(subscribeToSheetWidth, isSheetWidth, () => false);
-  const [collapsed, setCollapsed] = useState(contextPanelCollapsed);
+  const wide = useSyncExternalStore(subscribeToWideWidth, isWideWidth, () => true);
+  // What this browser chose, or null while it has not: a list's panel then
+  // starts open only in a wide window, any other panel always open.
+  const [chosen, setChosen] = useState(contextPanelCollapsed);
+  const [startsOpenWide, setStartsOpenWide] = useState(false);
+  const collapsed = chosen ?? (startsOpenWide && !wide);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [label, setLabel] = useState<string | null>(null);
   // A window widened past the sheet's width closes the sheet for good, so
@@ -75,11 +95,14 @@ export function ContextPanelProvider({ children }: { children: ReactNode }) {
     if (!sheet) setSheetOpen(false);
   }
   const toggleCollapsed = useCallback(() => {
-    setCollapsed((was) => {
-      rememberContextPanelCollapsed(!was);
-      return !was;
-    });
-  }, []);
+    const next = !collapsed;
+    rememberContextPanelCollapsed(next);
+    setChosen(next);
+  }, [collapsed]);
+  const open = useCallback(() => {
+    if (sheet) setSheetOpen(true);
+    else if (collapsed) toggleCollapsed();
+  }, [sheet, collapsed, toggleCollapsed]);
   const state = useMemo<ContextPanelState>(
     () => ({
       sheet,
@@ -89,8 +112,10 @@ export function ContextPanelProvider({ children }: { children: ReactNode }) {
       toggleCollapsed,
       label,
       setLabel,
+      setStartsOpenWide,
+      open,
     }),
-    [sheet, collapsed, sheetOpen, toggleCollapsed, label],
+    [sheet, collapsed, sheetOpen, toggleCollapsed, label, open],
   );
   return <ContextPanelContext.Provider value={state}>{children}</ContextPanelContext.Provider>;
 }
@@ -102,14 +127,28 @@ export function ContextPanelProvider({ children }: { children: ReactNode }) {
  * while open and gives it back to what opened it. Rendered by the route's
  * declaration, so a route without one leaves the page the whole card.
  */
-export function ContextPanel({ label, children }: { label: string; children: ReactNode }) {
-  const { sheet, collapsed, sheetOpen, setSheetOpen, setLabel } = useContextPanel();
+export function ContextPanel({
+  label,
+  startsOpenWide = false,
+  children,
+}: {
+  label: string;
+  /** A list's panel: it starts folded away in a window narrower than 1280 px. */
+  startsOpenWide?: boolean;
+  children: ReactNode;
+}) {
+  const { sheet, collapsed, sheetOpen, setSheetOpen, setLabel, setStartsOpenWide } =
+    useContextPanel();
   const focus = useReturnFocus();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   useLayoutEffect(() => {
     setLabel(label);
     return () => setLabel(null);
   }, [label, setLabel]);
+  useLayoutEffect(() => {
+    setStartsOpenWide(startsOpenWide);
+    return () => setStartsOpenWide(false);
+  }, [startsOpenWide, setStartsOpenWide]);
   // A sheet closes once a link has taken the member elsewhere.
   useEffect(() => {
     setSheetOpen(false);
@@ -176,6 +215,24 @@ export function ContextPanelTrigger() {
   );
 }
 
+/**
+ * A list toolbar's button for the panel's facets, shown while the panel is
+ * folded away or is a sheet: it brings the panel back. It is absent while
+ * the column is open or the route declares no panel.
+ */
+export function ContextPanelOpener({ children }: { children: ReactNode }) {
+  const state = useContext(ContextPanelContext);
+  if (state === null) return null;
+  const { sheet, collapsed, label, open } = state;
+  if (label === null || !(sheet || collapsed)) return null;
+  return (
+    <Button variant="outline" size="sm" onClick={open}>
+      <ListFilterIcon aria-hidden />
+      {children}
+    </Button>
+  );
+}
+
 /** A labelled group of links in the panel; without a label, links alone. */
 export function PanelGroup({ label, children }: { label?: string; children: ReactNode }) {
   return (
@@ -194,17 +251,30 @@ export type PanelLinkProps = LinkProps & {
   count?: number;
   /** A mark for what at the screen needs attention, shown at the link's end. */
   attention?: ReactNode;
+  /**
+   * Whether this is the view the screen shows, for a link whose address
+   * differs from the screen's only by search parameters, which the router
+   * would count as current whenever it is a part of them.
+   */
+  current?: boolean;
 };
 
 /** A route of the area: a 32 px row, the current one lifted onto a card. */
-export function PanelLink({ children, count, attention, ...link }: PanelLinkProps) {
+export function PanelLink({ children, count, attention, current, ...link }: PanelLinkProps) {
+  const props = useLinkProps(link);
   return (
-    <Link {...link} className={cn(sidebarLinkClassName(false), "justify-start")}>
+    <a
+      {...props}
+      // The router marks a link current whenever its address is part of the
+      // screen's; a view that says otherwise wins.
+      aria-current={current === undefined ? props["aria-current"] : current ? "page" : undefined}
+      className={cn(sidebarLinkClassName(false), "justify-start")}
+    >
       <span className="truncate">{children}</span>
       {count !== undefined && count > 0 ? (
         <span className="ml-auto text-xs text-muted-foreground tabular-nums">{count}</span>
       ) : null}
       {attention ? <span className="ml-auto flex items-center">{attention}</span> : null}
-    </Link>
+    </a>
   );
 }

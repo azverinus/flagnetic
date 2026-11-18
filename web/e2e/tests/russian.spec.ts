@@ -478,9 +478,9 @@ test.describe("the console in Russian", () => {
       .filter({ has: page.getByText("old_cleanup", { exact: true }) });
     await expect(row).toContainText("Пора удалить");
     const filter = page.getByRole("group", { name: "Причины устаревания" });
-    await filter.getByRole("button", { name: "Rollout завершён" }).click();
+    await filter.getByRole("checkbox", { name: "Rollout завершён" }).check();
     await expect(page.getByText("Флагов, устаревших по этим причинам, нет.")).toBeVisible();
-    // The pressed toggle fades to its colour; axe reads it once it has.
+    // The checked box settles; axe reads it once it has.
     await page.waitForFunction(() => document.getAnimations().length === 0);
     await expectNoSeriousViolations(page, "the stale flags in Russian");
 
