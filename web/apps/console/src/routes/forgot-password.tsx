@@ -13,7 +13,7 @@ export const Route = createFileRoute("/forgot-password")({
 
 function ForgotPasswordPage() {
   return (
-    <SignedOutCard className="max-w-sm">
+    <SignedOutCard>
       <PasswordResetRequest />
     </SignedOutCard>
   );

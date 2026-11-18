@@ -98,7 +98,7 @@ test.describe("unit types", () => {
 
     await openUnitTypes(page, projectKey);
     await expect(page.getByText("This project has no unit type yet.")).toBeVisible();
-    await expect(page.getByRole("button", { name: "New unit type" })).toHaveCount(2);
+    await expect(page.getByRole("button", { name: "New unit type" })).toHaveCount(1);
   });
 });
 

@@ -213,3 +213,18 @@
   --warning-text: hsl(31, 92%, 30%);
   --error-text: hsl(360, 100%, 40%);
 }
+
+/*
+ * The inner measures a screen may use, named so that no screen writes a
+ * width of its own: the width of the page is `Page`'s, these only keep a
+ * paragraph, a form or a dialog readable inside it.
+ */
+@utility measure-prose {
+  max-width: 65ch;
+}
+@utility measure-form {
+  max-width: 42rem;
+}
+@utility measure-dialog {
+  max-width: 56rem;
+}

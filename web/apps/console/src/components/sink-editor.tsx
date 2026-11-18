@@ -170,7 +170,6 @@ export function SinkEditor({ project, sink, initialKind, onSaved }: SinkEditorPr
         submitLabel={editing ? <Trans>Save</Trans> : <Trans>Create sink</Trans>}
         pending={save.isPending}
         refusal={hereRefusal}
-        className="max-w-3xl"
       >
         {base && conflict ? (
           <ConflictBanner

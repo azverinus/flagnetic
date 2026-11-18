@@ -1,4 +1,5 @@
 import { createExperiment, type ExperimentCreate } from "@flagnetic/api";
+import { Page } from "@/components/ui/page";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
@@ -40,7 +41,7 @@ function NewExperiment() {
   const { project } = Route.useParams();
   return (
     <PermissionGate permission="experiment.edit" title={t`New experiment`}>
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+      <Page>
         <PageHeader
           title={t`New experiment`}
           description={
@@ -51,7 +52,7 @@ function NewExperiment() {
           }
         />
         <CreateExperiment key={project} project={project} />
-      </div>
+      </Page>
     </PermissionGate>
   );
 }
@@ -125,8 +126,8 @@ function CreateExperiment({ project }: { project: string }) {
   if (choices.state === "loading") {
     return (
       <div className="flex flex-col gap-3" aria-busy>
-        <Skeleton className="h-9 w-full max-w-2xl" />
-        <Skeleton className="h-24 w-full max-w-2xl" />
+        <Skeleton className="h-9 w-full measure-form" />
+        <Skeleton className="h-24 w-full measure-form" />
       </div>
     );
   }
@@ -146,7 +147,6 @@ function CreateExperiment({ project }: { project: string }) {
 
   return (
     <FormPage
-      className="max-w-3xl"
       onSubmit={(event) => {
         event.preventDefault();
         setChecked(true);

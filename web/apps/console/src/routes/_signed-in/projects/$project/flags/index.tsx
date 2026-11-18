@@ -1,4 +1,6 @@
 import { type Environment, type FlagListItem, type FlagState, zFlagType } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
+import { Page } from "@/components/ui/page";
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -116,6 +118,14 @@ function Flags() {
   const filter = (patch: Partial<FlagsSearch>) => apply({ ...search, ...patch, cursor: undefined });
   const shown = { ...search, environment };
 
+  // The header's create action shows once the project is known to have
+  // flags: while the list loads, fails or is empty it would flicker away,
+  // and the empty state carries it. A filtered list or a later page implies
+  // flags exist, so filtering keeps it in place.
+  const list = useQuery({ ...flagsQuery(project, shown), enabled: environment !== undefined });
+  const known =
+    Boolean(shown.cursor) || isFlagsFiltered(shown) || (list.data?.items.length ?? 0) > 0;
+
   const newFlag = (
     <Can permission="flag.edit" whenMissing="disable">
       <Button asChild>
@@ -128,7 +138,7 @@ function Flags() {
   );
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Flags`}
         description={
@@ -145,7 +155,7 @@ function Flags() {
                 <Trans>Stale flags</Trans>
               </Link>
             </Button>
-            {newFlag}
+            {known ? newFlag : null}
           </>
         }
       />
@@ -173,7 +183,7 @@ function Flags() {
           />
         </>
       )}
-    </div>
+    </Page>
   );
 }
 
@@ -381,22 +391,28 @@ function FlagsPages({
   }
   if (page.data?.items.length === 0 && !search.cursor) {
     return isFlagsFiltered(search) ? (
-      <EmptyState
-        icon={<FlagIcon />}
-        title={<Trans>No flag matches these filters.</Trans>}
-        action={
-          <Button variant="outline" onClick={onClear}>
-            <Trans>Clear filters</Trans>
-          </Button>
-        }
-      />
+      <Card list>
+        <EmptyState
+          icon={<FlagIcon />}
+          title={<Trans>No flag matches these filters.</Trans>}
+          action={
+            <Button variant="outline" onClick={onClear}>
+              <Trans>Clear filters</Trans>
+            </Button>
+          }
+        />
+      </Card>
     ) : (
-      <EmptyState
-        icon={<FlagIcon />}
-        title={<Trans>This project has no flag yet.</Trans>}
-        description={<Trans>A new flag is off in every environment until it is switched on.</Trans>}
-        action={newFlag}
-      />
+      <Card list>
+        <EmptyState
+          icon={<FlagIcon />}
+          title={<Trans>This project has no flag yet.</Trans>}
+          description={
+            <Trans>A new flag is off in every environment until it is switched on.</Trans>
+          }
+          action={newFlag}
+        />
+      </Card>
     );
   }
 
@@ -552,14 +568,16 @@ function FlagsTable({
     [environment, environments, i18n, owners, project, t],
   );
   return (
-    <Table
-      caption={t`Flags`}
-      hideCaption
-      stickyFirstColumn
-      columns={columns}
-      data={flags}
-      loading={loading}
-      getRowId={(flag) => flag.id}
-    />
+    <Card list>
+      <Table
+        caption={t`Flags`}
+        hideCaption
+        stickyFirstColumn
+        columns={columns}
+        data={flags}
+        loading={loading}
+        getRowId={(flag) => flag.id}
+      />
+    </Card>
   );
 }

@@ -1,4 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
+import { Page } from "@/components/ui/page";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useId } from "react";
@@ -26,7 +27,7 @@ function Overview() {
   const environments = useQuery(environmentsQuery(key));
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={project.name}
         description={
@@ -71,6 +72,6 @@ function Overview() {
         )}
       </section>
       <RecentActivity project={key} />
-    </div>
+    </Page>
   );
 }

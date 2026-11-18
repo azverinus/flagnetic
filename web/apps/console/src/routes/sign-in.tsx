@@ -27,7 +27,7 @@ function SignInPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
   return (
-    <SignedOutCard className="max-w-sm">
+    <SignedOutCard>
       <h1 className="text-2xl/7 font-semibold">
         <Trans>Sign in</Trans>
       </h1>

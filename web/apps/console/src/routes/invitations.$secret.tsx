@@ -19,7 +19,7 @@ function InvitationPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
   return (
-    <SignedOutCard className="max-w-md">
+    <SignedOutCard size="md">
       <InvitationAcceptance
         secret={secret}
         onAccepted={(me) => {

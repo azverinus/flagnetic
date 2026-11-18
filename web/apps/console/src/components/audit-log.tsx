@@ -1,4 +1,5 @@
 import type { AuditEntry } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { HistoryIcon } from "lucide-react";
@@ -124,14 +125,16 @@ export function AuditEntriesTable({
     [EntryLink, i18n, place, t],
   );
   return (
-    <Table
-      caption={caption}
-      hideCaption
-      columns={columns}
-      data={entries}
-      loading={loading}
-      getRowId={(entry) => entry.id}
-    />
+    <Card list>
+      <Table
+        caption={caption}
+        hideCaption
+        columns={columns}
+        data={entries}
+        loading={loading}
+        getRowId={(entry) => entry.id}
+      />
+    </Card>
   );
 }
 
@@ -162,23 +165,25 @@ export function AuditLog({ scope, search, onSearch, EntryLink, actors, place }: 
       {page.isError ? (
         <QueryError error={page.error} onRetry={() => void page.refetch()} />
       ) : page.data?.items.length === 0 && !search.cursor ? (
-        <EmptyState
-          icon={<HistoryIcon />}
-          title={
-            filtered ? (
-              <Trans>No entry matches these filters.</Trans>
-            ) : (
-              <Trans>Nothing has been recorded yet.</Trans>
-            )
-          }
-          action={
-            filtered ? (
-              <Button variant="outline" onClick={() => onSearch({})}>
-                <Trans>Clear filters</Trans>
-              </Button>
-            ) : null
-          }
-        />
+        <Card list>
+          <EmptyState
+            icon={<HistoryIcon />}
+            title={
+              filtered ? (
+                <Trans>No entry matches these filters.</Trans>
+              ) : (
+                <Trans>Nothing has been recorded yet.</Trans>
+              )
+            }
+            action={
+              filtered ? (
+                <Button variant="outline" onClick={() => onSearch({})}>
+                  <Trans>Clear filters</Trans>
+                </Button>
+              ) : null
+            }
+          />
+        </Card>
       ) : (
         <>
           <AuditEntriesTable
@@ -258,68 +263,70 @@ function AuditFilters({
   );
 
   return (
-    <form
-      role="search"
-      aria-label={t`Filter the audit log`}
-      onSubmit={apply}
-      className="flex flex-col gap-4 rounded-lg border p-4"
-    >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Field
-          label={<Trans>Search</Trans>}
-          className="sm:col-span-2"
-          hint={<Trans>In the action, the entity's key and the actor's name.</Trans>}
-        >
-          <Input
-            type="search"
-            value={draft.q ?? ""}
-            onChange={(event) => set("q", event.target.value)}
-          />
-        </Field>
-        {choice(
-          "action",
-          t`Action`,
-          auditActions.map((action) => ({ value: action, label: actionLabel(i18n, action) })),
-        )}
-        {choice(
-          "entity_kind",
-          t`Entity`,
-          auditEntityKinds.map((kind) => ({ value: kind, label: entityKindLabel(i18n, kind) })),
-        )}
-        {choice("actor", t`Member`, actors)}
-        {choice(
-          "actor_kind",
-          t`Actor kind`,
-          auditActorKinds.map((kind) => ({ value: kind, label: actorKindLabel(i18n, kind) })),
-        )}
-        {choice(place.filter, place.label, place.options)}
-        <div className="grid grid-cols-2 gap-4">
-          <Field label={<Trans>From</Trans>}>
+    <Card>
+      <form
+        role="search"
+        aria-label={t`Filter the audit log`}
+        onSubmit={apply}
+        className="flex flex-col gap-4 p-5"
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Field
+            label={<Trans>Search</Trans>}
+            className="sm:col-span-2"
+            hint={<Trans>In the action, the entity's key and the actor's name.</Trans>}
+          >
             <Input
-              type="date"
-              value={draft.from ?? ""}
-              onChange={(event) => set("from", event.target.value)}
+              type="search"
+              value={draft.q ?? ""}
+              onChange={(event) => set("q", event.target.value)}
             />
           </Field>
-          <Field label={<Trans>To</Trans>}>
-            <Input
-              type="date"
-              value={draft.to ?? ""}
-              onChange={(event) => set("to", event.target.value)}
-            />
-          </Field>
+          {choice(
+            "action",
+            t`Action`,
+            auditActions.map((action) => ({ value: action, label: actionLabel(i18n, action) })),
+          )}
+          {choice(
+            "entity_kind",
+            t`Entity`,
+            auditEntityKinds.map((kind) => ({ value: kind, label: entityKindLabel(i18n, kind) })),
+          )}
+          {choice("actor", t`Member`, actors)}
+          {choice(
+            "actor_kind",
+            t`Actor kind`,
+            auditActorKinds.map((kind) => ({ value: kind, label: actorKindLabel(i18n, kind) })),
+          )}
+          {choice(place.filter, place.label, place.options)}
+          <div className="grid grid-cols-2 gap-4">
+            <Field label={<Trans>From</Trans>}>
+              <Input
+                type="date"
+                value={draft.from ?? ""}
+                onChange={(event) => set("from", event.target.value)}
+              />
+            </Field>
+            <Field label={<Trans>To</Trans>}>
+              <Input
+                type="date"
+                value={draft.to ?? ""}
+                onChange={(event) => set("to", event.target.value)}
+              />
+            </Field>
+          </div>
         </div>
-      </div>
-      <div className="flex flex-wrap justify-end gap-2">
-        {isFiltered(search) ? (
-          <Button type="button" variant="outline" onClick={() => onSearch({})}>
-            <Trans>Clear filters</Trans>
+        <div className="flex flex-wrap justify-end gap-2">
+          {isFiltered(search) ? (
+            <Button type="button" variant="outline" onClick={() => onSearch({})}>
+              <Trans>Clear filters</Trans>
+            </Button>
+          ) : null}
+          <Button type="submit">
+            <Trans>Apply filters</Trans>
           </Button>
-        ) : null}
-        <Button type="submit">
-          <Trans>Apply filters</Trans>
-        </Button>
-      </div>
-    </form>
+        </div>
+      </form>
+    </Card>
   );
 }

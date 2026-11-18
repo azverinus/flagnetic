@@ -1,4 +1,5 @@
 import type { EventType } from "@flagnetic/api";
+import { Page } from "@/components/ui/page";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
@@ -42,7 +43,7 @@ function EventVolume() {
   const typeName = (key: string) => eventTypeName(i18n, key as EventType);
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Event volume`}
         description={
@@ -85,6 +86,6 @@ function EventVolume() {
           <Gaps gaps={volume.data.gaps} />
         </>
       )}
-    </div>
+    </Page>
   );
 }

@@ -4,6 +4,7 @@ import {
   type Role,
   revokeProjectToken,
 } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { PlusIcon } from "lucide-react";
@@ -81,15 +82,17 @@ export function ProjectTokenList({ project, roles, policy, names }: ProjectToken
       {tokens.isError ? (
         <QueryError error={tokens.error} onRetry={() => void tokens.refetch()} />
       ) : (
-        <Table
-          caption={t`Project tokens`}
-          hideCaption
-          columns={columns}
-          data={tokens.data ?? []}
-          loading={tokens.isPending || names === undefined}
-          empty={<Trans>This project has no token yet.</Trans>}
-          getRowId={(token) => token.id}
-        />
+        <Card list>
+          <Table
+            caption={t`Project tokens`}
+            hideCaption
+            columns={columns}
+            data={tokens.data ?? []}
+            loading={tokens.isPending || names === undefined}
+            empty={<Trans>This project has no token yet.</Trans>}
+            getRowId={(token) => token.id}
+          />
+        </Card>
       )}
 
       <Dialog open={creating} onOpenChange={setCreating} title={t`New project token`}>

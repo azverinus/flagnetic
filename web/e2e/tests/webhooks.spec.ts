@@ -130,7 +130,8 @@ test.describe("webhooks", () => {
     await expect(page.getByRole("row").filter({ hasText: "flag.kill_switch" })).toHaveCount(2);
 
     // Rotating issues a new secret; the old one signs beside it for a day.
-    await page.getByRole("button", { name: "Rotate secret" }).click();
+    await page.getByRole("button", { name: "More actions" }).click();
+    await page.getByRole("menuitem", { name: "Rotate secret" }).click();
     const confirm = page.getByRole("dialog", { name: "Rotate the secret of Release bot" });
     await confirm.getByRole("button", { name: "Rotate secret" }).click();
     const rotated = await takeSecret(page);
@@ -156,7 +157,8 @@ test.describe("webhooks", () => {
     await page.goto(`/projects/${project}/webhooks`);
     await expect(webhookRow(page, "Deploy bot")).toContainText("Enabled");
     await page.getByRole("link", { name: "Deploy bot" }).click();
-    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await page.getByRole("button", { name: "More actions" }).click();
+    await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
     const deletion = page.getByRole("dialog", { name: "Delete Deploy bot" });
     await deletion.getByRole("button", { name: "Delete webhook" }).click();
     await expect(page).toHaveURL(new RegExp(`/projects/${project}/webhooks$`));

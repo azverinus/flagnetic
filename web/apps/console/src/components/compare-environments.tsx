@@ -57,7 +57,7 @@ export function CompareEnvironments(props: CompareEnvironmentsProps) {
           and override notes do not count.
         </Trans>
       }
-      className="max-w-4xl"
+      className="measure-dialog"
     >
       {/* Mounted only while open, so each opening starts from the open tab. */}
       {props.open ? <Comparison {...props} /> : null}

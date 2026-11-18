@@ -6,6 +6,8 @@ import {
   type UnitTypeListItem,
   updateUnitType,
 } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
+import { Page } from "@/components/ui/page";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -99,7 +101,7 @@ function UnitTypes() {
   );
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Unit types`}
         description={
@@ -108,26 +110,30 @@ function UnitTypes() {
             the attributes and never changes.
           </Trans>
         }
-        actions={newUnitType}
+        actions={(unitTypes.data?.length ?? 0) > 0 ? newUnitType : undefined}
       />
       {unitTypes.isError ? (
         <QueryError error={unitTypes.error} onRetry={() => void unitTypes.refetch()} />
       ) : unitTypes.data?.length === 0 ? (
-        <EmptyState
-          icon={<BoxesIcon />}
-          title={<Trans>This project has no unit type yet.</Trans>}
-          description={<Trans>Declare the kinds of unit its flags are served to.</Trans>}
-          action={newUnitType}
-        />
+        <Card list>
+          <EmptyState
+            icon={<BoxesIcon />}
+            title={<Trans>This project has no unit type yet.</Trans>}
+            description={<Trans>Declare the kinds of unit its flags are served to.</Trans>}
+            action={newUnitType}
+          />
+        </Card>
       ) : (
-        <Table
-          caption={t`Unit types`}
-          hideCaption
-          columns={columns}
-          data={unitTypes.data ?? []}
-          loading={unitTypes.isPending}
-          getRowId={(unitType) => unitType.id}
-        />
+        <Card list>
+          <Table
+            caption={t`Unit types`}
+            hideCaption
+            columns={columns}
+            data={unitTypes.data ?? []}
+            loading={unitTypes.isPending}
+            getRowId={(unitType) => unitType.id}
+          />
+        </Card>
       )}
 
       <Dialog open={creating} onOpenChange={setCreating} title={t`New unit type`}>
@@ -169,7 +175,7 @@ function UnitTypes() {
           </p>
         )}
       </DeleteRowDialog>
-    </div>
+    </Page>
   );
 }
 

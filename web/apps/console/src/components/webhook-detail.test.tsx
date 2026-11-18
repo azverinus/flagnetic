@@ -88,7 +88,8 @@ describe("a webhook's screen", () => {
     const { router } = await renderScreen();
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    await user.click(await screen.findByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
     const confirm = await screen.findByRole("dialog", { name: "Delete Release bot" });
     await user.click(within(confirm).getByRole("button", { name: "Delete webhook" }));
 
@@ -117,7 +118,8 @@ describe("a webhook's screen", () => {
     const { queryClient } = await renderScreen();
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Rotate secret" }));
+    await user.click(await screen.findByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Rotate secret" }));
     const confirm = await screen.findByRole("dialog", { name: "Rotate the secret of Release bot" });
     await user.click(within(confirm).getByRole("button", { name: "Rotate secret" }));
 

@@ -5012,6 +5012,10 @@ msgstr "Mode: Merge"
 msgid "Mode: Replace"
 msgstr "Mode: Replace"
 
+#: src/components/ui/page-header.tsx
+msgid "More actions"
+msgstr "More actions"
+
 #: src/components/navigation.tsx
 msgid "More than {awaitingCountLimit} change requests await your decision"
 msgstr "More than {awaitingCountLimit} change requests await your decision"

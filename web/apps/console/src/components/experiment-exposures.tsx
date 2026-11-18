@@ -76,7 +76,7 @@ export function ExperimentExposuresSection({
         <h2 id="experiment-exposures" className="text-base/6 font-medium">
           <Trans>Exposures</Trans>
         </h2>
-        <p className="max-w-prose text-sm text-muted-foreground">
+        <p className="measure-prose text-sm text-muted-foreground">
           <Trans>
             Units first exposed to each variation against the shares its weights ask for, per day,
             and units exposed to more than one variation. Exposures are counted about every 10

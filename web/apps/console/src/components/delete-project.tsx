@@ -1,4 +1,5 @@
 import { deleteProject, type Project } from "@flagnetic/api";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -52,27 +53,25 @@ export function DeleteProject({ project }: { project: Project }) {
   });
 
   return (
-    <section
-      aria-labelledby="delete-project"
-      className="flex flex-col gap-3 rounded-lg border border-destructive/40 p-4"
-    >
-      <h2 id="delete-project" className="text-base font-medium">
-        <Trans>Delete this project</Trans>
-      </h2>
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          Deleting removes the project with its flags, segments, experiments, environments and SDK
-          keys at once, and its key becomes free. Its audit entries stay readable in the instance's
-          audit log.
-        </Trans>
-      </p>
-      <div>
+    <Card aria-labelledby="delete-project" className="border-destructive/40">
+      <CardHeader
+        titleId="delete-project"
+        title={<Trans>Delete this project</Trans>}
+        description={
+          <Trans>
+            Deleting removes the project with its flags, segments, experiments, environments and SDK
+            keys at once, and its key becomes free. Its audit entries stay readable in the
+            instance's audit log.
+          </Trans>
+        }
+      />
+      <CardContent>
         <Can permission="project.delete" whenMissing="disable">
           <Button variant="destructive" onClick={() => setAsking(true)}>
             <Trans>Delete project</Trans>
           </Button>
         </Can>
-      </div>
+      </CardContent>
       <ConfirmDialog
         open={asking}
         onOpenChange={(open) => {
@@ -110,6 +109,6 @@ export function DeleteProject({ project }: { project: Project }) {
         </p>
         <DownloadProjectDocument project={key} />
       </ConfirmDialog>
-    </section>
+    </Card>
   );
 }

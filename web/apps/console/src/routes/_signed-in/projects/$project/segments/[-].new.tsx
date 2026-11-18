@@ -1,4 +1,5 @@
 import { createSegment } from "@flagnetic/api";
+import { Page } from "@/components/ui/page";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -44,7 +45,7 @@ function NewSegment() {
   const declarations = useConditionAttributes(project);
   return (
     <PermissionGate permission="segment.edit" title={t`New segment`}>
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+      <Page>
         <PageHeader
           title={t`New segment`}
           description={
@@ -57,8 +58,8 @@ function NewSegment() {
           <QueryError error={declarations.error} onRetry={declarations.retry} />
         ) : declarations.state === "loading" ? (
           <div className="flex flex-col gap-3" aria-busy>
-            <Skeleton className="h-9 w-full max-w-2xl" />
-            <Skeleton className="h-24 w-full max-w-2xl" />
+            <Skeleton className="h-9 w-full measure-form" />
+            <Skeleton className="h-24 w-full measure-form" />
           </div>
         ) : (
           <CreateSegment
@@ -68,7 +69,7 @@ function NewSegment() {
             types={declarations.types}
           />
         )}
-      </div>
+      </Page>
     </PermissionGate>
   );
 }

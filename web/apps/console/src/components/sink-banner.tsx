@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { TriangleAlertIcon } from "lucide-react";
 
+import { Page } from "@/components/ui/page";
 import { useCan } from "@/lib/access";
 import { attentionReasons, needsAttention, sinksQuery } from "@/lib/sinks";
 
@@ -29,7 +30,7 @@ export function ProjectSinkBanner({ project }: { project: string }) {
   const attention = useSinksNeedingAttention(project, can);
   if (!can || attention.length === 0) return null;
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 pt-6">
+    <Page band>
       <div
         role="status"
         className="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm"
@@ -61,7 +62,7 @@ export function ProjectSinkBanner({ project }: { project: string }) {
           </ul>
         </div>
       </div>
-    </div>
+    </Page>
   );
 }
 

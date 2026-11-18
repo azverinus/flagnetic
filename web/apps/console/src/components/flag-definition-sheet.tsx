@@ -79,7 +79,7 @@ export function FlagDefinitionSheet({
       onOpenChange={onOpenChange}
       title={t`Edit definition`}
       description={<Trans>Applies to the flag in every environment.</Trans>}
-      className="max-w-2xl"
+      className="measure-form"
     >
       {/* Mounted while open only, so every opening starts from the flag as it is now. */}
       {open ? (

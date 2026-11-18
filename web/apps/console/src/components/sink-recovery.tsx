@@ -438,7 +438,7 @@ export function ReplayTab({
           fill a target after it lost data or after a dead letter was discarded.
         </Trans>
       </p>
-      <form noValidate onSubmit={submit} className="flex max-w-xl flex-col gap-4">
+      <form noValidate onSubmit={submit} className="flex measure-form flex-col gap-4">
         <Field
           label={<Trans>From</Trans>}
           hint={<Trans>In your time zone, within the retention window.</Trans>}

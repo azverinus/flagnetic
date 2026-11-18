@@ -1,4 +1,5 @@
 import { createProject } from "@flagnetic/api";
+import { Page } from "@/components/ui/page";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -37,7 +38,7 @@ function InstanceProjects() {
   const allProjects = useId();
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-8 p-6">
+    <Page>
       <PageHeader
         title={t`Projects`}
         description={
@@ -81,7 +82,7 @@ function InstanceProjects() {
           />
         )}
       </section>
-    </div>
+    </Page>
   );
 }
 

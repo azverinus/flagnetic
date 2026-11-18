@@ -1,4 +1,6 @@
 import type { AuthProvider, ScimToken } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
+import { Page } from "@/components/ui/page";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
@@ -85,7 +87,7 @@ export function ScimTokensScreen() {
 
   const revokingHint = revoking?.hint ?? "";
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`SCIM tokens`}
         description={
@@ -117,15 +119,17 @@ export function ScimTokensScreen() {
       {tokens.isError ? (
         <QueryError error={tokens.error} onRetry={() => void tokens.refetch()} />
       ) : (
-        <Table
-          caption={t`SCIM tokens`}
-          hideCaption
-          columns={columns}
-          data={tokens.data ?? []}
-          loading={tokens.isPending}
-          empty={<Trans>No SCIM token yet.</Trans>}
-          getRowId={(token) => token.id}
-        />
+        <Card list>
+          <Table
+            caption={t`SCIM tokens`}
+            hideCaption
+            columns={columns}
+            data={tokens.data ?? []}
+            loading={tokens.isPending}
+            empty={<Trans>No SCIM token yet.</Trans>}
+            getRowId={(token) => token.id}
+          />
+        </Card>
       )}
 
       <Dialog open={creating} onOpenChange={setCreating} title={t`New SCIM token`}>
@@ -175,7 +179,7 @@ export function ScimTokensScreen() {
           </Trans>
         </p>
       </ConfirmDialog>
-    </div>
+    </Page>
   );
 }
 

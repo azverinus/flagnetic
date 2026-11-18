@@ -47,7 +47,7 @@ export function ExperimentAssignmentLookup({
         <h2 id="experiment-assignment" className="text-base/6 font-medium">
           <Trans>Assignment lookup</Trans>
         </h2>
-        <p className="max-w-prose text-sm text-muted-foreground">
+        <p className="measure-prose text-sm text-muted-foreground">
           <Trans>
             Which variation the experiment gives a unit, from its salts and traffic allocation as
             they are now, and the query that recomputes it in ClickHouse. Looking up records

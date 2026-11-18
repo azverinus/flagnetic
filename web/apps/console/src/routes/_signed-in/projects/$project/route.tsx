@@ -1,4 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
+import { Page } from "@/components/ui/page";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { useEffect } from "react";
@@ -56,7 +57,7 @@ function ProjectLayout() {
     if (error instanceof ApiError && error.status === 403)
       return <ProjectForbidden error={error} />;
     return (
-      <div className="mx-auto max-w-5xl p-6">
+      <Page>
         <QueryError
           error={error}
           onRetry={() => {
@@ -64,15 +65,15 @@ function ProjectLayout() {
             if (me.isError) void me.refetch();
           }}
         />
-      </div>
+      </Page>
     );
   }
   if (!opened) {
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-4 p-6" aria-busy>
+      <Page aria-busy>
         <Skeleton className="h-7 w-48" />
         <Skeleton className="h-4 w-72" />
-      </div>
+      </Page>
     );
   }
   return (
@@ -88,7 +89,7 @@ function ProjectLayout() {
 
 function ProjectNotFound() {
   return (
-    <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
+    <Page measure="form">
       <h1 className="text-2xl/7 font-semibold">
         <Trans>Project not found</Trans>
       </h1>
@@ -97,14 +98,14 @@ function ProjectNotFound() {
           No project has this key. It may be mistyped, or the link may point to another instance.
         </Trans>
       </p>
-    </div>
+    </Page>
   );
 }
 
 function ProjectForbidden({ error }: { error: ApiError }) {
   const { i18n } = useLingui();
   return (
-    <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
+    <Page measure="form">
       <h1 className="text-2xl/7 font-semibold">
         <Trans>You cannot open this project</Trans>
       </h1>
@@ -112,6 +113,6 @@ function ProjectForbidden({ error }: { error: ApiError }) {
       <p className="text-sm text-muted-foreground">
         <Trans>A project owner or an instance admin can grant you a role in it.</Trans>
       </p>
-    </div>
+    </Page>
   );
 }

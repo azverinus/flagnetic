@@ -5012,6 +5012,10 @@ msgstr ""
 msgid "Mode: Replace"
 msgstr ""
 
+#: src/components/ui/page-header.tsx
+msgid "More actions"
+msgstr ""
+
 #: src/components/navigation.tsx
 msgid "More than {awaitingCountLimit} change requests await your decision"
 msgstr ""

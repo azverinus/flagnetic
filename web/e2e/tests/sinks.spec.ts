@@ -161,7 +161,8 @@ test.describe("sinks", () => {
     await expect(page.getByLabel("Header name", { exact: true })).toHaveValue("Authorization");
 
     // Rotating issues another, shown once as well.
-    await page.getByRole("button", { name: "Rotate secret" }).click();
+    await page.getByRole("button", { name: "More actions" }).click();
+    await page.getByRole("menuitem", { name: "Rotate secret" }).click();
     const confirm = page.getByRole("dialog", { name: "Rotate the secret of Pipeline" });
     await confirm.getByRole("button", { name: "Rotate secret" }).click();
     const rotated = await takeSecret(page);

@@ -1,4 +1,6 @@
 import type { Experiment } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
+import { Page } from "@/components/ui/page";
 import { plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
@@ -68,6 +70,14 @@ function Experiments() {
   const filter = (patch: Partial<ExperimentsSearch>) =>
     apply({ ...search, ...patch, cursor: undefined });
 
+  // The header's create action shows once the project is known to have
+  // experiments: while the list loads, fails or is empty it would flicker
+  // away, and the empty state carries it. A filtered list or a later page
+  // implies experiments exist, so filtering keeps it in place.
+  const list = useQuery(experimentsQuery(project, search));
+  const known =
+    Boolean(search.cursor) || isExperimentsFiltered(search) || (list.data?.items.length ?? 0) > 0;
+
   const newExperiment = (
     <Can permission="experiment.edit" whenMissing="disable">
       <Button asChild>
@@ -80,7 +90,7 @@ function Experiments() {
   );
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Experiments`}
         description={
@@ -89,7 +99,7 @@ function Experiments() {
             flag's rule serves it in the environments that hold it.
           </Trans>
         }
-        actions={newExperiment}
+        actions={known ? newExperiment : undefined}
       />
       <ExperimentFilters project={project} search={search} onFilter={filter} owners={names} />
       <ExperimentsPages
@@ -100,7 +110,7 @@ function Experiments() {
         newExperiment={newExperiment}
         owners={names}
       />
-    </div>
+    </Page>
   );
 }
 
@@ -266,24 +276,28 @@ function ExperimentsPages({
   }
   if (page.data?.items.length === 0 && !search.cursor) {
     return isExperimentsFiltered(search) ? (
-      <EmptyState
-        icon={<FlaskConicalIcon />}
-        title={<Trans>No experiment matches these filters.</Trans>}
-        action={
-          <Button variant="outline" onClick={onClear}>
-            <Trans>Clear filters</Trans>
-          </Button>
-        }
-      />
+      <Card list>
+        <EmptyState
+          icon={<FlaskConicalIcon />}
+          title={<Trans>No experiment matches these filters.</Trans>}
+          action={
+            <Button variant="outline" onClick={onClear}>
+              <Trans>Clear filters</Trans>
+            </Button>
+          }
+        />
+      </Card>
     ) : (
-      <EmptyState
-        icon={<FlaskConicalIcon />}
-        title={<Trans>This project has no experiment yet.</Trans>}
-        description={
-          <Trans>An experiment starts as a draft and changes nothing until it is started.</Trans>
-        }
-        action={newExperiment}
-      />
+      <Card list>
+        <EmptyState
+          icon={<FlaskConicalIcon />}
+          title={<Trans>This project has no experiment yet.</Trans>}
+          description={
+            <Trans>An experiment starts as a draft and changes nothing until it is started.</Trans>
+          }
+          action={newExperiment}
+        />
+      </Card>
     );
   }
 
@@ -495,14 +509,16 @@ function ExperimentsTable({
     [i18n, now, owners, project, t],
   );
   return (
-    <Table
-      caption={t`Experiments`}
-      hideCaption
-      stickyFirstColumn
-      columns={columns}
-      data={experiments}
-      loading={loading}
-      getRowId={(experiment) => experiment.id}
-    />
+    <Card list>
+      <Table
+        caption={t`Experiments`}
+        hideCaption
+        stickyFirstColumn
+        columns={columns}
+        data={experiments}
+        loading={loading}
+        getRowId={(experiment) => experiment.id}
+      />
+    </Card>
   );
 }

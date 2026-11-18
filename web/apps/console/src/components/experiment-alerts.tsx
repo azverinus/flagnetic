@@ -214,7 +214,7 @@ export function ExperimentAlertsSection({
         <h2 id="experiment-alerts" className="text-base/6 font-medium">
           <Trans>Alerts</Trans>
         </h2>
-        <p className="max-w-prose text-sm text-muted-foreground">
+        <p className="measure-prose text-sm text-muted-foreground">
           <Trans>
             A running experiment is checked every 10 minutes for a sample-ratio mismatch, a day
             without exposures, conflicting exposures and running past its expected end. An alert

@@ -1,4 +1,6 @@
 import type { AuthProvider } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -104,8 +106,15 @@ export function AuthProviderList() {
   const nameOf = (slug: string) =>
     providers.data?.find((provider) => provider.slug === slug)?.display_name ?? slug;
 
+  const newProvider = (
+    <Button onClick={() => setCreating(true)}>
+      <PlusIcon aria-hidden />
+      <Trans>New provider</Trans>
+    </Button>
+  );
+
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Auth providers`}
         description={
@@ -114,35 +123,35 @@ export function AuthProviderList() {
             vouches only for the email domains you give it.
           </Trans>
         }
-        actions={
-          <Button onClick={() => setCreating(true)}>
-            <PlusIcon aria-hidden />
-            <Trans>New provider</Trans>
-          </Button>
-        }
+        actions={(providers.data?.length ?? 0) > 0 ? newProvider : undefined}
       />
       {providers.isError ? (
         <QueryError error={providers.error} onRetry={() => void providers.refetch()} />
       ) : providers.data?.length === 0 ? (
-        <EmptyState
-          icon={<ShieldCheckIcon />}
-          title={<Trans>No auth provider yet.</Trans>}
-          description={
-            <Trans>
-              Add one to let members sign in through your company's identity provider. Members keep
-              signing in with their password until you do.
-            </Trans>
-          }
-        />
+        <Card list>
+          <EmptyState
+            icon={<ShieldCheckIcon />}
+            title={<Trans>No auth provider yet.</Trans>}
+            description={
+              <Trans>
+                Add one to let members sign in through your company's identity provider. Members
+                keep signing in with their password until you do.
+              </Trans>
+            }
+            action={newProvider}
+          />
+        </Card>
       ) : (
-        <Table
-          caption={t`Auth providers`}
-          hideCaption
-          columns={columns}
-          data={providers.data ?? []}
-          loading={providers.isPending}
-          getRowId={(provider) => provider.slug}
-        />
+        <Card list>
+          <Table
+            caption={t`Auth providers`}
+            hideCaption
+            columns={columns}
+            data={providers.data ?? []}
+            loading={providers.isPending}
+            getRowId={(provider) => provider.slug}
+          />
+        </Card>
       )}
 
       <Dialog open={creating} onOpenChange={setCreating} title={t`New auth provider`}>
@@ -182,6 +191,6 @@ export function AuthProviderList() {
           </p>
         )}
       </DeleteRowDialog>
-    </div>
+    </Page>
   );
 }

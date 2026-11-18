@@ -1,4 +1,6 @@
 import type { ChangeRequest } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -75,7 +77,7 @@ function ChangeRequests() {
     </div>
   );
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Change requests`}
         description={
@@ -103,7 +105,7 @@ function ChangeRequests() {
           { value: "all", label: t`All`, content },
         ]}
       />
-    </div>
+    </Page>
   );
 }
 
@@ -272,19 +274,23 @@ function ChangeRequestPages({
 
   if (search.tab === "awaiting" && !canDecide) {
     return (
-      <EmptyState
-        icon={<LockIcon />}
-        title={<Trans>No change request awaits your decision.</Trans>}
-        description={missing}
-      />
+      <Card list>
+        <EmptyState
+          icon={<LockIcon />}
+          title={<Trans>No change request awaits your decision.</Trans>}
+          description={missing}
+        />
+      </Card>
     );
   }
   if (authorless) {
     return (
-      <EmptyState
-        icon={<GitPullRequestArrowIcon />}
-        title={<Trans>You have proposed no change request here.</Trans>}
-      />
+      <Card list>
+        <EmptyState
+          icon={<GitPullRequestArrowIcon />}
+          title={<Trans>You have proposed no change request here.</Trans>}
+        />
+      </Card>
     );
   }
   if (page.isError) {
@@ -293,36 +299,40 @@ function ChangeRequestPages({
   if (page.data?.items.length === 0 && !search.cursor) {
     if (isChangeRequestsFiltered(search)) {
       return (
-        <EmptyState
-          icon={<GitPullRequestArrowIcon />}
-          title={<Trans>No change request matches these filters.</Trans>}
-          action={
-            <Button variant="outline" onClick={onClear}>
-              <Trans>Clear filters</Trans>
-            </Button>
-          }
-        />
+        <Card list>
+          <EmptyState
+            icon={<GitPullRequestArrowIcon />}
+            title={<Trans>No change request matches these filters.</Trans>}
+            action={
+              <Button variant="outline" onClick={onClear}>
+                <Trans>Clear filters</Trans>
+              </Button>
+            }
+          />
+        </Card>
       );
     }
     return (
-      <EmptyState
-        icon={<GitPullRequestArrowIcon />}
-        title={
-          search.tab === "awaiting" ? (
-            <Trans>No change request awaits your decision.</Trans>
-          ) : search.tab === "mine" ? (
-            <Trans>You have proposed no change request here.</Trans>
-          ) : (
-            <Trans>This project has no change request yet.</Trans>
-          )
-        }
-        description={
-          <Trans>
-            A change to a protected environment is proposed as a change request from the flag's
-            configuration.
-          </Trans>
-        }
-      />
+      <Card list>
+        <EmptyState
+          icon={<GitPullRequestArrowIcon />}
+          title={
+            search.tab === "awaiting" ? (
+              <Trans>No change request awaits your decision.</Trans>
+            ) : search.tab === "mine" ? (
+              <Trans>You have proposed no change request here.</Trans>
+            ) : (
+              <Trans>This project has no change request yet.</Trans>
+            )
+          }
+          description={
+            <Trans>
+              A change to a protected environment is proposed as a change request from the flag's
+              configuration.
+            </Trans>
+          }
+        />
+      </Card>
     );
   }
 
@@ -453,14 +463,16 @@ function ChangeRequestsTable({
     ];
   }, [environments.data, i18n, project, t]);
   return (
-    <Table
-      caption={t`Change requests`}
-      hideCaption
-      stickyFirstColumn
-      columns={columns}
-      data={changeRequests}
-      loading={loading}
-      getRowId={(changeRequest) => changeRequest.id}
-    />
+    <Card list>
+      <Table
+        caption={t`Change requests`}
+        hideCaption
+        stickyFirstColumn
+        columns={columns}
+        data={changeRequests}
+        loading={loading}
+        getRowId={(changeRequest) => changeRequest.id}
+      />
+    </Card>
   );
 }

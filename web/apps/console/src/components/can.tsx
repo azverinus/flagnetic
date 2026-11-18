@@ -1,4 +1,5 @@
 import { Trans } from "@lingui/react/macro";
+import { Page } from "@/components/ui/page";
 import { LockIcon } from "lucide-react";
 import { Children, cloneElement, type MouseEvent, type ReactElement, type ReactNode } from "react";
 
@@ -93,7 +94,7 @@ export function PermissionGate({ permission, title, children }: PermissionGatePr
 /** A screen the caller cannot open, with why, in place of its content. */
 export function RefusedScreen({ title, reason }: { title: string; reason: string }) {
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader title={title} />
       <div
         role="alert"
@@ -107,6 +108,6 @@ export function RefusedScreen({ title, reason }: { title: string; reason: string
           <p className="text-muted-foreground">{reason}</p>
         </div>
       </div>
-    </div>
+    </Page>
   );
 }

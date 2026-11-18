@@ -1,4 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
+import { Page } from "@/components/ui/page";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
@@ -33,22 +34,22 @@ function EnvironmentPage() {
       return <EnvironmentNotFound project={project} />;
     }
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+      <Page>
         <QueryError error={environment.error} onRetry={() => void environment.refetch()} />
-      </div>
+      </Page>
     );
   }
   if (environment.isPending) {
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+      <Page>
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-40 w-full" />
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={environment.data.name}
         description={
@@ -75,24 +76,24 @@ function EnvironmentPage() {
           },
         ]}
       />
-    </div>
+    </Page>
   );
 }
 
 function EnvironmentNotFound({ project }: { project: string }) {
   return (
-    <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
+    <Page measure="form">
       <h1 className="text-2xl/7 font-semibold">
         <Trans>Environment not found</Trans>
       </h1>
       <p className="text-sm text-muted-foreground">
         <Trans>The project has no environment with this key. It may have been deleted.</Trans>
       </p>
-      <Button asChild variant="outline">
+      <Button className="self-start" asChild variant="outline">
         <Link to="/projects/$project/environments" params={{ project }}>
           <Trans>Go to the environments</Trans>
         </Link>
       </Button>
-    </div>
+    </Page>
   );
 }

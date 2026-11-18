@@ -1,4 +1,6 @@
 import type { SegmentListItem } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -56,35 +58,42 @@ function Segments() {
     body = <QueryError error={segments.error} onRetry={() => void segments.refetch()} />;
   } else if (segments.data?.length === 0) {
     body = (
-      <EmptyState
-        icon={<UsersRoundIcon />}
-        title={<Trans>This project has no segment yet.</Trans>}
-        description={
-          <Trans>A segment names a group of contexts once, for the rules of every flag.</Trans>
-        }
-        action={newSegment}
-      />
+      <Card list>
+        <EmptyState
+          icon={<UsersRoundIcon />}
+          title={<Trans>This project has no segment yet.</Trans>}
+          description={
+            <Trans>A segment names a group of contexts once, for the rules of every flag.</Trans>
+          }
+          action={newSegment}
+        />
+      </Card>
     );
   } else {
     const shown = filterSegments(segments.data ?? [], search);
     body =
       segments.data && shown.length === 0 ? (
-        <EmptyState
-          icon={<UsersRoundIcon />}
-          title={<Trans>No segment matches these filters.</Trans>}
-          action={
-            <Button variant="outline" onClick={() => void navigate({ search: {}, replace: true })}>
-              <Trans>Clear filters</Trans>
-            </Button>
-          }
-        />
+        <Card list>
+          <EmptyState
+            icon={<UsersRoundIcon />}
+            title={<Trans>No segment matches these filters.</Trans>}
+            action={
+              <Button
+                variant="outline"
+                onClick={() => void navigate({ search: {}, replace: true })}
+              >
+                <Trans>Clear filters</Trans>
+              </Button>
+            }
+          />
+        </Card>
       ) : (
         <SegmentsTable project={project} segments={shown} loading={segments.isPending} />
       );
   }
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Segments`}
         description={
@@ -93,7 +102,7 @@ function Segments() {
             every change to it.
           </Trans>
         }
-        actions={newSegment}
+        actions={(segments.data?.length ?? 0) > 0 ? newSegment : undefined}
       />
       <div
         role="search"
@@ -132,7 +141,7 @@ function Segments() {
         </Field>
       </div>
       {body}
-    </div>
+    </Page>
   );
 }
 
@@ -188,13 +197,15 @@ function SegmentsTable({
     [i18n, project, t],
   );
   return (
-    <Table
-      caption={t`Segments`}
-      hideCaption
-      columns={columns}
-      data={segments}
-      loading={loading}
-      getRowId={(segment) => segment.id}
-    />
+    <Card list>
+      <Table
+        caption={t`Segments`}
+        hideCaption
+        columns={columns}
+        data={segments}
+        loading={loading}
+        getRowId={(segment) => segment.id}
+      />
+    </Card>
   );
 }

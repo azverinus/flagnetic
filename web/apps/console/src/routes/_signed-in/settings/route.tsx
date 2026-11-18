@@ -1,4 +1,5 @@
 import type { MessageDescriptor } from "@lingui/core";
+import { Page } from "@/components/ui/page";
 import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { createFileRoute, Link, type LinkProps, Outlet } from "@tanstack/react-router";
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/_signed-in/settings")({
 function PersonalSettings() {
   const { i18n, t } = useLingui();
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader title={t`Personal settings`} />
       <nav aria-label={t`Personal settings`} className="overflow-x-auto border-b">
         <ul className="flex gap-1">
@@ -40,6 +41,6 @@ function PersonalSettings() {
         </ul>
       </nav>
       <Outlet />
-    </div>
+    </Page>
   );
 }

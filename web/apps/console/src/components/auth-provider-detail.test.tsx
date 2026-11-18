@@ -166,7 +166,8 @@ describe("an auth provider's page", () => {
     const { router } = await renderScreen();
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    await user.click(await screen.findByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
     await user.click(await screen.findByRole("button", { name: "Delete provider" }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe("/admin/auth-providers"));

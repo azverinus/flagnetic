@@ -26,7 +26,9 @@ describe("a sink's screen", () => {
     expect(await screen.findByRole("heading", { name: "Warehouse", level: 1 })).toBeVisible();
     expect(screen.getByLabelText("Database")).toHaveValue("analytics");
     // Only a webhook sink has a secret to rotate.
-    expect(screen.queryByRole("button", { name: "Rotate secret" })).toBeNull();
+    await userEvent.setup().click(screen.getByRole("button", { name: "More actions" }));
+    expect(await screen.findByRole("menuitem", { name: "Delete" })).toBeVisible();
+    expect(screen.queryByRole("menuitem", { name: "Rotate secret" })).toBeNull();
   });
 
   it("says the sink is missing when the server has none", async () => {
@@ -50,7 +52,8 @@ describe("a sink's screen", () => {
     ));
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Rotate secret" }));
+    await user.click(await screen.findByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Rotate secret" }));
     const confirm = await screen.findByRole("dialog", { name: "Rotate the secret of Pipeline" });
     await user.click(within(confirm).getByRole("button", { name: "Rotate secret" }));
 

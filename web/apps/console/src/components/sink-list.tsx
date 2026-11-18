@@ -1,4 +1,6 @@
 import type { Sink } from "@flagnetic/api";
+import { Card } from "@/components/ui/card";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -88,7 +90,7 @@ export function SinkList({ project }: { project: string }) {
   );
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={t`Sinks`}
         description={
@@ -97,31 +99,35 @@ export function SinkList({ project }: { project: string }) {
             pipeline, so analysts never work on the platform's database.
           </Trans>
         }
-        actions={newSink}
+        actions={(sinks.data?.length ?? 0) > 0 ? newSink : undefined}
       />
       {sinks.isError ? (
         <QueryError error={sinks.error} onRetry={() => void sinks.refetch()} />
       ) : sinks.data?.length === 0 ? (
-        <EmptyState
-          icon={<DatabaseZapIcon />}
-          title={<Trans>No sink yet.</Trans>}
-          description={
-            <Trans>
-              Create one to have exposures, aliases and evaluation summaries delivered to
-              ClickHouse, object storage or a webhook.
-            </Trans>
-          }
-          action={newSink}
-        />
+        <Card list>
+          <EmptyState
+            icon={<DatabaseZapIcon />}
+            title={<Trans>No sink yet.</Trans>}
+            description={
+              <Trans>
+                Create one to have exposures, aliases and evaluation summaries delivered to
+                ClickHouse, object storage or a webhook.
+              </Trans>
+            }
+            action={newSink}
+          />
+        </Card>
       ) : (
-        <Table
-          caption={t`Sinks`}
-          hideCaption
-          columns={columns}
-          data={sinks.data ?? []}
-          loading={sinks.isPending}
-          getRowId={(sink) => sink.id}
-        />
+        <Card list>
+          <Table
+            caption={t`Sinks`}
+            hideCaption
+            columns={columns}
+            data={sinks.data ?? []}
+            loading={sinks.isPending}
+            getRowId={(sink) => sink.id}
+          />
+        </Card>
       )}
       <DeleteRowDialog
         rowKey={deleting?.id}
@@ -143,6 +149,6 @@ export function SinkList({ project }: { project: string }) {
           </p>
         )}
       </DeleteRowDialog>
-    </div>
+    </Page>
   );
 }

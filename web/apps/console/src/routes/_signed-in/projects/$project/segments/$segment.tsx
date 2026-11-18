@@ -6,6 +6,7 @@ import {
   updateSegment,
   type Violation,
 } from "@flagnetic/api";
+import { Page } from "@/components/ui/page";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
@@ -65,17 +66,17 @@ function SegmentDetail() {
       : undefined;
   if (failed) {
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+      <Page>
         <QueryError error={failed.error} onRetry={failed.retry} />
-      </div>
+      </Page>
     );
   }
   if (segment.data === undefined || declarations.state !== "ready") {
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6" aria-busy>
+      <Page aria-busy>
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-24 w-full" />
-      </div>
+      </Page>
     );
   }
   // Another segment's page starts afresh: its draft and dialogs are its own.
@@ -92,19 +93,19 @@ function SegmentDetail() {
 
 function SegmentNotFound({ project }: { project: string }) {
   return (
-    <div className="mx-auto flex max-w-xl flex-col items-start gap-3 p-6">
+    <Page measure="form">
       <h1 className="text-2xl/7 font-semibold">
         <Trans>Segment not found</Trans>
       </h1>
       <p className="text-sm text-muted-foreground">
         <Trans>The project has no segment with this key. It may have been deleted.</Trans>
       </p>
-      <Button asChild variant="outline">
+      <Button className="self-start" asChild variant="outline">
         <Link to="/projects/$project/segments" params={{ project }}>
           <Trans>Go to the segments</Trans>
         </Link>
       </Button>
-    </div>
+    </Page>
   );
 }
 
@@ -361,7 +362,7 @@ function SegmentPage({
   );
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <Page>
       <PageHeader
         title={segment.name}
         description={<code className="font-mono text-sm">{segment.key}</code>}
@@ -424,7 +425,7 @@ function SegmentPage({
           usageList
         )}
       </section>
-      <div className="flex w-full max-w-3xl flex-col gap-5">
+      <div className="flex w-full measure-form flex-col gap-5">
         <SegmentFields
           draft={draft}
           onChange={(next) => {
@@ -542,6 +543,6 @@ function SegmentPage({
           </Trans>
         </p>
       </ConfirmDialog>
-    </div>
+    </Page>
   );
 }
