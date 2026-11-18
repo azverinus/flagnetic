@@ -5,7 +5,7 @@ import { type ReactNode, useId } from "react";
 import { QueryError } from "@/components/query-error";
 import { Sheet } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatInstant } from "@/i18n/format";
+import { Moment } from "@/components/moment";
 import { actionLabel, actorKindLabel, changeRows, entityKindLabel } from "@/lib/audit";
 import { cn } from "@/lib/cn";
 
@@ -102,9 +102,7 @@ function EntryDetail({
           <Trans>Time</Trans>
         </dt>
         <dd>
-          <time dateTime={entry.occurred_at} title={entry.occurred_at}>
-            {formatInstant(i18n, entry.occurred_at)}
-          </time>
+          <Moment value={entry.occurred_at} full />
         </dd>
         <dt className={termClassName}>
           <Trans>Actor</Trans>

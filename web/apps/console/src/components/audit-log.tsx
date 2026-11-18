@@ -3,49 +3,24 @@ import { Card } from "@/components/ui/card";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { HistoryIcon } from "lucide-react";
-import { type ComponentType, type FormEvent, type ReactNode, useMemo, useState } from "react";
+import { type ComponentType, type ReactNode, useMemo } from "react";
 
+import { type AuditFilters } from "@/components/audit-filters";
 import { DownloadAudit } from "@/components/download-audit";
 import { Moment } from "@/components/moment";
 import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Select, SelectItem } from "@/components/ui/select";
 import { Table, type TableColumn } from "@/components/ui/table";
-import { formatInstant } from "@/i18n/format";
-import {
-  actionLabel,
-  actorKindLabel,
-  actorOptions,
-  auditActions,
-  auditActorKinds,
-  type AuditSearch,
-  auditEntityKinds,
-  entityKindLabel,
-  type FilterOption,
-  isFiltered,
-} from "@/lib/audit";
-import { type AuditScope, auditEntriesQuery } from "@/lib/queries";
-
-/** The select's value for a filter left unset: Radix keeps the empty string for itself. */
-const any = "any";
+import { Toolbar } from "@/components/ui/toolbar";
+import { actionLabel, actorKindLabel, entityKindLabel, isFiltered } from "@/lib/audit";
+import { auditEntriesQuery } from "@/lib/queries";
 
 export type AuditLogProps = {
-  scope: AuditScope;
-  search: AuditSearch;
-  /** Replaces the search, the page included. */
-  onSearch: (search: AuditSearch) => void;
+  /** The log's filters: the address's, edited in the context panel and the toolbar. */
+  filters: AuditFilters;
   /** The link to an entry's detail, keeping the search. */
   EntryLink: EntryLinkComponent;
-  /**
-   * The members the screen knows of to filter by; whoever else acted in
-   * the entries shown is offered too.
-   */
-  actors: FilterOption[];
-  /** The scope's own filter and column: the environment in a project, the project on the instance. */
-  place: Place & { filter: "environment" | "project"; options: FilterOption[] };
 };
 
 /** A link to one entry's detail, around what the row shows of it. */
@@ -91,13 +66,7 @@ export function AuditEntriesTable({
           relativeTimes ? (
             <Moment value={row.original.occurred_at} relative />
           ) : (
-            <time
-              dateTime={row.original.occurred_at}
-              title={row.original.occurred_at}
-              className="whitespace-nowrap"
-            >
-              {formatInstant(i18n, row.original.occurred_at)}
-            </time>
+            <Moment value={row.original.occurred_at} full />
           ),
       },
       {
@@ -146,29 +115,30 @@ export function AuditEntriesTable({
 }
 
 /**
- * An audit log: filters as search parameters, entries newest first on the
- * `Table` primitive, and keyset paging, so entries arriving while the
- * member reads never shift an older page.
+ * An audit log: its search and downloads in a toolbar over the entries,
+ * newest first on the `Table` primitive, the other filters in the context
+ * panel and echoed as chips, and keyset paging, so entries arriving while
+ * the member reads never shift an older page.
  */
-export function AuditLog({ scope, search, onSearch, EntryLink, actors, place }: AuditLogProps) {
-  const { i18n, t } = useLingui();
+export function AuditLog({ filters, EntryLink }: AuditLogProps) {
+  const { t } = useLingui();
+  const { scope, search, apply, turnPage, filter, place } = filters;
   const page = useQuery(auditEntriesQuery(scope, search));
   const filtered = isFiltered(search);
-  const actorChoices = useMemo(
-    () => actorOptions(i18n, actors, page.data?.items ?? [], search.actor),
-    [actors, i18n, page.data, search.actor],
-  );
 
   return (
-    <div className="flex flex-col gap-6">
-      <AuditFilters
-        key={JSON.stringify({ ...search, cursor: undefined })}
-        search={search}
-        onSearch={onSearch}
-        actors={actorChoices}
-        place={place}
+    <div className="flex flex-col gap-4">
+      <Toolbar
+        search={{
+          value: search.q ?? "",
+          placeholder: t`Action, key or actor`,
+          onChange: (q) => filter({ q: q.trim() || undefined }),
+        }}
+        chips={filters.chips}
+        onRemoveChip={filters.removeChip}
+        onClearAll={filters.clearFacets}
+        actions={<DownloadAudit scope={scope} search={search} />}
       />
-      <DownloadAudit scope={scope} search={search} />
       {page.isError ? (
         <QueryError error={page.error} onRetry={() => void page.refetch()} />
       ) : page.data?.items.length === 0 && !search.cursor ? (
@@ -184,7 +154,7 @@ export function AuditLog({ scope, search, onSearch, EntryLink, actors, place }: 
             }
             action={
               filtered ? (
-                <Button variant="outline" onClick={() => onSearch({})}>
+                <Button variant="outline" onClick={() => apply({})}>
                   <Trans>Clear filters</Trans>
                 </Button>
               ) : null
@@ -201,17 +171,13 @@ export function AuditLog({ scope, search, onSearch, EntryLink, actors, place }: 
             place={place}
           />
           <nav aria-label={t`Pages of entries`} className="flex flex-wrap justify-end gap-2">
-            <Button
-              variant="outline"
-              disabled={!search.cursor}
-              onClick={() => onSearch({ ...search, cursor: undefined })}
-            >
+            <Button variant="outline" disabled={!search.cursor} onClick={() => turnPage(undefined)}>
               <Trans>Newest entries</Trans>
             </Button>
             <Button
               variant="outline"
               disabled={!page.data?.next_cursor || page.isPlaceholderData}
-              onClick={() => onSearch({ ...search, cursor: page.data?.next_cursor ?? undefined })}
+              onClick={() => turnPage(page.data?.next_cursor ?? undefined)}
             >
               <Trans>Older entries</Trans>
             </Button>
@@ -231,109 +197,5 @@ function ActorCell({ entry }: { entry: AuditEntry }) {
         {actorKindLabel(i18n, entry.actor.kind)}
       </span>
     </span>
-  );
-}
-
-/**
- * The filters, edited here and applied together, so the address and the
- * request change once per search rather than on every keystroke.
- */
-function AuditFilters({
-  search,
-  onSearch,
-  actors,
-  place,
-}: Pick<AuditLogProps, "search" | "onSearch" | "actors" | "place">) {
-  const { i18n, t } = useLingui();
-  const [draft, setDraft] = useState<AuditSearch>(search);
-  const set = (name: keyof AuditSearch, value: string) =>
-    setDraft((current) => ({
-      ...current,
-      [name]: value === "" || value === any ? undefined : value,
-    }));
-  const apply = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    onSearch({ ...draft, q: draft.q?.trim() || undefined, cursor: undefined });
-  };
-
-  const choice = (name: keyof AuditSearch, label: string, options: FilterOption[]): ReactNode => (
-    <Field label={label}>
-      <Select value={draft[name] ?? any} onValueChange={(value) => set(name, value)}>
-        <SelectItem value={any}>{t`Any`}</SelectItem>
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </Select>
-    </Field>
-  );
-
-  return (
-    <Card>
-      <form
-        role="search"
-        aria-label={t`Filter the audit log`}
-        onSubmit={apply}
-        className="flex flex-col gap-4 p-5"
-      >
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Field
-            label={<Trans>Search</Trans>}
-            className="sm:col-span-2"
-            hint={<Trans>In the action, the entity's key and the actor's name.</Trans>}
-          >
-            <Input
-              type="search"
-              value={draft.q ?? ""}
-              onChange={(event) => set("q", event.target.value)}
-            />
-          </Field>
-          {choice(
-            "action",
-            t`Action`,
-            auditActions.map((action) => ({ value: action, label: actionLabel(i18n, action) })),
-          )}
-          {choice(
-            "entity_kind",
-            t`Entity`,
-            auditEntityKinds.map((kind) => ({ value: kind, label: entityKindLabel(i18n, kind) })),
-          )}
-          {choice("actor", t`Member`, actors)}
-          {choice(
-            "actor_kind",
-            t`Actor kind`,
-            auditActorKinds.map((kind) => ({ value: kind, label: actorKindLabel(i18n, kind) })),
-          )}
-          {choice(place.filter, place.label, place.options)}
-          <div className="grid grid-cols-2 gap-4">
-            <Field label={<Trans>From</Trans>}>
-              <Input
-                type="date"
-                value={draft.from ?? ""}
-                onChange={(event) => set("from", event.target.value)}
-              />
-            </Field>
-            <Field label={<Trans>To</Trans>}>
-              <Input
-                type="date"
-                value={draft.to ?? ""}
-                onChange={(event) => set("to", event.target.value)}
-              />
-            </Field>
-          </div>
-        </div>
-        <div className="flex flex-wrap justify-end gap-2">
-          {isFiltered(search) ? (
-            <Button type="button" variant="outline" onClick={() => onSearch({})}>
-              <Trans>Clear filters</Trans>
-            </Button>
-          ) : null}
-          <Button type="submit">
-            <Trans>Apply filters</Trans>
-          </Button>
-        </div>
-      </form>
-    </Card>
   );
 }

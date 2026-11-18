@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { activateForTests, renderWithProviders } from "@/test/render";
 
-import { PanelChecklist, PanelFacet, PanelTextFacet } from "./panel-facet";
+import { PanelChecklist, PanelDateFacet, PanelFacet, PanelTextFacet } from "./panel-facet";
 
 beforeEach(() => activateForTests("en"));
 
@@ -106,5 +106,41 @@ describe("PanelTextFacet", () => {
 
     await user.type(screen.getByRole("searchbox", { name: "Tag" }), "web");
     await vi.waitFor(() => expect(changed).toHaveBeenLastCalledWith("web"));
+  });
+});
+
+describe("PanelDateFacet", () => {
+  it("applies a day on blur, and not while it is being typed", async () => {
+    const user = userEvent.setup();
+    const changed = vi.fn();
+    renderWithProviders(<PanelDateFacet label="From" value={undefined} onChange={changed} />);
+
+    const input = screen.getByLabelText("From");
+    await user.type(input, "2026-11-01");
+    expect(changed).not.toHaveBeenCalled();
+    await user.tab();
+
+    expect(changed).toHaveBeenCalledExactlyOnceWith("2026-11-01");
+  });
+
+  it("applies on Enter, clears with an emptied field, and follows the address", async () => {
+    const user = userEvent.setup();
+    const changed = vi.fn();
+    const { rerender } = renderWithProviders(
+      <PanelDateFacet label="To" value="2026-11-05" onChange={changed} />,
+    );
+    const input = screen.getByLabelText("To");
+    expect(input).toHaveValue("2026-11-05");
+
+    await user.clear(input);
+    await user.type(input, "2026-11-09{Enter}");
+    expect(changed).toHaveBeenLastCalledWith("2026-11-09");
+
+    await user.clear(input);
+    await user.tab();
+    expect(changed).toHaveBeenLastCalledWith(undefined);
+
+    rerender(<PanelDateFacet label="To" value="2026-12-01" onChange={changed} />);
+    expect(screen.getByLabelText("To")).toHaveValue("2026-12-01");
   });
 });

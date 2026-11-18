@@ -665,6 +665,16 @@ test.describe("the console in Russian", () => {
     const download = page.getByRole("group", { name: "Скачать журнал аудита" });
     await expect(download.getByRole("button", { name: "Скачать JSON Lines" })).toBeVisible();
     await expect(download.getByRole("button", { name: "Скачать CSV" })).toBeVisible();
+    // The facets live in the context panel, applied at once, with no Apply button.
+    const panel = page.getByRole("navigation", { name: "Фильтры" });
+    await expect(panel.getByRole("combobox", { name: "Действие", exact: true })).toBeVisible();
+    await expect(panel.getByLabel("С", { exact: true })).toBeVisible();
+    await expect(panel.getByLabel("По", { exact: true })).toBeVisible();
+    await panel.getByLabel("С", { exact: true }).fill("2020-01-01");
+    await panel.getByLabel("С", { exact: true }).press("Enter");
+    await expect(page).toHaveURL(/from=2020-01-01/);
+    await expect(page.getByRole("list", { name: "Действующие фильтры" })).toContainText("С:");
+    await expect(page.getByRole("button", { name: "Сбросить всё" })).toBeVisible();
     await expectNoSeriousViolations(page, "the audit log with its download in Russian");
 
     await page.goto(`/projects/${doomed}/settings`);

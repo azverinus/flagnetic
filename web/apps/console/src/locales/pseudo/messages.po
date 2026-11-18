@@ -387,6 +387,10 @@ msgstr ""
 msgid "{name} will no longer be able to sign in through {provider} with this account. The member and everything they hold stays, and they can link it again."
 msgstr ""
 
+#: src/components/audit-filters.tsx
+msgid "{name}: {value}"
+msgstr ""
+
 #: src/components/session-list.tsx
 msgid "{others, plural, one {Revoke # session} other {Revoke # sessions}}"
 msgstr ""
@@ -959,8 +963,13 @@ msgid "ACS URL"
 msgstr ""
 
 #: src/components/audit-entry-sheet.tsx
+#: src/components/audit-filters.tsx
 #: src/components/audit-log.tsx
 msgid "Action"
+msgstr ""
+
+#: src/components/audit-log.tsx
+msgid "Action, key or actor"
 msgstr ""
 
 #: src/components/overrides-section.tsx
@@ -990,7 +999,7 @@ msgstr ""
 msgid "Actor"
 msgstr ""
 
-#: src/components/audit-log.tsx
+#: src/components/audit-filters.tsx
 msgid "Actor kind"
 msgstr ""
 
@@ -1224,7 +1233,7 @@ msgstr ""
 msgid "Another variation has this key."
 msgstr ""
 
-#: src/components/audit-log.tsx
+#: src/components/audit-filters.tsx
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Any"
 msgstr ""
@@ -1336,10 +1345,6 @@ msgstr ""
 
 #: src/components/propose-dialog.tsx
 msgid "Apply at"
-msgstr ""
-
-#: src/components/audit-log.tsx
-msgid "Apply filters"
 msgstr ""
 
 #: src/components/change-request-actions.tsx
@@ -3279,6 +3284,7 @@ msgid "Enter your password."
 msgstr ""
 
 #: src/components/audit-entry-sheet.tsx
+#: src/components/audit-filters.tsx
 #: src/components/audit-log.tsx
 msgid "Entity"
 msgstr ""
@@ -3759,10 +3765,6 @@ msgstr ""
 msgid "Field"
 msgstr ""
 
-#: src/components/audit-log.tsx
-msgid "Filter the audit log"
-msgstr ""
-
 #: src/components/webhook-deliveries.tsx
 msgid "Filter the deliveries"
 msgstr ""
@@ -3775,6 +3777,7 @@ msgstr ""
 msgid "Filter the segments"
 msgstr ""
 
+#: src/components/audit-filters.tsx
 #: src/components/change-requests-panel.tsx
 #: src/components/flags-panel.tsx
 #: src/components/ui/toolbar.tsx
@@ -3947,7 +3950,7 @@ msgstr ""
 msgid "Found"
 msgstr ""
 
-#: src/components/audit-log.tsx
+#: src/components/audit-filters.tsx
 #: src/components/sink-recovery.tsx
 #: src/components/webhook-deliveries.tsx
 msgid "From"
@@ -4253,10 +4256,6 @@ msgstr ""
 msgid "In {name}, as the server evaluates the flag."
 msgstr ""
 
-#: src/components/audit-log.tsx
-msgid "In the action, the entity's key and the actor's name."
-msgstr ""
-
 #: src/lib/conditions.ts
 msgid "in the segment {segment}"
 msgstr ""
@@ -4300,10 +4299,10 @@ msgstr ""
 #. An audit entry that belongs to no project.
 #. An audit entry that belongs to no project.
 #: src/components/area-screens.ts
+#: src/components/audit-filters.tsx
 #: src/components/navigation.tsx
 #: src/components/settings-panels.tsx
 #: src/routes/_signed-in/admin/audit.$entry.tsx
-#: src/routes/_signed-in/admin/audit.tsx
 msgid "Instance"
 msgstr ""
 
@@ -4956,7 +4955,7 @@ msgstr ""
 
 #. A kind of actor in the audit log.
 #. A kind of entity in the audit log.
-#: src/components/audit-log.tsx
+#: src/components/audit-filters.tsx
 #: src/components/grant-form.tsx
 #: src/components/project-invitations.tsx
 #: src/lib/audit.ts
@@ -6209,12 +6208,12 @@ msgstr ""
 
 #. A kind of entity in the audit log.
 #: src/components/area-screens.ts
+#: src/components/audit-filters.tsx
 #: src/components/group-mappings.tsx
 #: src/components/invite-form.tsx
 #: src/components/navigation.tsx
 #: src/lib/audit.ts
 #: src/routes/_signed-in/admin/audit.$entry.tsx
-#: src/routes/_signed-in/admin/audit.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "Project"
 msgstr ""
@@ -7117,7 +7116,6 @@ msgstr ""
 msgid "SDKs stop receiving the flag in every environment and code falls back to its default. It can be restored later; refused while another flag requires it."
 msgstr ""
 
-#: src/components/audit-log.tsx
 #: src/components/search-field.tsx
 msgid "Search"
 msgstr ""
@@ -9274,7 +9272,7 @@ msgstr ""
 msgid "TLS from the first byte, usually port 465"
 msgstr ""
 
-#: src/components/audit-log.tsx
+#: src/components/audit-filters.tsx
 #: src/components/sink-recovery.tsx
 #: src/components/webhook-deliveries.tsx
 msgid "To"

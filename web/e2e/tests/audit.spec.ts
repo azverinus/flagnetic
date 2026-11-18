@@ -66,10 +66,38 @@ async function seedHistory(): Promise<string> {
 const entries = (page: Page) =>
   page.getByRole("table", { name: "Audit entries, newest first" }).getByRole("row");
 
-async function choose(page: Page, label: string, option: string) {
-  await page.getByLabel(label, { exact: true }).click();
-  await page.getByRole("option", { name: option, exact: true }).click();
+/**
+ * A facet of the context panel is a radio list up to five options and a
+ * select beyond, depending on what the instance holds; this takes either.
+ */
+function facet(page: Page, label: string, option: string) {
+  return {
+    radio: page
+      .getByRole("radiogroup", { name: label, exact: true })
+      .getByRole("radio", { name: option, exact: true }),
+    select: page.getByRole("combobox", { name: label, exact: true }),
+  };
 }
+
+async function choose(page: Page, label: string, option: string) {
+  const { radio, select } = facet(page, label, option);
+  await radio.or(select).first().waitFor();
+  if (await select.isVisible()) {
+    await select.click();
+    await page.getByRole("option", { name: option, exact: true }).click();
+  } else {
+    await radio.check();
+  }
+}
+
+async function expectChosen(page: Page, label: string, option: string) {
+  const { radio, select } = facet(page, label, option);
+  await radio.or(select).first().waitFor();
+  if (await select.isVisible()) await expect(select).toHaveText(option);
+  else await expect(radio).toBeChecked();
+}
+
+const clearFilters = (page: Page) => page.getByRole("button", { name: "Clear all" });
 
 test("project audit log: filters, the entry with its before and after, and paging", async ({
   page,
@@ -87,12 +115,17 @@ test("project audit log: filters, the entry with its before and after, and pagin
   await page.getByRole("button", { name: "Older entries" }).click();
   await expect(page).toHaveURL(/cursor=/);
   await expect(entries(page).filter({ hasText: "project.created" })).toHaveCount(1);
+  // Each page is a history entry: going back returns to the newest one.
+  await page.goBack();
+  await expect(page).not.toHaveURL(/cursor=/);
+  await expect(entries(page).nth(1)).toContainText("unit_type.created");
+  await page.goForward();
+  await expect(page).toHaveURL(/cursor=/);
   await page.getByRole("button", { name: "Newest entries" }).click();
   await expect(page).not.toHaveURL(/cursor=/);
 
   // The action filter, applied to the address.
   await choose(page, "Action", "Environment updated");
-  await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(page).toHaveURL(/action=environment\.updated/);
   await expect(entries(page)).toHaveCount(2);
 
@@ -115,19 +148,53 @@ test("project audit log: filters, the entry with its before and after, and pagin
   // The entry's address is shareable: a reload opens it again, filters kept.
   await page.reload();
   await expect(page.getByRole("dialog", { name: "Audit entry" })).toContainText('"Pre-production"');
-  await expect(page.getByLabel("Action", { exact: true })).toHaveText("Environment updated");
   await page.getByRole("button", { name: "Close" }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${project}/audit\\?action=`));
+  await expectChosen(page, "Action", "Environment updated");
+  await expect(page.getByRole("list", { name: "Filters in force" })).toContainText(
+    "Action: Environment updated",
+  );
 
   // Free text over the action, the entity's key and the actor's name.
-  await page.getByRole("button", { name: "Clear filters" }).first().click();
+  await clearFilters(page).click();
   await expect(page).not.toHaveURL(/action=/);
   await page.getByLabel("Search").fill("sandbox");
-  await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(page).toHaveURL(/q=sandbox/);
   await expect(entries(page)).toHaveCount(3);
   await expect(entries(page).nth(1)).toContainText("Environment deleted");
   await expect(entries(page).nth(2)).toContainText("Environment created");
+});
+
+test("project audit log: the dates apply on Enter or blur, show as chips, and the chips remove them", async ({
+  page,
+}) => {
+  const project = await seedHistory();
+  await signIn(page);
+  await page.goto(`/projects/${project}/audit`);
+  await expect(entries(page)).toHaveCount(51);
+  const panel = page.getByRole("navigation", { name: "Filters" });
+  const chips = page.getByRole("list", { name: "Filters in force" });
+
+  // Nothing is written to the address while the date is being typed.
+  const from = panel.getByLabel("From", { exact: true });
+  await from.fill("2999-01-01");
+  await expect(page).not.toHaveURL(/from=/);
+  await from.press("Enter");
+  await expect(page).toHaveURL(/from=2999-01-01/);
+  await expect(page.getByText("No entry matches these filters.")).toBeVisible();
+  await expect(chips).toContainText("From:");
+
+  // Blur applies too, and a chip removes one filter only.
+  await from.fill("2020-01-01");
+  const to = panel.getByLabel("To", { exact: true });
+  await to.fill("2999-12-31");
+  await page.getByRole("heading", { name: "Audit log", level: 1 }).click();
+  await expect(page).toHaveURL(/to=2999-12-31/);
+  await expect(entries(page)).toHaveCount(51);
+  await chips.getByRole("button", { name: /Remove the filter From/ }).click();
+  await expect(page).not.toHaveURL(/from=/);
+  await expect(page).toHaveURL(/to=2999-12-31/);
+  await expectNoSeriousViolations(page, "the audit log filtered by dates");
 });
 
 test("the actor filters: an instance admin with no grant, and the kind of actor", async ({
@@ -141,20 +208,17 @@ test("the actor filters: an instance admin with no grant, and the kind of actor"
   // The history was written by the instance admin's token; the admin holds
   // no grant in the project and is still there to filter by.
   await choose(page, "Member", admin.name);
-  await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(page).toHaveURL(/actor=[0-9a-f-]{36}/);
-  await expect(page.getByLabel("Member", { exact: true })).toHaveText(admin.name);
+  await expectChosen(page, "Member", admin.name);
   await expect(entries(page)).toHaveCount(51);
   await expect(entries(page).nth(1)).toContainText("bootstrap");
 
-  await page.getByRole("button", { name: "Clear filters" }).first().click();
+  await clearFilters(page).click();
   await choose(page, "Actor kind", "API token");
-  await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(page).toHaveURL(/actor_kind=token/);
   await expect(entries(page).nth(1)).toContainText("API token");
 
   await choose(page, "Actor kind", "Command line");
-  await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(page).toHaveURL(/actor_kind=cli/);
   await expect(page.getByText("No entry matches these filters.")).toBeVisible();
 });
@@ -171,7 +235,6 @@ test("a viewer reads the project's audit log and filters by whoever acted in it"
   // acted here, by the harness's bootstrap token and, to grant the viewer,
   // signed in, so they are offered all the same, by the name they acted under.
   await choose(page, "Member", admin.name);
-  await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(page).toHaveURL(/actor=[0-9a-f-]{36}/);
   await expect(entries(page).filter({ hasText: "project.created" })).toHaveCount(1);
 });
@@ -211,9 +274,13 @@ test("instance audit log: entries of no project and the project filter", async (
   await page.goto("/admin/audit");
   await expect(page.getByRole("heading", { name: "Audit log", level: 1 })).toBeVisible();
 
+  // The facets sit under the instance area's links, in the same panel.
+  const instance = page.getByRole("navigation", { name: "Instance" });
+  await expect(instance.getByRole("link", { name: "Projects" })).toBeVisible();
+  await expect(instance.getByRole("combobox", { name: "Action", exact: true })).toBeVisible();
+
   // Sign-ins belong to no project.
   await choose(page, "Action", "Signed in");
-  await page.getByRole("button", { name: "Apply filters" }).click();
   const signedIn = entries(page).nth(1);
   await expect(signedIn).toContainText("auth.signed_in");
   await expect(signedIn).toContainText("Instance");
@@ -222,9 +289,8 @@ test("instance audit log: entries of no project and the project filter", async (
   await expectNoSeriousViolations(page, "instance audit entry");
   await page.keyboard.press("Escape");
 
-  await page.getByRole("button", { name: "Clear filters" }).first().click();
+  await clearFilters(page).click();
   await choose(page, "Project", seededProject.name);
-  await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(page).toHaveURL(/project=/);
   const created = entries(page).filter({ hasText: "project.created" });
   await expect(created).toHaveCount(1);
@@ -277,7 +343,6 @@ test("instance audit log: a project's entries are not linked while the projects 
   await signIn(page);
   await page.goto("/admin/audit");
   await choose(page, "Action", "Project created");
-  await page.getByRole("button", { name: "Apply filters" }).click();
 
   // Without the projects' keys a project's entry would open without one.
   const failure = page.getByRole("alert").filter({ hasText: "req-e2e-3" }).first();
@@ -375,7 +440,6 @@ test("instance audit log: downloads the entries of one project", async ({ page }
   await signIn(page);
   await page.goto("/admin/audit");
   await choose(page, "Project", seededProject.name);
-  await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(page).toHaveURL(/project=/);
 
   const csv = await saveDownload(page, "Download CSV");

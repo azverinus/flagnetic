@@ -4,17 +4,18 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
-import { createContext, type ReactNode, useCallback, useContext, useMemo } from "react";
+import { createContext, type ReactNode, useContext, useMemo } from "react";
 
-import { AuditLog, type AuditLogProps } from "@/components/audit-log";
+import { InstanceAuditPanel, useInstanceAuditFilters } from "@/components/audit-filters";
+import { AuditLog } from "@/components/audit-log";
 import { QueryError } from "@/components/query-error";
 import { PageHeader } from "@/components/ui/page-header";
 import { type AuditSearch, validateAuditSearch } from "@/lib/audit";
-import { membersQuery, projectsQuery } from "@/lib/queries";
+import { projectsQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_signed-in/admin/audit")({
   validateSearch: validateAuditSearch,
-  staticData: { crumb: msg`Audit log` },
+  staticData: { crumb: msg`Audit log`, panel: InstanceAuditPanel },
   component: InstanceAudit,
 });
 
@@ -24,25 +25,12 @@ export const Route = createFileRoute("/_signed-in/admin/audit")({
  */
 function InstanceAudit() {
   const { t } = useLingui();
-  const address = Route.useSearch();
   // A route's search also carries what its children read, such as an open
-  // entry's project key; the listing, its cache key and the filter form
-  // are built from the log's own filters alone, so opening an entry does
-  // not read the page again, send the key along or count as a filter.
-  const search = useMemo(() => validateAuditSearch(address), [address]);
-  const navigate = Route.useNavigate();
-  const members = useQuery(membersQuery);
+  // entry's project key; the filters take the log's own alone, so opening
+  // an entry does not read the page again, send the key along or count as
+  // a filter.
+  const filters = useInstanceAuditFilters();
   const projects = useQuery(projectsQuery);
-
-  const onSearch = useCallback((next: AuditSearch) => void navigate({ search: next }), [navigate]);
-  const actors = useMemo(
-    () =>
-      (members.data ?? []).map((member) => ({
-        value: member.id,
-        label: member.display_name || member.email,
-      })),
-    [members.data],
-  );
   // Resolved once for every row: a project entry's link carries its
   // project's key, so it waits for the projects, and goes without a link
   // while they cannot be read, rather than linking without the key.
@@ -53,21 +41,6 @@ function InstanceAudit() {
         : new Map(projects.data.map((project) => [project.id, project.key])),
     [projects.data],
   );
-  const place = useMemo<AuditLogProps["place"]>(() => {
-    const names = new Map((projects.data ?? []).map((project) => [project.id, project.name]));
-    const instance = t({
-      message: "Instance",
-      comment: "An audit entry that belongs to no project.",
-    });
-    return {
-      filter: "project",
-      label: t`Project`,
-      options: (projects.data ?? []).map((project) => ({ value: project.id, label: project.name })),
-      // A deleted project's entries stay; they show its identifier.
-      of: (entry) =>
-        entry.project_id ? (names.get(entry.project_id) ?? entry.project_id) : instance,
-    };
-  }, [projects.data, t]);
 
   return (
     <Page>
@@ -84,14 +57,7 @@ function InstanceAudit() {
         <QueryError error={projects.error} onRetry={() => void projects.refetch()} />
       ) : null}
       <ProjectKeys.Provider value={projectKeys}>
-        <AuditLog
-          scope="instance"
-          search={search}
-          onSearch={onSearch}
-          EntryLink={InstanceAuditEntryLink}
-          actors={actors}
-          place={place}
-        />
+        <AuditLog filters={filters} EntryLink={InstanceAuditEntryLink} />
       </ProjectKeys.Provider>
       <Outlet />
     </Page>
