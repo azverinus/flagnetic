@@ -23,14 +23,7 @@ function AuthSettingsPage() {
     <Page measure="form">
       <PageHeader
         title={t`Auth settings`}
-        description={
-          <Trans>
-            How long sessions last, how long API tokens may live, how long passwords must be,
-            whether members reset a forgotten password by mail, whether they sign in with a password
-            at all, and which email domains sign in through one auth provider only. Every replica of
-            the instance applies a change within a second.
-          </Trans>
-        }
+        description={<Trans>Every replica of the instance applies a change within a second.</Trans>}
       />
       {settings.data ? (
         <AuthSettingsForm settings={settings.data} />

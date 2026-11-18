@@ -130,7 +130,7 @@ function Upload({
     <div className="flex flex-col gap-4">
       <Field
         label={t`Project document`}
-        hint={t`A JSON or YAML file, such as an export of this or another project.`}
+        hint={t`A JSON or YAML file, such as an export of this or another project`}
         error={unreadable}
       >
         <Input type="file" accept=".json,.yaml,.yml" onChange={(event) => void choose(event)} />
@@ -139,9 +139,10 @@ function Upload({
         label={t`Mode`}
         hint={
           mode === "replace"
-            ? t`Replace makes the project's configuration equal to the document: what the document does not name is deleted, unless something still uses it.`
-            : t`Merge creates or updates what the document names and leaves everything else alone.`
+            ? t`Replace makes the configuration equal to the document, deleting what it does not name`
+            : t`Merge creates or updates what the document names and leaves everything else alone`
         }
+        details={mode === "replace" ? t`Something that is still in use is not deleted.` : undefined}
         className="w-64"
       >
         <Select value={mode} onValueChange={(value) => onMode(value as ImportMode)}>

@@ -82,8 +82,8 @@ export function GrantForm({
             hint={
               projectMembersOnly ? (
                 <Trans>
-                  You can grant further roles to the members of this project. An instance admin
-                  grants a first role to anyone else.
+                  You can grant further roles to the members of this project; an instance admin
+                  grants a first role to anyone else
                 </Trans>
               ) : undefined
             }

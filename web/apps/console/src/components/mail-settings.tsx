@@ -246,7 +246,7 @@ function MailSettingsForm({
           <div className="grid gap-5 sm:grid-cols-[1fr_8rem]">
             <Field
               label={<Trans>Host</Trans>}
-              hint={<Trans>The SMTP server's host name or address.</Trans>}
+              hint={<Trans>The SMTP server's host name or address</Trans>}
               error={errors.host?.message}
               refusal={refusal}
               pointer={pointerOf.host}
@@ -275,8 +275,12 @@ function MailSettingsForm({
                 label={<Trans>Security</Trans>}
                 hint={
                   <Trans>
-                    STARTTLS and TLS need TLS 1.2 or later and verify the server's certificate. With
-                    none, nothing is encrypted, and a username and password are sent only to a
+                    STARTTLS and TLS verify the server's certificate and need TLS 1.2 or later
+                  </Trans>
+                }
+                details={
+                  <Trans>
+                    With none, nothing is encrypted, and a username and password are sent only to a
                     server on this machine.
                   </Trans>
                 }
@@ -299,7 +303,7 @@ function MailSettingsForm({
           />
           <Field
             label={<Trans>Username</Trans>}
-            hint={<Trans>Leave empty when the server takes mail without signing in.</Trans>}
+            hint={<Trans>Leave empty when the server takes mail without signing in</Trans>}
             error={errors.username?.message}
             refusal={refusal}
             pointer={pointerOf.username}
@@ -310,14 +314,18 @@ function MailSettingsForm({
             label={<Trans>Password</Trans>}
             hint={
               passwordSet ? (
-                <Trans>
-                  A password is stored and never shown again. Leave this empty to keep it, or type a
-                  new one to replace it. Changing the host, port, security or username needs it
-                  again. Clearing the username removes both.
-                </Trans>
+                <Trans>A password is stored and never shown again; leave it empty to keep it</Trans>
               ) : (
-                <Trans>Stored encrypted and never shown again.</Trans>
+                <Trans>Stored encrypted and never shown again</Trans>
               )
+            }
+            details={
+              passwordSet ? (
+                <Trans>
+                  Type a new one to replace it. Changing the host, port, security or username needs
+                  it again. Clearing the username removes both.
+                </Trans>
+              ) : undefined
             }
             error={errors.password?.message}
             refusal={refusal}
@@ -335,7 +343,7 @@ function MailSettingsForm({
             hint={
               <Trans>
                 Who every mail comes from: one address, optionally with a name, such as Flagnetic
-                &lt;flags@example.com&gt;.
+                &lt;flags@example.com&gt;
               </Trans>
             }
             error={errors.from?.message}

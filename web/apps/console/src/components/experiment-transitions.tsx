@@ -622,7 +622,7 @@ function GrowForm({
       <Field
         label={<Trans>New traffic allocation (%)</Trans>}
         hint={
-          <Trans>Now {current} %. It only grows: every unit included so far stays included.</Trans>
+          <Trans>Now {current} %; it only grows: every unit included so far stays included</Trans>
         }
         error={checked ? issue : undefined}
         className="w-64"
@@ -753,9 +753,7 @@ function StopForm({
       <Field
         label={<Trans>Note</Trans>}
         hint={
-          <Trans>
-            Why, for whoever reads the decision later. Optional; editable while stopped.
-          </Trans>
+          <Trans>Why, for whoever reads the decision later; optional, editable while stopped</Trans>
         }
         error={checked ? issues.note : undefined}
       >
@@ -947,7 +945,7 @@ function CloneForm({
       </Field>
       <Field
         label={<Trans>Name</Trans>}
-        hint={<Trans>Left empty, it keeps “{sourceName}”.</Trans>}
+        hint={<Trans>Left empty, it keeps “{sourceName}”</Trans>}
         error={checked ? issues.name : undefined}
         refusal={clone.error}
         pointer="/name"
@@ -1102,7 +1100,7 @@ function NoteForm({
       submitLabel={<Trans>Save note</Trans>}
       pending={pending}
     >
-      <Field label={<Trans>Note</Trans>} hint={<Trans>Empty clears it.</Trans>} error={issue}>
+      <Field label={<Trans>Note</Trans>} hint={<Trans>Empty clears it</Trans>} error={issue}>
         <Textarea
           rows={4}
           maxLength={maxNoteLength}

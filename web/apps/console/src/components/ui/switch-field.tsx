@@ -1,5 +1,6 @@
 import { type ReactNode, useId } from "react";
 
+import { Details } from "@/components/ui/details";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -7,6 +8,8 @@ export type SwitchFieldProps = {
   label: ReactNode;
   /** What switching it on does, and when to. */
   hint: ReactNode;
+  /** What matters beyond the hint, folded under it and closed until opened. */
+  details?: ReactNode;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
   disabled?: boolean;
@@ -20,6 +23,7 @@ export type SwitchFieldProps = {
 export function SwitchField({
   label,
   hint,
+  details,
   checked,
   onCheckedChange,
   disabled = false,
@@ -32,6 +36,7 @@ export function SwitchField({
         <p id={`${id}-hint`} className="text-sm text-muted-foreground">
           {hint}
         </p>
+        {details ? <Details>{details}</Details> : null}
       </div>
       <Switch
         id={id}

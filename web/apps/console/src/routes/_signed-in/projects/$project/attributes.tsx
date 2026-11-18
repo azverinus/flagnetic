@@ -165,8 +165,7 @@ function Attributes() {
         title={t`Attributes`}
         description={
           <Trans>
-            What targeting reads about a unit. The standard attributes are in every project; they
-            can be renamed but not deleted. A type never changes once declared.
+            The standard attributes are in every project; they can be renamed but not deleted.
           </Trans>
         }
         actions={(attributes.data?.length ?? 0) > 0 ? newAttribute : undefined}
@@ -303,7 +302,7 @@ function AttributeForm({
     });
   const taken = save.error instanceof ApiError && save.error.code === "already_exists";
   const { errors } = form.formState;
-  const fixed = <Trans>Fixed once declared.</Trans>;
+  const fixed = <Trans>Fixed once declared</Trans>;
 
   return (
     <DialogForm
@@ -335,9 +334,7 @@ function AttributeForm({
       ) : null}
       <Field
         label={<Trans>Key</Trans>}
-        hint={
-          editing ? fixed : <Trans>Lowercase letters, digits, - and _. It never changes.</Trans>
-        }
+        hint={editing ? fixed : <Trans>Lowercase letters, digits, - and _; it never changes</Trans>}
         error={
           errors.key?.message ??
           (taken

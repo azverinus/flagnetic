@@ -49,12 +49,7 @@ function StaleFlags() {
     <Page>
       <PageHeader
         title={t`Stale flags`}
-        description={
-          <Trans>
-            Flags that may be ready to leave the code: each one with why it is stale. Archived flags
-            are never listed.
-          </Trans>
-        }
+        description={<Trans>Archived flags are never listed.</Trans>}
       />
       <Toolbar chips={chips} onRemoveChip={removeChip} onClearAll={clearFacets} />
       <StaleFlagsPages

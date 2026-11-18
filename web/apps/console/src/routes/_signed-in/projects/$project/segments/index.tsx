@@ -96,12 +96,6 @@ function Segments() {
     <Page>
       <PageHeader
         title={t`Segments`}
-        description={
-          <Trans>
-            Reusable sets of attribute conditions; a rule targets a segment by name and follows
-            every change to it.
-          </Trans>
-        }
         actions={(segments.data?.length ?? 0) > 0 ? newSegment : undefined}
       />
       <div

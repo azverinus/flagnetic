@@ -254,13 +254,13 @@ export function FlagsPanel() {
         />
         <PanelTextFacet
           label={t`Tag`}
-          placeholder={t`The whole tag`}
+          placeholder={t`Tag`}
           value={search.tag ?? ""}
           onChange={(tag) => filter({ tag: tag.trim() || undefined })}
         />
         <PanelFacet
           label={t`Differs between`}
-          hint={t`In what SDKs receive.`}
+          hint={t`In what SDKs receive`}
           value={compared}
           anyLabel={t`Any environments`}
           disabled={pairs.length === 0}
@@ -316,7 +316,7 @@ export function StaleFlagsPanel() {
       <PanelGroup label={t`Filters`}>
         <PanelChecklist
           label={t`Stale for`}
-          hint={t`Show flags stale for any of these reasons; none checked shows every stale flag.`}
+          hint={t`Show flags stale for any of these reasons; none checked shows every stale flag`}
           values={search.reason ?? []}
           onChange={setReasons}
           options={staleReasons.map((reason) => ({

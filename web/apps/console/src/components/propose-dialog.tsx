@@ -208,7 +208,7 @@ function ProposeForm({
       </Field>
       <Field
         label={<Trans>Description</Trans>}
-        hint={<Trans>Why the change is needed, for whoever reviews it. Optional.</Trans>}
+        hint={<Trans>Why the change is needed, for whoever reviews it; optional</Trans>}
         refusal={refusal}
         pointer="/description"
       >
@@ -223,8 +223,7 @@ function ProposeForm({
         label={<Trans>Apply at</Trans>}
         hint={
           <Trans>
-            Optional, in your time zone: once approved, it is applied then. Left empty, it is
-            applied by hand.
+            Optional, in your time zone: once approved, it is applied then; left empty, by hand
           </Trans>
         }
         refusal={refusal}

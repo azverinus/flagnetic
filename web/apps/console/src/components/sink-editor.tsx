@@ -212,7 +212,7 @@ export function SinkEditor({ project, sink, initialKind, onSaved }: SinkEditorPr
 
         <Field
           label={<Trans>Name</Trans>}
-          hint={<Trans>What the sink delivers to, to tell the sinks apart.</Trans>}
+          hint={<Trans>What the sink delivers to, to tell the sinks apart</Trans>}
           error={errors.name?.message}
           refusal={fieldRefusal}
           pointer="/name"
@@ -437,10 +437,10 @@ function ClickHouseFields({ form, refusal, editing }: KindFieldsProps & { editin
         label={<Trans>URL</Trans>}
         hint={
           <Trans>
-            Where ClickHouse's HTTP interface answers, such as https://clickhouse.example.com:8443.
-            The user and password have fields of their own.
+            Where ClickHouse's HTTP interface answers, such as https://clickhouse.example.com:8443
           </Trans>
         }
+        details={<Trans>The user and password have fields of their own.</Trans>}
         error={errorOf(form, "clickhouse.url")}
         refusal={refusal}
         pointer="/clickhouse/url"
@@ -449,7 +449,7 @@ function ClickHouseFields({ form, refusal, editing }: KindFieldsProps & { editin
       </Field>
       <Field
         label={<Trans>Database</Trans>}
-        hint={<Trans>The database the tables are created in or already exist in.</Trans>}
+        hint={<Trans>The database the tables are created in or already exist in</Trans>}
         error={errorOf(form, "clickhouse.database")}
         refusal={refusal}
         pointer="/clickhouse/database"
@@ -460,8 +460,7 @@ function ClickHouseFields({ form, refusal, editing }: KindFieldsProps & { editin
         label={<Trans>Table prefix</Trans>}
         hint={
           <Trans>
-            Every table name starts with this, such as flagnetic_exposures. The default is
-            flagnetic.
+            Every table name starts with this, such as flagnetic_exposures; the default is flagnetic
           </Trans>
         }
         error={errorOf(form, "clickhouse.table_prefix")}
@@ -477,7 +476,7 @@ function ClickHouseFields({ form, refusal, editing }: KindFieldsProps & { editin
       </Field>
       <Field
         label={<Trans>Username</Trans>}
-        hint={<Trans>The user that inserts the events.</Trans>}
+        hint={<Trans>The user that inserts the events</Trans>}
         error={errorOf(form, "clickhouse.username")}
         refusal={refusal}
         pointer="/clickhouse/username"
@@ -506,8 +505,8 @@ function ClickHouseFields({ form, refusal, editing }: KindFieldsProps & { editin
             label={<Trans>Skip TLS verification</Trans>}
             hint={
               <Trans>
-                Accept any certificate of the server. Use it only for a server with a self-signed
-                certificate you trust.
+                Accept any certificate of the server; use it only for a server with a self-signed
+                certificate you trust
               </Trans>
             }
             checked={field.value}
@@ -523,8 +522,8 @@ function ClickHouseFields({ form, refusal, editing }: KindFieldsProps & { editin
             label={<Trans>Create tables</Trans>}
             hint={
               <Trans>
-                Create the tables when the sink is enabled. Turn it off to bring tables you made
-                yourself.
+                Create the tables when the sink is enabled; turn it off to bring tables you made
+                yourself
               </Trans>
             }
             checked={field.value}
@@ -540,7 +539,7 @@ function ClickHouseFields({ form, refusal, editing }: KindFieldsProps & { editin
         legend={<Trans>Settings</Trans>}
         hint={
           <Trans>
-            ClickHouse settings sent with every insert. The ones delivery sets itself are refused.
+            ClickHouse settings sent with every insert; the ones delivery sets itself are refused
           </Trans>
         }
         nameLabel={t`Setting name`}
@@ -572,7 +571,7 @@ function ObjectStorageFields({ form, refusal, editing }: KindFieldsProps & { edi
         label={<Trans>Endpoint</Trans>}
         hint={
           <Trans>
-            A scheme, a host and a port, such as https://s3.example.com. Leave empty for AWS S3.
+            A scheme, a host and a port, such as https://s3.example.com; leave empty for AWS S3
           </Trans>
         }
         error={errorOf(form, "object_storage.endpoint")}
@@ -583,7 +582,7 @@ function ObjectStorageFields({ form, refusal, editing }: KindFieldsProps & { edi
       </Field>
       <Field
         label={<Trans>Region</Trans>}
-        hint={<Trans>Leave empty to ask the bucket.</Trans>}
+        hint={<Trans>Leave empty to ask the bucket</Trans>}
         error={errorOf(form, "object_storage.region")}
         refusal={refusal}
         pointer="/object_storage/region"
@@ -602,7 +601,7 @@ function ObjectStorageFields({ form, refusal, editing }: KindFieldsProps & { edi
         label={<Trans>Prefix</Trans>}
         hint={
           <Trans>
-            A folder in the bucket the files are written under, without slashes at either end.
+            A folder in the bucket the files are written under, without slashes at either end
           </Trans>
         }
         error={errorOf(form, "object_storage.prefix")}
@@ -642,7 +641,7 @@ function ObjectStorageFields({ form, refusal, editing }: KindFieldsProps & { edi
             hint={
               <Trans>
                 Address the bucket in the path rather than the host name, which most S3-compatible
-                services other than AWS need.
+                services other than AWS need
               </Trans>
             }
             checked={field.value}
@@ -656,7 +655,7 @@ function ObjectStorageFields({ form, refusal, editing }: KindFieldsProps & { edi
         render={({ field }) => (
           <Field
             label={<Trans context="file format">Format</Trans>}
-            hint={<Trans>One file per batch.</Trans>}
+            hint={<Trans>One file per batch</Trans>}
             refusal={refusal}
             pointer="/object_storage/format"
           >
@@ -678,7 +677,7 @@ function ObjectStorageFields({ form, refusal, editing }: KindFieldsProps & { edi
           render={({ field }) => (
             <Field
               label={<Trans>Compression</Trans>}
-              hint={<Trans>Parquet files are always compressed with zstd.</Trans>}
+              hint={<Trans>Parquet files are always compressed with zstd</Trans>}
               refusal={refusal}
               pointer="/object_storage/compression"
             >
@@ -703,12 +702,8 @@ function WebhookFields({ form, refusal }: KindFieldsProps) {
     <>
       <Field
         label={<Trans>URL</Trans>}
-        hint={
-          <Trans>
-            Where every batch is posted, signed with the sink's secret. The secret is shown once,
-            when the sink is created.
-          </Trans>
-        }
+        hint={<Trans>Where every batch is posted, signed with the sink's secret</Trans>}
+        details={<Trans>The secret is shown once, when the sink is created.</Trans>}
         error={errorOf(form, "webhook.url")}
         refusal={refusal}
         pointer="/webhook/url"
@@ -723,8 +718,7 @@ function WebhookFields({ form, refusal }: KindFieldsProps) {
         legend={<Trans>Headers</Trans>}
         hint={
           <Trans>
-            Sent with every call, before the platform's own. Names starting X-Flagnetic- are
-            refused.
+            Sent with every call, before the platform's own; names starting X-Flagnetic- are refused
           </Trans>
         }
         nameLabel={t`Header name`}
@@ -837,10 +831,10 @@ function BatchingFields({
         hint={
           defaults.maxBatchSize ? (
             <Trans>
-              The most events one delivery carries, at most {maxBatch}. Empty for the default.
+              The most events one delivery carries, at most {maxBatch}; empty for the default
             </Trans>
           ) : (
-            <Trans>The most events one delivery carries. Empty for the default.</Trans>
+            <Trans>The most events one delivery carries; empty for the default</Trans>
           )
         }
         error={errors.batch_size?.message}
@@ -860,14 +854,11 @@ function BatchingFields({
         hint={
           defaults.flush ? (
             <Trans>
-              How long the sink waits between deliveries once it has caught up, from {flushFrom} to{" "}
-              {flushTo}. Empty for the default.
+              Wait between deliveries once caught up, from {flushFrom} to {flushTo}; empty for the
+              default
             </Trans>
           ) : (
-            <Trans>
-              How long the sink waits between deliveries once it has caught up. Empty for the
-              default.
-            </Trans>
+            <Trans>Wait between deliveries once caught up; empty for the default</Trans>
           )
         }
         error={errors.flush_interval?.message}

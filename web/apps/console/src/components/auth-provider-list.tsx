@@ -117,12 +117,6 @@ export function AuthProviderList() {
     <Page>
       <PageHeader
         title={t`Auth providers`}
-        description={
-          <Trans>
-            The identity providers members sign in through. Each is offered on the sign-in page and
-            vouches only for the email domains you give it.
-          </Trans>
-        }
         actions={(providers.data?.length ?? 0) > 0 ? newProvider : undefined}
       />
       {providers.isError ? (

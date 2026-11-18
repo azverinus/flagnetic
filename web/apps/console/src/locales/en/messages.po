@@ -343,6 +343,10 @@ msgstr "{name} is not signed in anywhere."
 msgid "{name} is protected, so reverting its configuration to version {proposedVersion} goes through a change request. What it proposes is that version, as it was; nobody edits it."
 msgstr "{name} is protected, so reverting its configuration to version {proposedVersion} goes through a change request. What it proposes is that version, as it was; nobody edits it."
 
+#: src/components/kill-switch-dialog.tsx
+msgid "{name} is protected; the kill switch skips the change request it would need"
+msgstr "{name} is protected; the kill switch skips the change request it would need"
+
 #: src/components/flag-on-off.tsx
 msgid "{name} is protected: switching {key} off there goes through a change request."
 msgstr "{name} is protected: switching {key} off there goes through a change request."
@@ -354,10 +358,6 @@ msgstr "{name} is protected: switching {key} on there goes through a change requ
 #: src/components/environment-protection.tsx
 msgid "{name} is protected."
 msgstr "{name} is protected."
-
-#: src/components/kill-switch-dialog.tsx
-msgid "{name} is protected. The kill switch skips the change request it would need."
-msgstr "{name} is protected. The kill switch skips the change request it would need."
 
 #: src/components/member-actions.tsx
 msgid "{name} is reactivated."
@@ -563,16 +563,12 @@ msgid "A chain of prerequisites has at most 5 steps."
 msgstr "A chain of prerequisites has at most 5 steps."
 
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
-msgid "A change request proposes a change for review; once a member who did not write it approves it, it can be applied."
-msgstr "A change request proposes a change for review; once a member who did not write it approves it, it can be applied."
-
-#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "A change to a protected environment is proposed as a change request from the flag's configuration."
 msgstr "A change to a protected environment is proposed as a change request from the flag's configuration."
 
 #: src/components/environment-protection.tsx
-msgid "A change to what SDKs receive from a protected environment goes through a change request that someone else approves. The kill switch and import skip it."
-msgstr "A change to what SDKs receive from a protected environment goes through a change request that someone else approves. The kill switch and import skip it."
+msgid "A change to what SDKs receive from a protected environment goes through a change request that someone else approves"
+msgstr "A change to what SDKs receive from a protected environment goes through a change request that someone else approves"
 
 #: src/components/rule-editor.tsx
 msgid "A configuration has at most {maxRulesText} rules."
@@ -583,20 +579,12 @@ msgid "A copy of every audit entry of the project, so each change is sent twice 
 msgstr "A copy of every audit entry of the project, so each change is sent twice when it is chosen with the types above."
 
 #: src/components/webhook-editor.tsx
-msgid "A disabled subscription is sent nothing until it is enabled again."
-msgstr "A disabled subscription is sent nothing until it is enabled again."
+msgid "A disabled subscription is sent nothing until it is enabled again"
+msgstr "A disabled subscription is sent nothing until it is enabled again"
 
 #: src/components/webhook-detail.tsx
 msgid "A disabled webhook is sent nothing."
 msgstr "A disabled webhook is sent nothing."
-
-#: src/components/saml-provider-form.tsx
-msgid "A first sign-in whose email is in the domains above is linked to the existing member with that email. Anyone who controls such an address at the identity provider then signs in as that member, so turn it on only for a provider you trust with these domains."
-msgstr "A first sign-in whose email is in the domains above is linked to the existing member with that email. Anyone who controls such an address at the identity provider then signs in as that member, so turn it on only for a provider you trust with these domains."
-
-#: src/components/auth-provider-form.tsx
-msgid "A first sign-in whose verified email is in the domains above is linked to the existing member with that email. Anyone who controls such an address at the provider then signs in as that member, so turn it on only for a provider you trust with these domains."
-msgstr "A first sign-in whose verified email is in the domains above is linked to the existing member with that email. Anyone who controls such an address at the provider then signs in as that member, so turn it on only for a provider you trust with these domains."
 
 #: src/lib/conditions.ts
 #: src/lib/configuration-draft.ts
@@ -612,28 +600,28 @@ msgid "A flag shows up here once it outlives its expected removal, stops being e
 msgstr "A flag shows up here once it outlives its expected removal, stops being evaluated, loses its owner, finishes its rollout or keeps an overdue experiment."
 
 #: src/components/sink-editor.tsx
-msgid "A folder in the bucket the files are written under, without slashes at either end."
-msgstr "A folder in the bucket the files are written under, without slashes at either end."
+msgid "A folder in the bucket the files are written under, without slashes at either end"
+msgstr "A folder in the bucket the files are written under, without slashes at either end"
 
 #: src/lib/problem-messages.ts
 msgid "A header has a name of letters, digits and symbols without spaces, and a value on one line."
 msgstr "A header has a name of letters, digits and symbols without spaces, and a value on one line."
 
 #: src/components/create-from-document.tsx
-msgid "A JSON or YAML file, such as an export of a project of this or another instance."
-msgstr "A JSON or YAML file, such as an export of a project of this or another instance."
+msgid "A JSON or YAML file, such as an export of a project of this or another instance"
+msgstr "A JSON or YAML file, such as an export of a project of this or another instance"
 
 #: src/components/import-project.tsx
-msgid "A JSON or YAML file, such as an export of this or another project."
-msgstr "A JSON or YAML file, such as an export of this or another project."
+msgid "A JSON or YAML file, such as an export of this or another project"
+msgstr "A JSON or YAML file, such as an export of this or another project"
 
 #: src/lib/problem-messages.ts
 msgid "A key never changes once it is set."
 msgstr "A key never changes once it is set."
 
 #: src/components/auth-settings-form.tsx
-msgid "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
-msgstr "A member who forgot their password asks for a password reset by mail from the sign-in page. It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
+msgid "A member who forgot their password asks for a password reset by mail from the sign-in page"
+msgstr "A member who forgot their password asks for a password reset by mail from the sign-in page"
 
 #: src/components/experiments-panel.tsx
 #: src/components/flags-panel.tsx
@@ -690,8 +678,8 @@ msgid "A new sink is disabled and delivers nothing until it is enabled. Saving i
 msgstr "A new sink is disabled and delivers nothing until it is enabled. Saving is never held back by its target."
 
 #: src/components/mail-settings.tsx
-msgid "A password is stored and never shown again. Leave this empty to keep it, or type a new one to replace it. Changing the host, port, security or username needs it again. Clearing the username removes both."
-msgstr "A password is stored and never shown again. Leave this empty to keep it, or type a new one to replace it. Changing the host, port, security or username needs it again. Clearing the username removes both."
+msgid "A password is stored and never shown again; leave it empty to keep it"
+msgstr "A password is stored and never shown again; leave it empty to keep it"
 
 #: src/lib/problem-messages.ts
 msgid "A password needs a username."
@@ -784,8 +772,8 @@ msgid "A running experiment's traffic allocation can only grow."
 msgstr "A running experiment's traffic allocation can only grow."
 
 #: src/components/sink-editor.tsx
-msgid "A scheme, a host and a port, such as https://s3.example.com. Leave empty for AWS S3."
-msgstr "A scheme, a host and a port, such as https://s3.example.com. Leave empty for AWS S3."
+msgid "A scheme, a host and a port, such as https://s3.example.com; leave empty for AWS S3"
+msgstr "A scheme, a host and a port, such as https://s3.example.com; leave empty for AWS S3"
 
 #: src/components/scim-tokens.tsx
 msgid "A SCIM token belongs to an auth provider, and there is none yet. Add an auth provider for your identity provider first."
@@ -796,8 +784,8 @@ msgid "A scope is a word without spaces."
 msgstr "A scope is a word without spaces."
 
 #: src/components/auth-provider-form.tsx
-msgid "A secret is stored and never shown again. Leave this empty to keep it, or type a new one to replace it. Changing the issuer or the client ID needs it again."
-msgstr "A secret is stored and never shown again. Leave this empty to keep it, or type a new one to replace it. Changing the issuer or the client ID needs it again."
+msgid "A secret is stored and never shown again; leave it empty to keep it"
+msgstr "A secret is stored and never shown again; leave it empty to keep it"
 
 #: src/components/segment-fields.tsx
 msgid "A segment compares declared attributes only; one without conditions holds every context."
@@ -812,8 +800,8 @@ msgid "A segment names a group of contexts once, for the rules of every flag."
 msgstr "A segment names a group of contexts once, for the rules of every flag."
 
 #: src/components/sdk-keys.tsx
-msgid "A server key is for a backend; a client key is for a browser or an app. It cannot be changed later."
-msgstr "A server key is for a backend; a client key is for a browser or an app. It cannot be changed later."
+msgid "A server key is for a backend; a client key is for a browser or an app; it cannot be changed later"
+msgstr "A server key is for a backend; a client key is for a browser or an app; it cannot be changed later"
 
 #: src/lib/problem-messages.ts
 msgid "A server key is never used from a browser, so it takes no origins."
@@ -824,24 +812,12 @@ msgid "A server key lets a backend SDK download this environment’s ruleset. A 
 msgstr "A server key lets a backend SDK download this environment’s ruleset. A client key lets a browser or app ask for the values served to one context, and can be limited to the origins it is used from. A key’s value is shown once, when it is created."
 
 #: src/components/auth-settings-form.tsx
-msgid "A session ends this long after it opened, however much it is used. Lowering it ends the sessions already older."
-msgstr "A session ends this long after it opened, however much it is used. Lowering it ends the sessions already older."
+msgid "A session ends this long after it opened, however much it is used"
+msgstr "A session ends this long after it opened, however much it is used"
 
 #: src/components/auth-settings-form.tsx
-msgid "A session ends this long after its last request."
-msgstr "A session ends this long after its last request."
-
-#: src/components/saml-provider-form.tsx
-msgid "A sign-in whose email is in the domains above and has no member yet creates one, active, who holds no access until a project grants them a role."
-msgstr "A sign-in whose email is in the domains above and has no member yet creates one, active, who holds no access until a project grants them a role."
-
-#: src/components/auth-provider-form.tsx
-msgid "A sign-in whose verified email is in the domains above and has no member yet creates one, active, who holds no access until a project grants them a role."
-msgstr "A sign-in whose verified email is in the domains above and has no member yet creates one, active, who holds no access until a project grants them a role."
-
-#: src/components/sink-list.tsx
-msgid "A sink keeps a copy of the project's raw events in your own warehouse, bucket or pipeline, so analysts never work on the platform's database."
-msgstr "A sink keeps a copy of the project's raw events in your own warehouse, bucket or pipeline, so analysts never work on the platform's database."
+msgid "A session ends this long after its last request"
+msgstr "A session ends this long after its last request"
 
 #: src/lib/problem-messages.ts
 msgid "A sink's kind cannot be changed. Create a new sink of the other kind."
@@ -851,18 +827,30 @@ msgstr "A sink's kind cannot be changed. Create a new sink of the other kind."
 msgid "A sink's kind is fixed when it is created."
 msgstr "A sink's kind is fixed when it is created."
 
+#: src/components/saml-provider-form.tsx
+msgid "A subdomain is not included. An email counts as verified, and linking and creating members apply, only inside these domains."
+msgstr "A subdomain is not included. An email counts as verified, and linking and creating members apply, only inside these domains."
+
+#: src/components/auth-provider-form.tsx
+msgid "A subdomain is not included. Linking and creating members apply to these emails only."
+msgstr "A subdomain is not included. Linking and creating members apply to these emails only."
+
 #: src/lib/experiments.ts
 #: src/lib/flags.ts
 msgid "A tag has at most 64 characters."
 msgstr "A tag has at most 64 characters."
 
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-msgid "A temporary flag is meant to be removed once its change is released; a permanent one stays."
-msgstr "A temporary flag is meant to be removed once its change is released; a permanent one stays."
+msgid "A temporary flag is meant to be removed once its change is released; a permanent one stays"
+msgstr "A temporary flag is meant to be removed once its change is released; a permanent one stays"
 
 #: src/lib/stale-flags.ts
 msgid "A temporary flag past the date it was expected to be removed by."
 msgstr "A temporary flag past the date it was expected to be removed by."
+
+#: src/components/scim-tokens.tsx
+msgid "A token belongs to one auth provider for life and reaches only that provider's members and groups."
+msgstr "A token belongs to one auth provider for life and reaches only that provider's members and groups."
 
 #: src/lib/problem-messages.ts
 msgid "A token cannot carry a scope you do not hold yourself."
@@ -905,10 +893,6 @@ msgstr "A value, then Enter"
 msgid "A variation pinned for one unit, checked before any rule. An override is saved as soon as it is added or removed."
 msgstr "A variation pinned for one unit, checked before any rule. An override is saved as soon as it is added or removed."
 
-#: src/components/webhook-list.tsx
-msgid "A webhook posts the events you choose to a URL, signed with its secret, retried when the receiver fails, and logged."
-msgstr "A webhook posts the events you choose to a URL, signed with its secret, retried when the receiver fails, and logged."
-
 #: src/components/scim-tokens.tsx
 #: src/components/token-create-form.tsx
 msgid "A year"
@@ -919,8 +903,8 @@ msgid "About {key}"
 msgstr "About {key}"
 
 #: src/components/sink-editor.tsx
-msgid "Accept any certificate of the server. Use it only for a server with a self-signed certificate you trust."
-msgstr "Accept any certificate of the server. Use it only for a server with a self-signed certificate you trust."
+msgid "Accept any certificate of the server; use it only for a server with a self-signed certificate you trust"
+msgstr "Accept any certificate of the server; use it only for a server with a self-signed certificate you trust"
 
 #: src/components/invitation-acceptance.tsx
 msgid "Accept invitation"
@@ -1094,8 +1078,8 @@ msgid "Added by"
 msgstr "Added by"
 
 #: src/components/sink-editor.tsx
-msgid "Address the bucket in the path rather than the host name, which most S3-compatible services other than AWS need."
-msgstr "Address the bucket in the path rather than the host name, which most S3-compatible services other than AWS need."
+msgid "Address the bucket in the path rather than the host name, which most S3-compatible services other than AWS need"
+msgstr "Address the bucket in the path rather than the host name, which most S3-compatible services other than AWS need"
 
 #: src/lib/personal-tokens.ts
 msgid "Administer projects: environments, members and tokens."
@@ -1110,8 +1094,8 @@ msgid "After"
 msgstr "After"
 
 #: src/components/scim-tokens.tsx
-msgid "After this the identity provider is refused until it gets a new token."
-msgstr "After this the identity provider is refused until it gets a new token."
+msgid "After this the identity provider is refused until it gets a new token"
+msgstr "After this the identity provider is refused until it gets a new token"
 
 #: src/components/experiment-alerts.tsx
 msgid "Alert"
@@ -1290,6 +1274,14 @@ msgstr "Any type"
 msgid "Anyone allowed to edit flags can change what SDKs receive from {name} directly, with no review. SDKs honour local overrides there again."
 msgstr "Anyone allowed to edit flags can change what SDKs receive from {name} directly, with no review. SDKs honour local overrides there again."
 
+#: src/components/saml-provider-form.tsx
+msgid "Anyone who controls such an address at the identity provider then signs in as that member, so turn it on only for a provider you trust with these domains."
+msgstr "Anyone who controls such an address at the identity provider then signs in as that member, so turn it on only for a provider you trust with these domains."
+
+#: src/components/auth-provider-form.tsx
+msgid "Anyone who controls such an address at the provider then signs in as that member, so turn it on only for a provider you trust with these domains."
+msgstr "Anyone who controls such an address at the provider then signs in as that member, so turn it on only for a provider you trust with these domains."
+
 #. A kind of actor in the audit log.
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
@@ -1407,6 +1399,10 @@ msgstr "Archived"
 msgid "Archived experiments included"
 msgstr "Archived experiments included"
 
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
+msgid "Archived flags are never listed."
+msgstr "Archived flags are never listed."
+
 #: src/components/structural-diff-view.tsx
 msgid "Archived."
 msgstr "Archived."
@@ -1438,8 +1434,8 @@ msgstr "at its scheduled time"
 #: src/components/invitation-acceptance.tsx
 #: src/components/password-form.tsx
 #: src/components/password-reset-completion.tsx
-msgid "At least 12 characters, or as many as this instance asks for. Length is what makes a password hard to guess."
-msgstr "At least 12 characters, or as many as this instance asks for. Length is what makes a password hard to guess."
+msgid "At least 12 characters, or as many as this instance asks for"
+msgstr "At least 12 characters, or as many as this instance asks for"
 
 #: src/lib/experiments.ts
 #: src/lib/problem-messages.ts
@@ -2132,8 +2128,8 @@ msgid "ClickHouse query"
 msgstr "ClickHouse query"
 
 #: src/components/sink-editor.tsx
-msgid "ClickHouse settings sent with every insert. The ones delivery sets itself are refused."
-msgstr "ClickHouse settings sent with every insert. The ones delivery sets itself are refused."
+msgid "ClickHouse settings sent with every insert; the ones delivery sets itself are refused"
+msgstr "ClickHouse settings sent with every insert; the ones delivery sets itself are refused"
 
 #: src/lib/sdk-keys.ts
 msgid "Client"
@@ -2353,6 +2349,14 @@ msgstr "Copy the change request"
 msgid "Could not be read"
 msgstr "Could not be read"
 
+#: src/components/saml-provider-form.tsx
+msgid "Create an active member on a first sign-in from the domains above"
+msgstr "Create an active member on a first sign-in from the domains above"
+
+#: src/components/auth-provider-form.tsx
+msgid "Create an active member on a first sign-in with a verified email from the domains above"
+msgstr "Create an active member on a first sign-in with a verified email from the domains above"
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Create attribute"
 msgstr "Create attribute"
@@ -2415,8 +2419,8 @@ msgid "Create the first project to start declaring what it serves."
 msgstr "Create the first project to start declaring what it serves."
 
 #: src/components/sink-editor.tsx
-msgid "Create the tables when the sink is enabled. Turn it off to bring tables you made yourself."
-msgstr "Create the tables when the sink is enabled. Turn it off to bring tables you made yourself."
+msgid "Create the tables when the sink is enabled; turn it off to bring tables you made yourself"
+msgstr "Create the tables when the sink is enabled; turn it off to bring tables you made yourself"
 
 #: src/components/scim-tokens.tsx
 #: src/components/token-create-form.tsx
@@ -2704,6 +2708,11 @@ msgstr "Description changed."
 msgid "Details"
 msgstr "Details"
 
+#: src/components/ui/details.tsx
+msgctxt "disclosure"
+msgid "Details"
+msgstr "Details"
+
 #. The name of a built-in role.
 #: src/lib/access-names.ts
 msgid "Developer"
@@ -2889,10 +2898,6 @@ msgstr "Dropped"
 msgid "Each event kind gets a stream once the sink is enabled."
 msgstr "Each event kind gets a stream once the sink is enabled."
 
-#: src/routes/_signed-in/projects/$project/experiments/index.tsx
-msgid "Each experiment compares variations of one flag over the units of one unit type; a flag's rule serves it in the environments that hold it."
-msgstr "Each experiment compares variations of one flag over the units of one unit type; a flag's rule serves it in the environments that hold it."
-
 #: src/components/firebase-wizard.tsx
 msgid "Each Firebase condition becomes one rule per alternative, in the template's order. A condition the server cannot reproduce is skipped, and said so."
 msgstr "Each Firebase condition becomes one rule per alternative, in the template's order. A condition the server cannot reproduce is skipped, and said so."
@@ -2985,8 +2990,8 @@ msgid "Email claim"
 msgstr "Email claim"
 
 #: src/components/experiment-transitions.tsx
-msgid "Empty clears it."
-msgstr "Empty clears it."
+msgid "Empty clears it"
+msgstr "Empty clears it"
 
 #: src/components/tester-panel.tsx
 msgid "Empty context"
@@ -3474,13 +3479,9 @@ msgstr "Every batch carries a signature made with this secret, which the receive
 msgid "Every call carries a signature made with this secret, which the receiver checks to know the event came from here."
 msgstr "Every call carries a signature made with this secret, which the receiver checks to know the event came from here."
 
-#: src/routes/_signed-in/projects/$project/audit.tsx
-msgid "Every change made in this project, newest first, with its values before and after."
-msgstr "Every change made in this project, newest first, with its values before and after."
-
 #: src/routes/_signed-in/admin/audit.tsx
-msgid "Every change on this instance, in every project and outside them, such as members, sign-ins and settings."
-msgstr "Every change on this instance, in every project and outside them, such as members, sign-ins and settings."
+msgid "Every change on this instance, in every project and outside them."
+msgstr "Every change on this instance, in every project and outside them."
 
 #: src/components/firebase-wizard.tsx
 msgid "every context"
@@ -3527,17 +3528,17 @@ msgstr "Every event"
 msgid "Every event and every audit entry"
 msgstr "Every event and every audit entry"
 
-#: src/routes/_signed-in/projects/$project/flags/index.tsx
-msgid "Every flag exists in every environment of the project, each environment serving it by its own configuration."
-msgstr "Every flag exists in every environment of the project, each environment serving it by its own configuration."
-
 #: src/components/flag-evaluations.tsx
 msgid "Every flag of every remote evaluation the server answered, whether the application reads the flag or not."
 msgstr "Every flag of every remote evaluation the server answered, whether the application reads the flag or not."
 
 #: src/components/auth-settings-form.tsx
-msgid "Every new API token must have an expiry; none may live forever."
-msgstr "Every new API token must have an expiry; none may live forever."
+msgid "Every new API token must have an expiry; none may live forever"
+msgstr "Every new API token must have an expiry; none may live forever"
+
+#: src/routes/_signed-in/admin/auth-settings.tsx
+msgid "Every replica of the instance applies a change within a second."
+msgstr "Every replica of the instance applies a change within a second."
 
 #: src/components/sdk-keys.tsx
 msgid "Every SDK using the key {keyId} is refused at once, even within a rotation overlap. This cannot be undone."
@@ -3548,8 +3549,8 @@ msgid "Every status"
 msgstr "Every status"
 
 #: src/components/sink-editor.tsx
-msgid "Every table name starts with this, such as flagnetic_exposures. The default is flagnetic."
-msgstr "Every table name starts with this, such as flagnetic_exposures. The default is flagnetic."
+msgid "Every table name starts with this, such as flagnetic_exposures; the default is flagnetic"
+msgstr "Every table name starts with this, such as flagnetic_exposures; the default is flagnetic"
 
 #: src/components/webhook-editor.tsx
 msgid "Every type below, and any added later. Audit entries are chosen apart."
@@ -3563,13 +3564,9 @@ msgstr "Every unit is bucketed afresh: units now in the rollout may fall out of 
 msgid "Everyone receives the off variation in {name}, whatever the rules and overrides say. Switching the flag back on is an ordinary configuration change."
 msgstr "Everyone receives the off variation in {name}, whatever the rules and overrides say. Switching the flag back on is an ordinary configuration change."
 
-#: src/routes/_signed-in/admin/members/index.tsx
-msgid "Everyone who can sign in to this instance. What they may do in a project comes from their grants there."
-msgstr "Everyone who can sign in to this instance. What they may do in a project comes from their grants there."
-
 #: src/components/enforced-domains-field.tsx
-msgid "Everyone with an email address in an enforced domain signs in through its provider only: no password, no other provider, and the sign-in page sends the address to the provider. A domain is offered once an enabled auth provider lists it among its domains. Instance admins are not exempt."
-msgstr "Everyone with an email address in an enforced domain signs in through its provider only: no password, no other provider, and the sign-in page sends the address to the provider. A domain is offered once an enabled auth provider lists it among its domains. Instance admins are not exempt."
+msgid "Everyone with an email address in an enforced domain signs in through its provider only"
+msgstr "Everyone with an email address in an enforced domain signs in through its provider only"
 
 #: src/components/delete-project.tsx
 msgid "Everything in the project is deleted at once, its SDK keys stop working, and this cannot be undone."
@@ -3817,8 +3814,8 @@ msgid "Finished rollout"
 msgstr "Finished rollout"
 
 #: src/components/firebase-wizard.tsx
-msgid "Firebase's percent conditions become rollouts that bucket this unit type."
-msgstr "Firebase's percent conditions become rollouts that bucket this unit type."
+msgid "Firebase's percent conditions become rollouts that bucket this unit type"
+msgstr "Firebase's percent conditions become rollouts that bucket this unit type"
 
 #: src/components/experiment-exposures.tsx
 msgid "First exposed to"
@@ -3841,12 +3838,12 @@ msgstr "Fix what is marked above before saving."
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
-msgid "Fixed once declared."
-msgstr "Fixed once declared."
+msgid "Fixed once declared"
+msgstr "Fixed once declared"
 
 #: src/routes/_signed-in/projects/$project/settings.tsx
-msgid "Fixed once the project is created, since SDKs and scripts use it."
-msgstr "Fixed once the project is created, since SDKs and scripts use it."
+msgid "Fixed once the project is created, since SDKs and scripts use it"
+msgstr "Fixed once the project is created, since SDKs and scripts use it"
 
 #. A kind of entity in the audit log.
 #: src/components/change-requests-panel.tsx
@@ -3926,10 +3923,6 @@ msgstr "Flags"
 msgid "Flags and rules"
 msgstr "Flags and rules"
 
-#: src/routes/_signed-in/projects/$project/stale-flags.tsx
-msgid "Flags that may be ready to leave the code: each one with why it is stale. Archived flags are never listed."
-msgstr "Flags that may be ready to leave the code: each one with why it is stale. Archived flags are never listed."
-
 #: src/components/prerequisites-section.tsx
 msgid "Flags that must serve a variation for this flag to be evaluated here; otherwise it serves its off variation."
 msgstr "Flags that must serve a variation for this flag to be evaluated here; otherwise it serves its off variation."
@@ -3942,6 +3935,14 @@ msgstr "Flush interval (seconds)"
 #: src/components/profile-form.tsx
 msgid "Follow the browser"
 msgstr "Follow the browser"
+
+#: src/components/profile-form.tsx
+msgid "Following the browser uses the first of its languages the console offers."
+msgstr "Following the browser uses the first of its languages the console offers."
+
+#: src/components/saml-provider-form.tsx
+msgid "For an identity provider that checks them against the certificate in the SP metadata."
+msgstr "For an identity provider that checks them against the certificate in the SP metadata."
 
 #: src/components/password-reset-request.tsx
 #: src/components/sign-in-form.tsx
@@ -4166,36 +4167,24 @@ msgid "Host"
 msgstr "Host"
 
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-msgid "How code names the flag, such as checkout.newFlow: letters, digits, ., - and _. It never changes."
-msgstr "How code names the flag, such as checkout.newFlow: letters, digits, ., - and _. It never changes."
-
-#: src/routes/_signed-in/admin/auth-settings.tsx
-msgid "How long sessions last, how long API tokens may live, how long passwords must be, whether members reset a forgotten password by mail, whether they sign in with a password at all, and which email domains sign in through one auth provider only. Every replica of the instance applies a change within a second."
-msgstr "How long sessions last, how long API tokens may live, how long passwords must be, whether members reset a forgotten password by mail, whether they sign in with a password at all, and which email domains sign in through one auth provider only. Every replica of the instance applies a change within a second."
-
-#: src/components/sink-editor.tsx
-msgid "How long the sink waits between deliveries once it has caught up, from {flushFrom} to {flushTo}. Empty for the default."
-msgstr "How long the sink waits between deliveries once it has caught up, from {flushFrom} to {flushTo}. Empty for the default."
-
-#: src/components/sink-editor.tsx
-msgid "How long the sink waits between deliveries once it has caught up. Empty for the default."
-msgstr "How long the sink waits between deliveries once it has caught up. Empty for the default."
+msgid "How code names the flag, such as checkout.newFlow: letters, digits, ., - and _; it never changes"
+msgstr "How code names the flag, such as checkout.newFlow: letters, digits, ., - and _; it never changes"
 
 #: src/lib/sinks.ts
 msgid "How often SDKs and remote evaluation served each variation."
 msgstr "How often SDKs and remote evaluation served each variation."
 
 #: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
-msgid "How rules name the segment. It never changes."
-msgstr "How rules name the segment. It never changes."
+msgid "How rules name the segment; it never changes"
+msgstr "How rules name the segment; it never changes"
 
 #: src/routes/_signed-in/admin/projects.tsx
-msgid "How SDKs and scripts name the project: lowercase letters, digits, - and _. It never changes."
-msgstr "How SDKs and scripts name the project: lowercase letters, digits, - and _. It never changes."
+msgid "How SDKs and scripts name the project: lowercase letters, digits, - and _; it never changes"
+msgstr "How SDKs and scripts name the project: lowercase letters, digits, - and _; it never changes"
 
 #: src/components/profile-form.tsx
-msgid "How the instance knows you. An instance admin can change it."
-msgstr "How the instance knows you. An instance admin can change it."
+msgid "How the instance knows you; an instance admin can change it"
+msgstr "How the instance knows you; an instance admin can change it"
 
 #: src/components/experiment-fields.tsx
 #: src/lib/experiment-transitions.ts
@@ -4277,16 +4266,16 @@ msgid "in the segment {segment}"
 msgstr "in the segment {segment}"
 
 #: src/components/flags-panel.tsx
-msgid "In what SDKs receive."
-msgstr "In what SDKs receive."
+msgid "In what SDKs receive"
+msgstr "In what SDKs receive"
 
 #: src/components/sink-recovery.tsx
-msgid "In your time zone, within the retention window."
-msgstr "In your time zone, within the retention window."
+msgid "In your time zone, within the retention window"
+msgstr "In your time zone, within the retention window"
 
 #: src/components/sink-actions.tsx
-msgid "In your time zone. A stream the sink already has keeps its place."
-msgstr "In your time zone. A stream the sink already has keeps its place."
+msgid "In your time zone; a stream the sink already has keeps its place"
+msgstr "In your time zone; a stream the sink already has keeps its place"
 
 #: src/components/firebase-wizard.tsx
 msgid "Include"
@@ -4519,6 +4508,10 @@ msgstr "It is still in use."
 msgid "It was superseded afterwards, so it is not applied. Copy it to propose it again."
 msgstr "It was superseded afterwards, so it is not applied. Copy it to propose it again."
 
+#: src/components/auth-settings-form.tsx
+msgid "It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
+msgstr "It works only while an SMTP server is configured under Mail in the instance navigation. An instance admin can issue a password reset link from a member's page either way."
+
 #: src/components/segment-fields.tsx
 msgid "Its conditions never leave the server: only server-side evaluation uses it, and a client SDK key never receives it."
 msgstr "Its conditions never leave the server: only server-side evaluation uses it, and a client SDK key never receives it."
@@ -4721,16 +4714,16 @@ msgid "Leave"
 msgstr "Leave"
 
 #: src/components/sink-editor.tsx
-msgid "Leave empty to ask the bucket."
-msgstr "Leave empty to ask the bucket."
+msgid "Leave empty to ask the bucket"
+msgstr "Leave empty to ask the bucket"
 
 #: src/components/sink-recovery.tsx
-msgid "Leave empty to replay on into the live stream."
-msgstr "Leave empty to replay on into the live stream."
+msgid "Leave empty to replay on into the live stream"
+msgstr "Leave empty to replay on into the live stream"
 
 #: src/components/mail-settings.tsx
-msgid "Leave empty when the server takes mail without signing in."
-msgstr "Leave empty when the server takes mail without signing in."
+msgid "Leave empty when the server takes mail without signing in"
+msgstr "Leave empty when the server takes mail without signing in"
 
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Leave without saving?"
@@ -4738,12 +4731,12 @@ msgstr "Leave without saving?"
 
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-msgid "Left empty, 90 days from today."
-msgstr "Left empty, 90 days from today."
+msgid "Left empty, 90 days from today"
+msgstr "Left empty, 90 days from today"
 
 #: src/components/experiment-transitions.tsx
-msgid "Left empty, it keeps “{sourceName}”."
-msgstr "Left empty, it keeps “{sourceName}”."
+msgid "Left empty, it keeps “{sourceName}”"
+msgstr "Left empty, it keeps “{sourceName}”"
 
 #: src/components/daily-chart.tsx
 msgid "Legend"
@@ -4784,6 +4777,14 @@ msgstr "Link"
 #: src/components/sign-in-methods.tsx
 msgid "Link {name}"
 msgstr "Link {name}"
+
+#: src/components/saml-provider-form.tsx
+msgid "Link a first sign-in from the domains above to the existing member with that email"
+msgstr "Link a first sign-in from the domains above to the existing member with that email"
+
+#: src/components/auth-provider-form.tsx
+msgid "Link a first sign-in with a verified email from the domains above to the existing member with that email"
+msgstr "Link a first sign-in with a verified email from the domains above to the existing member with that email"
 
 #: src/components/sign-in-methods.tsx
 msgid "Link a provider"
@@ -4856,8 +4857,12 @@ msgstr "Look up"
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
-msgid "Lowercase letters, digits, - and _. It never changes."
-msgstr "Lowercase letters, digits, - and _. It never changes."
+msgid "Lowercase letters, digits, - and _; it never changes"
+msgstr "Lowercase letters, digits, - and _; it never changes"
+
+#: src/components/auth-settings-form.tsx
+msgid "Lowering it ends the sessions already older."
+msgstr "Lowering it ends the sessions already older."
 
 #: src/lib/audit.ts
 msgid "Made an instance admin"
@@ -4950,8 +4955,8 @@ msgid "Maps to"
 msgstr "Maps to"
 
 #: src/components/group-mappings.tsx
-msgid "Matched exactly as the provider claims it, case included."
-msgstr "Matched exactly as the provider claims it, case included."
+msgid "Matched exactly as the provider claims it, case included"
+msgstr "Matched exactly as the provider claims it, case included"
 
 #: src/components/rule-editor.tsx
 msgid "Matched in the tester"
@@ -5048,8 +5053,8 @@ msgid "Members of the project"
 msgstr "Members of the project"
 
 #: src/components/auth-settings-form.tsx
-msgid "Members sign in with their email and password. Switching it off leaves auth providers as the only way in, so it is refused unless you hold an identity at an enabled provider yourself. If a provider breaks and nobody can sign in, run \"flagnetic admin unlock\" on the server: it switches local login back on and lifts every enforced domain."
-msgstr "Members sign in with their email and password. Switching it off leaves auth providers as the only way in, so it is refused unless you hold an identity at an enabled provider yourself. If a provider breaks and nobody can sign in, run \"flagnetic admin unlock\" on the server: it switches local login back on and lifts every enforced domain."
+msgid "Members sign in with their email and password"
+msgstr "Members sign in with their email and password"
 
 #: src/components/change-request-actions.tsx
 msgid "Members who may approve change requests can then approve or reject it. Its proposal can still be edited while it is open."
@@ -5068,8 +5073,8 @@ msgid "Merge"
 msgstr "Merge"
 
 #: src/components/import-project.tsx
-msgid "Merge creates or updates what the document names and leaves everything else alone."
-msgstr "Merge creates or updates what the document names and leaves everything else alone."
+msgid "Merge creates or updates what the document names and leaves everything else alone"
+msgstr "Merge creates or updates what the document names and leaves everything else alone"
 
 #: src/routes/_signed-in/projects/$project/import-export.tsx
 msgid "Merges a project document into this project, or replaces the project's configuration with it. You see everything it would create, update and delete before you apply it."
@@ -5199,16 +5204,16 @@ msgid "Name or email"
 msgstr "Name or email"
 
 #: src/components/experiment-fields.tsx
-msgid "Names the experiment in rules and in the exposures SDKs report: letters, digits, ., - and _. It never changes."
-msgstr "Names the experiment in rules and in the exposures SDKs report: letters, digits, ., - and _. It never changes."
+msgid "Names the experiment in rules and in the exposures SDKs report: letters, digits, ., - and _; it never changes"
+msgstr "Names the experiment in rules and in the exposures SDKs report: letters, digits, ., - and _; it never changes"
 
 #: src/components/auth-provider-form.tsx
-msgid "Names the provider in sign-in addresses and in the redirect URI. It never changes."
-msgstr "Names the provider in sign-in addresses and in the redirect URI. It never changes."
+msgid "Names the provider in sign-in addresses and in the redirect URI; it never changes"
+msgstr "Names the provider in sign-in addresses and in the redirect URI; it never changes"
 
 #: src/components/saml-provider-form.tsx
-msgid "Names the provider in sign-in addresses, in the ACS URL and in the entity ID. It never changes."
-msgstr "Names the provider in sign-in addresses, in the ACS URL and in the entity ID. It never changes."
+msgid "Names the provider in sign-in addresses, in the ACS URL and in the entity ID; it never changes"
+msgstr "Names the provider in sign-in addresses, in the ACS URL and in the entity ID; it never changes"
 
 #: src/components/experiments-panel.tsx
 #: src/components/needs-attention.tsx
@@ -5487,6 +5492,10 @@ msgstr "No overrides in this environment."
 msgid "No parameter uses it."
 msgstr "No parameter uses it."
 
+#: src/components/enforced-domains-field.tsx
+msgid "No password, no other provider, and the sign-in page sends the address to the provider. A domain is offered once an enabled auth provider lists it among its domains. Instance admins are not exempt."
+msgstr "No password, no other provider, and the sign-in page sends the address to the provider. A domain is offered once an enabled auth provider lists it among its domains. Instance admins are not exempt."
+
 #: src/components/prerequisites-section.tsx
 msgid "No prerequisites."
 msgstr "No prerequisites."
@@ -5725,8 +5734,8 @@ msgid "Nothing that a member edits changed."
 msgstr "Nothing that a member edits changed."
 
 #: src/components/experiment-transitions.tsx
-msgid "Now {current} %. It only grows: every unit included so far stays included."
-msgstr "Now {current} %. It only grows: every unit included so far stays included."
+msgid "Now {current} %; it only grows: every unit included so far stays included"
+msgstr "Now {current} %; it only grows: every unit included so far stays included"
 
 #. An attribute type.
 #: src/lib/attribute-types.ts
@@ -5767,8 +5776,8 @@ msgstr "Off variation changed from <0>{before}</0> to <1>{after}</1>."
 
 #: src/components/auth-provider-form.tsx
 #: src/components/saml-provider-form.tsx
-msgid "Offer the provider on the sign-in page now. Turn it off to test it first."
-msgstr "Offer the provider on the sign-in page now. Turn it off to test it first."
+msgid "Offer the provider on the sign-in page now; turn it off to test it first"
+msgstr "Offer the provider on the sign-in page now; turn it off to test it first"
 
 #: src/components/audit-log.tsx
 msgid "Older entries"
@@ -5790,8 +5799,8 @@ msgid "once approved"
 msgstr "once approved"
 
 #: src/components/sink-editor.tsx
-msgid "One file per batch."
-msgstr "One file per batch."
+msgid "One file per batch"
+msgstr "One file per batch"
 
 #: src/lib/problem-messages.ts
 msgid "One of the environments does not exist in this project."
@@ -5802,8 +5811,8 @@ msgid "One of the event types is not in the catalogue."
 msgstr "One of the event types is not in the catalogue."
 
 #: src/components/discovered-attributes.tsx
-msgid "One of the types SDKs sent it with."
-msgstr "One of the types SDKs sent it with."
+msgid "One of the types SDKs sent it with"
+msgstr "One of the types SDKs sent it with"
 
 #: src/lib/problem-messages.ts
 msgid "One with this key already exists."
@@ -5892,16 +5901,16 @@ msgid "Operator (condition {position})"
 msgstr "Operator (condition {position})"
 
 #: src/components/propose-dialog.tsx
-msgid "Optional, in your time zone: once approved, it is applied then. Left empty, it is applied by hand."
-msgstr "Optional, in your time zone: once approved, it is applied then. Left empty, it is applied by hand."
-
-#: src/components/change-request-actions.tsx
-msgid "Optional; the author and the audit log see it."
-msgstr "Optional; the author and the audit log see it."
+msgid "Optional, in your time zone: once approved, it is applied then; left empty, by hand"
+msgstr "Optional, in your time zone: once approved, it is applied then; left empty, by hand"
 
 #: src/components/invite-form.tsx
-msgid "Optional. Accepting the invitation grants the role you choose in this project."
-msgstr "Optional. Accepting the invitation grants the role you choose in this project."
+msgid "Optional; accepting the invitation grants the role you choose in this project"
+msgstr "Optional; accepting the invitation grants the role you choose in this project"
+
+#: src/components/change-request-actions.tsx
+msgid "Optional; the author and the audit log see it"
+msgstr "Optional; the author and the audit log see it"
 
 #: src/components/invitation-acceptance.tsx
 #: src/components/sign-in-form.tsx
@@ -6037,8 +6046,8 @@ msgid "Parquet"
 msgstr "Parquet"
 
 #: src/components/sink-editor.tsx
-msgid "Parquet files are always compressed with zstd."
-msgstr "Parquet files are always compressed with zstd."
+msgid "Parquet files are always compressed with zstd"
+msgstr "Parquet files are always compressed with zstd"
 
 #: src/components/compare-environments.tsx
 msgid "Part"
@@ -6073,6 +6082,10 @@ msgstr "Past expected end"
 #: src/lib/stale-flags.ts
 msgid "Past expected removal"
 msgstr "Past expected removal"
+
+#: src/components/saml-provider-form.tsx
+msgid "Paste a new document to replace it."
+msgstr "Paste a new document to replace it."
 
 #: src/lib/saml-providers.ts
 msgid "Paste the identity provider's metadata."
@@ -6136,6 +6149,11 @@ msgstr "Personal settings"
 msgid "PKCE methods"
 msgstr "PKCE methods"
 
+#: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
+msgid "Plain http is accepted only on a loopback address."
+msgstr "Plain http is accepted only on a loopback address."
+
 #: src/components/sdk-inventory.tsx
 msgid "Platform"
 msgstr "Platform"
@@ -6185,8 +6203,8 @@ msgstr "Prerequisites"
 #: src/components/experiment-fields.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-msgid "Press Enter after each tag."
-msgstr "Press Enter after each tag."
+msgid "Press Enter after each tag"
+msgstr "Press Enter after each tag"
 
 #: src/components/condition-row.tsx
 msgid "Press Enter after each value."
@@ -6460,12 +6478,12 @@ msgid "Recent contexts"
 msgstr "Recent contexts"
 
 #: src/components/kill-switch-dialog.tsx
-msgid "Recorded in the audit log."
-msgstr "Recorded in the audit log."
+msgid "Recorded in the audit log"
+msgstr "Recorded in the audit log"
 
 #: src/components/kill-switch-dialog.tsx
-msgid "Recorded in the audit log. Characters still needed: {missing}."
-msgstr "Recorded in the audit log. Characters still needed: {missing}."
+msgid "Recorded in the audit log; characters still needed: {missing}"
+msgstr "Recorded in the audit log; characters still needed: {missing}"
 
 #: src/components/sink-recovery.tsx
 #: src/components/webhook-delivery-sheet.tsx
@@ -6493,8 +6511,8 @@ msgid "Refresh"
 msgstr "Refresh"
 
 #: src/components/auth-provider-form.tsx
-msgid "Refuse a sign-in whose token does not say the email is verified. Turn it off only for a provider that does not send the claim and checks addresses itself."
-msgstr "Refuse a sign-in whose token does not say the email is verified. Turn it off only for a provider that does not send the claim and checks addresses itself."
+msgid "Refuse a sign-in whose token does not say the email is verified"
+msgstr "Refuse a sign-in whose token does not say the email is verified"
 
 #: src/components/experiment-exposures.tsx
 msgid "Refused exposures"
@@ -6664,8 +6682,8 @@ msgid "Replace"
 msgstr "Replace"
 
 #: src/components/import-project.tsx
-msgid "Replace makes the project's configuration equal to the document: what the document does not name is deleted, unless something still uses it."
-msgstr "Replace makes the project's configuration equal to the document: what the document does not name is deleted, unless something still uses it."
+msgid "Replace makes the configuration equal to the document, deleting what it does not name"
+msgstr "Replace makes the configuration equal to the document, deleting what it does not name"
 
 #: src/components/compare-environments.tsx
 msgid "Replace the overrides of {to} with those of {source}"
@@ -6715,8 +6733,8 @@ msgid "Required variation (prerequisite {position})"
 msgstr "Required variation (prerequisite {position})"
 
 #: src/components/change-request-actions.tsx
-msgid "Required; the author and the audit log see it."
-msgstr "Required; the author and the audit log see it."
+msgid "Required; the author and the audit log see it"
+msgstr "Required; the author and the audit log see it"
 
 #: src/lib/problem-messages.ts
 #: src/lib/sinks.ts
@@ -6758,10 +6776,6 @@ msgstr "Retention has dropped every row of this dead letter, so there is nothing
 #: src/components/sink-recovery.tsx
 msgid "Retention is about to drop events this sink has not delivered. Get it delivering again before they are gone, or replay them from a time still within retention."
 msgstr "Retention is about to drop events this sink has not delivered. Get it delivering again before they are gone, or replay them from a time still within retention."
-
-#: src/routes/_signed-in/projects/$project/segments/index.tsx
-msgid "Reusable sets of attribute conditions; a rule targets a segment by name and follows every change to it."
-msgstr "Reusable sets of attribute conditions; a rule targets a segment by name and follows every change to it."
 
 #: src/components/flag-history.tsx
 msgid "Revert"
@@ -7134,8 +7148,8 @@ msgid "SDKs receive the flag again, configured in every environment as it was le
 msgstr "SDKs receive the flag again, configured in every environment as it was left."
 
 #: src/components/flag-definition-sheet.tsx
-msgid "SDKs record an exposure after every evaluation whose result carries an experiment."
-msgstr "SDKs record an exposure after every evaluation whose result carries an experiment."
+msgid "SDKs record an exposure after every evaluation whose result carries an experiment"
+msgstr "SDKs record an exposure after every evaluation whose result carries an experiment"
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "SDKs stop receiving the flag in every environment and code falls back to its default. It can be restored later; refused while another flag requires it."
@@ -7265,20 +7279,20 @@ msgid "Sent"
 msgstr "Sent"
 
 #: src/components/sink-editor.tsx
-msgid "Sent with every call, before the platform's own. Names starting X-Flagnetic- are refused."
-msgstr "Sent with every call, before the platform's own. Names starting X-Flagnetic- are refused."
+msgid "Sent with every call, before the platform's own; names starting X-Flagnetic- are refused"
+msgstr "Sent with every call, before the platform's own; names starting X-Flagnetic- are refused"
 
 #: src/components/auth-provider-form.tsx
-msgid "Separated by spaces. The defaults read the email and the name."
-msgstr "Separated by spaces. The defaults read the email and the name."
+msgid "Separated by spaces; the defaults read the email and the name"
+msgstr "Separated by spaces; the defaults read the email and the name"
 
 #: src/components/configuration-editor.tsx
-msgid "Served while the flag is off, and when a prerequisite fails."
-msgstr "Served while the flag is off, and when a prerequisite fails."
+msgid "Served while the flag is off, and when a prerequisite fails"
+msgstr "Served while the flag is off, and when a prerequisite fails"
 
 #: src/components/configuration-editor.tsx
-msgid "Served while the flag is on and no rule matches."
-msgstr "Served while the flag is on and no rule matches."
+msgid "Served while the flag is on and no rule matches"
+msgstr "Served while the flag is on and no rule matches"
 
 #: src/lib/sdk-keys.ts
 msgid "Server"
@@ -7400,8 +7414,8 @@ msgid "Show as table"
 msgstr "Show as table"
 
 #: src/components/flags-panel.tsx
-msgid "Show flags stale for any of these reasons; none checked shows every stale flag."
-msgstr "Show flags stale for any of these reasons; none checked shows every stale flag."
+msgid "Show flags stale for any of these reasons; none checked shows every stale flag"
+msgstr "Show flags stale for any of these reasons; none checked shows every stale flag"
 
 #: src/components/group-mappings.tsx
 msgid "Show the current mappings"
@@ -7448,8 +7462,8 @@ msgid "Sign out and sign in again, then link the provider."
 msgstr "Sign out and sign in again, then link the provider."
 
 #: src/components/saml-provider-form.tsx
-msgid "Sign the requests the instance sends with its current key, for an identity provider that checks them against the certificate in the SP metadata."
-msgstr "Sign the requests the instance sends with its current key, for an identity provider that checks them against the certificate in the SP metadata."
+msgid "Sign the requests the instance sends with its current key"
+msgstr "Sign the requests the instance sends with its current key"
 
 #: src/components/member-credentials.tsx
 msgid "Sign yourself out everywhere"
@@ -7583,6 +7597,10 @@ msgstr "Someone saved this configuration after this draft was loaded."
 msgid "Someone without an account here joins the instance through the invitation, and accepting it grants them the role. A member of the instance is granted a role instead."
 msgstr "Someone without an account here joins the instance through the invitation, and accepting it grants them the role. A member of the instance is granted a role instead."
 
+#: src/components/import-project.tsx
+msgid "Something that is still in use is not deleted."
+msgstr "Something that is still in use is not deleted."
+
 #: src/lib/problem-messages.ts
 msgid "Something went wrong on the server."
 msgstr "Something went wrong on the server."
@@ -7688,8 +7706,8 @@ msgid "starts with"
 msgstr "starts with"
 
 #: src/components/mail-settings.tsx
-msgid "STARTTLS and TLS need TLS 1.2 or later and verify the server's certificate. With none, nothing is encrypted, and a username and password are sent only to a server on this machine."
-msgstr "STARTTLS and TLS need TLS 1.2 or later and verify the server's certificate. With none, nothing is encrypted, and a username and password are sent only to a server on this machine."
+msgid "STARTTLS and TLS verify the server's certificate and need TLS 1.2 or later"
+msgstr "STARTTLS and TLS verify the server's certificate and need TLS 1.2 or later"
 
 #: src/components/mail-settings.tsx
 msgid "STARTTLS, usually port 587"
@@ -7787,8 +7805,8 @@ msgstr "Stops the experiment and ships the winner <0>{winner}</0>."
 
 #: src/components/auth-provider-form.tsx
 #: src/components/mail-settings.tsx
-msgid "Stored encrypted and never shown again."
-msgstr "Stored encrypted and never shown again."
+msgid "Stored encrypted and never shown again"
+msgstr "Stored encrypted and never shown again"
 
 #: src/components/sink-editor.tsx
 msgid "Stored sealed and never shown again."
@@ -7850,6 +7868,10 @@ msgstr "Switched on"
 #: src/components/structural-diff-view.tsx
 msgid "Switched on."
 msgstr "Switched on."
+
+#: src/components/auth-settings-form.tsx
+msgid "Switching it off leaves auth providers as the only way in, so it is refused unless you hold an identity at an enabled provider yourself. If a provider breaks and nobody can sign in, run \"flagnetic admin unlock\" on the server: it switches local login back on and lifts every enforced domain."
+msgstr "Switching it off leaves auth providers as the only way in, so it is refused unless you hold an identity at an enabled provider yourself. If a provider breaks and nobody can sign in, run \"flagnetic admin unlock\" on the server: it switches local login back on and lifts every enforced domain."
 
 #: src/components/kill-switch-dialog.tsx
 msgid "Switching off…"
@@ -8108,20 +8130,20 @@ msgid "The connection failed"
 msgstr "The connection failed"
 
 #: src/components/profile-form.tsx
-msgid "The console's language on every device you sign in on. Following the browser uses the first of its languages the console offers."
-msgstr "The console's language on every device you sign in on. Following the browser uses the first of its languages the console offers."
+msgid "The console's language on every device you sign in on"
+msgstr "The console's language on every device you sign in on"
 
 #: src/components/change-request-actions.tsx
 msgid "The copy is a new draft."
 msgstr "The copy is a new draft."
 
 #: src/components/sink-editor.tsx
-msgid "The database the tables are created in or already exist in."
-msgstr "The database the tables are created in or already exist in."
+msgid "The database the tables are created in or already exist in"
+msgstr "The database the tables are created in or already exist in"
 
 #: src/components/experiment-fields.tsx
-msgid "The day the experiment is expected to have its answer."
-msgstr "The day the experiment is expected to have its answer."
+msgid "The day the experiment is expected to have its answer"
+msgstr "The day the experiment is expected to have its answer"
 
 #: src/components/sink-recovery.tsx
 msgid "The dead letter could not be redelivered."
@@ -8152,8 +8174,8 @@ msgid "The devices you are signed in on"
 msgstr "The devices you are signed in on"
 
 #: src/components/create-from-document.tsx
-msgid "The document's own unless you change it. It never changes afterwards."
-msgstr "The document's own unless you change it. It never changes afterwards."
+msgid "The document's own unless you change it; it never changes afterwards"
+msgstr "The document's own unless you change it; it never changes afterwards"
 
 #: src/components/experiment-transitions.tsx
 msgid "The draft {key} is created."
@@ -8171,13 +8193,10 @@ msgstr "The draft never starts and nothing about it changes any more; no ruleset
 msgid "The email address's domain signs in through this provider only, so its identity there cannot be unlinked."
 msgstr "The email address's domain signs in through this provider only, so its identity there cannot be unlinked."
 
-#: src/components/saml-provider-form.tsx
-msgid "The email domains this provider vouches for, one per line or separated by spaces. A subdomain is not included. An email counts as verified, and linking and creating members apply, only inside these domains."
-msgstr "The email domains this provider vouches for, one per line or separated by spaces. A subdomain is not included. An email counts as verified, and linking and creating members apply, only inside these domains."
-
 #: src/components/auth-provider-form.tsx
-msgid "The email domains this provider vouches for, one per line or separated by spaces. A subdomain is not included. Linking and creating members apply to these emails only."
-msgstr "The email domains this provider vouches for, one per line or separated by spaces. A subdomain is not included. Linking and creating members apply to these emails only."
+#: src/components/saml-provider-form.tsx
+msgid "The email domains this provider vouches for, one per line or separated by spaces"
+msgstr "The email domains this provider vouches for, one per line or separated by spaces"
 
 #: src/lib/problem-messages.ts
 msgid "The email or the password is not right."
@@ -8281,8 +8300,8 @@ msgid "The experiment's status no longer lets these fields change: its flag, uni
 msgstr "The experiment's status no longer lets these fields change: its flag, unit type and weights stay as they started."
 
 #: src/components/auth-settings-form.tsx
-msgid "The fewest characters a password chosen from now on has, from 12 to 128. Passwords set before keep working."
-msgstr "The fewest characters a password chosen from now on has, from 12 to 128. Passwords set before keep working."
+msgid "The fewest characters a password chosen from now on has, from 12 to 128; passwords set before keep working"
+msgstr "The fewest characters a password chosen from now on has, from 12 to 128; passwords set before keep working"
 
 #: src/components/firebase-wizard.tsx
 msgid "The file is not a Remote Config template: it has no parameters."
@@ -8357,12 +8376,12 @@ msgid "The flag is off here: the off variation is served."
 msgstr "The flag is off here: the off variation is served."
 
 #: src/components/experiment-fields.tsx
-msgid "The flag whose variations the experiment compares."
-msgstr "The flag whose variations the experiment compares."
+msgid "The flag whose variations the experiment compares"
+msgstr "The flag whose variations the experiment compares"
 
 #: src/components/firebase-wizard.tsx
-msgid "The flags are on here, serving what the template says. Every other environment gets them off, serving the default."
-msgstr "The flags are on here, serving what the template says. Every other environment gets them off, serving the default."
+msgid "The flags are on here, serving what the template says; every other environment gets them off, serving the default"
+msgstr "The flags are on here, serving what the template says; every other environment gets them off, serving the default"
 
 #: src/lib/flag-detail.ts
 msgid "The flags would require each other in a cycle: {path}."
@@ -8372,13 +8391,9 @@ msgstr "The flags would require each other in a cycle: {path}."
 msgid "The flags would require each other in a cycle."
 msgstr "The flags would require each other in a cycle."
 
-#: src/components/saml-provider-form.tsx
-msgid "The format the instance asks the identity provider for. The name identifier links the person to their member; with the email address format it is also their email."
-msgstr "The format the instance asks the identity provider for. The name identifier links the person to their member; with the email address format it is also their email."
-
 #: src/components/auth-settings-form.tsx
-msgid "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
-msgstr "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
+msgid "The furthest ahead a new API token may expire"
+msgstr "The furthest ahead a new API token may expire"
 
 #: src/lib/project-members.ts
 msgid "The group mappings of {provider} made this grant, so only they remove it. An instance admin changes them on the provider's page."
@@ -8429,16 +8444,12 @@ msgid "The identity provider refused the sign-in. Ask whoever runs it, or your i
 msgstr "The identity provider refused the sign-in. Ask whoever runs it, or your instance admin."
 
 #: src/components/auth-provider-form.tsx
-msgid "The identity provider's issuer URL; its discovery document is read from it. Plain http is accepted only on a loopback address."
-msgstr "The identity provider's issuer URL; its discovery document is read from it. Plain http is accepted only on a loopback address."
+msgid "The identity provider's issuer URL, from which its discovery document is read"
+msgstr "The identity provider's issuer URL, from which its discovery document is read"
 
 #: src/components/saml-provider-form.tsx
-msgid "The identity provider's metadata document, at most 1 MiB."
-msgstr "The identity provider's metadata document, at most 1 MiB."
-
-#: src/components/auth-provider-list.tsx
-msgid "The identity providers members sign in through. Each is offered on the sign-in page and vouches only for the email domains you give it."
-msgstr "The identity providers members sign in through. Each is offered on the sign-in page and vouches only for the email domains you give it."
+msgid "The identity provider's metadata document, at most 1 MiB"
+msgstr "The identity provider's metadata document, at most 1 MiB"
 
 #: src/lib/problem-messages.ts
 msgid "The idle timeout cannot be longer than the absolute timeout."
@@ -8468,22 +8479,22 @@ msgstr "The instance stops mailing, and members can no longer reset a forgotten 
 msgid "The invitation is mailed to {email}. Its link works once, until {until}. If the mail does not arrive, issue the invitation again."
 msgstr "The invitation is mailed to {email}. Its link works once, until {until}. If the mail does not arrive, issue the invitation again."
 
-#: src/routes/_signed-in/projects/$project/unit-types.tsx
-msgid "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
-msgstr "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
+#: src/components/environment-protection.tsx
+msgid "The kill switch and import skip it."
+msgstr "The kill switch and import skip it."
 
 #: src/components/mail-settings.tsx
 msgid "The mail settings are saved."
 msgstr "The mail settings are saved."
 
 #: src/components/experiment-fields.tsx
-msgid "The member accountable for the experiment."
-msgstr "The member accountable for the experiment."
+msgid "The member accountable for the experiment"
+msgstr "The member accountable for the experiment"
 
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-msgid "The member accountable for the flag."
-msgstr "The member accountable for the flag."
+msgid "The member accountable for the flag"
+msgstr "The member accountable for the flag"
 
 #: src/lib/problem-messages.ts
 msgid "The member already holds this role in the project."
@@ -8509,10 +8520,6 @@ msgstr "The member is saved."
 msgid "The member whose API token is {token}"
 msgstr "The member whose API token is {token}"
 
-#: src/routes/_signed-in/projects/$project/members.tsx
-msgid "The members holding a role in this project. A member may hold several, and can do whatever any of them allows."
-msgstr "The members holding a role in this project. A member may hold several, and can do whatever any of them allows."
-
 #: src/lib/problem-messages.ts
 msgid "The metadata holds no signing certificate to check responses with."
 msgstr "The metadata holds no signing certificate to check responses with."
@@ -8522,16 +8529,24 @@ msgid "The metadata is at most 1 MiB."
 msgstr "The metadata is at most 1 MiB."
 
 #: src/components/sink-editor.tsx
-msgid "The most events one delivery carries, at most {maxBatch}. Empty for the default."
-msgstr "The most events one delivery carries, at most {maxBatch}. Empty for the default."
+msgid "The most events one delivery carries, at most {maxBatch}; empty for the default"
+msgstr "The most events one delivery carries, at most {maxBatch}; empty for the default"
 
 #: src/components/sink-editor.tsx
-msgid "The most events one delivery carries. Empty for the default."
-msgstr "The most events one delivery carries. Empty for the default."
+msgid "The most events one delivery carries; empty for the default"
+msgstr "The most events one delivery carries; empty for the default"
 
 #: src/components/project-audit.tsx
 msgid "The most recent changes in this project"
 msgstr "The most recent changes in this project"
+
+#: src/components/saml-provider-form.tsx
+msgid "The name identifier format the instance asks the identity provider for"
+msgstr "The name identifier format the instance asks the identity provider for"
+
+#: src/components/saml-provider-form.tsx
+msgid "The name identifier links the person to their member; with the email address format it is also their email."
+msgstr "The name identifier links the person to their member; with the email address format it is also their email."
 
 #: src/components/saml-provider-form.tsx
 msgid "The names of the assertion attributes the instance reads, matched by name or friendly name. The email is the name identifier when its format is email address."
@@ -8595,8 +8610,8 @@ msgid "The passwords do not match."
 msgstr "The passwords do not match."
 
 #: src/components/saml-provider-form.tsx
-msgid "The pasted metadata is stored and not shown again. Leave this empty to keep it, or paste a new document to replace it."
-msgstr "The pasted metadata is stored and not shown again. Leave this empty to keep it, or paste a new document to replace it."
+msgid "The pasted metadata is stored and not shown again; leave it empty to keep it"
+msgstr "The pasted metadata is stored and not shown again; leave it empty to keep it"
 
 #: src/lib/problem-messages.ts
 msgid "The pattern repeats too much. Shorten its repetitions or split it into conditions."
@@ -8727,8 +8742,8 @@ msgid "The provider manages this member, so their identity at it stays for as lo
 msgstr "The provider manages this member, so their identity at it stays for as long as they are provisioned. Deactivate or remove them at the provider."
 
 #: src/components/scim-tokens.tsx
-msgid "The provider whose members and groups the token reaches. It cannot be changed later."
-msgstr "The provider whose members and groups the token reaches. It cannot be changed later."
+msgid "The provider whose members and groups the token reaches; it cannot be changed later"
+msgstr "The provider whose members and groups the token reaches; it cannot be changed later"
 
 #: src/components/auth-provider-detail.tsx
 msgid "The redirect URI is built from the instance's public address (FLAGNETIC_BASE_URL), which is not set. Set it, and the address shows here."
@@ -8800,6 +8815,10 @@ msgstr "the SDK key {key}"
 msgid "The SDKs that have asked this environment for its ruleset or for values, most recently seen first. A row appears within a minute of an SDK’s request; whether an SDK is connected right now is not shown."
 msgstr "The SDKs that have asked this environment for its ruleset or for values, most recently seen first. A row appears within a minute of an SDK’s request; whether an SDK is connected right now is not shown."
 
+#: src/components/sink-editor.tsx
+msgid "The secret is shown once, when the sink is created."
+msgstr "The secret is shown once, when the sink is created."
+
 #: src/components/sink-secret-dialog.tsx
 msgid "The secret it replaces keeps signing beside this one for a day, so the receiver can take the new one without refusing a batch."
 msgstr "The secret it replaces keeps signing beside this one for a day, so the receiver can take the new one without refusing a batch."
@@ -8853,8 +8872,8 @@ msgid "The session is revoked."
 msgstr "The session is revoked."
 
 #: src/components/experiment-fields.tsx
-msgid "The share of units included in the experiment; the others get what the flag's other rules serve."
-msgstr "The share of units included in the experiment; the others get what the flag's other rules serve."
+msgid "The share of units included in the experiment; the others get what the flag's other rules serve"
+msgstr "The share of units included in the experiment; the others get what the flag's other rules serve"
 
 #: src/lib/problem-messages.ts
 msgid "The sink is not ready to be enabled: {failure}."
@@ -8865,13 +8884,13 @@ msgid "The sink's signing secret"
 msgstr "The sink's signing secret"
 
 #: src/components/sdk-keys.tsx
-msgid "The sites the key may be used from, such as https://app.example.com. Leave it empty to allow any origin."
-msgstr "The sites the key may be used from, such as https://app.example.com. Leave it empty to allow any origin."
+msgid "The sites the key may be used from, such as https://app.example.com; leave it empty to allow any origin"
+msgstr "The sites the key may be used from, such as https://app.example.com; leave it empty to allow any origin"
 
 #: src/components/auth-provider-form.tsx
 #: src/components/saml-provider-form.tsx
-msgid "The slug never changes."
-msgstr "The slug never changes."
+msgid "The slug never changes"
+msgstr "The slug never changes"
 
 #: src/components/mail-settings.tsx
 msgid "The SMTP server accepted a test mail to {recipient}. Check that it arrived."
@@ -8890,8 +8909,12 @@ msgid "The SMTP server the instance sends its mail through."
 msgstr "The SMTP server the instance sends its mail through."
 
 #: src/components/mail-settings.tsx
-msgid "The SMTP server's host name or address."
-msgstr "The SMTP server's host name or address."
+msgid "The SMTP server's host name or address"
+msgstr "The SMTP server's host name or address"
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "The standard attributes are in every project; they can be renamed but not deleted."
+msgstr "The standard attributes are in every project; they can be renamed but not deleted."
 
 #: src/components/sink-test.tsx
 msgid "The target answered and can take a batch."
@@ -8934,8 +8957,8 @@ msgid "The target rejected the dead letter again."
 msgstr "The target rejected the dead letter again."
 
 #: src/components/firebase-wizard.tsx
-msgid "The template as \"firebase remoteconfig:get\" or the Remote Config REST API returns it, a JSON file."
-msgstr "The template as \"firebase remoteconfig:get\" or the Remote Config REST API returns it, a JSON file."
+msgid "The template as \"firebase remoteconfig:get\" or the Remote Config REST API returns it, a JSON file"
+msgstr "The template as \"firebase remoteconfig:get\" or the Remote Config REST API returns it, a JSON file"
 
 #: src/components/firebase-wizard.tsx
 msgid "The template has no conditions."
@@ -8967,8 +8990,8 @@ msgid "The traffic allocation of {key} grew."
 msgstr "The traffic allocation of {key} grew."
 
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
-msgid "The type of every value the flag serves. It never changes."
-msgstr "The type of every value the flag serves. It never changes."
+msgid "The type of every value the flag serves; it never changes"
+msgstr "The type of every value the flag serves; it never changes"
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "The unit type {key} is no longer declared, and its key can be declared again."
@@ -8987,8 +9010,12 @@ msgid "The unsaved draft cannot be evaluated as it is:"
 msgstr "The unsaved draft cannot be evaluated as it is:"
 
 #: src/components/sink-editor.tsx
-msgid "The user that inserts the events."
-msgstr "The user that inserts the events."
+msgid "The user and password have fields of their own."
+msgstr "The user and password have fields of their own."
+
+#: src/components/sink-editor.tsx
+msgid "The user that inserts the events"
+msgstr "The user that inserts the events"
 
 #: src/lib/problem-messages.ts
 msgid "The value is out of range."
@@ -9014,11 +9041,6 @@ msgstr "The weights must sum to 100.00 %."
 #: src/lib/experiments.ts
 msgid "The weights sum to {sum} %; they must sum to {whole} %."
 msgstr "The weights sum to {sum} %; they must sum to {whole} %."
-
-#: src/components/experiments-panel.tsx
-#: src/components/flags-panel.tsx
-msgid "The whole tag"
-msgstr "The whole tag"
 
 #: src/lib/problem-messages.ts
 msgid "The X-Flagnetic- headers are the platform's own."
@@ -9052,6 +9074,11 @@ msgstr "These mappings were changed by someone else after you opened them. Savin
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "They get a link to set their password, mailed to them when the instance can send mail and shown to you once otherwise. A role in a project, if you choose one, is granted when they accept."
 msgstr "They get a link to set their password, mailed to them when the instance can send mail and shown to you once otherwise. A role in a project, if you choose one, is granted when they accept."
+
+#: src/components/auth-provider-form.tsx
+#: src/components/saml-provider-form.tsx
+msgid "They hold no access until a project grants them a role."
+msgstr "They hold no access until a project grants them a role."
 
 #: src/lib/flag-detail.ts
 msgid "This appears twice."
@@ -9103,10 +9130,13 @@ msgid "This instance accepts only https targets. Use an https URL, or ask the op
 msgstr "This instance accepts only https targets. Use an https URL, or ask the operator to allow plain http."
 
 #: src/components/token-create-form.tsx
-msgid "This instance allows a token at most {lifetime} ahead, and every token must expire."
-msgstr "This instance allows a token at most {lifetime} ahead, and every token must expire."
+msgid "This instance allows a token at most {lifetime} ahead"
+msgstr "This instance allows a token at most {lifetime} ahead"
 
 #: src/components/token-create-form.tsx
+msgid "This instance allows a token at most {lifetime} ahead, and every token must expire"
+msgstr "This instance allows a token at most {lifetime} ahead, and every token must expire"
+
 #: src/lib/problem-messages.ts
 msgid "This instance allows a token at most {lifetime} ahead."
 msgstr "This instance allows a token at most {lifetime} ahead."
@@ -9125,8 +9155,8 @@ msgid "This instance does not reach targets on its own network. Use a public add
 msgstr "This instance does not reach targets on its own network. Use a public address, or ask the operator to allow private networks."
 
 #: src/components/token-create-form.tsx
-msgid "This instance requires every token to expire."
-msgstr "This instance requires every token to expire."
+msgid "This instance requires every token to expire"
+msgstr "This instance requires every token to expire"
 
 #: src/components/invitation-link-dialog.tsx
 msgid "This instance sends no mail, so pass this link to {name} yourself. It works once, until {until}."
@@ -9330,6 +9360,10 @@ msgstr "Token endpoint"
 msgid "Token expiry required"
 msgstr "Token expiry required"
 
+#: src/components/auth-settings-form.tsx
+msgid "Tokens created before keep their expiry."
+msgstr "Tokens created before keep their expiry."
+
 #: src/lib/problem-messages.ts
 msgid "Too long."
 msgstr "Too long."
@@ -9403,6 +9437,10 @@ msgstr "Transient: new at every sign-in, so nothing stays linked"
 msgid "Try again"
 msgstr "Try again"
 
+#: src/components/auth-provider-form.tsx
+msgid "Turn it off only for a provider that does not send the claim and checks addresses itself."
+msgstr "Turn it off only for a provider that does not send the claim and checks addresses itself."
+
 #: src/routes/_signed-in/projects/$project/import-export.tsx
 msgid "Turns the parameters of a Firebase Remote Config template into flags, and its conditions into rules, in one environment. You see the flags, rules and warnings before you apply it."
 msgstr "Turns the parameters of a Firebase Remote Config template into flags, and its conditions into rules, in one environment. You see the flags, rules and warnings before you apply it."
@@ -9429,6 +9467,14 @@ msgstr "Type {flagKey} to confirm"
 #: src/components/ui/confirm-dialog.tsx
 msgid "Type {typeToConfirm} to confirm"
 msgstr "Type {typeToConfirm} to confirm"
+
+#: src/components/mail-settings.tsx
+msgid "Type a new one to replace it. Changing the host, port, security or username needs it again. Clearing the username removes both."
+msgstr "Type a new one to replace it. Changing the host, port, security or username needs it again. Clearing the username removes both."
+
+#: src/components/auth-provider-form.tsx
+msgid "Type a new one to replace it. Changing the issuer or the client ID needs it again."
+msgstr "Type a new one to replace it. Changing the issuer or the client ID needs it again."
 
 #: src/components/flags-panel.tsx
 msgid "Type: {type}"
@@ -9746,6 +9792,14 @@ msgstr "Views"
 msgid "Views and filters"
 msgstr "Views and filters"
 
+#: src/components/sink-editor.tsx
+msgid "Wait between deliveries once caught up, from {flushFrom} to {flushTo}; empty for the default"
+msgstr "Wait between deliveries once caught up, from {flushFrom} to {flushTo}; empty for the default"
+
+#: src/components/sink-editor.tsx
+msgid "Wait between deliveries once caught up; empty for the default"
+msgstr "Wait between deliveries once caught up; empty for the default"
+
 #: src/components/waiting-change-requests.tsx
 msgid "Waiting change requests"
 msgstr "Waiting change requests"
@@ -9815,25 +9869,17 @@ msgstr "Welcome, {name}. Choose a project to work in."
 msgid "What {name} holds"
 msgstr "What {name} holds"
 
-#: src/components/scim-tokens.tsx
-msgid "What an identity provider presents to create, update and deprovision members through SCIM. A token belongs to one auth provider for life and reaches only that provider's members and groups."
-msgstr "What an identity provider presents to create, update and deprovision members through SCIM. A token belongs to one auth provider for life and reaches only that provider's members and groups."
-
 #: src/components/webhook-editor.tsx
-msgid "What receives the events, to tell the subscriptions apart."
-msgstr "What receives the events, to tell the subscriptions apart."
+msgid "What receives the events, to tell the subscriptions apart"
+msgstr "What receives the events, to tell the subscriptions apart"
 
 #: src/components/flag-evaluations.tsx
 msgid "What SDKs counted evaluating in the application, per UTC day the server received their summaries."
 msgstr "What SDKs counted evaluating in the application, per UTC day the server received their summaries."
 
-#: src/routes/_signed-in/projects/$project/attributes.tsx
-msgid "What targeting reads about a unit. The standard attributes are in every project; they can be renamed but not deleted. A type never changes once declared."
-msgstr "What targeting reads about a unit. The standard attributes are in every project; they can be renamed but not deleted. A type never changes once declared."
-
 #: src/components/experiment-fields.tsx
-msgid "What the experiment expects to find, written before it runs."
-msgstr "What the experiment expects to find, written before it runs."
+msgid "What the experiment expects to find, written before it runs"
+msgstr "What the experiment expects to find, written before it runs"
 
 #: src/components/compare-environments.tsx
 msgid "What the flag serves in two environments, judged by what SDKs receive: rule descriptions and override notes do not count."
@@ -9843,18 +9889,14 @@ msgstr "What the flag serves in two environments, judged by what SDKs receive: r
 msgid "What the last check found"
 msgstr "What the last check found"
 
-#: src/routes/_signed-in/projects/$project/settings.tsx
-msgid "What the project is called and what it is for."
-msgstr "What the project is called and what it is for."
-
 #: src/components/auth-provider-form.tsx
 #: src/components/saml-provider-form.tsx
-msgid "What the sign-in button says: “Sign in with …”."
-msgstr "What the sign-in button says: “Sign in with …”."
+msgid "What the sign-in button says: “Sign in with …”"
+msgstr "What the sign-in button says: “Sign in with …”"
 
 #: src/components/sink-editor.tsx
-msgid "What the sink delivers to, to tell the sinks apart."
-msgstr "What the sink delivers to, to tell the sinks apart."
+msgid "What the sink delivers to, to tell the sinks apart"
+msgstr "What the sink delivers to, to tell the sinks apart"
 
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 msgid "What this change request was based on changed after it was written; it can no longer be approved or applied. Copy it to propose it again."
@@ -9865,40 +9907,36 @@ msgid "What this change request was based on changed after it was written. Rebas
 msgstr "What this change request was based on changed after it was written. Rebase it onto the current version before opening it."
 
 #: src/components/sdk-keys.tsx
-msgid "What uses the key, to tell it apart later."
-msgstr "What uses the key, to tell it apart later."
+msgid "What uses the key, to tell it apart later"
+msgstr "What uses the key, to tell it apart later"
 
 #: src/components/token-create-form.tsx
-msgid "What uses the token, to tell it apart later."
-msgstr "What uses the token, to tell it apart later."
+msgid "What uses the token, to tell it apart later"
+msgstr "What uses the token, to tell it apart later"
 
 #: src/components/token-list.tsx
 msgid "Whatever uses the token is refused from now on. This cannot be undone."
 msgstr "Whatever uses the token is refused from now on. This cannot be undone."
 
 #: src/components/sink-editor.tsx
-msgid "Where ClickHouse's HTTP interface answers, such as https://clickhouse.example.com:8443. The user and password have fields of their own."
-msgstr "Where ClickHouse's HTTP interface answers, such as https://clickhouse.example.com:8443. The user and password have fields of their own."
+msgid "Where ClickHouse's HTTP interface answers, such as https://clickhouse.example.com:8443"
+msgstr "Where ClickHouse's HTTP interface answers, such as https://clickhouse.example.com:8443"
 
 #: src/components/sink-editor.tsx
-msgid "Where every batch is posted, signed with the sink's secret. The secret is shown once, when the sink is created."
-msgstr "Where every batch is posted, signed with the sink's secret. The secret is shown once, when the sink is created."
+msgid "Where every batch is posted, signed with the sink's secret"
+msgstr "Where every batch is posted, signed with the sink's secret"
 
 #: src/components/webhook-editor.tsx
-msgid "Where every event is posted, signed with the subscription's secret."
-msgstr "Where every event is posted, signed with the subscription's secret."
+msgid "Where every event is posted, signed with the subscription's secret"
+msgstr "Where every event is posted, signed with the subscription's secret"
 
 #: src/components/sink-editor.tsx
 msgid "Where the events are delivered. It cannot be changed afterwards."
 msgstr "Where the events are delivered. It cannot be changed afterwards."
 
 #: src/components/saml-provider-form.tsx
-msgid "Where the identity provider publishes its metadata. Plain http is accepted only on a loopback address."
-msgstr "Where the identity provider publishes its metadata. Plain http is accepted only on a loopback address."
-
-#: src/routes/_signed-in/projects/$project/environments/index.tsx
-msgid "Where the project serves from. A key is fixed once created; the name can change."
-msgstr "Where the project serves from. A key is fixed once created; the name can change."
+msgid "Where the identity provider publishes its metadata"
+msgstr "Where the identity provider publishes its metadata"
 
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Which flags use the segment could not be read; the rules of any that do evaluate by what it holds once saved."
@@ -9913,8 +9951,8 @@ msgid "While the experiment is a draft, SDKs do not receive this rule: units con
 msgstr "While the experiment is a draft, SDKs do not receive this rule: units continue to the next rule until it starts."
 
 #: src/components/mail-settings.tsx
-msgid "Who every mail comes from: one address, optionally with a name, such as Flagnetic <flags@example.com>."
-msgstr "Who every mail comes from: one address, optionally with a name, such as Flagnetic <flags@example.com>."
+msgid "Who every mail comes from: one address, optionally with a name, such as Flagnetic <flags@example.com>"
+msgstr "Who every mail comes from: one address, optionally with a name, such as Flagnetic <flags@example.com>"
 
 #: src/components/member-actions.tsx
 msgid "Whoever opens the link chooses a new password for {name} and is signed in as them, and every other session of theirs ends. The link is shown once and works for an hour; earlier links keep working until one is used."
@@ -9925,21 +9963,21 @@ msgid "Whole experiment"
 msgstr "Whole experiment"
 
 #: src/components/experiment-fields.tsx
-msgid "Whose units are split: users, accounts, devices."
-msgstr "Whose units are split: users, accounts, devices."
+msgid "Whose units are split: users, accounts, devices"
+msgstr "Whose units are split: users, accounts, devices"
 
 #: src/components/change-request-actions.tsx
 #: src/components/propose-dialog.tsx
-msgid "Why the change is needed, for whoever reviews it. Optional."
-msgstr "Why the change is needed, for whoever reviews it. Optional."
+msgid "Why the change is needed, for whoever reviews it; optional"
+msgstr "Why the change is needed, for whoever reviews it; optional"
 
 #: src/components/overrides-section.tsx
-msgid "Why the unit has this override, such as the test it is for. Never sent to SDKs."
-msgstr "Why the unit has this override, such as the test it is for. Never sent to SDKs."
+msgid "Why the unit has this override, such as the test it is for; never sent to SDKs"
+msgstr "Why the unit has this override, such as the test it is for; never sent to SDKs"
 
 #: src/components/experiment-transitions.tsx
-msgid "Why, for whoever reads the decision later. Optional; editable while stopped."
-msgstr "Why, for whoever reads the decision later. Optional; editable while stopped."
+msgid "Why, for whoever reads the decision later; optional, editable while stopped"
+msgstr "Why, for whoever reads the decision later; optional, editable while stopped"
 
 #: src/components/experiment-transitions.tsx
 msgid "Winning variation"
@@ -9948,6 +9986,10 @@ msgstr "Winning variation"
 #: src/components/compare-environments.tsx
 msgid "With"
 msgstr "With"
+
+#: src/components/mail-settings.tsx
+msgid "With none, nothing is encrypted, and a username and password are sent only to a server on this machine."
+msgstr "With none, nothing is encrypted, and a username and password are sent only to a server on this machine."
 
 #: src/components/project-invitations.tsx
 msgid "Works until <0>{until}</0>"
@@ -10004,8 +10046,8 @@ msgid "You are signed in on this device only."
 msgstr "You are signed in on this device only."
 
 #: src/components/grant-form.tsx
-msgid "You can grant further roles to the members of this project. An instance admin grants a first role to anyone else."
-msgstr "You can grant further roles to the members of this project. An instance admin grants a first role to anyone else."
+msgid "You can grant further roles to the members of this project; an instance admin grants a first role to anyone else"
+msgstr "You can grant further roles to the members of this project; an instance admin grants a first role to anyone else"
 
 #: src/components/change-request-actions.tsx
 #: src/lib/problem-messages.ts

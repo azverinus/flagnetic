@@ -47,10 +47,7 @@ function InstanceAudit() {
       <PageHeader
         title={t`Audit log`}
         description={
-          <Trans>
-            Every change on this instance, in every project and outside them, such as members,
-            sign-ins and settings.
-          </Trans>
+          <Trans>Every change on this instance, in every project and outside them.</Trans>
         }
       />
       {projects.isError ? (

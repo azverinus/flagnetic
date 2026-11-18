@@ -1,4 +1,5 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { ApiError } from "@/lib/errors";
@@ -6,6 +7,7 @@ import { renderWithProviders } from "@/test/render";
 
 import { Field } from "./field";
 import { Input } from "./input";
+import { SwitchField } from "./switch-field";
 
 describe("a field", () => {
   it("names its control by the label above it and reads the hint with it", () => {
@@ -71,5 +73,52 @@ describe("a field", () => {
     );
 
     expect(screen.getByRole("textbox", { name: "Name" })).not.toHaveAttribute("aria-invalid");
+  });
+});
+
+describe("a field's details", () => {
+  it("are closed until opened, then read as an expanded disclosure", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <Field label="Key" hint="Lowercase letters and digits." details="Run the unlock command.">
+        <Input />
+      </Field>,
+    );
+
+    const summary = screen.getByText("Details");
+    const disclosure = summary.closest("details");
+    expect(disclosure).not.toHaveAttribute("open");
+
+    await user.click(summary);
+
+    expect(disclosure).toHaveAttribute("open");
+    expect(screen.getByText("Run the unlock command.")).toBeVisible();
+  });
+
+  it("do not appear without any", () => {
+    renderWithProviders(
+      <Field label="Key">
+        <Input />
+      </Field>,
+    );
+
+    expect(screen.queryByText("Details")).not.toBeInTheDocument();
+  });
+
+  it("are offered by a switch field as well", () => {
+    renderWithProviders(
+      <SwitchField
+        label="Enabled"
+        hint="Offer it now."
+        details="Turn it off to test first."
+        checked
+        onCheckedChange={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Details").closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByRole("switch", { name: "Enabled" })).toHaveAccessibleDescription(
+      "Offer it now.",
+    );
   });
 });

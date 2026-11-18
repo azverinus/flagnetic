@@ -130,12 +130,7 @@ export function WebhookList({ scope }: { scope: WebhookScope }) {
               An instance webhook is sent every audit entry that names no project, signed with its
               secret.
             </Trans>
-          ) : (
-            <Trans>
-              A webhook posts the events you choose to a URL, signed with its secret, retried when
-              the receiver fails, and logged.
-            </Trans>
-          )
+          ) : undefined
         }
         actions={(webhooks.data?.length ?? 0) > 0 ? newWebhook : undefined}
       />

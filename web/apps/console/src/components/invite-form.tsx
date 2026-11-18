@@ -140,7 +140,7 @@ export function InviteForm({
                 label={<Trans>Project</Trans>}
                 hint={
                   <Trans>
-                    Optional. Accepting the invitation grants the role you choose in this project.
+                    Optional; accepting the invitation grants the role you choose in this project
                   </Trans>
                 }
                 refusal={refusal}

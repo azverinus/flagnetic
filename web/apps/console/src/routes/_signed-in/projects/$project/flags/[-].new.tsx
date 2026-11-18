@@ -205,8 +205,8 @@ function CreateFlag({ project }: { project: string }) {
         label={<Trans>Key</Trans>}
         hint={
           <Trans>
-            How code names the flag, such as checkout.newFlow: letters, digits, ., - and _. It never
-            changes.
+            How code names the flag, such as checkout.newFlow: letters, digits, ., - and _; it never
+            changes
           </Trans>
         }
         error={
@@ -222,7 +222,7 @@ function CreateFlag({ project }: { project: string }) {
         render={({ field }) => (
           <Field
             label={<Trans>Type</Trans>}
-            hint={<Trans>The type of every value the flag serves. It never changes.</Trans>}
+            hint={<Trans>The type of every value the flag serves; it never changes</Trans>}
             error={errors.type?.message ?? at("/type")}
           >
             <Select
@@ -255,7 +255,7 @@ function CreateFlag({ project }: { project: string }) {
         render={({ field }) => (
           <Field
             label={<Trans>Owner</Trans>}
-            hint={<Trans>The member accountable for the flag.</Trans>}
+            hint={<Trans>The member accountable for the flag</Trans>}
             error={errors.owner?.message ?? at("/owner")}
           >
             <Select
@@ -280,7 +280,7 @@ function CreateFlag({ project }: { project: string }) {
         render={({ field }) => (
           <Field
             label={<Trans>Tags</Trans>}
-            hint={<Trans>Press Enter after each tag.</Trans>}
+            hint={<Trans>Press Enter after each tag</Trans>}
             error={
               errors.tags?.message ??
               (tagsRefusal ? flagViolationMessage(i18n, tagsRefusal) : undefined)
@@ -304,7 +304,7 @@ function CreateFlag({ project }: { project: string }) {
             hint={
               <Trans>
                 A temporary flag is meant to be removed once its change is released; a permanent one
-                stays.
+                stays
               </Trans>
             }
             error={at("/lifetime")}
@@ -324,7 +324,7 @@ function CreateFlag({ project }: { project: string }) {
       {lifetime === "temporary" ? (
         <Field
           label={<Trans>Expected removal</Trans>}
-          hint={<Trans>Left empty, 90 days from today.</Trans>}
+          hint={<Trans>Left empty, 90 days from today</Trans>}
           error={at("/expected_removal_at")}
           className="w-56"
         >

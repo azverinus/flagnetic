@@ -104,10 +104,7 @@ function SettingsForm() {
 
   return (
     <Page measure="form">
-      <PageHeader
-        title={t`Settings`}
-        description={<Trans>What the project is called and what it is for.</Trans>}
-      />
+      <PageHeader title={t`Settings`} />
       {conflict ? (
         <NamedConflictBanner
           base={base}
@@ -130,7 +127,7 @@ function SettingsForm() {
         <SettingsSection title={<Trans>Project</Trans>}>
           <Field
             label={<Trans>Key</Trans>}
-            hint={<Trans>Fixed once the project is created, since SDKs and scripts use it.</Trans>}
+            hint={<Trans>Fixed once the project is created, since SDKs and scripts use it</Trans>}
           >
             <Input value={project.key} disabled readOnly />
           </Field>

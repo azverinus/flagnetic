@@ -81,7 +81,7 @@ export function CreateFromDocument() {
     <div className="flex w-full measure-form flex-col gap-5">
       <Field
         label={t`Project document`}
-        hint={t`A JSON or YAML file, such as an export of a project of this or another instance.`}
+        hint={t`A JSON or YAML file, such as an export of a project of this or another instance`}
         error={unreadable}
       >
         <Input type="file" accept=".json,.yaml,.yml" onChange={(event) => void choose(event)} />
@@ -90,7 +90,7 @@ export function CreateFromDocument() {
         <>
           <Field
             label={t`Key`}
-            hint={t`The document's own unless you change it. It never changes afterwards.`}
+            hint={t`The document's own unless you change it; it never changes afterwards`}
             error={taken ? t`This instance already has a project with that key.` : undefined}
           >
             <Input

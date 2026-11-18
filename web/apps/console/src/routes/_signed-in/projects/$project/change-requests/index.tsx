@@ -40,15 +40,7 @@ function ChangeRequests() {
   const { project, search, apply, chips, removeChip, clearFacets } = useChangeRequestsFilters();
   return (
     <Page>
-      <PageHeader
-        title={t`Change requests`}
-        description={
-          <Trans>
-            A change request proposes a change for review; once a member who did not write it
-            approves it, it can be applied.
-          </Trans>
-        }
-      />
+      <PageHeader title={t`Change requests`} />
       <Toolbar chips={chips} onRemoveChip={removeChip} onClearAll={clearFacets} />
       <ChangeRequestPages
         project={project}

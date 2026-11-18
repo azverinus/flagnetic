@@ -97,7 +97,7 @@ export function ProfileForm({ member }: { member: ProfileMember }) {
       >
         <Field
           label={<Trans>Email</Trans>}
-          hint={<Trans>How the instance knows you. An instance admin can change it.</Trans>}
+          hint={<Trans>How the instance knows you; an instance admin can change it</Trans>}
         >
           <Input value={member.email} readOnly />
         </Field>
@@ -115,10 +115,10 @@ export function ProfileForm({ member }: { member: ProfileMember }) {
           render={({ field }) => (
             <Field
               label={<Trans>Language</Trans>}
-              hint={
+              hint={<Trans>The console's language on every device you sign in on</Trans>}
+              details={
                 <Trans>
-                  The console's language on every device you sign in on. Following the browser uses
-                  the first of its languages the console offers.
+                  Following the browser uses the first of its languages the console offers.
                 </Trans>
               }
               refusal={save.error}

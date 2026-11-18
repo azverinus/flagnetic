@@ -176,12 +176,6 @@ function Members() {
     <Page>
       <PageHeader
         title={t`Members`}
-        description={
-          <Trans>
-            The members holding a role in this project. A member may hold several, and can do
-            whatever any of them allows.
-          </Trans>
-        }
         actions={(members.data?.length ?? 0) > 0 ? grantRole : undefined}
       />
       {failure ? (

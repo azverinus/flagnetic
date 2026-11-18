@@ -108,12 +108,7 @@ function ResetForm({
       >
         <Field
           label={<Trans>New password</Trans>}
-          hint={
-            <Trans>
-              At least 12 characters, or as many as this instance asks for. Length is what makes a
-              password hard to guess.
-            </Trans>
-          }
+          hint={<Trans>At least 12 characters, or as many as this instance asks for</Trans>}
           error={errors.password?.message}
           refusal={complete.error}
           pointer="/password"

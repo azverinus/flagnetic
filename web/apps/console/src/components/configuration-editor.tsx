@@ -453,14 +453,14 @@ export function ConfigurationEditor({
               {switches}
               <Field
                 label={<Trans>Off variation</Trans>}
-                hint={<Trans>Served while the flag is off, and when a prerequisite fails.</Trans>}
+                hint={<Trans>Served while the flag is off, and when a prerequisite fails</Trans>}
                 error={errors.get("off_variation")}
               >
                 {variationSelect("offVariation", "off_variation")}
               </Field>
               <Field
                 label={<Trans>Fallthrough variation</Trans>}
-                hint={<Trans>Served while the flag is on and no rule matches.</Trans>}
+                hint={<Trans>Served while the flag is on and no rule matches</Trans>}
                 error={errors.get("fallthrough")}
               >
                 {variationSelect("fallthrough", "fallthrough")}
