@@ -249,6 +249,8 @@ jobs:
       migrations: ${{ steps.plan.outputs.migrations }}
       helm: ${{ steps.plan.outputs.helm }}
       load: ${{ steps.plan.outputs.load }}
+      upgrade: ${{ steps.plan.outputs.upgrade }}
+      upgrade_gate: ${{ steps.gate.outputs.upgrade_gate }}
       modules: ${{ steps.plan.outputs.modules }}
       test_shards: ${{ steps.plan.outputs.test_shards }}
       cover_packages: ${{ steps.plan.outputs.cover_packages }}
@@ -289,6 +291,13 @@ jobs:
             cat "$RUNNER_TEMP/plan"
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
+      # The rolling-upgrade test only reports until the server has released
+      # v1.0.0, since 0.x promised nothing across versions; the tag turns the
+      # gate on with no edit here.
+      - id: gate
+        run: |
+          if git tag --list v1.0.0 | grep -q .; then gate=true; else gate=false; fi
+          echo "upgrade_gate=$gate" >> "$GITHUB_OUTPUT"
 
   # The console end to end: on a pull request that touches the console, its
   # handlers or the suite; a change to the server behind it meets the suite
@@ -865,23 +874,100 @@ jobs:
       - name: Measure the SDK API against two replicas
         run: .github/scripts/load.sh
 
+  # A rolling upgrade, as an operator does it: the head chart is installed in
+  # kind with the image of the last server release, the instance is seeded
+  # through the management API, and `helm upgrade` moves it to the image built
+  # from this checkout while light SDK load and a streaming Go SDK are on it.
+  # It fails on a failed migration hook, a 5xx or any failed request during
+  # the rollout, an SDK that stopped evaluating, or one that did not receive a
+  # change made afterwards: a pull request that would break the previous
+  # release's replicas on the new schema, or the chart's rollout, is caught
+  # here. It runs for a migration or a change to the chart, nightly and on
+  # the server's release pull request. Until the repository has a v1.0.0 tag
+  # it only reports (continue-on-error); from then on it gates, with no edit.
+  upgrade:
+    name: rolling upgrade
+    needs: plan
+    if: needs.plan.outputs.upgrade == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: ${{ needs.plan.outputs.upgrade_gate != 'true' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            e2e/go.sum
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v4.3.2
+      - name: The last server release
+        id: last
+        run: |
+          # Tags the release contains are left out, so that the run for the
+          # release itself upgrades from the one before it.
+          tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname --no-contains HEAD | grep -v -- '-' | head -n 1 || true)"
+          if [ -z "$tag" ]; then
+            echo "no server release to upgrade from" >&2
+            exit 1
+          fi
+          echo "from=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "Upgrading from ${tag#v}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: helm/kind-action@ea822c7bf1874f08e5a491df991c228edffc3376 # v1.15.2
+        with:
+          cluster_name: upgrade
+          config: deploy/helm/test/kind-upgrade.yaml
+          # The oldest Kubernetes minor the chart supports.
+          node_image: kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0
+      - name: Build the head image into kind
+        run: |
+          docker build -f deploy/Dockerfile -t flagnetic:upgrade-head .
+          kind load docker-image flagnetic:upgrade-head --name upgrade
+      - name: Upgrade under load
+        env:
+          UPGRADE_FROM: ${{ steps.last.outputs.from }}
+        run: .github/scripts/upgrade.sh
+      - name: Say that the result is only a report
+        if: failure() && needs.plan.outputs.upgrade_gate != 'true'
+        run: |
+          echo "::warning title=rolling upgrade::The rolling-upgrade test failed. It only reports until the server has released v1.0.0."
+          echo "**Rolling upgrade failed; report-only until v1.0.0 is tagged.**" >> "$GITHUB_STEP_SUMMARY"
+
   # The one check branch protection requires. A job above may be skipped (a
   # module matrix with nothing to run, a job behind a condition), which is
   # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
-    needs: [plan, lint, test, coverage, vuln, npm-audit, tidy, console, e2e, sdk-e2e, load, sdk-ruby, sdk-python, workflows, migrations, helm, docker, module, released, dart, flutter, sdk-js]
+    needs: [plan, lint, test, coverage, vuln, npm-audit, tidy, console, e2e, sdk-e2e, load, upgrade, sdk-ruby, sdk-python, workflows, migrations, helm, docker, module, released, dart, flutter, sdk-js]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Every needed job succeeded or was skipped
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
+          UPGRADE_RESULT: ${{ needs.upgrade.result }}
+          UPGRADE_GATE: ${{ needs.plan.outputs.upgrade_gate }}
         run: |
           echo "Results: $RESULTS"
+          # The rolling-upgrade test only reports until v1.0.0 is tagged. Its
+          # continue-on-error keeps the run green, but whether a needed job's
+          # result then reads success or failure is not something to rely
+          # on, so a report-only failure, cancellation or timeout is left out
+          # here by name.
+          skip_upgrade=0
+          if [ "$UPGRADE_GATE" != true ] && [ "$UPGRADE_RESULT" != success ] && [ "$UPGRADE_RESULT" != skipped ]; then
+            echo "rolling upgrade: $UPGRADE_RESULT, report-only until v1.0.0"
+            skip_upgrade=1
+          fi
           for result in $RESULTS; do
             case "$result" in
               success|skipped) ;;
-              *) echo "a needed job ended with: $result" >&2; exit 1 ;;
+              *)
+                if [ "$skip_upgrade" = 1 ] && [ "$result" = "$UPGRADE_RESULT" ]; then skip_upgrade=0; continue; fi
+                echo "a needed job ended with: $result" >&2; exit 1 ;;
             esac
           done

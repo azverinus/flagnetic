@@ -1,0 +1,10 @@
+# A kind cluster for the rolling-upgrade test: node port 30080 is published on
+# the host, where the load generator and the SDK reach the instance.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 30080
+        listenAddress: 127.0.0.1
