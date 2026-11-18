@@ -93,8 +93,9 @@ export function useFlagsFilters() {
     const type = flagTypeName(i18n, search.type);
     chips.push({ id: "type", label: t`Type: ${type}` });
   }
-  if (search.owner) {
-    const owner = owners?.get(search.owner) ?? t`A member without a grant here`;
+  // Once the members are read: until then the owner's name is not known.
+  if (search.owner && owners) {
+    const owner = owners.get(search.owner) ?? t`A member without a grant here`;
     chips.push({ id: "owner", label: t`Owner: ${owner}` });
   }
   if (search.tag) {
