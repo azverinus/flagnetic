@@ -22,7 +22,7 @@ echo "FLAGNETIC_SECRET_KEY=$(openssl rand -base64 32)" > .env   # once; keep thi
 docker compose up -d
 ```
 
-Compose reads the secret key from `.env` and refuses to start without it. The server image is `ghcr.io/azverinus/flagnetic`, for `linux/amd64` and `linux/arm64`, with build provenance and an SBOM. The compose file pulls `latest`; to pin a release, add it to `.env` before `docker compose up -d`:
+Compose reads the secret key from `.env` and refuses to start without it. The server image is `ghcr.io/azverinus/flagnetic`, for `linux/amd64` and `linux/arm64`, with build provenance and an SBOM ([how to verify it](verify.md)). The compose file pulls `latest`; to pin a release, add it to `.env` before `docker compose up -d`:
 
 ```bash
 echo "FLAGNETIC_VERSION=0.5.0" >> .env

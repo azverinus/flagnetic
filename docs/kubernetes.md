@@ -227,4 +227,6 @@ helm pull oci://ghcr.io/azverinus/charts/flagnetic --version <version>
 gh attestation verify oci://ghcr.io/azverinus/charts/flagnetic:<version> --repo azverinus/flagnetic
 ```
 
+[Verifying a release](verify.md) covers `cosign` too, and the image and the SDK packages.
+
 The chart is also listed on Artifact Hub.

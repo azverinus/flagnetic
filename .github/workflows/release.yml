@@ -377,7 +377,8 @@ jobs:
           retention-days: 30
 
   # RubyGems trusts this workflow, in the rubygems environment, by its OIDC
-  # token (trusted publishing), so no RubyGems key is stored anywhere. The
+  # token (trusted publishing), so no RubyGems key is stored anywhere, and
+  # the gem is pushed with a sigstore attestation. The
   # pending publisher is configured before the first release
   # (CONTRIBUTING.md), so the first version is published here too.
   sdk-ruby-rubygems:
@@ -399,7 +400,11 @@ jobs:
       - name: Publish
         env:
           VERSION: ${{ needs.release-please.outputs.sdk_ruby_version }}
-        run: gem push "gem/flagnetic-$VERSION.gem"
+        run: |
+          # The attestation is signed with this job's OIDC identity, so the
+          # gem page and `gem push` tie the file to this workflow.
+          gem exec sigstore-cli:0.2.1 sign "gem/flagnetic-$VERSION.gem" --bundle "$RUNNER_TEMP/flagnetic.sigstore.json"
+          gem push "gem/flagnetic-$VERSION.gem" --attestation "$RUNNER_TEMP/flagnetic.sigstore.json"
 
   sdk-ruby-openfeature-gem:
     name: ruby gem (flagnetic-openfeature)
@@ -462,7 +467,9 @@ jobs:
       - name: Publish
         env:
           VERSION: ${{ needs.release-please.outputs.sdk_ruby_openfeature_version }}
-        run: gem push "gem/flagnetic-openfeature-$VERSION.gem"
+        run: |
+          gem exec sigstore-cli:0.2.1 sign "gem/flagnetic-openfeature-$VERSION.gem" --bundle "$RUNNER_TEMP/flagnetic-openfeature.sigstore.json"
+          gem push "gem/flagnetic-openfeature-$VERSION.gem" --attestation "$RUNNER_TEMP/flagnetic-openfeature.sigstore.json"
 
   # pub.dev accepts a publish only from a run started by a tag push or by
   # workflow_dispatch on the tag, and the tags release-please creates start
