@@ -116,6 +116,12 @@ Before a module's first release its dependents require it at `v0.0.0`, which onl
 
 The first release of all three follows the order above, with one difference: Dependabot cannot resolve a `v0.0.0` requirement outside the workspace, so the first bump of each dependent is made by hand, in its directory, with `go get github.com/azverinus/flagnetic/eval@v0.1.0` (and the SDK's tag for the provider) and `.github/scripts/check-tidy.sh <dir> -w`. Every later bump is Dependabot's.
 
+### The Helm chart
+
+The chart in `deploy/helm/flagnetic` is released with the server: the server component's release-please `extra-files` keep `version` and `appVersion` in `Chart.yaml` at the release's version, and the `helm chart` job of `release.yml` packages the chart of the tag after the image is pushed, pushes it to `oci://ghcr.io/azverinus/charts/flagnetic`, attests its digest and pushes `deploy/helm/artifacthub-repo.yml` to the chart's `artifacthub.io` tag. A fix to the chart alone is therefore a server patch release, with the scope `deploy`.
+
+Artifact Hub reads the repository from there once it is registered, and the registration is a one-time step: on artifacthub.io add a repository of kind Helm charts at `oci://ghcr.io/azverinus/charts/flagnetic`, then put the `repositoryID` it shows into `artifacthub-repo.yml` to claim verified publisher status. Make the package public in GHCR's settings after the first push, or the chart cannot be pulled without a login.
+
 ### The JavaScript SDK
 
 The npm package `flagnetic` in `sdks/js` is its own release-please component, tagged `sdks/js/vX.Y.Z`; use the scope `sdk-js`. release-please keeps `package.json` and `VERSION` in `src/version.ts` at the release's version. When its release pull request is merged, the `npm (flagnetic)` job of `release.yml` checks out the tag, checks that the version is the tag's, builds and checks the package, keeps the tarball as the artifact `flagnetic-<version>` for 30 days and publishes that tarball to npm through [trusted publishing](https://docs.npmjs.com/trusted-publishers): npm accepts the workflow's OIDC token, so no npm token is stored, and attaches a provenance attestation. The job runs in the GitHub environment `npm`; give it the protection rules a publish should have.

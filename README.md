@@ -19,14 +19,13 @@ The open-source flag products keep a paid tier, and the features a real team nee
 - **SDKs** for Go, JavaScript and TypeScript, Dart and Flutter, Ruby and Python, with OpenFeature providers for Go, JavaScript, Ruby and Python, listed below. Evaluation happens in a server SDK, so a flag check costs no network call and the SDK keeps serving its last good ruleset if the server goes away.
 - **Sinks**: a project's durable, at-least-once copy of its raw events (exposures, aliases and evaluation summaries) in ClickHouse, S3-compatible object storage as JSON Lines or Parquet, or a signed webhook, in a documented export schema that only grows. A sink is tested before it is enabled and can send sample rows; its health, failure classes, dead letters and replay are in the console and the API, and a sink is flagged at risk before retention drops rows it has not delivered, with a gap recorded when it does.
 - **Export and import**: a project's configuration as one document, YAML or JSON, to keep in git, copy to another instance or show an auditor. An import creates a project, merges into one or replaces its configuration, whole or not at all, after a dry run that shows what it would change; it works from the console, the API and the command line. A Firebase Remote Config template is translated into flags and rules of one environment, and a demo project is included.
-- **Operations**: any number of identical replicas on one PostgreSQL, with no sticky sessions; Prometheus metrics on a listener of their own, loopback by default; secrets sealed to the row that holds them; a deprecated API operation announced with `Deprecation` and `Sunset` headers; a console in English and Russian covering all of the above; a Docker image for `linux/amd64` and `linux/arm64` with provenance and an SBOM.
+- **Operations**: any number of identical replicas on one PostgreSQL, with no sticky sessions; Prometheus metrics on a listener of their own, loopback by default; secrets sealed to the row that holds them; a deprecated API operation announced with `Deprecation` and `Sunset` headers; a console in English and Russian covering all of the above; a Docker image for `linux/amd64` and `linux/arm64` with provenance and an SBOM; a Helm chart for Kubernetes, published to GHCR with a build attestation (see [Running on Kubernetes](docs/kubernetes.md)).
 
 ## Not there yet
 
 Each arrives in a later release:
 
 - **Analysis** of an experiment's results: Flagnetic assigns units, records exposures and checks the sample ratio, and for now the metrics are read in your own warehouse, from the events a sink delivers there.
-- A Helm chart.
 
 ## SDKs
 

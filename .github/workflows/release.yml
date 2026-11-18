@@ -114,6 +114,81 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
+  # The chart of the same version goes to GHCR after the image it installs,
+  # so a chart never points at an image that is not there yet. Its
+  # permissions are this job's alone: the registry write and the attestation.
+  # Artifact Hub reads the repository's metadata file from the chart's
+  # `artifacthub.io` tag; the one-time registration is the maintainer's
+  # (CONTRIBUTING.md).
+  server-chart:
+    name: helm chart
+    needs: [release-please, server-image]
+    if: needs.release-please.outputs.server_released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      REGISTRY: ghcr.io
+      CHART_REPOSITORY: oci://ghcr.io/azverinus/charts
+      CHART_REF: ghcr.io/azverinus/charts/flagnetic
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.release-please.outputs.server_tag }}
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v3.18.6
+      - uses: oras-project/setup-oras@5e2f2482b30b0cb3e14e67f89a80c88c659a7c63 # v2.0.3
+      - name: Chart version equals the release
+        env:
+          VERSION: ${{ needs.release-please.outputs.server_version }}
+        run: |
+          chart_version="$(sed -n 's/^version: \([^ ]*\).*/\1/p' deploy/helm/flagnetic/Chart.yaml)"
+          app_version="$(sed -n 's/^appVersion: "\([^"]*\)".*/\1/p' deploy/helm/flagnetic/Chart.yaml)"
+          if [ "$chart_version" != "$VERSION" ] || [ "$app_version" != "$VERSION" ]; then
+            echo "Chart.yaml has version $chart_version and appVersion $app_version; the release is $VERSION." >&2
+            exit 1
+          fi
+      - name: Log in to GHCR
+        env:
+          ACTOR: ${{ github.actor }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          helm registry login "$REGISTRY" --username "$ACTOR" --password-stdin <<< "$TOKEN"
+          oras login "$REGISTRY" --username "$ACTOR" --password-stdin <<< "$TOKEN"
+      - name: Package
+        run: helm package deploy/helm/flagnetic --destination "$RUNNER_TEMP/chart"
+      - name: Push
+        id: push
+        run: |
+          out="$(helm push "$RUNNER_TEMP"/chart/flagnetic-*.tgz "$CHART_REPOSITORY" 2>&1)"
+          echo "$out"
+          digest="$(sed -n 's/^Digest: \(sha256:[0-9a-f]\{64\}\)$/\1/p' <<< "$out")"
+          if [ -z "$digest" ]; then
+            echo "helm push printed no digest." >&2
+            exit 1
+          fi
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-name: ${{ env.CHART_REF }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+      - name: Artifact Hub metadata
+        working-directory: deploy/helm
+        run: |
+          oras push "$CHART_REF:artifacthub.io" \
+            --config /dev/null:application/vnd.cncf.artifacthub.config.v1+yaml \
+            artifacthub-repo.yml:application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml
+      - name: Summary
+        env:
+          VERSION: ${{ needs.release-please.outputs.server_version }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: echo "Pushed $CHART_REF:$VERSION ($DIGEST) with a build attestation." >> "$GITHUB_STEP_SUMMARY"
+
   # A Go module is published by its tag alone. The SDK reports its version in
   # every User-Agent and summary envelope, so the tagged tree's Version must
   # be the tag's; release-please keeps them in step, and this proves it.

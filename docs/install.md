@@ -69,7 +69,7 @@ helm install flagnetic oci://ghcr.io/azverinus/charts/flagnetic -n flagnetic \
   --set config.base_url=https://flags.example.com
 ```
 
-The chart's README has the Secret, every value and the supported Kubernetes and Helm versions.
+[Running Flagnetic on Kubernetes](kubernetes.md) walks through PostgreSQL, the Secret, routes, scaling and upgrades; the chart's README lists every value and the supported Kubernetes and Helm versions.
 
 ## As a binary
 
