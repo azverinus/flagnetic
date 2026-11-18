@@ -209,6 +209,30 @@ histogram_quantile(0.99, sum by (le) (rate(flagnetic_ruleset_propagation_seconds
 
 Above a second or two for minutes, it points at a `rulesets` listener that is down, a database slow to build rulesets, or replica clocks out of step.
 
+## Performance
+
+Flagnetic measures the SDK API's latency under load on every nightly run, on the server's release pull request and on pull requests that touch what answers an SDK: two replicas of the real binary on one PostgreSQL 18, a project of 1,000 flags, and requests sent on a schedule fixed before the run. The generator is an open model: a request is sent at its scheduled time whether or not earlier ones were answered, and its latency is measured from that scheduled time, so a slow server cannot hide the queue behind it. Each scenario runs after a 5-second warm-up that is not counted.
+
+| Scenario | What is sent | Shape | p99 target |
+|---|---|---|---|
+| `evaluate` | Remote evaluation with a client key: the context of one unit, answered the served value of all 1,000 flags | 100 requests per second for 30 seconds, over both replicas | 1,000 ms |
+| `ruleset` | The ruleset with a server key, alternately a full `200` and a revalidation with `If-None-Match` answered `304` | 100 per second for 30 seconds | 500 ms |
+| `events` | A batch of five events from a server key: three evaluation summaries of 20 rows and two exposures of a running experiment | 100 batches per second for 30 seconds | 1,000 ms |
+| `stream` | 500 ruleset streams held open across both replicas by a server key; one configuration change made through replica A, ten times; the time from the commit to the frame announcing it, for every stream | 500 subscribers, 10 changes | 3,000 ms |
+
+The targets are the ceilings the gate fails at, which are deliberately generous: a hosted runner varies by several percent from run to run and by more between machines, so the gate catches a regression of a multiple, not of a few percent. A run also fails when more than 0.1% of the samples fail. A quiet instance answers far faster (on a laptop the same run measures a p99 of a few milliseconds for the first three scenarios and about 50 ms for the stream), and the rates, durations and ceilings are in `e2e/load/profile.json`.
+
+The CI job runs on a GitHub-hosted `ubuntu-latest` runner (the standard 4-vCPU, 16 GB Linux runner), with the replicas, the database and the generator on the same machine and the SDK API's [rate limits](#rate-limits-on-the-sdk-api) off, so that they do not shape the result. Its numbers go to the job summary of every run.
+
+To run it on your own machine, with Docker (a throwaway PostgreSQL is started) and Go:
+
+```bash
+task load
+task load -- --scenario evaluate --report-only
+```
+
+`--scenario` takes a comma-separated list of scenarios, `--profile` a profile file of your own with other rates and ceilings, and `--report-only` prints the numbers without failing on a ceiling. Set `DATABASE_URL` to a test database to use one of your own; the run migrates and seeds whatever it names.
+
 ## What a client key still learns
 
 A client key ships inside apps and browsers, where anyone can read it, so it never receives a ruleset and its [remote evaluation](sdks/evaluate.md) answers never say which rule, segment or prerequisite produced a value (see [What a key learns](sdks/compatibility.md#what-a-key-learns)). A private segment's conditions and members never leave the server. Whoever holds a client key can still learn:

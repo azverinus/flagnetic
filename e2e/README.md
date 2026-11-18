@@ -65,6 +65,12 @@ Each reads the state `up` wrote (`FLAGNETIC_E2E_STATE`, a file in the system tem
 | `flagnetic-e2e events` | the project's events per UTC day and type, as the management API counts them (`{"days": [{"day", "type", "events"}], "gaps"}`); the counts lag the SDK by ten seconds |
 | `flagnetic-e2e seed` | seeds the running instance again, keeping its keys, and prints the seed |
 
+## The load run
+
+`flagnetic-load` measures the SDK API's latency under a fixed arrival rate against the instance a running `up` brought up: it seeds 1,000 flags and a running experiment into the project, runs the scenarios of `load/profile.json`, prints the results as JSON, writes a table to the job summary and exits 1 when a scenario's p99 is above its ceiling or more samples failed than the profile allows. `task load` does all of it with a throwaway database (`.github/scripts/load.sh`; flags after `--` go to `flagnetic-load`, such as `--scenario evaluate` or `--report-only`), with the SDK API's rate limits off. [Performance](../docs/operations.md#performance) lists the scenarios, the rates and the targets.
+
+The generator sends on a schedule fixed before the run and measures each latency from the scheduled send time, so a slow server cannot hide the queue behind it. `load/profile.json` holds the rates, the durations and the p99 ceilings, which are generous absolute numbers that catch a regression of a multiple: a hosted runner varies by more than a few percent.
+
 ## In CI
 
-The `sdk-e2e` job of `.github/workflows/ci.yml` runs on every pull request against a PostgreSQL service and runs this module's test, which brings the instance up in-process and also exercises the command. A language adds steps that start `flagnetic-e2e up` in the background with `FLAGNETIC_E2E_SEED` set, wait for the seed file, and run its smoke, as the Ruby SDK's steps do.
+The `sdk-e2e` job of `.github/workflows/ci.yml` runs on every pull request against a PostgreSQL service and runs this module's test, which brings the instance up in-process and also exercises the command. The `load` job runs the load scenarios against two replicas and PostgreSQL 18 (see above). A language adds steps that start `flagnetic-e2e up` in the background with `FLAGNETIC_E2E_SEED` set, wait for the seed file, and run its smoke, as the Ruby SDK's steps do.

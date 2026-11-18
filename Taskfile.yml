@@ -146,6 +146,11 @@ tasks:
     cmds:
       - env -u DATABASE_URL go run ./e2e/cmd/flagnetic-e2e up
 
+  load:
+    desc: Measure the SDK API's p99 under load against two replicas and a throwaway PostgreSQL (see docs/operations.md; extra flags go to flagnetic-load, e.g. -- --scenario evaluate --report-only)
+    cmds:
+      - env -u DATABASE_URL .github/scripts/load.sh {{.CLI_ARGS}}
+
   # --- Checks (what CI runs) ---
 
   pr:check:
