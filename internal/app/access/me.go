@@ -230,10 +230,10 @@ func (h *ChangeMyPassword) apply(ctx context.Context, cmd ChangeMyPasswordComman
 	if !callerLive {
 		return access.ErrSessionExpired
 	}
-	if err := h.d.Store.ClearAttempt(ctx, a.reserved); err != nil {
+	if err = h.d.Store.ClearAttempt(ctx, a.reserved); err != nil {
 		return err
 	}
-	if err := h.d.Store.SetPasswordHash(ctx, member.ID, hash, now); err != nil {
+	if err = h.d.Store.SetPasswordHash(ctx, member.ID, hash, now); err != nil {
 		return err
 	}
 	if len(others) > 0 {

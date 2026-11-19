@@ -907,7 +907,7 @@ func TestASignInCompletedWhileAProviderIsChangedWaitsForTheChange(t *testing.T) 
 	if done.URL.Path != "/" {
 		t.Fatalf("the sign-in ended at %s", done.URL)
 	}
-	if me := signedIn(t, b); me == nil || me.Member == nil || string(me.Member.Email) != email {
+	if me := signedIn(t, b); me == nil || me.Member == nil || me.Member.Email != email {
 		t.Errorf("signed in as %v, want %s", me, email)
 	}
 }

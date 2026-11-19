@@ -60,8 +60,8 @@ func updateAuthSettings(t *testing.T, change func(*access.AuthSettings), domain 
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		if err := store.SaveAuthSettings(context.WithoutCancel(t.Context()), before); err != nil {
-			t.Error(err)
+		if restoreErr := store.SaveAuthSettings(context.WithoutCancel(t.Context()), before); restoreErr != nil {
+			t.Error(restoreErr)
 		}
 	})
 	admin := testkit.NewMember(t, pool, testkit.AsInstanceAdmin())
@@ -226,8 +226,8 @@ func closeLocalLogin(t *testing.T) (open func()) {
 		t.Fatal(err)
 	}
 	open = func() {
-		if err := store.SaveAuthSettings(context.WithoutCancel(t.Context()), before); err != nil {
-			t.Error(err)
+		if restoreErr := store.SaveAuthSettings(context.WithoutCancel(t.Context()), before); restoreErr != nil {
+			t.Error(restoreErr)
 		}
 	}
 	t.Cleanup(open)
