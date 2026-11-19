@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/scim"
@@ -120,7 +119,7 @@ func TestAUserCreatedInactiveKeepsNoneOfTheProvidersMappedGrants(t *testing.T) {
 
 	address := uniqueEmail()
 	local := testkit.NewMember(t, testkit.Pool(t), testkit.WithEmail(address))
-	member := openapi_types.UUID(uuid.MustParse(local.ID.String()))
+	member := uuid.MustParse(local.ID.String())
 	idp.NextClaims(map[string]any{"sub": "sub-local", "email": address, "email_verified": true, "groups": []string{"eng"}})
 	b := testkit.NewBrowser(t, e.srv.URL)
 	if v := e.signIn(t, b, slug, "", e.opts()); v.URL.Path != "/" {

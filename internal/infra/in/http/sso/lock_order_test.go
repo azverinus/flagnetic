@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
@@ -56,15 +55,15 @@ func TestASignInActivatingAnInvitedMemberWaitsForTheAdminChangeToThatMember(t *t
 	)
 	store := pgaccess.NewStore(e.pool)
 	err = postgres.NewTransactor(e.pool).Within(t.Context(), func(ctx context.Context) error {
-		if err := store.LockInstanceAdmins(ctx); err != nil {
-			return err
+		if lockErr := store.LockInstanceAdmins(ctx); lockErr != nil {
+			return lockErr
 		}
 		wg.Go(func() { done = b.Visit(t, held.URL.String(), e.opts()) })
 		// The completion runs as far as it can: before the fix as far as the
 		// member, whom it then holds while it waits for the admins.
 		settle()
-		_, _, err := store.LockMember(ctx, memberID)
-		return err
+		_, _, lockErr := store.LockMember(ctx, memberID)
+		return lockErr
 	})
 	wg.Wait()
 	if err != nil {
@@ -91,7 +90,7 @@ func TestUnlinkingAnIdentityAndReplacingTheMappingsAtOnceLeaveNoGrantFromTheProv
 	alpha, beta := e.project(t), e.project(t)
 	e.mapGroups(t, slug, projectMapping("eng", alpha, "developer"))
 	m := e.passwordMember(t)
-	member := openapi_types.UUID(uuid.MustParse(m.ID.String()))
+	member := uuid.MustParse(m.ID.String())
 
 	idp.NextClaims(map[string]any{"sub": "sub-race", "email": m.Email, "email_verified": true, "groups": []string{"eng"}})
 	if v := e.signIn(t, testkit.NewBrowser(t, e.srv.URL), slug, "", e.opts()); v.URL.Path != "/" {
