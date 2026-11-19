@@ -919,3 +919,28 @@ func TestASignInCompletedWhileAProviderIsChangedWaitsForTheChange(t *testing.T) 
 		t.Errorf("signed in as %v, want %s", me, email)
 	}
 }
+
+// An address that differs from a member's only by a letter Unicode folds into
+// an ASCII one (U+212A KELVIN SIGN is k) is another address: whoever claims it
+// is not the member, however the database's collation folds.
+func TestAnEmailThatOnlyUnicodeFoldingEquatesLinksNoMember(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	slug := e.forged(t, idp, func(p *provider) { p.autoProvision, p.linkByEmail = false, true })
+	kate := testkit.NewMember(t, testkit.Pool(t), testkit.WithEmail("kate"+strings.ToLower(rand.Text()[:6])+"@example.com"))
+	forged := "K" + kate.Email[1:]
+
+	idp.NextClaims(map[string]any{"sub": "sub-forged", "email": forged, "email_verified": true})
+	b := testkit.NewBrowser(t, e.srv.URL)
+	wantError(t, e.signIn(t, b, slug, "", e.opts()), b, "member_not_found")
+	if n := len(e.audited(t, "identity.linked", "member_email", kate.Email)); n != 0 {
+		t.Errorf("%d identities linked to %s, want none", n, kate.Email)
+	}
+
+	// The same address in ASCII, in another case, still is the member.
+	idp.NextClaims(map[string]any{"sub": "sub-real", "email": strings.ToUpper(kate.Email[:1]) + kate.Email[1:], "email_verified": true})
+	b = testkit.NewBrowser(t, e.srv.URL)
+	if v := e.signIn(t, b, slug, "", e.opts()); v.URL.Path != "/" {
+		t.Errorf("the sign-in with the address in another case ended at %s", v.URL)
+	}
+}

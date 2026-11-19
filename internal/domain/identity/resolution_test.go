@@ -94,3 +94,41 @@ func TestTheProvidersAcceptingAnInvitationVouchForItsEmail(t *testing.T) {
 		})
 	}
 }
+
+// Emails are ASCII-case-insensitive byte strings. Unicode folding maps U+212A
+// KELVIN SIGN to k, so an address written with it must not be taken for the
+// ASCII one.
+func TestEmailsFoldAsciiLettersOnly(t *testing.T) {
+	const kelvin = "K"
+	for _, tc := range []struct {
+		a, b string
+		same bool
+	}{
+		{"Kate@Example.COM", "kate@example.com", true},
+		{kelvin + "ate@example.com", "kate@example.com", false},
+		{"kate@example.com", kelvin + "ate@example.com", false},
+		{kelvin + "ate@example.com", kelvin + "ATE@example.com", true},
+		{"Ünal@example.com", "ünal@example.com", false},
+	} {
+		if got := identity.SameEmail(tc.a, tc.b); got != tc.same {
+			t.Errorf("SameEmail(%q, %q) = %v, want %v", tc.a, tc.b, got, tc.same)
+		}
+	}
+
+	p := identity.Provider{Domains: []string{"kelvin.example"}}
+	for email, want := range map[string]bool{
+		"x@kelvin.example": true, "x@KELVIN.example": true, "x@" + kelvin + "elvin.example": false, "x@kelvin.example" + kelvin: false,
+	} {
+		if got := p.VouchesForEmail(email); got != want {
+			t.Errorf("VouchesForEmail(%q) = %v, want %v", email, got, want)
+		}
+	}
+
+	// A claim whose address only Unicode folding equates with a member's
+	// resolves to nobody: the store does not find the member, so a provider
+	// that does not provision refuses it.
+	in := identity.ResolveInput{Provider: provider(true, false, false), Claims: claims(kelvin+"ate@example.com", true)}
+	if _, err := identity.Resolve(in); !errors.Is(err, identity.ErrMemberNotFound) {
+		t.Errorf("a claim of a lookalike address = %v, want member_not_found", err)
+	}
+}

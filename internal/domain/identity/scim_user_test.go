@@ -150,21 +150,21 @@ func TestPatchingAUserRefusesWhatItCannotDo(t *testing.T) {
 		ops  []identity.PatchOperation
 		want string
 	}{
-		"no operations":                  {nil, "invalidValue"},
-		"an unknown op":                  {[]identity.PatchOperation{op("move", "active", true)}, "invalidSyntax"},
-		"remove without a path":          {[]identity.PatchOperation{op("remove", "", nil)}, "noTarget"},
-		"no path and no object":          {[]identity.PatchOperation{op("replace", "", "x")}, "invalidValue"},
-		"active is a boolean":            {[]identity.PatchOperation{op("replace", "active", 5.0)}, "invalidValue"},
-		"active is not removable":        {[]identity.PatchOperation{op("remove", "active", nil)}, "invalidValue"},
-		"userName is not removable":      {[]identity.PatchOperation{op("remove", "userName", nil)}, "invalidValue"},
-		"emails is not removable":        {[]identity.PatchOperation{op("remove", "emails", nil)}, "invalidValue"},
-		"an email must be a string":      {[]identity.PatchOperation{op("replace", "userName", 7.0)}, "invalidValue"},
-		"displayName must be a string":   {[]identity.PatchOperation{op("replace", "displayName", true)}, "invalidValue"},
-		"externalId must be a string":    {[]identity.PatchOperation{op("replace", "externalId", 7.0)}, "invalidValue"},
-		"groups are read only":           {[]identity.PatchOperation{op("add", "groups", []any{})}, "mutability"},
-		"a group by a value path":        {[]identity.PatchOperation{op("remove", `groups[value eq "x"]`, nil)}, "mutability"},
-		"id is read only":                {[]identity.PatchOperation{op("replace", "id", "x")}, "mutability"},
-		"a malformed path":               {[]identity.PatchOperation{op("replace", "emails[", "x")}, "invalidPath"},
+		"no operations":                {nil, "invalidValue"},
+		"an unknown op":                {[]identity.PatchOperation{op("move", "active", true)}, "invalidSyntax"},
+		"remove without a path":        {[]identity.PatchOperation{op("remove", "", nil)}, "noTarget"},
+		"no path and no object":        {[]identity.PatchOperation{op("replace", "", "x")}, "invalidValue"},
+		"active is a boolean":          {[]identity.PatchOperation{op("replace", "active", 5.0)}, "invalidValue"},
+		"active is not removable":      {[]identity.PatchOperation{op("remove", "active", nil)}, "invalidValue"},
+		"userName is not removable":    {[]identity.PatchOperation{op("remove", "userName", nil)}, "invalidValue"},
+		"emails is not removable":      {[]identity.PatchOperation{op("remove", "emails", nil)}, "invalidValue"},
+		"an email must be a string":    {[]identity.PatchOperation{op("replace", "userName", 7.0)}, "invalidValue"},
+		"displayName must be a string": {[]identity.PatchOperation{op("replace", "displayName", true)}, "invalidValue"},
+		"externalId must be a string":  {[]identity.PatchOperation{op("replace", "externalId", 7.0)}, "invalidValue"},
+		"groups are read only":         {[]identity.PatchOperation{op("add", "groups", []any{})}, "mutability"},
+		"a group by a value path":      {[]identity.PatchOperation{op("remove", `groups[value eq "x"]`, nil)}, "mutability"},
+		"id is read only":              {[]identity.PatchOperation{op("replace", "id", "x")}, "mutability"},
+		"a malformed path":             {[]identity.PatchOperation{op("replace", "emails[", "x")}, "invalidPath"},
 	} {
 		if _, err := identity.ApplyUserPatch(c.ops); scimType(err) != c.want {
 			t.Errorf("%s: = %v, want %s", name, err, c.want)

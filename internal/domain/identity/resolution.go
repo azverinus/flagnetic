@@ -174,7 +174,7 @@ func (p Provider) VouchesForEmail(email string) bool {
 	if at <= 0 {
 		return false
 	}
-	domain := strings.ToLower(email[at+1:])
+	domain := FoldEmail(email[at+1:])
 	for _, d := range p.Domains {
 		if d == domain {
 			return true
@@ -191,3 +191,20 @@ func (c VerifiedClaims) MemberName() string {
 	}
 	return c.Email
 }
+
+// FoldEmail lowercases the ASCII letters of email and nothing else. Emails
+// are matched as ASCII-case-insensitive byte strings: Unicode folding maps
+// U+212A KELVIN SIGN to k, so "Kate@acme.uk" written with it would be taken
+// for kate@acme.uk and its holder for another member.
+func FoldEmail(email string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= 'A' && r <= 'Z' {
+			return r + ('a' - 'A')
+		}
+		return r
+	}, email)
+}
+
+// SameEmail reports whether a and b are one address, ignoring the case of
+// ASCII letters only.
+func SameEmail(a, b string) bool { return FoldEmail(a) == FoldEmail(b) }
