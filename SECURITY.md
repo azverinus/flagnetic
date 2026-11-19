@@ -13,3 +13,9 @@ Until 1.0, fixes go to `main` and the latest release only, currently 0.5. From 1
 ## Scope
 
 In scope: the server, the console, the SDKs in this repository, and their release artifacts. Particularly interesting: anything a client-side SDK key (embedded in public apps) can learn or do beyond reading served flag values, authentication and authorization bypasses, server-side request forgery through integrations, and denial of service from unauthenticated requests.
+
+### What a database writer can do
+
+Someone who can write to the PostgreSQL database is outside the threat model: the database is the instance's source of truth, and a writer can set `instance_admin`, grants, an auth provider's trust anchors (issuer, certificates, domains) and password hashes directly, whatever the server checks on the way in. Protect the database with the access you would give the instance's administrators.
+
+What the secret key protects is the confidentiality of secrets at rest: auth provider client secrets, SMTP passwords, the hashes of SCIM tokens and the like are sealed under it, so a database dump, a backup or a read-only replica is no source of them. Sessions are signed with it, so a writer cannot mint one. Each sealed value is also bound to its row, and a SCIM token's hash to its provider and expiry, so a value copied between rows, or a token pointed at another provider, does not open; that is defense in depth against mistakes and leaked values, not a promise that a writer cannot change what the instance does.
