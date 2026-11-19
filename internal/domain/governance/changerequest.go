@@ -562,6 +562,13 @@ func (cr ChangeRequest) Rebase(by Taker, current Subject, now time.Time) (Change
 	out := cr
 	out.Base, out.BaseVersion = current.Base, current.BaseVersion
 	out.BaseReferrers, out.BaseHolders = current.BaseReferrers, current.BaseHolders
+	// An experiment moves between flags while its draft waits, and what
+	// supersedes a request is matched by the flag it names, so the flag
+	// follows the entity; the other subjects' references cannot move.
+	if current.Flag != nil {
+		flag := *current.Flag
+		out.Flag = &flag
+	}
 	out.Diff = diffOf(cr.Kind, current.Base, cr.Proposed)
 	return cr.changedTo(out, now)
 }
@@ -787,7 +794,8 @@ func (cr ChangeRequest) moved(state ChangeRequestState, now time.Time) ChangeReq
 // anything changed; cr itself when nothing did.
 func (cr ChangeRequest) changedTo(out ChangeRequest, now time.Time) (ChangeRequest, bool, error) {
 	sameSchedule := (out.ApplyAt == nil) == (cr.ApplyAt == nil) && (out.ApplyAt == nil || out.ApplyAt.Equal(*cr.ApplyAt))
-	if sameSchedule && out.Title == cr.Title && out.Description == cr.Description && out.BaseVersion == cr.BaseVersion &&
+	sameFlag := (out.Flag == nil) == (cr.Flag == nil) && (out.Flag == nil || *out.Flag == *cr.Flag)
+	if sameSchedule && sameFlag && out.Title == cr.Title && out.Description == cr.Description && out.BaseVersion == cr.BaseVersion &&
 		reflect.DeepEqual(out.Proposed, cr.Proposed) && reflect.DeepEqual(out.Base, cr.Base) &&
 		slices.Equal(out.BaseReferrers, cr.BaseReferrers) && slices.Equal(out.BaseHolders, cr.BaseHolders) {
 		return cr, false, nil

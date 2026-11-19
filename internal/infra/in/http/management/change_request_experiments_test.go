@@ -528,3 +528,58 @@ func TestAnExperimentChangeRequestNamesItsExperimentAlone(t *testing.T) {
 	res := do(f.developer.CreateChangeRequestWithResponse(t.Context(), key, body))
 	assertProblem(t, "a configuration naming an experiment", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid_change_request")
 }
+
+// A draft change request follows its experiment to another flag when it is
+// rebased, so a write to the new flag's rules supersedes it as it would
+// any other request to the experiment.
+func TestARebasedExperimentChangeRequestFollowsItsExperimentToAnotherFlag(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	key := p.Key
+	stringFlag(t, admin, key, "checkout_title")
+	stringFlag(t, admin, key, "checkout_banner")
+	e := createExperiment(t, admin, key, startableExperiment("checkout_v2"))
+	setProtected(t, admin, key, "production", true)
+	developer, _ := grantedSession(t, srv, p, access.RoleDeveloper)
+	maintainer, _ := grantedSession(t, srv, p, access.RoleMaintainer)
+
+	body := experimentRequest(startTransition)
+	body.Open = ptr(false)
+	draft := createChangeRequest(t, developer.ClientWithResponses, key, body)
+	if valueOr(draft.Flag) != "checkout_title" {
+		t.Fatalf("draft flag = %q, want checkout_title", valueOr(draft.Flag))
+	}
+
+	// The experiment moves to another flag, which a rule now serves it on.
+	if res := patchExperiment(t, admin, key, "checkout_v2", e.Version, management.ExperimentPatch{Flag: ptr("checkout_banner")}); res.JSON200 == nil {
+		t.Fatalf("move the experiment = %d: %s", res.StatusCode(), res.Body)
+	}
+	for _, env := range []string{"staging", "production"} {
+		setProtected(t, admin, key, env, false)
+		mustPut(t, admin, key, "checkout_banner", env, 1, holding("checkout_v2"))
+	}
+	setProtected(t, admin, key, "production", true)
+
+	opened := openChangeRequest(t, developer.ClientWithResponses, key, draft)
+	assertProblem(t, "opening after the move", opened.StatusCode(), opened.Body, http.StatusConflict, "base_moved")
+	rebased := rebaseChangeRequest(t, developer.ClientWithResponses, key, draft)
+	if rebased.JSON200 == nil {
+		t.Fatalf("rebase = %d: %s", rebased.StatusCode(), rebased.Body)
+	}
+	if got := valueOr(rebased.JSON200.Flag); got != "checkout_banner" {
+		t.Errorf("rebased flag = %q, want checkout_banner", got)
+	}
+	if opened = openChangeRequest(t, developer.ClientWithResponses, key, *rebased.JSON200); opened.JSON200 == nil {
+		t.Fatalf("open after the rebase = %d: %s", opened.StatusCode(), opened.Body)
+	}
+	approved := mustApprove(t, maintainer.ClientWithResponses, key, *opened.JSON200)
+
+	staging := getConfiguration(t, admin, key, "checkout_banner", "staging")
+	wider := holding("checkout_v2")
+	wider.Fallthrough = "b"
+	mustPut(t, admin, key, "checkout_banner", "staging", staging.Version, wider)
+	if got := getChangeRequest(t, admin, key, approved); got.State != management.ChangeRequestStateSuperseded {
+		t.Errorf("after a write to the new flag's staging rules: %s, want superseded", got.State)
+	}
+}

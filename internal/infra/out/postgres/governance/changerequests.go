@@ -176,6 +176,10 @@ func (s *ChangeRequests) UpdateChangeRequest(ctx context.Context, cr governance.
 	if !cr.SupersededBy.IsZero() {
 		supersededBy = cr.SupersededBy.Bytes()
 	}
+	var flag any
+	if cr.Flag != nil {
+		flag = cr.Flag.ID.Bytes()
+	}
 	tag, err := s.db(ctx).Exec(ctx, `
 		UPDATE change_requests
 		SET state = $3, title = $4, description = $5, base = $6, base_version = $7, proposed = $8, diff = $9,
@@ -183,13 +187,13 @@ func (s *ChangeRequests) UpdateChangeRequest(ctx context.Context, cr governance.
 		    applied_at = $16, applied_by_kind = $17, applied_by = $18, applied_by_token = $19, superseded_by = $20,
 		    base_referrers = $21, approval_covers = $22, apply_at = $23, schedule_failed_at = $24,
 		    schedule_failure_code = $25, schedule_failure_message = $26, schedule_failures = $27, schedule_stopped = $28,
-		    base_holders = $29
+		    base_holders = $29, flag_id = $30
 		WHERE project_id = $1 AND id = $2`,
 		append(append([]any{
 			cr.Project.Bytes(), cr.ID.Bytes(), string(cr.State), cr.Title, cr.Description, base, cr.BaseVersion, proposed, diff,
 			cr.UpdatedAt, cr.Version, decision, decidedBy, decidedAt, comment, appliedAt, appliedKind, appliedBy, appliedT,
 			supersededBy, referrersOf(cr), coversOf(cr), cr.ApplyAt,
-		}, failureArgs(cr.ScheduleFailure)...), holdersOf(cr))...)
+		}, failureArgs(cr.ScheduleFailure)...), holdersOf(cr), flag)...)
 	if err != nil {
 		return fmt.Errorf("updating a change request: %w", err)
 	}
