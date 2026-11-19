@@ -6,12 +6,13 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 // The class names a screen may not write, as regular expressions over a
-// class-name string: a token starts the string or follows a space, and may
-// carry variant prefixes (`md:`, `max-sm:`).
-const classToken = (name) => `/(^|\\s)([a-z0-9[\\]-]+:)*(${name})(\\s|$)/`;
+// class-name string: a token starts the string or follows a space, may
+// carry variant prefixes (`md:`, `max-sm:`, `data-[state=open]:`) and the
+// important modifier on either side (`p-6!`, `!p-6`).
+const classToken = (name) => `/(^|\\s)([^\\s:]+:)*!?(${name})!?(\\s|$)/`;
 const screenClassRules = [
   {
-    pattern: classToken("max-w-(?!full(\\s|$))[^\\s]+|mx-auto"),
+    pattern: classToken("max-w-(?!full!?(\\s|$))[^\\s]+|mx-auto"),
     message:
       'A screen does not set its own width or centre itself: wrap it in <Page measure="full" | "form">, and put sections in <Card>.',
   },

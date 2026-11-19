@@ -127,4 +127,4 @@ While working, run one test file with `pnpm --dir web --filter @flagnetic/consol
 
 ## The lint rule
 
-`web/eslint.config.js` fails a class-name string in a route or a screen component (anything outside `components/ui/`) that contains `max-w-` (except `max-w-full`), `mx-auto`, `p-6`, `px-6`, `pt-6` or `uppercase`, with or without a variant prefix. The message names the primitive to use. `apps/console/src/test/screen-classes.test.ts` holds a failing and a passing screen, so loosening the rule fails a test.
+`web/eslint.config.js` fails a class-name string in a route or a screen component (anything outside `components/ui/`) that contains `max-w-` (except `max-w-full`), `mx-auto`, `p-6`, `px-6`, `pt-6` or `uppercase`, with or without a variant prefix or the important modifier. The message names the primitive to use. `apps/console/src/test/screen-classes.test.ts` holds a failing and a passing screen, so loosening the rule fails a test.

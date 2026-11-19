@@ -29,7 +29,7 @@ import { Page } from "@/components/ui/page";
 export function Screen() {
   return (
     <Page measure="form">
-      <Card className="max-w-full min-w-0 p-4 max-sm:p-3" />
+      <Card className="max-w-full! min-w-0 p-4 max-sm:p-3" />
     </Page>
   );
 }
@@ -49,6 +49,14 @@ describe("screen class names", () => {
       "components/fixture.tsx",
     );
     expect(found).toHaveLength(2);
+  });
+
+  it("refuses them with an arbitrary variant or the important modifier", async () => {
+    const found = await messages(
+      'export const a = <div className="data-[state=open]:mx-auto p-6! !uppercase" />;',
+      "components/fixture.tsx",
+    );
+    expect(found).toHaveLength(3);
   });
 
   it("accepts a screen built from the primitives", async () => {
