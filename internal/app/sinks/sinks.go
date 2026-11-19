@@ -20,6 +20,11 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
+// errSinkChanged refuses a request whose sink was edited between what it read
+// outside the unit of work and the lock it then took.
+var errSinkChanged = apperrors.PreconditionFailed("sink_changed",
+	"the sink was edited while the request was running; try again")
+
 // ErrNotFound is what a store answers for a row it does not have.
 var ErrNotFound = errors.New("sinks: not found")
 

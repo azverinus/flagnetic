@@ -45,37 +45,60 @@ func (s *Store) WithFault(f *Fault) *Store {
 // the stream does not know, and sends it again under the same delivery ID
 // once the lease runs out.
 type Fault struct {
-	lose atomic.Bool
-	gap  atomic.Pointer[gapHold]
+	lose   atomic.Bool
+	gap    atomic.Pointer[gapHold]
+	search atomic.Pointer[gapHold]
 }
 
-// gapHold stops the next recording of a gap until released.
+// gapHold stops the next recording of a gap, or the next search for where a
+// replay starts, until released.
 type gapHold struct {
 	reached chan struct{}
 	release chan struct{}
+}
+
+func holdNext(slot *atomic.Pointer[gapHold]) (reached <-chan struct{}, release func()) {
+	h := &gapHold{reached: make(chan struct{}), release: make(chan struct{})}
+	slot.Store(h)
+	var once sync.Once
+	return h.reached, func() { once.Do(func() { close(h.release) }) }
+}
+
+func hold(ctx context.Context, slot *atomic.Pointer[gapHold]) {
+	if h := slot.Swap(nil); h != nil {
+		close(h.reached)
+		select {
+		case <-h.release:
+		case <-ctx.Done():
+		}
+	}
 }
 
 // HoldNextGapRecording stops the next gap a sink records inside its
 // transaction, as a slow statement would, until release is called. reached is
 // closed once the recording is stopped.
 func (f *Fault) HoldNextGapRecording() (reached <-chan struct{}, release func()) {
-	h := &gapHold{reached: make(chan struct{}), release: make(chan struct{})}
-	f.gap.Store(h)
-	var once sync.Once
-	return h.reached, func() { once.Do(func() { close(h.release) }) }
+	return holdNext(&f.gap)
+}
+
+// HoldNextSearch holds the next search for where a replay or an enable
+// starts, to show that the search runs without the project's lock: reached is
+// closed once the search is under way, and release lets it read.
+func (f *Fault) HoldNextSearch() (reached <-chan struct{}, release func()) {
+	return holdNext(&f.search)
 }
 
 // holdGap stops the recording about to be made if it is the one held.
 func (f *Fault) holdGap(ctx context.Context) {
-	if f == nil {
-		return
+	if f != nil {
+		hold(ctx, &f.gap)
 	}
-	if h := f.gap.Swap(nil); h != nil {
-		close(h.reached)
-		select {
-		case <-h.release:
-		case <-ctx.Done():
-		}
+}
+
+// holdSearch blocks while a test holds the search that is about to run.
+func (f *Fault) holdSearch(ctx context.Context) {
+	if f != nil {
+		hold(ctx, &f.search)
 	}
 }
 

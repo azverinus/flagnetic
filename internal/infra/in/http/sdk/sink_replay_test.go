@@ -621,3 +621,77 @@ func TestABatchOfABoundedReplaySetAsideKeepsTheReplaysFloorWhenRedelivered(t *te
 		t.Errorf("redelivered %v, want %v: the row received before the window stays out", got, want)
 	}
 }
+
+// writeWhileHeld runs write, which needs the project's lock, while the search
+// for where a replay or an enable starts is held, and reports whether it
+// completed without waiting for the search.
+func (f delivering) writeWhileHeld(t *testing.T, reached <-chan struct{}, write func()) bool {
+	t.Helper()
+	select {
+	case <-reached:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the search never started")
+	}
+	done := make(chan struct{})
+	go func() {
+		write()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return true
+	case <-time.After(5 * time.Second):
+		return false
+	}
+}
+
+// A replay searches the raw event tables for where it starts, which reads as
+// far back as the replay goes, before it takes the project's lock: a write to
+// the project, the kill switch included, never waits for the search.
+func TestAReplaysSearchOfTheEventsDoesNotHoldUpWritesToItsProject(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t)
+	sink, _ := f.enabled(t, webhook(r, "exposure"))
+	_, at := f.timeline(t, "u-1", "u-2")
+	tick(t, f.srv)
+
+	reached, release := f.srv.HoldNextSinkSearch()
+	defer release()
+	replayed := make(chan *management.ReplaySinkResponse, 1)
+	go func() {
+		replayed <- do(f.p.admin.ReplaySinkWithResponse(t.Context(), f.p.key, sink.Id, management.SinkReplay{From: at[0]}))
+	}()
+
+	if !f.writeWhileHeld(t, reached, func() { f.p.flag(t, "kill_switch") }) {
+		t.Error("a write to the project waited for the replay's search of the events")
+	}
+	release()
+	if res := <-replayed; res.JSON200 == nil {
+		t.Fatalf("POST replay = %d: %s", res.StatusCode(), res.Body)
+	}
+}
+
+// Enabling a sink from a time searches the raw event tables the same way,
+// outside the project's lock.
+func TestAnEnablesSearchOfTheEventsDoesNotHoldUpWritesToItsProject(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t)
+	created, _ := f.create(t, webhook(r, "exposure"))
+	f.timeline(t, "u-1")
+	f.srv.AwaitHorizon(t)
+
+	reached, release := f.srv.HoldNextSinkSearch()
+	defer release()
+	enabled := make(chan *management.EnableSinkResponse, 1)
+	go func() {
+		enabled <- do(f.p.admin.EnableSinkWithResponse(t.Context(), f.p.key, created.Id, management.SinkEnable{StartFrom: ptr(f.clock.Now().Add(-24 * time.Hour))}))
+	}()
+
+	if !f.writeWhileHeld(t, reached, func() { f.p.flag(t, "kill_switch") }) {
+		t.Error("a write to the project waited for the enable's search of the events")
+	}
+	release()
+	if res := <-enabled; res.JSON200 == nil {
+		t.Fatalf("POST enable = %d: %s", res.StatusCode(), res.Body)
+	}
+}

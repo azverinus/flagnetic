@@ -121,8 +121,16 @@ func (h *Test) Handle(ctx context.Context, cmd TestCommand) (Tested, error) {
 			return txErr
 		}
 		if cmd.Config == nil {
-			if txErr := h.d.Store.SaveWarnings(ctx, s.ID, result.Warnings); txErr != nil {
+			// What the probe found is the warnings of the configuration it
+			// called; a sink edited since keeps the ones its edit stored.
+			current, txErr := sinkOf(ctx, h.d.Store, cmd.Project, cmd.Sink)
+			if txErr != nil {
 				return txErr
+			}
+			if current.Version == s.Version {
+				if txErr = h.d.Store.SaveWarnings(ctx, s.ID, result.Warnings); txErr != nil {
+					return txErr
+				}
 			}
 		}
 		after := sinks.Sink{ID: s.ID, Project: s.Project, Input: sinks.Input{Name: s.Name, Kind: s.Kind}}
