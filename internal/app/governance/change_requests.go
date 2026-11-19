@@ -183,6 +183,9 @@ type ChangeRequestCommand struct {
 	Expected      precondition.Version
 	By            governance.Taker
 	Request       governance.Request
+	// MayEditExperiments is whether the caller holds experiment.edit in the
+	// project, which applying a change request to an experiment needs.
+	MayEditExperiments bool
 }
 
 // transition runs one transition of the change request cmd names: under the

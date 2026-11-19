@@ -117,6 +117,7 @@ func (a *api) CreateChangeRequest(ctx context.Context, req CreateChangeRequestRe
 	cr, err := a.h.CreateChangeRequest.Handle(ctx, appgovernance.CreateChangeRequestCommand{
 		Project: projectID(ctx), Target: target, Title: b.Title, Description: valueOf(b.Description), Proposed: proposed,
 		RevertTo: b.RevertTo, Open: valueOr(b.Open, false), ApplyAt: b.ApplyAt, Author: authorOf(ctx), Request: requestOf(ctx),
+		MayEditExperiments: mayEditExperiments(ctx),
 	})
 	if err != nil {
 		return nil, err
@@ -260,7 +261,7 @@ func (a *api) ApplyChangeRequest(ctx context.Context, req ApplyChangeRequestRequ
 func (a *api) CopyChangeRequest(ctx context.Context, req CopyChangeRequestRequestObject) (CopyChangeRequestResponseObject, error) {
 	cr, err := a.h.CopyChangeRequest.Handle(ctx, appgovernance.CopyChangeRequestCommand{
 		Project: projectID(ctx), ChangeRequest: id.FromBytes[governance.ChangeRequest](req.ChangeRequest),
-		Author: authorOf(ctx), Request: requestOf(ctx),
+		Author: authorOf(ctx), Request: requestOf(ctx), MayEditExperiments: mayEditExperiments(ctx),
 	})
 	if err != nil {
 		return nil, err
@@ -357,6 +358,7 @@ func changeRequestCommand(ctx context.Context, changeRequest ChangeRequestID, he
 	return appgovernance.ChangeRequestCommand{
 		Project: projectID(ctx), ChangeRequest: id.FromBytes[governance.ChangeRequest](changeRequest), Expected: expected,
 		By: governance.Taker{As: authorOf(ctx), MayDecide: mayDecide(ctx)}, Request: requestOf(ctx),
+		MayEditExperiments: mayEditExperiments(ctx),
 	}, nil
 }
 
@@ -365,6 +367,14 @@ func changeRequestCommand(ctx context.Context, changeRequest ChangeRequestID, he
 // the permission.
 func mayDecide(ctx context.Context) bool {
 	return slices.Contains(projectOf(ctx).permissions, access.PermChangeRequestApprove)
+}
+
+// mayEditExperiments reports whether the caller of ctx holds experiment.edit
+// in the project, which proposing or applying a change to an experiment
+// needs besides the permission to propose. A project token's permissions are
+// already narrowed to the scopes it carries.
+func mayEditExperiments(ctx context.Context) bool {
+	return slices.Contains(projectOf(ctx).permissions, access.PermExperimentEdit)
 }
 
 // authorOf returns who the request ctx belongs to proposes as: the member

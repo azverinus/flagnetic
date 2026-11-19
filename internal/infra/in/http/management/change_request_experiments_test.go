@@ -459,7 +459,7 @@ func TestTheSchedulerAppliesExperimentTransitions(t *testing.T) {
 func TestExperimentChangeRequestsAreListedAndAuthoredByAProjectToken(t *testing.T) {
 	f := heldInProduction(t)
 	key := f.project.Key
-	ci := pipeline(t, f.srv, f.project, "maintainer", management.ScopeFlagsWrite)
+	ci := pipeline(t, f.srv, f.project, "maintainer", management.ScopeFlagsWrite, management.ScopeExperimentsWrite)
 	other := createChangeRequest(t, f.developer.ClientWithResponses, key, experimentRequest(startTransition))
 	res := approveChangeRequest(t, ci, key, other, nil)
 	assertProblem(t, "a token approving", res.StatusCode(), res.Body, http.StatusForbidden, "token_cannot_approve")
@@ -582,4 +582,32 @@ func TestARebasedExperimentChangeRequestFollowsItsExperimentToAnotherFlag(t *tes
 	if got := getChangeRequest(t, admin, key, approved); got.State != management.ChangeRequestStateSuperseded {
 		t.Errorf("after a write to the new flag's staging rules: %s, want superseded", got.State)
 	}
+}
+
+// Proposing and applying a change to an experiment needs the permission to
+// run experiments as well as to propose, so a token allowed to write rules
+// and not to run experiments cannot move one through a change request.
+func TestAnExperimentChangeRequestNeedsThePermissionToRunExperiments(t *testing.T) {
+	f := heldInProduction(t)
+	key := f.project.Key
+	rulesOnly := pipeline(t, f.srv, f.project, "maintainer", management.ScopeFlagsWrite)
+	res := do(rulesOnly.CreateChangeRequestWithResponse(t.Context(), key, experimentRequest(startTransition)))
+	pr := assertProblem(t, "a token without the experiments scope proposing", res.StatusCode(), res.Body, http.StatusForbidden, "forbidden")
+	if valueOr(pr.Permission) != "experiment.edit" {
+		t.Errorf("refused for %v, want experiment.edit", valueOr(pr.Permission))
+	}
+	// Another's change request is not copied into a draft of theirs either.
+	proposed := createChangeRequest(t, f.developer.ClientWithResponses, key, experimentRequest(startTransition))
+	copied := do(rulesOnly.CopyChangeRequestWithResponse(t.Context(), key, proposed.Id))
+	assertProblem(t, "copying", copied.StatusCode(), copied.Body, http.StatusForbidden, "forbidden")
+	// A change request to a flag's configuration is unaffected.
+	configuration := configurationRequest("Elsewhere", proposedOn())
+	configuration.Environment = ptr("development")
+	createChangeRequest(t, rulesOnly, key, configuration)
+
+	both := pipeline(t, f.srv, f.project, "maintainer", management.ScopeFlagsWrite, management.ScopeExperimentsWrite)
+	mine := createChangeRequest(t, both, key, experimentRequest(startTransition))
+	approved := mustApprove(t, f.maintainer.ClientWithResponses, key, mine)
+	res2 := do(rulesOnly.ApplyChangeRequestWithResponse(t.Context(), key, approved.Id, &management.ApplyChangeRequestParams{IfMatch: ifMatch(approved.Version)}))
+	assertProblem(t, "applying", res2.StatusCode(), res2.Body, http.StatusForbidden, "forbidden")
 }

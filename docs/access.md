@@ -30,7 +30,7 @@ Every operation of the management API declares the one thing it needs in the Ope
 | `sdk_key.manage` | creating, renaming, rotating and revoking an environment's SDK keys and changing their allowed origins | `project:admin` | |
 | `experiment.edit` | creating, changing and cloning experiments, and regenerating a draft's salts | `experiments:write` | |
 | `experiment.delete` | deleting draft experiments | `experiments:write` | |
-| `change_request.propose` | proposing changes as change requests: creating them, editing, rebasing, opening, cancelling and applying one's own, copying any | `flags:write` | |
+| `change_request.propose` | proposing changes as change requests: creating them, editing, rebasing, opening, cancelling and applying one's own, copying any; for an experiment's transition also needs `experiment.edit` | `flags:write` | |
 | `change_request.approve` | deciding change requests: approving and rejecting another's, and cancelling or applying another's | `flags:write` | ✓ |
 | `webhook.manage` | creating, reading, editing, enabling and deleting a project's webhook subscriptions, rotating their secrets, testing them, reading and redelivering their deliveries, and sending the stale-flag digest now | `project:admin` | |
 | `sink.manage` | creating, reading, editing and deleting a project's sinks, rotating a webhook sink's secret, resuming a stopped sink, listing, redelivering and discarding its dead letters, and listing and dismissing its gaps; reading needs it too, since a sink's configuration names internal hosts, buckets and URLs that may carry tokens | `project:admin` | |

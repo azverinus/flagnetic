@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -37,6 +38,18 @@ type CreateChangeRequestCommand struct {
 	ApplyAt *time.Time
 	Author  governance.Author
 	Request governance.Request
+	// MayEditExperiments is whether the caller holds experiment.edit in the
+	// project.
+	MayEditExperiments bool
+}
+
+// errExperimentEditRequired refuses a caller who may propose changes but not
+// run experiments a change request to an experiment: proposing and applying
+// it moves the experiment as editing it does, and a token may be allowed to
+// write rules and not to run experiments, or the other way round.
+func errExperimentEditRequired() error {
+	return apperrors.Forbidden("forbidden", "this operation needs the permission "+string(access.PermExperimentEdit)+" in its project").
+		WithExtension("permission", string(access.PermExperimentEdit))
 }
 
 // Handle creates the change request, based on its entity as it is now, and
@@ -46,6 +59,9 @@ type CreateChangeRequestCommand struct {
 func (h *CreateChangeRequest) Handle(ctx context.Context, cmd CreateChangeRequestCommand) (governance.ChangeRequest, error) {
 	if err := cmd.check(); err != nil {
 		return governance.ChangeRequest{}, err
+	}
+	if cmd.Kind == governance.KindExperiment && !cmd.MayEditExperiments {
+		return governance.ChangeRequest{}, errExperimentEditRequired()
 	}
 	now := h.d.now()
 	var out governance.ChangeRequest
@@ -276,6 +292,9 @@ type CopyChangeRequestCommand struct {
 	ChangeRequest governance.ChangeRequestID
 	Author        governance.Author
 	Request       governance.Request
+	// MayEditExperiments is whether the caller holds experiment.edit in the
+	// project.
+	MayEditExperiments bool
 }
 
 // Handle copies the change request, whatever its state, into a new draft of
@@ -295,6 +314,9 @@ func (h *CopyChangeRequest) Handle(ctx context.Context, cmd CopyChangeRequestCom
 		source, err := changeRequestOf(ctx, h.d.Store, cmd.Project, cmd.ChangeRequest)
 		if err != nil {
 			return err
+		}
+		if source.Kind == governance.KindExperiment && !cmd.MayEditExperiments {
+			return errExperimentEditRequired()
 		}
 		var in Proposed
 		if source.RevertTo == nil {
@@ -497,6 +519,9 @@ func NewApplyChangeRequest(d ChangeRequestDeps) *ApplyChangeRequest {
 func (h *ApplyChangeRequest) Handle(ctx context.Context, cmd ChangeRequestCommand) (governance.ChangeRequest, error) {
 	return transition(ctx, h.d, cmd, "change_request.applied",
 		func(ctx context.Context, cr governance.ChangeRequest, now time.Time) (governance.ChangeRequest, bool, error) {
+			if cr.Kind == governance.KindExperiment && !cmd.MayEditExperiments {
+				return cr, false, errExperimentEditRequired()
+			}
 			return applyChange(ctx, h.d, cr, cmd.By, cmd.Request, now)
 		})
 }
