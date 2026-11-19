@@ -272,11 +272,20 @@ func (s *Store) PurgeClaims(ctx context.Context, typ events.EventType, before ti
 	if !ok {
 		return 0, fmt.Errorf("purging event IDs: no events of type %q are stored", typ)
 	}
-	t := pgx.Identifier{table}.Sanitize()
-	tag, err := s.db(ctx).Exec(ctx, `DELETE FROM `+t+` WHERE ctid IN (SELECT ctid FROM `+t+` WHERE received_at < $1 LIMIT $2)`,
-		before, limit)
-	if err != nil {
-		return 0, fmt.Errorf("purging the event IDs of %s: %w", table, err)
+	tables := []string{table}
+	if typ == events.EventExposure {
+		// The IDs of exposures refused are kept as long as those accepted.
+		tables = append(tables, "exposure_refusal_dedup")
 	}
-	return int(tag.RowsAffected()), nil
+	purged := 0
+	for _, name := range tables {
+		t := pgx.Identifier{name}.Sanitize()
+		tag, err := s.db(ctx).Exec(ctx, `DELETE FROM `+t+` WHERE ctid IN (SELECT ctid FROM `+t+` WHERE received_at < $1 LIMIT $2)`,
+			before, limit)
+		if err != nil {
+			return 0, fmt.Errorf("purging the event IDs of %s: %w", name, err)
+		}
+		purged += int(tag.RowsAffected())
+	}
+	return purged, nil
 }

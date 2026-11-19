@@ -226,6 +226,11 @@ func JudgeEvent(raw json.RawMessage, receivedAt time.Time, retention, skew time.
 		if s.IntervalEnd.Before(oldest) {
 			return e.reject(RejectOutOfWindow, "interval_end is older than the raw retention")
 		}
+		// An interval may start before the window, but is stored and
+		// exported as no earlier than its oldest instant.
+		if s.IntervalStart.Before(oldest) {
+			s.IntervalStart = oldest
+		}
 		if s.IntervalEnd.After(receivedAt.Add(MaxEventAhead)) {
 			s.IntervalEnd = receivedAt
 			if s.IntervalStart.After(receivedAt) {
@@ -439,6 +444,12 @@ func (r *reader) summary() EvaluationSummary {
 	rows, ok := v.([]any)
 	if !ok {
 		r.fault("counts", "must be a list of objects")
+		return s
+	}
+	if len(rows) == 0 {
+		// A summary with no row stores nothing, so no rollup or volume
+		// could ever count it.
+		r.fault("counts", "must hold at least one row")
 		return s
 	}
 	if len(rows) > MaxSummaryRows {
