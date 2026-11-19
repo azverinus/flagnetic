@@ -17,7 +17,7 @@ The secret key and the database URL are in a Secret rendered from your values. K
 {{- end }}
 
 {{- if or .Values.ingress.enabled .Values.httpRoute.enabled }}
-{{- if not (hasKey .Values.config "trusted_proxies") }}
+{{- if not .Values.config.trusted_proxies }}
 
 Traffic arrives through a proxy, and config.trusted_proxies is not set: the server then ignores X-Forwarded-For and sees every request as coming from the proxy, so all clients share one rate-limit budget and the audit log records the proxy's address. Set config.trusted_proxies to the Ingress controller's pod range or the Gateway's addresses. With a Service of type LoadBalancer or NodePort in front of the controller, externalTrafficPolicy: Cluster hides the client's address from it by source NAT; set Local, or the address the server learns is the node's.
 {{- end }}

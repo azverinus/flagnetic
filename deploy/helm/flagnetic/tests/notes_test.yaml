@@ -23,6 +23,16 @@ tests:
     asserts:
       - matchRegexRaw:
           pattern: "config.trusted_proxies is not set"
+  - it: warns about trusted proxies when they are set empty
+    set:
+      ingress:
+        enabled: true
+        hosts: [flags.example.com]
+      config:
+        trusted_proxies: ""
+    asserts:
+      - matchRegexRaw:
+          pattern: "config.trusted_proxies is not set"
   - it: stays quiet about trusted proxies once they are set
     set:
       ingress:
