@@ -133,3 +133,29 @@ func TestTheEventVolumeRefusesARangeItCannotRead(t *testing.T) {
 		}
 	}
 }
+
+func TestASummaryThatStoresNoRowIsCountedInNoVolume(t *testing.T) {
+	f := startSummaries(t)
+	now := f.clock.Now()
+
+	// An empty counts is refused: nothing would ever count it.
+	empty := f.summary(now.Add(-time.Minute))
+	empty["counts"] = []any{}
+	res := batchResult(t, f.srv, f.server, f.envelope(t, empty))
+	if res.Accepted != 0 || len(res.Rejected) != 1 || res.Rejected[0].Code != "event_invalid" {
+		t.Fatalf("empty counts = %+v, want it refused as event_invalid", res)
+	}
+
+	// A summary whose every row names a flag the project lacks is accepted,
+	// stores nothing and so counts in no volume, beside one that does.
+	f.post(t, f.summary(now.Add(-time.Minute), counted("no-such-flag", "true", "rule", 3)),
+		f.summary(now.Add(-time.Minute), counted("checkout", "true", "rule", 1)))
+	f.rollUp(t)
+
+	day := utcDay(now)
+	days, _ := f.volume(t, &day, &day)
+	want := []string{day.Format(time.DateOnly) + " evaluation_summary 1"}
+	if fmt.Sprint(days) != fmt.Sprint(want) {
+		t.Errorf("days = %v, want %v", days, want)
+	}
+}

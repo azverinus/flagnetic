@@ -346,6 +346,41 @@ func TestTheExposuresShowTheRefusalsByReason(t *testing.T) {
 	}
 }
 
+func TestARefusedExposureIsCountedOnceHoweverOftenItIsSent(t *testing.T) {
+	f := startRollup(t)
+	refused := f.exposure("u", "maybe", f.clock.Now())
+	// A copy in the same batch, then the whole batch again as an app does
+	// after a lost answer.
+	body := batch(refused, refused)
+	batchResult(t, f.srv, f.server, body)
+	batchResult(t, f.srv, f.server, body)
+	want := []management.ExposureRejections{{Reason: "unknown_variation", Count: 1}}
+	if x := f.exposures(t); fmt.Sprint(x.Rejections) != fmt.Sprint(want) {
+		t.Errorf("rejections = %+v, want %+v", x.Rejections, want)
+	}
+	// Another refused exposure is another count.
+	batchResult(t, f.srv, f.server, batch(f.exposure("v", "maybe", f.clock.Now())))
+	want = []management.ExposureRejections{{Reason: "unknown_variation", Count: 2}}
+	if x := f.exposures(t); fmt.Sprint(x.Rejections) != fmt.Sprint(want) {
+		t.Errorf("rejections = %+v, want %+v", x.Rejections, want)
+	}
+}
+
+func TestAnAliasAndAnExposureSharingAnEventIDAreBothStored(t *testing.T) {
+	f := startRollup(t)
+	at := f.clock.Now()
+	shared := eventID(at, 700)
+	body := f.envelope(t,
+		with(aliasEvent(shared), map[string]any{"occurred_at": at.Format(time.RFC3339)}),
+		with(f.exposure("u-1", "true", at), map[string]any{"event_id": shared}))
+	if res := batchResult(t, f.srv, f.server, body); res.Accepted != 2 || res.Duplicates != 0 {
+		t.Fatalf("batch = %+v, want both stored: IDs are claimed per type", res)
+	}
+	if res := batchResult(t, f.srv, f.server, body); res.Accepted != 0 || res.Duplicates != 2 {
+		t.Errorf("batch again = %+v, want both duplicates", res)
+	}
+}
+
 func TestTheRollupCountsTheEventsReceivedPerDay(t *testing.T) {
 	f := startRollup(t)
 	day1 := f.clock.Now()

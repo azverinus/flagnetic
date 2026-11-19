@@ -118,6 +118,7 @@ func (s *Store) FirstStored(ctx context.Context, kind sinks.EventKind, scope sin
 // flight and the lease are dropped, so that a send under way records nothing
 // over the move and the next batch is chosen anew under a new delivery ID.
 func (s *Store) RecordGap(ctx context.Context, sink sinks.ID, kind sinks.EventKind, replaying bool, gap events.Gap) error {
+	s.fault.holdGap(ctx)
 	db := s.db(ctx)
 	if _, err := db.Exec(ctx, `INSERT INTO event_gaps (id, stream, event_type, from_xid, from_seq, to_xid, to_seq,
 			period_start, period_end, rows, dropped_at, sink_id)

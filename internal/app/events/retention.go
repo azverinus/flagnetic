@@ -48,11 +48,16 @@ type RetentionStore interface {
 	LockRetention(ctx context.Context, typ events.EventType) error
 	// Partitions returns the UTC days of the partitions of typ's raw table.
 	Partitions(ctx context.Context, typ events.EventType) ([]time.Time, error)
-	// LockPartitions takes typ's raw table and the partitions of days
-	// exclusively until the unit of work ends, giving up after a short
-	// timeout rather than stalling ingest behind a transaction still
-	// writing them.
+	// LockPartitions keeps writers out of the partitions of days of typ's
+	// raw table until the unit of work ends, giving up after a short
+	// timeout rather than stalling behind a transaction still writing
+	// them. Readers and ingest of the day itself go on.
 	LockPartitions(ctx context.Context, typ events.EventType, days []time.Time) error
+	// LockForDrop takes typ's raw table and the partitions of days away
+	// from every reader too until the unit of work ends, giving up after the
+	// same timeout. Ingest of the kind waits on it, so it is taken only
+	// right before the drop.
+	LockForDrop(ctx context.Context, typ events.EventType, days []time.Time) error
 	// Lost returns what the partitions of days of typ's raw table hold past
 	// from.
 	Lost(ctx context.Context, typ events.EventType, days []time.Time, from events.Cursor) (events.Lost, error)
@@ -198,6 +203,12 @@ func (h *RunRetention) drop(ctx context.Context, typ events.EventType, now time.
 			return err
 		}
 		gaps = append(gaps, sinkGaps...)
+		// The table is locked only now: the gaps above are exact because the
+		// due partitions took no writes meanwhile, and the table, which
+		// ingest of the kind writes through, waits for the drop alone.
+		if err = h.store.LockForDrop(ctx, typ, due); err != nil {
+			return err
+		}
 		if err = h.store.DropPartitions(ctx, typ, due); err != nil {
 			return err
 		}

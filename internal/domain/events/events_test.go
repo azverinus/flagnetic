@@ -126,6 +126,7 @@ func TestEachEventIsRejectedWithItsCode(t *testing.T) {
 			events.RejectEventInvalid,
 			"interval_start is missing; interval_end is missing; ruleset_version is missing; counts[0].flag is missing; counts[0].reason is missing; and 1 more"},
 		"summary without counts": {with(summary(id), map[string]any{"counts": nil, "ruleset_version": nil}), events.RejectEventInvalid, "ruleset_version is missing; counts is missing"},
+		"empty counts":           {summary(id), events.RejectEventInvalid, "counts must hold at least one row"},
 		"counts not a list":      {with(summary(id), map[string]any{"counts": "many"}), events.RejectEventInvalid, "counts must be a list of objects"},
 		"a row not an object":    {with(summary(id), map[string]any{"counts": []any{"checkout"}}), events.RejectEventInvalid, "counts[0] must be an object"},
 	} {
@@ -443,5 +444,21 @@ func TestATimeFarAheadIsTakenAsTheTimeReceived(t *testing.T) {
 	}))
 	if !s.Summary.IntervalStart.Equal(received) || !s.Summary.IntervalEnd.Equal(received) {
 		t.Errorf("summary 3 days ahead = %v–%v, want both %v", s.Summary.IntervalStart, s.Summary.IntervalEnd, received)
+	}
+}
+
+func TestAnIntervalStartBeforeTheWindowIsClampedToItsOldestInstant(t *testing.T) {
+	id := eventIDAt(received, 1)
+	oldest := received.Add(-retention)
+	s := judge(t, with(summary(id, row("checkout", "rule", 1)), map[string]any{"interval_start": "0001-01-01T00:00:00Z"}))
+	if s.Rejection != nil {
+		t.Fatalf("rejected: %+v", s.Rejection)
+	}
+	if !s.Summary.IntervalStart.Equal(oldest) {
+		t.Errorf("interval_start = %v, want the window's oldest instant %v", s.Summary.IntervalStart, oldest)
+	}
+	inside := judge(t, summary(id, row("checkout", "rule", 1)))
+	if !inside.Summary.IntervalStart.Equal(time.Date(2026, 9, 19, 9, 59, 0, 0, time.UTC)) {
+		t.Errorf("interval_start inside the window = %v, want it kept", inside.Summary.IntervalStart)
 	}
 }

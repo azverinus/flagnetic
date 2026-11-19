@@ -8,10 +8,10 @@ import (
 
 // projectPurgeTables are the tables holding rows of a project without a
 // foreign key to it, which deleting the project cannot cascade to: the IDs
-// of the events received, kept apart from the raw events so a retry is
+// of the events received and of the exposures refused, kept apart from the raw events so a retry is
 // stored once. Each is keyed by project_id first, so finding the projects
 // it holds rows of costs one index probe per project.
-var projectPurgeTables = []string{"evaluation_summary_dedup", "alias_dedup", "exposure_dedup"}
+var projectPurgeTables = []string{"evaluation_summary_dedup", "alias_dedup", "exposure_dedup", "exposure_refusal_dedup"}
 
 // ProjectPurgeTables returns the tables the project purge deletes a deleted
 // project's rows from.

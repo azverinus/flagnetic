@@ -28,6 +28,14 @@ const AliasRollupName = "alias_rollup"
 // besides the time a long transaction holds the horizon back.
 const rollupInterval = 10 * time.Second
 
+// rollupTimeout bounds one round; lagReserve is the end of it kept for
+// measuring the lag, so a round that catches up until its deadline still
+// reports how far behind the stream is.
+var (
+	rollupTimeout = time.Minute
+	lagReserve    = 5 * time.Second
+)
+
 // RollupMetrics are the series every rollup stream reports.
 type RollupMetrics struct {
 	lag *prometheus.GaugeVec
@@ -64,10 +72,27 @@ func RollupStream(name string, stream events.Stream, r Rollup, m *RollupMetrics)
 		// A stream far behind catches up in bounded batches, each committed
 		// with its cursor: a round cut short by its timeout loses nothing,
 		// and the next goes on from there.
-		Timeout: time.Minute,
+		Timeout: rollupTimeout,
 		Round: func(ctx context.Context) error {
-			_, err := r.Handle(ctx)
-			lag, lagErr := r.Lag(ctx)
+			// Handle stops lagReserve before the round does, so the lag is
+			// measured while a stream far behind is still catching up, which
+			// is when the gauge is needed. Reaching that stop is the round's
+			// plan, not a failure: the batches it committed moved the cursor.
+			// The error a statement cut off at that stop returns need not
+			// wrap the context's (the database reports a cancelled
+			// statement), so the stop itself decides.
+			handleCtx, stop := context.WithTimeout(ctx, rollupTimeout-lagReserve)
+			_, err := r.Handle(handleCtx)
+			if handleCtx.Err() != nil && ctx.Err() == nil {
+				err = nil
+			}
+			stop()
+			// The lag is measured on a context of its own: the round's may
+			// be cancelled by a stopping runner, which must not leave the
+			// gauge stale.
+			lagCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), lagReserve)
+			defer cancel()
+			lag, lagErr := r.Lag(lagCtx)
 			if lagErr == nil {
 				m.lag.WithLabelValues(string(stream)).Set(lag.Seconds())
 			}

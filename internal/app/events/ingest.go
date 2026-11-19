@@ -63,6 +63,10 @@ type EventStore interface {
 	// pair, keeping the alias that occurred earliest.
 	LinkAliases(ctx context.Context, aliases []events.AliasRecord) error
 	SaveExposures(ctx context.Context, exposures []events.ExposureRecord) error
+	// ClaimRefusals records the IDs of exposures of project refused, as
+	// received at at, and returns those not recorded before: the refusals
+	// to count, once each however often the exposure is sent.
+	ClaimRefusals(ctx context.Context, project workspace.ProjectID, ids []delivery.EventID, at time.Time) (map[delivery.EventID]bool, error)
 	// CountRejections adds counts to those of exposures refused in
 	// environment, as of at.
 	CountRejections(ctx context.Context, environment workspace.EnvironmentID, counts []events.RejectionCount, at time.Time) error
@@ -246,8 +250,8 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 	// rather than counted as received.
 	ids := map[events.EventType][]delivery.EventID{}
 	duplicate := make([]bool, len(judged))
-	seen := map[delivery.EventID]bool{}
-	refused := map[rejectionKey]int64{}
+	seen := map[typedID]bool{}
+	var refusals []refusal
 	detailed := key.Kind == delivery.SDKKeyServer
 	for i, e := range judged {
 		if e.Rejection != nil {
@@ -284,7 +288,7 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 				// refused as if it did not exist, with no unit assigned
 				// whose refusals could be told apart.
 				if exists && facts.Status != experiments.StatusDraft {
-					refused[rejectionKey{facts.ID, rj.Code}]++
+					refusals = append(refusals, refusal{rejectionKey{facts.ID, rj.Code}, e.ID})
 				}
 				continue
 			}
@@ -297,16 +301,18 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 				continue
 			}
 		}
-		if seen[e.ID] {
+		// An ID is claimed per type, so two events of different types
+		// sharing one are two events, here as across batches.
+		if seen[typedID{e.Type, e.ID}] {
 			duplicate[i] = true
 			continue
 		}
-		seen[e.ID] = true
+		seen[typedID{e.Type, e.ID}] = true
 		ids[e.Type] = append(ids[e.Type], e.ID)
 	}
 	// Claimed in a fixed order of types and IDs, so two replicas storing
 	// overlapping batches at once wait on each other instead of deadlocking.
-	fresh := map[delivery.EventID]bool{}
+	fresh := map[typedID]bool{}
 	for _, typ := range []events.EventType{events.EventEvaluationSummary, events.EventAlias, events.EventExposure} {
 		if len(ids[typ]) == 0 {
 			continue
@@ -320,7 +326,7 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 			return BatchResult{}, err
 		}
 		for id := range claimed {
-			fresh[id] = true
+			fresh[typedID{typ, id}] = true
 		}
 	}
 	res := BatchResult{Accepted: map[events.EventType]int{}}
@@ -334,7 +340,7 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 		case e.Rejection != nil:
 			res.Rejected = append(res.Rejected, EventRejection{Index: i, EventID: e.SentID, Rejection: *e.Rejection})
 			continue
-		case duplicate[i] || !fresh[e.ID]:
+		case duplicate[i] || !fresh[typedID{e.Type, e.ID}]:
 			res.Duplicates++
 			continue
 		}
@@ -373,8 +379,8 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 		if err := h.store.SaveAliases(ctx, aliases); err != nil {
 			return BatchResult{}, err
 		}
-		// The link outlives the raw alias, which retention drops: it is what
-		// joins an anonymous ID to the ID known after sign-up for good.
+		// The link outlives the raw alias, which retention drops: it keeps
+		// the pair linked once and counts against the environment's limit.
 		if err := h.store.LinkAliases(ctx, aliases); err != nil {
 			return BatchResult{}, err
 		}
@@ -384,7 +390,7 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 			return BatchResult{}, err
 		}
 	}
-	if err := h.countRejections(ctx, key, refused, now); err != nil {
+	if err := h.countFirstRefusals(ctx, key, refusals, now); err != nil {
 		return BatchResult{}, err
 	}
 	return res, nil
@@ -490,6 +496,63 @@ func (h *IngestEvents) atLimit(ctx context.Context, key delivery.SDKKey, judged 
 		}
 	}
 	return res, nil
+}
+
+// typedID is an event ID of one type: IDs are claimed, and so duplicates
+// told, per type.
+type typedID struct {
+	typ events.EventType
+	id  delivery.EventID
+}
+
+// refusal is one exposure refused for an experiment that exists.
+type refusal struct {
+	key rejectionKey
+	id  delivery.EventID
+}
+
+// countFirstRefusals counts the refusals of a batch, leaving out those of
+// exposures refused before.
+func (h *IngestEvents) countFirstRefusals(ctx context.Context, key delivery.SDKKey, refusals []refusal, at time.Time) error {
+	refused, err := h.firstRefusals(ctx, key, refusals, at)
+	if err != nil {
+		return err
+	}
+	return h.countRejections(ctx, key, refused, at)
+}
+
+// firstRefusals returns the refusals of a batch by experiment and reason,
+// leaving out those of exposures refused before, in this batch or an earlier
+// one, so a batch sent again adds nothing to the counts.
+func (h *IngestEvents) firstRefusals(ctx context.Context, key delivery.SDKKey, refusals []refusal, at time.Time,
+) (map[rejectionKey]int64, error) {
+	if len(refusals) == 0 {
+		return nil, nil
+	}
+	ids := make([]delivery.EventID, 0, len(refusals))
+	for _, r := range refusals {
+		ids = append(ids, r.id)
+	}
+	// Claimed in a fixed order, like every claim, so replicas refusing
+	// overlapping batches wait on each other instead of deadlocking.
+	slices.SortFunc(ids, func(a, b delivery.EventID) int {
+		x, y := a.Bytes(), b.Bytes()
+		return bytes.Compare(x[:], y[:])
+	})
+	ids = slices.Compact(ids)
+	fresh, err := h.store.ClaimRefusals(ctx, key.Project, ids, at)
+	if err != nil {
+		return nil, err
+	}
+	counted := map[delivery.EventID]bool{}
+	refused := map[rejectionKey]int64{}
+	for _, r := range refusals {
+		if fresh[r.id] && !counted[r.id] {
+			counted[r.id] = true
+			refused[r.key]++
+		}
+	}
+	return refused, nil
 }
 
 // rejectionKey is what exposures refused are counted by within a batch: the

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -43,7 +44,40 @@ func (s *Store) WithFault(f *Fault) *Store {
 // target's acknowledgement and the commit would: the target has the batch,
 // the stream does not know, and sends it again under the same delivery ID
 // once the lease runs out.
-type Fault struct{ lose atomic.Bool }
+type Fault struct {
+	lose atomic.Bool
+	gap  atomic.Pointer[gapHold]
+}
+
+// gapHold stops the next recording of a gap until released.
+type gapHold struct {
+	reached chan struct{}
+	release chan struct{}
+}
+
+// HoldNextGapRecording stops the next gap a sink records inside its
+// transaction, as a slow statement would, until release is called. reached is
+// closed once the recording is stopped.
+func (f *Fault) HoldNextGapRecording() (reached <-chan struct{}, release func()) {
+	h := &gapHold{reached: make(chan struct{}), release: make(chan struct{})}
+	f.gap.Store(h)
+	var once sync.Once
+	return h.reached, func() { once.Do(func() { close(h.release) }) }
+}
+
+// holdGap stops the recording about to be made if it is the one held.
+func (f *Fault) holdGap(ctx context.Context) {
+	if f == nil {
+		return
+	}
+	if h := f.gap.Swap(nil); h != nil {
+		close(h.reached)
+		select {
+		case <-h.release:
+		case <-ctx.Done():
+		}
+	}
+}
 
 // LoseNextCommit makes the next acknowledged batch go unrecorded.
 func (f *Fault) LoseNextCommit() { f.lose.Store(true) }

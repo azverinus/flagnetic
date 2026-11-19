@@ -111,6 +111,18 @@ func (s *Store) ClaimEvents(ctx context.Context, project workspace.ProjectID, ty
 	if !ok {
 		return nil, fmt.Errorf("claiming events: no events of type %q are stored", typ)
 	}
+	return s.claim(ctx, table, project, ids, at)
+}
+
+// ClaimRefusals records the IDs of exposures of project refused as received at
+// at and returns those not recorded before: the refusals to count.
+func (s *Store) ClaimRefusals(ctx context.Context, project workspace.ProjectID, ids []delivery.EventID, at time.Time,
+) (map[delivery.EventID]bool, error) {
+	return s.claim(ctx, "exposure_refusal_dedup", project, ids, at)
+}
+
+func (s *Store) claim(ctx context.Context, table string, project workspace.ProjectID, ids []delivery.EventID, at time.Time,
+) (map[delivery.EventID]bool, error) {
 	raw := make([][16]byte, len(ids))
 	for i, v := range ids {
 		raw[i] = v.Bytes()
