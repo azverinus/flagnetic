@@ -96,3 +96,19 @@ func TestTheCursorNeverMovesBack(t *testing.T) {
 		t.Errorf("cursor moved to %+v, want it left at %+v", gap.Moved, from)
 	}
 }
+
+func TestTodaysPartitionIsKeptAtTheLongestRetentionTheConfigurationAccepts(t *testing.T) {
+	now := time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC)
+	today := time.Date(2026, 11, 19, 0, 0, 0, 0, time.UTC)
+	const maxDays = 3650 // the bound of FLAGNETIC_EVENTS_RETENTION_DAYS
+	retention := time.Duration(maxDays) * 24 * time.Hour
+	if events.PartitionDue(today, now, retention) {
+		t.Error("today's partition is due at the longest retention")
+	}
+	if events.PartitionDue(today.AddDate(0, 0, -maxDays+1), now, retention) {
+		t.Error("a partition inside the window is due")
+	}
+	if !events.PartitionDue(today.AddDate(0, 0, -maxDays-1), now, retention) {
+		t.Error("a partition wholly past the longest retention is kept")
+	}
+}

@@ -223,7 +223,7 @@ func TestTheFileIsReadAndAVariableWinsOverIt(t *testing.T) {
 
 func TestTheFileIsRefusedWhenItCannotBeTrusted(t *testing.T) {
 	for _, tt := range []struct{ name, content, want string }{
-		{"unknown key", "database_url: postgres://x\nlisten_port: \":9090\"\n", "listen_port"},
+		{"key that is no setting name", "database_url: postgres://x\nListen-Port: \":9090\"\n", "Listen-Port"},
 		{"non-scalar value", "database_url: postgres://x\nlisten_addr: [a, b]\n", "listen_addr"},
 		{"environment-only setting", "database_url: postgres://x\nconfig_file: other.yaml\n", "config_file"},
 		{"not a mapping", "- database_url\n", "mapping"},
@@ -340,5 +340,215 @@ func TestARateLimitOfZeroOrLessIsRefusedRatherThanSwitchedOff(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "FLAGNETIC_RATE_LIMIT_SERVER_EVENTS") {
 			t.Errorf("FLAGNETIC_RATE_LIMIT_SERVER_EVENTS=%s: err = %v, want refused naming the variable", value, err)
 		}
+	}
+}
+
+// A bound is accepted at its edge and refused one step beyond, and the
+// refusal names the variable and the range.
+func TestEveryNumericSettingHasABoundedRange(t *testing.T) {
+	for _, tt := range []struct{ name, belowMin, min, max, aboveMax, rng string }{
+		{"FLAGNETIC_PASSWORD_HASH_CONCURRENCY", "0", "1", "64", "65", "1 to 64"},
+		{"FLAGNETIC_SHUTDOWN_DRAIN", "-1s", "0s", "1h", "1h1s", "0s to 1h"},
+		{"FLAGNETIC_SHUTDOWN_GRACE", "-1s", "0s", "1h", "1h1s", "0s to 1h"},
+		{"FLAGNETIC_HTTP_READ_HEADER_TIMEOUT", "99ms", "100ms", "24h", "24h1s", "100ms to 24h"},
+		{"FLAGNETIC_HTTP_IDLE_TIMEOUT", "99ms", "100ms", "24h", "24h1s", "100ms to 24h"},
+		{"FLAGNETIC_HTTP_BODY_READ_TIMEOUT", "99ms", "100ms", "24h", "24h1s", "100ms to 24h"},
+		{"FLAGNETIC_HTTP_WRITE_TIMEOUT", "99ms", "100ms", "24h", "24h1s", "100ms to 24h"},
+		{"FLAGNETIC_HTTP_MAX_BODY_BYTES", "0", "1", "1073741824", "1073741825", "1 to 1073741824"},
+		{"FLAGNETIC_EVENTS_RETENTION_DAYS", "0", "1", "3650", "3651", "1 to 3650"},
+		{"FLAGNETIC_EVENTS_RETENTION_DAYS", "0", "1", "3650", "106752", "1 to 3650"},
+		{"FLAGNETIC_EVENTS_LOSS_WARNING_HOURS", "0", "1", "87600", "87601", "1 to 87600"},
+		{"FLAGNETIC_EVENTS_LOSS_WARNING_HOURS", "0", "1", "87600", "2562048", "1 to 87600"},
+		{"FLAGNETIC_EVENTS_PARTITIONS_AHEAD", "0", "1", "31", "32", "1 to 31"},
+		{"FLAGNETIC_SDK_INVENTORY_RETENTION_DAYS", "0", "1", "3650", "3651", "1 to 3650"},
+		{"FLAGNETIC_SDK_INVENTORY_RETENTION_DAYS", "0", "1", "3650", "999999", "1 to 3650"},
+		{"FLAGNETIC_ALIAS_LINKS_LIMIT", "0", "1", "1000000000", "1000000001", "1 to 1000000000"},
+		{"FLAGNETIC_FIRST_EXPOSURES_LIMIT", "0", "1", "1000000000", "1000000001", "1 to 1000000000"},
+		{"FLAGNETIC_WEBHOOK_TICK", "1ns", "100ms", "1h", "1h1s", "100ms to 1h"},
+		{"FLAGNETIC_SINK_TICK", "1ns", "100ms", "1h", "1h1s", "100ms to 1h"},
+		{"FLAGNETIC_SCHEDULE_TICK", "1ns", "100ms", "1h", "1h1s", "100ms to 1h"},
+		{"FLAGNETIC_SINK_LAG_WARNING", "999ms", "1s", "720h", "720h1s", "1s to 720h"},
+		{"FLAGNETIC_SINK_REJECTION_ATTEMPTS", "0", "1", "1000", "1001", "1 to 1000"},
+		{"FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS", "0", "1", "1000", "1001", "1 to 1000"},
+		{"FLAGNETIC_WEBHOOK_SECRET_OVERLAP", "999ms", "1s", "8760h", "8760h1s", "1s to 8760h"},
+		{"FLAGNETIC_SCHEDULE_MIN_LEAD", "999ms", "1s", "720h", "720h1s", "1s to 720h"},
+		{"FLAGNETIC_SCHEDULE_MAX_FAILURES", "0", "1", "1000", "1001", "1 to 1000"},
+		{"FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES", "0", "1", "100000000", "100000001", "1 to 100000000"},
+		{"FLAGNETIC_AUDIT_EXPORT_MAX_CONCURRENT", "0", "1", "1000", "1001", "1 to 1000"},
+		{"FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE", "0", "1", "10000000", "10000001", "1 to 10000000"},
+		{"FLAGNETIC_RATE_LIMIT_CLIENT_STREAMS_PER_REPLICA", "0", "1", "10000000", "10000001", "1 to 10000000"},
+		{"FLAGNETIC_RATE_LIMIT_SERVER_EVENTS", "0", "1", "10000000", "10000001", "1 to 10000000"},
+	} {
+		t.Run(tt.name+"="+tt.aboveMax, func(t *testing.T) {
+			load := func(value string) error {
+				_, err := config.Load(env(map[string]string{"DATABASE_URL": "postgres://localhost/flagnetic", tt.name: value}))
+				return err
+			}
+			for _, ok := range []string{tt.min, tt.max} {
+				if err := load(ok); err != nil {
+					t.Errorf("%s=%s: %v, want it accepted", tt.name, ok, err)
+				}
+			}
+			for _, bad := range []string{tt.belowMin, tt.aboveMax} {
+				err := load(bad)
+				if err == nil {
+					t.Errorf("%s=%s accepted, want it refused", tt.name, bad)
+					continue
+				}
+				if msg := err.Error(); !strings.Contains(msg, tt.name) || !strings.Contains(msg, tt.rng) {
+					t.Errorf("%s=%s: error %q does not name the variable and the range %q", tt.name, bad, msg, tt.rng)
+				}
+			}
+		})
+	}
+}
+
+func TestTheReferenceStatesEachRange(t *testing.T) {
+	ref := string(config.Reference())
+	for _, s := range config.Settings() {
+		if s.Range != "" && !strings.Contains(ref, "Range: "+s.Range+".") {
+			t.Errorf("the reference does not state the range of %s: %s", s.Name, s.Range)
+		}
+	}
+}
+
+func TestTheMaximumRetentionStaysWithinADuration(t *testing.T) {
+	cfg, err := config.Load(env(map[string]string{
+		"DATABASE_URL":                           "postgres://localhost/flagnetic",
+		"FLAGNETIC_EVENTS_RETENTION_DAYS":        "3650",
+		"FLAGNETIC_SDK_INVENTORY_RETENTION_DAYS": "3650",
+		"FLAGNETIC_EVENTS_LOSS_WARNING_HOURS":    "87600",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, d := range map[string]time.Duration{
+		"events retention":        time.Duration(cfg.EventsRetentionDays) * 24 * time.Hour,
+		"SDK inventory retention": time.Duration(cfg.SDKInventoryRetentionDays) * 24 * time.Hour,
+		"loss warning":            time.Duration(cfg.EventsLossWarningHours) * time.Hour,
+	} {
+		if d <= 0 {
+			t.Errorf("the maximum %s is %v, want a positive duration", name, d)
+		}
+	}
+}
+
+func TestAFileKeyThisVersionDoesNotKnowIsReportedNotRefused(t *testing.T) {
+	file := writeFile(t, "database_url: postgres://x/y\nlisten_port: \":9090\"\nfuture_setting: 3\n")
+	cfg, err := config.Load(env(map[string]string{"FLAGNETIC_CONFIG_FILE": file}))
+	if err != nil {
+		t.Fatalf("Load = %v, want a binary rolled back to start with a file that has newer keys", err)
+	}
+	if got := strings.Join(cfg.IgnoredFileKeys, ","); got != "listen_port,future_setting" {
+		t.Errorf("IgnoredFileKeys = %q, want the unknown keys in file order", got)
+	}
+	if cfg.ListenAddr != ":8080" {
+		t.Errorf("ListenAddr = %q, want the default: the unknown key sets nothing", cfg.ListenAddr)
+	}
+}
+
+func TestAnEnvironmentOnlySettingIsRefusedInTheFile(t *testing.T) {
+	_, err := config.Load(env(map[string]string{"FLAGNETIC_CONFIG_FILE": writeFile(t, "database_url: postgres://x\ntest_clock_file: /tmp/c\n")}))
+	if err == nil || !strings.Contains(err.Error(), "test_clock_file") {
+		t.Errorf("Load = %v, want a refusal naming test_clock_file: the environment alone sets it", err)
+	}
+}
+
+func TestUnknownVariablesAreThoseNeitherSettingsNorTheCommandLines(t *testing.T) {
+	got := config.UnknownVariables([]string{
+		"PATH=/bin", "FLAGNETIC_LOG_LEVL=debug", "FLAGNETIC_LOG_LEVEL=debug", "DATABASE_URL=postgres://x",
+		"FLAGNETIC_ADMIN_PASSWORD=x", "FLAGNETIC_URL=http://x", "FLAGNETIC_TOKEN=t", "FLAGNETIC_TEST_HARNESS=playwright",
+		"FLAGNETIC_TRUSTED_PROXY=10.0.0.0/8", "FLAGNETIC_EMPTY",
+	})
+	if want := "FLAGNETIC_EMPTY,FLAGNETIC_LOG_LEVL,FLAGNETIC_TRUSTED_PROXY"; strings.Join(got, ",") != want {
+		t.Errorf("UnknownVariables = %v, want %s, sorted", got, want)
+	}
+}
+
+func TestEveryVariableTheCommandLineReadsIsDocumented(t *testing.T) {
+	ref := string(config.Reference())
+	for _, v := range config.CommandLineVariables() {
+		if !strings.Contains(ref, "`"+v.Name+"`") {
+			t.Errorf("the reference does not name %s", v.Name)
+		}
+	}
+}
+
+func TestARefusedBaseURLDoesNotRepeatItsPassword(t *testing.T) {
+	_, err := config.Load(env(map[string]string{"DATABASE_URL": "postgres://x/y", "FLAGNETIC_BASE_URL": "https://admin:pass@flags.example.com"}))
+	if err == nil || !strings.Contains(err.Error(), "FLAGNETIC_BASE_URL") || strings.Contains(err.Error(), "pass") ||
+		!strings.Contains(err.Error(), "flags.example.com") {
+		t.Errorf("Load = %v, want a refusal naming the variable and the host, without the userinfo", err)
+	}
+}
+
+func TestTheBaseURLIsRefusedUnlessItIsAnOrigin(t *testing.T) {
+	for _, value := range []string{
+		"flags.example.com", "ftp://flags.example.com", "https://", "https://flags.example.com/console",
+		"https://flags.example.com?x=1", "https://flags.example.com#top", "https://u@flags.example.com",
+	} {
+		_, err := config.Load(env(map[string]string{"DATABASE_URL": "postgres://x/y", "FLAGNETIC_BASE_URL": value}))
+		if err == nil || !strings.Contains(err.Error(), "FLAGNETIC_BASE_URL") {
+			t.Errorf("FLAGNETIC_BASE_URL=%s: %v, want a refusal naming the variable", value, err)
+		}
+	}
+}
+
+func TestTheBaseURLIsNormalisedToItsOrigin(t *testing.T) {
+	for value, want := range map[string]string{
+		"https://flags.example.com":      "https://flags.example.com",
+		"https://flags.example.com/":     "https://flags.example.com",
+		"http://localhost:8080/":         "http://localhost:8080",
+		"HTTPS://Flags.Example.com:8443": "https://Flags.Example.com:8443",
+	} {
+		cfg, err := config.Load(env(map[string]string{"DATABASE_URL": "postgres://x/y", "FLAGNETIC_BASE_URL": value}))
+		if err != nil || cfg.BaseURL == nil || cfg.BaseURL.String() != want {
+			t.Errorf("FLAGNETIC_BASE_URL=%s: %v, %v; want %s", value, cfg.BaseURL, err, want)
+		}
+	}
+}
+
+func TestMoreMalformedValuesAreRefusedNamingTheVariable(t *testing.T) {
+	for _, tt := range []struct{ name, value string }{
+		{"FLAGNETIC_DEFAULT_LOCALE", "fr"},
+		{"FLAGNETIC_PASSWORD_HASH_CONCURRENCY", "lots"},
+		{"FLAGNETIC_DIGEST_HOUR", "24"},
+		{"FLAGNETIC_DIGEST_HOUR", "-1"},
+		{"FLAGNETIC_DIGEST_WEEKDAY", "someday"},
+		{"FLAGNETIC_INSECURE_COOKIES", "sometimes"},
+		{"FLAGNETIC_WEBHOOK_ALLOW_HTTP", "maybe"},
+		{"FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS", "maybe"},
+		{"FLAGNETIC_EVENTS_RETENTION_DAYS", "forever"},
+		{"FLAGNETIC_EVENTS_LOSS_WARNING_HOURS", "-3"},
+		{"FLAGNETIC_EVENTS_PARTITIONS_AHEAD", "1.5"},
+		{"FLAGNETIC_SINK_TICK", "fast"},
+		{"FLAGNETIC_SINK_LAG_WARNING", "15"},
+		{"FLAGNETIC_SCHEDULE_TICK", "10"},
+		{"FLAGNETIC_SCHEDULE_MIN_LEAD", "soon"},
+	} {
+		_, err := config.Load(env(map[string]string{"DATABASE_URL": "postgres://x/y", tt.name: tt.value}))
+		if err == nil || !strings.Contains(err.Error(), tt.name) {
+			t.Errorf("%s=%s: %v, want a refusal naming the variable", tt.name, tt.value, err)
+		}
+	}
+}
+
+func TestTheDigestSlotAndTheBooleansAreRead(t *testing.T) {
+	cfg, err := config.Load(env(map[string]string{
+		"DATABASE_URL":                             "postgres://x/y",
+		"FLAGNETIC_DIGEST_WEEKDAY":                 "Friday",
+		"FLAGNETIC_DIGEST_HOUR":                    "23",
+		"FLAGNETIC_INSECURE_COOKIES":               "true",
+		"FLAGNETIC_WEBHOOK_ALLOW_HTTP":             "true",
+		"FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS": "true",
+		"FLAGNETIC_DEFAULT_LOCALE":                 "ru",
+		"FLAGNETIC_PASSWORD_HASH_CONCURRENCY":      "8",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.DigestWeekday != time.Friday || cfg.DigestHour != 23 || !cfg.InsecureCookies || !cfg.WebhookAllowHTTP ||
+		!cfg.WebhookAllowPrivateNetworks || cfg.DefaultLocale != "ru" || cfg.PasswordHashConcurrency != 8 {
+		t.Errorf("config = %+v", cfg)
 	}
 }
