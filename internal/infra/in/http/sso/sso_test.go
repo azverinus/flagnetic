@@ -833,3 +833,33 @@ func (e env) session(t *testing.T) *management.ClientWithResponses {
 	t.Helper()
 	return testkit.InstanceAdminSessionOn(t, e.srv, e.pool)
 }
+
+func TestSigningOutOfASingleSignOnSessionIsAuditedWithItsMethodAndProvider(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	slug := e.forged(t, idp, nil)
+	email := uniqueEmail()
+	idp.NextClaims(map[string]any{"email": email})
+	b := testkit.NewBrowser(t, e.srv.URL)
+	if me := signedIn(t, e.signInAs(t, b, slug)); me == nil {
+		t.Fatal("the sign-in opened no session")
+	}
+
+	out, err := b.SignOutWithResponse(t.Context())
+	if err != nil || out.StatusCode() != http.StatusNoContent {
+		t.Fatalf("signing out = %v, %v", out.StatusCode(), err)
+	}
+	got := e.audited(t, "auth.signed_out", "email", email)
+	if len(got) != 1 || got[0]["method"] != "oidc" || got[0]["provider"] != slug {
+		t.Errorf("auth.signed_out = %v, want method oidc through %s", got, slug)
+	}
+}
+
+// signInAs signs b in through slug and returns it.
+func (e env) signInAs(t *testing.T, b *testkit.Browser, slug string) *testkit.Browser {
+	t.Helper()
+	if v := e.signIn(t, b, slug, "", e.opts()); v.URL.Path != "/" {
+		t.Fatalf("the sign-in ended at %s", v.URL)
+	}
+	return b
+}

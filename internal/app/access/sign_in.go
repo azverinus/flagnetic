@@ -103,7 +103,7 @@ type SignInDeps struct {
 	// is sent, so a known member's failure does not take longer than an
 	// unknown email's, which writes none; nil writes it before answering.
 	Background *Background
-	Key    []byte
+	Key        []byte
 }
 
 // NewSignIn returns the handler.

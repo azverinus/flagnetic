@@ -276,6 +276,18 @@ func (s *SSO) record(ctx context.Context, now time.Time, req governance.Request,
 	return s.audit.Record(ctx, entry)
 }
 
+// sessionRecord is the audit record of action, a sign-out, of m and the
+// session s they ended: it names the method s was opened by and, for an auth
+// provider's, the provider.
+func sessionRecord(action string, m access.Member, s access.Session, more map[string]any) governance.Record {
+	if s.Provider != "" {
+		return ssoRecord(action, m, s.Method, s.Provider, more)
+	}
+	r := authRecord(action, m, more)
+	r.After.(map[string]any)["method"] = s.Method
+	return r
+}
+
 // ssoRecord is the audit record of action, a sign-in or a failed one, of m
 // through provider.
 func ssoRecord(action string, m access.Member, method access.SignInMethod, provider string, more map[string]any) governance.Record {
