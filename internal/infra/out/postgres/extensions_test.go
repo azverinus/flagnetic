@@ -31,7 +31,7 @@ func TestEveryExtensionIsCreatedInANamedSchema(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, stmt := range createExtension.FindAllString(sqlComment.ReplaceAllString(string(src), ""), -1) {
+		for _, stmt := range createExtension.FindAllString(withoutSQLComments(string(src)), -1) {
 			if !withSchema.MatchString(stmt) {
 				unplaced = append(unplaced, f+": "+strings.Join(strings.Fields(stmt), " "))
 			}
