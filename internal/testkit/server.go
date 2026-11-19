@@ -57,6 +57,13 @@ type Server struct {
 // same delivery ID, once its lease has run out.
 func (s *Server) LoseNextSinkCommit() { s.sinkFault.LoseNextCommit() }
 
+// HoldNextSinkGapRecording stops the next gap a sink records inside the
+// retention's transaction until release is called; reached is closed once it
+// is stopped there.
+func (s *Server) HoldNextSinkGapRecording() (reached <-chan struct{}, release func()) {
+	return s.sinkFault.HoldNextGapRecording()
+}
+
 // CloseBackground ends the work the replica's use cases started on their
 // own, such as ruleset loads nobody waits for, as stopping the replica
 // does.

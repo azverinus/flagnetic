@@ -10,6 +10,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -168,6 +169,47 @@ func gapsOfEvents(t *testing.T) []string {
 		out = append(out, string(g.Stream))
 	}
 	return out
+}
+
+func TestIngestOfTheKindIsNotBlockedWhileRetentionComputesASinksGap(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t)
+	created, _ := f.enabled(t, webhook(r, "exposure"))
+	dayEnd := f.dayEnd()
+	f.post(t, f.exposure("u-1", "true", f.clock.Now()))
+
+	f.pastRetention(dayEnd)
+	reached, release := f.srv.HoldNextSinkGapRecording()
+	defer release()
+	retained := make(chan error, 1)
+	go func() { retained <- f.srv.Tick(t, worker.EventRetentionName) }()
+	select {
+	case <-reached:
+	case <-time.After(30 * time.Second):
+		t.Fatal("retention never reached the sink's gap")
+	}
+
+	// The drop has the old day, not today's: a batch of the kind goes on
+	// being accepted while the gap is worked out.
+	posted := make(chan sdk.EventBatchResult, 1)
+	body := f.envelope(t, f.exposure("u-2", "true", f.clock.Now()))
+	go func() { posted <- batchResult(t, f.srv, f.server, body) }()
+	select {
+	case res := <-posted:
+		if res.Accepted != 1 {
+			t.Errorf("batch = %+v, want accepted", res)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("a batch posted for today waits while retention computes a sink's gap")
+	}
+
+	release()
+	if err := <-retained; err != nil {
+		t.Fatalf("retention: %v", err)
+	}
+	if gaps := f.gaps(t, created); len(gaps) != 1 || gaps[0].Rows != 1 {
+		t.Errorf("gaps = %+v, want the one exposure of the dropped day", gaps)
+	}
 }
 
 func TestRetentionOvertakingASinkNobodyTickedRecordsAGap(t *testing.T) {

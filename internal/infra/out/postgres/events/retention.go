@@ -77,20 +77,38 @@ func (s *Store) Partitions(ctx context.Context, typ events.EventType) ([]time.Ti
 // next round.
 const lockTimeout = "5s"
 
-// LockPartitions takes typ's raw table, without its other partitions, and
-// the partitions of days exclusively until the unit of work ends, giving up
-// after lockTimeout.
+// LockPartitions takes the partitions of days of typ's raw table in
+// exclusive mode until the unit of work ends, giving up after lockTimeout.
+// It keeps writers out of them, and readers are let in: ingest writes the
+// partition of the day it is received, never a due one, so it goes on while
+// the gaps the drop leaves are computed.
 func (s *Store) LockPartitions(ctx context.Context, typ events.EventType, days []time.Time) error {
 	table := rawTables[typ]
 	if _, err := s.db(ctx).Exec(ctx, `SET LOCAL lock_timeout = '`+lockTimeout+`'`); err != nil {
 		return fmt.Errorf("locking the partitions of %s: %w", table, err)
 	}
+	names := make([]string, len(days))
+	for i, d := range days {
+		names[i] = "ONLY " + pgx.Identifier{partitionName(table, d)}.Sanitize()
+	}
+	if _, err := s.db(ctx).Exec(ctx, `LOCK TABLE `+strings.Join(names, ", ")+` IN EXCLUSIVE MODE`); err != nil {
+		return fmt.Errorf("locking the partitions of %s due to go: %w", table, err)
+	}
+	return nil
+}
+
+// LockForDrop takes typ's raw table, without its other partitions, and the
+// partitions of days, away from readers too, until the unit of work ends,
+// giving up after lockTimeout. It is taken right before the drop, which
+// needs it: every batch of the kind waits on the table from here.
+func (s *Store) LockForDrop(ctx context.Context, typ events.EventType, days []time.Time) error {
+	table := rawTables[typ]
 	names := []string{"ONLY " + pgx.Identifier{table}.Sanitize()}
 	for _, d := range days {
 		names = append(names, "ONLY "+pgx.Identifier{partitionName(table, d)}.Sanitize())
 	}
 	if _, err := s.db(ctx).Exec(ctx, `LOCK TABLE `+strings.Join(names, ", ")+` IN ACCESS EXCLUSIVE MODE`); err != nil {
-		return fmt.Errorf("locking the partitions of %s due to go: %w", table, err)
+		return fmt.Errorf("locking %s for the drop of its partitions: %w", table, err)
 	}
 	return nil
 }
