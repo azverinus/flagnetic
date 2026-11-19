@@ -2,6 +2,8 @@ package sso_test
 
 import (
 	"context"
+	"github.com/google/uuid"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"net/http"
 	"testing"
 
@@ -103,4 +105,39 @@ func TestAProvisionedMemberNobodyLinkedIsRefusedWhenTheyAreDeactivatedBeforeThei
 	idp.NextClaims(map[string]any{"sub": "sub-ext-2", "email": address})
 	b := testkit.NewBrowser(t, e.srv.URL)
 	wantError(t, e.signIn(t, b, slug, "", e.opts()), b, "member_deactivated")
+}
+
+// A directory creating a user inactive for a member who signed in through the
+// provider takes the member over deactivated, and the provider's mappings run
+// for them as for any deactivation: they keep none of its grants.
+func TestAUserCreatedInactiveKeepsNoneOfTheProvidersMappedGrants(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	slug := e.forged(t, idp, func(p *provider) { p.autoProvision, p.linkByEmail = false, true })
+	project := e.project(t)
+	e.mapGroups(t, slug, projectMapping("eng", project, "developer"))
+
+	address := uniqueEmail()
+	local := testkit.NewMember(t, testkit.Pool(t), testkit.WithEmail(address))
+	member := openapi_types.UUID(uuid.MustParse(local.ID.String()))
+	idp.NextClaims(map[string]any{"sub": "sub-local", "email": address, "email_verified": true, "groups": []string{"eng"}})
+	b := testkit.NewBrowser(t, e.srv.URL)
+	if v := e.signIn(t, b, slug, "", e.opts()); v.URL.Path != "/" {
+		t.Fatalf("the sign-in ended at %s", v.URL)
+	}
+	e.wantGrants(t, project, member, management.GrantSourceSso, slug, "developer")
+	before := len(e.entries(t, "grant.deleted", management.ActorKindScim))
+
+	directory := e.scimClient(t, slug)
+	created, err := directory.CreateUserWithApplicationScimPlusJSONBodyWithResponse(t.Context(), scim.User{UserName: &address, Active: ptr(false)})
+	if err != nil || created.ApplicationscimJSON201 == nil {
+		t.Fatalf("provisioning: %v, %d: %s", err, created.StatusCode(), created.Body)
+	}
+	if got := *created.ApplicationscimJSON201.Id; got != member {
+		t.Fatalf("the user is %s, want the member %s adopted", got, member)
+	}
+	e.wantGrants(t, project, member, management.GrantSourceSso, slug)
+	if got := len(e.entries(t, "grant.deleted", management.ActorKindScim)); got != before+1 {
+		t.Errorf("%d grant.deleted entries by the SCIM token, want %d", got, before+1)
+	}
 }

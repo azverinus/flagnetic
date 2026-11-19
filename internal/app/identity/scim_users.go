@@ -252,15 +252,26 @@ func (h *CreateSCIMUser) Handle(ctx context.Context, req SCIMRequest, attrs iden
 	if err != nil {
 		return ProvisionedMember{}, err
 	}
-	provider := req.provider()
+	inactive := attrs.Active != nil && !*attrs.Active
 	var out ProvisionedMember
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		var txErr error
+		var (
+			p     identity.Provider
+			txErr error
+		)
+		if inactive {
+			// Deactivating re-runs the provider's mappings, which must not
+			// interleave with replacing them: the provider is held before
+			// anything else, as for a patch.
+			if p, txErr = h.d.holdProvider(ctx, req); txErr != nil {
+				return txErr
+			}
+		}
 		if out, txErr = h.provisionOrAdopt(ctx, req, attrs, email, externalID); txErr != nil {
 			return txErr
 		}
-		if attrs.Active != nil && !*attrs.Active {
-			out, txErr = h.d.Members.SetActive(ctx, SetUserActive{Provider: provider, Member: out.ID, Active: false, Request: req.governance()})
+		if inactive {
+			out, txErr = h.d.setActive(ctx, p, req, out.ID, false)
 		}
 		return txErr
 	})
