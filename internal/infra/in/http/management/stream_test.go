@@ -8,11 +8,14 @@ import (
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/governance"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
+	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -188,9 +191,17 @@ func TestLastEventIDReplaysTheEntriesAfterIt(t *testing.T) {
 
 	s := openChanges(t, srv, token, p.Key, checkout.Id.String())
 	s.Started(t)
-	entryID, n := nextChange(t, s)
-	if entryID != search.Id.String() || n.Key != "search" {
-		t.Errorf("replayed %s %+v, want the entry %s of the flag search", entryID, n, search.Id)
+	// The replay repeats entries recorded shortly before the one resumed
+	// from, which may have committed after it: what the client heard is
+	// replayed again, and the entry of the flag search ends it.
+	for {
+		entryID, n := nextChange(t, s)
+		if entryID == search.Id.String() {
+			if n.Key != "search" {
+				t.Errorf("replayed %s %+v, want the flag search", entryID, n)
+			}
+			break
+		}
 	}
 	s.Quiet(t, 200*time.Millisecond)
 
@@ -212,6 +223,53 @@ func TestLastEventIDReplaysTheEntriesAfterIt(t *testing.T) {
 		s.Started(t)
 		isRefetch(t, name, s.Next(t))
 		s.Quiet(t, 100*time.Millisecond)
+	}
+}
+
+func TestAResumedChangeStreamHearsAnEntryRecordedBeforeOneItHeardButCommittedAfter(t *testing.T) {
+	srv := testkit.StartServer(t)
+	token := testkit.InstanceAdminToken(t)
+	admin := testkit.Client(t, srv, token)
+	p := createProject(t, admin, projectKey())
+	createFlag(t, admin, p.Key, management.FlagCreate{Key: "checkout", Name: "Checkout", Type: "boolean"})
+
+	s := openChanges(t, srv, token, p.Key, "")
+	s.Started(t)
+	createFlag(t, admin, p.Key, management.FlagCreate{Key: "search", Name: "Search", Type: "boolean"})
+	heardID, n := nextChange(t, s)
+	if n.Key != "search" {
+		t.Fatalf("heard %+v, want the flag search", n)
+	}
+	// The stream drops; meanwhile a write that recorded its entry before the
+	// one heard commits, so no stream hears it.
+	s.Close()
+	recordedBefore := id.New[governance.Entry](testkit.IDs(clock.NewFake(time.Now().Add(-2 * time.Second))))
+	entry, err := governance.NewEntry(recordedBefore, time.Now(), governance.Request{
+		Actor: governance.Actor{Kind: governance.ActorSystem, ID: "system", Name: "system"},
+	}, governance.Record{
+		Project: id.MustParse[workspace.Project](p.Id.String()), Action: "flag.updated",
+		Entity: governance.Entity{Kind: "flag", ID: id.New[governance.Entry](testkit.IDs(testkit.Clock())).String(), Key: "late"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pggovernance.NewAuditLog(testkit.Pool(t)).Append(t.Context(), entry); err != nil {
+		t.Fatal(err)
+	}
+	if recordedBefore.String() >= heardID {
+		t.Fatalf("late entry %s does not order before the one heard, %s", recordedBefore, heardID)
+	}
+
+	resumed := openChanges(t, srv, token, p.Key, heardID)
+	resumed.Started(t)
+	for {
+		f := resumed.Next(t)
+		if f["event"] == "refetch" {
+			return
+		}
+		if f["id"] == recordedBefore.String() {
+			return
+		}
 	}
 }
 

@@ -61,7 +61,8 @@ func NewStreamChanges(feed ChangeFeed, replay ChangeReplay) *StreamChanges {
 // reads what to replay, so no change falls between the two. A lastEventID
 // that names no entry of the project, or that more than
 // governance.MaxPendingNotices entries follow, is answered by a refetch
-// instead.
+// instead. The replay also repeats entries recorded shortly before
+// lastEventID, which may have committed after the client's stream dropped.
 func (h *StreamChanges) Open(ctx context.Context, project workspace.ProjectID, lastEventID string) (*ChangeStream, error) {
 	s := &ChangeStream{follower: h.feed.Follow(project), first: true}
 	if lastEventID == "" {
@@ -78,10 +79,6 @@ func (h *StreamChanges) Open(ctx context.Context, project workspace.ProjectID, l
 		return nil, err
 	}
 	s.refetch = !ok
-	s.replayed = make(map[governance.EntryID]bool, len(notices))
-	for _, n := range notices {
-		s.replayed[n.Entry] = true
-	}
 	s.replay = notices
 	return s, nil
 }
@@ -94,9 +91,6 @@ type ChangeStream struct {
 	first   bool
 	refetch bool
 	replay  []governance.ChangeNotice
-	// replayed are the entries replayed whose announcement may still
-	// arrive, which is then not sent again.
-	replayed map[governance.EntryID]bool
 }
 
 // Changed is sent on when more may be waiting.
@@ -110,19 +104,11 @@ func (s *ChangeStream) Take() ([]governance.ChangeNotice, bool) {
 		s.first = false
 		return s.replay, s.refetch
 	}
-	notices, refetch := s.follower.Take()
-	if len(s.replayed) == 0 {
-		return notices, refetch
-	}
-	out := notices[:0:0]
-	for _, n := range notices {
-		if s.replayed[n.Entry] {
-			delete(s.replayed, n.Entry)
-			continue
-		}
-		out = append(out, n)
-	}
-	return out, refetch
+	// An entry replayed may be announced again; sending it twice only
+	// refetches its entity twice, whereas dropping it as replayed would
+	// also drop an earlier change of the same entity that coalescing
+	// folded into it.
+	return s.follower.Take()
 }
 
 // Close stops following.

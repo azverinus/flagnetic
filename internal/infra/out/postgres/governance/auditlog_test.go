@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -107,13 +108,17 @@ func TestAVersionIsFoundInTheBeforeOrAfterOfItsEntityInOneEnvironment(t *testing
 }
 
 func TestNoticesAfterAnEntryAreReplayedUpToTheLimitAndNoFurther(t *testing.T) {
-	ids := testkit.IDs(testkit.Clock())
+	clk := testkit.Clock()
+	ids := testkit.IDs(clk)
 	log := pggovernance.NewAuditLog(testkit.FreshPool(t))
 	system := governance.Request{Actor: governance.Actor{Kind: governance.ActorSystem, ID: "system", Name: "system"}}
 	project := id.New[workspace.Project](ids)
 	entries := make([]governance.Entry, 5)
 	for i := range entries {
-		e, err := governance.NewEntry(id.New[governance.Entry](ids), testkit.Start, system, governance.Record{
+		// Spaced beyond the replay's lookback, so each replay holds only
+		// what follows its entry.
+		clk.Advance(5 * time.Minute)
+		e, err := governance.NewEntry(id.New[governance.Entry](ids), clk.Now(), system, governance.Record{
 			Project: project, Action: "flag.updated",
 			Entity: governance.Entity{Kind: "flag", ID: id.New[governance.Entry](ids).String(), Key: "flag"},
 		})
@@ -127,17 +132,59 @@ func TestNoticesAfterAnEntryAreReplayedUpToTheLimitAndNoFurther(t *testing.T) {
 	}
 	first, last := entries[0].ID, entries[len(entries)-1].ID
 
-	notices, ok, err := log.NoticesAfter(t.Context(), project, first, 4)
-	if err != nil || !ok || len(notices) != 4 || notices[0].Entry != entries[1].ID || notices[3].Entry != last {
-		t.Errorf("4 after the first, limit 4 = %d notices, %v, %v; want the four, oldest first", len(notices), ok, err)
+	// The replay repeats the entry it starts from, which a client that
+	// heard it refetches once more at most.
+	notices, ok, err := log.NoticesAfter(t.Context(), project, first, 5)
+	if err != nil || !ok || len(notices) != 5 || notices[0].Entry != first || notices[4].Entry != last {
+		t.Errorf("after the first, limit 5 = %d notices, %v, %v; want it and the four after, oldest first", len(notices), ok, err)
 	}
-	if notices, ok, err := log.NoticesAfter(t.Context(), project, first, 3); err != nil || ok || notices != nil {
-		t.Errorf("4 after the first, limit 3 = %d notices, %v, %v; want none and a refetch", len(notices), ok, err)
+	if notices, ok, err := log.NoticesAfter(t.Context(), project, first, 4); err != nil || ok || notices != nil {
+		t.Errorf("after the first, limit 4 = %d notices, %v, %v; want none and a refetch", len(notices), ok, err)
 	}
-	if notices, ok, err := log.NoticesAfter(t.Context(), project, last, 3); err != nil || !ok || len(notices) != 0 {
-		t.Errorf("after the last = %d notices, %v, %v; want none to replay", len(notices), ok, err)
+	if notices, ok, err := log.NoticesAfter(t.Context(), project, last, 3); err != nil || !ok || len(notices) != 1 || notices[0].Entry != last {
+		t.Errorf("after the last = %d notices, %v, %v; want only the last again", len(notices), ok, err)
 	}
 	if _, ok, err := log.NoticesAfter(t.Context(), id.New[workspace.Project](ids), first, 3); err != nil || ok {
 		t.Errorf("after an entry of another project = %v, %v; want a refetch", ok, err)
+	}
+}
+
+func TestNoticesAfterAnEntryIncludeOnesRecordedJustBeforeItThatCommittedLater(t *testing.T) {
+	clk := testkit.Clock()
+	ids := testkit.IDs(clk)
+	log := pggovernance.NewAuditLog(testkit.FreshPool(t))
+	system := governance.Request{Actor: governance.Actor{Kind: governance.ActorSystem, ID: "system", Name: "system"}}
+	project := id.New[workspace.Project](ids)
+	record := func(key string) governance.Entry {
+		e, err := governance.NewEntry(id.New[governance.Entry](ids), clk.Now(), system, governance.Record{
+			Project: project, Action: "flag.updated",
+			Entity: governance.Entity{Kind: "flag", ID: key, Key: key},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return e
+	}
+	// Late is recorded first and committed after the stream heard heard.
+	clk.Advance(time.Hour)
+	late := record("late")
+	clk.Advance(2 * time.Second)
+	heard := record("heard")
+	if err := log.Append(t.Context(), heard); err != nil {
+		t.Fatal(err)
+	}
+	if err := log.Append(t.Context(), late); err != nil {
+		t.Fatal(err)
+	}
+	notices, ok, err := log.NoticesAfter(t.Context(), project, heard.ID, 10)
+	if err != nil || !ok {
+		t.Fatalf("NoticesAfter = %v, %v", ok, err)
+	}
+	var got []string
+	for _, n := range notices {
+		got = append(got, n.Entity.Key)
+	}
+	if len(got) != 2 || got[0] != "late" || got[1] != "heard" {
+		t.Errorf("replayed %v, want the late entry and the one heard, oldest first", got)
 	}
 }
