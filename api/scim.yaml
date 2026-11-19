@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: |
     SCIM 2.0 (RFC 7643/7644), served at `/scim/v2`, for an identity provider
-    to create, find, update and deprovision the members it manages. It is its
+    to create, find, update and deprovision the members it provisions. It is its
     own document, with the `application/scim+json` media type and error
     shape, since none match the management API's.
 
@@ -13,8 +13,9 @@ info:
     life to one auth provider and reaches only that provider's provisioned
     members: another provider's member is not found, and an email one holds
     is a 409 `uniqueness`. A token that is missing, malformed, unknown,
-    revoked, expired or of a disabled provider is refused 401
-    `invalidCredentials` alike, and a refused bearer counts against the
+    revoked, expired or of a disabled provider is refused 401 alike,
+    with `WWW-Authenticate: Bearer` and no `scimType` (RFC 7644 defines
+    none for it), and a refused bearer counts against the
     brute-force throttle of the address it comes from, shared with local
     sign-in, invitation acceptance and password reset.
 
@@ -41,8 +42,9 @@ info:
     Bodies are at most 1 MiB. Errors follow RFC 7644 §3.12:
     `application/scim+json`, `schemas` naming
     `urn:ietf:params:scim:api:messages:2.0:Error`, `status` as a string, and
-    `scimType` for the errors it defines (`invalidFilter`, `invalidSyntax`,
-    `invalidValue`, `mutability`, `uniqueness`, `noTarget`).
+    `scimType` for the errors it defines (`invalidFilter`, `invalidPath`,
+    `invalidSyntax`, `invalidValue`, `mutability`, `uniqueness`,
+    `noTarget`).
   license:
     name: Apache-2.0
     identifier: Apache-2.0
@@ -122,7 +124,7 @@ paths:
       operationId: createUser
       summary: Provision a member
       description: |
-        Creates an active member managed by SCIM, with no credential:
+        Creates an active provisioned member, with no credential:
         `userName` (wins over `emails[primary].value` when both are sent
         and differ) becomes the member's email. A taken email is 409
         `uniqueness`.
@@ -167,7 +169,8 @@ paths:
       summary: Replace a member's mapped attributes
       description: |
         Replaces `userName`/`emails`, `displayName`/`name` and
-        `externalId` at once. `active: false` deactivates in the same
+        `externalId` at once. Attributes the instance does not map are
+        ignored. `active: false` deactivates in the same
         transaction, revoking sessions and tokens; `active: true`
         reactivates. A taken email is 409 `uniqueness`.
       requestBody:
@@ -195,9 +198,15 @@ paths:
       operationId: patchUser
       summary: Patch a member's mapped attributes
       description: |
-        `add`, `replace` and `remove` on `userName`, `emails`,
-        `displayName`, `name.givenName`, `name.familyName`, `externalId`
-        and `active`. `active: false` deactivates in the same
+        `add` and `replace` on `userName`, `emails`, `displayName`,
+        `name.givenName`, `name.familyName`, `externalId` and `active`;
+        `remove` on `displayName` and `externalId` only (`userName`,
+        `emails` and `active` cannot be removed: 400 `invalidValue`).
+        Attributes the instance does not map (`title`, phone numbers, the
+        enterprise extension) are ignored, so a patch that also carries
+        `active: false` still deactivates; `id`, `groups` and `meta` are
+        read only (400 `mutability`) and a path that does not parse is 400
+        `invalidPath`. `active: false` deactivates in the same
         transaction, revoking sessions and tokens; `active: true`
         reactivates. A taken email is 409 `uniqueness`.
       requestBody:
@@ -426,7 +435,7 @@ components:
         maximum: 100
   responses:
     BadRequest:
-      description: The body or the filter is malformed (`invalidFilter`, or no `scimType`).
+      description: The body, the filter or a patch path is malformed (`invalidFilter`, `invalidPath`, or no `scimType`).
       content:
         application/scim+json:
           schema:
@@ -434,8 +443,8 @@ components:
     Unauthorized:
       description: |
         No usable SCIM bearer: missing, not `fn_scim_…`, unknown, revoked,
-        expired or of a disabled provider (`invalidCredentials`), with
-        `WWW-Authenticate: Bearer`. A refused bearer counts against the
+        expired or of a disabled provider, with `WWW-Authenticate: Bearer`
+        and no `scimType` (RFC 7644 defines none for it). A refused bearer counts against the
         address's throttle; an address over it is answered 429.
       headers:
         WWW-Authenticate:
@@ -674,6 +683,15 @@ components:
             maxResults:
               type: integer
         bulk:
+          type: object
+          properties:
+            supported:
+              type: boolean
+            maxOperations:
+              type: integer
+            maxPayloadSize:
+              type: integer
+        etag:
           type: object
           properties:
             supported:

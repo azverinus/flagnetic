@@ -215,7 +215,7 @@ func applyGroupOperation(g *GroupState, self, op string, o PatchOperation) error
 func applyGroupPath(g *GroupState, op, path string, value any, hasValue bool) error {
 	parsed, err := filter.ParsePath([]byte(path))
 	if err != nil {
-		return scimErr("invalidSyntax", "the path %q is not valid: %v", path, err)
+		return scimErr("invalidPath", "the path %q is not valid: %v", path, err)
 	}
 	ap := parsed.AttributePath
 	if ap.URIPrefix != nil && !strings.EqualFold(*ap.URIPrefix, GroupSchema) {

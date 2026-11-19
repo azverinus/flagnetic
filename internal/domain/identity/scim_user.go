@@ -52,8 +52,8 @@ type UserFilter struct {
 // ScimError is a refusal a SCIM client reads by its scimType, which the
 // adapter writes into the error document.
 type ScimError struct {
-	// Type is the RFC 7644 scimType: invalidFilter, invalidSyntax,
-	// invalidValue, mutability, uniqueness or noTarget.
+	// Type is the RFC 7644 scimType: invalidFilter, invalidPath,
+	// invalidSyntax, invalidValue, mutability, uniqueness or noTarget.
 	Type   string
 	Detail string
 }
@@ -259,9 +259,13 @@ type UserPatch struct {
 // are alike for the single-valued attributes a member has. An operation with
 // a path addresses one attribute; one without carries an object naming
 // several, as Okta sends `active`. name is accepted and changes nothing: a
-// member has one name, displayName. Anything else is refused: a read-only
-// attribute (id, groups, meta) as mutability, one the instance does not map
-// as noTarget, a value of the wrong shape as invalidValue.
+// member has one name, displayName. So is every attribute the instance does
+// not map (title, phone numbers, the enterprise extension): the directory
+// owns them and nothing reads them, and a patch that also carries a leaver's
+// `active` must not lose it to an attribute that is not ours. Anything else
+// is refused: a read-only attribute (id, groups, meta) as mutability, a path
+// that does not parse as invalidPath, a value of the wrong shape as
+// invalidValue.
 func ApplyUserPatch(ops []PatchOperation) (UserPatch, error) {
 	var p UserPatch
 	if len(ops) == 0 {
@@ -307,11 +311,12 @@ func applyUserOperation(p *UserPatch, op string, o PatchOperation) error {
 func applyUserAttribute(p *UserPatch, op, path string, value any) error {
 	parsed, err := filter.ParsePath([]byte(path))
 	if err != nil {
-		return scimErr("invalidSyntax", "the path %q is not valid: %v", path, err)
+		return scimErr("invalidPath", "the path %q is not valid: %v", path, err)
 	}
 	ap := parsed.AttributePath
 	if ap.URIPrefix != nil && !strings.EqualFold(*ap.URIPrefix, UserSchema) {
-		return scimErr("noTarget", "the path %q names an attribute of another schema", path)
+		// An attribute of an extension schema is not mapped, like any other.
+		return nil
 	}
 	sub := strings.ToLower(parsed.SubAttributeName())
 	if sub == "" {
@@ -324,7 +329,7 @@ func applyUserAttribute(p *UserPatch, op, path string, value any) error {
 		return patchEmail(p, op, "userName", value)
 	case "emails":
 		if sub != "" && sub != "value" {
-			return scimErr("noTarget", "only the value of an email is mapped")
+			return nil
 		}
 		return patchEmail(p, op, "emails", value)
 	case "displayname":
@@ -341,7 +346,7 @@ func applyUserAttribute(p *UserPatch, op, path string, value any) error {
 	case "id", "groups", "meta":
 		return scimErr("mutability", "%s is read only", ap.AttributeName)
 	}
-	return scimErr("noTarget", "%s is not an attribute the instance maps", path)
+	return nil
 }
 
 func patchActive(p *UserPatch, op string, value any) error {

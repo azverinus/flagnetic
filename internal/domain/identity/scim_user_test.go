@@ -121,6 +121,17 @@ func TestPatchingAUser(t *testing.T) {
 		"the later operation wins": {
 			[]identity.PatchOperation{op("replace", "displayName", "A"), op("replace", "displayName", "B"), op("remove", "externalId", nil), op("add", "externalId", "x")},
 			identity.UserPatch{DisplayName: s("B"), ExternalID: s("x")}},
+		"an unmapped attribute alone changes nothing": {
+			[]identity.PatchOperation{op("replace", "title", "x"), op("add", "phoneNumbers", []any{map[string]any{"value": "1"}})}, identity.UserPatch{}},
+		"a sub attribute of emails other than value changes nothing": {
+			[]identity.PatchOperation{op("replace", `emails[type eq "work"].display`, "x")}, identity.UserPatch{}},
+		"an attribute of an extension schema changes nothing": {
+			[]identity.PatchOperation{
+				op("replace", "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department", "x"),
+				{Op: "add", Value: map[string]any{"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager": "y", "title": "z"}},
+			}, identity.UserPatch{}},
+		"an unmapped attribute does not hide a deactivation": {
+			[]identity.PatchOperation{op("replace", "title", "x"), op("replace", "active", "False")}, identity.UserPatch{Active: new(false)}},
 		"name is accepted and changes nothing": {
 			[]identity.PatchOperation{op("replace", "name.givenName", "Jo"), op("replace", "name", map[string]any{"familyName": "Doe"})}, identity.UserPatch{}},
 	} {
@@ -153,11 +164,7 @@ func TestPatchingAUserRefusesWhatItCannotDo(t *testing.T) {
 		"groups are read only":           {[]identity.PatchOperation{op("add", "groups", []any{})}, "mutability"},
 		"a group by a value path":        {[]identity.PatchOperation{op("remove", `groups[value eq "x"]`, nil)}, "mutability"},
 		"id is read only":                {[]identity.PatchOperation{op("replace", "id", "x")}, "mutability"},
-		"an unmapped attribute":          {[]identity.PatchOperation{op("replace", "title", "x")}, "noTarget"},
-		"a sub attribute of emails":      {[]identity.PatchOperation{op("replace", `emails[type eq "work"].display`, "x")}, "noTarget"},
-		"another schema":                 {[]identity.PatchOperation{op("replace", "urn:other:schema:2.0:User:active", true)}, "noTarget"},
-		"a malformed path":               {[]identity.PatchOperation{op("replace", "emails[", "x")}, "invalidSyntax"},
-		"a refused operation after a ok": {[]identity.PatchOperation{op("replace", "active", true), op("replace", "title", "x")}, "noTarget"},
+		"a malformed path":               {[]identity.PatchOperation{op("replace", "emails[", "x")}, "invalidPath"},
 	} {
 		if _, err := identity.ApplyUserPatch(c.ops); scimType(err) != c.want {
 			t.Errorf("%s: = %v, want %s", name, err, c.want)

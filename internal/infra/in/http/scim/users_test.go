@@ -426,8 +426,11 @@ func TestPatchingAUserAddsReplacesAndRemoves(t *testing.T) {
 	if doc := r.json(t); doc["displayName"] != "Many" || doc["externalId"] != "ext-many" {
 		t.Errorf("replace without a path = %s", r.body)
 	}
-	if r := patchOf(op("replace", "name.givenName", "Jo"), op("replace", "title", "x")); r.status != http.StatusBadRequest {
-		t.Errorf("an unmapped attribute after a mapped one = %d, want 400: %s", r.status, r.body)
+	if r := patchOf(op("replace", "name.givenName", "Jo"), op("replace", "title", "x")); r.status != http.StatusOK {
+		t.Errorf("an unmapped attribute after a mapped one = %d, want 200: %s", r.status, r.body)
+	}
+	if r := patchOf(op("replace", "displayName", "Kept"), op("replace", "groups", []any{})); r.status != http.StatusBadRequest {
+		t.Errorf("a read-only attribute after a mapped one = %d, want 400: %s", r.status, r.body)
 	}
 	if got := e.call(t, token, http.MethodGet, "/Users/"+member, "").json(t); got["displayName"] != "Many" {
 		t.Errorf("a refused patch changed the user: %v", got)
@@ -442,7 +445,7 @@ func TestPatchingAUserAddsReplacesAndRemoves(t *testing.T) {
 		"active is a boolean":    {[]map[string]any{op("replace", "active", 5)}, "invalidValue"},
 		"userName not removable": {[]map[string]any{op("remove", "userName", nil)}, "invalidValue"},
 		"groups are read only":   {[]map[string]any{op("add", "groups", []any{})}, "mutability"},
-		"an unmapped attribute":  {[]map[string]any{op("replace", "title", "x")}, "noTarget"},
+		"a malformed path":       {[]map[string]any{op("replace", "emails[", "x")}, "invalidPath"},
 		"a taken email":          {[]map[string]any{op("replace", "userName", address)}, ""},
 	} {
 		if c.want == "" {
@@ -568,6 +571,44 @@ func TestDeactivatingAUserEndsItsTokensAndResetsAndReactivatingRestoresIt(t *tes
 		t.Fatal(err)
 	}
 	assertProblem(t, "the member's token after reactivation", res.StatusCode(), res.Body, http.StatusUnauthorized, "token_revoked")
+}
+
+// Entra puts every change of one user into one PATCH, and its default
+// mappings send attributes the instance does not map. A leaver's deactivation
+// must not be lost to them.
+func TestADeactivationCarryingUnmappedAttributesStillDeactivates(t *testing.T) {
+	e := start(t)
+	token := e.token(t, e.provider(t))
+	member := e.mustCreate(t, token, userBody(email("example.com"), nil))
+	memberID, err := id.Parse[access.Member](member)
+	if err != nil {
+		t.Fatal(err)
+	}
+	personal := testkit.Client(t, e.srv, testkit.PersonalToken(t, testkit.Pool(t), memberID, "script"))
+
+	r := e.call(t, token, http.MethodPatch, "/Users/"+member, marshal(t, patch(
+		op("Replace", "title", "x"),
+		op("Replace", "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department", "y"),
+		op("Replace", "active", "False"),
+	)))
+	if r.status != http.StatusOK || r.json(t)["active"] != false {
+		t.Fatalf("PATCH title and active=False = %d: %s", r.status, r.body)
+	}
+	if m := e.member(t, member); m.Status != management.MemberStatusDeactivated {
+		t.Errorf("member status = %s, want deactivated", m.Status)
+	}
+	res, err := personal.GetMeWithResponse(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertProblem(t, "the member's token", res.StatusCode(), res.Body, http.StatusUnauthorized, "token_revoked")
+
+	// A full replace carrying attributes the instance does not map is no
+	// different.
+	put := e.call(t, token, http.MethodPut, "/Users/"+member, marshal(t, userBody(e.member(t, member).Email, map[string]any{"title": "x", "active": true})))
+	if put.status != http.StatusOK || put.json(t)["active"] != true {
+		t.Errorf("PUT with an unmapped attribute = %d: %s", put.status, put.body)
+	}
 }
 
 func TestDeletingAUserDeactivatesItAndKeepsTheRow(t *testing.T) {
