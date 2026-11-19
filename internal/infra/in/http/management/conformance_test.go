@@ -23,8 +23,10 @@ import (
 // conformanceDir holds the fixtures every evaluator passes.
 const conformanceDir = "../../../../../conformance/fixtures"
 
-// fixturesNotRulesets are the fixture files that hold no ruleset.
-var fixturesNotRulesets = []string{"murmur3", "regex"}
+// fixturesNotRulesets are the fixture files that hold no ruleset, or one the
+// API cannot be given at all: unsupported/attribute-type declares an
+// attribute of a type no write accepts.
+var fixturesNotRulesets = []string{"murmur3", "regex", "unsupported/attribute-type"}
 
 // refusedByTheAPI are the fixture flags and segments the management API
 // refuses to write: documents broken on purpose to pin how an evaluator
@@ -78,6 +80,10 @@ var refusedByTheAPI = []string{
 	"prerequisites/cycle back",
 	"prerequisites/cycle self",
 	// Constructs no evaluator knows yet, and what names them.
+	"prerequisites/override-shadow-cycle b",
+	"rollout/invalid-missing-unit-type invalid",
+	"rollout/invalid-percentage-above-range invalid",
+	"rollout/invalid-percentage-below-range invalid",
 	"unsupported/rules segment future_segment",
 	"unsupported/rules segment segment_of_a_future_kind",
 	"unsupported/rules several_unknown_constructs",
