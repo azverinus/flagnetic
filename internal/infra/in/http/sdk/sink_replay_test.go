@@ -1,8 +1,10 @@
 package sdk_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -719,5 +721,84 @@ func TestAReplayThatRunsOnLeavesTheLiveStreamsFloorAlone(t *testing.T) {
 	tick(t, f.srv)
 	if got, _ := delivered(t, r, secret, n); !slices.Equal(got, ids(late)) {
 		t.Errorf("delivered %v after the replay, want the row stamped before its start", got)
+	}
+}
+
+// editDuringSearches edits sink while each of the next n searches for where
+// its streams start is held, so that every one of them is overtaken.
+func (f delivering) editDuringSearches(t *testing.T, sink management.Sink, n int) {
+	t.Helper()
+	for i := range n {
+		reached, release := f.srv.HoldNextSinkSearch()
+		select {
+		case <-reached:
+		case <-time.After(10 * time.Second):
+			release()
+			t.Fatalf("search %d never started", i+1)
+		}
+		f.patch(t, sink, management.SinkPatch{Name: ptr("Edited " + strconv.Itoa(i+1))})
+		release()
+	}
+}
+
+// wantSinkChanged fails unless res is the refusal of a request whose sink was
+// edited under every search it made.
+func wantSinkChanged(t *testing.T, status int, body []byte) {
+	t.Helper()
+	var problem map[string]any
+	if err := json.Unmarshal(body, &problem); err != nil {
+		t.Fatal(err)
+	}
+	if status != http.StatusPreconditionFailed || problem["code"] != "sink_changed" {
+		t.Fatalf("answer = %d: %s, want 412 sink_changed", status, body)
+	}
+}
+
+// A replay whose sink is edited under each of its three searches gives up
+// with sink_changed rather than searching for ever, and moves no stream.
+func TestAReplayWhoseSinkKeepsBeingEditedIsRefused(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t)
+	sink, _ := f.enabled(t, webhook(r, "exposure"))
+	_, at := f.timeline(t, "u-1", "u-2")
+	tick(t, f.srv)
+	before := f.sink(t, sink)
+
+	replayed := make(chan *management.ReplaySinkResponse, 1)
+	go func() {
+		replayed <- do(f.p.admin.ReplaySinkWithResponse(t.Context(), f.p.key, sink.Id, management.SinkReplay{From: at[0]}))
+	}()
+	f.editDuringSearches(t, sink, 3)
+	res := <-replayed
+	wantSinkChanged(t, res.StatusCode(), res.Body)
+
+	n := len(r.Calls())
+	tick(t, f.srv)
+	if got := len(r.Calls()); got != n {
+		t.Errorf("the receiver got %d more calls after the refused replay, want none", got-n)
+	}
+	if after := f.sink(t, sink); after.Version != before.Version+3 {
+		t.Errorf("sink version %d, want %d: the three edits and nothing else", after.Version, before.Version+3)
+	}
+}
+
+// An enable from a time whose sink is edited under each of its three
+// searches gives up the same way and leaves the sink disabled.
+func TestAnEnableWhoseSinkKeepsBeingEditedIsRefused(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t)
+	created, _ := f.create(t, webhook(r, "exposure"))
+	f.timeline(t, "u-1")
+	f.srv.AwaitHorizon(t)
+
+	enabled := make(chan *management.EnableSinkResponse, 1)
+	go func() {
+		enabled <- do(f.p.admin.EnableSinkWithResponse(t.Context(), f.p.key, created.Id, management.SinkEnable{StartFrom: ptr(f.clock.Now().Add(-24 * time.Hour))}))
+	}()
+	f.editDuringSearches(t, created, 3)
+	res := <-enabled
+	wantSinkChanged(t, res.StatusCode(), res.Body)
+	if s := f.sink(t, created); s.Enabled {
+		t.Error("the refused enable left the sink enabled")
 	}
 }
