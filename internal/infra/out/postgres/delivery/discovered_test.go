@@ -66,7 +66,7 @@ func (p *pausingStore) DiscoveredAttributes(ctx context.Context, project workspa
 // is under way holds: the flush writes its row back whole, so a change
 // committed between would be undone unless the two are ordered.
 func TestAMembersChangeToADiscoveredAttributeHoldsAgainstAFlushUnderWay(t *testing.T) {
-	declared := func(ctx context.Context, d appdelivery.AttributeDeclaration) (workspace.Attribute, error) {
+	declared := func(_ context.Context, _ appdelivery.AttributeDeclaration) (workspace.Attribute, error) {
 		return workspace.Attribute{}, nil
 	}
 	changes := map[string]func(tx appdelivery.Transactor, store *pgdelivery.Store, p workspace.ProjectID) error{
