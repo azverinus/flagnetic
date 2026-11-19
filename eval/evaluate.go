@@ -298,7 +298,10 @@ func (e *evaluation) body(f *compiledFlag) Result {
 }
 
 // assign walks weights in list order; variation i covers
-// [sum(w_0..w_{i-1}), sum(w_0..w_i)).
+// [sum(w_0..w_{i-1}), sum(w_0..w_i)). Decoding refuses weights that do not
+// sum to Buckets, so every bucket falls in one; the false result stays for a
+// ruleset built in code around that check, which is answered
+// inconsistent_ruleset rather than served a guess.
 func assign(weights []Weight, bucket int) (string, bool) {
 	upper := 0
 	for _, w := range weights {
