@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -849,5 +850,64 @@ func TestDeadLetterActionsOfASinkOrADeadLetterThatDoesNotExistAreNotFound(t *tes
 	resumed := do(admin.ResumeSinkWithResponse(t.Context(), p.Key, created.Id))
 	if resumed.JSON200 == nil || resumed.JSON200.StoppedAt != nil || resumed.JSON200.Version != created.Version {
 		t.Errorf("resuming a sink that is not stopped = %d: %s, want it as it is", resumed.StatusCode(), resumed.Body)
+	}
+}
+
+// Every operation on a sink is scoped to its project and needs the permission
+// to manage sinks: another project's sink is not found, and a viewer or a
+// developer is refused, whatever the operation does to the sink.
+func TestEverySinkOperationIsScopedToItsProjectAndNeedsSinkManage(t *testing.T) {
+	srv := testkit.StartServer(t)
+	pool := testkit.Pool(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	mine, other := createProject(t, admin, projectKey()), createProject(t, admin, projectKey())
+	created := createSink(t, admin, mine.Key, webhookSink())
+	sink := created.Id
+
+	type call func(c *management.ClientWithResponses, project string) (status int)
+	operations := map[string]call{
+		"replay": func(c *management.ClientWithResponses, project string) int {
+			return do(c.ReplaySinkWithResponse(t.Context(), project, sink, management.SinkReplay{From: time.Now().Add(-time.Hour)})).StatusCode()
+		},
+		"sample": func(c *management.ClientWithResponses, project string) int {
+			return do(c.SampleSinkWithResponse(t.Context(), project, sink, management.SinkSample{})).StatusCode()
+		},
+		"test": func(c *management.ClientWithResponses, project string) int {
+			return do(c.TestSinkWithResponse(t.Context(), project, sink, management.SinkTest{})).StatusCode()
+		},
+		"enable": func(c *management.ClientWithResponses, project string) int {
+			return do(c.EnableSinkWithResponse(t.Context(), project, sink, management.SinkEnable{})).StatusCode()
+		},
+		"rotate": func(c *management.ClientWithResponses, project string) int {
+			return do(c.RotateSinkSecretWithResponse(t.Context(), project, sink)).StatusCode()
+		},
+		"resume": func(c *management.ClientWithResponses, project string) int {
+			return do(c.ResumeSinkWithResponse(t.Context(), project, sink)).StatusCode()
+		},
+		"update": func(c *management.ClientWithResponses, project string) int {
+			return do(c.UpdateSinkWithResponse(t.Context(), project, sink, &management.UpdateSinkParams{IfMatch: ifMatch(1)}, management.SinkPatch{Name: ptr("Renamed")})).StatusCode()
+		},
+		"delete": func(c *management.ClientWithResponses, project string) int {
+			return do(c.DeleteSinkWithResponse(t.Context(), project, sink, &management.DeleteSinkParams{IfMatch: ifMatch(1)})).StatusCode()
+		},
+	}
+
+	for name, run := range operations {
+		if got := run(admin, other.Key); got != http.StatusNotFound {
+			t.Errorf("%s through another project = %d, want 404", name, got)
+		}
+	}
+	for _, role := range []access.RoleName{access.RoleViewer, access.RoleDeveloper} {
+		c := testkit.Client(t, srv, testkit.GrantedToken(t, pool, projectIDOf(mine), role))
+		for name, run := range operations {
+			if got := run(c, mine.Key); got != http.StatusForbidden {
+				t.Errorf("a %s's %s = %d, want 403", role, name, got)
+			}
+		}
+	}
+	// Nothing any of them tried changed the sink.
+	got := do(admin.GetSinkWithResponse(t.Context(), mine.Key, sink))
+	if got.JSON200 == nil || got.JSON200.Name != "Ingest" || got.JSON200.Version != 1 || got.JSON200.Enabled {
+		t.Errorf("sink after the refusals = %s, want it untouched", got.Body)
 	}
 }
