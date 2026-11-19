@@ -1141,3 +1141,52 @@ func TestRecordingASinkFailureTakesTheProjectBeforeTheSink(t *testing.T) {
 		t.Errorf("health = %s, want failing", s.Health)
 	}
 }
+
+// One replica attempts at most a project's share of sinks at once and leaves
+// the rest of the project's due sinks unclaimed, so that another replica
+// attempts them beside it instead of the project's sinks queueing behind one.
+func TestOneProjectsSinksAreAttemptedByTwoReplicasAtOnce(t *testing.T) {
+	f := startDelivering(t)
+	release := make(chan struct{})
+	const sinksOfProject = 8
+	// Enabling a sink calls the target once, which it answers at once.
+	replies := make([]testkit.Reply, sinksOfProject, sinksOfProject+1)
+	r := testkit.StartReceiver(t, append(replies, testkit.Reply{Release: release})...)
+	for i := range sinksOfProject {
+		body := webhook(r, "exposure")
+		body.Name = fmt.Sprintf("Warehouse %d", i)
+		f.enabled(t, body)
+	}
+	f.post(t, f.exposure("u-1", "true", f.clock.Now()))
+	f.srv.AwaitHorizon(t)
+	other := testkit.StartServer(t, testkit.WithClock(f.clock), sinkTargets)
+
+	rounds := make(chan error, 2)
+	go func() { rounds <- f.srv.Tick(t, worker.SinkDeliveryName) }()
+	waitForCalls := func(want int) int {
+		deadline := time.Now().Add(10 * time.Second)
+		for len(batchCalls(r)) < want && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+		return len(batchCalls(r))
+	}
+	if got := waitForCalls(4); got != 4 {
+		t.Fatalf("the first replica attempted %d sinks, want its share of 4", got)
+	}
+	// The first replica holds its share and leaves the other sinks alone.
+	time.Sleep(300 * time.Millisecond)
+	if got := len(batchCalls(r)); got != 4 {
+		t.Errorf("the first replica attempted %d sinks of one project at once, want 4", got)
+	}
+
+	go func() { rounds <- other.Tick(t, worker.SinkDeliveryName) }()
+	if got := waitForCalls(sinksOfProject); got != sinksOfProject {
+		t.Errorf("%d sinks attempted with two replicas, want all %d", got, sinksOfProject)
+	}
+	close(release)
+	for range 2 {
+		if err := <-rounds; err != nil {
+			t.Fatalf("sink delivery round: %v", err)
+		}
+	}
+}

@@ -28,9 +28,20 @@ type Lease struct{}
 // claim once it runs out.
 const LeaseDuration = 5 * time.Minute
 
-// claimBatch bounds the streams one claim leases; a round claims again once it
-// has attempted them.
-const claimBatch = 50
+// ClaimLimit bounds what one claim leases, in sinks, because a replica
+// attempts sinks, not streams: whatever it leases and cannot start stays
+// leased away from the other replicas until the lease runs out.
+type ClaimLimit struct {
+	// Sinks is how many sinks the claim may take: the replica's free slots.
+	Sinks int
+	// PerProject is how many sinks of one project the replica holds at most,
+	// those it is attempting now included.
+	PerProject int
+}
+
+// abandonTimeout bounds how long giving back the leases of sinks that never
+// started takes, once the replica is shutting down.
+const abandonTimeout = 5 * time.Second
 
 // StreamRef names one stream: the delivery of an event kind of a sink.
 type StreamRef struct {
@@ -90,10 +101,11 @@ type DeliveryStore interface {
 	LockProject(ctx context.Context, project workspace.ProjectID) error
 	// Claim leases to token, until until, the streams due by now of sinks
 	// that are enabled or still have a batch in flight and are not stopped,
-	// leaving out those of the sinks busy, the longest due first, at most
-	// limit streams. A replay a stream has waiting is applied as it is
+	// leaving out those of the sinks busy and of sinks another replica holds a
+	// stream of, the longest due first, at most limit sinks and all the due
+	// streams of each. A replay a stream has waiting is applied as it is
 	// leased: its cursor is the position the replay set.
-	Claim(ctx context.Context, token LeaseToken, now, until time.Time, limit int, busy []sinks.ID) ([]ClaimedSink, error)
+	Claim(ctx context.Context, token LeaseToken, now, until time.Time, limit ClaimLimit, busy []sinks.ID) ([]ClaimedSink, error)
 	// Renew pushes the lease token holds on stream out to until and reports
 	// the state of its sink.
 	Renew(ctx context.Context, stream StreamRef, token LeaseToken, until time.Time) (Renewal, error)
@@ -314,18 +326,36 @@ func NewDeliver(d DeliverDeps) *Deliver { return &Deliver{d: d} }
 
 func (h *Deliver) now() time.Time { return h.d.Clock.Now().UTC().Truncate(time.Microsecond) }
 
-// Claim leases the streams due now, leaving out the sinks busy, which the
-// caller is still attempting.
-func (h *Deliver) Claim(ctx context.Context, busy []sinks.ID) (Claim, error) {
+// Claim leases the streams due now of at most limit sinks, leaving out the
+// sinks busy, which the caller is still attempting.
+func (h *Deliver) Claim(ctx context.Context, busy []sinks.ID, limit ClaimLimit) (Claim, error) {
 	token := id.New[Lease](h.d.IDs)
 	now := h.now()
 	var claimed []ClaimedSink
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		var err error
-		claimed, err = h.d.Store.Claim(ctx, token, now, now.Add(LeaseDuration), claimBatch, busy)
+		claimed, err = h.d.Store.Claim(ctx, token, now, now.Add(LeaseDuration), limit, busy)
 		return err
 	})
 	return Claim{Token: token, Sinks: claimed}, err
+}
+
+// Abandon gives back the leases of the streams of c, a claimed sink that never
+// started, so that another replica attempts them at once instead of after the
+// lease runs out. It runs on its own context: it is called when the one of the
+// claim is cancelled. A stream whose lease is gone is left alone.
+func (h *Deliver) Abandon(ctx context.Context, token LeaseToken, c ClaimedSink) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), abandonTimeout)
+	defer cancel()
+	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
+		for _, due := range c.Streams {
+			ref := StreamRef{Sink: c.Sink.ID, Kind: due.Stream.EventKind}
+			if _, err := h.d.Store.Release(ctx, ref, token); err != nil {
+				return fmt.Errorf("giving back the lease of stream %s: %w", due.Stream.EventKind, err)
+			}
+		}
+		return nil
+	})
 }
 
 // AttemptSink attempts the streams of c one after another, so that a stop one
@@ -335,8 +365,12 @@ func (h *Deliver) Claim(ctx context.Context, busy []sinks.ID) (Claim, error) {
 func (h *Deliver) AttemptSink(ctx context.Context, token LeaseToken, c ClaimedSink) (map[sinks.EventKind]Result, error) {
 	results := make(map[sinks.EventKind]Result, len(c.Streams))
 	var errs []error
-	for _, due := range c.Streams {
+	for i, due := range c.Streams {
 		if ctx.Err() != nil {
+			// The streams not started give their leases back at once.
+			if err := h.Abandon(ctx, token, ClaimedSink{Sink: c.Sink, Streams: c.Streams[i:]}); err != nil {
+				errs = append(errs, err)
+			}
 			break
 		}
 		res, err := h.attempt(ctx, token, c, due)

@@ -30,7 +30,9 @@ const sinkRoundFor = time.Minute
 
 // SinkDeliverer is the use case attempting the sink streams that are due.
 type SinkDeliverer interface {
-	Claim(ctx context.Context, busy []sinks.ID) (appsinks.Claim, error)
+	Claim(ctx context.Context, busy []sinks.ID, limit appsinks.ClaimLimit) (appsinks.Claim, error)
+	// Abandon gives back the leases of a claimed sink that never started.
+	Abandon(ctx context.Context, token appsinks.LeaseToken, c appsinks.ClaimedSink) error
 	AttemptSink(ctx context.Context, token appsinks.LeaseToken, c appsinks.ClaimedSink) (map[sinks.EventKind]appsinks.Result, error)
 }
 
@@ -267,7 +269,10 @@ func (r *sinkRound) claim(ctx context.Context) (int, error) {
 		busy = append(busy, id)
 	}
 	r.mu.Unlock()
-	c, err := r.d.Claim(ctx, busy)
+	// A claim takes no more sinks than the replica can start now, and no
+	// more of one project than it may run: what it takes and cannot start
+	// stays leased away from the replicas that could.
+	c, err := r.d.Claim(ctx, busy, appsinks.ClaimLimit{Sinks: sinksAtOnce - len(busy), PerProject: attemptsPerProject})
 	if err != nil {
 		return 0, err
 	}
@@ -289,12 +294,14 @@ func (r *sinkRound) claim(ctx context.Context) (int, error) {
 			}()
 			release, err := r.perProject.acquire(ctx, s.Sink.Project)
 			if err != nil {
+				r.abandon(ctx, c.Token, s)
 				return
 			}
 			defer release()
 			select {
 			case r.slots <- struct{}{}:
 			case <-ctx.Done():
+				r.abandon(ctx, c.Token, s)
 				return
 			}
 			defer func() { <-r.slots }()
@@ -305,6 +312,15 @@ func (r *sinkRound) claim(ctx context.Context) (int, error) {
 		})
 	}
 	return len(c.Sinks), nil
+}
+
+// abandon gives back the leases of a claimed sink the round stopped before
+// starting, so that another replica attempts it without waiting for them to
+// run out.
+func (r *sinkRound) abandon(ctx context.Context, token appsinks.LeaseToken, s appsinks.ClaimedSink) {
+	if err := r.d.Abandon(ctx, token, s); err != nil {
+		r.log.ErrorContext(ctx, "giving back the leases of a sink that never started failed", "sink", s.Sink.ID.String(), "error", err.Error())
+	}
 }
 
 // attempt attempts one sink's streams and logs what did not go as planned.
