@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.6.0](https://github.com/azverinus/flagnetic/compare/v0.5.0...v0.6.0) (2026-11-19)
+
+
+### Features
+
+* **console:** audit log facets in the context panel ([#379](https://github.com/azverinus/flagnetic/issues/379)) ([9c84ad9](https://github.com/azverinus/flagnetic/commit/9c84ad9272a9e21aea96299c71da65b771fb6bb3))
+* **console:** change requests views and facets in the panel ([#377](https://github.com/azverinus/flagnetic/issues/377)) ([669ae6f](https://github.com/azverinus/flagnetic/commit/669ae6f18fd23f523d227015ac00eb693647ee23))
+* **console:** compose settings and detail screens of cards ([#374](https://github.com/azverinus/flagnetic/issues/374)) ([1bee74f](https://github.com/azverinus/flagnetic/commit/1bee74fd45a8b312cc1dd8c1b413be7dcc7a9dfa))
+* **console:** context panel and the three settings areas ([#370](https://github.com/azverinus/flagnetic/issues/370)) ([81479df](https://github.com/azverinus/flagnetic/commit/81479df56b760a84523cfabfe7f2dcb3330b29b5))
+* **console:** conventions page and lint rule for screen widths ([#383](https://github.com/azverinus/flagnetic/issues/383)) ([984797e](https://github.com/azverinus/flagnetic/commit/984797e978ad34a460af36f6866ef3cb1be31a1a))
+* **console:** experiments facets in the panel, cards for an experiment ([#380](https://github.com/azverinus/flagnetic/issues/380)) ([48e9a03](https://github.com/azverinus/flagnetic/commit/48e9a03e3fba8e2fca86cec21254da4c7f241560))
+* **console:** flag environments in the panel, configuration in cards ([#378](https://github.com/azverinus/flagnetic/issues/378)) ([86c0325](https://github.com/azverinus/flagnetic/commit/86c03257abc2b1ad6fd4832b95f5cf4fa8bbf628))
+* **console:** flags list toolbar, views and facets in the panel ([#375](https://github.com/azverinus/flagnetic/issues/375)) ([62bb76e](https://github.com/azverinus/flagnetic/commit/62bb76e4af6b44574ef4f5f48fae5a686a3bfe44))
+* **console:** inset shell with the grouped sidebar ([#365](https://github.com/azverinus/flagnetic/issues/365)) ([6c493ed](https://github.com/azverinus/flagnetic/commit/6c493edbfe103899c10517b13ccf68f9287eff9a))
+* **console:** one-sentence hints, details under fields ([#381](https://github.com/azverinus/flagnetic/issues/381)) ([c1bb368](https://github.com/azverinus/flagnetic/commit/c1bb36830c8a426b3fea4094a7b9acf6ed6a175e))
+* **console:** overview shows environments, attention and activity ([#376](https://github.com/azverinus/flagnetic/issues/376)) ([8597943](https://github.com/azverinus/flagnetic/commit/8597943f5b6aad858fdf148ea680a7ebfb1598ee))
+* **console:** page and card primitives for every screen ([#368](https://github.com/azverinus/flagnetic/issues/368)) ([9b5324d](https://github.com/azverinus/flagnetic/commit/9b5324d2eb8590b77f43b39f005da59edb41b6c4))
+* **console:** surface ramp, accent roles and Geist typeface ([#361](https://github.com/azverinus/flagnetic/issues/361)) ([dc01cac](https://github.com/azverinus/flagnetic/commit/dc01cac5a14aa6c4a66c66de20eaea9d58835ddc))
+* **deploy:** add routes, metrics, scaling and policy to the chart ([#366](https://github.com/azverinus/flagnetic/issues/366)) ([9445d51](https://github.com/azverinus/flagnetic/commit/9445d5160f1b5f5e681af0eb244d52045d3bcd0a))
+* **deploy:** add the Helm chart ([#364](https://github.com/azverinus/flagnetic/issues/364)) ([fab1876](https://github.com/azverinus/flagnetic/commit/fab18768859c0e7edbd86dca015f76a42da04ba7))
+* **deploy:** release the chart and add the Kubernetes guide ([#369](https://github.com/azverinus/flagnetic/issues/369)) ([ed73452](https://github.com/azverinus/flagnetic/commit/ed734520070b84a237583b731b0fb886bd4ff1c7))
+* **docs:** publish the docs as a site with search and API reference ([#373](https://github.com/azverinus/flagnetic/issues/373)) ([8294599](https://github.com/azverinus/flagnetic/commit/82945996f6e56ab2537387efadfcb1c648ecc9a4))
+* **e2e:** measure the SDK API's p99 under load in CI ([#367](https://github.com/azverinus/flagnetic/issues/367)) ([96a9186](https://github.com/azverinus/flagnetic/commit/96a9186b127349d7c3911e4b59f2db215bdbfb67))
+
+
+### Bug Fixes
+
+* **deploy:** install the chart with a published image on release pull requests ([#385](https://github.com/azverinus/flagnetic/issues/385)) ([b1ece42](https://github.com/azverinus/flagnetic/commit/b1ece42514b86223f9c325159bb1ba8fb6ef19e2))
+* **deploy:** keep the chart's image tag test independent of the release ([#384](https://github.com/azverinus/flagnetic/issues/384)) ([d0acc7e](https://github.com/azverinus/flagnetic/commit/d0acc7e137b187600ad4bb7ccf064a78f011b287))
+
 ## [0.5.0](https://github.com/azverinus/flagnetic/compare/v0.4.0...v0.5.0) (2026-11-17)
 
 
