@@ -857,10 +857,21 @@ jobs:
         run: |
           kubectl apply -f deploy/helm/test/postgres.yaml
           kubectl rollout status deployment/postgres --timeout=120s
-      # The chart's appVersion is the last release, whose image is published;
       # ct installs the chart once per ci/*-values.yaml file and runs helm test.
+      # The chart's appVersion is the last release, whose image is published,
+      # except on the release pull request, which already carries the version
+      # about to be released: its image exists only once the release is cut. The
+      # install then uses the newest published server release instead.
       - name: ct install
-        run: ct install --config .github/ct.yaml --all
+        run: |
+          app_version=$(sed -n 's/^appVersion: "\(.*\)".*/\1/p' deploy/helm/flagnetic/Chart.yaml)
+          tag=$app_version
+          if ! docker manifest inspect "ghcr.io/${GITHUB_REPOSITORY}:${app_version}" >/dev/null 2>&1; then
+            tag=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n1)
+            tag=${tag#v}
+            echo "The image for ${app_version} is not published yet; installing ${tag}."
+          fi
+          ct install --config .github/ct.yaml --all --helm-extra-set-args "--set=image.tag=${tag}"
 
   # The SDK API's latency under load: two replicas of the real binary on
   # PostgreSQL 18, a project of 1,000 flags, and requests sent on a fixed
