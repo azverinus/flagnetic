@@ -13,7 +13,9 @@ The schema of the server, applied in order by `flagnetic migrate`.
   edited, renamed or removed, since databases in the field have already
   applied it and would never see the change. A change is a new migration.
   `released.sum` lists the SHA-256 of every released file, and a test fails
-  when a listed file changes or disappears. A release that ships new
+  when a listed file changes or disappears. CI fails when a file of the latest
+  server tag is not listed, and on the server's release pull request when a
+  migration it ships is not. A release that ships new
   migrations appends them: `sha256sum NNNNN_*.sql >> released.sum` for each
   new file, in order.
 - A migration runs forward only and loses no data. A change that would break
