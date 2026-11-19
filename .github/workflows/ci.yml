@@ -785,7 +785,7 @@ jobs:
     if: needs.plan.outputs.sdk_js == 'true'
     uses: ./.github/workflows/sdk-js.yml
 
-  # The migrations a pull request adds, linted with squawk so that a replica of
+  # The unreleased migrations a pull request adds or changes, linted with squawk so that a replica of
   # the previous minor keeps working against the new schema (expand/contract:
   # no rename, no drop, no blocking index, no NOT NULL without a default).
   # Released migrations are not linted; they are pinned instead: every file of
@@ -808,7 +808,7 @@ jobs:
           echo "$RUNNER_TEMP/squawk" >> "$GITHUB_PATH"
       - name: The rules catch the bad fixtures
         run: .github/scripts/lint-migrations.sh --self-test
-      - name: Lint the migrations the pull request adds
+      - name: Lint the unreleased migrations the pull request adds or changes
         if: github.event_name == 'pull_request'
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
