@@ -159,11 +159,23 @@ type gunzipBody struct {
 	// its own bound is refused with: the slack added to that bound is the
 	// adapter's, not a limit the client is told about.
 	limit int64
+	// srcErr is the first error the source returned other than its end: a
+	// failure of the connection, not of the gzip it carried.
+	srcErr error
+}
+
+// read reads the compressed body, remembering how the source failed.
+func (b *gunzipBody) read(p []byte) (int, error) {
+	n, err := b.src.Read(p)
+	if err != nil && !errors.Is(err, io.EOF) && b.srcErr == nil {
+		b.srcErr = err
+	}
+	return n, err
 }
 
 func (b *gunzipBody) Read(p []byte) (int, error) {
 	if b.zr == nil {
-		zr, err := gzip.NewReader(b.src)
+		zr, err := gzip.NewReader(readerFunc(b.read))
 		if err != nil {
 			return 0, b.fault(err)
 		}
@@ -187,7 +199,17 @@ func (b *gunzipBody) fault(err error) error {
 	if errors.Is(err, os.ErrDeadlineExceeded) || errors.As(err, &tooLarge) {
 		return err
 	}
+	if b.srcErr != nil {
+		// The body stopped arriving, as when the client went away before
+		// sending all of it: the edge judges that, not the gzip.
+		return b.srcErr
+	}
 	return flaghttp.InvalidRequest("the body is not valid gzip: " + err.Error())
 }
+
+// readerFunc is an io.Reader made of a function.
+type readerFunc func([]byte) (int, error)
+
+func (f readerFunc) Read(p []byte) (int, error) { return f(p) }
 
 func (b *gunzipBody) Close() error { return b.src.Close() }

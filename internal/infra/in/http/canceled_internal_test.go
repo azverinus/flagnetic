@@ -39,15 +39,16 @@ func TestOnlyAContextTheClientEndedIsACancellationByTheClient(t *testing.T) {
 		want bool
 	}{
 		{"the client went away", servedUnder(gone), interrupted, true},
-		{"the client went away, the error is another", servedUnder(gone), errors.New("connection reset"), false},
+		{"the client went away, the error is another", servedUnder(gone), errors.New("connection reset"), true},
+		{"the client went away, no error", servedUnder(gone), nil, false},
 		{"a server deadline", servedUnder(timedOut), fmt.Errorf("listing: %w", context.DeadlineExceeded), false},
 		{"the replica ended the request", servedUnder(stopping), interrupted, false},
 		{"a cancellation of the server's own while the client waits", servedUnder(context.Background()), interrupted, false},
 		{"the handler cancelled a context it derived", abandoned.WithContext(abandonedCtx), interrupted, false},
 		{"a request the edge did not serve", httptest.NewRequestWithContext(gone, http.MethodGet, "/", nil), interrupted, false},
 	} {
-		if got := canceledByClient(c.r, c.err); got != c.want {
-			t.Errorf("%s: canceledByClient = %v, want %v", c.name, got, c.want)
+		if got := CanceledByClient(c.r, c.err); got != c.want {
+			t.Errorf("%s: CanceledByClient = %v, want %v", c.name, got, c.want)
 		}
 	}
 }

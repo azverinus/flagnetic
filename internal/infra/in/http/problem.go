@@ -154,18 +154,41 @@ func problemOf(err error) problem {
 // request, outside the range of a server failure.
 const statusClientClosedRequest = 499
 
-// canceledByClient reports whether err is r ending because its client went
-// away: err is a cancellation, and the context net/http served r under was
-// canceled with no cause of its own, which is how net/http ends the context
-// of a request whose connection closed. The context r carries now is not
-// judged, since a handler may have derived it and cancelled it itself. A
-// server deadline, a handler's own cancel, and the replica ending its
-// requests when it stops, which gives a cause, are failures of the server
-// instead.
-func canceledByClient(r *http.Request, err error) bool {
+// CanceledByClient reports whether err is r ending because its client went
+// away, and when it is marks r as canceled, so the access log and the metrics
+// record 499. The context net/http served r under was canceled with no cause
+// of its own, which is how net/http ends the context of a request whose
+// connection closed: whatever error the work then returned, from a query that
+// saw the cancellation to a body read cut short, the client is gone. The
+// context r carries now is not judged, since a handler may have derived it
+// and cancelled it itself. A server deadline, a handler's own cancel, and the
+// replica ending its requests when it stops, which gives a cause, are
+// failures of the server instead.
+func CanceledByClient(r *http.Request, err error) bool {
+	var tooLarge *http.MaxBytesError
+	if err == nil || IsBodyTimeout(err) || errors.As(err, &tooLarge) || !canceledByClient(r) {
+		// A body that stalled or ran over its limit is judged on its own: the
+		// body's deadline closes the connection's read side, which ends the
+		// served context although the client is still there, waiting for
+		// its answer.
+		return false
+	}
+	stateOf(r.Context()).canceled = true
+	return true
+}
+
+func canceledByClient(r *http.Request) bool {
 	st := stateOf(r.Context())
-	return st != nil && st.served != nil && errors.Is(err, context.Canceled) &&
+	return st != nil && st.served != nil &&
 		context.Cause(st.served) == context.Canceled //nolint:errorlint // a cause of its own may wrap Canceled and still be the server's
+}
+
+// IsBodyTimeout reports whether err is a request body that did not arrive
+// within the body read timeout: a client still connected, too slow, which is
+// answered 408 so it retries rather than takes its request for malformed.
+func IsBodyTimeout(err error) bool {
+	var bodyTimeout *bodyTimeoutError
+	return errors.As(err, &bodyTimeout)
 }
 
 // WriteError answers err as an RFC 9457 problem document. An error of a kind
@@ -179,10 +202,7 @@ func canceledByClient(r *http.Request, err error) bool {
 // recorded as 499, so that neither the error log nor the 5xx count operators
 // alert on grows with every browser that navigates away.
 func (s *Server) WriteError(w http.ResponseWriter, r *http.Request, err error) {
-	if canceledByClient(r, err) {
-		if st := stateOf(r.Context()); st != nil {
-			st.canceled = true
-		}
+	if CanceledByClient(r, err) {
 		s.log.DebugContext(r.Context(), "request canceled by the client", "error", err.Error())
 		return
 	}
