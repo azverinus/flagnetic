@@ -31,19 +31,39 @@ func refuseMissingMembers(body []byte, op operations.Entry) error {
 	if op.Body == 0 || len(bytes.TrimSpace(body)) == 0 || !json.Valid(body) {
 		return nil
 	}
-	root := operations.Shapes[op.Body]
+	return refuseLacking(body, operations.Shapes[op.Body], "")
+}
+
+// refuseAlternativeLacking refuses raw, found at pointer in a body, when it
+// lacks what schema, the alternative of a oneOf the handler knows it to be,
+// requires. The operation's own check cannot look into a oneOf, since which
+// alternative a value is depends on what else the request names: a change
+// request proposing `{}` for a flag's configuration would otherwise switch
+// the flag off when applied.
+func refuseAlternativeLacking(raw json.RawMessage, schema, pointer string) error {
+	shape, ok := operations.Named[schema]
+	if !ok || len(bytes.TrimSpace(raw)) == 0 || !json.Valid(raw) {
+		return nil
+	}
+	return refuseLacking(raw, operations.Shapes[shape], pointer)
+}
+
+// refuseLacking answers 422 with a violation per member raw, found at
+// pointer, lacks of what shape requires, or one when raw is no object where
+// shape wants one.
+func refuseLacking(raw []byte, shape operations.Shape, pointer string) error {
 	var found []apperrors.Violation
 	add := func(pointer, detail string) {
 		if len(found) < text.MaxViolations {
 			found = append(found, apperrors.Violation{Pointer: pointer, Code: "required", Detail: detail})
 		}
 	}
-	if root.Object && bytes.TrimSpace(body)[0] != '{' {
+	if shape.Object && first(raw) != '{' {
 		return apperrors.Invalid(bodyInvalid, "the request body must be a JSON object",
-			apperrors.Violation{Pointer: "", Code: "invalid_type", Detail: "the body must be a JSON object"})
+			apperrors.Violation{Pointer: pointer, Code: "invalid_type", Detail: "the value must be a JSON object"})
 	}
-	if root.Deep {
-		checkShape(json.RawMessage(body), root, "", add)
+	if shape.Deep {
+		checkShape(json.RawMessage(raw), shape, pointer, add)
 	}
 	if len(found) == 0 {
 		return nil

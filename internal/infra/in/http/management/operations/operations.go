@@ -60,22 +60,23 @@ const PasswordBodyLimit = 8 << 10
 // without an identifier, without x-permission or naming a permission the
 // catalog does not hold, so no operation is ever open by accident.
 func Read(doc []byte) (map[string]Entry, error) {
-	ops, _, err := ReadAll(doc)
+	ops, _, _, err := ReadAll(doc)
 	return ops, err
 }
 
 // ReadAll is Read that also returns the shapes the request bodies must have,
-// which the entries number in Body.
-func ReadAll(doc []byte) (map[string]Entry, []Shape, error) {
-	list, bodies, err := readShapes(doc)
+// which the entries number in Body, and the shapes of the schemas a oneOf in
+// them names, by schema name.
+func ReadAll(doc []byte) (map[string]Entry, []Shape, map[string]int, error) {
+	list, bodies, named, err := readShapes(doc)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	var d struct {
 		Paths map[string]map[string]yaml.Node `yaml:"paths"`
 	}
 	if err := yaml.Unmarshal(doc, &d); err != nil {
-		return nil, nil, fmt.Errorf("reading the document: %w", err)
+		return nil, nil, nil, fmt.Errorf("reading the document: %w", err)
 	}
 	ops := map[string]Entry{}
 	var errs []error
@@ -133,9 +134,9 @@ func ReadAll(doc []byte) (map[string]Entry, []Shape, error) {
 	}
 	if len(errs) > 0 {
 		slices.SortFunc(errs, func(a, b error) int { return strings.Compare(a.Error(), b.Error()) })
-		return nil, nil, errors.Join(errs...)
+		return nil, nil, nil, errors.Join(errs...)
 	}
-	return ops, list, nil
+	return ops, list, named, nil
 }
 
 // extensions are the x- keys an operation may carry, each read by Read.
@@ -158,7 +159,7 @@ func unknownExtensions(keys map[string]yaml.Node) []string {
 }
 
 // render returns the Go source of the operation table.
-func render(ops map[string]Entry, shapes []Shape) ([]byte, error) {
+func render(ops map[string]Entry, shapes []Shape, named map[string]int) ([]byte, error) {
 	var b bytes.Buffer
 	b.WriteString(`// Code generated from api/management.yaml by ` + "`task generate`" + `. DO NOT EDIT.
 
@@ -183,6 +184,10 @@ var Table = map[string]Entry{
 	for i, s := range shapes {
 		fmt.Fprintf(&b, "\t%d: {Object: %t, Required: %s, Members: %s, Items: %d, Values: %d, Deep: %t},\n",
 			i, s.Object, goStrings(s.Required), goMembers(s.Members), s.Items, s.Values, s.Deep)
+	}
+	b.WriteString("}\n\n// Named are the shapes of the schemas a oneOf names, by schema name, for the\n// handler that knows which alternative a body is.\nvar Named = map[string]int{\n")
+	for _, name := range sortedKeys(named) {
+		fmt.Fprintf(&b, "\t%q: %d,\n", name, named[name])
 	}
 	b.WriteString("}\n")
 	return format.Source(b.Bytes())

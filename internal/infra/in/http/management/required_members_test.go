@@ -73,14 +73,70 @@ func TestAFlagConfigurationWithoutOnDoesNotSwitchItOff(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProjectAsCreated(t, admin, projectKey()).Key
+	stringFlag(t, admin, p, "f")
+	configuration := func() (bool, management.Version, string) {
+		res := do(admin.GetFlagConfigurationWithResponse(t.Context(), p, "f", "staging"))
+		if res.JSON200 == nil {
+			t.Fatalf("GET configuration = %d %s", res.StatusCode(), res.Body)
+		}
+		return res.JSON200.On, res.JSON200.Version, res.HTTPResponse.Header.Get("ETag")
+	}
+	on := do(admin.PutFlagConfigurationWithBodyWithResponse(t.Context(), p, "f", "staging",
+		&management.PutFlagConfigurationParams{IfMatch: ifMatch(1)}, "application/json",
+		strings.NewReader(`{"on": true, "off_variation": "a", "fallthrough": "a"}`)))
+	if on.JSON200 == nil {
+		t.Fatalf("switching it on = %d %s", on.StatusCode(), on.Body)
+	}
+	wasOn, version, tag := configuration()
+
 	res, err := admin.PutFlagConfigurationWithBodyWithResponse(t.Context(), p, "f", "staging",
-		&management.PutFlagConfigurationParams{IfMatch: ifMatch(1)}, "application/json", strings.NewReader(`{}`))
+		&management.PutFlagConfigurationParams{IfMatch: ifMatch(version)}, "application/json", strings.NewReader(`{}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	pr := assertProblem(t, "a configuration without on", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid")
 	if pr.Errors == nil || !slices.ContainsFunc(*pr.Errors, func(v management.Violation) bool { return v.Pointer == "/on" }) {
 		t.Errorf("violations = %+v, want one at /on among them", pr.Errors)
+	}
+	if nowOn, v, etag := configuration(); !wasOn || !nowOn || v != version || etag != tag {
+		t.Errorf("after the refusal on = %v at version %d, ETag %s; want on at %d, ETag %s", nowOn, v, etag, version, tag)
+	}
+}
+
+// What a change request proposes is one of four documents, told apart by
+// its kind, so the operation's own check cannot look into it; the handler
+// checks it against the one the kind calls for, or `{}` proposed for a
+// configuration would switch the flag off once applied.
+func TestAProposalLackingARequiredMemberIsRefused(t *testing.T) {
+	f := startChangeRequests(t)
+	for name, c := range map[string]struct{ body, want string }{
+		"a configuration":            {`{"kind": "flag_configuration", "flag": "checkout_title", "environment": "production", "title": "t", "proposed": {"off_variation": "a", "fallthrough": "a"}}`, "/proposed/on"},
+		"a flag's definition":        {`{"kind": "definition", "flag": "checkout_title", "title": "t", "proposed": {"variations": []}}`, "/proposed/automatic_exposure"},
+		"a segment's definition":     {`{"kind": "definition", "segment": "s", "title": "t", "proposed": {"conditions": []}}`, "/proposed/private"},
+		"an experiment's transition": {`{"kind": "experiment", "experiment": "x", "title": "t", "proposed": {}}`, "/proposed/action"},
+	} {
+		res, err := f.dev.CreateChangeRequestWithBodyWithResponse(t.Context(), f.project.Key, "application/json", strings.NewReader(c.body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		pr := assertProblem(t, name, res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid")
+		if pr.Errors == nil || !slices.ContainsFunc(*pr.Errors, func(v management.Violation) bool { return v.Pointer == c.want && v.Code == "required" }) {
+			t.Errorf("%s: violations = %+v, want one at %s", name, pr.Errors, c.want)
+		}
+	}
+
+	cr := createChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, configurationRequest("Good", proposedOn()))
+	res, err := f.dev.UpdateChangeRequestWithBodyWithResponse(t.Context(), f.project.Key, cr.Id,
+		&management.UpdateChangeRequestParams{IfMatch: ifMatch(cr.Version)}, "application/json", strings.NewReader(`{"proposed": {}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pr := assertProblem(t, "an edit proposing {}", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid")
+	if pr.Errors == nil || !slices.ContainsFunc(*pr.Errors, func(v management.Violation) bool { return v.Pointer == "/proposed/on" }) {
+		t.Errorf("edit: violations = %+v, want one at /proposed/on", pr.Errors)
+	}
+	if got := getChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, cr); got.Version != cr.Version {
+		t.Errorf("the change request moved to version %d after a refused edit, want %d", got.Version, cr.Version)
 	}
 }
 

@@ -19,11 +19,11 @@ func TestTheOperationTableIsTheDocument(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ops, shapes, err := ReadAll(doc)
+	ops, shapes, named, err := ReadAll(doc)
 	if err != nil {
 		t.Fatalf("the document does not declare what every operation requires:\n%v", err)
 	}
-	want, err := render(ops, shapes)
+	want, err := render(ops, shapes, named)
 	if err != nil {
 		t.Fatal(err)
 	}

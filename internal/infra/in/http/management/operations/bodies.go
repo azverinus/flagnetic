@@ -54,12 +54,17 @@ type shapes struct {
 	schemas map[string]map[string]any
 	list    []Shape
 	byKey   map[string]int
-	err     []error
+	// named numbers the shapes of the schemas a oneOf names, by schema name:
+	// which alternative a body is cannot be told from the schema, but the
+	// handler that reads the body knows, and checks it against that one.
+	named map[string]int
+	err   []error
 }
 
-// readShapes returns the shapes of the document's JSON request bodies and the
-// shape each operation's body has, keyed by route pattern.
-func readShapes(doc []byte) ([]Shape, map[string]int, error) {
+// readShapes returns the shapes of the document's JSON request bodies, the
+// shape each operation's body has, keyed by route pattern, and the shapes of
+// the schemas a oneOf in them names, keyed by schema name.
+func readShapes(doc []byte) ([]Shape, map[string]int, map[string]int, error) {
 	var d struct {
 		Paths      map[string]map[string]any `yaml:"paths"`
 		Components struct {
@@ -67,9 +72,9 @@ func readShapes(doc []byte) ([]Shape, map[string]int, error) {
 		} `yaml:"components"`
 	}
 	if err := yaml.Unmarshal(doc, &d); err != nil {
-		return nil, nil, fmt.Errorf("reading the document: %w", err)
+		return nil, nil, nil, fmt.Errorf("reading the document: %w", err)
 	}
-	s := &shapes{schemas: d.Components.Schemas, list: []Shape{{}}, byKey: map[string]int{}}
+	s := &shapes{schemas: d.Components.Schemas, list: []Shape{{}}, byKey: map[string]int{}, named: map[string]int{}}
 	bodies := map[string]int{}
 	paths := sortedKeys(d.Paths)
 	for _, path := range paths {
@@ -90,9 +95,9 @@ func readShapes(doc []byte) ([]Shape, map[string]int, error) {
 	}
 	s.markDeep()
 	if len(s.err) > 0 {
-		return nil, nil, fmt.Errorf("reading the request bodies: %w", joinErrors(s.err))
+		return nil, nil, nil, fmt.Errorf("reading the request bodies: %w", joinErrors(s.err))
 	}
-	return s.list, bodies, nil
+	return s.list, bodies, s.named, nil
 }
 
 // jsonBody returns the schema of an operation's JSON request body, or nil when
@@ -113,8 +118,8 @@ func jsonBody(op map[string]any) map[string]any {
 type flat struct {
 	object   bool
 	nullable bool
-	// untyped says no part of the schema gives the value a type, so any JSON
-	// value, null among them, is one the schema holds.
+	// typed says some part of the schema gives the value a type; without one,
+	// any JSON value, null among them, is one the schema holds.
 	typed    bool
 	required []string
 	props    map[string]map[string]any
@@ -212,6 +217,16 @@ func (s *shapes) build(key string, schema map[string]any) int {
 		shape.Values = s.build(key+"/additionalProperties", f.values)
 	}
 	s.list[id] = shape
+	resolved, _ := s.resolve(schema)
+	if alternatives, ok := resolved["oneOf"].([]any); ok {
+		for _, a := range alternatives {
+			alt, _ := a.(map[string]any)
+			ref, _ := alt["$ref"].(string)
+			if name, found := strings.CutPrefix(ref, schemaRef); found {
+				s.named[name] = s.build("", alt)
+			}
+		}
+	}
 	return id
 }
 

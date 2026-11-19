@@ -52,7 +52,7 @@ components:
 `
 
 func TestTheShapeOfABodyMergesAllOfAndFollowsReferencesAndCycles(t *testing.T) {
-	ops, shapes, err := ReadAll([]byte(bodiesDoc))
+	ops, shapes, _, err := ReadAll([]byte(bodiesDoc))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,5 +74,51 @@ func TestTheShapeOfABodyMergesAllOfAndFollowsReferencesAndCycles(t *testing.T) {
 	}
 	if got := ops["POST /import"].Body; got != 0 {
 		t.Errorf("a body that may also be YAML has shape %d, want none to check", got)
+	}
+}
+
+const oneOfDoc = `
+paths:
+  /proposals:
+    post:
+      operationId: propose
+      x-permission: member
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [proposed]
+              properties:
+                proposed:
+                  oneOf:
+                    - $ref: "#/components/schemas/Switch"
+                    - $ref: "#/components/schemas/Note"
+components:
+  schemas:
+    Switch:
+      type: object
+      required: ["on"]
+      properties:
+        "on": {type: boolean}
+    Note:
+      type: object
+      properties:
+        text: {type: string}
+`
+
+// Which alternative of a oneOf a body is cannot be told from the schema, so
+// each alternative gets its own shape, by name, for the handler that knows.
+func TestEachAlternativeOfAOneOfHasItsShapeByName(t *testing.T) {
+	_, shapes, named, err := ReadAll([]byte(oneOfDoc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sw, ok := named["Switch"]
+	if !ok || !slices.Equal(shapes[sw].Required, []string{"on"}) || !shapes[sw].Deep {
+		t.Errorf("Switch = %d %+v, want a shape requiring on", sw, shapes[sw])
+	}
+	if note, ok := named["Note"]; !ok || shapes[note].Deep || !shapes[note].Object {
+		t.Errorf("Note = %d %+v, want an object with nothing to check", note, shapes[note])
 	}
 }
