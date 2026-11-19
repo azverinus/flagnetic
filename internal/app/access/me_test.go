@@ -1,7 +1,8 @@
 package access_test
 
 import (
-	"context"
+	"bytes"
+	"crypto/rand"
 	"testing"
 	"time"
 
@@ -57,28 +58,53 @@ func TestAPasswordChangeHeldWhileAResetCompletesDoesNotOverwriteTheReset(t *test
 	const reset = "harbor-maple-signal-4410"
 	testkit.RecordSecret(reset)
 	testkit.RecordSecret("attacker-chosen-pass-9")
-	err := holdAChangeOfPassword(t, m, func(access.Session) {
-		hash, err := password.NewHasher(password.DefaultParams).Hash(t.Context(), secret.New(reset))
-		if err != nil {
-			t.Fatal(err)
-		}
-		store := pgaccess.NewStore(pool)
-		if err := postgres.NewTransactor(pool).Within(t.Context(), func(ctx context.Context) error {
-			if err := store.SetPasswordHash(ctx, m.ID, hash, time.Now()); err != nil {
-				return err
-			}
-			_, err := store.RevokeMemberSessions(ctx, m.ID, time.Now())
-			return err
-		}); err != nil {
-			t.Fatal(err)
-		}
-	})
+	err := holdAChangeOfPassword(t, m, func(access.Session) { completeAPasswordReset(t, m, reset) })
 	if codeOf(err) != "invalid_credentials" {
 		t.Errorf("the change held while a reset completed: %v, want invalid_credentials", err)
 	}
 	h := newSignIn(t, password.NewHasher(password.DefaultParams))
 	if _, err := h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New(reset), ClientIP: anAddress()}); err != nil {
 		t.Errorf("the password the reset set: %v, want signed in", err)
+	}
+}
+
+// completeAPasswordReset issues a password reset of m, as an instance admin
+// does, and completes it with newPassword.
+func completeAPasswordReset(t *testing.T, m testkit.Member, newPassword string) {
+	t.Helper()
+	pool := testkit.Pool(t)
+	c := clock.System{}
+	tx, store, audit, ids := postgres.NewTransactor(pool), pgaccess.NewStore(pool), testkit.Record(pool), id.NewSource(c)
+	admin := testkit.NewMember(t, pool, testkit.AsInstanceAdmin())
+	caller := access.Caller{Method: access.MethodSession, Member: &access.Member{ID: admin.ID, Email: admin.Email, Status: access.MemberActive, InstanceAdmin: true}}
+	issued, err := appaccess.NewIssuePasswordReset(tx, store, audit, c, ids, rand.Reader).Handle(t.Context(), appaccess.IssuePasswordResetCommand{
+		Caller: caller, Member: m.ID, Request: governance.Request{Actor: appaccess.ActorOf(caller)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testkit.RecordSecret(issued.Secret.Reveal())
+	if _, err = appaccess.NewCompletePasswordReset(appaccess.CompletePasswordResetDeps{
+		Tx: tx, Store: store, Settings: store, Hasher: password.NewHasher(cheap), Audit: audit,
+		Clock: c, IDs: ids, Random: rand.Reader, Key: bytes.Repeat([]byte{1}, 32),
+	}).Handle(t.Context(), appaccess.CompletePasswordResetCommand{Secret: issued.Secret, Password: secret.New(newPassword), ClientIP: anAddress()}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAPasswordChangeHeldWhileItsMemberIsDeactivatedIsRefused(t *testing.T) {
+	pool := testkit.Pool(t)
+	m := testkit.NewMember(t, pool)
+	testkit.RecordSecret("attacker-chosen-pass-9")
+	err := holdAChangeOfPassword(t, m, func(access.Session) {
+		c := clock.System{}
+		if _, err := appaccess.NewDeactivateMember(postgres.NewTransactor(pool), pgaccess.NewStore(pool), testkit.Record(pool), c, id.NewSource(c)).
+			Handle(t.Context(), m.ID, governance.Request{Actor: cli}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if codeOf(err) != "invalid_credentials" {
+		t.Errorf("the change held while its member was deactivated: %v, want invalid_credentials", err)
 	}
 }
 
