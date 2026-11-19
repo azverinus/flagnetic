@@ -263,6 +263,7 @@ func (c *RulesetCache) ruleset(ctx context.Context, environment workspace.Enviro
 				e.next = &rulesetLoad{done: make(chan struct{})}
 			}
 			l = e.next
+			c.fault.queue()
 		}
 		want := e.latest
 		c.mu.Unlock()
@@ -473,6 +474,7 @@ type RulesetLoadFault struct {
 	stalled  int
 	failing  bool
 	failed   int
+	queued   int
 }
 
 // errRulesetLoadFault is the failure of a materialization the fault fails.
@@ -510,6 +512,23 @@ func (f *RulesetLoadFault) Release() {
 		close(f.released)
 		f.released = nil
 	}
+}
+
+// Queued counts the requests that have waited for a materialization queued
+// behind a running one, so a test knows every request it sent has arrived.
+func (f *RulesetLoadFault) Queued() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.queued
+}
+
+func (f *RulesetLoadFault) queue() {
+	if f == nil {
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.queued++
 }
 
 // Stalled counts the materializations held now.

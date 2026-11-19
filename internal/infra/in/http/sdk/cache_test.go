@@ -187,7 +187,9 @@ func TestWhileTheListenerIsDownARequestIsAnsweredFromALoadStartedAfterItArrived(
 	wg.Go(func() { second = ruleset(t, srv, value).StatusCode() })
 	// The second request waits for the load queued behind the first, which
 	// starts when the first ends: only one load is under way meanwhile.
-	time.Sleep(200 * time.Millisecond)
+	if !eventually(time.Second, func() bool { return stall.Queued() == 1 }) {
+		t.Fatal("the second request never queued behind the first load")
+	}
 	if got := stall.Stalled(); got != 1 {
 		t.Errorf("loads under way = %d, want 1", got)
 	}
@@ -219,7 +221,11 @@ func TestWhileTheListenerIsDownAnEnvironmentHasAtMostTwoLoadsHoweverManyAsk(t *t
 	if !eventually(time.Second, func() bool { return stall.Stalled() == 1 }) {
 		t.Fatalf("loads under way = %d, want 1", stall.Stalled())
 	}
-	time.Sleep(200 * time.Millisecond)
+	// Every request but the one that started the load waits behind it
+	// before the load is released, so none may start a third.
+	if !eventually(5*time.Second, func() bool { return stall.Queued() == len(statuses)-1 }) {
+		t.Fatalf("requests queued = %d, want %d", stall.Queued(), len(statuses)-1)
+	}
 	if got := stall.Stalled(); got != 1 {
 		t.Errorf("loads under way = %d, want 1 whatever the requests queued", got)
 	}
