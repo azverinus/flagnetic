@@ -165,24 +165,73 @@ func TestAReplicaWhoseListenerIsDownMaterializesEveryRequest(t *testing.T) {
 	}
 }
 
-func TestWhileTheListenerIsDownARequestDoesNotJoinALoadStartedBeforeIt(t *testing.T) {
+// A request does not join a load started before it arrived: it may have read
+// the database before a write another replica committed, which no
+// notification announces while the listener is down.
+func TestWhileTheListenerIsDownARequestIsAnsweredFromALoadStartedAfterItArrived(t *testing.T) {
 	listen, stall := &pglisten.Fault{}, &pgdelivery.RulesetLoadFault{}
 	srv := testkit.StartServer(t, testkit.WithRulesetLoadFault(stall), testkit.WithListenerOptions(testkit.SilenceableListener(listen)))
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	deafen(t, srv, listen)
+	start := testkit.Metric(t, srv.Scrape(t), materializations)
 	stall.Stall()
 	t.Cleanup(stall.Release)
-	// Each request finds the load before it under way; it may have read the
-	// database before a write another replica committed, which no
-	// notification announces while the listener is down.
-	for range 2 {
-		if res := ruleset(t, srv, value); res.StatusCode() != http.StatusServiceUnavailable {
-			t.Fatalf("while it cannot load: %d %s", res.StatusCode(), res.Body)
+
+	var first, second int
+	var wg sync.WaitGroup
+	wg.Go(func() { first = ruleset(t, srv, value).StatusCode() })
+	if !eventually(time.Second, func() bool { return stall.Stalled() == 1 }) {
+		t.Fatal("the first request never started a load")
+	}
+	wg.Go(func() { second = ruleset(t, srv, value).StatusCode() })
+	// The second request waits for the load queued behind the first, which
+	// starts when the first ends: only one load is under way meanwhile.
+	time.Sleep(200 * time.Millisecond)
+	if got := stall.Stalled(); got != 1 {
+		t.Errorf("loads under way = %d, want 1", got)
+	}
+	stall.Release()
+	wg.Wait()
+	if first != http.StatusOK || second != http.StatusOK {
+		t.Fatalf("statuses = %d, %d, want 200 and 200", first, second)
+	}
+	if got := testkit.Metric(t, srv.Scrape(t), materializations) - start; got != 2 {
+		t.Errorf("materializations = %v, want 2: the second request reads the database afresh, not the load before it", got)
+	}
+}
+
+func TestWhileTheListenerIsDownAnEnvironmentHasAtMostTwoLoadsHoweverManyAsk(t *testing.T) {
+	listen, stall := &pglisten.Fault{}, &pgdelivery.RulesetLoadFault{}
+	srv := testkit.StartServer(t, testkit.WithRulesetLoadFault(stall), testkit.WithListenerOptions(testkit.SilenceableListener(listen)))
+	p := newProject(t, srv)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	deafen(t, srv, listen)
+	start := testkit.Metric(t, srv.Scrape(t), materializations)
+	stall.Stall()
+	t.Cleanup(stall.Release)
+
+	statuses := make([]int, 50)
+	var wg sync.WaitGroup
+	for i := range statuses {
+		wg.Go(func() { statuses[i] = ruleset(t, srv, value).StatusCode() })
+	}
+	if !eventually(time.Second, func() bool { return stall.Stalled() == 1 }) {
+		t.Fatalf("loads under way = %d, want 1", stall.Stalled())
+	}
+	time.Sleep(200 * time.Millisecond)
+	if got := stall.Stalled(); got != 1 {
+		t.Errorf("loads under way = %d, want 1 whatever the requests queued", got)
+	}
+	stall.Release()
+	wg.Wait()
+	for i, s := range statuses {
+		if s != http.StatusOK {
+			t.Errorf("request %d = %d, want 200", i, s)
 		}
 	}
-	if got := stall.Stalled(); got != 2 {
-		t.Errorf("loads under way = %d, want 2: the second request reads the database afresh", got)
+	if got := testkit.Metric(t, srv.Scrape(t), materializations) - start; got > 2 {
+		t.Errorf("materializations = %v, want at most 2 for 50 requests", got)
 	}
 }
 
