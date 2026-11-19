@@ -59,7 +59,7 @@ The Secret may have other key names; set `secrets.databaseUrlKey` and `secrets.s
 
 ```bash
 helm install flagnetic oci://ghcr.io/azverinus/charts/flagnetic -n flagnetic \
-  --version <version> \
+  --version <version> --timeout 20m \
   --set secrets.existingSecret=flagnetic \
   --set config.base_url=https://flags.example.com
 ```
@@ -93,7 +93,7 @@ kubectl exec -n flagnetic deploy/flagnetic -- flagnetic admin bootstrap --email 
 |---|---|---|
 | `hook` (default) | A Job runs `flagnetic migrate` before every install and upgrade, and the pods start with auto-migration off. A failed migration stops the upgrade before any pod is replaced, and the Job's log says why. | Helm runs the release: `helm install` and `helm upgrade`. |
 | `initContainer` | Every pod runs `flagnetic migrate` before its server starts. Replicas take turns through a PostgreSQL lock, and each migration is applied once. | The tool applying the chart does not run Helm hooks: `helm template` output applied with `kubectl`, or a renderer that drops hooks. |
-| `auto` | The server migrates when it starts. | A single replica where you accept that a long migration delays startup; the startup probe allows two minutes. |
+| `auto` | The server migrates when it starts, before it listens. | A single replica where you accept that a long migration delays startup. The startup probe allows 120 seconds by default, less than the five minutes the server may wait for the migration lock: a migration that outlives the probe is killed by the kubelet on every restart. Raise `probes.startup.failureThreshold` so that its product with `probes.startup.periodSeconds` covers the lock wait and the longest migration: 400 at the default period of 2 seconds allows 800 seconds. The install notes warn below 600. |
 
 **Argo CD** renders the chart with `helm template` and runs Helm hooks as `PreSync` hooks on every sync, so the default works: the Job runs before each sync, which is harmless because `migrate` is idempotent and takes a lock. If you would rather not run a Job on every sync, use `initContainer`. The chart's own Secret, when you let it render one, is a hook too, so under Argo CD keep the secrets in an `existingSecret`.
 
@@ -132,6 +132,10 @@ httpRoute:
   hostnames: [flags.example.com]
 ```
 
+**Trusted proxies.** Set `config.trusted_proxies` to the addresses of the ingress controller's pods or of the Gateway, for example `config.trusted_proxies: 10.244.0.0/16` (comma-separated CIDR prefixes or addresses; list only proxies you control). Without it the server ignores `X-Forwarded-For` and sees every request as coming from the controller: all the browsers of a project share one client-key budget per replica, one script spraying passwords trips the source throttle for every member, a handful of wrong SDK keys makes the replica refuse every key it does not already hold, and the audit log records the controller's address for everyone. The server logs a warning (`X-Forwarded-For from a peer that is not a trusted proxy`) once per replica when it sees the header from a peer that is not listed, and the install notes warn while a route is on and `config.trusted_proxies` is not set.
+
+Where a Service of type `LoadBalancer` or `NodePort` sits in front of the controller, `externalTrafficPolicy: Cluster`, the default, replaces the client's address with a node's by source NAT before the controller sees it, so the controller forwards the node's address however it is configured. Set `externalTrafficPolicy: Local` on that Service, or the clients the server learns are the nodes.
+
 The metrics are on a Service of their own that neither route reaches. Behind a proxy, also read [Behind a reverse proxy](operations.md#behind-a-reverse-proxy).
 
 ## Metrics
@@ -149,7 +153,7 @@ prometheusRule:
     release: prometheus
 ```
 
-The alerts are `FlagneticListenerDown`, `FlagneticRulesetPropagationSlow` (the 99th percentile above `prometheusRule.propagationSeconds`, 2 s by default), `FlagneticSinkStopped` and `FlagneticWebhookDeliveriesFailing`. They select the series of this release's metrics Service, so they rely on the ServiceMonitor or on a scrape job of the same name. Without the Operator, point your own scrape job at the `metrics` Service.
+The alerts are `FlagneticListenerDown`, `FlagneticRulesetPropagationSlow` (the 99th percentile above `prometheusRule.propagationSeconds`, 2 s by default), `FlagneticSinkDeadLetters` and `FlagneticWebhookDeliveriesFailing`. They select the series of this release's metrics Service, so they rely on the ServiceMonitor or on a scrape job of the same name. Without the Operator, point your own scrape job at the `metrics` Service.
 
 ## Scaling
 
@@ -200,7 +204,7 @@ networkPolicy:
           - port: 443
 ```
 
-The example admits the ingress controller to the console and the monitoring namespace to the metrics, restricts PostgreSQL to the CloudNativePG pods, and lets the server call HTTPS endpoints outside the cluster's private range: the shape webhook receivers, sinks and identity providers usually have. Narrow the last rule to the hosts you use. The migration Job and the `helm test` Pod are not selected by the policy.
+The example admits the ingress controller to the console and the monitoring namespace to the metrics, restricts PostgreSQL to the CloudNativePG pods, and lets the server call HTTPS endpoints outside the cluster's private range: the shape webhook receivers, sinks and identity providers usually have. Narrow the last rule to the hosts you use. The migration Job and the `helm test` Pod are not selected by the policy; because `networkPolicy.ingress.http.from` is set, the chart admits the `helm test` Pod to the `http` port by its label, so `helm test` still reaches the Service.
 
 ## Upgrading
 
@@ -208,10 +212,14 @@ Read the release notes of every version between yours and the new one; a change 
 
 ```bash
 helm upgrade flagnetic oci://ghcr.io/azverinus/charts/flagnetic -n flagnetic \
-  --version <new version> -f values.yaml
+  --version <new version> --timeout 20m -f values.yaml
 ```
 
-Pass your values file again rather than `--reuse-values`, which would keep the old release's defaults for values the new chart adds. The hook Job migrates the database, and only when it succeeds does Helm roll the Deployment, replacing the pods a few at a time while the others keep serving. A stopping pod answers `/readyz` with 503 for the drain, then finishes its requests, so the Service stops routing to it before it goes and no request is refused; the 30-second `terminationGracePeriodSeconds` covers both (see [Stopping](operations.md#stopping)). A failed migration fails the upgrade with every pod still on the old version; read the Job's log with `kubectl logs -n flagnetic job/flagnetic-migrate`, fix the cause and upgrade again.
+`--timeout` matters: Helm waits for the migration Job within it, five minutes unless set, while the Job may run for `migrations.activeDeadlineSeconds` (15 minutes). A migration longer than five minutes would fail the upgrade while the Job runs on, and upgrading again deletes the running Job, which kills the migration and rolls it back; pass a `--timeout` above the deadline, as above.
+
+**Until 1.0, stop every replica first.** 0.x does not promise that two versions serve side by side, so the rolling upgrade below does not apply to an upgrade between 0.x versions (0.6 to 0.7, say): follow [From 0.x to 1.0](upgrades.md#from-0x-to-10), which scales the Deployment to zero before `helm upgrade` and back after it. With `autoscaling.enabled` the Deployment has no replica count of its own and an autoscaler does nothing at zero, so scale it back yourself once the upgrade has finished.
+
+Pass your values file again rather than `--reuse-values`, which would keep the old release's defaults for values the new chart adds. From 1.0, the hook Job migrates the database, and only when it succeeds does Helm roll the Deployment, replacing the pods one at a time while the others keep serving. A stopping pod answers `/readyz` with 503 for the drain, then finishes its requests, so the Service stops routing to it before it goes and no request is refused; the 30-second `terminationGracePeriodSeconds` covers both (see [Stopping](operations.md#stopping)). A failed migration fails the upgrade with every pod still on the old version; read the Job's log with `kubectl logs -n flagnetic job/flagnetic-migrate`, fix the cause and upgrade again.
 
 `helm rollback` returns the chart to a previous revision but not the database. Migrations only move forward and there are no down migrations, so to go back after a migration, restore the backup taken before the upgrade. The rest of the policy, and the note for each release, is in [Upgrading Flagnetic](upgrades.md) and [Compatibility](compatibility.md).
 

@@ -832,9 +832,10 @@ jobs:
       - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
         with:
           version: ${{ matrix.helm }}
-      - name: Install helm-unittest and kubeconform
+      - name: Install helm-unittest, kubeconform and promtool
         env:
           KUBECONFORM_VERSION: v0.8.0
+          PROMETHEUS_VERSION: 3.5.0
           UNITTEST_VERSION: v1.2.1
         run: |
           # Helm 4 verifies plugin signatures and the plugin ships none; Helm 3
@@ -843,8 +844,9 @@ jobs:
           case "$(helm version --short)" in v4*) verify=(--verify=false) ;; esac
           helm plugin install https://github.com/helm-unittest/helm-unittest --version "$UNITTEST_VERSION" "${verify[@]}"
           curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" | tar -xz -C "$RUNNER_TEMP" kubeconform
+          curl -fsSL "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz" | tar -xz --strip-components=1 -C "$RUNNER_TEMP" "prometheus-${PROMETHEUS_VERSION}.linux-amd64/promtool"
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-      - name: Lint, unit tests and kubeconform
+      - name: Lint, unit tests, kubeconform and promtool
         run: .github/scripts/check-helm.sh
       - uses: helm/chart-testing-action@720270857a28afd41e2426521a7801db09e9b510 # v2.9.0
       - name: ct lint

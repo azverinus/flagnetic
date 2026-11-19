@@ -17,9 +17,12 @@ Install the chart with it, naming the address the console is reached at:
 
 ```bash
 helm install flagnetic oci://ghcr.io/azverinus/charts/flagnetic -n flagnetic \
+  --timeout 20m \
   --set secrets.existingSecret=flagnetic \
   --set config.base_url=https://flags.example.com
 ```
+
+`--timeout` matters: Helm waits for the migration Job within it, five minutes unless set, while the Job may run for `migrations.activeDeadlineSeconds` (15 minutes). Pass one above the deadline on every `helm install` and `helm upgrade`; without it a migration longer than five minutes fails the command while the Job runs on, and the next attempt deletes the running Job.
 
 Then create the first instance admin once, as the notes the install prints say:
 
@@ -41,9 +44,11 @@ The chart's own Secret, when you use one, is a Helm hook, so `helm uninstall` le
 
 ## Rolling
 
-Pods are replaced one at a time behind a PodDisruptionBudget. A stopping pod keeps serving for `FLAGNETIC_SHUTDOWN_DRAIN` while `/readyz` answers 503, then finishes in-flight requests within `FLAGNETIC_SHUTDOWN_GRACE`; the 30 s grace period of the pod covers both.
+The Deployment replaces pods one at a time (`maxSurge: 1`, `maxUnavailable: 0`): a new pod must answer `/readyz` before an old one goes. The PodDisruptionBudget guards voluntary disruptions such as a node drain, not the rollout. A stopping pod keeps serving for `FLAGNETIC_SHUTDOWN_DRAIN` while `/readyz` answers 503, then finishes in-flight requests within `FLAGNETIC_SHUTDOWN_GRACE`; the 30 s grace period of the pod covers both.
 
 ## Traffic
+
+Behind an Ingress or a Gateway, set `config.trusted_proxies` to the addresses of the controller's pods or of the Gateway, such as `config.trusted_proxies=10.244.0.0/16`. Without it the server ignores `X-Forwarded-For` and sees every request as coming from the controller, so all clients of a project share one rate-limit budget, one script's failed sign-ins lock every member out, and the audit log records the controller's address for everyone. The server logs a warning the first time it sees the header from a peer that is not listed, and `helm install` prints one in the notes. Where a Service of type `LoadBalancer` or `NodePort` sits in front of the controller, `externalTrafficPolicy: Cluster` (the default) replaces the client's address with a node's by source NAT before the controller sees it: set `Local`, or the address the server learns is the node's. List only proxies you control.
 
 Neither the Ingress nor the HTTPRoute is on by default. An SDK holds a ruleset stream open for up to 65 minutes, and the ruleset stream and the management change stream send a heartbeat every 15 seconds, so the proxy in front must not buffer either stream, must time out an idle connection above 15 seconds and must not end a request before the stream does; an hour is a safe idle timeout. For ingress-nginx:
 
@@ -82,7 +87,7 @@ The alerts select the series of this release's metrics Service, so they rely on 
 
 `autoscaling.enabled` replaces the Deployment's replica count with a HorizontalPodAutoscaler on CPU; the pods request CPU by default, which the autoscaler needs, and the chart refuses to render without it. Turning it on in an upgrade removes the Deployment's replica count, which Kubernetes may reset to one until the autoscaler scales back to `autoscaling.minReplicas`.
 
-`networkPolicy.enabled` restricts the server's pods to the `http` port from `networkPolicy.ingress.http.from` and the `metrics` port from `networkPolicy.ingress.metrics.from`, and to DNS, PostgreSQL and the rules in `networkPolicy.egress.rules`. List there what the instance reaches: webhook receivers, sinks, SMTP servers and identity providers (OIDC and SAML). The migration Job and the `helm test` Pod are not selected. With a ServiceMonitor, list the Prometheus pods in `networkPolicy.ingress.metrics.from`, or no scrape gets through.
+`networkPolicy.enabled` restricts the server's pods to the `http` port from `networkPolicy.ingress.http.from` and the `metrics` port from `networkPolicy.ingress.metrics.from`, and to DNS, PostgreSQL and the rules in `networkPolicy.egress.rules`. List there what the instance reaches: webhook receivers, sinks, SMTP servers and identity providers (OIDC and SAML). The migration Job and the `helm test` Pod are not selected by the policy; where `networkPolicy.ingress.http.from` is set, the chart adds the `helm test` Pod to it by its label, so the test still reaches the Service. With a ServiceMonitor, list the Prometheus pods in `networkPolicy.ingress.metrics.from`, or no scrape gets through.
 
 ## Supported versions
 
@@ -103,30 +108,33 @@ The chart's `version` and `appVersion` are the server's: a chart installs the im
 | `image.repository` | `ghcr.io/azverinus/flagnetic` | The server image. |
 | `image.tag` | `""` | The image tag; the chart's `appVersion` when empty. |
 | `image.pullPolicy` | `IfNotPresent` | The image pull policy. |
-| `imagePullSecrets` | `[]` | Secrets to pull the image with. |
+| `imagePullSecrets` | `[]` | Secrets to pull the image with, for the pods, the migration Job and the `helm test` Pod. |
 | `replicaCount` | `2` | Replicas of the server. Each holds its own connection pool and rate limits. |
 | `secrets.existingSecret` | `""` | Name of a Secret holding `DATABASE_URL` and `FLAGNETIC_SECRET_KEY`. Recommended. Without it the chart renders its own Secret from the two values below, or refuses to render. |
 | `secrets.databaseUrlKey` | `DATABASE_URL` | Key of the database URL in the Secret. |
 | `secrets.secretKeyKey` | `FLAGNETIC_SECRET_KEY` | Key of the secret key in the Secret. |
 | `secrets.databaseUrl` | `""` | The database URL for the chart's own Secret, which is used when `secrets.existingSecret` is empty. PostgreSQL 16 or newer. |
-| `secrets.secretKey` | `""` | The secret key for the chart's own Secret. At least 32 bytes, kept for the life of the instance. The chart never generates one. |
-| `config` | `{}` | Settings as `FLAGNETIC_*` variables: the key is the setting's file key in [the configuration reference](../../../docs/configuration.md), so `log_level` becomes `FLAGNETIC_LOG_LEVEL`. The listeners, `auto_migrate`, `database_url` and `secret_key` are the chart's own and are refused. |
+| `secrets.secretKey` | `""` | The secret key for the chart's own Secret. At least 32 characters (the chart refuses a shorter one), kept for the life of the instance. The chart never generates one. |
+| `config` | `{}` | Settings as `FLAGNETIC_*` variables, for the server and the migration: the key is the setting's file key in [the configuration reference](../../../docs/configuration.md), so `log_level` becomes `FLAGNETIC_LOG_LEVEL`. The listeners, `auto_migrate`, `database_url` and `secret_key` are the chart's own and are refused. |
 | `extraEnv` | `[]` | Extra container environment variables, as in a container spec. |
 | `extraEnvFrom` | `[]` | Extra `envFrom` sources, as in a container spec. |
 | `migrations.mode` | `hook` | `hook` runs `flagnetic migrate` in a Job before every install and upgrade, so a failed migration stops the upgrade before a pod is replaced. `initContainer` migrates in every pod before it serves. `auto` lets the server migrate when it starts. Use `initContainer` or `auto` where hooks are not run, such as `helm template` output applied by hand. |
-| `migrations.activeDeadlineSeconds` | `900` | Deadline of the migration Job. The server waits up to five minutes for the migration lock, so keep it above 330. |
+| `migrations.activeDeadlineSeconds` | `900` | Deadline of the migration Job. The server waits up to five minutes for the migration lock, so keep it above 330. Helm waits for the Job within `--timeout`, five minutes unless set: pass a `--timeout` above this deadline, such as `20m`, to `helm install` and `helm upgrade`. |
 | `migrations.resources` | `{}` | Resources of the migration container. |
 | `serviceAccount.create` | `true` | Create a ServiceAccount. It never mounts a token. |
-| `serviceAccount.name` | `""` | Name of the ServiceAccount; the release's full name when empty. |
+| `serviceAccount.name` | `""` | Name of the ServiceAccount; the release's full name when empty. With `serviceAccount.create` false it is the existing account the pods and the migration Job run under. |
 | `serviceAccount.annotations` | `{}` | Annotations of the ServiceAccount. |
-| `podAnnotations` | `{}` | Annotations of the pods. |
-| `podLabels` | `{}` | Extra labels of the pods. |
+| `podAnnotations` | `{}` | Annotations of the pods and the migration Job's pod; `sidecar.istio.io/inject: "false"` here keeps a mesh sidecar from stopping the Job from completing. |
+| `podLabels` | `{}` | Extra labels of the pods and the migration Job's pod. |
 | `terminationGracePeriodSeconds` | `30` | Time a pod has to stop. It covers the server's drain (5 s) and grace (15 s) with a margin; keep it at 25 or more. |
 | `probes.startup.periodSeconds` | `2` | Period of the startup probe on `/readyz`. |
-| `probes.startup.failureThreshold` | `60` | Failures the startup probe tolerates, which leaves two minutes for a cold start. |
+| `probes.startup.timeoutSeconds` | `3` | Time the startup probe waits for `/readyz`, which pings PostgreSQL for up to two seconds. Keep it above 2. |
+| `probes.startup.failureThreshold` | `60` | Failures the startup probe tolerates, which leaves two minutes for a cold start. With `migrations.mode: auto` the server migrates before it listens, waiting up to five minutes for the migration lock, so raise it: 400 at a period of 2 seconds allows 800 seconds. The notes warn below 600 seconds. |
 | `probes.readiness.periodSeconds` | `5` | Period of the readiness probe on `/readyz`. |
+| `probes.readiness.timeoutSeconds` | `3` | Time the readiness probe waits for `/readyz`, which pings PostgreSQL for up to two seconds, waiting for a pooled connection under load. Keep it above 2. |
 | `probes.readiness.failureThreshold` | `3` | Failures before a pod leaves the Service. |
 | `probes.liveness.periodSeconds` | `10` | Period of the liveness probe on `/healthz`. |
+| `probes.liveness.timeoutSeconds` | `1` | Time the liveness probe waits for `/healthz`. |
 | `probes.liveness.failureThreshold` | `3` | Failures before a pod is restarted. |
 | `resources.requests.cpu` | `100m` | CPU the server container requests. |
 | `resources.requests.memory` | `256Mi` | Memory the server container requests. Password hashing takes 64 MiB per sign-in in flight. |
@@ -154,7 +162,7 @@ The chart's `version` and `appVersion` are the server's: a chart installs the im
 | `serviceMonitor.labels` | `{}` | Labels the Prometheus instance selects ServiceMonitors by. |
 | `serviceMonitor.interval` | `30s` | Scrape interval. |
 | `serviceMonitor.scrapeTimeout` | `""` | Scrape timeout; Prometheus's default when empty. |
-| `prometheusRule.enabled` | `false` | Render a PrometheusRule with four alerts: a listener down, ruleset propagation slow, a sink with dead letters, webhook deliveries failing. Needs the CRD. |
+| `prometheusRule.enabled` | `false` | Render a PrometheusRule with four alerts: a listener down, ruleset propagation slow, a sink with dead letters (`FlagneticSinkDeadLetters`), webhook deliveries failing. Needs the CRD. |
 | `prometheusRule.namespace` | `""` | Namespace of the PrometheusRule; the release's when empty. |
 | `prometheusRule.labels` | `{}` | Labels the Prometheus instance selects rules by. |
 | `prometheusRule.propagationSeconds` | `2` | The 99th percentile of ruleset propagation above which its alert fires. |
@@ -169,9 +177,10 @@ The chart's `version` and `appVersion` are the server's: a chart installs the im
 | `networkPolicy.egress.postgresql.port` | `5432` | The PostgreSQL port. |
 | `networkPolicy.egress.postgresql.to` | `[]` | Peers the PostgreSQL port is open to. Empty is every destination. |
 | `networkPolicy.egress.rules` | `[]` | Further egress rules, as in a NetworkPolicy `egress`: webhook receivers, sinks, SMTP and identity providers. |
-| `nodeSelector` | `{}` | Node selector of the pods. |
-| `tolerations` | `[]` | Tolerations of the pods. |
-| `affinity` | `{}` | Affinity of the pods. |
+| `nodeSelector` | `{}` | Node selector of the pods, the migration Job's pod and the `helm test` Pod. |
+| `tolerations` | `[]` | Tolerations of the pods, the migration Job's pod and the `helm test` Pod. |
+| `affinity` | `{}` | Affinity of the pods and the migration Job's pod. |
 | `test.image.repository` | `busybox` | Image of the `helm test` Pod. |
 | `test.image.tag` | `1.37.0` | Tag of the `helm test` image. |
+| `test.image.digest` | `sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec` | Digest the tag is pinned to; empty uses the tag alone. |
 | `test.resources` | `{}` | Resources of the `helm test` Pod. |
