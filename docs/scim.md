@@ -114,6 +114,8 @@ A provisioned member's **email, name and status follow the directory**, so the m
   - `add` or `replace` on `displayName` and `externalId`, by path or in an object with no path; `remove` empties `externalId`, and the name cannot be removed (`400 invalidValue`). An object with no path may repeat the group's own `id`, as Okta's rename does; another `id`, and `meta`, are read only (`400 mutability`), and any other attribute is `400 noTarget`.
 - **`DELETE /Groups/{id}`** deletes the group and answers `204`; its members leave it.
 
+While the provider has group mappings, a `POST`, `PUT` or `PATCH` that touches more than 1000 members is `400 tooMany`: the members who join or leave count, and every member of the group when it is renamed. The mappings run for each member touched while the request holds the provider and the instance admins, which every sign-in through the provider and every change of access waits for, so a directory splits a larger change into requests of at most 1000 members. `DELETE` is never refused, and a provider without mappings has no limit.
+
 A change that alters the group is audited `scim_group.updated`, with the name and `externalId` when they changed and the members who joined (`members_added`) and left (`members_removed`); one that alters nothing is not. A deleted group is audited `scim_group.deleted` with what it held. Every write names the SCIM token as its actor.
 
 ### Groups and group mappings

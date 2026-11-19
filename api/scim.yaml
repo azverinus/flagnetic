@@ -37,14 +37,19 @@ info:
     in the same transaction, for each member it adds or removes (for every
     member when it is renamed or deleted), from the union of the groups the
     member last claimed signing in through the provider and the provider's
-    groups they are in.
+    groups they are in. While the provider has group mappings, a write that
+    adds or removes more than 1000 members at once (or renames a group of
+    more than 1000) is 400 `tooMany`: the mappings run for each member
+    while the write holds every other change of access, so a directory
+    sends such a change in several requests. Deleting a group is never
+    refused.
 
     Bodies are at most 1 MiB. Errors follow RFC 7644 §3.12:
     `application/scim+json`, `schemas` naming
     `urn:ietf:params:scim:api:messages:2.0:Error`, `status` as a string, and
     `scimType` for the errors it defines (`invalidFilter`, `invalidPath`,
     `invalidSyntax`, `invalidValue`, `mutability`, `uniqueness`,
-    `noTarget`).
+    `noTarget`, `tooMany`).
   license:
     name: Apache-2.0
     identifier: Apache-2.0

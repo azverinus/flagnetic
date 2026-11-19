@@ -192,7 +192,7 @@ func write(w http.ResponseWriter, status int, v any) {
 // instance answers.
 var scimStatuses = map[string]int{
 	"invalidFilter": http.StatusBadRequest, "invalidPath": http.StatusBadRequest, "invalidSyntax": http.StatusBadRequest, "invalidValue": http.StatusBadRequest,
-	"mutability": http.StatusBadRequest, "noTarget": http.StatusBadRequest, "uniqueness": http.StatusConflict,
+	"mutability": http.StatusBadRequest, "noTarget": http.StatusBadRequest, "tooMany": http.StatusBadRequest, "uniqueness": http.StatusConflict,
 }
 
 // fail answers err as the SCIM refusal it stands for, in one place.

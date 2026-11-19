@@ -334,6 +334,14 @@ func memberRefs(value any) ([]MemberID, error) {
 	return out, nil
 }
 
+// MaxTouchedMembers is how many members one group write may touch where the
+// provider has group mappings. Every member touched has the mappings run for
+// them while the write holds the provider and the instance admins, which
+// every other change of access and every sign-in through the provider waits
+// for, so a write of tens of thousands of members would stop them for as long
+// as it takes. A directory splits a larger change into requests of this size.
+const MaxTouchedMembers = 1000
+
 // TouchedMembers returns the members a change of a group from before to
 // after may give or take access: those who joined or left it, and every
 // member before and after when it was renamed, since group mappings name
