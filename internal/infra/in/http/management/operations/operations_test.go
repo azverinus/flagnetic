@@ -198,9 +198,9 @@ func TestTheOperationsAcceptingOnlyJSONAreRead(t *testing.T) {
 }
 
 func TestAMisspeltExtensionOfAnOperationIsRefused(t *testing.T) {
-	doc := "paths:\n  /me:\n    patch:\n      operationId: updateMe\n      x-permission: member\n      x-session-requried: true\n"
+	doc := "paths:\n  /me:\n    patch:\n      operationId: updateMe\n      x-permission: member\n      x-session-reqiured: true\n"
 	_, err := Read([]byte(doc))
-	if err == nil || !strings.Contains(err.Error(), "x-session-requried") {
+	if err == nil || !strings.Contains(err.Error(), "x-session-reqiured") {
 		t.Errorf("Read = %v, want the misspelt extension named", err)
 	}
 }

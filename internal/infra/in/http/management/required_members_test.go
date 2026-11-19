@@ -230,7 +230,7 @@ func TestEveryOperationRefusesABodyWithOneRequiredMemberRemoved(t *testing.T) {
 					Violations []struct{ Pointer string } `json:"errors"`
 				}
 				_ = json.NewDecoder(res.Body).Decode(&got)
-				res.Body.Close()
+				_ = res.Body.Close()
 				pointers := make([]string, len(got.Violations))
 				for i, v := range got.Violations {
 					pointers[i] = v.Pointer

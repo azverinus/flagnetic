@@ -145,7 +145,7 @@ var extensions = []string{
 }
 
 // unknownExtensions returns the x- keys among keys that Read does not read,
-// sorted: one misspelt (x-session-requried) would otherwise be ignored, and
+// sorted: one misspelt (x-session-reqiured) would otherwise be ignored, and
 // the operation would stay open to what it was meant to refuse.
 func unknownExtensions(keys map[string]yaml.Node) []string {
 	var out []string

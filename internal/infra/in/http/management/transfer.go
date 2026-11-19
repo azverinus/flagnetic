@@ -195,9 +195,9 @@ func (a *api) importProject(r *http.Request, params ImportProjectParams) (Import
 		Caller: callerMember(ctx), Request: requestOf(ctx),
 	}
 	if params.IfMatch != nil {
-		tags, err := ifMatchTags(*params.IfMatch)
-		if err != nil {
-			return nil, err
+		tags, tagErr := ifMatchTags(*params.IfMatch)
+		if tagErr != nil {
+			return nil, tagErr
 		}
 		cmd.IfMatch = &tags
 	}
@@ -284,9 +284,9 @@ func (a *api) importFirebaseTemplate(r *http.Request, params ImportFirebaseTempl
 		cmd.UnitType = *params.UnitType
 	}
 	if params.IfMatch != nil {
-		tags, err := ifMatchTags(*params.IfMatch)
-		if err != nil {
-			return nil, err
+		tags, tagErr := ifMatchTags(*params.IfMatch)
+		if tagErr != nil {
+			return nil, tagErr
 		}
 		cmd.IfMatch = &tags
 	}

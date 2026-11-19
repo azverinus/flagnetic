@@ -39,7 +39,7 @@ func TestEveryAnswerOfTheManagementAPIIsMarkedNoStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res.Body.Close()
+	_ = res.Body.Close()
 	if got := res.Header.Get("Cache-Control"); got != "no-store" {
 		t.Errorf("an unknown route answered %d with Cache-Control %q, want no-store", res.StatusCode, got)
 	}
