@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, unwrap } from "@/lib/errors";
 import { problemMessage } from "@/lib/problem-messages";
 import { authMethodsQuery } from "@/lib/queries";
+import { PageTitle } from "@/components/ui/page-header";
 
 /**
  * The forgotten-password page: a member gives the email they sign in with
@@ -28,9 +29,9 @@ export function PasswordResetRequest() {
   const methods = useQuery(authMethodsQuery);
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>Forgot your password?</Trans>
-      </h1>
+      </PageTitle>
       {methods.data === undefined && methods.isPending ? (
         <div className="flex flex-col gap-3" aria-busy>
           <Skeleton className="h-10 w-full" />

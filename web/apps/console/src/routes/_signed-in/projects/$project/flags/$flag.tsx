@@ -26,7 +26,7 @@ import { QueryError } from "@/components/query-error";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader, PageTitle } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -96,9 +96,9 @@ function FlagDetail() {
 function FlagNotFound({ project }: { project: string }) {
   return (
     <Page measure="form">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>Flag not found</Trans>
-      </h1>
+      </PageTitle>
       <p className="text-sm text-muted-foreground">
         <Trans>The project has no flag with this key. It may have been deleted.</Trans>
       </p>

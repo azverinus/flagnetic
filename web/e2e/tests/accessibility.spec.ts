@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs";
 import {
   createAuthProvider,
   createChangeRequest,
+  createEnvironment,
   createExperiment,
+  createProject,
   createInstanceWebhook,
   createSegment,
   createSink,
@@ -20,17 +22,27 @@ import {
   pathOf,
   seedInvitation,
   seedMember,
-  seedProject,
   signIn,
 } from "../support/console";
 import { seedFlag, stringFlag } from "../support/flags";
+import { contentWidth, overlappingControls, sidewaysOverflow } from "../support/layout";
 
 /**
  * The accessibility sweep: axe on every routed screen in light and dark
- * with no serious or critical violation, and no screen scrolling sideways
- * at the 768 px floor the console is laid out for. Each screen is checked
+ * with no serious or critical violation, no screen scrolling sideways from
+ * 390 px up, no control covered by another at the widths the console is laid
+ * out for, and content that stops at 1600 px on a wide screen. It runs over
+ * a stress seed: long names and keys, many environments and tags, a long
+ * webhook URL and a long change request title. Each screen is checked
  * softly, so one run lists every failure instead of the first.
  */
+
+/** Names and keys at the limits the API accepts, so a screen is laid out for the worst case. */
+const longName = "A very long name that a person typed once and nobody ever shortened ".repeat(3);
+const longKey = (prefix: string) => `${prefix}-${"long-key-".repeat(8)}`.slice(0, 64);
+const longUrl = `https://hooks.example.com/${"a-long-path-segment/".repeat(12)}flagnetic`;
+const longTitle =
+  "Switch the sweep flag on for every customer in every region once the long review is over";
 
 /**
  * What the sweep's screens are about: a project, an invited member, their
@@ -253,14 +265,41 @@ function routedPaths(): string[] {
  * the sweep's own, so no other spec's changes show.
  */
 async function seed(): Promise<Seeded> {
-  const project = await seedProject("sweep");
-  const invited = await seedInvitation("sweep", "Sweep Invitee");
+  const project = longKey(`sweep-${Date.now().toString(36)}`);
+  must(
+    `seeding ${project}`,
+    await createProject({
+      client: managementClient(),
+      body: { key: project, name: longName.slice(0, 200) },
+    }),
+  );
+  for (const n of [1, 2, 3, 4, 5, 6]) {
+    must(
+      `creating environment ${n}`,
+      await createEnvironment({
+        client: managementClient(),
+        path: { project },
+        body: { key: longKey(`env${n}`), name: `${n} ${longName}`.slice(0, 200) },
+      }),
+    );
+  }
+  const invited = await seedInvitation("sweep", longName.slice(0, 200));
   const active = await seedMember("sweep-reset", "Sweep Member", "harness-sweep-reset-6172");
   const reset = must(
     "issuing a password reset",
     await issuePasswordReset({ client: managementClient(), path: { member: active.id } }),
   );
-  await seedFlag(project, stringFlag(sweepFlag));
+  await seedFlag(
+    project,
+    stringFlag(sweepFlag, {
+      name: longName.slice(0, 200),
+      tags: Array.from({ length: 30 }, (_, n) => `a-fairly-long-tag-${n}`),
+    }),
+  );
+  await seedFlag(
+    project,
+    stringFlag(`flag_${"long_key_".repeat(13)}end`, { name: longName.slice(0, 200) }),
+  );
   must(
     `creating ${sweepSegment}`,
     await createSegment({
@@ -301,7 +340,7 @@ async function seed(): Promise<Seeded> {
         kind: "flag_configuration",
         flag: sweepFlag,
         environment: "production",
-        title: "Switch the sweep flag on",
+        title: longTitle,
         description: "So the sweep sees a change request open for review.",
         proposed: { on: true, off_variation: "control", fallthrough: "treatment" },
         open: true,
@@ -316,7 +355,7 @@ async function seed(): Promise<Seeded> {
       path: { project },
       body: {
         name: "Sweep webhook",
-        url: "https://hooks.example.com/flagnetic",
+        url: longUrl,
         events: ["flag.kill_switch"],
         enabled: false,
       },
@@ -331,7 +370,7 @@ async function seed(): Promise<Seeded> {
       body: {
         name: "Sweep sink",
         kind: "webhook",
-        webhook: { url: "https://hooks.example.com/flagnetic" },
+        webhook: { url: longUrl },
       },
     }),
   );
@@ -341,14 +380,14 @@ async function seed(): Promise<Seeded> {
       client: managementClient(),
       body: {
         name: "Sweep instance webhook",
-        url: "https://hooks.example.com/flagnetic",
+        url: longUrl,
         events: ["audit.entry"],
         enabled: false,
       },
     }),
   );
   // Disabled, so the sign-in page of every spec after this one is as it was.
-  const authProvider = `${project}-idp`;
+  const authProvider = `sweep-${Date.now().toString(36)}-idp`;
   must(
     "adding an auth provider",
     await createAuthProvider({
@@ -435,15 +474,62 @@ test.describe("accessibility", () => {
     });
   }
 
-  test("nothing scrolls sideways at the 768 px floor", async ({ page }) => {
-    await page.setViewportSize({ width: 768, height: 1024 });
-    await walk(page, seeded, async (route) => {
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
-      expect
-        .soft(overflow, `${route.name} scrolls sideways by ${overflow}px`)
-        .toBeLessThanOrEqual(0);
+  for (const width of [390, 768, 1024, 1440, 1920]) {
+    test(`nothing scrolls sideways at ${width} px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: width < 768 ? 844 : 1024 });
+      await walk(page, seeded, async (route) => {
+        const overflow = await sidewaysOverflow(page);
+        expect
+          .soft(overflow, `${route.name} scrolls sideways by ${overflow}px at ${width} px`)
+          .toBeLessThanOrEqual(0);
+      });
     });
+  }
+
+  // The widths the console is laid out for; on a phone only the on-call
+  // path's screens are held to it.
+  for (const width of [1440, 1024, 768]) {
+    test(`no control covers another at ${width} px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await walk(page, seeded, async (route) => {
+        expect.soft(await overlappingControls(page), `${route.name} at ${width} px`).toEqual([]);
+      });
+    });
+  }
+
+  test("no control covers another at 390 px on the on-call path's screens", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const onCall = new Set(["sign-in", "project flags", "project flag", "project change request"]);
+    await walk(page, seeded, async (route) => {
+      if (!onCall.has(route.name)) return;
+      expect.soft(await overlappingControls(page), `${route.name} at 390 px`).toEqual([]);
+    });
+  });
+
+  test("content stops at 1600 px on a 1920 px screen", async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await walk(page, seeded, async (route) => {
+      const width = await contentWidth(page);
+      expect.soft(width, `${route.name} is ${width}px wide`).toBeLessThanOrEqual(1600);
+    });
+  });
+
+  test("the context panel opens as a sheet by keyboard under 1024 px", async ({ page }) => {
+    // The sheet replaces the column below 1024 px.
+    await page.setViewportSize({ width: 1000, height: 900 });
+    await signIn(page);
+    await page.goto(`/projects/${seeded.project}/flags`);
+    await expect(page.locator("main h1").first()).toBeVisible();
+
+    const open = page.locator('header button[aria-haspopup="dialog"]');
+    await open.focus();
+    await page.keyboard.press("Enter");
+    const sheet = page.getByRole("dialog");
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByRole("link").first()).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+    await expect(open).toBeFocused();
   });
 });

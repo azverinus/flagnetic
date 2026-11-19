@@ -32,7 +32,7 @@ import { ScimGroups } from "@/components/scim-groups";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader, PageTitle } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { authProviderApi, authProviderQuery, authProvidersKey } from "@/lib/auth-providers";
 import { ApiError } from "@/lib/errors";
@@ -67,9 +67,9 @@ function AuthProviderNotFound() {
   const navigate = useNavigate();
   return (
     <Page measure="form">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>Auth provider not found</Trans>
-      </h1>
+      </PageTitle>
       <p className="text-sm text-muted-foreground">
         <Trans>It does not exist here, or it was deleted.</Trans>
       </p>

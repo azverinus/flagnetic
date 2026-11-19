@@ -49,7 +49,7 @@ export function CardHeader({ title, titleId, description, actions, className }: 
   return (
     <div
       className={cn(
-        "flex flex-wrap items-start justify-between gap-x-4 gap-y-2 p-5 pb-0",
+        "flex flex-wrap items-start justify-between gap-x-4 gap-y-2 p-5 pb-0 max-sm:p-4 max-sm:pb-0",
         className,
       )}
     >
@@ -73,7 +73,11 @@ export function CardContent({
   return (
     <div
       {...props}
-      className={cn("flex min-w-0 flex-1 flex-col gap-4", flush ? "pt-4" : "p-5", className)}
+      className={cn(
+        "flex min-w-0 flex-1 flex-col gap-4",
+        flush ? "pt-4" : "p-5 max-sm:p-4",
+        className,
+      )}
     />
   );
 }

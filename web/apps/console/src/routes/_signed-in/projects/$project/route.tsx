@@ -15,6 +15,7 @@ import { ApiError } from "@/lib/errors";
 import { rememberLastProject } from "@/lib/preferences";
 import { problemMessage } from "@/lib/problem-messages";
 import { projectMeQuery, projectQuery, rolesQuery } from "@/lib/queries";
+import { PageTitle } from "@/components/ui/page-header";
 
 /**
  * One project: every screen under it renders inside the shell with what
@@ -90,9 +91,9 @@ function ProjectLayout() {
 function ProjectNotFound() {
   return (
     <Page measure="form">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>Project not found</Trans>
-      </h1>
+      </PageTitle>
       <p className="text-sm text-muted-foreground">
         <Trans>
           No project has this key. It may be mistyped, or the link may point to another instance.
@@ -106,9 +107,9 @@ function ProjectForbidden({ error }: { error: ApiError }) {
   const { i18n } = useLingui();
   return (
     <Page measure="form">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>You cannot open this project</Trans>
-      </h1>
+      </PageTitle>
       <p className="text-sm text-muted-foreground">{problemMessage(i18n, error)}</p>
       <p className="text-sm text-muted-foreground">
         <Trans>A project owner or an instance admin can grant you a role in it.</Trans>

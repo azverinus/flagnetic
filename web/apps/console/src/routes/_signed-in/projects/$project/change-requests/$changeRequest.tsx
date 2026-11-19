@@ -15,7 +15,7 @@ import { ProtectedMark } from "@/components/protected-mark";
 import { QueryError } from "@/components/query-error";
 import { ScheduleFailureNotice } from "@/components/schedule-failure-notice";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader, PageTitle } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateTime } from "@/i18n/format";
 import { changeRequestKindName, diffBasis } from "@/lib/change-requests";
@@ -61,9 +61,9 @@ function ChangeRequestDetail() {
 function ChangeRequestNotFound({ project }: { project: string }) {
   return (
     <Page measure="form">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>Change request not found</Trans>
-      </h1>
+      </PageTitle>
       <p className="text-sm text-muted-foreground">
         <Trans>
           The project has no such change request. It goes when the flag or the environment it

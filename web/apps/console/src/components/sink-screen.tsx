@@ -18,7 +18,7 @@ import { SinkAtRisk, SinkHealthBadge } from "@/components/sink-status";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader, PageTitle } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
 import { formatLag } from "@/i18n/format";
@@ -100,9 +100,9 @@ function SinkNotFound({ project }: { project: string }) {
   const navigate = useNavigate();
   return (
     <Page measure="form">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>Sink not found</Trans>
-      </h1>
+      </PageTitle>
       <p className="text-sm text-muted-foreground">
         <Trans>It does not exist here, or it was deleted.</Trans>
       </p>

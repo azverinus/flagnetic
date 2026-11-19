@@ -19,7 +19,7 @@ import { QueryError } from "@/components/query-error";
 import { ExperimentDiff } from "@/components/structural-diff-view";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader, PageTitle } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UnsavedChangesBar } from "@/components/ui/unsaved-changes-bar";
 import { useCan, useMissingPermissionReason } from "@/lib/access";
@@ -95,9 +95,9 @@ function ExperimentDetail() {
 function ExperimentNotFound({ project }: { project: string }) {
   return (
     <Page measure="form">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>Experiment not found</Trans>
-      </h1>
+      </PageTitle>
       <p className="text-sm text-muted-foreground">
         <Trans>The project has no experiment with this key. It may have been deleted.</Trans>
       </p>

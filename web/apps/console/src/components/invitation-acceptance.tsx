@@ -21,6 +21,7 @@ import { ApiError, unwrap } from "@/lib/errors";
 import { formRefusal } from "@/lib/problem-messages";
 import { invitationQuery } from "@/lib/queries";
 import { forgetsSecret } from "@/lib/mutations";
+import { PageTitle } from "@/components/ui/page-header";
 
 export type InvitationAcceptanceProps = {
   /** The invitation's secret, the last segment of its link. */
@@ -84,9 +85,9 @@ function AcceptForm({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>Accept your invitation</Trans>
-      </h1>
+      </PageTitle>
       <InvitedBy invitation={invitation} />
       <p className="text-sm text-muted-foreground">
         {choices === "password" ? (
@@ -253,9 +254,9 @@ function InvitedBy({ invitation }: { invitation: Invitation }) {
 function InvitationGone() {
   return (
     <div className="flex flex-col gap-3">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>This invitation no longer works</Trans>
-      </h1>
+      </PageTitle>
       <p className="text-sm text-muted-foreground">
         <Trans>
           An invitation link works once, for seven days, and only until a newer one replaces it. Ask

@@ -26,7 +26,7 @@ import { SegmentFields } from "@/components/segment-fields";
 import { SegmentDiff } from "@/components/structural-diff-view";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader, PageTitle } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UnsavedChangesBar } from "@/components/ui/unsaved-changes-bar";
 import { useCan, useMissingPermissionReason } from "@/lib/access";
@@ -96,9 +96,9 @@ function SegmentDetail() {
 function SegmentNotFound({ project }: { project: string }) {
   return (
     <Page measure="form">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>Segment not found</Trans>
-      </h1>
+      </PageTitle>
       <p className="text-sm text-muted-foreground">
         <Trans>The project has no segment with this key. It may have been deleted.</Trans>
       </p>

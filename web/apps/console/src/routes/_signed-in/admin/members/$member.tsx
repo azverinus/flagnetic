@@ -11,7 +11,7 @@ import { MemberIdentities } from "@/components/member-identities";
 import { MemberSessions, MemberTokens } from "@/components/member-credentials";
 import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader, PageTitle } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
 import { formatDateTime, formatNumber } from "@/i18n/format";
@@ -140,9 +140,9 @@ function MemberPage() {
 function MemberNotFound() {
   return (
     <Page measure="form">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>Member not found</Trans>
-      </h1>
+      </PageTitle>
       <p className="text-sm text-muted-foreground">
         <Trans>No member has this identifier. The link may be mistyped or old.</Trans>
       </p>
