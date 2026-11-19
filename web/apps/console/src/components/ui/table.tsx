@@ -24,7 +24,11 @@ export type TableProps<T extends RowData> = {
   /** What the table lists, for a screen reader; shown above it unless hidden. */
   caption: ReactNode;
   hideCaption?: boolean;
-  /** Keeps the first column, the row's name, in view while the rest scrolls. */
+  /**
+   * Keeps the first column, the row's name, in view while the rest scrolls,
+   * at every width. Without it a table of more than four columns still
+   * does so under 640 px.
+   */
   stickyFirstColumn?: boolean;
   loading?: boolean;
   /** Shown in place of the rows when there are none. */
@@ -38,6 +42,12 @@ export type TableProps<T extends RowData> = {
  * they pass under.
  */
 const stickyClassName = "sticky left-0 z-[1] bg-inherit";
+
+/** The same, only on a phone, where a table of many columns has to scroll. */
+const stickyNarrowClassName = "max-sm:sticky max-sm:left-0 max-sm:z-[1] max-sm:bg-inherit";
+
+/** A table with more columns than this keeps its first column in view under 640 px. */
+const wideTable = 4;
 
 /** How many placeholder rows a loading table shows. */
 const loadingRows = 3;
@@ -67,9 +77,12 @@ export function Table<T extends RowData>({
     data: data as T[],
     getRowId,
   });
-  const sticky = (index: number) =>
-    stickyFirstColumn && index === 0 ? stickyClassName : undefined;
   const width = table.getAllLeafColumns().length;
+  const sticky = (index: number) => {
+    if (index !== 0) return undefined;
+    if (stickyFirstColumn) return stickyClassName;
+    return width > wideTable ? stickyNarrowClassName : undefined;
+  };
 
   const wrapper = useRef<HTMLDivElement>(null);
   const captionId = useId();

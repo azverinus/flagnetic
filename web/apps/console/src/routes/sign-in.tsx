@@ -7,6 +7,7 @@ import { SignedOutCard } from "@/components/signed-out-card";
 import { meQuery } from "@/lib/queries";
 import { safeReturnTo } from "@/lib/return-to";
 import { announceSessionChange, validateSignInSearch } from "@/lib/signed-in";
+import { PageTitle } from "@/components/ui/page-header";
 
 export const Route = createFileRoute("/sign-in")({
   validateSearch: validateSignInSearch,
@@ -28,9 +29,9 @@ function SignInPage() {
   const router = useRouter();
   return (
     <SignedOutCard>
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>Sign in</Trans>
-      </h1>
+      </PageTitle>
       <SignInForm
         ended={ended}
         returnTo={returnTo}

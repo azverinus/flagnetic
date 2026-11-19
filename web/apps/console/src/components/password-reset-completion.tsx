@@ -18,6 +18,7 @@ import { ApiError, unwrap } from "@/lib/errors";
 import { forgetsSecret } from "@/lib/mutations";
 import { formRefusal } from "@/lib/problem-messages";
 import { passwordResetQuery } from "@/lib/queries";
+import { PageTitle } from "@/components/ui/page-header";
 
 export type PasswordResetCompletionProps = {
   /** The password reset's secret, the last segment of its link. */
@@ -92,9 +93,9 @@ function ResetForm({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>Choose a new password</Trans>
-      </h1>
+      </PageTitle>
       <p className="text-sm text-muted-foreground">
         <Trans>
           Choose a new password for {name} ({email}); the link works until {until}. Setting it signs
@@ -142,9 +143,9 @@ function ResetForm({
 function ResetGone() {
   return (
     <div className="flex flex-col gap-3">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>This password reset link no longer works</Trans>
-      </h1>
+      </PageTitle>
       <p className="text-sm text-muted-foreground">
         <Trans>
           A password reset link works once, for an hour, and ends when the password is changed. Ask

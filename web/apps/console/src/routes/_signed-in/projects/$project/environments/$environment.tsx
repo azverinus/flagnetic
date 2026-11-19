@@ -10,7 +10,7 @@ import { QueryError } from "@/components/query-error";
 import { SdkInventory } from "@/components/sdk-inventory";
 import { SdkKeys } from "@/components/sdk-keys";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader, PageTitle } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
 import { ApiError } from "@/lib/errors";
@@ -83,9 +83,9 @@ function EnvironmentPage() {
 function EnvironmentNotFound({ project }: { project: string }) {
   return (
     <Page measure="form">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>Environment not found</Trans>
-      </h1>
+      </PageTitle>
       <p className="text-sm text-muted-foreground">
         <Trans>The project has no environment with this key. It may have been deleted.</Trans>
       </p>

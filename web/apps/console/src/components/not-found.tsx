@@ -3,14 +3,15 @@ import { Page } from "@/components/ui/page";
 import { Link } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
+import { PageTitle } from "@/components/ui/page-header";
 
 /** An address the console has no page for, rendered inside the shell. */
 export function NotFound() {
   return (
     <Page measure="form">
-      <h1 className="text-2xl/7 font-semibold">
+      <PageTitle>
         <Trans>Page not found</Trans>
-      </h1>
+      </PageTitle>
       <p className="text-sm text-muted-foreground">
         <Trans>There is nothing at this address. The link may be old or mistyped.</Trans>
       </p>

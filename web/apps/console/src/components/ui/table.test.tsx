@@ -106,4 +106,21 @@ describe("a table", () => {
     expect(screen.getByText("Projects")).toHaveClass("sr-only");
     expect(screen.getByRole("table", { name: "Projects" })).toBeInTheDocument();
   });
+
+  it("keeps the first column in view under 640 px only when it has more than four columns", () => {
+    const five: TableColumn<Row>[] = ["a", "b", "c", "d", "e"].map((id) => ({
+      id,
+      accessorFn: (row: Row) => `${id}:${row.key}`,
+      header: id,
+    }));
+    renderWithProviders(<Table caption="Wide" columns={five} data={rows} />);
+    expect(screen.getByRole("columnheader", { name: "a" })).toHaveClass("max-sm:sticky");
+    expect(screen.getByRole("columnheader", { name: "a" })).not.toHaveClass("sticky");
+    expect(screen.getByRole("columnheader", { name: "b" })).not.toHaveClass("max-sm:sticky");
+  });
+
+  it("leaves a table of four columns or fewer unpinned", () => {
+    renderWithProviders(<Table caption="Narrow" columns={columns} data={rows} />);
+    expect(screen.getByRole("columnheader", { name: "Key" })).not.toHaveClass("max-sm:sticky");
+  });
 });

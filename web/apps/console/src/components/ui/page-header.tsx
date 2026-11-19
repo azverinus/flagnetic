@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import { EllipsisIcon } from "lucide-react";
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ComponentProps, type ReactNode, useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +9,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/cn";
+
+/**
+ * The one place a screen's h1 is written: 24/28 at 600. A page header uses
+ * it, and so does a signed-out card or a state (not found, gone) that has
+ * no header of its own.
+ */
+export function PageTitle({ className, ...props }: ComponentProps<"h1">) {
+  return <h1 {...props} className={cn("text-2xl/7 font-semibold", className)} />;
+}
 
 export type PageHeaderProps = {
   title: string;
@@ -63,9 +72,9 @@ export function PageHeader({
     <header className={cn("flex min-w-0 flex-col gap-2", className)}>
       {breadcrumb}
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h1 className="min-w-0 flex-1 truncate text-2xl/7 font-semibold" title={title}>
+        <PageTitle className="min-w-0 flex-1 truncate" title={title}>
           {title}
-        </h1>
+        </PageTitle>
         {actions || more ? (
           <div ref={bar} className="flex flex-wrap items-center gap-2 [&>*]:h-8">
             {actions}
