@@ -432,7 +432,7 @@ func (a *api) seam(op operations.Entry, next http.Handler) http.Handler {
 			err = errNotJSON
 		}
 		if err == nil {
-			err = refuseControlCharacters(r)
+			err = refuseBody(r, op)
 		}
 		if err != nil {
 			a.refuse(w, r, op.Operation, err)
@@ -554,17 +554,18 @@ func (a *api) refuse(w http.ResponseWriter, r *http.Request, op access.Operation
 	a.edge.WriteError(w, r, err)
 }
 
-// refuseControlCharacters refuses a request whose path or query holds a
-// control character (400, as for any other value that is no value of the
-// parameter) or whose JSON body does (422, a violation per text by its
-// pointer), and leaves the body to be read again. PostgreSQL stores no
-// U+0000, so a text that reached it would be a 500 raised by any member at
-// will; checking here, once, covers every text of every operation, those
-// added later too. The body is checked whatever media type it claims: an
-// operation that is not JSON-only decodes its body as JSON under any
-// Content-Type, and a body that is no JSON (a YAML document) yields nothing
-// here and meets the same rule in its own decoder.
-func refuseControlCharacters(r *http.Request) error {
+// refuseBody refuses a request whose path or query holds a control character
+// (400, as for any other value that is no value of the parameter), whose JSON
+// body does (422, a violation per text by its pointer), or whose JSON body
+// leaves out what its operation requires (422, a violation per member), and
+// leaves the body to be read again. PostgreSQL stores no U+0000, so a text
+// that reached it would be a 500 raised by any member at will; checking here,
+// once, covers every text of every operation, those added later too, as it
+// does the members a client may leave out. The body is checked whatever media
+// type it claims: an operation that is not JSON-only decodes its body as JSON
+// under any Content-Type, and a body that is no JSON (a YAML document) yields
+// nothing here and meets the same rule in its own decoder.
+func refuseBody(r *http.Request, op operations.Entry) error {
 	if !text.AllowedURL(r.URL) {
 		return flaghttp.InvalidRequest("the path and query must not contain control characters")
 	}
@@ -576,5 +577,8 @@ func refuseControlCharacters(r *http.Request) error {
 		return err
 	}
 	r.Body = io.NopCloser(bytes.NewReader(body))
-	return text.Error(text.InJSON(body))
+	if err := text.Error(text.InJSON(body)); err != nil {
+		return err
+	}
+	return refuseMissingMembers(body, op)
 }

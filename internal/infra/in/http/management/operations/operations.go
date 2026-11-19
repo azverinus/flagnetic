@@ -46,6 +46,9 @@ type Entry struct {
 	// body limit, for the few that take bodies larger than the server's
 	// limit allows, such as a long list of unit IDs.
 	MaxBodyBytes int64
+	// Body is the number in Shapes of what the operation's JSON request body
+	// must hold, 0 when the operation takes none to check.
+	Body int
 }
 
 // PasswordBodyLimit caps the bodies of the operations that check a
@@ -57,11 +60,22 @@ const PasswordBodyLimit = 8 << 10
 // without an identifier, without x-permission or naming a permission the
 // catalog does not hold, so no operation is ever open by accident.
 func Read(doc []byte) (map[string]Entry, error) {
+	ops, _, err := ReadAll(doc)
+	return ops, err
+}
+
+// ReadAll is Read that also returns the shapes the request bodies must have,
+// which the entries number in Body.
+func ReadAll(doc []byte) (map[string]Entry, []Shape, error) {
+	list, bodies, err := readShapes(doc)
+	if err != nil {
+		return nil, nil, err
+	}
 	var d struct {
 		Paths map[string]map[string]yaml.Node `yaml:"paths"`
 	}
 	if err := yaml.Unmarshal(doc, &d); err != nil {
-		return nil, fmt.Errorf("reading the document: %w", err)
+		return nil, nil, fmt.Errorf("reading the document: %w", err)
 	}
 	ops := map[string]Entry{}
 	var errs []error
@@ -113,15 +127,15 @@ func Read(doc []byte) (map[string]Entry, error) {
 					Name: o.OperationID, Requirement: requirement, SessionRequired: o.SessionRequired,
 					Read: read, Scope: access.ScopeOf(requirement, read), OpenToProjectTokens: where == whoAmI,
 				},
-				OpensSession: o.OpensSession, JSONOnly: o.JSONOnly, ChecksPassword: o.ChecksPassword, MaxBodyBytes: o.MaxBodyBytes,
+				OpensSession: o.OpensSession, JSONOnly: o.JSONOnly, ChecksPassword: o.ChecksPassword, MaxBodyBytes: o.MaxBodyBytes, Body: bodies[where],
 			}
 		}
 	}
 	if len(errs) > 0 {
 		slices.SortFunc(errs, func(a, b error) int { return strings.Compare(a.Error(), b.Error()) })
-		return nil, errors.Join(errs...)
+		return nil, nil, errors.Join(errs...)
 	}
-	return ops, nil
+	return ops, list, nil
 }
 
 // extensions are the x- keys an operation may carry, each read by Read.
@@ -144,7 +158,7 @@ func unknownExtensions(keys map[string]yaml.Node) []string {
 }
 
 // render returns the Go source of the operation table.
-func render(ops map[string]Entry) ([]byte, error) {
+func render(ops map[string]Entry, shapes []Shape) ([]byte, error) {
 	var b bytes.Buffer
 	b.WriteString(`// Code generated from api/management.yaml by ` + "`task generate`" + `. DO NOT EDIT.
 
@@ -162,9 +176,36 @@ var Table = map[string]Entry{
 	slices.Sort(patterns)
 	for _, p := range patterns {
 		o := ops[p]
-		fmt.Fprintf(&b, "\t%q: {Operation: access.Operation{Name: %q, Requirement: %q, SessionRequired: %t, Read: %t, Scope: %q, OpenToProjectTokens: %t}, OpensSession: %t, JSONOnly: %t, ChecksPassword: %t, MaxBodyBytes: %d},\n",
-			p, o.Name, string(o.Requirement), o.SessionRequired, o.Read, string(o.Scope), o.OpenToProjectTokens, o.OpensSession, o.JSONOnly, o.ChecksPassword, o.MaxBodyBytes)
+		fmt.Fprintf(&b, "\t%q: {Operation: access.Operation{Name: %q, Requirement: %q, SessionRequired: %t, Read: %t, Scope: %q, OpenToProjectTokens: %t}, OpensSession: %t, JSONOnly: %t, ChecksPassword: %t, MaxBodyBytes: %d, Body: %d},\n",
+			p, o.Name, string(o.Requirement), o.SessionRequired, o.Read, string(o.Scope), o.OpenToProjectTokens, o.OpensSession, o.JSONOnly, o.ChecksPassword, o.MaxBodyBytes, o.Body)
+	}
+	b.WriteString("}\n\n// Shapes are what the JSON request bodies must hold, numbered as Entry.Body says.\nvar Shapes = []Shape{\n")
+	for i, s := range shapes {
+		fmt.Fprintf(&b, "\t%d: {Object: %t, Required: %s, Members: %s, Items: %d, Values: %d, Deep: %t},\n",
+			i, s.Object, goStrings(s.Required), goMembers(s.Members), s.Items, s.Values, s.Deep)
 	}
 	b.WriteString("}\n")
 	return format.Source(b.Bytes())
+}
+
+func goStrings(in []string) string {
+	if len(in) == 0 {
+		return "nil"
+	}
+	parts := make([]string, len(in))
+	for i, s := range in {
+		parts[i] = fmt.Sprintf("%q", s)
+	}
+	return "[]string{" + strings.Join(parts, ", ") + "}"
+}
+
+func goMembers(in []Member) string {
+	if len(in) == 0 {
+		return "nil"
+	}
+	parts := make([]string, len(in))
+	for i, m := range in {
+		parts[i] = fmt.Sprintf("{%q, %d, %t}", m.Name, m.Shape, m.Nullable)
+	}
+	return "[]Member{" + strings.Join(parts, ", ") + "}"
 }

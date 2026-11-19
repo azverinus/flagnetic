@@ -53,6 +53,7 @@ Before an operation's handler runs, one check in front of every operation judges
 6. **Project.** An operation addressing an unknown project answers `404 not_found`.
 7. **Permission.** A caller without the permission in the project is refused `403 forbidden`, naming it.
 8. **Body.** An operation that opens a session (signing in, accepting an invitation) refuses a body not sent as `application/json` with `415 unsupported_media_type`, since that is what a form on another site would send.
+9. **Required members.** A JSON body that is not an object, or that leaves out a member the operation requires (or sets one to `null` that may not be), is refused `422 invalid` with a violation `required` at each missing member's pointer, such as `/protected`; nothing is changed. A missing boolean is never taken for `false`: `{}` sent to the protection of an environment leaves it as it was. Members an operation does not name are ignored.
 
 The refusals of steps 1 to 7 are counted per operation and code in the metric `flagnetic_management_refusals_total`, so a sudden run of one code (a revoked token still in use, say) shows on a dashboard.
 

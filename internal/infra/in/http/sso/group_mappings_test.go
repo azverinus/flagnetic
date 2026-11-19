@@ -82,7 +82,7 @@ func TestAReplacementOfGroupMappingsNamesTheVersionItRead(t *testing.T) {
 	put := func(ifMatch *string, items ...management.GroupMapping) *management.ReplaceAuthProviderGroupMappingsResponse {
 		t.Helper()
 		res, err := e.session(t).ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), slug,
-			&management.ReplaceAuthProviderGroupMappingsParams{IfMatch: ifMatch}, management.GroupMappings{Items: items})
+			&management.ReplaceAuthProviderGroupMappingsParams{IfMatch: ifMatch}, management.GroupMappings{Items: append([]management.GroupMapping{}, items...)})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -27,6 +27,13 @@ info:
 
     Errors are problem documents (RFC 9457) with a stable `code`.
 
+    A JSON request body that is not an object, or leaves out a member its
+    schema lists as `required` (or sets one to `null` that may not be), is
+    refused `422 invalid` with a violation of code `required` for each such
+    member, by its pointer, before anything is read or changed: a missing
+    boolean or list is never taken for `false` or empty. Members the schema
+    does not name are accepted and ignored.
+
     Every versioned entity (project, environment, unit type, attribute,
     flag definition, flag configuration and segment) carries a `version`,
     which counts its accepted changes from 1 and is answered as a strong

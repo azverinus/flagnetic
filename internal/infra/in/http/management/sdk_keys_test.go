@@ -273,7 +273,7 @@ func TestAnUpdateRenamesAKeyAndReplacesItsRequiredAllowedOrigins(t *testing.T) {
 
 	for name, body := range map[string]string{"no allowed origins": `{"name": "shop"}`, "null allowed origins": `{"allowed_origins": null}`} {
 		res := patch(body)
-		if got := violationsOf(t, name, res.StatusCode(), res.Body, "invalid_sdk_key"); !slices.Equal(got, []string{"/allowed_origins required"}) {
+		if got := violationsOf(t, name, res.StatusCode(), res.Body, "invalid"); !slices.Equal(got, []string{"/allowed_origins required"}) {
 			t.Errorf("%s: violations %v", name, got)
 		}
 	}

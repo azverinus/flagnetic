@@ -168,14 +168,14 @@ func TestEverythingUnderAuthSettingsNeedsAnInstanceAdmin(t *testing.T) {
 
 func TestAChangedSessionIdleTimeoutExpiresASessionSooner(t *testing.T) {
 	c := testkit.Clock()
-	srv, pool, admin := freshInstance(t, c)
+	srv, pool, _ := freshInstance(t, c)
 	b := signedIn(t, srv, testkit.NewMember(t, pool))
 	c.Advance(30 * time.Minute)
 	wantSignedIn(t, b, "half an hour on")
 
 	s := defaultSettings
 	s.SessionIdleTimeoutSeconds = 3600
-	putSettings(t, admin, s)
+	putSettings(t, testkit.InstanceAdminSessionOn(t, srv, pool), s)
 	c.Advance(59 * time.Minute)
 	wantSignedIn(t, b, "59 minutes idle under an hour's timeout")
 	c.Advance(61 * time.Minute)
@@ -184,7 +184,7 @@ func TestAChangedSessionIdleTimeoutExpiresASessionSooner(t *testing.T) {
 
 func TestALoweredAbsoluteTimeoutEndsALiveSession(t *testing.T) {
 	c := testkit.Clock()
-	srv, pool, admin := freshInstance(t, c)
+	srv, pool, _ := freshInstance(t, c)
 	m := testkit.NewMember(t, pool)
 	b := signedIn(t, srv, m)
 	for range 3 {
@@ -194,7 +194,7 @@ func TestALoweredAbsoluteTimeoutEndsALiveSession(t *testing.T) {
 
 	s := defaultSettings
 	s.SessionIdleTimeoutSeconds, s.SessionAbsoluteTimeoutSeconds = 3600, 2*3600
-	putSettings(t, admin, s)
+	putSettings(t, testkit.InstanceAdminSessionOn(t, srv, pool), s)
 	wantSignedOut(t, b, "three hours after opening under a two-hour absolute timeout")
 
 	fresh := signedIn(t, srv, m)
@@ -202,7 +202,7 @@ func TestALoweredAbsoluteTimeoutEndsALiveSession(t *testing.T) {
 		t.Errorf("a session opened now ends at %v, want two hours on", got)
 	}
 	s.SessionAbsoluteTimeoutSeconds = 90 * 24 * 3600
-	putSettings(t, admin, s)
+	putSettings(t, testkit.InstanceAdminSessionOn(t, srv, pool), s)
 	if got := currentOf(t, mySessions(t, fresh)).ExpiresAt; !got.Equal(c.Now().Add(2 * time.Hour)) {
 		t.Errorf("after raising the timeout the session ends at %v, want still two hours on", got)
 	}
@@ -237,10 +237,10 @@ func TestAnAuthSettingsChangeIsAppliedByAnotherReplicaWithinASecond(t *testing.T
 
 func TestATokenBeyondTheChangedMaxLifetimeIsRefused(t *testing.T) {
 	c := testkit.Clock()
-	srv, pool, admin := freshInstance(t, c)
+	srv, pool, _ := freshInstance(t, c)
 	s := defaultSettings
 	s.TokenMaxLifetimeSeconds = 24 * 3600
-	putSettings(t, admin, s)
+	putSettings(t, testkit.InstanceAdminSessionOn(t, srv, pool), s)
 	b := signedIn(t, srv, testkit.NewMember(t, pool))
 
 	beyond := c.Now().Add(25 * time.Hour)
@@ -256,10 +256,10 @@ func TestATokenBeyondTheChangedMaxLifetimeIsRefused(t *testing.T) {
 
 func TestTokenExpiryRequiredRefusesATokenWithNoExpiry(t *testing.T) {
 	c := testkit.Clock()
-	srv, pool, admin := freshInstance(t, c)
+	srv, pool, _ := freshInstance(t, c)
 	s := defaultSettings
 	s.TokenExpiryRequired = true
-	putSettings(t, admin, s)
+	putSettings(t, testkit.InstanceAdminSessionOn(t, srv, pool), s)
 	b := signedIn(t, srv, testkit.NewMember(t, pool))
 
 	res := createToken(t, b, management.ApiTokenCreate{Name: "forever"})
