@@ -11,6 +11,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/transfer/firebase"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
+	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
 // DefaultFirebaseUnitType is the unit type percent rollouts bucket on when
@@ -39,7 +40,7 @@ type ImportFirebaseTemplateCommand struct {
 	Environment string
 	UnitType    string
 	DryRun      bool
-	IfMatch     *string
+	IfMatch     *precondition.Tags
 	Caller      *access.MemberID
 	Request     governance.Request
 }

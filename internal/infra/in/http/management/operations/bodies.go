@@ -115,7 +115,7 @@ type flat struct {
 	nullable bool
 	// untyped says no part of the schema gives the value a type, so any JSON
 	// value, null among them, is one the schema holds.
-	typed bool
+	typed    bool
 	required []string
 	props    map[string]map[string]any
 	items    map[string]any

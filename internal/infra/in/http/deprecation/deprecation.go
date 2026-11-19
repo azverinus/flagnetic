@@ -158,25 +158,40 @@ func (n Notice) SunsetValue() string {
 // served under base, such as /api/v1, with its Deprecation and Sunset
 // headers; every other request and every other part of the answer is left
 // as it is. A table with no operation yields a middleware that does nothing.
-func Middleware(base string, t Table) func(http.Handler) http.Handler {
+//
+// routes are the patterns of the API's other operations, as the table writes
+// its own ("GET /flags/{flag}"). The middleware matches a request in a mux of
+// its own, which must decide as the API's does: were only the deprecated
+// patterns in it, a literal route beside a deprecated wildcard one
+// ("GET /flags/export" beside "GET /flags/{flag}") would match the wildcard
+// there and be announced as deprecated though it is not.
+func Middleware(base string, t Table, routes ...string) func(http.Handler) http.Handler {
 	if len(t) == 0 {
 		return func(next http.Handler) http.Handler { return next }
 	}
-	// A mux with the deprecated patterns decides which operation a request
-	// is, path parameters and the methods a pattern implies included.
 	mux := http.NewServeMux()
-	for pattern := range t {
+	register := func(pattern string) {
 		method, path, _ := strings.Cut(pattern, " ")
-		mux.Handle(method+" "+strings.TrimSuffix(base, "/")+path, http.NotFoundHandler())
+		full := method + " " + strings.TrimSuffix(base, "/") + path
+		mux.Handle(full, http.NotFoundHandler())
+	}
+	for pattern := range t {
+		register(pattern)
+	}
+	for _, pattern := range routes {
+		if _, deprecated := t[pattern]; !deprecated {
+			register(pattern)
+		}
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if _, matched := mux.Handler(r); matched != "" {
 				method, path, _ := strings.Cut(matched, " ")
-				n := t[method+" "+strings.TrimPrefix(path, strings.TrimSuffix(base, "/"))]
-				w.Header().Set("Deprecation", n.DeprecationValue())
-				if s := n.SunsetValue(); s != "" {
-					w.Header().Set("Sunset", s)
+				if n, deprecated := t[method+" "+strings.TrimPrefix(path, strings.TrimSuffix(base, "/"))]; deprecated {
+					w.Header().Set("Deprecation", n.DeprecationValue())
+					if s := n.SunsetValue(); s != "" {
+						w.Header().Set("Sunset", s)
+					}
 				}
 			}
 			next.ServeHTTP(w, r)

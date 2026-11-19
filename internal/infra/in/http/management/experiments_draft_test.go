@@ -183,7 +183,7 @@ func TestExperimentWritesNeedTheCurrentVersionInIfMatch(t *testing.T) {
 	stale := patchExperiment(t, f.admin, p, k, 1, management.ExperimentPatch{Name: ptr("x")})
 	check("patch at a stale version", stale.StatusCode(), stale.Body, http.StatusPreconditionFailed, "version_mismatch")
 	malformed := do(f.admin.UpdateExperimentWithResponse(t.Context(), p, k, &management.UpdateExperimentParams{IfMatch: ptr(`W/"2"`)}, management.ExperimentPatch{Name: ptr("x")}))
-	assertProblem(t, "a weak tag", malformed.StatusCode(), malformed.Body, http.StatusBadRequest, "invalid_request")
+	check("a weak tag", malformed.StatusCode(), malformed.Body, http.StatusPreconditionFailed, "version_mismatch")
 
 	saltsNone := do(f.admin.RegenerateExperimentSaltsWithResponse(t.Context(), p, k, &management.RegenerateExperimentSaltsParams{}))
 	check("salts without If-Match", saltsNone.StatusCode(), saltsNone.Body, http.StatusPreconditionRequired, "precondition_required")

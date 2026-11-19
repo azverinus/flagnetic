@@ -280,7 +280,11 @@ func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer, opts Op
 	edge.SecretPath(invitationLinkPath + "{secret}")
 	edge.SecretPath(passwordResetLinkPath + "{secret}")
 	// A deprecated operation is announced whatever its handler answers.
-	edge.Wrap(BaseURL+"/", deprecation.Middleware(BaseURL, Deprecated))
+	routes := make([]string, 0, len(operations.Table))
+	for pattern := range operations.Table {
+		routes = append(routes, pattern)
+	}
+	edge.Wrap(BaseURL+"/", deprecation.Middleware(BaseURL, Deprecated, routes...))
 	HandlerWithOptions(rawBodies{ServerInterface: strict, a: a}, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
 		BaseRouter:       router{a},

@@ -14,6 +14,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
+	"github.com/azverinus/flagnetic/internal/shared/precondition"
 	"github.com/azverinus/flagnetic/internal/shared/protection"
 )
 
@@ -56,7 +57,7 @@ type ImportIntoProjectCommand struct {
 	Mode     transfer.Mode
 	Document transfer.Document
 	DryRun   bool
-	IfMatch  *string
+	IfMatch  *precondition.Tags
 	Caller   *access.MemberID
 	Request  governance.Request
 
@@ -111,7 +112,7 @@ func (h *ImportIntoProject) Handle(ctx context.Context, cmd ImportIntoProjectCom
 		if err != nil {
 			return err
 		}
-		if cmd.IfMatch != nil && *cmd.IfMatch != entityTag(latest) {
+		if cmd.IfMatch != nil && !cmd.IfMatch.Matches(entityTag(latest)) {
 			return errVersionMismatch
 		}
 		snapshot, err := h.read(ctx, project)

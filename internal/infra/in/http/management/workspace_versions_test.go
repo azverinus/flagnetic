@@ -139,7 +139,7 @@ func TestWorkspaceEntityWritesNeedTheCurrentVersionInIfMatch(t *testing.T) {
 			status, body, _, _ = e.rename(nil, " ")
 			violationsOf(t, "an invalid change without If-Match", status, body, e.invalid)
 			status, body, _, _ = e.rename(ptr(`W/"1"`), "Renamed")
-			assertProblem(t, "a weak tag", status, body, http.StatusBadRequest, "invalid_request")
+			assertProblem(t, "a weak tag", status, body, http.StatusPreconditionFailed, "version_mismatch")
 
 			if st, b, tag, v := e.rename(ptr("1"), "Renamed"); st != http.StatusOK || tag != `"2"` || v != 2 {
 				t.Fatalf("a bare version = %d, ETag %s, version %d: %s; want version 2", st, tag, v, b)
