@@ -18,6 +18,17 @@ type AuthSettingsReader interface {
 	AuthSettings(ctx context.Context) (access.AuthSettings, error)
 }
 
+// AuthSettingsSharer reads the auth settings as stored, for a unit of work
+// that opens a session.
+type AuthSettingsSharer interface {
+	// ShareAuthSettings returns the settings and holds them against a change
+	// until the unit of work ends. A change locks them first and ends the
+	// sessions the new settings refuse once it holds the lock, so a session
+	// opened under the old settings either commits before it and is seen by
+	// that sweep, or begins after it and is judged by the new settings.
+	ShareAuthSettings(ctx context.Context) (access.AuthSettings, error)
+}
+
 // AuthSettingsStore keeps the auth settings.
 type AuthSettingsStore interface {
 	// LockAuthSettings returns the settings and locks them until the
@@ -223,13 +234,13 @@ func (h *UpdateAuthSettings) requireIdentity(ctx context.Context, caller access.
 	return nil
 }
 
-// authSettingsRecord is s as audit entries show it, in the API's terms.
 // tightens reports whether after closes a way in before left open: local
 // login switched off, or the enforced domains changed.
 func tightens(before, after access.AuthSettings) bool {
 	return (before.LocalLoginEnabled && !after.LocalLoginEnabled) || !slices.Equal(before.SSOEnforcedDomains, after.SSOEnforcedDomains)
 }
 
+// authSettingsRecord is s as audit entries show it, in the API's terms.
 func authSettingsRecord(s access.AuthSettings) map[string]any {
 	return map[string]any{
 		"session_idle_timeout_seconds":     int64(s.SessionIdleTimeout / time.Second),

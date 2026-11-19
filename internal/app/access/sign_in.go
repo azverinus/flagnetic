@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/netip"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -29,6 +30,7 @@ type PasswordVerifier interface {
 // SignInStore is what signing in needs of the stored members and sessions.
 type SignInStore interface {
 	passwordStore
+	AuthSettingsSharer
 	// LockMemberPassword returns member with their password hash ("" for
 	// none), locked until the unit of work ends, so no password change
 	// commits between the check and the session it opens; ErrNotFound when
@@ -97,7 +99,11 @@ type SignInDeps struct {
 	IDs      *id.Source
 	// Random draws session cookies, which are signed with Key.
 	Random io.Reader
-	Key    []byte
+	// Background writes the audit entry of a failed sign-in after the answer
+	// is sent, so a known member's failure does not take longer than an
+	// unknown email's, which writes none; nil writes it before answering.
+	Background *Background
+	Key        []byte
 }
 
 // NewSignIn returns the handler.
@@ -217,8 +223,8 @@ func (a passwordAttempt) right() bool { return a.ok && a.hash != "" }
 // before any hash: it takes no hashing slot from the members signing in
 // and, since no password was checked, counts as no failure either. An
 // unknown email is verified against a hash no password matches, so it takes
-// as long as a wrong password; a password longer than any ever set is
-// refused before any hash, so a huge one cannot cost one. On an error,
+// as long as a wrong password, and so is a password longer than any ever
+// set, which is verified as a placeholder and refused. On an error,
 // nothing was guessed and the failure is taken back.
 func attemptPassword(ctx context.Context, tx Transactor, store passwordStore, hasher PasswordVerifier,
 	attempt access.Attempt, password secret.String,
@@ -243,11 +249,20 @@ func attemptPassword(ctx context.Context, tx Transactor, store passwordStore, ha
 	if err != nil && !errors.Is(err, ErrNotFound) {
 		return a, releaseAttempt(ctx, tx, store, reserved, err)
 	}
-	if utf8.RuneCountInString(password.Reveal()) <= access.MaxPasswordLength {
-		if a.ok, a.outdated, err = hasher.Verify(ctx, password, a.hash); err != nil {
-			// Busy, or the stored hash unreadable: nothing was guessed.
-			return a, releaseAttempt(ctx, tx, store, reserved, err)
-		}
+	// A password longer than any ever set cannot be right, but is verified
+	// all the same, as a placeholder of the longest length: a sign-in that
+	// skipped the hash would answer sooner than any other and tell, by its
+	// timing, a known email from an unknown one.
+	candidate, tooLong := password, utf8.RuneCountInString(password.Reveal()) > access.MaxPasswordLength
+	if tooLong {
+		candidate = secret.New(strings.Repeat("x", access.MaxPasswordLength))
+	}
+	if a.ok, a.outdated, err = hasher.Verify(ctx, candidate, a.hash); err != nil {
+		// Busy, or the stored hash unreadable: nothing was guessed.
+		return a, releaseAttempt(ctx, tx, store, reserved, err)
+	}
+	if tooLong {
+		a.ok, a.outdated = false, false
 	}
 	return a, nil
 }
@@ -291,24 +306,33 @@ func (h *SignIn) succeed(ctx context.Context, cmd SignInCommand, a passwordAttem
 			return SignInResult{}, err
 		}
 	}
-	settings, err := h.d.Settings.AuthSettings(ctx)
-	if err != nil {
-		return SignInResult{}, err
-	}
 	member := a.member
 	now := h.d.Clock.Now()
-	session, cookie := access.NewSession(id.New[access.Session](h.d.IDs), access.NewSessionInput{
-		Member: member.ID, Method: access.SignInLocal, ClientIP: cmd.ClientIP, UserAgent: cmd.UserAgent,
-		Timeouts: settings.SessionTimeouts(), Now: now,
-	}, h.d.Random, h.d.Key)
-	entry, err := governance.NewEntry(id.New[governance.Entry](h.d.IDs), now, governance.Request{
-		Actor: memberActor(member), ID: cmd.RequestID,
-	}, authRecord("auth.signed_in", member, nil))
-	if err != nil {
-		return SignInResult{}, err
-	}
+	var session access.Session
+	var cookie secret.String
 	if err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		if err := h.stillHolds(ctx, member, a.hash); err != nil {
+		// The settings are read where the session is stored, held against
+		// a change: one that closed local login while the password was
+		// verified refuses this sign-in, and one that comes after sees the
+		// session and ends it.
+		settings, err := h.d.Store.ShareAuthSettings(ctx)
+		if err != nil {
+			return err
+		}
+		if err = settings.PasswordRefusal(member.Email); err != nil {
+			return err
+		}
+		if err = h.stillHolds(ctx, member, a.hash); err != nil {
+			return err
+		}
+		session, cookie = access.NewSession(id.New[access.Session](h.d.IDs), access.NewSessionInput{
+			Member: member.ID, Method: access.SignInLocal, ClientIP: cmd.ClientIP, UserAgent: cmd.UserAgent,
+			Timeouts: settings.SessionTimeouts(), Now: now,
+		}, h.d.Random, h.d.Key)
+		entry, err := governance.NewEntry(id.New[governance.Entry](h.d.IDs), now, governance.Request{
+			Actor: memberActor(member), ID: cmd.RequestID,
+		}, authRecord("auth.signed_in", member, nil))
+		if err != nil {
 			return err
 		}
 		if err := h.d.Store.ClearAttempt(ctx, a.reserved); err != nil {
@@ -359,8 +383,15 @@ func (h *SignIn) open(ctx context.Context, session access.Session, rehash string
 	return h.d.Audit.Record(ctx, entry)
 }
 
+// signInFailureBound is how long the audit entry of a failed sign-in, written
+// after the answer, may take.
+const signInFailureBound = 10 * time.Second
+
 // fail records the failed sign-in of member, with its true reason, and the
 // lockout the failure starts, and returns the refusal every failure gets.
+// The record is written after the answer when there is room for the work, so
+// the answer takes no longer than an unknown email's, which has none to
+// write; without room, it is written first, so no failure goes unrecorded.
 func (h *SignIn) fail(ctx context.Context, cmd SignInCommand, member access.Member, reserved access.Reservation, reason string) error {
 	now := h.d.Clock.Now()
 	req := governance.Request{Actor: memberActor(member), ID: cmd.RequestID}
@@ -368,10 +399,19 @@ func (h *SignIn) fail(ctx context.Context, cmd SignInCommand, member access.Memb
 	if locked, locks := lockedOut(member, reserved); locks {
 		records = append(records, locked)
 	}
-	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		return recordAll(ctx, h.d.Audit, h.d.IDs, now, req, records...)
-	})
-	if err != nil {
+	write := func(ctx context.Context) error {
+		return h.d.Tx.Within(ctx, func(ctx context.Context) error {
+			return recordAll(ctx, h.d.Audit, h.d.IDs, now, req, records...)
+		})
+	}
+	if h.d.Background != nil && h.d.Background.Go(ctx, "sign-in failure audit", signInFailureBound, func(ctx context.Context) {
+		if err := write(ctx); err != nil {
+			h.d.Background.logger.ErrorContext(ctx, "a failed sign-in was not recorded", "error", err.Error())
+		}
+	}) {
+		return ErrInvalidCredentials
+	}
+	if err := write(ctx); err != nil {
 		return err
 	}
 	return ErrInvalidCredentials

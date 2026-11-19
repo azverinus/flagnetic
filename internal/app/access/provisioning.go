@@ -164,7 +164,7 @@ type UpdateProvisionedCommand struct {
 // address, and a reset is mailed to whatever address the member has: kept
 // across the move, they would let whoever holds a SCIM token adopt a member,
 // move them to an address of their own and have a reset mailed there,
-// taking the account over without ever signing in at the identity
+// taking the member over without ever signing in at the identity
 // provider. The provider is how its members sign in, so nobody is locked
 // out. A change of case alone is no move.
 func (p *Provisioning) Update(ctx context.Context, cmd UpdateProvisionedCommand) (access.Member, error) {

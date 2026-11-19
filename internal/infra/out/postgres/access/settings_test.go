@@ -110,3 +110,15 @@ func TestClearingEverySignInFailureLiftsEachLockoutAndThrottledAddress(t *testin
 		}
 	}
 }
+
+// The defaults are the migration's column defaults, which nothing else ties
+// to DefaultAuthSettings.
+func TestAFreshDatabaseReadsBackTheDefaultAuthSettings(t *testing.T) {
+	got, err := pgaccess.NewStore(testkit.FreshPool(t)).AuthSettings(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Equal(access.DefaultAuthSettings) {
+		t.Errorf("a fresh database holds %+v, want %+v", got, access.DefaultAuthSettings)
+	}
+}

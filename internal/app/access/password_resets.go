@@ -158,6 +158,7 @@ func openPasswordReset(ctx context.Context, store PasswordResetReader, s secret.
 
 // CompletePasswordResetStore is what completing a password reset needs.
 type CompletePasswordResetStore interface {
+	AuthSettingsSharer
 	PasswordResetReader
 	PasswordResetStore
 	InvitationStore
@@ -284,7 +285,7 @@ func (h *CompletePasswordReset) complete(ctx context.Context, cmd CompletePasswo
 	now := h.d.Clock.Now()
 	var res SignInResult
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		res, err = h.reset(ctx, cmd, opened, hash, settings, reserved, now)
+		res, err = h.reset(ctx, cmd, opened, hash, reserved, now)
 		return err
 	})
 	if err != nil {
@@ -301,10 +302,17 @@ func (h *CompletePasswordReset) complete(ctx context.Context, cmd CompletePasswo
 // before their password reset, the order deactivating them and changing
 // their password take, so none of them waits on another in a deadlock.
 func (h *CompletePasswordReset) reset(ctx context.Context, cmd CompletePasswordResetCommand, opened access.PasswordReset, hash string,
-	settings access.AuthSettings, reserved access.Reservation, now time.Time,
+	reserved access.Reservation, now time.Time,
 ) (SignInResult, error) {
 	st := h.d.Store
-	if _, _, err := st.LockMember(ctx, opened.Member); err != nil {
+	// The settings are read where the session is stored, held against a
+	// change: one that closed local login or enforced the member's domain
+	// meanwhile refuses the reset, which stays open for its provider.
+	settings, err := st.ShareAuthSettings(ctx)
+	if err != nil {
+		return SignInResult{}, err
+	}
+	if _, _, err = st.LockMember(ctx, opened.Member); err != nil {
 		return SignInResult{}, err
 	}
 	reset, m, err := st.LockPasswordResetByHash(ctx, opened.Hash)
@@ -314,6 +322,9 @@ func (h *CompletePasswordReset) reset(ctx context.Context, cmd CompletePasswordR
 	if err != nil || !reset.Open(now, m) {
 		// Completed, ended or deactivated since it was read.
 		return SignInResult{}, access.ErrPasswordResetGone
+	}
+	if err = settings.PasswordRefusal(m.Email); err != nil {
+		return SignInResult{}, err
 	}
 	if err = st.SetPasswordHash(ctx, m.ID, hash, now); err != nil {
 		return SignInResult{}, err

@@ -182,6 +182,10 @@ type Background struct {
 	// the mail still leaving is awaited until ctx ends, so a mail that does
 	// not finish never holds back what was counted.
 	Close func(ctx context.Context)
+	// Wait returns once the work the requests started after their answers,
+	// such as mails and the records of failed sign-ins, has ended, or ctx
+	// ends.
+	Wait func(ctx context.Context)
 }
 
 // Listener is a handler of the notifications of one channel.
@@ -369,7 +373,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	}
 	backgroundDropped := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: metrics.Namespace, Subsystem: "background", Name: "dropped_total",
-		Help: "Background jobs (mails, password reset requests) dropped because the replica was already running its limit, by kind.",
+		Help: "Background work (mails, password reset requests, records of failed sign-ins) dropped because the replica was already running its limit, by kind.",
 	}, []string{"kind"})
 	reg.MustRegister(backgroundDropped)
 	background := appaccess.NewBackground(edge.Logger(), appaccess.WithDroppedCounter(func(name string) {
@@ -489,7 +493,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		AuthenticateSession:                     authenticateSession,
 		SignIn: appaccess.NewSignIn(appaccess.SignInDeps{
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
-			Random: rand.Reader, Key: sessionKey,
+			Random: rand.Reader, Key: sessionKey, Background: background,
 		}),
 		SignOut:         appaccess.NewSignOut(tx, accessStore, audit, d.Clock, d.IDs),
 		ListSessions:    appaccess.NewListSessions(accessStore, settings, d.Clock),
@@ -830,6 +834,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			{Channel: pgdelivery.RulesetsChannel, Handler: rulesetStream},
 			{Channel: pggovernance.ChangesChannel, Handler: changeHub},
 		},
+		Wait: background.Wait,
 		Close: func(ctx context.Context) {
 			rulesetStream.Close()
 			changeHub.Close()

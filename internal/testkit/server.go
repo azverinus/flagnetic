@@ -40,14 +40,15 @@ type Server struct {
 	// Logs captures everything the server logs.
 	Logs *LogSink
 
-	edge       *flaghttp.Server
-	metrics    http.Handler
-	runner     *worker.Runner
-	listeners  *postgres.Listeners
-	background func()
-	pool       *pgxpool.Pool
-	hold       *pgevents.IngestHold
-	sinkFault  *pgsinks.Fault
+	edge           *flaghttp.Server
+	metrics        http.Handler
+	runner         *worker.Runner
+	listeners      *postgres.Listeners
+	background     func()
+	waitBackground func(ctx context.Context)
+	pool           *pgxpool.Pool
+	hold           *pgevents.IngestHold
+	sinkFault      *pgsinks.Fault
 }
 
 // LoseNextSinkCommit makes the next batch a sink's target acknowledges go
@@ -60,6 +61,15 @@ func (s *Server) LoseNextSinkCommit() { s.sinkFault.LoseNextCommit() }
 // own, such as ruleset loads nobody waits for, as stopping the replica
 // does.
 func (s *Server) CloseBackground() { s.background() }
+
+// WaitBackground returns once the work the replica's requests started after
+// their answers has ended, such as the record of a failed sign-in.
+func (s *Server) WaitBackground(t testing.TB) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	s.waitBackground(ctx)
+}
 
 // Drain begins the replica's drain, as the stop signal does.
 func (s *Server) Drain() { s.edge.Drain() }
@@ -391,7 +401,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	}
 	return &Server{
 		URL: srv.URL, Logs: logs, edge: h, metrics: metrics.Handler(reg), runner: runner, listeners: listeners,
-		background: closeBackground, pool: o.pool, hold: hold, sinkFault: sinkFault,
+		background: closeBackground, waitBackground: background.Wait, pool: o.pool, hold: hold, sinkFault: sinkFault,
 	}
 }
 

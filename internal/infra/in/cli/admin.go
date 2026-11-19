@@ -111,7 +111,7 @@ func adminRefusal(cl commandLine, command string, e *apperrors.Error) int {
 		fmt.Fprintf(cl.stderr, "admin %s: %s\n", command, describe(e))
 		return exitUsage
 	}
-	fmt.Fprintf(cl.stderr, "admin %s: %s\n", command, e.Detail)
+	fmt.Fprintf(cl.stderr, "admin %s: %s (%s)\n", command, e.Detail, e.Code)
 	return exitFailure
 }
 

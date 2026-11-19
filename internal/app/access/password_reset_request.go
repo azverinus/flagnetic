@@ -145,8 +145,8 @@ const requestBound = 30 * time.Second
 
 // Handle counts the request against the throttle of its source and starts
 // it, returning before anything is looked up, whatever the email is: neither
-// what comes of the request nor how long it takes tells who holds an
-// account. A source past the throttle is refused rate_limited, whatever the
+// what comes of the request nor how long it takes tells who is a
+// member. A source past the throttle is refused rate_limited, whatever the
 // email; every request counts, so a source cannot make the instance mail or
 // audit at wire speed, and the count is kept, as the answer is the same
 // whether or not the email exists. Behind the answer, a password reset is

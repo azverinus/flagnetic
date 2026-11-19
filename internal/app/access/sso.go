@@ -28,6 +28,7 @@ type SSOStore interface {
 	// LockMember returns the member, locked until the unit of work ends, and
 	// whether they hold a password; ErrNotFound when none has the identifier.
 	LockMember(ctx context.Context, member access.MemberID) (access.Member, bool, error)
+	AuthSettingsSharer
 	// LockInstanceAdmins serializes, until the unit of work ends, every
 	// change that could leave the instance without an active instance admin.
 	LockInstanceAdmins(ctx context.Context) error
@@ -199,7 +200,11 @@ type SSOSignIn struct {
 // session revocation and live again when they are reactivated, so a member
 // no longer active is refused ErrSessionExpired.
 func (s *SSO) OpenSession(ctx context.Context, in SSOSignIn) (secret.String, error) {
-	settings, err := s.settings.AuthSettings(ctx)
+	// The settings are read where the session is stored, held against a
+	// change: one that enforced the member's domain to another provider
+	// meanwhile refuses the sign-in, and one that comes after sees the
+	// session and ends it.
+	settings, err := s.store.ShareAuthSettings(ctx)
 	if err != nil {
 		return secret.String{}, err
 	}
@@ -208,6 +213,9 @@ func (s *SSO) OpenSession(ctx context.Context, in SSOSignIn) (secret.String, err
 		return secret.String{}, access.ErrSessionExpired
 	}
 	if err != nil {
+		return secret.String{}, err
+	}
+	if err = settings.SessionRefusal(in.Method, in.Provider, current.Email); err != nil {
 		return secret.String{}, err
 	}
 	now := s.clock.Now()
@@ -266,6 +274,26 @@ func (s *SSO) record(ctx context.Context, now time.Time, req governance.Request,
 		return err
 	}
 	return s.audit.Record(ctx, entry)
+}
+
+// HoldAuthSettings holds the auth settings against a change until the unit
+// of work ends, as OpenSession does: a sign-in takes it before locking
+// anything else, the order a change of the settings or of a provider takes.
+func (s *SSO) HoldAuthSettings(ctx context.Context) error {
+	_, err := s.store.ShareAuthSettings(ctx)
+	return err
+}
+
+// sessionRecord is the audit record of action, a sign-out, of m and the
+// session s they ended: it names the method s was opened by and, for an auth
+// provider's, the provider.
+func sessionRecord(action string, m access.Member, s access.Session, more map[string]any) governance.Record {
+	if s.Provider != "" {
+		return ssoRecord(action, m, s.Method, s.Provider, more)
+	}
+	r := authRecord(action, m, more)
+	r.After.(map[string]any)["method"] = s.Method
+	return r
 }
 
 // ssoRecord is the audit record of action, a sign-in or a failed one, of m

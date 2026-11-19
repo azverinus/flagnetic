@@ -30,6 +30,7 @@ const clearedCookie = "flagnetic_session=; Path=/; Max-Age=0; HttpOnly; SameSite
 // first, as an instance admin reads them.
 func auditOf(t *testing.T, srv *testkit.Server, action, entityID string) []management.AuditEntry {
 	t.Helper()
+	srv.WaitBackground(t) // a failed sign-in is recorded after its answer
 	res, err := testkit.Client(t, srv, testkit.InstanceAdminToken(t)).ListAuditEntriesWithResponse(t.Context(),
 		&management.ListAuditEntriesParams{Action: &action, EntityId: &entityID})
 	if err != nil {
@@ -196,6 +197,7 @@ func TestWrongEmailAndWrongPasswordAreTheSame401(t *testing.T) {
 // auditOfQ returns the instance audit entries whose text holds q.
 func auditOfQ(t *testing.T, srv *testkit.Server, q string) []management.AuditEntry {
 	t.Helper()
+	srv.WaitBackground(t)
 	res, err := testkit.Client(t, srv, testkit.InstanceAdminToken(t)).ListAuditEntriesWithResponse(t.Context(),
 		&management.ListAuditEntriesParams{Q: &q})
 	if err != nil || res.JSON200 == nil {

@@ -1,7 +1,7 @@
 {{define "role"}}{{if eq . "owner"}}Owner{{else if eq . "maintainer"}}Maintainer{{else if eq . "developer"}}Developer{{else if eq . "viewer"}}Viewer{{else}}{{.}}{{end}}{{end -}}
 Hello {{.Recipient.Name}},
 
-{{with .Data}}{{if .InvitedBy}}{{.InvitedBy}} invited you{{else}}You are invited{{end}} to join Flagnetic{{if .Project}}, with the role {{template "role" .Role}} in the project {{.Project}}{{end}}.{{end}} Your account will be {{.Recipient.Email}}. {{if .Data.Provider}}Open this link and sign in with {{.Data.Provider}} to accept; your organisation signs in through it, so there is no password to set:{{else}}Open this link and choose a password to accept:{{end}}
+{{with .Data}}{{if .InvitedBy}}{{.InvitedBy}} invited you{{else}}You are invited{{end}} to join Flagnetic{{if .Project}}, with the role {{template "role" .Role}} in the project {{.Project}}{{end}}.{{end}} You will join as {{.Recipient.Email}}. {{if .Data.Provider}}Open this link and sign in with {{.Data.Provider}} to accept; your organisation signs in through it, so there is no password to set:{{else}}Open this link and choose a password to accept:{{end}}
 
 {{.Data.URL}}
 
