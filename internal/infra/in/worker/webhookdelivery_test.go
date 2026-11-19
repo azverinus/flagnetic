@@ -22,7 +22,7 @@ import (
 // fails.
 type disablingDeliverer struct{ claimed bool }
 
-func (d *disablingDeliverer) Claim(context.Context) (appgovernance.Claim, error) {
+func (d *disablingDeliverer) Claim(context.Context, int) (appgovernance.Claim, error) {
 	if d.claimed {
 		return appgovernance.Claim{}, nil
 	}
@@ -81,7 +81,7 @@ type busyDeliverer struct {
 	started chan workspace.ProjectID
 }
 
-func (d *busyDeliverer) Claim(context.Context) (appgovernance.Claim, error) {
+func (d *busyDeliverer) Claim(context.Context, int) (appgovernance.Claim, error) {
 	if d.claimed {
 		return appgovernance.Claim{}, nil
 	}
@@ -150,5 +150,70 @@ func TestOneProjectCannotTakeEveryAttemptOfAReplica(t *testing.T) {
 	}
 	if d.peak[flooding] > 4 {
 		t.Errorf("peak %d attempts of one project at once, want at most 4", d.peak[flooding])
+	}
+}
+
+// limitingDeliverer records the limit of every claim and hands out one
+// delivery whose attempt finds its lease gone.
+type limitingDeliverer struct {
+	limits  []int
+	claimed bool
+}
+
+func (d *limitingDeliverer) Claim(_ context.Context, limit int) (appgovernance.Claim, error) {
+	d.limits = append(d.limits, limit)
+	if d.claimed {
+		return appgovernance.Claim{}, nil
+	}
+	d.claimed = true
+	return appgovernance.Claim{Deliveries: []appgovernance.ClaimedDelivery{{}}}, nil
+}
+
+func (d *limitingDeliverer) Attempt(context.Context, appgovernance.LeaseToken, governance.DeliveryID,
+) (appgovernance.Attempted, error) {
+	return appgovernance.Attempted{}, nil
+}
+
+// A claim takes what the replica attempts at once, and an attempt whose
+// lease went before its turn is counted and logged.
+func TestAClaimTakesNoMoreThanTheReplicaAttemptsAtOnceAndASkippedAttemptIsCounted(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	logs := testkit.NewLogSink()
+	d := &limitingDeliverer{}
+	w := worker.WebhookDelivery(d, time.Minute, logs.Logger(), reg)
+	if err := w.Round(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	for _, limit := range d.limits {
+		if limit != worker.AttemptsAtOnce {
+			t.Errorf("claimed with limit %d, want the %d attempts a replica makes at once", limit, worker.AttemptsAtOnce)
+		}
+	}
+	families, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var skipped float64
+	for _, f := range families {
+		if f.GetName() == "flagnetic_webhook_attempts_skipped_total" {
+			skipped = f.GetMetric()[0].GetCounter().GetValue()
+		}
+	}
+	if skipped != 1 {
+		t.Errorf("flagnetic_webhook_attempts_skipped_total = %v, want 1", skipped)
+	}
+	if len(logs.Find("webhook delivery attempt skipped: its lease was no longer held")) != 1 {
+		t.Error("the skipped attempt was not logged")
+	}
+}
+
+// A claim's deliveries all being one project's, they are attempted
+// attemptsPerProject at a time, each taking the whole timeout: the lease must
+// outlast the last of them.
+func TestALeaseOutlastsEveryDeliveryAClaimTakes(t *testing.T) {
+	waves := (worker.AttemptsAtOnce + worker.AttemptsPerProject - 1) / worker.AttemptsPerProject
+	if need := time.Duration(waves) * governance.DeliveryTimeout; need > appgovernance.LeaseFor {
+		t.Errorf("a claim of %d deliveries of one project takes up to %v to attempt, past the %v lease",
+			worker.AttemptsAtOnce, need, appgovernance.LeaseFor)
 	}
 }

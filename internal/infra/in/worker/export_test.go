@@ -25,3 +25,10 @@ func SetRollupTimeouts(round, reserve time.Duration) func() {
 func (m *RollupMetrics) LagGauge(stream events.Stream) prometheus.Gauge {
 	return m.lag.WithLabelValues(string(stream))
 }
+
+// AttemptsAtOnce and AttemptsPerProject are exported for the test that the
+// delivery lease outlasts what one claim takes.
+const (
+	AttemptsAtOnce     = attemptsAtOnce
+	AttemptsPerProject = attemptsPerProject
+)

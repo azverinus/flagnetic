@@ -19,9 +19,15 @@ import (
 // metrics and Tick.
 const WebhookDeliveryName = "webhook_delivery"
 
-// attemptsAtOnce is how many attempts one replica makes at once. What a
-// receiver sees is bounded per subscription by the claim; this keeps one
-// replica from opening a hundred connections in one round.
+// attemptsAtOnce is how many attempts one replica makes at once, and how
+// many deliveries it claims at once. What a receiver sees is bounded per
+// subscription by the claim; this keeps one replica from opening a hundred
+// connections in one round. A claim takes no more than that because it has
+// to attempt every delivery it leases before the lease runs out: with all of
+// them one project's, attemptsPerProject at a time and each taking the full
+// timeout, that is attemptsAtOnce/attemptsPerProject timeouts, which
+// appgovernance.LeaseFor must cover, or the deliveries that wait lose their
+// lease and keep every other replica from taking them.
 const attemptsAtOnce = 16
 
 // deliveryRoundFor is how long a round goes on claiming while deliveries are
@@ -30,7 +36,7 @@ const deliveryRoundFor = time.Minute
 
 // Deliverer is the use case attempting the deliveries that are due.
 type Deliverer interface {
-	Claim(ctx context.Context) (appgovernance.Claim, error)
+	Claim(ctx context.Context, limit int) (appgovernance.Claim, error)
 	Attempt(ctx context.Context, token appgovernance.LeaseToken, delivery governance.DeliveryID) (appgovernance.Attempted, error)
 }
 
@@ -47,10 +53,21 @@ func WebhookDelivery(d Deliverer, interval time.Duration, log *slog.Logger, reg 
 		Namespace: metrics.Namespace, Subsystem: "webhook", Name: "deliveries_total",
 		Help: "Webhook deliveries settled, by status: succeeded, failed or exhausted.",
 	}, []string{"status"})
-	reg.MustRegister(settled)
+	skipped := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: metrics.Namespace, Subsystem: "webhook", Name: "attempts_skipped_total",
+		Help: "Webhook delivery attempts skipped because their lease was no longer held when their turn came.",
+	})
+	reg.MustRegister(settled, skipped)
 	attempt := func(ctx context.Context, token appgovernance.LeaseToken, delivery governance.DeliveryID) {
 		done, err := d.Attempt(ctx, token, delivery)
 		switch {
+		case err == nil && done.Status == "":
+			// The lease no longer held when the attempt came to it, or the
+			// subscription was disabled or deleted meanwhile; nothing was
+			// sent, and the delivery is another replica's or gone.
+			skipped.Inc()
+			log.InfoContext(ctx, "webhook delivery attempt skipped: its lease was no longer held",
+				"delivery", delivery.String())
 		case errors.Is(err, appgovernance.ErrLeaseLost):
 			// Another replica took the delivery while this one waited on
 			// the receiver; its outcome stands, and the receiver
@@ -84,7 +101,7 @@ func WebhookDelivery(d Deliverer, interval time.Duration, log *slog.Logger, reg 
 			var attempts sync.WaitGroup
 			defer attempts.Wait()
 			for ctx.Err() == nil && time.Now().Before(until) {
-				c, err := d.Claim(ctx)
+				c, err := d.Claim(ctx, attemptsAtOnce)
 				if err != nil || len(c.Deliveries) == 0 {
 					return err
 				}

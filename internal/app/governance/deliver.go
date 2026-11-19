@@ -100,11 +100,6 @@ type Opener interface {
 	Open(purpose secret.Purpose, sealed string, binding secret.Binding) ([]byte, error)
 }
 
-// deliveryBatch bounds the deliveries one claim leases. A round claims
-// again once it has attempted them, so it bounds the transaction, not the
-// round.
-const deliveryBatch = 100
-
 // leaseSlack is how far past an attempt's timeout a lease runs, so that no
 // second replica takes a delivery while the first still waits for its
 // answer.
@@ -175,16 +170,22 @@ type Claim struct {
 
 func (h *Deliver) now() time.Time { return h.d.Clock.Now().UTC().Truncate(time.Microsecond) }
 
-// leaseUntil is when a lease taken at now runs out.
-func leaseUntil(now time.Time) time.Time { return now.Add(governance.DeliveryTimeout + leaseSlack) }
+// LeaseFor is how long a lease runs from the claim or the last renewal. A
+// replica claims no more deliveries at once than it can attempt within it,
+// else the leases of those that wait run out, the delivery counts as in
+// flight to no one, and no other replica can take it.
+const LeaseFor = governance.DeliveryTimeout + leaseSlack
 
-// Claim leases a batch of the deliveries due, empty when none is.
-func (h *Deliver) Claim(ctx context.Context) (Claim, error) {
+// leaseUntil is when a lease taken at now runs out.
+func leaseUntil(now time.Time) time.Time { return now.Add(LeaseFor) }
+
+// Claim leases at most limit of the deliveries due, empty when none is.
+func (h *Deliver) Claim(ctx context.Context, limit int) (Claim, error) {
 	c := Claim{Token: id.New[Lease](h.d.IDs)}
 	now := h.now()
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		var err error
-		c.Deliveries, err = h.d.Store.ClaimDeliveries(ctx, c.Token, now, leaseUntil(now), deliveryBatch)
+		c.Deliveries, err = h.d.Store.ClaimDeliveries(ctx, c.Token, now, leaseUntil(now), max(limit, 1))
 		return err
 	})
 	return c, err
