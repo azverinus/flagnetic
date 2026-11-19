@@ -583,8 +583,10 @@ func (h *Deliver) release(ctx context.Context, ref StreamRef, token LeaseToken) 
 }
 
 // fail records a failed attempt and, in the same unit of work, the audit entry
-// of the sink's failing when it begins an episode: it ends once every stream
-// of the sink has delivered since.
+// of the sink's failing when it begins an episode: it ends once no stream of
+// the sink has a failure counted, which a delivery clears and so does setting
+// a batch aside. The next batch the target rejects therefore begins an episode
+// of its own, and each one is told to the project's subscriptions.
 func (h *Deliver) fail(ctx context.Context, ref StreamRef, token LeaseToken, c ClaimedSink, due Due, f sinks.Failure, rejected bool, scope sinks.Scope) (Result, error) {
 	now := h.now()
 	wait := sinks.Backoff(due.Stream.ConsecutiveFailures+1, h.d.Random)
