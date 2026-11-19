@@ -1223,3 +1223,34 @@ func TestASinksStreamsAreNotAttemptedOnTwoReplicasAtOnce(t *testing.T) {
 		}
 	}
 }
+
+// A sink edited while its target is being probed for the enable is probed
+// again, so that the target enabled is the one that was checked.
+func TestASinkEditedWhileItsTargetIsProbedIsProbedAgainBeforeItIsEnabled(t *testing.T) {
+	f := startDelivering(t)
+	release := make(chan struct{})
+	first := testkit.StartReceiver(t, testkit.Reply{Release: release})
+	second := testkit.StartReceiver(t)
+	created, _ := f.create(t, webhook(first, "exposure"))
+	f.srv.AwaitHorizon(t)
+
+	enabled := make(chan *management.EnableSinkResponse, 1)
+	go func() {
+		enabled <- do(f.p.admin.EnableSinkWithResponse(t.Context(), f.p.key, created.Id, management.SinkEnable{}))
+	}()
+	for deadline := time.Now().Add(10 * time.Second); len(first.Calls()) == 0; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the target was never probed")
+		}
+	}
+	f.patch(t, created, management.SinkPatch{Webhook: &management.SinkWebhookInput{Url: ptr(second.URL)}})
+	close(release)
+
+	res := <-enabled
+	if res.JSON200 == nil {
+		t.Fatalf("POST enable = %d: %s", res.StatusCode(), res.Body)
+	}
+	if n := len(second.Calls()); n != 1 {
+		t.Errorf("the edited target was probed %d times, want once before the sink was enabled", n)
+	}
+}

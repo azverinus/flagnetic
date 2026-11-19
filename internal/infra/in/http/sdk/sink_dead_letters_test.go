@@ -509,3 +509,43 @@ func TestSettingAsideTheBatchThatStopsASinkTakesTheProjectBeforeTheSink(t *testi
 		t.Errorf("health = %s, want stopped", s.Health)
 	}
 }
+
+// A dead letter that is settled stays listed for as long as events are kept
+// and is then purged, so that a target that rejects some batches but never
+// enough in a row to stop the sink does not grow the list without bound. A
+// pending one is never purged.
+func TestSettledDeadLettersArePurgedOnceEventsAreNoLongerKept(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t, script(times(5, rejected), []testkit.Reply{{}}, times(5, rejected), []testkit.Reply{{}})...)
+	created, _ := f.enabled(t, small(r, "exposure"))
+	f.post(t, f.exposure("u-1", "true", f.clock.Now()))
+	f.rounds(t, 5)
+	first := f.deadLetters(t, created)
+	if len(first) != 1 {
+		t.Fatalf("dead letters %+v, want one", first)
+	}
+	// Redelivering it settles it; the sink goes on with a second event.
+	f.redeliver(t, created, first[0])
+	f.post(t, f.exposure("u-2", "true", f.clock.Now()))
+	f.rounds(t, 5)
+	if n := len(f.deadLetters(t, created)); n != 2 {
+		t.Fatalf("%d dead letters, want the redelivered one and a pending one", n)
+	}
+
+	// Retention drops the days the rows were received on: the pending letter
+	// expires, the redelivered one is past its time.
+	f.clock.Advance(retention + 26*time.Hour)
+	f.retain(t)
+	left := f.deadLetters(t, created)
+	if len(left) != 1 || left[0].Status != management.SinkDeadLetterStatusExpired {
+		t.Fatalf("dead letters after the drop %+v, want only the one that expired", left)
+	}
+
+	// An expired one stays for one more retention.
+	f.post(t, f.exposure("u-3", "true", f.clock.Now()))
+	f.clock.Advance(retention + 26*time.Hour)
+	f.retain(t)
+	if left = f.deadLetters(t, created); len(left) != 0 {
+		t.Errorf("dead letters after a second retention %+v, want none", left)
+	}
+}

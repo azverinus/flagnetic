@@ -166,6 +166,19 @@ func (s *Store) ExpireDeadLetters(ctx context.Context, kind sinks.EventKind, bef
 	return nil
 }
 
+// PurgeDeadLetters deletes the dead letters of kind that are settled:
+// redelivered before redelivered, or expired and created before expired.
+func (s *Store) PurgeDeadLetters(ctx context.Context, kind sinks.EventKind, redelivered, expired time.Time) error {
+	if _, err := s.db(ctx).Exec(ctx, `
+		DELETE FROM sink_dead_letters
+		WHERE event_kind = $1
+		  AND ((status = 'redelivered' AND redelivered_at < $2) OR (status = 'expired' AND created_at < $3))`,
+		string(kind), redelivered, expired); err != nil {
+		return fmt.Errorf("purging dead letters: %w", err)
+	}
+	return nil
+}
+
 const gapColumns = `g.id, g.sink_id, g.event_type, g.rows, g.period_start, g.period_end, g.dropped_at, g.dismissed_at`
 
 func scanGap(row pgx.Row) (sinks.Gap, error) {

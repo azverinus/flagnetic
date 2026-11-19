@@ -87,7 +87,7 @@ A transient failure is retried with the same batch under the same delivery ID, a
 A **dead letter** records a batch set aside after its rejections ran out: the event kind, the cursor range, the environments filter, the attempts and the last failure, never the rows, which stay in PostgreSQL until retention drops them. The stream goes on with the next batch.
 
 - `GET …/sinks/{sink}/dead-letters` lists them. `POST …/dead-letters/{deadLetter}/redeliver` reads the range again and sends it inside the request, under a delivery ID of its own for each attempt; the dead letter becomes `redelivered` only when the target acknowledges, so a failed redelivery leaves it pending and can be repeated. It is refused `422 rows_expired` when retention has dropped every row of it. `DELETE …/dead-letters/{deadLetter}` discards it.
-- A pending dead letter none of whose rows is stored any more is marked `expired` by retention.
+- A pending dead letter none of whose rows is stored any more is marked `expired` by retention. A `redelivered` dead letter stays listed for `FLAGNETIC_EVENTS_RETENTION_DAYS` after its redelivery and an `expired` one for as long again; then retention deletes it. A pending one is never deleted.
 - After `FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS` dead letters in a row on one stream (a batch the target acknowledges ends the run) the sink **stops**: a target that keeps refusing is not fed the rest of the event store. Nothing is sent, no cursor moves, and the project's subscriptions are told `sink.stopped`. Find out why from the last failure, fix the target or the configuration, and `POST …/sinks/{sink}/resume`. Resuming does not redeliver dead letters; do that yourself.
 
 ## Replay

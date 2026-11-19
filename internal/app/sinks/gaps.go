@@ -40,6 +40,10 @@ type GapStore interface {
 	// ExpireDeadLetters expires the pending dead letters of kind none of
 	// whose rows is stored at or after before.
 	ExpireDeadLetters(ctx context.Context, kind sinks.EventKind, before time.Time) error
+	// PurgeDeadLetters deletes the dead letters of kind that are settled:
+	// redelivered before redelivered, or expired and created before expired.
+	// A pending one is never deleted.
+	PurgeDeadLetters(ctx context.Context, kind sinks.EventKind, redelivered, expired time.Time) error
 	// Gaps returns sink's gaps, the oldest first.
 	Gaps(ctx context.Context, sink sinks.ID) ([]sinks.Gap, error)
 	// Dismiss marks sink's gap dismissed at now, keeping the first time of
@@ -66,6 +70,9 @@ type RetentionDeps struct {
 	Rows  GapRows
 	Audit AuditLog
 	IDs   *id.Source
+	// Retention is how long raw events are kept, which settled dead letters
+	// stay listed for as well.
+	Retention time.Duration
 }
 
 // Retention is the sinks' side of retention dropping a partition: the events
@@ -109,6 +116,14 @@ func (r *Retention) RecordGaps(ctx context.Context, typ events.EventType, days [
 	}
 	end := slices.MaxFunc(days, time.Time.Compare).AddDate(0, 0, 1)
 	if err = r.d.Store.ExpireDeadLetters(ctx, kind, end); err != nil {
+		return nil, err
+	}
+	// A dead letter settled stays listed for as long as events are kept, so
+	// that what became of it can be read, and then goes: a target that rejects
+	// some batches but never enough in a row to stop would otherwise grow the
+	// list without bound. A letter expires about one retention after it was
+	// set aside, when its rows go, so it stays one more.
+	if err = r.d.Store.PurgeDeadLetters(ctx, kind, now.Add(-r.d.Retention), now.Add(-2*r.d.Retention)); err != nil {
 		return nil, err
 	}
 	return recorded, nil

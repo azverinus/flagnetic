@@ -362,6 +362,14 @@ func (s *Store) Create(ctx context.Context, v sinks.Sink) error {
 	return nil
 }
 
+// nullIfEmpty is s as a nullable column's value: NULL when it is empty.
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
 func nonNil(s []string) []string {
 	if s == nil {
 		return []string{}
@@ -370,8 +378,9 @@ func nonNil(s []string) []string {
 }
 
 // Update stores what an edit changes of v, which its caller read under the
-// project's lock, and the warnings of its last check. Its creator and its
-// webhook secret overlap are left to the operations that change them.
+// project's lock, and the warnings of its last check. Both sealed secrets are
+// stored, since a write rebinds them to the row. Its creator and its webhook
+// secret overlap's end are left to the operations that change them.
 func (s *Store) Update(ctx context.Context, v sinks.Sink) error {
 	config, err := encodeConfig(v.Kind, v.Config)
 	if err != nil {
@@ -380,10 +389,12 @@ func (s *Store) Update(ctx context.Context, v sinks.Sink) error {
 	_, err = s.db(ctx).Exec(ctx, `
 		UPDATE sinks
 		SET name = $3, config = $4, secret_sealed = $5, event_kinds = $6, environments = $7, batch_size = $8,
-		    flush_interval_seconds = $9, enabled = $10, warnings = $11, updated_at = $12, version = $13
+		    flush_interval_seconds = $9, enabled = $10, warnings = $11, updated_at = $12, version = $13,
+		    previous_secret_sealed = $14
 		WHERE project_id = $1 AND id = $2`,
 		v.Project.Bytes(), v.ID.Bytes(), v.Name, config, v.SealedSecret, kindNames(v.EventKinds), nonNil(v.Environments),
-		v.BatchSize, int(v.FlushInterval/time.Second), v.Enabled, nonNil(v.Warnings), v.UpdatedAt, v.Version)
+		v.BatchSize, int(v.FlushInterval/time.Second), v.Enabled, nonNil(v.Warnings), v.UpdatedAt, v.Version,
+		nullIfEmpty(v.PreviousSealedSecret))
 	if err != nil {
 		return fmt.Errorf("updating a sink: %w", err)
 	}
