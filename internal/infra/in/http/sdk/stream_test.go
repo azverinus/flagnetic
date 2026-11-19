@@ -594,3 +594,52 @@ func TestAStreamOnAReplicaWhoseListenerIsDownLearnsAVersionWithinAHeartbeat(t *t
 		t.Errorf("materializations on b = %v, want 1 for the environment, not one per stream", got)
 	}
 }
+
+func TestAStreamOnAReplicaWhoseListenerIsDownLoadsNothingOfItsOwnAfterAReloadFails(t *testing.T) {
+	c := fakeClock()
+	deaf := &pglisten.Fault{}
+	load := &pgdelivery.RulesetLoadFault{}
+	a := testkit.StartServer(t)
+	b := testkit.StartServer(t, testkit.WithClock(c), testkit.WithRulesetLoadFault(load), testkit.WithListenerOptions(testkit.SilenceableListener(deaf)))
+	p := newProject(t, a)
+	p.flag(t, "checkout.new-flow")
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	streams := make([]*stream, 10)
+	for i := range streams {
+		streams[i] = openStream(t, b, nil, bearer(value))
+		streams[i].started(t)
+		streams[i].next(t) // the current version
+	}
+
+	// The reload a heartbeat wakes while the listener is down fails, and so
+	// does its retry.
+	deafen(t, b, deaf)
+	load.Fail()
+	t.Cleanup(load.Release)
+	c.Advance(15 * time.Second)
+	for _, s := range streams {
+		heartbeat(t, s.next(t))
+	}
+	if !eventually(5*time.Second, func() bool { return load.Failed() >= 2 }) {
+		t.Fatal("the reload woken by a heartbeat was not tried twice")
+	}
+	load.Release()
+
+	p.switchOn(t, "checkout.new-flow", "production")
+	want := currentVersion(t, a, value)
+	before := testkit.Metric(t, b.Scrape(t), materializations)
+	c.Advance(15 * time.Second)
+	for _, s := range streams {
+		f := s.next(t)
+		for f["event"] != "ruleset" {
+			heartbeat(t, f)
+			f = s.next(t)
+		}
+		version(t, f, want)
+	}
+	// The next reload finds the version for every stream; no heartbeat
+	// loads it on its own.
+	if got := testkit.Metric(t, b.Scrape(t), materializations) - before; got != 1 {
+		t.Errorf("materializations on b = %v, want 1 for the environment, not one per stream", got)
+	}
+}

@@ -135,8 +135,9 @@ func (s *RulesetStream) Received(payload string) {
 }
 
 // Latest returns the newest version of environment heard of while it has
-// streams, or above every version while its last reload failed, since the
-// version that reload was looking for may be known nowhere else. While the
+// streams, or above every version while its last reload failed and the
+// listener listens, since the version that reload was looking for may be
+// known nowhere else. While the
 // listener is down it also wakes the environment's fan-out when it has not
 // reloaded for deafReload: no notification would tell of a version another
 // replica committed, and the fan-out offers what it loads to every stream,
@@ -151,7 +152,11 @@ func (s *RulesetStream) Latest(environment workspace.EnvironmentID) int64 {
 	switch {
 	case !ok:
 		return 0
-	case t.unsure:
+	// While the listener is down the reload above looks for the version a
+	// failed reload missed, once per deafReload for every stream: answering
+	// above every version would have each stream's heartbeat load it on its
+	// own instead.
+	case t.unsure && s.up:
 		return math.MaxInt64
 	default:
 		return t.latest
