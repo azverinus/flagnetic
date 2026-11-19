@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"log/slog"
 	"net/netip"
 	"strings"
 	"sync"
@@ -14,10 +15,13 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
+	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -134,6 +138,17 @@ func TestEverySlotHeldAnswersBusyAndRefusedAttemptsTakeNoSlot(t *testing.T) {
 		return codeOf(err), time.Since(start)
 	}
 
+	// An email locked and a source throttled by failures counted while the
+	// slots were free, as an attacker's would be.
+	locked := "nobody-" + m.Email
+	for range 5 {
+		attempt(locked, "not-the-password-9", from)
+	}
+	throttled := anAddress()
+	for i := range access.SourceFailureLimit {
+		attempt("spray-"+string(rune('a'+i%26))+m.Email, "not-the-password-9", throttled)
+	}
+
 	// The test holds every slot, as hashes running for other sign-ins would.
 	if err := slots.Acquire(t.Context(), 2); err != nil {
 		t.Fatal(err)
@@ -143,19 +158,13 @@ func TestEverySlotHeldAnswersBusyAndRefusedAttemptsTakeNoSlot(t *testing.T) {
 			t.Fatalf("with every slot held: %s after %v, want busy after the wait", code, took)
 		}
 	}
-	if code, took := attempt(m.Email, strings.Repeat("x", 129), from); code != "invalid_credentials" || took >= wait {
-		t.Errorf("an oversized password with every slot held: %s after %v, want invalid_credentials at once", code, took)
-	}
-	locked := "nobody-" + m.Email
-	for range 5 {
-		attempt(locked, strings.Repeat("x", 129), from)
+	// An oversized password is verified as a placeholder, so it takes a slot
+	// as any other does, and is as slow to refuse.
+	if code, took := attempt(m.Email, strings.Repeat("x", 129), from); code != "busy" || took < wait {
+		t.Errorf("an oversized password with every slot held: %s after %v, want busy after the wait", code, took)
 	}
 	if code, took := attempt(locked, "not-the-password-9", from); code != "locked" || took >= wait {
 		t.Errorf("a locked email with every slot held: %s after %v, want locked at once", code, took)
-	}
-	throttled := anAddress()
-	for i := range access.SourceFailureLimit {
-		attempt("spray-"+string(rune('a'+i%26))+m.Email, strings.Repeat("x", 129), throttled)
 	}
 	if code, took := attempt(m.Email, m.Password, throttled); code != "rate_limited" || took >= wait {
 		t.Errorf("a throttled source with every slot held: %s after %v, want rate_limited at once", code, took)
@@ -302,5 +311,103 @@ func TestAPasswordChangedAfterItWasVerifiedOpensNoSession(t *testing.T) {
 	}
 	if _, err := h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New(changed), ClientIP: from}); err != nil {
 		t.Errorf("the new password after the change: %v, want signed in: the rehash of the old password never replaced it", err)
+	}
+}
+
+func TestEverySignInFailureVerifiesOnePasswordWhoseEmailAndLengthItDoesNotShow(t *testing.T) {
+	v := &countingVerifier{Hasher: password.NewHasher(password.DefaultParams)}
+	h := newSignIn(t, v)
+	m := testkit.NewMember(t, testkit.Pool(t))
+	cases := map[string]appaccess.SignInCommand{
+		"an unknown email":                  {Email: "nobody-" + m.Email, Password: secret.New("not-the-password-9")},
+		"a known member's wrong password":   {Email: m.Email, Password: secret.New("not-the-password-9")},
+		"a known member's 129 characters":   {Email: m.Email, Password: secret.New(strings.Repeat("x", access.MaxPasswordLength+1))},
+		"an unknown email's 129 characters": {Email: "nobody-" + m.Email, Password: secret.New(strings.Repeat("x", access.MaxPasswordLength+1))},
+	}
+	for name, cmd := range cases {
+		cmd.ClientIP = anAddress()
+		v.verified.Store(0)
+		if _, err := h.Handle(t.Context(), cmd); codeOf(err) != "invalid_credentials" {
+			t.Errorf("%s: %v, want invalid_credentials", name, err)
+		}
+		if n := v.verified.Load(); n != 1 {
+			t.Errorf("%s: %d verifications, want 1", name, n)
+		}
+	}
+}
+
+func TestAnOverLongPasswordOpensNoSessionForAMemberWhosePasswordIsThePlaceholder(t *testing.T) {
+	// The placeholder an over-long password is verified as is the longest a
+	// password may be: it must open no session for a member whose password
+	// that is.
+	pool := testkit.Pool(t)
+	placeholder := strings.Repeat("x", access.MaxPasswordLength)
+	testkit.RecordSecret(placeholder)
+	hash, err := password.NewHasher(password.DefaultParams).Hash(t.Context(), secret.New(placeholder))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testkit.NewMember(t, pool)
+	if err = pgaccess.NewStore(pool).SetPasswordHash(t.Context(), m.ID, hash, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	h := newSignIn(t, password.NewHasher(password.DefaultParams))
+	_, err = h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New(placeholder + "y"), ClientIP: anAddress()})
+	if codeOf(err) != "invalid_credentials" {
+		t.Errorf("a password one character past the placeholder: %v, want invalid_credentials", err)
+	}
+	if _, err = h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New(placeholder), ClientIP: anAddress()}); err != nil {
+		t.Errorf("the member's own password of the longest length: %v, want it signed in", err)
+	}
+}
+
+// failuresOf returns the auth.sign_in_failed entries of member.
+func failuresOf(t *testing.T, m testkit.Member) []governance.Entry {
+	t.Helper()
+	entries, err := pggovernance.NewAuditLog(testkit.Pool(t)).Entries(t.Context(),
+		appgovernance.AuditFilter{Action: "auth.sign_in_failed", EntityID: m.ID.String()}, governance.EntryID{}, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return entries
+}
+
+func TestAFailedSignInIsRecordedAfterItsAnswerOrBeforeItWhenTheBackgroundIsFull(t *testing.T) {
+	pool := testkit.Pool(t)
+	c := clock.System{}
+	bg := appaccess.NewBackground(slog.New(slog.DiscardHandler), appaccess.WithBackgroundLimit(1))
+	h := appaccess.NewSignIn(appaccess.SignInDeps{
+		Tx: postgres.NewTransactor(pool), Store: pgaccess.NewStore(pool), Settings: pgaccess.NewStore(pool),
+		Hasher: password.NewHasher(password.DefaultParams), Audit: testkit.Record(pool), Clock: c, IDs: id.NewSource(c),
+		Random: rand.Reader, Key: bytes.Repeat([]byte{1}, 32), Background: bg,
+	})
+	wrong := func(m testkit.Member) {
+		t.Helper()
+		_, err := h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New("not-the-password-9"), ClientIP: anAddress()})
+		if codeOf(err) != "invalid_credentials" {
+			t.Fatalf("a wrong password: %v, want invalid_credentials", err)
+		}
+	}
+
+	afterAnswer := testkit.NewMember(t, pool)
+	wrong(afterAnswer)
+	bg.Wait(t.Context())
+	if n := len(failuresOf(t, afterAnswer)); n != 1 {
+		t.Errorf("%d failures recorded once the background work ended, want 1", n)
+	}
+
+	// Other work holds the only room, so the record is written before the
+	// answer instead of being dropped.
+	release := make(chan struct{})
+	if !bg.Go(t.Context(), "holding", time.Minute, func(context.Context) { <-release }) {
+		t.Fatal("the background refused the work holding it")
+	}
+	full := testkit.NewMember(t, pool)
+	wrong(full)
+	got := len(failuresOf(t, full))
+	close(release)
+	bg.Wait(t.Context())
+	if got != 1 {
+		t.Errorf("%d failures recorded when the answer came with the background full, want 1", got)
 	}
 }

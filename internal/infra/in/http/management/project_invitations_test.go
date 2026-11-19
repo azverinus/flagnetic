@@ -734,3 +734,24 @@ func TestAProjectListsTheMembersInvitedToItWithTheRoleTheirInvitationGrants(t *t
 	owner.ClientWithResponses = signedIn(t, srv, testkit.Member{ID: owner.ID, Email: owner.Email, Password: owner.Password}).ClientWithResponses
 	check("once the links expired")
 }
+
+func TestCorrectingAnInvitedMembersEmailKeepsWhatTheirReissuedInvitationGrants(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.InstanceAdminSession(t, srv)
+	p := createProject(t, admin, projectKey())
+	owner := memberIn(t, srv, p, access.RoleOwner)
+	mi, _ := inviteTo(t, owner.ClientWithResponses, p.Key, "developer")
+
+	corrected := newEmail()
+	if res := do(admin.UpdateMemberWithResponse(t.Context(), mi.Member.Id.String(), management.MemberPatch{Email: ptr(corrected)})); res.JSON200 == nil {
+		t.Fatalf("correcting the email = %d: %s", res.StatusCode(), res.Body)
+	}
+	wantGone(t, srv, *mi.Invitation.Url, "the link made for the old address")
+
+	link := reissue(t, admin, mi.Member)
+	acceptedBy(t, srv, link)
+	grants := grantsOf(t, admin, p.Key, corrected)
+	if len(grants) != 1 || grants[0].Role != "developer" || grants[0].CreatedBy == nil || *grants[0].CreatedBy != owner.ID.Bytes() {
+		t.Errorf("grants = %+v, want the developer grant of the owner who invited, carried over the correction of the address", grants)
+	}
+}

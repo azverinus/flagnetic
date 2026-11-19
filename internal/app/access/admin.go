@@ -138,7 +138,7 @@ func NewPromoteMember(tx Transactor, store PromoteStore, audit AuditLog, c clock
 
 // Handle makes the member with email an instance admin and reports whether
 // they were not one already; promoting an instance admin changes and
-// records nothing.
+// records nothing. Only an active member can be promoted.
 func (h *PromoteMember) Handle(ctx context.Context, email string, req governance.Request) (bool, error) {
 	promoted := false
 	err := h.tx.Within(ctx, func(ctx context.Context) error {
@@ -146,8 +146,20 @@ func (h *PromoteMember) Handle(ctx context.Context, email string, req governance
 		if errors.Is(err, ErrNotFound) {
 			return ErrNoMemberWithEmail
 		}
-		if err != nil || m.InstanceAdmin {
+		if err != nil {
 			return err
+		}
+		// An invited member's link is held by whoever issued it, and a
+		// deactivated one becomes admin the moment anyone reactivates them,
+		// as the API refuses both.
+		switch m.Status {
+		case access.MemberInvited:
+			return access.ErrMemberInvited
+		case access.MemberDeactivated:
+			return access.ErrMemberDeactivated
+		}
+		if m.InstanceAdmin {
+			return nil
 		}
 		now := h.clock.Now()
 		entry, err := governance.NewEntry(id.New[governance.Entry](h.ids), now, req, governance.Record{

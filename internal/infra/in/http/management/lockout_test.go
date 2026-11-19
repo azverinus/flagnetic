@@ -149,6 +149,32 @@ func TestUnknownEmailAndWrongPasswordTakeComparableTimeUnderLockout(t *testing.T
 	}
 }
 
+func TestUnknownEmailAndKnownMemberTakeComparableTimeForAnOverlongPassword(t *testing.T) {
+	srv := testkit.StartServer(t, trustLoopback())
+	b := fromAddress(t, srv, someAddress())
+	overlong := strings.Repeat("x", 129)
+	const samples = 12
+	var known, unknown []time.Duration
+	for range samples {
+		m := testkit.NewMember(t, testkit.Pool(t))
+		for _, email := range []string{m.Email, "nobody-" + m.Email} {
+			start := time.Now()
+			if status, _, _ := signInAs(t, b, email, overlong); status != 401 {
+				t.Fatalf("status = %d, want 401", status)
+			}
+			if email == m.Email {
+				known = append(known, time.Since(start))
+			} else {
+				unknown = append(unknown, time.Since(start))
+			}
+		}
+	}
+	a, u := median(known), median(unknown)
+	if ratio := float64(max(a, u)) / float64(min(a, u)); ratio > 1.5 {
+		t.Errorf("median overlong password of a known member %v, of an unknown email %v: ratio %.2f, want at most 1.5", a, u, ratio)
+	}
+}
+
 func median(ds []time.Duration) time.Duration {
 	s := slices.Clone(ds)
 	slices.Sort(s)

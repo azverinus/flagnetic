@@ -11,9 +11,24 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/identity"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pgidentity "github.com/azverinus/flagnetic/internal/infra/out/postgres/identity"
+	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
+
+// signInMethodOf is the method of a session opened through a provider of
+// kind. Each kind is named here, so one renamed in the identity context
+// stops this build's tests instead of writing a method the access context
+// does not know.
+func signInMethodOf(kind identity.Kind) access.SignInMethod {
+	switch kind {
+	case identity.KindOIDC:
+		return access.SignInOIDC
+	case identity.KindSAML:
+		return access.SignInSAML
+	}
+	panic("compose: no sign-in method for the auth provider kind " + string(kind)) // kinds are checked when a provider is stored
+}
 
 // ssoMembers lets the identity context reach the members of the access
 // context: the two share no types, so this is where one's are turned into
@@ -56,13 +71,13 @@ func (a ssoMembers) MemberByExternalID(ctx context.Context, provider, externalID
 }
 
 func (a ssoMembers) ProvisionMember(ctx context.Context, email, displayName string, kind identity.Kind, provider, requestID string) (appidentity.MemberRecord, error) {
-	m, err := a.sso.ProvisionMember(ctx, email, displayName, access.SignInMethod(kind), provider, requestID)
+	m, err := a.sso.ProvisionMember(ctx, email, displayName, signInMethodOf(kind), provider, requestID)
 	return recordOf(m), err
 }
 
 func (a ssoMembers) ActivateInvited(ctx context.Context, member identity.MemberID, kind identity.Kind, provider, requestID string) (appidentity.MemberRecord, error) {
 	m, err := a.sso.ActivateInvited(ctx, appaccess.SSOActivation{
-		Member: id.FromBytes[access.Member](member.Bytes()), Method: access.SignInMethod(kind), Provider: provider, RequestID: requestID,
+		Member: id.FromBytes[access.Member](member.Bytes()), Method: signInMethodOf(kind), Provider: provider, RequestID: requestID,
 	})
 	if errors.Is(err, appaccess.ErrNotInvited) {
 		return appidentity.MemberRecord{}, identity.ErrMemberNotFound
@@ -70,10 +85,22 @@ func (a ssoMembers) ActivateInvited(ctx context.Context, member identity.MemberI
 	return recordOf(m), err
 }
 
+func (a ssoMembers) HoldAuthSettings(ctx context.Context) error {
+	return a.sso.HoldAuthSettings(ctx)
+}
+
 func (a ssoMembers) OpenSession(ctx context.Context, s appidentity.SessionRequest) (secret.String, error) {
-	return a.sso.OpenSession(ctx, appaccess.SSOSignIn{
-		Member: memberOf(s.Member), Method: access.SignInMethod(s.Kind), Provider: s.Provider, ClientIP: s.ClientIP, UserAgent: s.UserAgent, RequestID: s.RequestID,
+	cookie, err := a.sso.OpenSession(ctx, appaccess.SSOSignIn{
+		Member: memberOf(s.Member), Method: signInMethodOf(s.Kind), Provider: s.Provider, ClientIP: s.ClientIP, UserAgent: s.UserAgent, RequestID: s.RequestID,
 	})
+	// A domain enforced to another provider while the sign-in was under way
+	// is refused as one enforced when it began.
+	if e, ok := apperrors.From(err); ok && e.Code == "sso_required" {
+		if provider, _ := e.Extensions["provider"].(string); provider != "" {
+			return secret.String{}, appidentity.RequireSSO(provider)
+		}
+	}
+	return cookie, err
 }
 
 func (a ssoMembers) LockInstanceAdmins(ctx context.Context) error {
@@ -85,7 +112,7 @@ func (a ssoMembers) RevokeProviderSessions(ctx context.Context, member identity.
 }
 
 func (a ssoMembers) RecordFailedSignIn(ctx context.Context, member appidentity.MemberRecord, kind identity.Kind, provider, reason, requestID string) error {
-	return a.sso.RecordFailedSignIn(ctx, memberOf(member), access.SignInMethod(kind), provider, reason, requestID)
+	return a.sso.RecordFailedSignIn(ctx, memberOf(member), signInMethodOf(kind), provider, reason, requestID)
 }
 
 func (a ssoMembers) LockMember(ctx context.Context, member identity.MemberID) (appidentity.MemberRecord, bool, error) {

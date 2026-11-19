@@ -28,7 +28,7 @@ type InviteToProjectStore interface {
 }
 
 // errEmailHeld refuses inviting to a project someone the instance holds
-// already: one person has one account, and holding one they are granted a
+// already: one person is one member, and being one they are granted a
 // role in the project instead.
 var errEmailHeld = apperrors.Conflict("already_exists",
 	"a member with this email already exists; grant them a role in the project instead")

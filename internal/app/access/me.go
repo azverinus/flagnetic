@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"errors"
 	"net/netip"
 	"time"
 
@@ -81,6 +82,9 @@ func localeOrNil(locale string) any {
 // PasswordChangeStore is what changing one's password needs.
 type PasswordChangeStore interface {
 	passwordStore
+	// LockMemberPassword returns member with their password hash ("" for
+	// none), locked until the unit of work ends; ErrNotFound when none.
+	LockMemberPassword(ctx context.Context, member access.MemberID) (access.Member, string, error)
 	SetPasswordHash(ctx context.Context, member access.MemberID, hash string, at time.Time) error
 	MemberSessions(ctx context.Context, member access.MemberID) ([]access.Session, error)
 	RevokeSessions(ctx context.Context, sessions []access.SessionID, at time.Time) ([]access.SessionID, error)
@@ -161,7 +165,7 @@ func (h *ChangeMyPassword) Handle(ctx context.Context, cmd ChangeMyPasswordComma
 	if !a.right() {
 		return h.wrong(ctx, cmd, member, a.reserved)
 	}
-	if err := h.change(ctx, cmd, member, a.reserved, settings); err != nil {
+	if err := h.change(ctx, cmd, a, settings); err != nil {
 		// The current password proved right, so whatever failed after was
 		// no wrong guess.
 		return releaseAttempt(ctx, h.d.Tx, h.d.Store, a.reserved, err)
@@ -172,15 +176,15 @@ func (h *ChangeMyPassword) Handle(ctx context.Context, cmd ChangeMyPasswordComma
 // change hashes the new password and stores it, revoking the caller's other
 // sessions and consuming their invitations and password resets, in one unit
 // of work that also takes back the failure reserved.
-func (h *ChangeMyPassword) change(ctx context.Context, cmd ChangeMyPasswordCommand, member access.Member,
-	reserved access.Reservation, settings access.AuthSettings,
+func (h *ChangeMyPassword) change(ctx context.Context, cmd ChangeMyPasswordCommand, a passwordAttempt,
+	settings access.AuthSettings,
 ) error {
 	hash, err := h.d.Hasher.Hash(ctx, cmd.NewPassword)
 	if err != nil {
 		return err
 	}
 	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		return h.apply(ctx, cmd, member, reserved, settings, hash)
+		return h.apply(ctx, cmd, a, settings, hash)
 	})
 }
 
@@ -188,25 +192,49 @@ func (h *ChangeMyPassword) change(ctx context.Context, cmd ChangeMyPasswordComma
 // sessions, consumes their invitations and password resets, takes back the
 // failure reserved and records password.changed with how many sessions it
 // revoked, in the unit of work ctx carries.
-func (h *ChangeMyPassword) apply(ctx context.Context, cmd ChangeMyPasswordCommand, member access.Member,
-	reserved access.Reservation, settings access.AuthSettings, hash string,
+//
+// The current password was verified outside any unit of work, so a password
+// reset, another change or a deactivation may have committed since: the
+// member is locked and read again, and a password no longer the one
+// verified, or a member no longer active, refuses the change as a wrong
+// current password, and a session of the caller's that ended meanwhile
+// refuses it session_expired. Otherwise the stale change would write over
+// the password a reset just set and revoke the session the reset opened.
+func (h *ChangeMyPassword) apply(ctx context.Context, cmd ChangeMyPasswordCommand, a passwordAttempt,
+	settings access.AuthSettings, hash string,
 ) error {
 	now := h.d.Clock.Now()
-	if err := h.d.Store.ClearAttempt(ctx, reserved); err != nil {
+	member, stored, err := h.d.Store.LockMemberPassword(ctx, a.member.ID)
+	if errors.Is(err, ErrNotFound) {
+		return ErrWrongCurrentPassword
+	}
+	if err != nil {
 		return err
 	}
-	if err := h.d.Store.SetPasswordHash(ctx, member.ID, hash, now); err != nil {
-		return err
+	if stored != a.hash || member.Status != access.MemberActive {
+		return ErrWrongCurrentPassword
 	}
 	sessions, err := h.d.Store.MemberSessions(ctx, member.ID)
 	if err != nil {
 		return err
 	}
 	var others, revoked []access.SessionID
+	var callerLive bool
 	for _, s := range access.LiveSessions(sessions, member, now, settings.SessionTimeouts()) {
-		if s.ID != cmd.Caller.Session.ID {
+		if s.ID == cmd.Caller.Session.ID {
+			callerLive = true
+		} else {
 			others = append(others, s.ID)
 		}
+	}
+	if !callerLive {
+		return access.ErrSessionExpired
+	}
+	if err = h.d.Store.ClearAttempt(ctx, a.reserved); err != nil {
+		return err
+	}
+	if err = h.d.Store.SetPasswordHash(ctx, member.ID, hash, now); err != nil {
+		return err
 	}
 	if len(others) > 0 {
 		if revoked, err = h.d.Store.RevokeSessions(ctx, others, now); err != nil {

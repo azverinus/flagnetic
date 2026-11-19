@@ -18,8 +18,12 @@ One running process of an instance. Every replica of an instance is the same: it
 _Avoid_: node, pod, server, leader
 
 **Worker**:
-Background work every replica runs in rounds, one round every interval, until the replica stops. A round that fails or panics is counted and the next round still runs; what keeps two replicas from doing one piece of work twice is the work's own locking in PostgreSQL, never the worker.
+Work every replica runs in rounds, one round every interval, until the replica stops. A round that fails or panics is counted and the next round still runs; what keeps two replicas from doing one piece of work twice is the work's own locking in PostgreSQL, never the worker.
 _Avoid_: job, cron, daemon, background task
+
+**Background work**:
+What a request starts and finishes after it has answered: a mail, a password reset request's lookup and the record of a failed sign-in. It runs on the replica that took the request, never in rounds, at most 256 pieces at once; one started past that is dropped, logged and counted, and a replica stopping waits for it. What a request must not be felt to wait for goes here; what runs on a schedule is a worker.
+_Avoid_: job, task
 
 **Drain**:
 The window after a replica is told to stop in which it reports itself not ready, so that load balancers stop routing to it, while it still serves every request that reaches it except a new ruleset stream, which it refuses so that the SDK connects to a replica that stays. After the drain the replica stops accepting requests and shuts down.
