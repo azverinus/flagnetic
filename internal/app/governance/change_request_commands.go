@@ -69,7 +69,7 @@ func (h *CreateChangeRequest) Handle(ctx context.Context, cmd CreateChangeReques
 		if err := h.d.lockProject(ctx, cmd.Project); err != nil {
 			return err
 		}
-		cr, err := propose(ctx, h.d, cmd.Project, cmd.Target, cmd.Proposed, cmd.RevertTo, governance.Proposal{
+		cr, err := propose(ctx, h.d, cmd.Project, cmd.Target, cmd.Proposed, cmd.RevertTo, governance.Authored{
 			Title: cmd.Title, Description: cmd.Description,
 		}, cmd.Open, cmd.ApplyAt, cmd.Author, now)
 		if err != nil {
@@ -128,7 +128,7 @@ func (cmd CreateChangeRequestCommand) check() error {
 // project, or reverting t to revertTo unless nil, based on its entity as it
 // is now, to be applied at applyAt unless nil.
 func propose(ctx context.Context, d ChangeRequestDeps, project workspace.ProjectID, t Target, in Proposed, revertTo *int64,
-	p governance.Proposal, open bool, applyAt *time.Time, author governance.Author, now time.Time,
+	p governance.Authored, open bool, applyAt *time.Time, author governance.Author, now time.Time,
 ) (governance.ChangeRequest, error) {
 	var (
 		subject  governance.Subject
@@ -145,7 +145,7 @@ func propose(ctx context.Context, d ChangeRequestDeps, project workspace.Project
 	}
 	p.Proposed = proposed
 	return governance.NewChangeRequest(governance.NewChangeRequestInput{
-		ID: id.New[governance.ChangeRequest](d.IDs), Project: project, Subject: subject, Proposal: p, RevertTo: revertTo,
+		ID: id.New[governance.ChangeRequest](d.IDs), Project: project, Subject: subject, Authored: p, RevertTo: revertTo,
 		Open: open, Author: author, ApplyAt: applyAt, MinLead: d.MinLead, Now: now,
 	})
 }
@@ -230,6 +230,9 @@ func (h *RebaseChangeRequest) Handle(ctx context.Context, cmd ChangeRequestComma
 				}
 				return cr.RebaseRevert(cmd.By, subject, proposed, now)
 			}
+			if err := h.d.recheck(ctx, cr); err != nil {
+				return cr, false, err
+			}
 			subject, err := h.d.current(ctx, cr)
 			if err != nil {
 				return cr, false, err
@@ -258,7 +261,15 @@ func (h *OpenChangeRequest) Handle(ctx context.Context, cmd ChangeRequestCommand
 				return cr, false, err
 			}
 			opened, err := cr.Open(cmd.By, governance.Current{Version: subject.BaseVersion, Holders: subject.BaseHolders}, now)
-			return opened, err == nil, err
+			if err != nil {
+				return opened, false, err
+			}
+			// Judged after the base: a moved base is rebased first, and the
+			// proposal checked against what it is rebased onto.
+			if err = h.d.recheck(ctx, cr); err != nil {
+				return cr, false, err
+			}
+			return opened, true, nil
 		})
 }
 
@@ -324,7 +335,7 @@ func (h *CopyChangeRequest) Handle(ctx context.Context, cmd CopyChangeRequestCom
 				return err
 			}
 		}
-		cr, err := propose(ctx, h.d, cmd.Project, TargetOf(source), in, source.RevertTo, governance.Proposal{
+		cr, err := propose(ctx, h.d, cmd.Project, TargetOf(source), in, source.RevertTo, governance.Authored{
 			Title: source.Title, Description: source.Description,
 		}, false, nil, cmd.Author, now)
 		if err != nil {
@@ -404,7 +415,8 @@ type ChangeRequestFilter struct {
 	// authored.
 	AwaitingDecisionOf *governance.Taker
 	// NotAuthoredBy leaves out the change requests of the member with this
-	// identifier.
+	// identifier and of the project tokens the member created, which they
+	// may not decide either.
 	NotAuthoredBy string
 	// Scheduled, when set, selects the change requests with an apply time
 	// (true) or without one (false).

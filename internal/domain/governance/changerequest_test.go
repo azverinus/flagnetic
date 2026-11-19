@@ -31,7 +31,7 @@ func proposal(t *testing.T) governance.NewChangeRequestInput {
 	t.Helper()
 	return governance.NewChangeRequestInput{
 		Subject:  governance.Subject{Kind: governance.KindFlagConfiguration, Base: doc(t, `{"on":false}`), BaseVersion: 3},
-		Proposal: governance.Proposal{Title: "  Turn the checkout on  ", Description: " For everyone. ", Proposed: doc(t, `{"on":true}`)},
+		Authored: governance.Authored{Title: "  Turn the checkout on  ", Description: " For everyone. ", Proposed: doc(t, `{"on":true}`)},
 		Author:   governance.Author{Member: &ada},
 		Now:      now,
 	}
@@ -58,6 +58,12 @@ func codeOf(err error) string {
 		return e.Code
 	}
 	return ""
+}
+
+// allStates is every state of a change request, in the order of its life.
+var allStates = []governance.ChangeRequestState{
+	governance.StateDraft, governance.StateOpen, governance.StateApproved, governance.StateRejected,
+	governance.StateApplied, governance.StateCancelled, governance.StateSuperseded,
 }
 
 func TestAChangeRequestIsDraftedWithItsDiffAtVersionOne(t *testing.T) {
@@ -115,7 +121,7 @@ func TestTheStateMachine(t *testing.T) {
 		to   governance.ChangeRequestState
 		code string
 	}
-	all := governance.ChangeRequestStates()
+	all := allStates
 	// allowed lists, per transition, the states it is taken from and the
 	// state it leaves ("" for the same state).
 	allowed := map[governance.Transition]struct {

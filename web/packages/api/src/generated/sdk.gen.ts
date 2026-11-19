@@ -3809,7 +3809,7 @@ export const getChangeRequest = <ThrowOnError extends boolean = false>(
  * recomputed from the entity as the change request is based on it; a
  * rebase moves that. `apply_at` sets the apply time, judged
  * from now as on creation, and null removes it. An edit that changes nothing changes
- * nothing and records nothing. The proposal of a revert, which the
+ * nothing and records nothing. What a revert proposes, which the
  * server fills from `revert_to`, is edited by nobody
  * (`invalid_change_request`, `not_allowed` under `/proposed`); its
  * title, description and apply time are.
@@ -3934,7 +3934,7 @@ export const cancelChangeRequest = <ThrowOnError extends boolean = false>(
  *
  * Copies any change request, whatever its state and whoever wrote it,
  * into a new draft of the caller's with the same title, description
- * and proposal, based on the entity as it is now and checked against
+ * and proposed document, based on the entity as it is now and checked against
  * it as a new change request is. A revert's copy keeps its
  * `revert_to` and fills `proposed` from it again.
  *

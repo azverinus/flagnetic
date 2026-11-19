@@ -133,7 +133,7 @@ func TestAnEntryMovesTheWaitingChangeRequestsOnWhatItChanged(t *testing.T) {
 
 func TestOnlyOpenAndApprovedChangeRequestsAreSuperseded(t *testing.T) {
 	var candidates []governance.ChangeRequest
-	for i, s := range governance.ChangeRequestStates() {
+	for i, s := range allStates {
 		candidates = append(candidates, configurationRequest(t, byte(i+1), checkout, production, s))
 	}
 	got := governance.Supersedes(flagEntry("flag.killed", checkout, production), candidates, nil, nil)

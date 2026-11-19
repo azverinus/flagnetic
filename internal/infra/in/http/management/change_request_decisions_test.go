@@ -434,6 +434,21 @@ func TestTheCreatorOfAProjectTokenCannotDecideWhatItProposed(t *testing.T) {
 	if got := getChangeRequest(t, f.admin, key, cr); got.State != management.ChangeRequestStateOpen {
 		t.Errorf("state = %s, want still open", got.State)
 	}
+	// What the creator may not decide is not listed as awaiting them; it is
+	// for the other member.
+	awaiting := func(c *management.ClientWithResponses) bool {
+		res := do(c.ListChangeRequestsWithResponse(t.Context(), key, &management.ListChangeRequestsParams{AwaitingMyDecision: ptr(true)}))
+		if res.JSON200 == nil {
+			t.Fatalf("GET change-requests awaiting = %d: %s", res.StatusCode(), res.Body)
+		}
+		return slices.ContainsFunc(res.JSON200.Items, func(c management.ChangeRequest) bool { return c.Id == cr.Id })
+	}
+	if awaiting(creator.ClientWithResponses) {
+		t.Error("the token's creator is listed what the token proposed as awaiting their decision")
+	}
+	if !awaiting(other.ClientWithResponses) {
+		t.Error("another member who may decide is not listed it as awaiting their decision")
+	}
 	if got := mustApprove(t, other.ClientWithResponses, key, cr); got.State != management.ChangeRequestStateApproved {
 		t.Errorf("state after another member approves = %s, want approved", got.State)
 	}

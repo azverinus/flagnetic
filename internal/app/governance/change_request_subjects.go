@@ -276,6 +276,26 @@ func (d ChangeRequestDeps) propose(ctx context.Context, project workspace.Projec
 	return governance.Subject{}, nil, errNothingProposed
 }
 
+// recheck refuses cr's proposal as writing it now would be refused: a
+// change request is checked against its entity when it is created, and a
+// draft that waited may have stopped being possible to apply since, such as a
+// start of an experiment started directly meanwhile or a configuration
+// naming a variation removed. Refusing it when it is rebased or opened, not
+// at review, is what creating it does.
+func (d ChangeRequestDeps) recheck(ctx context.Context, cr governance.ChangeRequest) error {
+	t := TargetOf(cr)
+	if cr.RevertTo != nil {
+		_, _, err := d.proposeRevert(ctx, cr.Project, t, *cr.RevertTo)
+		return err
+	}
+	in, err := proposedOf(cr)
+	if err != nil {
+		return err
+	}
+	_, _, err = d.propose(ctx, cr.Project, t, in, cr.Proposed)
+	return err
+}
+
 // proposeRevert returns the subject of a change request reverting t, a
 // flag's configuration, to version, based on the configuration as it is
 // now, and the document reverting to it would write: the version whole,

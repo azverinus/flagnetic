@@ -9422,7 +9422,7 @@ type ClientInterface interface {
 	// recomputed from the entity as the change request is based on it; a
 	// rebase moves that. `apply_at` sets the apply time, judged
 	// from now as on creation, and null removes it. An edit that changes nothing changes
-	// nothing and records nothing. The proposal of a revert, which the
+	// nothing and records nothing. What a revert proposes, which the
 	// server fills from `revert_to`, is edited by nobody
 	// (`invalid_change_request`, `not_allowed` under `/proposed`); its
 	// title, description and apply time are.
@@ -9442,7 +9442,7 @@ type ClientInterface interface {
 	// recomputed from the entity as the change request is based on it; a
 	// rebase moves that. `apply_at` sets the apply time, judged
 	// from now as on creation, and null removes it. An edit that changes nothing changes
-	// nothing and records nothing. The proposal of a revert, which the
+	// nothing and records nothing. What a revert proposes, which the
 	// server fills from `revert_to`, is edited by nobody
 	// (`invalid_change_request`, `not_allowed` under `/proposed`); its
 	// title, description and apply time are.
@@ -9520,7 +9520,7 @@ type ClientInterface interface {
 	//
 	// Copies any change request, whatever its state and whoever wrote it,
 	// into a new draft of the caller's with the same title, description
-	// and proposal, based on the entity as it is now and checked against
+	// and proposed document, based on the entity as it is now and checked against
 	// it as a new change request is. A revert's copy keeps its
 	// `revert_to` and fills `proposed` from it again.
 	//
@@ -14658,7 +14658,7 @@ func (c *Client) GetChangeRequest(ctx context.Context, project ProjectKey, chang
 // recomputed from the entity as the change request is based on it; a
 // rebase moves that. `apply_at` sets the apply time, judged
 // from now as on creation, and null removes it. An edit that changes nothing changes
-// nothing and records nothing. The proposal of a revert, which the
+// nothing and records nothing. What a revert proposes, which the
 // server fills from `revert_to`, is edited by nobody
 // (`invalid_change_request`, `not_allowed` under `/proposed`); its
 // title, description and apply time are.
@@ -14688,7 +14688,7 @@ func (c *Client) UpdateChangeRequestWithBody(ctx context.Context, project Projec
 // recomputed from the entity as the change request is based on it; a
 // rebase moves that. `apply_at` sets the apply time, judged
 // from now as on creation, and null removes it. An edit that changes nothing changes
-// nothing and records nothing. The proposal of a revert, which the
+// nothing and records nothing. What a revert proposes, which the
 // server fills from `revert_to`, is edited by nobody
 // (`invalid_change_request`, `not_allowed` under `/proposed`); its
 // title, description and apply time are.
@@ -14816,7 +14816,7 @@ func (c *Client) CancelChangeRequest(ctx context.Context, project ProjectKey, ch
 //
 // Copies any change request, whatever its state and whoever wrote it,
 // into a new draft of the caller's with the same title, description
-// and proposal, based on the entity as it is now and checked against
+// and proposed document, based on the entity as it is now and checked against
 // it as a new change request is. A revert's copy keeps its
 // `revert_to` and fills `proposed` from it again.
 //
@@ -31502,7 +31502,7 @@ type ClientWithResponsesInterface interface {
 	// recomputed from the entity as the change request is based on it; a
 	// rebase moves that. `apply_at` sets the apply time, judged
 	// from now as on creation, and null removes it. An edit that changes nothing changes
-	// nothing and records nothing. The proposal of a revert, which the
+	// nothing and records nothing. What a revert proposes, which the
 	// server fills from `revert_to`, is edited by nobody
 	// (`invalid_change_request`, `not_allowed` under `/proposed`); its
 	// title, description and apply time are.
@@ -31522,7 +31522,7 @@ type ClientWithResponsesInterface interface {
 	// recomputed from the entity as the change request is based on it; a
 	// rebase moves that. `apply_at` sets the apply time, judged
 	// from now as on creation, and null removes it. An edit that changes nothing changes
-	// nothing and records nothing. The proposal of a revert, which the
+	// nothing and records nothing. What a revert proposes, which the
 	// server fills from `revert_to`, is edited by nobody
 	// (`invalid_change_request`, `not_allowed` under `/proposed`); its
 	// title, description and apply time are.
@@ -31604,7 +31604,7 @@ type ClientWithResponsesInterface interface {
 	//
 	// Copies any change request, whatever its state and whoever wrote it,
 	// into a new draft of the caller's with the same title, description
-	// and proposal, based on the entity as it is now and checked against
+	// and proposed document, based on the entity as it is now and checked against
 	// it as a new change request is. A revert's copy keeps its
 	// `revert_to` and fills `proposed` from it again.
 	//
@@ -53296,7 +53296,7 @@ func (c *ClientWithResponses) GetChangeRequestWithResponse(ctx context.Context, 
 // recomputed from the entity as the change request is based on it; a
 // rebase moves that. `apply_at` sets the apply time, judged
 // from now as on creation, and null removes it. An edit that changes nothing changes
-// nothing and records nothing. The proposal of a revert, which the
+// nothing and records nothing. What a revert proposes, which the
 // server fills from `revert_to`, is edited by nobody
 // (`invalid_change_request`, `not_allowed` under `/proposed`); its
 // title, description and apply time are.
@@ -53322,7 +53322,7 @@ func (c *ClientWithResponses) UpdateChangeRequestWithBodyWithResponse(ctx contex
 // recomputed from the entity as the change request is based on it; a
 // rebase moves that. `apply_at` sets the apply time, judged
 // from now as on creation, and null removes it. An edit that changes nothing changes
-// nothing and records nothing. The proposal of a revert, which the
+// nothing and records nothing. What a revert proposes, which the
 // server fills from `revert_to`, is edited by nobody
 // (`invalid_change_request`, `not_allowed` under `/proposed`); its
 // title, description and apply time are.
@@ -53434,7 +53434,7 @@ func (c *ClientWithResponses) CancelChangeRequestWithResponse(ctx context.Contex
 //
 // Copies any change request, whatever its state and whoever wrote it,
 // into a new draft of the caller's with the same title, description
-// and proposal, based on the entity as it is now and checked against
+// and proposed document, based on the entity as it is now and checked against
 // it as a new change request is. A revert's copy keeps its
 // `revert_to` and fills `proposed` from it again.
 //

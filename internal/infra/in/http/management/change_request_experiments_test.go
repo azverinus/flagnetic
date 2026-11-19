@@ -611,3 +611,53 @@ func TestAnExperimentChangeRequestNeedsThePermissionToRunExperiments(t *testing.
 	res2 := do(rulesOnly.ApplyChangeRequestWithResponse(t.Context(), key, approved.Id, &management.ApplyChangeRequestParams{IfMatch: ifMatch(approved.Version)}))
 	assertProblem(t, "applying", res2.StatusCode(), res2.Body, http.StatusForbidden, "forbidden")
 }
+
+// A draft is checked against its experiment when it is rebased or opened, as
+// when it was created: a start proposed for an experiment started directly
+// meanwhile is refused then, not found empty at review and failing at
+// application.
+func TestADraftStartOfAnExperimentStartedMeanwhileIsRefusedAtRebaseAndOpen(t *testing.T) {
+	f := heldInProduction(t)
+	key := f.project.Key
+	body := experimentRequest(startTransition)
+	body.Open = ptr(false)
+	draft := createChangeRequest(t, f.developer.ClientWithResponses, key, body)
+
+	setProtected(t, f.admin, key, "production", false)
+	mustStart(t, f.admin, key, "checkout_v2", f.experiment.Version)
+	setProtected(t, f.admin, key, "production", true)
+
+	rebased := rebaseChangeRequest(t, f.developer.ClientWithResponses, key, draft)
+	assertProblem(t, "rebasing", rebased.StatusCode(), rebased.Body, http.StatusConflict, "not_draft")
+	opened := openChangeRequest(t, f.developer.ClientWithResponses, key, draft)
+	if opened.StatusCode() != http.StatusConflict {
+		t.Errorf("opening = %d %s, want a refusal", opened.StatusCode(), opened.Body)
+	}
+	if got := getChangeRequest(t, f.admin, key, draft); got.State != management.ChangeRequestStateDraft {
+		t.Errorf("state = %s, want still a draft", got.State)
+	}
+}
+
+// The approval covers the environments protected when it was given: an
+// experiment whose rule an environment holds that was protected since is not
+// started by applying the change request, which is superseded instead.
+func TestAnExperimentIsNotStartedOverAHoldingEnvironmentProtectedSinceItsApproval(t *testing.T) {
+	f := heldInProduction(t)
+	key := f.project.Key
+	approved := mustApprove(t, f.maintainer.ClientWithResponses, key,
+		createChangeRequest(t, f.developer.ClientWithResponses, key, experimentRequest(startTransition)))
+	setProtected(t, f.admin, key, "staging", true)
+	versions := rulesetVersions(t, f.project)
+
+	res := applyChangeRequest(t, f.developer.ClientWithResponses, key, approved)
+	assertProblem(t, "applying once staging is protected", res.StatusCode(), res.Body, http.StatusConflict, "base_moved")
+	if got := getChangeRequest(t, f.admin, key, approved); got.State != management.ChangeRequestStateSuperseded {
+		t.Errorf("state = %s, want superseded", got.State)
+	}
+	if got := getExperiment(t, f.admin, key, "checkout_v2"); got.Status != management.ExperimentStatusDraft {
+		t.Errorf("experiment = %s, want still a draft", got.Status)
+	}
+	if moved := bumped(t, "the refusal", versions, rulesetVersions(t, f.project)); len(moved) != 0 {
+		t.Errorf("rulesets moved = %v, want none", moved)
+	}
+}
