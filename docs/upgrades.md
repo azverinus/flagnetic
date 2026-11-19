@@ -17,10 +17,10 @@ The SDK API (`/sdk/v1`) and the ruleset format only grow, so SDKs keep working a
 
 0.x does not promise that two versions serve side by side, so every replica stops for the upgrade and you accept a brief downtime.
 
-1. **Stop every replica.** On Kubernetes, `kubectl scale deployment/flagnetic --replicas=0` before the upgrade: the chart's migration hook runs while the old pods are still up. With Compose, `docker compose stop flagnetic`; under systemd, `systemctl stop flagnetic` on every host.
+1. **Stop every replica.** On Kubernetes, `kubectl scale deployment/flagnetic -n flagnetic --replicas=0` before the upgrade, so that the chart's migration hook finds no old pod running; with `autoscaling.enabled` the autoscaler does nothing at zero replicas, so it holds them there. With Compose, `docker compose stop flagnetic`; under systemd, `systemctl stop flagnetic` on every host.
 2. **Back up the database.** Taken with nothing writing, it holds every change up to the stop, and it is the way back if anything goes wrong; see [Going back](#going-back).
 3. **Migrate.** Run `flagnetic migrate` with the new version, as a job. The chart does it in its hook Job and the Compose file in its `migrate` service. Or leave `FLAGNETIC_AUTO_MIGRATE` on: the first new replica migrates, and replicas starting together take turns.
-4. **Start the new replicas.** `helm upgrade` with the new chart (it sets the replica count back), `docker compose up -d` after setting the new `FLAGNETIC_VERSION` in `.env`, or `systemctl start flagnetic` with the new binary in place.
+4. **Start the new replicas.** `helm upgrade --timeout 20m` with the new chart, which sets the replica count back unless `autoscaling.enabled` is on: then the Deployment has no replica count of its own and the autoscaler does nothing at zero, so scale it yourself once the upgrade has finished, `kubectl scale deployment/flagnetic -n flagnetic --replicas=<autoscaling.minReplicas>`, and the autoscaler takes over from there. With Compose, `docker compose up -d` after setting the new `FLAGNETIC_VERSION` in `.env`, or `systemctl start flagnetic` with the new binary in place.
 
 A replica never runs against a schema older than its own: with auto-migration off it refuses to start until `flagnetic migrate` has run (see [Migrations](operations.md#migrations)).
 
@@ -44,12 +44,12 @@ To go further than one minor, upgrade through each one in turn (1.4, 1.5, then 1
 
 ```bash
 helm upgrade flagnetic oci://ghcr.io/azverinus/charts/flagnetic -n flagnetic \
-  --version <new version> -f values.yaml
+  --version <new version> --timeout 20m -f values.yaml
 ```
 
 Pass your values file again rather than `--reuse-values`, which keeps the old release's defaults for values the new chart adds. [Running on Kubernetes](kubernetes.md#upgrading) has the rest.
 
-The chart's `pre-upgrade` hook Job runs `flagnetic migrate` with the new image before any pod is replaced, while the old pods serve. A failed migration stops the upgrade and leaves the old pods running. The Deployment's rolling update then replaces the pods, and the PodDisruptionBudget keeps at most one of them away from voluntary disruptions: a new pod receives requests when `/readyz` answers, an old one leaves the Service when it starts its [drain](operations.md#stopping) and finishes its in-flight requests within the termination grace period. Keep at least two replicas for this to be free of downtime, which is the chart's default. Settings that choose another migration mode (`migrations.mode`) are in the [chart's README](../deploy/helm/flagnetic/README.md).
+The chart's `pre-upgrade` hook Job runs `flagnetic migrate` with the new image before any pod is replaced, while the old pods serve. A failed migration stops the upgrade and leaves the old pods running. The Deployment's rolling update then replaces the pods one at a time (`maxSurge: 1`, `maxUnavailable: 0`), and the PodDisruptionBudget keeps at most one of them away from voluntary disruptions such as a node drain: a new pod receives requests when `/readyz` answers, an old one leaves the Service when it starts its [drain](operations.md#stopping) and finishes its in-flight requests within the termination grace period. Keep at least two replicas for this to be free of downtime, which is the chart's default. Settings that choose another migration mode (`migrations.mode`) are in the [chart's README](../deploy/helm/flagnetic/README.md).
 
 ### Docker Compose
 

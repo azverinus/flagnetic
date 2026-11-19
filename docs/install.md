@@ -66,10 +66,11 @@ The command talks to `http://localhost:8080`; point it elsewhere with `--url` or
 
 ## On Kubernetes
 
-The Helm chart in [`deploy/helm/flagnetic`](../deploy/helm/flagnetic/README.md) installs Flagnetic against your own PostgreSQL and a Secret that holds `DATABASE_URL` and `FLAGNETIC_SECRET_KEY`; it never generates the key. A hook Job runs `flagnetic migrate` before every install and upgrade, and two replicas roll behind a PodDisruptionBudget and the server's drain.
+The Helm chart in [`deploy/helm/flagnetic`](../deploy/helm/flagnetic/README.md) installs Flagnetic against your own PostgreSQL and a Secret that holds `DATABASE_URL` and `FLAGNETIC_SECRET_KEY`; it never generates the key. A hook Job runs `flagnetic migrate` before every install and upgrade, and two replicas roll one at a time, with a PodDisruptionBudget for node drains and the server's drain for the stopping pod.
 
 ```bash
 helm install flagnetic oci://ghcr.io/azverinus/charts/flagnetic -n flagnetic \
+  --timeout 20m \
   --set secrets.existingSecret=flagnetic \
   --set config.base_url=https://flags.example.com
 ```

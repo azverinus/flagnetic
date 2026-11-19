@@ -41,7 +41,8 @@ migrations:
   # before it serves. auto: the server migrates when it starts.
   mode: hook
   # The server waits up to five minutes for the migration lock, so the Job's
-  # deadline lies above it.
+  # deadline lies above it. `helm install` and `helm upgrade` wait for the Job
+  # within --timeout, five minutes unless set: pass one above this.
   activeDeadlineSeconds: 900
   resources: {}
 
@@ -57,14 +58,20 @@ terminationGracePeriodSeconds: 30
 
 probes:
   # A cold start waits for PostgreSQL and the schema check.
+  # The timeouts of startup and readiness lie above the two seconds /readyz
+  # waits for PostgreSQL, which under load includes waiting for a pooled
+  # connection: a probe that gave up sooner would empty the Service.
   startup:
     periodSeconds: 2
+    timeoutSeconds: 3
     failureThreshold: 60
   readiness:
     periodSeconds: 5
+    timeoutSeconds: 3
     failureThreshold: 3
   liveness:
     periodSeconds: 10
+    timeoutSeconds: 1
     failureThreshold: 3
 
 resources:
@@ -158,7 +165,8 @@ autoscaling:
   targetCPUUtilizationPercentage: 70
 
 # Restricts the server's pods. The migration Job and the helm test Pod are
-# not selected. Needs a network plugin that enforces NetworkPolicy.
+# not selected; where http.from is set, the test Pod is admitted by its label.
+# Needs a network plugin that enforces NetworkPolicy.
 networkPolicy:
   enabled: false
   ingress:
@@ -203,4 +211,6 @@ test:
   image:
     repository: busybox
     tag: "1.37.0"
+    # Pins the tag to one image; empty uses the tag alone.
+    digest: "sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec"
   resources: {}

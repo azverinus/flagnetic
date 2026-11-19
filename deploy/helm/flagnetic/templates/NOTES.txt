@@ -15,3 +15,16 @@ Check the installation with: helm test {{ .Release.Name }} -n {{ .Release.Namesp
 
 The secret key and the database URL are in a Secret rendered from your values. Keep the secret key for the life of the instance: the server refuses to start under another one. An existing Secret (secrets.existingSecret) keeps them out of your values.
 {{- end }}
+
+{{- if or .Values.ingress.enabled .Values.httpRoute.enabled }}
+{{- if not .Values.config.trusted_proxies }}
+
+Traffic arrives through a proxy, and config.trusted_proxies is not set: the server then ignores X-Forwarded-For and sees every request as coming from the proxy, so all clients share one rate-limit budget and the audit log records the proxy's address. Set config.trusted_proxies to the Ingress controller's pod range or the Gateway's addresses. With a Service of type LoadBalancer or NodePort in front of the controller, externalTrafficPolicy: Cluster hides the client's address from it by source NAT; set Local, or the address the server learns is the node's.
+{{- end }}
+{{- end }}
+{{- if eq .Values.migrations.mode "auto" }}
+{{- if lt (mul (int .Values.probes.startup.periodSeconds) (int .Values.probes.startup.failureThreshold)) 600 }}
+
+migrations.mode is auto: the server migrates before it listens, waiting up to five minutes for the migration lock, and the startup probe allows only {{ mul (int .Values.probes.startup.periodSeconds) (int .Values.probes.startup.failureThreshold) }} seconds (probes.startup.periodSeconds times probes.startup.failureThreshold). A migration that outlives it is killed on every restart. Raise probes.startup.failureThreshold so the probe allows the lock wait and the longest migration, for example 400 with a period of 2 seconds.
+{{- end }}
+{{- end }}

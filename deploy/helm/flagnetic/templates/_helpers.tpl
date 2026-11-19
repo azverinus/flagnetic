@@ -15,6 +15,14 @@
 {{- end -}}
 {{- end -}}
 
+{{/*
+The full name cut to 55 characters, so that -migrate and -metrics still fit the
+63 a Job's and a Service's name may have.
+*/}}
+{{- define "flagnetic.shortname" -}}
+{{- include "flagnetic.fullname" . | trunc 55 | trimSuffix "-" -}}
+{{- end -}}
+
 {{- define "flagnetic.labels" -}}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{ include "flagnetic.selectorLabels" . }}
@@ -80,6 +88,30 @@ Every template that renders a workload includes it.
       key: {{ .Values.secrets.databaseUrlKey }}
 {{- end -}}
 
+{{/*
+The settings of config as variables. The migration reads them too: the log
+format and level and the pool size apply to it as to the server.
+*/}}
+{{- define "flagnetic.configEnv" -}}
+{{- range $key, $value := .Values.config }}
+- name: {{ printf "FLAGNETIC_%s" ($key | upper) }}
+  {{- if kindIs "float64" $value }}
+  value: {{ int64 $value | toString | quote }}
+  {{- else }}
+  value: {{ $value | toString | quote }}
+  {{- end }}
+{{- end }}
+{{- end -}}
+
+{{/* What the migration runs with: the database, config and extraEnv. */}}
+{{- define "flagnetic.migrationEnv" -}}
+{{ include "flagnetic.databaseEnv" . }}
+{{- include "flagnetic.configEnv" . }}
+{{- with .Values.extraEnv }}
+{{ toYaml . }}
+{{- end }}
+{{- end -}}
+
 {{- define "flagnetic.serverEnv" -}}
 {{ include "flagnetic.databaseEnv" . }}
 - name: FLAGNETIC_SECRET_KEY
@@ -93,14 +125,7 @@ Every template that renders a workload includes it.
   value: {{ printf ":%d" (int .Values.service.metrics.port) | quote }}
 - name: FLAGNETIC_AUTO_MIGRATE
   value: {{ ternary "true" "false" (eq .Values.migrations.mode "auto") | quote }}
-{{- range $key, $value := .Values.config }}
-- name: {{ printf "FLAGNETIC_%s" ($key | upper) }}
-  {{- if kindIs "float64" $value }}
-  value: {{ int64 $value | toString | quote }}
-  {{- else }}
-  value: {{ $value | toString | quote }}
-  {{- end }}
-{{- end }}
+{{- include "flagnetic.configEnv" . }}
 {{- with .Values.extraEnv }}
 {{ toYaml . }}
 {{- end }}

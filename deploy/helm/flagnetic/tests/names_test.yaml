@@ -1,0 +1,35 @@
+suite: long names
+templates:
+  - templates/migrate-job.yaml
+  - templates/service-metrics.yaml
+  - templates/tests/test-ready.yaml
+  - templates/prometheusrule.yaml
+set:
+  secrets.existingSecret: mine
+  fullnameOverride: a-release-name-that-is-longer-than-the-sixty-three-characters-a-name-may-have
+  prometheusRule.enabled: true
+tests:
+  - it: keeps the Job and the Service within 63 characters after the suffix
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: "^.{63}$"
+        template: templates/migrate-job.yaml
+      - matchRegex:
+          path: metadata.name
+          pattern: "-migrate$"
+        template: templates/migrate-job.yaml
+      - matchRegex:
+          path: metadata.name
+          pattern: "^.{63}$"
+        template: templates/service-metrics.yaml
+      - matchRegex:
+          path: metadata.name
+          pattern: "-metrics$"
+        template: templates/service-metrics.yaml
+  - it: keeps the alerts on the series of the shortened metrics Service
+    template: templates/prometheusrule.yaml
+    asserts:
+      - matchRegex:
+          path: spec.groups[0].rules[0].expr
+          pattern: 'job="a-release-name-that-is-longer-than-the-sixty-three-char-metrics"'

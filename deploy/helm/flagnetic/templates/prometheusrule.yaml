@@ -1,7 +1,7 @@
 {{- if .Values.prometheusRule.enabled }}
 {{- /* The ServiceMonitor names the job after the metrics Service, so these
 matchers keep the alerts to this release when one Prometheus scrapes several. */}}
-{{- $series := printf "job=%q, namespace=%q" (printf "%s-metrics" (include "flagnetic.fullname" .)) .Release.Namespace }}
+{{- $series := printf "job=%q, namespace=%q" (printf "%s-metrics" (include "flagnetic.shortname" .)) .Release.Namespace }}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -44,7 +44,7 @@ spec:
               The 99th percentile of the time from a change to a replica's first
               answer carrying it has been above
               {{ .Values.prometheusRule.propagationSeconds }} seconds for ten minutes.
-        - alert: FlagneticSinkStopped
+        - alert: FlagneticSinkDeadLetters
           # Every replica reports the same count, so one alert per sink.
           expr: max by (sink) (flagnetic_sink_dead_letters{ {{- $series -}} }) > 0
           for: 10m

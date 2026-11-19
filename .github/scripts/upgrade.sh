@@ -4,7 +4,7 @@
 # release's image, seeds the instance through the management API, and runs
 # flagnetic-upgrade, which keeps light SDK load and a streaming Go SDK on the
 # instance while `helm upgrade` moves it to the head image. The chart's
-# migration hook, its disruption budget and the server's drain are all in the
+# migration hook, its rollout strategy, its disruption budget and the server's drain are all in the
 # path, which is the point of doing it in a cluster.
 #
 #   UPGRADE_FROM    image tag of the last server release, such as 0.5.0 (required)

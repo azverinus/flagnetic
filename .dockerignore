@@ -5,4 +5,4 @@ bin
 web/**/node_modules
 **/*.test
 coverage.out
-.env
+**/.env

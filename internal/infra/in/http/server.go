@@ -120,6 +120,10 @@ type Server struct {
 	db          Pinger
 	opts        Options
 	draining    atomic.Bool
+	// forwardedWarned is set once the replica has warned about an
+	// X-Forwarded-For it ignored, so a misconfigured proxy costs one record
+	// and not one per request.
+	forwardedWarned atomic.Bool
 	// drained is closed when the replica begins to drain, so long-lived
 	// requests such as streams end and their clients reconnect elsewhere.
 	drained   chan struct{}
@@ -266,7 +270,13 @@ func (s *Server) Logger() *slog.Logger { return s.log }
 // a panic as an internal problem, and writes one access log record.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	st := &requestState{id: requestID(r), client: resolveClient(r, s.opts.TrustedProxies)}
+	client, ignoredForwarded := resolveClient(r, s.opts.TrustedProxies)
+	st := &requestState{id: requestID(r), client: client}
+	if ignoredForwarded && s.forwardedWarned.CompareAndSwap(false, true) {
+		s.log.WarnContext(r.Context(), "X-Forwarded-For from a peer that is not a trusted proxy",
+			"peer", client.IP.String(),
+			"hint", "the header is ignored, so every request through that peer is seen with the peer's address; set trusted_proxies to the proxy's addresses")
+	}
 	w.Header().Set("X-Request-ID", st.id)
 	r = withState(r, st)
 	rw := &recorder{ResponseWriter: w}
