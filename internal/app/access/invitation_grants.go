@@ -23,6 +23,10 @@ type InvitationGrantStore interface {
 	// yet, expired or not, locked until the unit of work ends; ErrNotFound
 	// when the member has none.
 	PendingInvitation(ctx context.Context, member access.MemberID) (access.Invitation, error)
+	// LatestInvitation returns the latest invitation of member, consumed or
+	// not, locked until the unit of work ends; ErrNotFound when the member
+	// has none.
+	LatestInvitation(ctx context.Context, member access.MemberID) (access.Invitation, error)
 	// GrantingInvitations returns the invitations issued by inviter, not
 	// consumed yet, that grant a role in project, or in any project when it
 	// is zero, each with its member, locked until the unit of work ends.
@@ -65,11 +69,15 @@ func dropInvitationGrants(ctx context.Context, store InvitationGrantStore, invit
 }
 
 // carriedOrigin returns where the fresh invitation of invited, issued in
-// place of their pending one, comes from: the member who issued the pending
+// place of their latest one, comes from: the member who issued the latest
 // one, bringing its grant along only while that member may still hand it
-// out. A grant they may not is not carried and its drop is recorded.
+// out. A grant they may not is not carried and its drop is recorded. The
+// latest invitation counts although it was consumed: correcting an invited
+// member's email ends their open invitations, whose links were made for the
+// old address, but corrects the address, not the access the invitation was
+// to give.
 func carriedOrigin(ctx context.Context, store ReissueStore, invited access.Member) (invitationOrigin, []governance.Record, error) {
-	pending, err := store.PendingInvitation(ctx, invited.ID)
+	pending, err := store.LatestInvitation(ctx, invited.ID)
 	if errors.Is(err, ErrNotFound) {
 		return invitationOrigin{}, nil, nil
 	}

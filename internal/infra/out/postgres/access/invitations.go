@@ -107,6 +107,24 @@ func (s *Store) PendingInvitation(ctx context.Context, member access.MemberID) (
 	return invitation(), nil
 }
 
+// LatestInvitation returns the latest invitation of member, consumed or not,
+// locked until the transaction ends; ErrNotFound when the member has none.
+// Its member is to be locked first.
+func (s *Store) LatestInvitation(ctx context.Context, member access.MemberID) (access.Invitation, error) {
+	dest, invitation := scanInvitation()
+	err := s.db(ctx).QueryRow(ctx, `
+		SELECT `+invitationColumns+` FROM invitations i
+		WHERE i.member_id = $1
+		ORDER BY i.created_at DESC, i.id DESC LIMIT 1 FOR UPDATE`, member.Bytes()).Scan(dest...)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return access.Invitation{}, appaccess.ErrNotFound
+	}
+	if err != nil {
+		return access.Invitation{}, fmt.Errorf("reading a member's latest invitation: %w", err)
+	}
+	return invitation(), nil
+}
+
 // ProjectInvitations returns the invited members whose pending invitation,
 // expired or not, grants a role in project, ordered by email, each with that
 // invitation. A member's pending invitation is their latest not consumed
