@@ -35,29 +35,54 @@ var errMalformed = errors.New(`precondition: If-Match is "*" or a list of entity
 
 // ParseTags reads an If-Match header: `*`, or entity tags separated by commas,
 // each strong (`"7"`, or bare, `7`) or weak (`W/"7"`, which matches nothing).
-// A header that is none of these is refused.
+// A quoted tag may hold a comma, and empty list elements (`"6", , "7"`) are
+// skipped, as RFC 9110 asks of a list's recipient. A header that is none of
+// these, or lists no tag at all, is refused.
 func ParseTags(s string) (Tags, error) {
-	s = strings.TrimSpace(s)
-	if s == "*" {
+	if strings.TrimSpace(s) == "*" {
 		return Tags{Any: true}, nil
 	}
 	var t Tags
-	for _, item := range strings.Split(s, ",") {
-		item = strings.TrimSpace(item)
-		weak := strings.HasPrefix(item, "W/")
-		item = strings.TrimPrefix(item, "W/")
-		switch {
-		case len(item) >= 2 && item[0] == '"' && item[len(item)-1] == '"':
-			item = item[1 : len(item)-1]
-			if strings.ContainsAny(item, `"`) {
+	found := false
+	rest := s
+	for {
+		rest = strings.TrimLeft(rest, " \t")
+		if rest == "" {
+			break
+		}
+		if rest[0] == ',' {
+			rest = rest[1:]
+			continue
+		}
+		weak := strings.HasPrefix(rest, "W/")
+		rest = strings.TrimPrefix(rest, "W/")
+		var tag string
+		if rest != "" && rest[0] == '"' {
+			end := strings.IndexByte(rest[1:], '"')
+			if end < 0 {
 				return Tags{}, errMalformed
 			}
-		case weak || item == "" || strings.ContainsAny(item, `" `):
+			tag, rest = rest[1:1+end], rest[2+end:]
+		} else {
+			end := strings.IndexByte(rest, ',')
+			if end < 0 {
+				end = len(rest)
+			}
+			tag, rest = strings.TrimRight(rest[:end], " \t"), rest[end:]
+			if weak || tag == "" || tag == "*" || strings.ContainsAny(tag, "\" \t") {
+				return Tags{}, errMalformed
+			}
+		}
+		if rest = strings.TrimLeft(rest, " \t"); rest != "" && rest[0] != ',' {
 			return Tags{}, errMalformed
 		}
+		found = true
 		if !weak {
-			t.Strong = append(t.Strong, item)
+			t.Strong = append(t.Strong, tag)
 		}
+	}
+	if !found {
+		return Tags{}, errMalformed
 	}
 	return t, nil
 }

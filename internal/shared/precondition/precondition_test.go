@@ -30,7 +30,7 @@ func TestAVersionIsParsedQuotedOrBare(t *testing.T) {
 			t.Errorf("Parse(%q) = %v, %v, want %d", in, got, err, want)
 		}
 	}
-	for _, in := range []string{``, `"7`, `7"`, `"7" "8"`, `W/`, `"7",`, `*,`, `a b`} {
+	for _, in := range []string{``, ` , `, `"7`, `7"`, `"7" "8"`, `W/`, `W/7`, `*,`, `"7", *`, `a b`} {
 		if _, err := precondition.Parse(in); err == nil {
 			t.Errorf("Parse(%q) accepted, want refused", in)
 		}
@@ -42,7 +42,7 @@ func TestAVersionIsParsedQuotedOrBare(t *testing.T) {
 func TestIfMatchIsReadAsTheRFCReadsIt(t *testing.T) {
 	for in, want := range map[string]bool{
 		`"6"`: false, `"7"`: true, `W/"7"`: false, `*`: true, `"6", "7"`: true, `"6","8"`: false, `W/"7", "6"`: false,
-		`7`: true, `"x"`: false, `"0"`: false,
+		`7`: true, `"x"`: false, `"0"`: false, `"7",`: true, `"6", , "7"`: true, `, "6"`: false,
 	} {
 		v, err := precondition.Parse(in)
 		if err != nil {
@@ -62,11 +62,11 @@ func TestIfMatchIsReadAsTheRFCReadsIt(t *testing.T) {
 }
 
 func TestATagListMatchesTheCurrentTagOfAnOpaqueEntity(t *testing.T) {
-	tags, err := precondition.ParseTags(`"0197a1", W/"0197b2", 0197c3`)
+	tags, err := precondition.ParseTags(`"0197a1", W/"0197b2", 0197c3, "a,b"`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for tag, want := range map[string]bool{"0197a1": true, "0197b2": false, "0197c3": true, "": false} {
+	for tag, want := range map[string]bool{"0197a1": true, "0197b2": false, "0197c3": true, "a,b": true, "a": false, "": false} {
 		if got := tags.Matches(tag); got != want {
 			t.Errorf("Matches(%q) = %t, want %t", tag, got, want)
 		}
