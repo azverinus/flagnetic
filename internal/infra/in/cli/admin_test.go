@@ -413,6 +413,36 @@ func TestAdminPromoteMakesAMemberAnInstanceAdmin(t *testing.T) {
 	}
 }
 
+func TestAdminPromoteRefusesAMemberWhoIsNotActive(t *testing.T) {
+	url := testkit.EmptyDatabase(t)
+	if r := migrate(url); r.code != 0 {
+		t.Fatalf("migrate: %s", r.stderr)
+	}
+	pool, err := pgxpool.New(t.Context(), url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	admin := testkit.NewMember(t, pool, testkit.WithEmail("admin@example.com"))
+	testkit.NewMember(t, pool, testkit.WithEmail("invited@example.com"), testkit.WithStatus(access.MemberInvited))
+	testkit.NewMember(t, pool, testkit.WithEmail("gone@example.com"), testkit.WithStatus(access.MemberDeactivated))
+	if r := run(map[string]string{"DATABASE_URL": url}, nil, "admin", "promote", "--email", admin.Email); r.code != 0 {
+		t.Fatalf("promote the observer: %s", r.stderr)
+	}
+	srv := serve(t, map[string]string{"DATABASE_URL": url})
+
+	for email, code := range map[string]string{"invited@example.com": "member_invited", "gone@example.com": "member_deactivated"} {
+		r := run(map[string]string{"DATABASE_URL": url}, nil, "admin", "promote", "--email", email)
+		if r.code != 1 || r.stdout != "" || !strings.Contains(r.stderr, code) {
+			t.Errorf("promote %s: exit code = %d, stderr:\n%s\nwant 1 naming %s", email, r.code, r.stderr, code)
+		}
+	}
+	audit := cliAudit(t, signIn(t, srv.baseURL, admin.Email, admin.Password))
+	if want := []string{"flagnetic admin promote member.promoted admin@example.com"}; !slices.Equal(audit, want) {
+		t.Errorf("command line audit = %q, want %q: a refused promotion records nothing", audit, want)
+	}
+}
+
 func TestAdminBootstrapSetsALocalCredential(t *testing.T) {
 	t.Run("from FLAGNETIC_ADMIN_PASSWORD", func(t *testing.T) {
 		url := testkit.EmptyDatabase(t)
