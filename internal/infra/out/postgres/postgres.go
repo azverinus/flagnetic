@@ -11,7 +11,9 @@ import (
 	"io/fs"
 	"math"
 	"regexp"
+	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -119,20 +121,52 @@ type MigrationReport struct {
 	Version int64
 }
 
+// MigrationLockTimeout is how long a statement of a migration waits for a
+// lock before it fails. An ALTER TABLE queues for an ACCESS EXCLUSIVE lock
+// behind every reader of the table, and every query that arrives after it
+// queues behind the ALTER, so without a bound one long reader (a dump, an
+// idle transaction) would stall the replicas still serving until it ends. A
+// migration that times out fails, each migration runs in a transaction of its
+// own, and running it again is safe.
+const MigrationLockTimeout = 5 * time.Second
+
+// MigrationLockID is the advisory lock that serialises migrations of the
+// schema pool's search_path points at. It is derived from the schema, as the
+// server's other locks are, so instances sharing a database in separate
+// schemas never wait for each other's migrations.
+func MigrationLockID(ctx context.Context, pool *pgxpool.Pool) (int64, error) {
+	var id int64
+	if err := pool.QueryRow(ctx, `SELECT hashtextextended('migrate@' || current_schema(), 0)`).Scan(&id); err != nil {
+		return 0, fmt.Errorf("derive the migration lock: %w", err)
+	}
+	return id, nil
+}
+
 // Migrate applies every pending migration of migrations to the schema that
 // pool's search_path points at. Replicas that start together serialise on a
-// PostgreSQL session advisory lock, so each migration is applied exactly once;
-// the lock belongs to the session, so it is released even when a migration
-// fails half way. An empty migration set is valid and applies nothing.
+// PostgreSQL session advisory lock of that schema, so each migration is
+// applied exactly once; the lock belongs to the session, so it is released
+// even when a migration fails half way. Statements of a migration wait at most
+// MigrationLockTimeout for a lock. An empty migration set is valid and applies
+// nothing.
 func Migrate(ctx context.Context, pool *pgxpool.Pool, migrations fs.FS) (MigrationReport, error) {
+	lockID, err := MigrationLockID(ctx, pool)
+	if err != nil {
+		return MigrationReport{}, err
+	}
 	// A replica waiting for another's migrations probes the lock every second,
 	// for up to five minutes, so a scaled deployment starts promptly once the
 	// first replica is done.
-	locker, err := lock.NewPostgresSessionLocker(lock.WithLockTimeout(1, 300))
+	locker, err := lock.NewPostgresSessionLocker(lock.WithLockID(lockID), lock.WithLockTimeout(1, 300))
 	if err != nil {
 		return MigrationReport{}, fmt.Errorf("create the migration lock: %w", err)
 	}
-	db := stdlib.OpenDBFromPool(pool)
+	// The migrations run on connections of their own, not the pool's, so that
+	// the timeout bounds them alone and never the server's queries.
+	db := stdlib.OpenDB(*pool.Config().ConnConfig.Copy(), stdlib.OptionAfterConnect(func(ctx context.Context, conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, fmt.Sprintf("SET lock_timeout = %d", MigrationLockTimeout.Milliseconds()))
+		return err
+	}))
 	defer func() { _ = db.Close() }()
 	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations, goose.WithSessionLocker(locker))
 	if errors.Is(err, goose.ErrNoMigrations) {
