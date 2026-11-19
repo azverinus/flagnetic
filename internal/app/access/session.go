@@ -43,24 +43,9 @@ func NewAuthenticateSession(store SessionStore, settings AuthSettingsReader, c c
 // session_expired for a session that no longer signs anyone in. A live
 // session's last request is written at most once a minute.
 func (h *AuthenticateSession) Handle(ctx context.Context, cookie string) (access.Caller, error) {
-	hash, ok := access.ParseSessionCookie(cookie, h.key)
-	if !ok {
-		return access.Caller{}, ErrNoSession
-	}
-	session, member, err := h.store.SessionByHash(ctx, hash)
-	if errors.Is(err, ErrNotFound) {
-		return access.Caller{}, access.ErrSessionExpired
-	}
+	session, member, now, err := h.judge(ctx, cookie)
 	if err != nil {
 		return access.Caller{}, err
-	}
-	settings, err := h.settings.AuthSettings(ctx)
-	if err != nil {
-		return access.Caller{}, err
-	}
-	now := h.clock.Now()
-	if !session.Live(now, member, settings.SessionTimeouts()) {
-		return access.Caller{}, access.ErrSessionExpired
 	}
 	if session.NeedsTouch(now) {
 		if err := h.store.TouchSession(ctx, session.ID, now); err != nil {
@@ -69,6 +54,42 @@ func (h *AuthenticateSession) Handle(ctx context.Context, cookie string) (access
 		session.LastSeenAt = now
 	}
 	return access.SessionCaller(session, member), nil
+}
+
+// Check judges the session as Handle does but never records a request: a
+// caller of whom something other than a request asks, such as an open
+// stream deciding whether to go on, must not keep a session from idling out.
+func (h *AuthenticateSession) Check(ctx context.Context, cookie string) (access.Caller, error) {
+	session, member, _, err := h.judge(ctx, cookie)
+	if err != nil {
+		return access.Caller{}, err
+	}
+	return access.SessionCaller(session, member), nil
+}
+
+// judge finds the session cookie names and its member, and refuses one that
+// no longer signs anyone in.
+func (h *AuthenticateSession) judge(ctx context.Context, cookie string) (access.Session, access.Member, time.Time, error) {
+	hash, ok := access.ParseSessionCookie(cookie, h.key)
+	if !ok {
+		return access.Session{}, access.Member{}, time.Time{}, ErrNoSession
+	}
+	session, member, err := h.store.SessionByHash(ctx, hash)
+	if errors.Is(err, ErrNotFound) {
+		return access.Session{}, access.Member{}, time.Time{}, access.ErrSessionExpired
+	}
+	if err != nil {
+		return access.Session{}, access.Member{}, time.Time{}, err
+	}
+	settings, err := h.settings.AuthSettings(ctx)
+	if err != nil {
+		return access.Session{}, access.Member{}, time.Time{}, err
+	}
+	now := h.clock.Now()
+	if !session.Live(now, member, settings.SessionTimeouts()) {
+		return access.Session{}, access.Member{}, time.Time{}, access.ErrSessionExpired
+	}
+	return session, member, now, nil
 }
 
 // SignOut ends the session a caller is signed in to.

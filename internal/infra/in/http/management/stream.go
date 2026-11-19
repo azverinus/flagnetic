@@ -186,11 +186,12 @@ func (c *changeStream) VisitStreamProjectChangesResponse(w http.ResponseWriter) 
 // outlives the request that resolved its caller, so a session signed out, a
 // token revoked or expired, a member deactivated, a member who lost their
 // grant, or a project deleted (its key perhaps taken by another), ends the
-// stream at its next notice or heartbeat. A credential or access that
+// stream at its next notice or heartbeat. The check never records a use of
+// a session, so a stream left open does not keep it from idling out. A credential or access that
 // cannot be resolved for now, the store being unreachable say, keeps the
 // stream; a refusal ends it.
 func (c *changeStream) stillReads() bool {
-	caller, err := c.a.authenticate(c.ctx, c.credential, streamOperation)
+	caller, err := c.a.recheck(c.ctx, c.credential, streamOperation)
 	if err != nil {
 		return c.ctx.Err() == nil && !refused(err)
 	}

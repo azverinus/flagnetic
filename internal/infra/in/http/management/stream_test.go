@@ -514,6 +514,35 @@ func TestASignedOutSessionHasItsStreamClosedAtTheNextNotice(t *testing.T) {
 	}
 }
 
+func TestAnOpenChangeStreamDoesNotKeepItsSessionFromIdlingOut(t *testing.T) {
+	c := clock.NewFake(time.Now())
+	srv, pool, admin := freshInstance(t, c)
+	p := createProject(t, admin, projectKey())
+	viewer := testkit.NewMember(t, pool)
+	testkit.Grant(t, pool, projectIDOf(p), viewer.ID, access.RoleViewer)
+	browser := signedIn(t, srv, viewer)
+	settings := defaultSettings
+	settings.SessionIdleTimeoutSeconds = 120
+	putSettings(t, admin, settings)
+	s := testkit.OpenEventStream(t, &http.Client{Jar: browser.HTTP.Jar}, changesRequest(t, srv, p.Key, ""))
+	s.Started(t)
+
+	// Three minutes of heartbeats and no other request: were a heartbeat
+	// to touch the session (as it does once a minute), it would never idle out.
+	ended := false
+	for range 12 {
+		c.Advance(15 * time.Second)
+		if s.Ended(500 * time.Millisecond) {
+			ended = true
+			break
+		}
+	}
+	if !ended {
+		t.Error("the stream is open three minutes on under a two-minute idle timeout")
+	}
+	wantSignedOut(t, browser, "after three idle minutes")
+}
+
 func TestARevokedTokenHasItsStreamClosedAtTheNextHeartbeat(t *testing.T) {
 	c := clock.NewFake(time.Now())
 	srv := testkit.StartServer(t, testkit.WithClock(c))

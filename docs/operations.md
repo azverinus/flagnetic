@@ -100,7 +100,7 @@ An instance admin changes the instance's auth settings at runtime (`/instance/au
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `session_idle_timeout_seconds` | 86400 (a day) | A session ends this long after its last request. |
+| `session_idle_timeout_seconds` | 86400 (a day) | A session ends this long after its last request. A console screen left open holds a change stream, but the stream's periodic checks are not requests: it does not keep the session alive, and closes once the session idles out. |
 | `session_absolute_timeout_seconds` | 2592000 (30 days) | A session ends this long after it opened, however much it is used. |
 | `token_max_lifetime_seconds` | 31536000 (365 days) | The furthest ahead an API token may expire. |
 | `token_expiry_required` | false | Whether an API token must be created with an expiry. |
