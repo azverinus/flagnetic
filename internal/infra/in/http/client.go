@@ -52,6 +52,12 @@ func resolveClient(r *http.Request, trusted []netip.Prefix) (c Client, ignored b
 	return c, false
 }
 
+// fromTrustedPeer reports whether the TCP peer of r is a trusted proxy.
+func fromTrustedPeer(r *http.Request, trusted []netip.Prefix) bool {
+	peer, err := netip.ParseAddrPort(r.RemoteAddr)
+	return err == nil && isTrusted(plain(peer.Addr()), trusted)
+}
+
 // forwardedFor walks X-Forwarded-For from the right, where each trusted proxy
 // appended the address it received the request from, and returns the first
 // address outside the trusted list; when every address is trusted, the

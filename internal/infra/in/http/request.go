@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"os"
 	"regexp"
 	"time"
@@ -58,10 +59,13 @@ func RequestIDOf(ctx context.Context) string {
 // kept: short and free of anything a log or a header could misread.
 var wellFormedRequestID = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
 
-// requestID keeps a well-formed incoming X-Request-ID, so a request stays
-// traceable through the proxies in front, and mints one otherwise.
-func requestID(r *http.Request) string {
-	if id := r.Header.Get("X-Request-ID"); wellFormedRequestID.MatchString(id) {
+// requestID keeps a well-formed incoming X-Request-ID sent by a trusted
+// proxy, so a request stays traceable through the proxies in front, and mints
+// one otherwise. Any other peer could give its request the ID of another's,
+// or one its own log lines never carry, and the ID is what leads from an
+// audit entry to the log lines of the request that made it.
+func requestID(r *http.Request, trusted []netip.Prefix) string {
+	if id := r.Header.Get("X-Request-ID"); wellFormedRequestID.MatchString(id) && fromTrustedPeer(r, trusted) {
 		return id
 	}
 	return rand.Text()

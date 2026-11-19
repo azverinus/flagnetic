@@ -204,6 +204,11 @@ func (s *Server) SecretPath(path string) {
 	if !s.secretSeen[path] {
 		s.secretSeen[path] = true
 		s.secretPaths.Handle(path, http.NotFoundHandler())
+		if !strings.HasSuffix(path, "/") && !strings.HasSuffix(path, "...}") && !strings.HasSuffix(path, "{$}") {
+			// The same link with a trailing slash reaches no route, and
+			// carries its secret all the same.
+			s.secretPaths.Handle(path+"/", http.NotFoundHandler())
+		}
 	}
 }
 
@@ -278,7 +283,7 @@ func (s *Server) Logger() *slog.Logger { return s.log }
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	client, ignoredForwarded := resolveClient(r, s.opts.TrustedProxies)
-	st := &requestState{id: requestID(r), client: client}
+	st := &requestState{id: requestID(r, s.opts.TrustedProxies), client: client}
 	if ignoredForwarded && s.forwardedWarned.CompareAndSwap(false, true) {
 		s.log.WarnContext(r.Context(), "X-Forwarded-For from a peer that is not a trusted proxy",
 			"peer", client.IP.String(),
@@ -313,6 +318,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// reaching a route, such as a browser's preflight, is bounded too.
 	out, done := withWriteDeadline(w, rw, s.opts.WriteTimeout)
 	defer done()
+	// Named before the middlewares, so an answer one of them gives without
+	// reaching a route is logged and counted under its route as well.
+	if _, pattern := s.mux.Handler(r); s.hasPattern(pattern) {
+		st.route = pattern
+	} else if !s.servesConsole(r) {
+		st.route = "unmatched"
+	}
 	route := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) { s.route(w, rw, r, st) })
 	for _, wr := range s.wraps {
 		if r.URL.Path == strings.TrimSuffix(wr.prefix, "/") || strings.HasPrefix(r.URL.Path, wr.prefix) {
@@ -321,6 +333,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	route.ServeHTTP(out, r)
+}
+
+func (s *Server) hasPattern(pattern string) bool {
+	_, ok := s.patterns[pattern]
+	return ok
 }
 
 // BodyLimit returns the limit on the body of a request to the route r

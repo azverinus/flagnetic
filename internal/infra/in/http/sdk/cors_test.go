@@ -221,3 +221,32 @@ func TestAnOriginChangedThroughOneReplicaAppliesOnAnotherWithinASecond(t *testin
 		t.Errorf("an origin removed on one replica: %d on the other, want 403", got)
 	}
 }
+
+func TestTheRefusalOfAnUnknownContentEncodingCarriesTheBrowserHeaders(t *testing.T) {
+	srv := testkit.StartServer(t)
+	a := send(t, srv, http.MethodPost, sdk.BaseURL+"/evaluate", []byte("{}"),
+		"Origin", "https://app.example.com", "Content-Encoding", "br", "Content-Type", "application/json")
+	refused(t, "an unknown Content-Encoding", a.status, a.body, http.StatusUnsupportedMediaType, "unsupported_media_type")
+	browserHeaders(t, "415", a.header)
+}
+
+func TestAPreflightIsCountedAndLoggedUnderItsRoute(t *testing.T) {
+	srv := testkit.StartServer(t)
+	const route = "OPTIONS /sdk/v1/evaluate"
+	a := send(t, srv, http.MethodOptions, sdk.BaseURL+"/evaluate", nil,
+		"Origin", "https://app.example.com", "Access-Control-Request-Method", "POST")
+	if a.status != http.StatusNoContent {
+		t.Fatalf("preflight = %d: %s", a.status, a.body)
+	}
+	series := `flagnetic_http_requests_total{code="204",method="OPTIONS",route="` + route + `"}`
+	if got := testkit.Metric(t, srv.Scrape(t), series); got != 1 {
+		t.Errorf("%s = %v, want 1", series, got)
+	}
+	var routes []any
+	for _, r := range srv.Logs.Find("request") {
+		routes = append(routes, r.Attrs["route"])
+	}
+	if len(routes) != 1 || routes[0] != route {
+		t.Errorf("access records name routes %v, want [%s]", routes, route)
+	}
+}

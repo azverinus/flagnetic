@@ -242,8 +242,8 @@ func TestEveryResponseCarriesARequestID(t *testing.T) {
 	}
 }
 
-func TestIncomingRequestIDIsEchoedWhenWellFormed(t *testing.T) {
-	srv := testkit.StartServer(t)
+func TestIncomingRequestIDIsEchoedWhenWellFormedFromATrustedProxy(t *testing.T) {
+	srv := testkit.StartServer(t, trusting("127.0.0.0/8", "::1/128"))
 	const id = "lb-7f3a:42.retry_1"
 	if got := request(t, "GET", srv.URL+"/nope", map[string]string{"X-Request-ID": id}); got.header.Get("X-Request-ID") != id || got.body["request_id"] != id {
 		t.Errorf("X-Request-ID = %q, request_id = %v; want the incoming %q", got.header.Get("X-Request-ID"), got.body["request_id"], id)
@@ -253,6 +253,15 @@ func TestIncomingRequestIDIsEchoedWhenWellFormed(t *testing.T) {
 		if got == bad || !wellFormedID.MatchString(got) {
 			t.Errorf("incoming %q: X-Request-ID = %q, want a minted one", bad, got)
 		}
+	}
+}
+
+func TestIncomingRequestIDFromAnyOtherPeerIsReplaced(t *testing.T) {
+	srv := testkit.StartServer(t)
+	const id = "another-requests-id"
+	got := request(t, "GET", srv.URL+"/nope", map[string]string{"X-Request-ID": id})
+	if sent := got.header.Get("X-Request-ID"); sent == id || !wellFormedID.MatchString(sent) || got.body["request_id"] != sent {
+		t.Errorf("X-Request-ID = %q, request_id = %v; want a minted ID, not %q", sent, got.body["request_id"], id)
 	}
 }
 
