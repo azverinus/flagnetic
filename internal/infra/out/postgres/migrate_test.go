@@ -53,7 +53,7 @@ func TestAMigrationWaitingForALockFailsInsteadOfStallingTheTable(t *testing.T) {
 		}
 	}
 	t.Cleanup(release)
-	if _, err := reader.Exec(t.Context(), "LOCK TABLE x IN ACCESS SHARE MODE"); err != nil {
+	if _, err = reader.Exec(t.Context(), "LOCK TABLE x IN ACCESS SHARE MODE"); err != nil {
 		t.Fatal(err)
 	}
 

@@ -164,8 +164,8 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, migrations fs.FS) (Migrati
 	// The migrations run on connections of their own, not the pool's, so that
 	// the timeout bounds them alone and never the server's queries.
 	db := stdlib.OpenDB(*pool.Config().ConnConfig.Copy(), stdlib.OptionAfterConnect(func(ctx context.Context, conn *pgx.Conn) error {
-		_, err := conn.Exec(ctx, fmt.Sprintf("SET lock_timeout = %d", MigrationLockTimeout.Milliseconds()))
-		return err
+		_, execErr := conn.Exec(ctx, fmt.Sprintf("SET lock_timeout = %d", MigrationLockTimeout.Milliseconds()))
+		return execErr
 	}))
 	defer func() { _ = db.Close() }()
 	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations, goose.WithSessionLocker(locker))
