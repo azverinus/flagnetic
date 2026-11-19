@@ -304,3 +304,47 @@ func TestAPasswordChangedAfterItWasVerifiedOpensNoSession(t *testing.T) {
 		t.Errorf("the new password after the change: %v, want signed in: the rehash of the old password never replaced it", err)
 	}
 }
+
+func TestEverySignInFailureVerifiesOnePasswordWhoseEmailAndLengthItDoesNotShow(t *testing.T) {
+	v := &countingVerifier{Hasher: password.NewHasher(password.DefaultParams)}
+	h := newSignIn(t, v)
+	m := testkit.NewMember(t, testkit.Pool(t))
+	cases := map[string]appaccess.SignInCommand{
+		"an unknown email":                  {Email: "nobody-" + m.Email, Password: secret.New("not-the-password-9")},
+		"a known member's wrong password":   {Email: m.Email, Password: secret.New("not-the-password-9")},
+		"a known member's 129 characters":   {Email: m.Email, Password: secret.New(strings.Repeat("x", access.MaxPasswordLength+1))},
+		"an unknown email's 129 characters": {Email: "nobody-" + m.Email, Password: secret.New(strings.Repeat("x", access.MaxPasswordLength+1))},
+	}
+	for name, cmd := range cases {
+		cmd.ClientIP = anAddress()
+		v.verified.Store(0)
+		if _, err := h.Handle(t.Context(), cmd); codeOf(err) != "invalid_credentials" {
+			t.Errorf("%s: %v, want invalid_credentials", name, err)
+		}
+		if n := v.verified.Load(); n != 1 {
+			t.Errorf("%s: %d verifications, want 1", name, n)
+		}
+	}
+}
+
+func TestAPasswordOfTheLongestLengthThatIsTheMembersOwnStillSignsIn(t *testing.T) {
+	// The placeholder an over-long password is verified as is the longest a
+	// password may be: it must open no session for a member whose password
+	// that is.
+	pool := testkit.Pool(t)
+	placeholder := strings.Repeat("x", access.MaxPasswordLength)
+	testkit.RecordSecret(placeholder)
+	hash, err := password.NewHasher(password.DefaultParams).Hash(t.Context(), secret.New(placeholder))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testkit.NewMember(t, pool)
+	if err = pgaccess.NewStore(pool).SetPasswordHash(t.Context(), m.ID, hash, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	h := newSignIn(t, password.NewHasher(password.DefaultParams))
+	_, err = h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New(placeholder + "y"), ClientIP: anAddress()})
+	if codeOf(err) != "invalid_credentials" {
+		t.Errorf("a password one character past the placeholder: %v, want invalid_credentials", err)
+	}
+}
