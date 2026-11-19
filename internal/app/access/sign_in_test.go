@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"log/slog"
 	"net/netip"
 	"strings"
 	"sync"
@@ -14,10 +15,13 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
+	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -332,7 +336,7 @@ func TestEverySignInFailureVerifiesOnePasswordWhoseEmailAndLengthItDoesNotShow(t
 	}
 }
 
-func TestAPasswordOfTheLongestLengthThatIsTheMembersOwnStillSignsIn(t *testing.T) {
+func TestAnOverLongPasswordOpensNoSessionForAMemberWhosePasswordIsThePlaceholder(t *testing.T) {
 	// The placeholder an over-long password is verified as is the longest a
 	// password may be: it must open no session for a member whose password
 	// that is.
@@ -351,5 +355,59 @@ func TestAPasswordOfTheLongestLengthThatIsTheMembersOwnStillSignsIn(t *testing.T
 	_, err = h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New(placeholder + "y"), ClientIP: anAddress()})
 	if codeOf(err) != "invalid_credentials" {
 		t.Errorf("a password one character past the placeholder: %v, want invalid_credentials", err)
+	}
+	if _, err = h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New(placeholder), ClientIP: anAddress()}); err != nil {
+		t.Errorf("the member's own password of the longest length: %v, want it signed in", err)
+	}
+}
+
+// failuresOf returns the auth.sign_in_failed entries of member.
+func failuresOf(t *testing.T, m testkit.Member) []governance.Entry {
+	t.Helper()
+	entries, err := pggovernance.NewAuditLog(testkit.Pool(t)).Entries(t.Context(),
+		appgovernance.AuditFilter{Action: "auth.sign_in_failed", EntityID: m.ID.String()}, governance.EntryID{}, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return entries
+}
+
+func TestAFailedSignInIsRecordedAfterItsAnswerOrBeforeItWhenTheBackgroundIsFull(t *testing.T) {
+	pool := testkit.Pool(t)
+	c := clock.System{}
+	bg := appaccess.NewBackground(slog.New(slog.DiscardHandler), appaccess.WithBackgroundLimit(1))
+	h := appaccess.NewSignIn(appaccess.SignInDeps{
+		Tx: postgres.NewTransactor(pool), Store: pgaccess.NewStore(pool), Settings: pgaccess.NewStore(pool),
+		Hasher: password.NewHasher(password.DefaultParams), Audit: testkit.Record(pool), Clock: c, IDs: id.NewSource(c),
+		Random: rand.Reader, Key: bytes.Repeat([]byte{1}, 32), Background: bg,
+	})
+	wrong := func(m testkit.Member) {
+		t.Helper()
+		_, err := h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New("not-the-password-9"), ClientIP: anAddress()})
+		if codeOf(err) != "invalid_credentials" {
+			t.Fatalf("a wrong password: %v, want invalid_credentials", err)
+		}
+	}
+
+	afterAnswer := testkit.NewMember(t, pool)
+	wrong(afterAnswer)
+	bg.Wait(t.Context())
+	if n := len(failuresOf(t, afterAnswer)); n != 1 {
+		t.Errorf("%d failures recorded once the background work ended, want 1", n)
+	}
+
+	// Other work holds the only room, so the record is written before the
+	// answer instead of being dropped.
+	release := make(chan struct{})
+	if !bg.Go(t.Context(), "holding", time.Minute, func(context.Context) { <-release }) {
+		t.Fatal("the background refused the work holding it")
+	}
+	full := testkit.NewMember(t, pool)
+	wrong(full)
+	got := len(failuresOf(t, full))
+	close(release)
+	bg.Wait(t.Context())
+	if got != 1 {
+		t.Errorf("%d failures recorded when the answer came with the background full, want 1", got)
 	}
 }

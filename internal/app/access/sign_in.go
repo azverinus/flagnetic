@@ -389,9 +389,9 @@ const signInFailureBound = 10 * time.Second
 
 // fail records the failed sign-in of member, with its true reason, and the
 // lockout the failure starts, and returns the refusal every failure gets.
-// The record is written after the answer when there is room for the job, so
+// The record is written after the answer when there is room for the work, so
 // the answer takes no longer than an unknown email's, which has none to
-// write; with none, it is written first, so no failure goes unrecorded.
+// write; without room, it is written first, so no failure goes unrecorded.
 func (h *SignIn) fail(ctx context.Context, cmd SignInCommand, member access.Member, reserved access.Reservation, reason string) error {
 	now := h.d.Clock.Now()
 	req := governance.Request{Actor: memberActor(member), ID: cmd.RequestID}
