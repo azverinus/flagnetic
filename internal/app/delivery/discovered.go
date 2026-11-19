@@ -241,6 +241,10 @@ func (h *ListDiscoveredAttributes) Handle(ctx context.Context, project workspace
 
 // DiscoveredAttributeEditor changes one discovered attribute.
 type DiscoveredAttributeEditor interface {
+	// LockDiscoveredAttributes takes the lock a flush of sightings holds, so
+	// a change does not interleave with a flush that read the row before it
+	// and writes it back whole afterwards.
+	LockDiscoveredAttributes(ctx context.Context, project workspace.ProjectID) error
 	// DiscoveredAttributeForUpdate returns the attribute of project keyed
 	// key, locked until the unit of work ends, or ErrNotFound when there is
 	// none it has not declared since.
@@ -265,6 +269,11 @@ func NewDismissDiscoveredAttribute(tx Transactor, store DiscoveredAttributeEdito
 // answers not_found for one not listed.
 func (h *DismissDiscoveredAttribute) Handle(ctx context.Context, project workspace.ProjectID, key string) error {
 	return h.tx.Within(ctx, func(ctx context.Context) error {
+		// First, so a flush that read the attribute before this change
+		// finishes before it, and one after it reads what it saved.
+		if err := h.store.LockDiscoveredAttributes(ctx, project); err != nil {
+			return err
+		}
 		a, err := listedForUpdate(ctx, h.store, project, key)
 		if err != nil {
 			return err
@@ -321,6 +330,11 @@ func (h *DeclareDiscoveredAttribute) Handle(ctx context.Context, d AttributeDecl
 	}
 	var attr workspace.Attribute
 	err := h.tx.Within(ctx, func(ctx context.Context) error {
+		// Before anything else, as in a dismissal: a flush that read the row
+		// would otherwise write it back after its deletion.
+		if err := h.store.LockDiscoveredAttributes(ctx, d.Project); err != nil {
+			return err
+		}
 		if _, err := listedForUpdate(ctx, h.store, d.Project, d.Key); err != nil {
 			return err
 		}
