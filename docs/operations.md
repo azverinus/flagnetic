@@ -420,11 +420,11 @@ On SIGTERM or SIGINT a replica stops in three steps:
 
 1. **Drain** (`FLAGNETIC_SHUTDOWN_DRAIN`, 5 s by default): `/readyz` answers 503 at once, while every request that still arrives is served, except a new [ruleset stream](sdks/stream.md), which is refused `503 unavailable` with `Retry-After`. Every [ruleset stream](sdks/stream.md) and management change stream the replica holds is closed, and its SDK or console reconnects, usually to another replica. This gives load balancers time to notice and route away, so stopping one replica of several never refuses a request. `0` skips the drain.
 2. **Grace** (`FLAGNETIC_SHUTDOWN_GRACE`, 15 s by default): the replica stops accepting connections and lets requests in flight finish.
-3. **Cancel**: requests still running when the grace period ends are cancelled, background work is stopped, and the database pool closes.
+3. **Cancel**, within 10 seconds of the end of the grace period: requests still running are cancelled; the workers and the notification listeners stop side by side (at most 3 s); what the requests counted since the last round, the remote evaluation counts and the SDK inventory, is written (at most 5 s); the mail still leaving, invitations and password resets, is awaited for what is left of the 10 s, so a mail to an SMTP server that does not answer is given up, never holding back the counts; and the database pool closes (at most 2 s).
 
 A second signal skips whatever is left of the drain and the grace and goes straight to the cancel. Either way, a request the replica cancels is logged at error and counted as a 500: its client was still waiting for it.
 
-Give the platform a stop timeout of at least drain plus grace plus a margin before it kills the process: 25 seconds for the defaults (`stop_grace_period` in Compose, `terminationGracePeriodSeconds` in Kubernetes).
+Give the platform a stop timeout of at least drain plus grace plus the 10 seconds of the cancel: 30 seconds for the defaults (`stop_grace_period` in Compose, `terminationGracePeriodSeconds` in Kubernetes). The Helm chart refuses a `terminationGracePeriodSeconds` below `config.shutdown_drain` plus `config.shutdown_grace` plus 10 seconds, so raise it together with either.
 
 A second SIGTERM or SIGINT at any point exits at once with code 1, for an operator at a terminal who does not want to wait.
 

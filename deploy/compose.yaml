@@ -67,10 +67,11 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
-    # Covers the drain (FLAGNETIC_SHUTDOWN_DRAIN, 5s) and the grace period
-    # (FLAGNETIC_SHUTDOWN_GRACE, 15s) with a margin, so the container is not
-    # killed while it still finishes requests.
-    stop_grace_period: 25s
+    # Covers the drain (FLAGNETIC_SHUTDOWN_DRAIN, 5s), the grace period
+    # (FLAGNETIC_SHUTDOWN_GRACE, 15s) and the 10s the replica takes to cancel
+    # what is left, so the container is not killed while it still finishes
+    # requests or writes what it counted.
+    stop_grace_period: 30s
     restart: unless-stopped
 
 volumes:

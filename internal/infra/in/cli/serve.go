@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -26,15 +27,26 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
+// cancelBound is how long a replica takes to stop once the grace period is
+// over, which is what docs/operations.md and the chart's termination grace
+// period add to the drain and the grace. Four steps share it: the workers
+// and the notification listeners stop side by side (workerStopBound), the
+// work the requests left is written (finalFlushBound, in compose), the mail
+// still leaving gets what is left until the pool's turn, and the pool closes
+// (poolCloseBound). The steps' bounds add up to it, so a step that runs to its
+// bound still leaves the later ones theirs.
+const cancelBound = 10 * time.Second
+
 // workerStopBound is how long the stop waits for worker rounds, and for
-// notification listeners, to end once cancelled. Each round is bounded by its own timeout too; this keeps the stop
-// finite even for a round that ignores its context.
-const workerStopBound = 10 * time.Second
+// notification listeners, to end once cancelled. Each round is bounded by its
+// own timeout too; this keeps the stop finite even for a round that ignores
+// its context.
+const workerStopBound = 3 * time.Second
 
 // poolCloseBound is how long the stop waits for the pool to close once every
 // request has been cancelled. Code that ignores its context could hold a
 // connection forever; the bound keeps the stop finite even then.
-const poolCloseBound = 5 * time.Second
+const poolCloseBound = 2 * time.Second
 
 // errStopped ends the requests still running when the replica stops.
 var errStopped = errors.New("the replica stopped before the request was served")
@@ -123,8 +135,18 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		WebhookSecretOverlap: cfg.WebhookSecretOverlap,
 		Options:              management.Options{BaseURL: cfg.BaseURL, InsecureCookies: cfg.InsecureCookies},
 	})
-	// Run on every way out, after the requests are done.
-	defer background.Close()
+	// Run on every way out, after the requests are done. The mail still
+	// leaving is awaited until the pool's turn, counted from when the cancel
+	// step began.
+	var cancelStep time.Time
+	defer func() {
+		if cancelStep.IsZero() {
+			cancelStep = time.Now()
+		}
+		ctx, cancel := context.WithDeadline(context.Background(), cancelStep.Add(cancelBound-poolCloseBound))
+		defer cancel()
+		background.Close(ctx)
+	}()
 	for _, w := range background.Workers {
 		if err = runner.Register(w); err != nil {
 			return failStart(ctx, log, err)
@@ -181,9 +203,8 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	// spawned from it have their panics counted.
 	replica := runner.PanicHook(kill)
 	runner.Start(replica)
-	defer runner.Stop(workerStopBound)
 	listeners := postgres.NewListeners(replica, pool, log, reg)
-	defer listeners.Stop(workerStopBound)
+	defer stopTogether(runner, listeners)
 	for _, l := range background.Listeners {
 		listeners.Start(l.Channel, l.Handler, pglisten.Options{})
 	}
@@ -214,10 +235,19 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	if err := <-served; err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Warn("serving ended with an error", "error", err.Error())
 	}
-	runner.Stop(workerStopBound)
-	listeners.Stop(workerStopBound)
+	cancelStep = time.Now()
+	stopTogether(runner, listeners)
 	log.Info("stopped")
 	return exitOK
+}
+
+// stopTogether stops the workers and the notification listeners side by side,
+// so the two do not take their bounds one after the other.
+func stopTogether(runner *worker.Runner, listeners *postgres.Listeners) {
+	var wg sync.WaitGroup
+	wg.Go(func() { runner.Stop(workerStopBound) })
+	wg.Go(func() { listeners.Stop(workerStopBound) })
+	wg.Wait()
 }
 
 // requestBase returns the context every request of the replica derives from,
