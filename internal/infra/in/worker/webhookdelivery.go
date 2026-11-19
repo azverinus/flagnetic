@@ -61,10 +61,12 @@ func WebhookDelivery(d Deliverer, interval time.Duration, log *slog.Logger, reg 
 	attempt := func(ctx context.Context, token appgovernance.LeaseToken, delivery governance.DeliveryID) {
 		done, err := d.Attempt(ctx, token, delivery)
 		switch {
-		case err == nil && done.Status == "":
-			// The lease no longer held when the attempt came to it, or the
-			// subscription was disabled or deleted meanwhile; nothing was
-			// sent, and the delivery is another replica's or gone.
+		case done.Skipped:
+			// The lease no longer held when the attempt came to it; nothing
+			// was sent, and the delivery is another replica's or due again.
+			// A delivery that settled, or whose subscription was disabled or
+			// deleted meanwhile, is not attempted either but is not counted:
+			// the count is of claims outrunning their lease.
 			skipped.Inc()
 			log.InfoContext(ctx, "webhook delivery attempt skipped: its lease was no longer held",
 				"delivery", delivery.String())

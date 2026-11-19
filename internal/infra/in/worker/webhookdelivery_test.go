@@ -153,12 +153,15 @@ func TestOneProjectCannotTakeEveryAttemptOfAReplica(t *testing.T) {
 	}
 }
 
-// limitingDeliverer records the limit of every claim and hands out one
-// delivery whose attempt finds its lease gone.
+// limitingDeliverer records the limit of every claim and hands out two
+// deliveries: the first finds its lease gone, the second its subscription
+// disabled meanwhile.
 type limitingDeliverer struct {
 	limits  []int
 	claimed bool
 }
+
+var leaseGone = governance.DeliveryID(id.MustParse[governance.Delivery]("019a0000-0000-7000-8000-000000000001"))
 
 func (d *limitingDeliverer) Claim(_ context.Context, limit int) (appgovernance.Claim, error) {
 	d.limits = append(d.limits, limit)
@@ -166,16 +169,17 @@ func (d *limitingDeliverer) Claim(_ context.Context, limit int) (appgovernance.C
 		return appgovernance.Claim{}, nil
 	}
 	d.claimed = true
-	return appgovernance.Claim{Deliveries: []appgovernance.ClaimedDelivery{{}}}, nil
+	return appgovernance.Claim{Deliveries: []appgovernance.ClaimedDelivery{{ID: leaseGone}, {}}}, nil
 }
 
-func (d *limitingDeliverer) Attempt(context.Context, appgovernance.LeaseToken, governance.DeliveryID,
+func (d *limitingDeliverer) Attempt(_ context.Context, _ appgovernance.LeaseToken, delivery governance.DeliveryID,
 ) (appgovernance.Attempted, error) {
-	return appgovernance.Attempted{}, nil
+	return appgovernance.Attempted{Skipped: delivery == leaseGone}, nil
 }
 
 // A claim takes what the replica attempts at once, and an attempt whose
-// lease went before its turn is counted and logged.
+// lease went before its turn is counted and logged; one not made because its
+// subscription was disabled meanwhile is not.
 func TestAClaimTakesNoMoreThanTheReplicaAttemptsAtOnceAndASkippedAttemptIsCounted(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	logs := testkit.NewLogSink()
