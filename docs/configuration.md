@@ -85,7 +85,7 @@ The table above is the settings of a replica. The commands read these variables 
 |---|---|
 | `FLAGNETIC_ADMIN_PASSWORD` | The password of the instance admin that `flagnetic admin bootstrap` and `flagnetic admin create` create. When unset, a password is generated and printed once. |
 | `FLAGNETIC_URL` | The instance that `flagnetic export`, `import` and `import-firebase` talk to, when `--url` is not given. |
-| `FLAGNETIC_TOKEN` | The access token those commands present, when `--token` is not given. |
+| `FLAGNETIC_TOKEN` | The access token those commands present, when neither `--token` nor `--token-file` is given. |
 | `FLAGNETIC_TEST_HARNESS` | Test only: the marker, set to `playwright` by the end-to-end harness, under which `FLAGNETIC_TEST_CLOCK_FILE` is accepted. |
 
 See [The first instance admin](operations.md#the-first-instance-admin) for the admin password.
