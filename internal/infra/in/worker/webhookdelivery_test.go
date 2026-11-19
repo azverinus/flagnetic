@@ -161,7 +161,7 @@ type limitingDeliverer struct {
 	claimed bool
 }
 
-var leaseGone = governance.DeliveryID(id.MustParse[governance.Delivery]("019a0000-0000-7000-8000-000000000001"))
+var leaseGone = id.MustParse[governance.Delivery]("019a0000-0000-7000-8000-000000000001")
 
 func (d *limitingDeliverer) Claim(_ context.Context, limit int) (appgovernance.Claim, error) {
 	d.limits = append(d.limits, limit)
