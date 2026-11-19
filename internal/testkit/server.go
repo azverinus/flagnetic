@@ -15,6 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/infra/compose"
 	"github.com/azverinus/flagnetic/internal/infra/config"
@@ -368,8 +369,14 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		DefaultLocale: cmp.Or(o.defaultLocale, cfg.DefaultLocale),
 		MailRootCAs:   o.mailRoots,
 	})
+	// A test waits for every mail in flight, as long as one may take.
+	closeBackground := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), appaccess.MailBound)
+		defer cancel()
+		background.Close(ctx)
+	}
 	// Registered first, so it runs once the server below has stopped.
-	t.Cleanup(background.Close)
+	t.Cleanup(closeBackground)
 	for _, w := range background.Workers {
 		if err := runner.Register(w); err != nil {
 			t.Fatal(err)
@@ -394,7 +401,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	}
 	return &Server{
 		URL: srv.URL, Logs: logs, edge: h, metrics: metrics.Handler(reg), runner: runner, listeners: listeners,
-		background: background.Close, waitBackground: background.Wait, pool: o.pool, hold: hold, sinkFault: sinkFault,
+		background: closeBackground, waitBackground: background.Wait, pool: o.pool, hold: hold, sinkFault: sinkFault,
 	}
 }
 

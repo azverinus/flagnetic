@@ -115,7 +115,7 @@ The chart's `version` and `appVersion` are the server's: a chart installs the im
 | `secrets.secretKeyKey` | `FLAGNETIC_SECRET_KEY` | Key of the secret key in the Secret. |
 | `secrets.databaseUrl` | `""` | The database URL for the chart's own Secret, which is used when `secrets.existingSecret` is empty. PostgreSQL 16 or newer. |
 | `secrets.secretKey` | `""` | The secret key for the chart's own Secret. At least 32 characters (the chart refuses a shorter one), kept for the life of the instance. The chart never generates one. |
-| `config` | `{}` | Settings as `FLAGNETIC_*` variables, for the server and the migration: the key is the setting's file key in [the configuration reference](../../../docs/configuration.md), so `log_level` becomes `FLAGNETIC_LOG_LEVEL`. The listeners, `auto_migrate`, `database_url` and `secret_key` are the chart's own and are refused. |
+| `config` | `{}` | Settings as `FLAGNETIC_*` variables, for the server and the migration: the key is the setting's file key in [the configuration reference](../../../docs/configuration.md), so `log_level` becomes `FLAGNETIC_LOG_LEVEL`. A key that is no setting is refused, and so are the listeners, `auto_migrate`, `database_url` and `secret_key`, which are the chart's own. Quote `"off"` for a rate limit that is switched off: an unquoted `off` is a boolean to Helm, which the chart renders as `off` all the same. |
 | `extraEnv` | `[]` | Extra container environment variables, as in a container spec. |
 | `extraEnvFrom` | `[]` | Extra `envFrom` sources, as in a container spec. |
 | `migrations.mode` | `hook` | `hook` runs `flagnetic migrate` in a Job before every install and upgrade, so a failed migration stops the upgrade before a pod is replaced. `initContainer` migrates in every pod before it serves. `auto` lets the server migrate when it starts. Use `initContainer` or `auto` where hooks are not run, such as `helm template` output applied by hand. |
@@ -126,7 +126,7 @@ The chart's `version` and `appVersion` are the server's: a chart installs the im
 | `serviceAccount.annotations` | `{}` | Annotations of the ServiceAccount. |
 | `podAnnotations` | `{}` | Annotations of the pods and the migration Job's pod; `sidecar.istio.io/inject: "false"` here keeps a mesh sidecar from stopping the Job from completing. |
 | `podLabels` | `{}` | Extra labels of the pods and the migration Job's pod. |
-| `terminationGracePeriodSeconds` | `30` | Time a pod has to stop. It covers the server's drain (5 s) and grace (15 s) with a margin; keep it at 25 or more. |
+| `terminationGracePeriodSeconds` | `30` | Time a pod has to stop. It must be at least `config.shutdown_drain` (5 s by default) plus `config.shutdown_grace` (15 s) plus the 10 s the server takes to cancel what is left, which the chart checks. |
 | `probes.startup.periodSeconds` | `2` | Period of the startup probe on `/readyz`. |
 | `probes.startup.timeoutSeconds` | `3` | Time the startup probe waits for `/readyz`, which pings PostgreSQL for up to two seconds. Keep it above 2. |
 | `probes.startup.failureThreshold` | `60` | Failures the startup probe tolerates, which leaves two minutes for a cold start. With `migrations.mode: auto` the server migrates before it listens, waiting up to five minutes for the migration lock, so raise it: 400 at a period of 2 seconds allows 800 seconds. The notes warn below 600 seconds. |

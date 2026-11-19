@@ -169,7 +169,7 @@ autoscaling:
   targetCPUUtilizationPercentage: 70
 ```
 
-The target is a share of `resources.requests.cpu` (100m by default), so size the request to the pod's real use. Each replica holds its own PostgreSQL pool, so keep `maxReplicas` times the pool size within `max_connections`. Turning the autoscaler on in an upgrade removes the Deployment's replica count, which Kubernetes may reset to one until the autoscaler scales back up. The memory request and limit (256 Mi and 512 Mi) are sized for password hashing, which takes 64 MiB per sign-in in flight.
+The target is a share of `resources.requests.cpu` (100m by default), so size the request to the pod's real use. Each replica holds its own PostgreSQL pool, so keep `maxReplicas` times the pool size plus 7 (the listener and protection connections outside the pool) within `max_connections`; [The connection budget](install.md#the-connection-budget) has the formula. Turning the autoscaler on in an upgrade removes the Deployment's replica count, which Kubernetes may reset to one until the autoscaler scales back up. The memory request and limit (256 Mi and 512 Mi) are sized for password hashing, which takes 64 MiB per sign-in in flight.
 
 ## Network policy
 

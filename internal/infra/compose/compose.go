@@ -178,8 +178,10 @@ type Background struct {
 	Listeners []Listener
 	// Close ends the work the replica's use cases started on their own, such
 	// as the ruleset loads in flight; whoever runs the replica calls it once
-	// the requests are done.
-	Close func()
+	// the requests are done. What the requests counted is written first, then
+	// the mail still leaving is awaited until ctx ends, so a mail that does
+	// not finish never holds back what was counted.
+	Close func(ctx context.Context)
 	// Wait returns once the work the requests started after their answers,
 	// such as mails and the records of failed sign-ins, has ended, or ctx
 	// ends.
@@ -833,26 +835,27 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			{Channel: pggovernance.ChangesChannel, Handler: changeHub},
 		},
 		Wait: background.Wait,
-		Close: func() {
+		Close: func(ctx context.Context) {
 			rulesetStream.Close()
 			changeHub.Close()
 			rulesetCache.Close()
 			guardPool.Close()
-			// The mails the requests caused, and the password resets they asked
-			// for, leave with the replica.
-			mailCtx, stopWaiting := context.WithTimeout(context.Background(), appaccess.MailBound)
-			defer stopWaiting()
-			background.Wait(mailCtx)
 			// The requests are done: what they counted since the last round
-			// is written now rather than lost with the replica.
-			ctx, cancel := context.WithTimeout(context.Background(), finalFlushBound)
+			// is written now rather than lost with the replica, before the
+			// wait on the mail, which a slow SMTP server can stretch past the
+			// time the replica has.
+			flushCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), finalFlushBound)
 			defer cancel()
-			if _, err := remoteCounts.Flush(ctx); err != nil {
+			if _, err := remoteCounts.Flush(flushCtx); err != nil {
 				edge.Logger().Warn("remote evaluation counts lost on stop", "error", err.Error())
 			}
-			if err := inventory.Flush(ctx); err != nil {
+			if err := inventory.Flush(flushCtx); err != nil {
 				edge.Logger().Warn("SDK inventory lost on stop", "error", err.Error())
 			}
+			// The mails the requests caused, and the password resets they asked
+			// for, leave with the replica as far as ctx allows; what is still
+			// unsent then is lost with it.
+			background.Wait(ctx)
 		},
 	}
 }

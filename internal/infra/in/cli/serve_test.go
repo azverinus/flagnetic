@@ -176,12 +176,12 @@ func TestAnEmptyVariableStillOverridesTheConfigurationFile(t *testing.T) {
 	}
 }
 
-func TestAConfigurationFileWithAnUnknownKeyIsRefused(t *testing.T) {
-	file := writeConfigFile(t, "database_url: postgres://localhost/flagnetic\nlisten_port: \":9090\"\n")
+func TestAConfigurationFileWithAKeyThatIsNoSettingNameIsRefused(t *testing.T) {
+	file := writeConfigFile(t, "database_url: postgres://localhost/flagnetic\nListen-Port: \":9090\"\n")
 	for _, cmd := range []string{"serve", "migrate"} {
 		res := run(map[string]string{"FLAGNETIC_CONFIG_FILE": file}, nil, cmd)
-		if res.code != 2 || !strings.Contains(res.stderr, "listen_port") {
-			t.Errorf("%s: exit code = %d, stderr:\n%s\nwant 2 naming the unknown key", cmd, res.code, res.stderr)
+		if res.code != 2 || !strings.Contains(res.stderr, "Listen-Port") {
+			t.Errorf("%s: exit code = %d, stderr:\n%s\nwant 2 naming the malformed key", cmd, res.code, res.stderr)
 		}
 	}
 }

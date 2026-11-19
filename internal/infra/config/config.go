@@ -69,8 +69,12 @@ type Config struct {
 	// TestClockFile names the offset file of the test clock, "" outside the
 	// end-to-end harness.
 	TestClockFile string
-	ConfigFile    string
-	ListenAddr    string
+	// IgnoredFileKeys are the keys of the configuration file that are no
+	// setting of this version, in file order. They are ignored, so that a
+	// binary rolled back keeps starting with a file written for a newer one;
+	// whoever starts the replica logs them, since a typo is one too.
+	IgnoredFileKeys []string
+	ListenAddr      string
 	// MetricsListenAddr is "" when metrics are switched off.
 	MetricsListenAddr string
 	AutoMigrate       bool
@@ -185,6 +189,9 @@ type Setting struct {
 	Default string
 	// Unit says what a value counts, when it is a quantity.
 	Unit string
+	// Range is the span of values a numeric setting accepts, as the
+	// reference states it, "" when the setting is no quantity.
+	Range string
 	// Description is the reference's explanation.
 	Description string
 	// Example is a valid value, shown in the reference and in the refusal of
@@ -280,14 +287,8 @@ func Settings() []Setting {
 			Description: "How many passwords one replica hashes or verifies at once. Each takes 64 MiB of memory for about a tenth of a second, " +
 				"so the bound keeps a burst of sign-ins from exhausting the replica. A sign-in that waits more than 2 seconds for a slot is answered 503 `busy` with `Retry-After`.",
 			Example: "8",
-			apply: func(cfg *Config, v string) error {
-				n, err := strconv.Atoi(v)
-				if err != nil || n < 1 {
-					return errors.New("not a whole number of at least 1")
-				}
-				cfg.PasswordHashConcurrency = n
-				return nil
-			},
+			Range:   hashConcurrency.String(),
+			apply:   hashConcurrency.whole(func(c *Config, n int) { c.PasswordHashConcurrency = n }),
 		},
 		{
 			Name:    "FLAGNETIC_DEFAULT_LOCALE",
@@ -318,10 +319,8 @@ func Settings() []Setting {
 			Name:        "FLAGNETIC_CONFIG_FILE",
 			Description: "YAML file of settings, keyed by the names in the File key column. Environment only.",
 			Example:     "/etc/flagnetic/flagnetic.yaml",
-			apply: func(cfg *Config, v string) error {
-				cfg.ConfigFile = v
-				return nil
-			},
+			// Load reads the file itself, before any setting.
+			apply: func(*Config, string) error { return nil },
 		},
 		{
 			Name:        "FLAGNETIC_LISTEN_ADDR",
@@ -374,6 +373,7 @@ func Settings() []Setting {
 			Key:         "db_max_conns",
 			Default:     strconv.Itoa(postgres.DefaultMaxConns),
 			Unit:        "connections",
+			Range:       "1 to 10000",
 			Description: "Size of the PostgreSQL connection pool of one replica. When unset, `pool_max_conns` in `DATABASE_URL` applies if present; when both are set, this wins and a notice is logged.",
 			Example:     "25",
 			apply: func(cfg *Config, v string) error {
@@ -395,14 +395,8 @@ func Settings() []Setting {
 			Unit:        "duration",
 			Description: "How long a replica told to stop keeps serving while `/readyz` answers 503, so load balancers route away from it before it stops accepting requests. `0` skips the drain.",
 			Example:     "5s",
-			apply: func(cfg *Config, v string) error {
-				d, err := time.ParseDuration(v)
-				if err != nil || d < 0 {
-					return errors.New("not a non-negative duration")
-				}
-				cfg.ShutdownDrain = d
-				return nil
-			},
+			Range:       stopPeriod.String(),
+			apply:       stopPeriod.within(func(c *Config, d time.Duration) { c.ShutdownDrain = d }),
 		},
 		{
 			Name:        "FLAGNETIC_SHUTDOWN_GRACE",
@@ -411,14 +405,8 @@ func Settings() []Setting {
 			Unit:        "duration",
 			Description: "How long in-flight requests may run once the drain is over and the replica stops accepting new ones; then they are cancelled.",
 			Example:     "15s",
-			apply: func(cfg *Config, v string) error {
-				d, err := time.ParseDuration(v)
-				if err != nil || d < 0 {
-					return errors.New("not a non-negative duration")
-				}
-				cfg.ShutdownGrace = d
-				return nil
-			},
+			Range:       stopPeriod.String(),
+			apply:       stopPeriod.within(func(c *Config, d time.Duration) { c.ShutdownGrace = d }),
 		},
 		{
 			Name:        "FLAGNETIC_LOG_LEVEL",
@@ -472,7 +460,8 @@ func Settings() []Setting {
 			Unit:        "duration",
 			Description: "How long a client may take to send a request's headers on the public listener.",
 			Example:     "10s",
-			apply:       durationSetting(func(c *Config, d time.Duration) { c.HTTPReadHeaderTimeout = d }),
+			Range:       httpTimeout.String(),
+			apply:       httpTimeout.within(func(c *Config, d time.Duration) { c.HTTPReadHeaderTimeout = d }),
 		},
 		{
 			Name:        "FLAGNETIC_HTTP_IDLE_TIMEOUT",
@@ -481,7 +470,8 @@ func Settings() []Setting {
 			Unit:        "duration",
 			Description: "How long a keep-alive connection may stay idle before the server closes it.",
 			Example:     "120s",
-			apply:       durationSetting(func(c *Config, d time.Duration) { c.HTTPIdleTimeout = d }),
+			Range:       httpTimeout.String(),
+			apply:       httpTimeout.within(func(c *Config, d time.Duration) { c.HTTPIdleTimeout = d }),
 		},
 		{
 			Name:        "FLAGNETIC_HTTP_BODY_READ_TIMEOUT",
@@ -490,7 +480,8 @@ func Settings() []Setting {
 			Unit:        "duration",
 			Description: "How long a client may take to send a request's body; a body still arriving then is answered 408. Long-lived streams are excepted.",
 			Example:     "30s",
-			apply:       durationSetting(func(c *Config, d time.Duration) { c.HTTPBodyReadTimeout = d }),
+			Range:       httpTimeout.String(),
+			apply:       httpTimeout.within(func(c *Config, d time.Duration) { c.HTTPBodyReadTimeout = d }),
 		},
 		{
 			Name:    "FLAGNETIC_HTTP_WRITE_TIMEOUT",
@@ -500,7 +491,8 @@ func Settings() []Setting {
 			Description: "How long a client may take to accept what the server writes to it: each chunk of a response, or each frame of a stream, " +
 				"must be taken within it, or the server drops the connection. It bounds a stalled reader, not the length of a response or a stream.",
 			Example: "30s",
-			apply:   durationSetting(func(c *Config, d time.Duration) { c.HTTPWriteTimeout = d }),
+			Range:   httpTimeout.String(),
+			apply:   httpTimeout.within(func(c *Config, d time.Duration) { c.HTTPWriteTimeout = d }),
 		},
 		{
 			Name:        "FLAGNETIC_HTTP_MAX_BODY_BYTES",
@@ -509,10 +501,11 @@ func Settings() []Setting {
 			Unit:        "bytes",
 			Description: "Largest request body accepted, unless a route declares a larger limit of its own; a larger body is answered 413.",
 			Example:     "1048576",
+			Range:       fmt.Sprintf("1 to %d", maxBodyBytes),
 			apply: func(cfg *Config, v string) error {
 				n, err := strconv.ParseInt(v, 10, 64)
-				if err != nil || n < 1 {
-					return errors.New("not a whole number of bytes of at least 1")
+				if err != nil || n < 1 || n > maxBodyBytes {
+					return fmt.Errorf("not a whole number of bytes from 1 to %d", maxBodyBytes)
 				}
 				cfg.HTTPMaxBodyBytes = n
 				return nil
@@ -527,7 +520,8 @@ func Settings() []Setting {
 				"Raw events are kept as long: each day is dropped once it is wholly older. An event ID is recognised as a retry and the event stored once " +
 				"for a year, or the window plus a day when that is longer, so it outlives the raw events.",
 			Example: "30",
-			apply:   wholeNumber(func(c *Config, n int) { c.EventsRetentionDays = n }),
+			Range:   retentionDays.String(),
+			apply:   retentionDays.whole(func(c *Config, n int) { c.EventsRetentionDays = n }),
 		},
 		{
 			Name:    "FLAGNETIC_EVENTS_LOSS_WARNING_HOURS",
@@ -539,7 +533,8 @@ func Settings() []Setting {
 				"A sink that falls behind by less than the retention window minus this loses nothing. " +
 				"A value of the retention window or more flags every sink with an undelivered event.",
 			Example: "72",
-			apply:   wholeNumber(func(c *Config, n int) { c.EventsLossWarningHours = n }),
+			Range:   lossWarning.String(),
+			apply:   lossWarning.whole(func(c *Config, n int) { c.EventsLossWarningHours = n }),
 		},
 		{
 			Name:    "FLAGNETIC_EVENTS_PARTITIONS_AHEAD",
@@ -549,7 +544,8 @@ func Settings() []Setting {
 			Description: "How many days after today the raw event tables' daily partitions are created ahead of time, " +
 				"so that events received after midnight never wait for one.",
 			Example: "3",
-			apply:   wholeNumber(func(c *Config, n int) { c.EventsPartitionsAhead = n }),
+			Range:   partitionsAhead.String(),
+			apply:   partitionsAhead.whole(func(c *Config, n int) { c.EventsPartitionsAhead = n }),
 		},
 		{
 			Name:    "FLAGNETIC_SDK_INVENTORY_RETENTION_DAYS",
@@ -559,7 +555,8 @@ func Settings() []Setting {
 			Description: "How long an environment's SDK inventory keeps an SDK after it was last seen. " +
 				"An SDK seen again afterwards appears again, with a new first-seen time.",
 			Example: "90",
-			apply:   wholeNumber(func(c *Config, n int) { c.SDKInventoryRetentionDays = n }),
+			Range:   retentionDays.String(),
+			apply:   retentionDays.whole(func(c *Config, n int) { c.SDKInventoryRetentionDays = n }),
 		},
 		{
 			Name:    "FLAGNETIC_ALIAS_LINKS_LIMIT",
@@ -571,7 +568,8 @@ func Settings() []Setting {
 				"`quota_exceeded`, while one for a pair already linked is still accepted. The count is exact for batches one after another " +
 				"and may be exceeded by the batches in flight at the moment the limit is reached.",
 			Example: "5000000",
-			apply:   wholeNumber(func(c *Config, n int) { c.AliasLinksLimit = n }),
+			Range:   quota.String(),
+			apply:   quota.whole(func(c *Config, n int) { c.AliasLinksLimit = n }),
 		},
 		{
 			Name:    "FLAGNETIC_FIRST_EXPOSURES_LIMIT",
@@ -582,7 +580,8 @@ func Settings() []Setting {
 				"an exposure of another unit is refused `quota_exceeded`, while one of a unit already counted is still accepted. " +
 				"Exposures received before the rollup has counted them are not refused, so the limit is approximate by the rollup's lag.",
 			Example: "10000000",
-			apply:   wholeNumber(func(c *Config, n int) { c.FirstExposuresLimit = n }),
+			Range:   quota.String(),
+			apply:   quota.whole(func(c *Config, n int) { c.FirstExposuresLimit = n }),
 		},
 		{
 			Name:    "FLAGNETIC_WEBHOOK_ALLOW_HTTP",
@@ -615,7 +614,8 @@ func Settings() []Setting {
 			Description: "How often a replica turns new events into webhook deliveries and sends the deliveries that are due. " +
 				"An event reaches a receiver about this long after its change at the earliest.",
 			Example: "5s",
-			apply:   durationSetting(func(c *Config, d time.Duration) { c.WebhookTick = d }),
+			Range:   workerTick.String(),
+			apply:   workerTick.within(func(c *Config, d time.Duration) { c.WebhookTick = d }),
 		},
 		{
 			Name:    "FLAGNETIC_SINK_TICK",
@@ -625,7 +625,8 @@ func Settings() []Setting {
 			Description: "How often a replica looks for sink streams that are due and delivers their next batch. " +
 				"A stream still waits its sink's `flush_interval` between batches once it has caught up, and goes on at once while batches are full.",
 			Example: "1s",
-			apply:   durationSetting(func(c *Config, d time.Duration) { c.SinkTick = d }),
+			Range:   workerTick.String(),
+			apply:   workerTick.within(func(c *Config, d time.Duration) { c.SinkTick = d }),
 		},
 		{
 			Name:    "FLAGNETIC_SINK_LAG_WARNING",
@@ -635,7 +636,8 @@ func Settings() []Setting {
 			Description: "How old the oldest event a sink has not delivered may be before the sink's health is `lagging`. " +
 				"A long transaction anywhere in the database holds every sink back, and shows as lag.",
 			Example: "15m",
-			apply:   durationSetting(func(c *Config, d time.Duration) { c.SinkLagWarning = d }),
+			Range:   longPeriod.String(),
+			apply:   longPeriod.within(func(c *Config, d time.Duration) { c.SinkLagWarning = d }),
 		},
 		{
 			Name:    "FLAGNETIC_SINK_REJECTION_ATTEMPTS",
@@ -645,7 +647,8 @@ func Settings() []Setting {
 			Description: "How many times a sink's target must reject one batch before the sink sets it aside as a dead letter and goes on with the next. " +
 				"Only a rejection counts: a target that is down or busy is retried without limit, with a growing wait, and the batch keeps its place.",
 			Example: "3",
-			apply:   wholeNumber(func(c *Config, n int) { c.SinkRejectionAttempts = n }),
+			Range:   attempts.String(),
+			apply:   attempts.whole(func(c *Config, n int) { c.SinkRejectionAttempts = n }),
 		},
 		{
 			Name:    "FLAGNETIC_SINK_STOP_AFTER_DEAD_LETTERS",
@@ -655,7 +658,8 @@ func Settings() []Setting {
 			Description: "How many dead letters in a row on one stream stop its sink, so that a target that keeps refusing is not fed the rest of the event store. " +
 				"A batch the target acknowledges ends the run. A stopped sink delivers nothing until a member resumes it.",
 			Example: "5",
-			apply:   wholeNumber(func(c *Config, n int) { c.SinkStopAfterDeadLetters = n }),
+			Range:   attempts.String(),
+			apply:   attempts.whole(func(c *Config, n int) { c.SinkStopAfterDeadLetters = n }),
 		},
 		{
 			Name:    "FLAGNETIC_WEBHOOK_SECRET_OVERLAP",
@@ -665,7 +669,8 @@ func Settings() []Setting {
 			Description: "How long the secret a rotation replaced, a webhook subscription's or a webhook sink's, keeps signing beside the new one, " +
 				"so a receiver can take the new secret without refusing a single event.",
 			Example: "24h",
-			apply:   durationSetting(func(c *Config, d time.Duration) { c.WebhookSecretOverlap = d }),
+			Range:   overlapPeriod.String(),
+			apply:   overlapPeriod.within(func(c *Config, d time.Duration) { c.WebhookSecretOverlap = d }),
 		},
 		{
 			Name:    "FLAGNETIC_SCHEDULE_MIN_LEAD",
@@ -675,7 +680,8 @@ func Settings() []Setting {
 			Description: "How far ahead a change request's apply time must be at least when it is set; " +
 				"a sooner time is refused `invalid_change_request`.",
 			Example: "5m",
-			apply:   durationSetting(func(c *Config, d time.Duration) { c.ScheduleMinLead = d }),
+			Range:   longPeriod.String(),
+			apply:   longPeriod.within(func(c *Config, d time.Duration) { c.ScheduleMinLead = d }),
 		},
 		{
 			Name:    "FLAGNETIC_SCHEDULE_TICK",
@@ -685,7 +691,8 @@ func Settings() []Setting {
 			Description: "How often every replica looks for approved change requests whose apply time has come and applies them; " +
 				"a change request is applied at most this long after its time, or later when no replica was running.",
 			Example: "10s",
-			apply:   durationSetting(func(c *Config, d time.Duration) { c.ScheduleTick = d }),
+			Range:   workerTick.String(),
+			apply:   workerTick.within(func(c *Config, d time.Duration) { c.ScheduleTick = d }),
 		},
 		{
 			Name:    "FLAGNETIC_SCHEDULE_MAX_FAILURES",
@@ -695,7 +702,8 @@ func Settings() []Setting {
 			Description: "How many scheduled applications of a change request may fail in a row before the scheduler stops trying it " +
 				"and records `change_request.schedule_failed`.",
 			Example: "5",
-			apply:   wholeNumber(func(c *Config, n int) { c.ScheduleMaxFailures = n }),
+			Range:   attempts.String(),
+			apply:   attempts.whole(func(c *Config, n int) { c.ScheduleMaxFailures = n }),
 		},
 		{
 			Name:    "FLAGNETIC_AUDIT_EXPORT_MAX_ENTRIES",
@@ -705,7 +713,8 @@ func Settings() []Setting {
 			Description: "The most entries one download of the audit log may hold. A download whose filters match more is refused " +
 				"`export_too_large` before anything is sent; narrowing it by time brings it under.",
 			Example: "100000",
-			apply:   wholeNumber(func(c *Config, n int) { c.AuditExportMaxEntries = n }),
+			Range:   exportEntries.String(),
+			apply:   exportEntries.whole(func(c *Config, n int) { c.AuditExportMaxEntries = n }),
 		},
 		{
 			Name:    "FLAGNETIC_AUDIT_EXPORT_MAX_CONCURRENT",
@@ -715,7 +724,8 @@ func Settings() []Setting {
 			Description: "How many downloads of the audit log one replica serves at once. A download asked while every slot is taken is refused " +
 				"`too_many_exports` (429) with `Retry-After`.",
 			Example: "4",
-			apply:   wholeNumber(func(c *Config, n int) { c.AuditExportMaxConcurrent = n }),
+			Range:   exportDownloads.String(),
+			apply:   exportDownloads.whole(func(c *Config, n int) { c.AuditExportMaxConcurrent = n }),
 		},
 		{
 			Name:    "FLAGNETIC_DIGEST_WEEKDAY",
@@ -798,6 +808,7 @@ func rateLimit(name, def, unit, description string, field func(*RateLimits) *int
 		Key:     strings.ToLower(strings.TrimPrefix(name, "FLAGNETIC_")),
 		Default: def,
 		Unit:    unit,
+		Range:   requestRate.String(),
 		Description: description + " Each replica counts on its own, so an instance of n replicas lets up to n times as much through. " +
 			"A refused request is answered 429 `rate_limited` with `Retry-After`. `off` switches the limit off.",
 		Example: def,
@@ -807,8 +818,8 @@ func rateLimit(name, def, unit, description string, field func(*RateLimits) *int
 				return nil
 			}
 			n, err := strconv.Atoi(v)
-			if err != nil || n < 1 {
-				return errors.New("not a whole number of at least 1, or off")
+			if err != nil || n < requestRate.min || n > requestRate.max {
+				return fmt.Errorf("not a whole number from %s, or off", requestRate)
 			}
 			*field(&cfg.RateLimits) = n
 			return nil
@@ -816,17 +827,74 @@ func rateLimit(name, def, unit, description string, field func(*RateLimits) *int
 	}
 }
 
-// wholeNumber parses a whole number of at least 1 into the field set picks.
-func wholeNumber(set func(*Config, int)) func(*Config, string) error {
+// intRange is the inclusive range a whole-number setting accepts. Every
+// numeric setting has an upper bound: an unbounded value overflows the
+// duration it is turned into, or exhausts what it sizes.
+type intRange struct{ min, max int }
+
+func (r intRange) String() string { return fmt.Sprintf("%d to %d", r.min, r.max) }
+
+// whole parses a whole number within the range into the field set picks.
+func (r intRange) whole(set func(*Config, int)) func(*Config, string) error {
 	return func(cfg *Config, v string) error {
 		n, err := strconv.Atoi(v)
-		if err != nil || n < 1 {
-			return errors.New("not a whole number of at least 1")
+		if err != nil || n < r.min || n > r.max {
+			return fmt.Errorf("not a whole number from %s", r)
 		}
 		set(cfg, n)
 		return nil
 	}
 }
+
+// durRange is the inclusive range a duration setting accepts.
+type durRange struct{ min, max time.Duration }
+
+func (r durRange) String() string { return shortDuration(r.min) + " to " + shortDuration(r.max) }
+
+// shortDuration writes d as 1h, 15m or 100ms rather than 1h0m0s.
+func shortDuration(d time.Duration) string {
+	out := d.String()
+	if strings.HasSuffix(out, "m0s") {
+		out = strings.TrimSuffix(out, "0s")
+	}
+	if strings.HasSuffix(out, "h0m") {
+		out = strings.TrimSuffix(out, "0m")
+	}
+	return out
+}
+
+// within parses a duration within the range into the field set picks.
+func (r durRange) within(set func(*Config, time.Duration)) func(*Config, string) error {
+	return func(cfg *Config, v string) error {
+		d, err := time.ParseDuration(v)
+		if err != nil || d < r.min || d > r.max {
+			return fmt.Errorf("not a duration from %s", r)
+		}
+		set(cfg, d)
+		return nil
+	}
+}
+
+// The ranges of the settings. Retention is capped at ten years, and the
+// periods are kept to what a time.Duration holds with room to spare.
+var (
+	retentionDays   = intRange{1, 3650}
+	lossWarning     = intRange{1, 87600}
+	partitionsAhead = intRange{1, 31}
+	hashConcurrency = intRange{1, 64}
+	quota           = intRange{1, 1_000_000_000}
+	attempts        = intRange{1, 1000}
+	exportEntries   = intRange{1, 100_000_000}
+	exportDownloads = intRange{1, 1000}
+	requestRate     = intRange{1, 10_000_000}
+	stopPeriod      = durRange{0, time.Hour}
+	httpTimeout     = durRange{100 * time.Millisecond, 24 * time.Hour}
+	workerTick      = durRange{100 * time.Millisecond, time.Hour}
+	longPeriod      = durRange{time.Second, 720 * time.Hour}
+	overlapPeriod   = durRange{time.Second, 8760 * time.Hour}
+)
+
+const maxBodyBytes = 1 << 30
 
 // boolSetting parses true or false into the field set picks.
 func boolSetting(set func(*Config, bool)) func(*Config, string) error {
@@ -836,18 +904,6 @@ func boolSetting(set func(*Config, bool)) func(*Config, string) error {
 			return errors.New("not true or false")
 		}
 		set(cfg, b)
-		return nil
-	}
-}
-
-// durationSetting parses a positive duration into the field set picks.
-func durationSetting(set func(*Config, time.Duration)) func(*Config, string) error {
-	return func(cfg *Config, v string) error {
-		d, err := time.ParseDuration(v)
-		if err != nil || d <= 0 {
-			return errors.New("not a positive duration")
-		}
-		set(cfg, d)
 		return nil
 	}
 }
@@ -902,14 +958,15 @@ func checkAddr(v string) error {
 func Load(lookupEnv func(string) (string, bool)) (Config, error) {
 	settings := Settings()
 	var file map[string]string
+	var ignored []string
 	if path, _ := lookupEnv("FLAGNETIC_CONFIG_FILE"); path != "" {
 		var err error
-		if file, err = readFile(path, settings); err != nil {
+		if file, ignored, err = readFile(path, settings); err != nil {
 			return Config{}, err
 		}
 	}
 
-	var cfg Config
+	cfg := Config{IgnoredFileKeys: ignored}
 	for _, s := range settings {
 		value, set := lookupEnv(s.Name)
 		if !set && s.Key != "" {
@@ -930,8 +987,11 @@ func Load(lookupEnv func(string) (string, bool)) (Config, error) {
 		}
 		if err := s.apply(&cfg, value); err != nil {
 			shown := strconv.Quote(value)
-			if s.Secret {
+			switch {
+			case s.Secret:
 				shown = "the value"
+			case s.Name == "FLAGNETIC_BASE_URL":
+				shown = strconv.Quote(redactUserinfo(value))
 			}
 			return Config{}, fmt.Errorf("%s: %s is %w; for example %s", s.Name, shown, err, s.Example)
 		}
@@ -967,53 +1027,83 @@ func requireTestHarness(lookupEnv func(string) (string, bool), listenAddr string
 	return nil
 }
 
+// fileKey is what a key of the configuration file looks like: the lower-case
+// name of a setting.
+var fileKey = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
 // readFile reads a configuration file: a YAML mapping from file keys to
-// scalars. An unknown key is refused, so a typo never silently leaves a
-// default in place.
-func readFile(path string, settings []Setting) (map[string]string, error) {
+// scalars. A key that is no setting name is refused, and so is the name of a
+// setting that only the environment sets. A well-formed key this version does
+// not know is returned, not refused: a binary rolled back after an upgrade
+// has to start with the file written for the newer one, and the caller logs
+// the keys so that a typo is still noticed.
+func readFile(path string, settings []Setting) (values map[string]string, ignored []string, err error) {
 	src, err := os.ReadFile(path) //nolint:gosec // the operator names the file
 	if err != nil {
-		return nil, fmt.Errorf("FLAGNETIC_CONFIG_FILE: %w", err)
+		return nil, nil, fmt.Errorf("FLAGNETIC_CONFIG_FILE: %w", err)
 	}
 	var doc yaml.Node
 	if err := yaml.NewDecoder(bytes.NewReader(src)).Decode(&doc); err != nil {
 		if errors.Is(err, io.EOF) { // an empty file sets nothing
-			return nil, nil
+			return nil, nil, nil
 		}
-		return nil, fmt.Errorf("%s: %w", path, err)
+		return nil, nil, fmt.Errorf("%s: %w", path, err)
 	}
 	if len(doc.Content) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	root := doc.Content[0]
 	if root.Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("%s: want a mapping of settings at the top level", path)
+		return nil, nil, fmt.Errorf("%s: want a mapping of settings at the top level", path)
 	}
-	known := make(map[string]bool, len(settings))
+	known, environmentOnly := make(map[string]bool, len(settings)), make(map[string]bool)
 	for _, s := range settings {
 		if s.Key != "" {
 			known[s.Key] = true
+		} else {
+			environmentOnly[strings.ToLower(strings.TrimPrefix(s.Name, "FLAGNETIC_"))] = true
 		}
 	}
-	values := make(map[string]string, len(root.Content)/2)
+	values = make(map[string]string, len(root.Content)/2)
 	seen := make(map[string]bool, len(root.Content)/2)
 	for i := 0; i+1 < len(root.Content); i += 2 {
 		k, v := root.Content[i], root.Content[i+1]
-		if !known[k.Value] {
-			return nil, fmt.Errorf("%s: line %d: unknown setting %q", path, k.Line, k.Value)
+		if !fileKey.MatchString(k.Value) || environmentOnly[k.Value] {
+			return nil, nil, fmt.Errorf("%s: line %d: %q is not a key of the file; the settings are in the File key column of the reference", path, k.Line, k.Value)
 		}
 		if seen[k.Value] {
-			return nil, fmt.Errorf("%s: line %d: %s is set twice", path, k.Line, k.Value)
+			return nil, nil, fmt.Errorf("%s: line %d: %s is set twice", path, k.Line, k.Value)
 		}
 		seen[k.Value] = true
+		if !known[k.Value] {
+			ignored = append(ignored, k.Value)
+			continue
+		}
 		if v.Kind != yaml.ScalarNode {
-			return nil, fmt.Errorf("%s: line %d: %s must be a single value", path, k.Line, k.Value)
+			return nil, nil, fmt.Errorf("%s: line %d: %s must be a single value", path, k.Line, k.Value)
 		}
 		if v.Tag != "!!null" {
 			values[k.Value] = v.Value
 		}
 	}
-	return values, nil
+	return values, ignored, nil
+}
+
+// scheme is the scheme of a URL with the slashes after it.
+var scheme = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*://`)
+
+// redactUserinfo hides the credentials of a URL, so a refusal that quotes the
+// value never repeats a password. Everything after the scheme up to the last
+// @ is hidden, since a password may itself hold a slash, a colon or an @ the
+// operator did not escape, and a value with no scheme may still hold one.
+func redactUserinfo(v string) string {
+	prefix := scheme.FindString(v)
+	rest := v[len(prefix):]
+	at := strings.LastIndex(rest, "@")
+	if at < 0 {
+		return v
+	}
+	return prefix + "[redacted]" + rest[at:]
 }
 
 var keywordPassword = regexp.MustCompile(`password\s*=\s*('(?:[^'\\]|\\.)*'|\S+)`)
@@ -1035,4 +1125,45 @@ func (c Config) DatabaseURLForLog() string {
 		u.RawQuery = q.Encode()
 	}
 	return u.String()
+}
+
+// CommandLineVariable is an environment variable the command line reads
+// outside the settings table: a setting configures the replica, these
+// address an instance or tell a command what to create.
+type CommandLineVariable struct {
+	Name        string
+	Description string
+}
+
+// CommandLineVariables lists the variables the commands read themselves.
+func CommandLineVariables() []CommandLineVariable {
+	return []CommandLineVariable{
+		{"FLAGNETIC_ADMIN_PASSWORD", "The password of the instance admin that `flagnetic admin bootstrap` and `flagnetic admin create` create. When unset, a password is generated and printed once."},
+		{"FLAGNETIC_URL", "The instance that `flagnetic export`, `import` and `import-firebase` talk to, when `--url` is not given."},
+		{"FLAGNETIC_TOKEN", "The access token those commands present, when neither `--token` nor `--token-file` is given."},
+		{"FLAGNETIC_TEST_HARNESS", "Test only: the marker, set to `" + TestHarness + "` by the end-to-end harness, under which `FLAGNETIC_TEST_CLOCK_FILE` is accepted."},
+	}
+}
+
+// UnknownVariables returns the names among environ, in the form of
+// os.Environ, that start with FLAGNETIC_ but are neither a setting nor a
+// variable of the command line: a mistyped setting that would otherwise
+// change nothing. They are sorted.
+func UnknownVariables(environ []string) []string {
+	known := make(map[string]bool)
+	for _, s := range Settings() {
+		known[s.Name] = true
+	}
+	for _, v := range CommandLineVariables() {
+		known[v.Name] = true
+	}
+	var out []string
+	for _, kv := range environ {
+		name, _, _ := strings.Cut(kv, "=")
+		if strings.HasPrefix(name, "FLAGNETIC_") && !known[name] {
+			out = append(out, name)
+		}
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
 }

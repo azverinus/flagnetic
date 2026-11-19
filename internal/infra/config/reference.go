@@ -12,7 +12,7 @@ func Reference() []byte {
 	var b bytes.Buffer
 	b.WriteString(`---
 title: "Configuration reference"
-description: "Every FLAGNETIC_* environment variable and flag of the server with its default, generated from the settings table."
+description: "Every setting of a Flagnetic replica, as an environment variable or a configuration file key, with its default, and the variables the command line reads, generated from the settings table."
 ---
 
 # Configuration reference
@@ -29,7 +29,7 @@ listen_addr: ":8080"
 log_format: text
 ` + "```" + `
 
-A file key that is not listed here, a value that is not a single value, and a value that does not parse are refused when the server starts, with exit code 2 and a message naming the setting.
+A value that is not a single value, a value that does not parse or lies outside the range shown, a key that is not written like a setting name and the key of a setting that only the environment sets are refused when the replica starts, with exit code 2 and a message naming the setting. A well-formed key that is not listed here is ignored with a warning in the log, and so is an environment variable that starts with ` + "`FLAGNETIC_`" + ` but is no setting and no variable of the command line: a binary rolled back to an earlier version still starts with the file or the environment written for a newer one, and a mistyped setting is noticed.
 
 Durations are written as a number and a unit: ` + "`500ms`, `15s`, `2m`" + `.
 
@@ -53,12 +53,16 @@ Durations are written as a number and a unit: ` + "`500ms`, `15s`, `2m`" + `.
 		if s.Unit != "" {
 			desc += " Unit: " + s.Unit + "."
 		}
+		if s.Range != "" {
+			desc += " Range: " + s.Range + "."
+		}
 		desc += " Example: `" + s.Example + "`."
 		fmt.Fprintf(&b, "| `%s` | %s | %s | %s |\n", s.Name, key, def, strings.ReplaceAll(desc, "|", `\|`))
 	}
-	// The one variable read outside the settings table, by the commands
-	// that create an instance admin; listed so the reference names every
-	// variable Flagnetic reads.
-	b.WriteString("\nOne more variable is read by `flagnetic admin bootstrap` and `flagnetic admin create` alone, never by `serve`: `FLAGNETIC_ADMIN_PASSWORD`, the password of the instance admin they create (environment only; when unset, a password is generated and printed once). See [The first instance admin](operations.md#the-first-instance-admin).\n")
+	b.WriteString("\n## Variables of the command line\n\nThe table above is the settings of a replica. The commands read these variables too, never `serve`; they are environment only. The command line's own flags are listed by each command's `-h`.\n\n| Variable | Description |\n|---|---|\n")
+	for _, v := range CommandLineVariables() {
+		fmt.Fprintf(&b, "| `%s` | %s |\n", v.Name, strings.ReplaceAll(v.Description, "|", `\|`))
+	}
+	b.WriteString("\nSee [The first instance admin](operations.md#the-first-instance-admin) for the admin password.\n")
 	return b.Bytes()
 }

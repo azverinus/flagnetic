@@ -77,6 +77,32 @@ Every template that renders a workload includes it.
 {{- fail (printf "flagnetic: config.%s is managed by the chart: use migrations.mode, service.port, service.metrics.port or secrets instead" $key) -}}
 {{- end -}}
 {{- end -}}
+{{- /* A pod killed before the server has stopped loses the mail, the
+evaluation counts and the SDK inventory it was still writing. The server
+stops within the drain, the grace period and the cancel step after them
+(docs/operations.md, "Stopping"), so the pod gets at least as long. */ -}}
+{{- $drain := "5s" -}}
+{{- if and (hasKey .Values.config "shutdown_drain") (ne (toString .Values.config.shutdown_drain) "") -}}{{- $drain = .Values.config.shutdown_drain -}}{{- end -}}
+{{- $grace := "15s" -}}
+{{- if and (hasKey .Values.config "shutdown_grace") (ne (toString .Values.config.shutdown_grace) "") -}}{{- $grace = .Values.config.shutdown_grace -}}{{- end -}}
+{{- $stop := add (ceil (addf (include "flagnetic.durationSeconds" $drain) (include "flagnetic.durationSeconds" $grace))) 10 -}}
+{{- if lt (int .Values.terminationGracePeriodSeconds) (int $stop) -}}
+{{- fail (printf "flagnetic: terminationGracePeriodSeconds is %d and must be at least %d: config.shutdown_drain plus config.shutdown_grace plus the 10 seconds the server takes to cancel what is left" (int .Values.terminationGracePeriodSeconds) (int $stop)) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+The seconds a Go duration such as 20s, 1m30s or 500ms lasts. A value that is
+no duration, which the server refuses, counts as nothing here.
+*/}}
+{{- define "flagnetic.durationSeconds" -}}
+{{- $units := dict "ns" 0.000000001 "us" 0.000001 "µs" 0.000001 "ms" 0.001 "s" 1.0 "m" 60.0 "h" 3600.0 -}}
+{{- $total := 0.0 -}}
+{{- range $part := regexFindAll "[0-9.]+(ns|us|µs|ms|s|m|h)" (toString .) -1 -}}
+{{- $number := regexFind "^[0-9.]+" $part -}}
+{{- $total = addf $total (mulf (float64 $number) (get $units (trimPrefix $number $part))) -}}
+{{- end -}}
+{{- $total -}}
 {{- end -}}
 
 {{/* The environment of the server and the migration: DATABASE_URL and extras. */}}
@@ -97,6 +123,13 @@ format and level and the pool size apply to it as to the server.
 - name: {{ printf "FLAGNETIC_%s" ($key | upper) }}
   {{- if kindIs "float64" $value }}
   value: {{ int64 $value | toString | quote }}
+  {{- else if and (hasPrefix "rate_limit_" $key) (kindIs "bool" $value) }}
+  {{- /* An unquoted off is a boolean in YAML 1.1, which Helm reads; the
+  setting takes off, never false or true. */}}
+  {{- if $value }}
+  {{- fail (printf "flagnetic: config.%s is true, which is no limit: give a whole number, or \"off\" in quotes" $key) }}
+  {{- end }}
+  value: "off"
   {{- else }}
   value: {{ $value | toString | quote }}
   {{- end }}

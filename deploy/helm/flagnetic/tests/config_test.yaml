@@ -1,0 +1,93 @@
+suite: config
+templates:
+  - templates/deployment.yaml
+set:
+  secrets.existingSecret: mine
+tests:
+  - it: refuses a config key that is no setting
+    set:
+      config:
+        base_ur: https://flags.example.com
+    asserts:
+      - failedTemplate: {}
+  - it: refuses a misspelt rate limit key
+    set:
+      config:
+        rate_limit_client_evalute: 5
+    asserts:
+      - failedTemplate: {}
+  - it: renders an unquoted off, which YAML 1.1 reads as false, as off
+    set:
+      config:
+        rate_limit_client_evaluate: false
+        rate_limit_server_events: "off"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE
+            value: "off"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FLAGNETIC_RATE_LIMIT_SERVER_EVENTS
+            value: "off"
+  - it: renders a number of a rate limit as it is
+    set:
+      config:
+        rate_limit_client_evaluate: 240
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE
+            value: "240"
+  - it: refuses a boolean true for a rate limit, which the server would refuse
+    set:
+      config:
+        rate_limit_client_evaluate: true
+    asserts:
+      - failedTemplate:
+          errorPattern: rate_limit_client_evaluate
+  - it: stops within the default drain and grace and the 10 seconds after them
+    asserts:
+      - equal:
+          path: spec.template.spec.terminationGracePeriodSeconds
+          value: 30
+  - it: refuses a grace period that does not cover the drain, the grace and the cancel step
+    set:
+      config:
+        shutdown_drain: 20s
+        shutdown_grace: 60s
+    asserts:
+      - failedTemplate:
+          errorPattern: terminationGracePeriodSeconds
+  - it: accepts a grace period that covers them
+    set:
+      terminationGracePeriodSeconds: 90
+      config:
+        shutdown_drain: 20s
+        shutdown_grace: 1m
+    asserts:
+      - equal:
+          path: spec.template.spec.terminationGracePeriodSeconds
+          value: 90
+  - it: reads a drain written as a number of seconds, or as minutes and seconds
+    set:
+      terminationGracePeriodSeconds: 100
+      config:
+        shutdown_drain: 0
+        shutdown_grace: 1m30s
+    asserts:
+      - equal:
+          path: spec.template.spec.terminationGracePeriodSeconds
+          value: 100
+  - it: refuses by a second a period one second short
+    set:
+      terminationGracePeriodSeconds: 99
+      config:
+        shutdown_drain: 0
+        shutdown_grace: 1m30s
+    asserts:
+      - failedTemplate:
+          errorPattern: terminationGracePeriodSeconds
