@@ -42,7 +42,7 @@ func (f *summaryFixture) retain(t *testing.T) {
 
 func (f *summaryFixture) storedSummaries(t *testing.T) int {
 	t.Helper()
-	rows, err := pgevents.NewStore(testkit.Pool(t)).EvaluationSummaries(t.Context(), f.p.environmentID(t, "production"))
+	rows, err := testkit.StoredEvaluationSummaries(t.Context(), testkit.Pool(t), f.p.environmentID(t, "production"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func (f *summaryFixture) storedSummaries(t *testing.T) int {
 
 func (f *summaryFixture) storedAliases(t *testing.T) int {
 	t.Helper()
-	rows, err := pgevents.NewStore(testkit.Pool(t)).Aliases(t.Context(), f.p.environmentID(t, "production"))
+	rows, err := testkit.StoredAliases(t.Context(), testkit.Pool(t), f.p.environmentID(t, "production"))
 	if err != nil {
 		t.Fatal(err)
 	}

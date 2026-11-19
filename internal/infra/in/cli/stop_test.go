@@ -16,7 +16,6 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
-	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -137,7 +136,7 @@ func TestAReplicaStoppedWithAMailStuckOnASilentServerStillWritesItsCountsWithinT
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	rows, err := pgevents.NewStore(pool).EvaluationSummaries(t.Context(), id.FromBytes[workspace.Environment](environment.JSON200.Id))
+	rows, err := testkit.StoredEvaluationSummaries(t.Context(), pool, id.FromBytes[workspace.Environment](environment.JSON200.Id))
 	if err != nil {
 		t.Fatal(err)
 	}

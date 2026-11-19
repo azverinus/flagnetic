@@ -15,7 +15,6 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
-	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/testkit"
@@ -135,20 +134,32 @@ func startExposures(t *testing.T) exposuresFixture {
 
 func (f exposuresFixture) stored(t *testing.T) []events.ExposureRecord {
 	t.Helper()
-	xs, err := pgevents.NewStore(testkit.Pool(t)).Exposures(t.Context(), f.p.environmentID(t, "production"))
+	xs, err := testkit.StoredExposures(t.Context(), testkit.Pool(t), f.p.environmentID(t, "production"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	return xs
 }
 
+// refused returns how many exposures of the fixture's experiment were refused
+// in environment for each reason, as the experiment's exposures report them.
 func (f exposuresFixture) refused(t *testing.T, environment string) map[events.RejectionCode]int64 {
 	t.Helper()
-	counts, err := pgevents.NewStore(testkit.Pool(t)).RejectionCountsOf(t.Context(), f.experiment, f.p.environmentID(t, environment))
-	if err != nil {
-		t.Fatal(err)
+	return f.p.refusedOf(t, "checkout_test", environment)
+}
+
+// refusedOf is refused for the experiment with key.
+func (p project) refusedOf(t *testing.T, key, environment string) map[events.RejectionCode]int64 {
+	t.Helper()
+	res := do(p.admin.GetExperimentExposuresWithResponse(t.Context(), p.key, key, &management.GetExperimentExposuresParams{Environment: environment}))
+	if res.JSON200 == nil {
+		t.Fatalf("GET exposures of %s = %d: %s", key, res.StatusCode(), res.Body)
 	}
-	return counts
+	out := map[events.RejectionCode]int64{}
+	for _, r := range res.JSON200.Rejections {
+		out[events.RejectionCode(r.Reason)] = r.Count
+	}
+	return out
 }
 
 func TestAnExposureOfAnExperimentIsStoredOnce(t *testing.T) {
@@ -201,7 +212,7 @@ func TestAnOverrideExposureOfAVariationTheFlagLacksIsRefused(t *testing.T) {
 func TestAnExposureOfADraftExperimentIsRefused(t *testing.T) {
 	f := startExposures(t)
 	f.p.flagWithVariations(t, "banner", "short", "Try", "long", "Start")
-	draft := f.p.draftExperiment(t, "banner_test", "banner", "user", "short", 5000, "long", 5000)
+	f.p.draftExperiment(t, "banner_test", "banner", "user", "short", 5000, "long", 5000)
 	exposure := with(exposureEvent(1, nil), map[string]any{
 		"experiment_key": "banner_test", "flag_key": "banner", "variation_key": "short",
 	})
@@ -215,12 +226,7 @@ func TestAnExposureOfADraftExperimentIsRefused(t *testing.T) {
 		t.Errorf("exposures stored = %+v, want none", stored)
 	}
 	// Refused as if it did not exist, so the draft's refusals count nothing.
-	counts, err := pgevents.NewStore(testkit.Pool(t)).RejectionCountsOf(t.Context(),
-		id.FromBytes[experiments.Experiment](draft.Id), f.p.environmentID(t, "production"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(counts) != 0 {
+	if counts := f.p.refusedOf(t, "banner_test", "production"); len(counts) != 0 {
 		t.Errorf("the draft's refusals = %+v, want none counted", counts)
 	}
 }
@@ -479,16 +485,16 @@ func TestAnEnvelopeFromAWrongClockHasEveryTimeOfEveryEventShifted(t *testing.T) 
 		with(summaryEvent(eventID(protocolTime, 3), map[string]any{"flag": "checkout", "variation": "true", "reason": "rule", "count": 1}),
 			map[string]any{"interval_start": at(-time.Minute), "interval_end": at(0)}),
 	)
-	store := pgevents.NewStore(testkit.Pool(t))
+	pool := testkit.Pool(t)
 	production := f.p.environmentID(t, "production")
 	if x := f.stored(t); len(x) != 1 || !x[0].Exposure.OccurredAt.Equal(protocolTime.Add(-10*time.Minute)) {
 		t.Errorf("exposure = %+v, want occurred 10 minutes before it was received", x)
 	}
-	aliases, err := store.Aliases(t.Context(), production)
+	aliases, err := testkit.StoredAliases(t.Context(), pool, production)
 	if err != nil || len(aliases) != 1 || !aliases[0].Alias.OccurredAt.Equal(protocolTime.Add(-20*time.Minute)) {
 		t.Errorf("aliases = %+v, %v, want occurred 20 minutes before it was received", aliases, err)
 	}
-	summaries, err := store.EvaluationSummaries(t.Context(), production)
+	summaries, err := testkit.StoredEvaluationSummaries(t.Context(), pool, production)
 	if err != nil || len(summaries) != 1 || !summaries[0].PeriodStart.Equal(protocolTime.Add(-time.Minute)) ||
 		!summaries[0].PeriodEnd.Equal(protocolTime) {
 		t.Errorf("summaries = %+v, %v, want the minute before it was received", summaries, err)
