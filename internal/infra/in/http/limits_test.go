@@ -429,3 +429,32 @@ func TestAClientThatStopsReadingWhatAMiddlewareAnswersIsDropped(t *testing.T) {
 		t.Errorf("all %d preflights were answered: the connection was held while its client stopped reading", sent)
 	}
 }
+
+const untrustedForwardedMessage = "X-Forwarded-For from a peer that is not a trusted proxy"
+
+func TestForwardedForFromAnUntrustedPeerIsWarnedOncePerReplica(t *testing.T) {
+	srv := testkit.StartServer(t, whoami, trusting("10.0.0.0/8"))
+	for range 3 {
+		clientIP(t, srv, map[string]string{"X-Forwarded-For": "203.0.113.7"})
+	}
+	if got := len(srv.Logs.Find(untrustedForwardedMessage)); got != 1 {
+		t.Errorf("%d warnings for X-Forwarded-For from an untrusted peer, want 1", got)
+	}
+}
+
+func TestForwardedForFromATrustedProxyIsNotWarned(t *testing.T) {
+	srv := testkit.StartServer(t, whoami, trusting("127.0.0.1/32"))
+	clientIP(t, srv, map[string]string{"X-Forwarded-For": "203.0.113.7"})
+	clientIP(t, srv, nil)
+	if got := len(srv.Logs.Find(untrustedForwardedMessage)); got != 0 {
+		t.Errorf("%d warnings for X-Forwarded-For from a trusted proxy, want none", got)
+	}
+}
+
+func TestARequestWithoutForwardedForIsNotWarned(t *testing.T) {
+	srv := testkit.StartServer(t, whoami)
+	clientIP(t, srv, nil)
+	if got := len(srv.Logs.Find(untrustedForwardedMessage)); got != 0 {
+		t.Errorf("%d warnings without X-Forwarded-For, want none", got)
+	}
+}

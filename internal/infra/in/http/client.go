@@ -28,25 +28,28 @@ func ClientOf(ctx context.Context) Client {
 
 // resolveClient returns r's client. The TCP peer is the client unless it is
 // a trusted proxy; then X-Forwarded-For names the client and
-// X-Forwarded-Proto the scheme. From any other peer both headers are ignored.
-func resolveClient(r *http.Request, trusted []netip.Prefix) Client {
-	c := Client{Scheme: "http"}
+// X-Forwarded-Proto the scheme. From any other peer both headers are ignored,
+// and ignored reports that an X-Forwarded-For was among them: behind an
+// Ingress or a Gateway whose address is not listed, every request then
+// arrives from the proxy, and the operator needs telling.
+func resolveClient(r *http.Request, trusted []netip.Prefix) (c Client, ignored bool) {
+	c.Scheme = "http"
 	if r.TLS != nil {
 		c.Scheme = "https"
 	}
 	peer, err := netip.ParseAddrPort(r.RemoteAddr)
 	if err != nil {
-		return c
+		return c, false
 	}
 	c.IP = plain(peer.Addr())
 	if !isTrusted(c.IP, trusted) {
-		return c
+		return c, len(r.Header.Values("X-Forwarded-For")) > 0
 	}
 	c.IP = forwardedFor(r.Header.Values("X-Forwarded-For"), c.IP, trusted)
 	if proto := forwardedProto(r.Header.Values("X-Forwarded-Proto")); proto != "" {
 		c.Scheme = proto
 	}
-	return c
+	return c, false
 }
 
 // forwardedFor walks X-Forwarded-For from the right, where each trusted proxy
