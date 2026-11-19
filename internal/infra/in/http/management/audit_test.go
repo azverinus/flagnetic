@@ -1,8 +1,10 @@
 package management_test
 
 import (
+	"context"
 	"io"
 	"net/http"
+	"net/netip"
 	"slices"
 	"strings"
 	"sync"
@@ -13,6 +15,7 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -389,4 +392,36 @@ func request(t *testing.T, method, url, token string) rawResponse {
 		t.Fatal(err)
 	}
 	return rawResponse{status: res.StatusCode, body: body}
+}
+
+func TestAnAuditEntryKeepsTheRequestIDOfATrustedProxyOnly(t *testing.T) {
+	const sent = "lb-7f3a:42.retry_1"
+	for name, trusted := range map[string]bool{"an untrusted peer": false, "a trusted proxy": true} {
+		var opts []testkit.ServerOption
+		if trusted {
+			opts = append(opts, testkit.WithEdge(func(o *flaghttp.Options) {
+				o.TrustedProxies = append(o.TrustedProxies, netip.MustParsePrefix("127.0.0.0/8"), netip.MustParsePrefix("::1/128"))
+			}))
+		}
+		srv := testkit.StartServer(t, opts...)
+		admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+		key := projectKey()
+		res, err := admin.CreateProjectWithResponse(t.Context(), management.ProjectCreate{Key: key, Name: "Project " + key},
+			func(_ context.Context, r *http.Request) error { r.Header.Set("X-Request-ID", sent); return nil })
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.JSON201 == nil {
+			t.Fatalf("%s: POST /projects = %d: %s", name, res.StatusCode(), res.Body)
+		}
+		answered := res.HTTPResponse.Header.Get("X-Request-ID")
+		entries := do(admin.ListProjectAuditEntriesWithResponse(t.Context(), key, &management.ListProjectAuditEntriesParams{Action: ptr("project.created")})).JSON200.Items
+		if len(entries) != 1 || entries[0].RequestId == nil {
+			t.Fatalf("%s: entries = %+v, want one with a request ID", name, entries)
+		}
+		recorded := *entries[0].RequestId
+		if recorded != answered || (answered == sent) != trusted {
+			t.Errorf("%s: X-Request-ID = %q, audit request_id = %q, sent %q", name, answered, recorded, sent)
+		}
+	}
 }
