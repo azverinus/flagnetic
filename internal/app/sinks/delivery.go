@@ -366,17 +366,22 @@ func (h *Deliver) AttemptSink(ctx context.Context, token LeaseToken, c ClaimedSi
 	results := make(map[sinks.EventKind]Result, len(c.Streams))
 	var errs []error
 	for i, due := range c.Streams {
+		if ctx.Err() == nil {
+			res, err := h.attempt(ctx, token, c, due)
+			results[due.Stream.EventKind] = res
+			if err != nil {
+				errs = append(errs, fmt.Errorf("event kind %s: %w", due.Stream.EventKind, err))
+			}
+		}
 		if ctx.Err() != nil {
-			// The streams not started give their leases back at once.
+			// A shutdown gives the leases of the streams left back at once, the
+			// one cut short included; one whose outcome was recorded has none
+			// to give back. Otherwise the sink waits for them to run out, and
+			// no other replica attempts any of its streams meanwhile.
 			if err := h.Abandon(ctx, token, ClaimedSink{Sink: c.Sink, Streams: c.Streams[i:]}); err != nil {
 				errs = append(errs, err)
 			}
 			break
-		}
-		res, err := h.attempt(ctx, token, c, due)
-		results[due.Stream.EventKind] = res
-		if err != nil {
-			errs = append(errs, fmt.Errorf("event kind %s: %w", due.Stream.EventKind, err))
 		}
 	}
 	return results, errors.Join(errs...)

@@ -135,6 +135,12 @@ func (s *Server) Tick(t testing.TB, name string) error {
 	return s.runner.Tick(t.Context(), name)
 }
 
+// TickWith is Tick under ctx, which a test cancels to end a round as a
+// shutdown would.
+func (s *Server) TickWith(ctx context.Context, name string) error {
+	return s.runner.Tick(ctx, name)
+}
+
 // Scrape returns the server's metrics in the Prometheus text format, as the
 // metrics listener serves them.
 func (s *Server) Scrape(t testing.TB) string {

@@ -1,6 +1,7 @@
 package sdk_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -1289,5 +1290,45 @@ func TestABatchWhoseLeaseWasLostIsNotCounted(t *testing.T) {
 	}
 	if got := testkit.Metric(t, other.Scrape(t), series); got != 1 {
 		t.Errorf("the replica that recorded the batch counted %v acknowledged, want 1", got)
+	}
+}
+
+// A round cut short by a shutdown gives back the leases of the streams it was
+// attempting and had not started, so that another replica delivers the sink at
+// once instead of after the leases run out.
+func TestAShutdownMidAttemptGivesTheSinksLeasesBackToOtherReplicas(t *testing.T) {
+	f := startDelivering(t)
+	release := make(chan struct{})
+	r := testkit.StartReceiver(t, script([]testkit.Reply{{Release: release}}, []testkit.Reply{{}})...)
+	f.enabled(t, small(r, "exposure", "alias"))
+	other := testkit.StartServer(t, testkit.WithClock(f.clock), sinkTargets)
+	f.post(t, f.exposure("u-1", "true", f.clock.Now()), f.alias(1))
+	f.srv.AwaitHorizon(t)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() { done <- f.srv.TickWith(ctx, worker.SinkDeliveryName) }()
+	for deadline := time.Now().Add(10 * time.Second); len(batchCalls(r)) == 0; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the first batch never reached the receiver")
+		}
+	}
+	cancel()
+	<-done
+	close(release)
+
+	// The lease would run for minutes: the other replica delivers both streams
+	// within this round.
+	tick(t, other)
+	kinds := map[string]bool{}
+	for _, c := range batchCalls(r) {
+		var b struct {
+			EventKind string `json:"event_kind"`
+		}
+		_ = json.Unmarshal(c.Body, &b)
+		kinds[b.EventKind] = true
+	}
+	if !kinds["exposure"] || !kinds["alias"] {
+		t.Errorf("batches of %v reached the receiver, want both streams delivered by the other replica", kinds)
 	}
 }
