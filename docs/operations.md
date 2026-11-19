@@ -35,7 +35,9 @@ Exit codes: `0` success, `1` a runtime failure (PostgreSQL unreachable or too ol
 
 ## Migrations
 
-By default `serve` applies pending migrations on start, so an upgrade is a redeploy. Replicas that start together take turns through a PostgreSQL lock, and each migration is applied once.
+By default `serve` applies pending migrations on start, so an upgrade is a redeploy. Replicas that start together take turns through a PostgreSQL lock, and each migration is applied once. The lock belongs to the schema, so instances that share a database in separate schemas never wait for each other's migrations.
+
+Statements of a migration wait at most 5 seconds for a table lock (`lock_timeout`). A schema change queues behind every open reader of its table, and every query that arrives after it queues behind the change, so an unbounded wait would stall the replicas still serving until a long query, a dump or an idle transaction ended. A migration that times out fails (`flagnetic migrate` exits non-zero, a pre-upgrade job fails) and leaves the schema as it was: end the long reader and run it again.
 
 To run migrations as a separate step instead, for example as a job before the new version starts, run `flagnetic migrate` with the new version and start the replicas with `FLAGNETIC_AUTO_MIGRATE=false`.
 

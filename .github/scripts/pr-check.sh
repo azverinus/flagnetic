@@ -20,8 +20,10 @@
 #   server changed    build and golangci-lint
 #   a Go module       lint, tests with its coverage floors, when it or a module
 #                     it requires changed
-#   migrations changed  squawk on the migrations added since the merge base, and
-#                     on the bad fixtures; not run without squawk installed
+#   migrations changed  squawk on the migrations added or changed since the merge
+#                     base, and on the bad fixtures; not run without squawk
+#                     installed. Every migration of the latest server tag must be
+#                     pinned in released.sum.
 #   chart changed     helm lint, the helm-unittest suites and kubeconform on
 #                     what the chart renders; not run without helm (with the
 #                     helm-unittest plugin) and kubeconform installed
@@ -470,6 +472,10 @@ if [ "$RUN_MIGRATIONS" = 1 ]; then
     step "migration lint" digest_tail "make the migration expand/contract (see CONTRIBUTING.md), or add a squawk-ignore with its reason on the line before" \
       bash -c ".github/scripts/lint-migrations.sh --base '$BASE_REF' && .github/scripts/lint-migrations.sh --self-test"
   else not_run "migration lint" "squawk is not installed (.github/scripts/install-squawk.sh DIR installs the pinned one)"; fi
+  if git tag -l 'v[0-9]*' | grep -q .; then
+    step "released migrations pinned" digest_tail "append the sum of each released migration to internal/infra/out/postgres/migrations/released.sum" \
+      bash -c ".github/scripts/check-released-migrations.sh && .github/scripts/check-released-migrations.sh --self-test"
+  else not_run "released migrations pinned" "no server tag in this checkout (git fetch --tags)"; fi
 fi
 if [ "$RUN_HELM" = 1 ]; then
   if need_tool "${HELM:-helm}" && need_tool "${KUBECONFORM:-kubeconform}" && "${HELM:-helm}" plugin list 2>/dev/null | grep -q '^unittest'; then

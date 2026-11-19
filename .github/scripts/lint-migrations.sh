@@ -4,13 +4,17 @@
 # (expand/contract: add, never rename or drop what the previous minor uses, and
 # take no lock that stops it for long). Settings are in .squawk.toml.
 #
-#   lint-migrations.sh --base REF   the migrations added since the merge base with REF
+#   lint-migrations.sh --base REF   the migrations added, renamed or modified since
+#                                   the merge base with REF, but not the released
+#                                   ones (those pinned in released.sum)
 #   lint-migrations.sh FILE...      those files
 #   lint-migrations.sh --self-test  each deliberately bad migration under
 #                                   .github/scripts/testdata/migration-lint must fail
 #
-# Only added files are linted: a released migration is never edited, and the
-# ones already there were written before the rule. An exception is a squawk
+# A migration that has not been released is linted again whenever it changes:
+# a later pull request can edit one an earlier pull request added and passed.
+# A released one is never linted: it is pinned in released.sum, where a test
+# fails on any edit, and it was written before the rule. An exception is a squawk
 # ignore comment, `-- squawk-ignore <rule>`, on the line after a comment that
 # gives the reason:
 #
@@ -51,6 +55,21 @@ lint_files() { # <file>...
   return $rc
 }
 
+# changed_migrations <repository> <merge base>: the migration files added,
+# renamed or modified since the merge base, committed or not, that released.sum
+# does not pin, one per line.
+changed_migrations() {
+  local repo="$1" merge_base="$2" f
+  while IFS= read -r f; do
+    [ -n "$f" ] && [ -f "$repo/$f" ] || continue
+    awk -v f="$(basename "$f")" '$2 == f { found = 1 } END { exit !found }' "$repo/$MIGRATIONS/released.sum" && continue
+    echo "$f"
+  done < <({
+    git -C "$repo" diff --name-only --diff-filter=ARM "$merge_base" -- "$MIGRATIONS/*.sql"
+    git -C "$repo" ls-files --others --exclude-standard -- "$MIGRATIONS/*.sql"
+  } | sort -u)
+}
+
 squawk_available() { command -v "${SQUAWK:-squawk}" >/dev/null 2>&1; }
 
 self_test() {
@@ -67,7 +86,30 @@ self_test() {
       rc=1
     fi
   done
+  rc=$(( rc | $(changed_migrations_self_test) ))
   return $rc
+}
+
+# The files a change gets linted for: an added one, a modified one that is not
+# released yet, and not one pinned in released.sum.
+changed_migrations_self_test() {
+  local dir rc=0 git=(git -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false) got
+  dir="$(mktemp -d)" || { echo 1; return; }
+  mkdir -p "$dir/$MIGRATIONS"
+  git -C "$dir" init -q
+  for f in 00001_released 00002_unreleased 00003_untouched; do echo "-- +goose Up" >"$dir/$MIGRATIONS/$f.sql"; done
+  echo "$(printf '0%.0s' {1..64})  00001_released.sql" >"$dir/$MIGRATIONS/released.sum"
+  git -C "$dir" add -A && "${git[@]}" -C "$dir" commit -q -m base
+  echo "ALTER TABLE flags DROP COLUMN owner;" >>"$dir/$MIGRATIONS/00001_released.sql"
+  echo "ALTER TABLE flags DROP COLUMN owner;" >>"$dir/$MIGRATIONS/00002_unreleased.sql"
+  echo "-- +goose Up" >"$dir/$MIGRATIONS/00004_added.sql"
+  got="$(changed_migrations "$dir" HEAD | xargs -n1 basename 2>/dev/null | tr '\n' ' ')"
+  if [ "$got" != "00002_unreleased.sql 00004_added.sql " ]; then
+    echo "lint-migrations: a change to a released, an unreleased and a new migration selects [$got], want [00002_unreleased.sql 00004_added.sql ]" >&2
+    rc=1
+  fi
+  rm -rf "$dir"
+  echo $rc
 }
 
 mode=files
@@ -89,15 +131,14 @@ case "$mode" in
   self-test) self_test; exit $? ;;
   base)
     merge_base="$(git merge-base HEAD "$base")" || { echo "lint-migrations: no merge base with $base" >&2; exit 2; }
-    # Added files only, committed or not; a rename counts as an addition.
     while IFS= read -r f; do
-      [ -n "$f" ] && [ -f "$f" ] && files+=("$f")
-    done < <({ git diff --name-only --diff-filter=AR "$merge_base" -- "$MIGRATIONS/*.sql"; git ls-files --others --exclude-standard -- "$MIGRATIONS/*.sql"; } | sort -u)
+      [ -n "$f" ] && files+=("$f")
+    done < <(changed_migrations "$root" "$merge_base")
     ;;
 esac
 
 if [ "${#files[@]}" -eq 0 ]; then
-  echo "lint-migrations: no migration added; nothing to lint"
+  echo "lint-migrations: no unreleased migration added or changed; nothing to lint"
   exit 0
 fi
 echo "lint-migrations: ${files[*]}"

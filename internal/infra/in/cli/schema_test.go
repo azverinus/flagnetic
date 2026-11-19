@@ -74,3 +74,32 @@ func TestWithoutAutoMigrateAnUnmigratedDatabaseIsRefused(t *testing.T) {
 		t.Errorf("exit code = %d, want 1 pointing at flagnetic migrate:\n%s", res.code, res.stderr)
 	}
 }
+
+// A chart rollback starts the older binary against a database a newer one
+// migrated, and it must come up: goose ignores applied versions it has no file
+// for, so the older binary applies nothing and leaves the schema as it is.
+func TestAnOlderBinaryMigratingANewerSchemaAppliesNothing(t *testing.T) {
+	url := migrated(t, fixtures)
+
+	t.Run("flagnetic migrate", func(t *testing.T) {
+		res := migrate(url, fixturesV1)
+		if res.code != 0 {
+			t.Fatalf("exit code = %d, want 0:\n%s", res.code, res.stderr)
+		}
+		rec := res.logRecord(t, "migrations applied")
+		if rec["applied"] != 0.0 || rec["version"] != 2.0 {
+			t.Errorf("applied %v up to version %v, want 0 up to 2", rec["applied"], rec["version"])
+		}
+	})
+
+	t.Run("serve with auto-migration", func(t *testing.T) {
+		r := serve(t, map[string]string{"DATABASE_URL": url, "FLAGNETIC_AUTO_MIGRATE": "true"}, fixturesV1)
+		rec := r.findLog("migrations applied")
+		if rec == nil || rec["applied"] != 0.0 || rec["version"] != 2.0 {
+			t.Errorf("want migrations applied: 0 up to version 2, got %v:\n%s", rec, r.stderr.String())
+		}
+		if r.findLog("listening") == nil {
+			t.Errorf("the older binary did not start:\n%s", r.stderr.String())
+		}
+	})
+}
