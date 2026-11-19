@@ -100,7 +100,11 @@ func (g *gzipWriter) WriteHeader(status int) {
 	if !strings.Contains(strings.ToLower(strings.Join(h.Values("Vary"), ",")), "accept-encoding") {
 		h.Add("Vary", "Accept-Encoding")
 	}
-	if g.accepted && status != http.StatusNoContent && status != http.StatusNotModified && h.Get("Content-Encoding") == "" {
+	// An event stream stays plain: its frames are a few dozen bytes each, so
+	// compressing saves nothing, and the compressor's buffers (about 800 KB)
+	// would be held for as long as the stream lives, for every open stream.
+	stream := strings.HasPrefix(strings.ToLower(strings.TrimSpace(h.Get("Content-Type"))), "text/event-stream")
+	if g.accepted && !stream && status != http.StatusNoContent && status != http.StatusNotModified && h.Get("Content-Encoding") == "" {
 		h.Set("Content-Encoding", "gzip")
 		h.Del("Content-Length")
 		g.zw = gzip.NewWriter(g.ResponseWriter)
@@ -118,15 +122,22 @@ func (g *gzipWriter) Write(b []byte) (int, error) {
 	return g.ResponseWriter.Write(b)
 }
 
-// Flush sends what is compressed so far, so a stream's frames leave at once.
-func (g *gzipWriter) Flush() {
+// Flush sends what is compressed so far. A failure is reported by
+// FlushError, which http.ResponseController prefers.
+func (g *gzipWriter) Flush() { _ = g.FlushError() }
+
+// FlushError sends what is compressed so far and returns the compressor's
+// error, or the one of the writer underneath, so a caller that flushes learns
+// of a connection that broke instead of only buffering into the compressor.
+func (g *gzipWriter) FlushError() error {
 	if !g.wrote {
 		g.WriteHeader(http.StatusOK)
 	}
+	var zerr error
 	if g.zw != nil {
-		_ = g.zw.Flush()
+		zerr = g.zw.Flush()
 	}
-	_ = http.NewResponseController(g.ResponseWriter).Flush()
+	return errors.Join(zerr, http.NewResponseController(g.ResponseWriter).Flush())
 }
 
 // Unwrap lets http.ResponseController reach the writer underneath.

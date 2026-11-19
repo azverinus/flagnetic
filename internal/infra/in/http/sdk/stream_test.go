@@ -537,3 +537,23 @@ func TestAVersionMissedWhileTheListenerWasDeafIsCaughtUpByAHeartbeatWhenItsReloa
 	version(t, s.next(t), currentVersion(t, a, value))
 	heartbeat(t, s.next(t))
 }
+
+func TestAStreamIsNeverGzippedWhileARulesetFetchIs(t *testing.T) {
+	srv := testkit.StartServer(t)
+	p := newProject(t, srv)
+	p.flag(t, "checkout.new-flow")
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
+
+	s := openStream(t, srv, nil, bearer(value), header("Accept-Encoding", "gzip"))
+	s.started(t) // its first frame arrives at once, uncompressed
+	if enc := s.res.Header.Get("Content-Encoding"); enc != "" {
+		t.Errorf("stream Content-Encoding = %q, want none", enc)
+	}
+	version(t, s.next(t), currentVersion(t, srv, value))
+
+	res := do(client(t, srv).GetRuleset(t.Context(), &sdk.GetRulesetParams{}, bearer(value), header("Accept-Encoding", "gzip")))
+	defer func() { _ = res.Body.Close() }()
+	if enc := res.Header.Get("Content-Encoding"); enc != "gzip" {
+		t.Errorf("ruleset Content-Encoding = %q, want gzip", enc)
+	}
+}

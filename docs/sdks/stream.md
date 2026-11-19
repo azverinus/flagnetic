@@ -17,7 +17,7 @@ Either kind of key may hold it: the stream carries versions only, never a docume
 
 ## Frames
 
-The answer is `text/event-stream` with `Cache-Control: no-cache` and `X-Accel-Buffering: no`. Its first frame tells the SDK to reconnect after three seconds:
+The answer is `text/event-stream` with `Cache-Control: no-cache` and `X-Accel-Buffering: no`. It is never compressed, whatever `Accept-Encoding` says (its frames are a few dozen bytes, and a compressor held for the stream's life would cost the replica memory for every open stream). Its first frame tells the SDK to reconnect after three seconds:
 
 ```
 retry: 3000
