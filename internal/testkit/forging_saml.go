@@ -63,6 +63,21 @@ const (
 	SAMLFailedStatus
 	// SAMLNoAudience leaves the audience restriction out.
 	SAMLNoAudience
+	// SAMLNoDestination signs the response and leaves its Destination out.
+	SAMLNoDestination
+	// SAMLNoAssertion signs a successful response that holds no assertion.
+	SAMLNoAssertion
+	// SAMLTwoAssertions signs a response that holds two assertions.
+	SAMLTwoAssertions
+	// SAMLProcessingInstruction puts a processing instruction in front of an
+	// otherwise valid response.
+	SAMLProcessingInstruction
+	// SAMLWrongRecipient names another recipient than the ACS in the subject
+	// confirmation of the assertion.
+	SAMLWrongRecipient
+	// SAMLSecondAudienceMisses restricts the assertion to the audience twice,
+	// the second restriction naming another one.
+	SAMLSecondAudienceMisses
 )
 
 // SAMLEncryption is how a ForgingSAMLIDP encrypts the assertion.
@@ -392,12 +407,15 @@ func (f *ForgingSAMLIDP) Respond(t testing.TB, req SAMLRequest, a SAMLAssertion)
 		a.ID = "_" + randomHex(16)
 	}
 	issuer, audience, destination, inResponseTo := f.EntityID, req.Issuer, req.ACS, req.ID
+	recipient := req.ACS
 	notBefore, notAfter := now.Add(-time.Minute), now.Add(5*time.Minute)
 	switch a.Fault {
 	case SAMLWrongAudience:
 		audience = "https://other.example.com/sp"
 	case SAMLWrongDestination:
 		destination = "https://other.example.com/acs"
+	case SAMLWrongRecipient:
+		recipient = "https://other.example.com/acs"
 	case SAMLWrongInResponseTo:
 		inResponseTo = "_not-the-request"
 	case SAMLNoInResponseTo:
@@ -417,9 +435,12 @@ func (f *ForgingSAMLIDP) Respond(t testing.TB, req SAMLRequest, a SAMLAssertion)
 		code := resp.FindElement("./Status/StatusCode")
 		code.RemoveAttr("Value")
 		code.CreateAttr("Value", "urn:oasis:names:tc:SAML:2.0:status:AuthnFailed")
-		return f.form(t, resp, req.RelayState, false)
+		return f.form(t, resp, req.RelayState, false, false)
 	}
-	assertion := f.assertion(now, a, issuer, audience, destination, inResponseTo, notBefore, notAfter, a.Fault == SAMLNoAudience)
+	assertion := f.assertion(now, a, issuer, audience, recipient, inResponseTo, notBefore, notAfter, a.Fault == SAMLNoAudience)
+	if a.Fault == SAMLSecondAudienceMisses {
+		assertion.FindElement("./Conditions").CreateElement("saml:AudienceRestriction").CreateElement("saml:Audience").SetText("https://other.example.com/sp")
+	}
 	resp := f.response(now, destination, inResponseTo, issuer)
 
 	switch {
@@ -429,6 +450,18 @@ func (f *ForgingSAMLIDP) Respond(t testing.TB, req SAMLRequest, a SAMLAssertion)
 		resp.AddChild(f.signWith(t, assertion, f.otherKey, f.otherCert))
 	case a.Fault == SAMLWrapped:
 		f.wrap(t, resp, a, now, issuer, audience, destination, inResponseTo, notBefore, notAfter)
+	case a.Fault == SAMLNoDestination:
+		resp.RemoveAttr("Destination")
+		resp.AddChild(assertion)
+		resp = f.signWith(t, resp, f.key, f.cert)
+	case a.Fault == SAMLNoAssertion:
+		resp = f.signWith(t, resp, f.key, f.cert)
+	case a.Fault == SAMLTwoAssertions:
+		second := a
+		second.ID = "_second" + randomHex(8)
+		resp.AddChild(assertion)
+		resp.AddChild(f.assertion(now, second, issuer, audience, recipient, inResponseTo, notBefore, notAfter, false))
+		resp = f.signWith(t, resp, f.key, f.cert)
 	case a.SignResponse:
 		resp.AddChild(assertion)
 		resp = f.signWith(t, resp, f.key, f.cert)
@@ -440,7 +473,7 @@ func (f *ForgingSAMLIDP) Respond(t testing.TB, req SAMLRequest, a SAMLAssertion)
 			resp.AddChild(signed)
 		}
 	}
-	return f.form(t, resp, req.RelayState, a.Fault == SAMLDocType)
+	return f.form(t, resp, req.RelayState, a.Fault == SAMLDocType, a.Fault == SAMLProcessingInstruction)
 }
 
 // wrap builds a signature wrapping attack: the response holds an unsigned
@@ -537,7 +570,7 @@ func (f *ForgingSAMLIDP) signWith(t testing.TB, el *etree.Element, key *rsa.Priv
 
 // form serializes resp as the SAMLResponse of the form an identity provider
 // posts.
-func (f *ForgingSAMLIDP) form(t testing.TB, resp *etree.Element, relayState string, docType bool) url.Values {
+func (f *ForgingSAMLIDP) form(t testing.TB, resp *etree.Element, relayState string, docType, processingInstruction bool) url.Values {
 	t.Helper()
 	doc := etree.NewDocument()
 	doc.SetRoot(resp)
@@ -547,6 +580,9 @@ func (f *ForgingSAMLIDP) form(t testing.TB, resp *etree.Element, relayState stri
 	}
 	if docType {
 		raw = append([]byte(`<!DOCTYPE foo [<!ENTITY xxe "x">]>`), raw...)
+	}
+	if processingInstruction {
+		raw = append([]byte(`<?xml-stylesheet type="text/xsl" href="https://other.example.com/x.xsl"?>`), raw...)
 	}
 	return url.Values{"SAMLResponse": {base64.StdEncoding.EncodeToString(raw)}, "RelayState": {relayState}}
 }

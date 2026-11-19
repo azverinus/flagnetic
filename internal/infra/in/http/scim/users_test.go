@@ -770,3 +770,53 @@ func TestAControlCharacterInAProvisioningRequestIsRefused(t *testing.T) {
 	r := e.call(t, token, http.MethodPatch, "/Users/"+id, marshal(t, patch(op("replace", "displayName", "x\x00"))))
 	assertScimError(t, "a patched name with NUL", r, http.StatusBadRequest, "invalidValue")
 }
+
+// The directory deprovisioning the last active instance admin is refused like
+// any other deactivation of them: the instance is never left without one.
+func TestADirectoryCannotDeactivateTheLastActiveInstanceAdmin(t *testing.T) {
+	pool := testkit.FreshPool(t)
+	srv := testkit.StartServer(t, testkit.WithBaseURL(publicURL), testkit.WithPool(pool))
+	founder := testkit.NewBrowser(t, srv.URL)
+	testkit.Bootstrap(t, pool)
+	founder.SignIn(t, testkit.InstanceAdminEmail, testkit.InstanceAdminPassword)
+	e := env{srv: srv, admin: founder.ClientWithResponses, browser: founder}
+	slug := e.provider(t)
+	token := e.token(t, slug)
+
+	// The directory's member becomes an instance admin through a group the
+	// provider maps to it.
+	member := e.mustCreate(t, token, userBody(email("example.com"), nil))
+	e.mapGroups(t, slug, adminMapping("admins"))
+	e.mustCreateGroup(t, token, groupBody("admins", map[string]any{"members": memberRefs(member)}))
+	if got := e.member(t, member); !got.InstanceAdmin {
+		t.Fatalf("the provisioned member = %+v, want an instance admin through the mapping", got)
+	}
+
+	// Every other instance admin goes: the founder is deactivated by a second
+	// admin, who then deactivates themselves, while the provisioned member
+	// remains.
+	second := testkit.NewMember(t, pool, testkit.AsInstanceAdmin())
+	other := testkit.NewBrowser(t, srv.URL)
+	other.SignIn(t, second.Email, second.Password)
+	founders := do(other.ListMembersWithResponse(t.Context(), &management.ListMembersParams{Q: ptr(testkit.InstanceAdminEmail)}))
+	if founders.JSON200 == nil || len(founders.JSON200.Items) != 1 {
+		t.Fatalf("GET /members?q=%s = %d: %s", testkit.InstanceAdminEmail, founders.StatusCode(), founders.Body)
+	}
+	for _, id := range []string{founders.JSON200.Items[0].Id.String(), second.ID.String()} {
+		if res := do(other.DeactivateMemberWithResponse(t.Context(), id)); res.StatusCode() != http.StatusOK {
+			t.Fatalf("deactivating %s = %d: %s", id, res.StatusCode(), res.Body)
+		}
+	}
+
+	r := e.call(t, token, http.MethodPatch, "/Users/"+member, marshal(t, patch(op("replace", "active", false))))
+	assertScimError(t, "deactivating the last instance admin", r, http.StatusConflict, "")
+	if !strings.Contains(string(r.body), "instance admin") {
+		t.Errorf("the refusal = %s, want it to name the instance admin", r.body)
+	}
+	if got := e.call(t, token, http.MethodGet, "/Users/"+member, "").json(t); got["active"] != true {
+		t.Errorf("the user after the refusal = %v, want it still active", got)
+	}
+	if res := e.call(t, token, http.MethodDelete, "/Users/"+member, ""); res.status != http.StatusConflict {
+		t.Errorf("DELETE of the last instance admin = %d: %s, want 409", res.status, res.body)
+	}
+}

@@ -191,6 +191,12 @@ func TestAResponseTheProviderForgedOpensNoSessionAndCreatesNoMember(t *testing.T
 		{"by another issuer", testkit.SAMLWrongIssuer, "Issuer"},
 		{"wrapped", testkit.SAMLWrapped, "Missing signature"},
 		{"with a DOCTYPE", testkit.SAMLDocType, "DOCTYPE"},
+		{"with a processing instruction", testkit.SAMLProcessingInstruction, "processing instruction"},
+		{"signed without a destination", testkit.SAMLNoDestination, "names no destination"},
+		{"without an assertion", testkit.SAMLNoAssertion, "missing Assertion"},
+		{"with two assertions", testkit.SAMLTwoAssertions, "2 assertions, not one"},
+		{"for another recipient", testkit.SAMLWrongRecipient, "Recipient"},
+		{"with a second audience restriction that misses", testkit.SAMLSecondAudienceMisses, "another audience"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			p := e.createSAML(t, idp, nil)
