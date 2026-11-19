@@ -30,7 +30,7 @@ docker compose up -d
 Compose reads the secret key from `.env` and refuses to start without it. The server image is `ghcr.io/azverinus/flagnetic`, for `linux/amd64` and `linux/arm64`, with build provenance and an SBOM ([how to verify it](verify.md)). The compose file pulls `latest`; to pin a release, add it to `.env` before `docker compose up -d`:
 
 ```bash
-echo "FLAGNETIC_VERSION=0.5.0" >> .env
+echo "FLAGNETIC_VERSION=0.6.0" >> .env
 ```
 
 `docker compose build` builds the image from your checkout instead.
@@ -83,7 +83,7 @@ helm install flagnetic oci://ghcr.io/azverinus/charts/flagnetic -n flagnetic \
 From the release image, for Linux (add `--platform linux/arm64` to `docker create` for ARM):
 
 ```bash
-docker create --name flagnetic-binary ghcr.io/azverinus/flagnetic:0.5.0
+docker create --name flagnetic-binary ghcr.io/azverinus/flagnetic:0.6.0
 docker cp flagnetic-binary:/usr/local/bin/flagnetic ./flagnetic
 docker rm flagnetic-binary
 ```
@@ -91,7 +91,7 @@ docker rm flagnetic-binary
 Or built from source, for any platform Go supports, with Go, Node.js, pnpm and [Task](https://taskfile.dev):
 
 ```bash
-git clone --branch v0.5.0 https://github.com/azverinus/flagnetic.git
+git clone --branch v0.6.0 https://github.com/azverinus/flagnetic.git
 cd flagnetic
 task build        # the console, then bin/flagnetic embedding it
 ```
