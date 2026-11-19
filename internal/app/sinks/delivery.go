@@ -486,16 +486,17 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 		ID:   sinks.DeliveryID(c.Sink.ID, ref.Kind, batch.From, batch.To, sinks.RowIDs(page.Rows)),
 		Kind: ref.Kind, Rows: page.Rows, Now: now,
 	})
+	// A batch is counted once its outcome is recorded: one whose lease was
+	// lost, or whose call was cut short by a shutdown, recorded nothing, and
+	// another replica's attempt is counted instead.
 	if failure == nil {
-		h.d.Observer.Batch(ref.Sink, ref.Kind, ResultAck)
-		return h.ack(ctx, ref, token, c, due, batch, len(page.Rows), page.Skipped, live)
+		res, ackErr := h.ack(ctx, ref, token, c, due, batch, len(page.Rows), page.Skipped, live)
+		if ackErr == nil && res == Acked {
+			h.d.Observer.Batch(ref.Sink, ref.Kind, ResultAck)
+		}
+		return res, ackErr
 	}
 	rejected := failure.Class == sinks.ClassRejected
-	if rejected {
-		h.d.Observer.Batch(ref.Sink, ref.Kind, ResultRejected)
-	} else {
-		h.d.Observer.Batch(ref.Sink, ref.Kind, ResultTransient)
-	}
 	if rejected && sinks.SetsAside(rejections, h.d.RejectionAttempts) {
 		return h.setAside(ctx, ref, token, c, batch, page, *failure, read.Floor, live)
 	}
@@ -612,6 +613,11 @@ func (h *Deliver) fail(ctx context.Context, ref StreamRef, token LeaseToken, c C
 		return Failed, fmt.Errorf("recording the failure: %w", err)
 	case !held:
 		return LeaseLost, nil
+	}
+	if rejected {
+		h.d.Observer.Batch(ref.Sink, ref.Kind, ResultRejected)
+	} else {
+		h.d.Observer.Batch(ref.Sink, ref.Kind, ResultTransient)
 	}
 	h.observeLag(ctx, ref, scope, due.Stream.Live())
 	return Failed, nil

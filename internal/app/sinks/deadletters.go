@@ -85,7 +85,9 @@ func (h *Deliver) setAside(ctx context.Context, ref StreamRef, token LeaseToken,
 	case !res.Held:
 		return LeaseLost, nil
 	}
-	// Counted once the cursor has passed the batch.
+	// Counted once the cursor has passed the batch, the rejection that set it
+	// aside with it.
+	h.d.Observer.Batch(ref.Sink, ref.Kind, ResultRejected)
 	h.d.Observer.Batch(ref.Sink, ref.Kind, ResultDeadLettered)
 	if page.Skipped > 0 {
 		h.d.Observer.RowsSkipped(SkipEnvironmentDeleted, page.Skipped)

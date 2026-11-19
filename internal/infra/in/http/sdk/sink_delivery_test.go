@@ -14,6 +14,7 @@ import (
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
+	appsinks "github.com/azverinus/flagnetic/internal/app/sinks"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
@@ -1252,5 +1253,41 @@ func TestASinkEditedWhileItsTargetIsProbedIsProbedAgainBeforeItIsEnabled(t *test
 	}
 	if n := len(second.Calls()); n != 1 {
 		t.Errorf("the edited target was probed %d times, want once before the sink was enabled", n)
+	}
+}
+
+// An attempt whose lease another replica took records nothing, and is not
+// counted: the replica that recorded its own attempt counts the batch.
+func TestABatchWhoseLeaseWasLostIsNotCounted(t *testing.T) {
+	f := startDelivering(t)
+	release := make(chan struct{})
+	r := testkit.StartReceiver(t, script([]testkit.Reply{{Release: release}}, []testkit.Reply{{}})...)
+	created, _ := f.enabled(t, webhook(r, "exposure"))
+	other := testkit.StartServer(t, testkit.WithClock(f.clock), sinkTargets)
+	f.post(t, f.exposure("u-1", "true", f.clock.Now()))
+	f.srv.AwaitHorizon(t)
+
+	slow := make(chan error, 1)
+	go func() { slow <- f.srv.Tick(t, worker.SinkDeliveryName) }()
+	for deadline := time.Now().Add(10 * time.Second); len(batchCalls(r)) == 0; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the batch never reached the receiver")
+		}
+	}
+	// The first replica waits on the target past its lease, and the other
+	// takes the stream and records the batch.
+	f.clock.Advance(appsinks.LeaseDuration + time.Minute)
+	tick(t, other)
+	close(release)
+	if err := <-slow; err != nil {
+		t.Fatalf("sink delivery round: %v", err)
+	}
+
+	series := `flagnetic_sink_batches_total{event_kind="exposure",result="ack",sink="` + created.Id.String() + `"}`
+	if got := testkit.Metric(t, f.srv.Scrape(t), series); got > 0 {
+		t.Errorf("the replica that lost its lease counted %v batches acknowledged, want none", got)
+	}
+	if got := testkit.Metric(t, other.Scrape(t), series); got != 1 {
+		t.Errorf("the replica that recorded the batch counted %v acknowledged, want 1", got)
 	}
 }

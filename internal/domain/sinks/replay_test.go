@@ -186,8 +186,8 @@ func TestAReplayCarriesItsOwnFloorAtItsStart(t *testing.T) {
 		wantReplay *time.Time
 	}{
 		{
-			name: "an open ended replay from before the floor leaves it, and reads with its own",
-			in:   sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, From: earlier, Floor: &floor},
+			name:       "an open ended replay from before the floor leaves it, and reads with its own",
+			in:         sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, From: earlier, Floor: &floor},
 			want:       &floor,
 			wantReplay: &earlier,
 		},
