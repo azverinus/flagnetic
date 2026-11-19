@@ -11,6 +11,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/identity"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pgidentity "github.com/azverinus/flagnetic/internal/infra/out/postgres/identity"
+	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
@@ -71,9 +72,17 @@ func (a ssoMembers) ActivateInvited(ctx context.Context, member identity.MemberI
 }
 
 func (a ssoMembers) OpenSession(ctx context.Context, s appidentity.SessionRequest) (secret.String, error) {
-	return a.sso.OpenSession(ctx, appaccess.SSOSignIn{
+	cookie, err := a.sso.OpenSession(ctx, appaccess.SSOSignIn{
 		Member: memberOf(s.Member), Method: access.SignInMethod(s.Kind), Provider: s.Provider, ClientIP: s.ClientIP, UserAgent: s.UserAgent, RequestID: s.RequestID,
 	})
+	// A domain enforced to another provider while the sign-in was under way
+	// is refused as one enforced when it began.
+	if e, ok := apperrors.From(err); ok && e.Code == "sso_required" {
+		if provider, _ := e.Extensions["provider"].(string); provider != "" {
+			return secret.String{}, appidentity.RequireSSO(provider)
+		}
+	}
+	return cookie, err
 }
 
 func (a ssoMembers) LockInstanceAdmins(ctx context.Context) error {

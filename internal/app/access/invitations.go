@@ -361,6 +361,7 @@ func openInvitation(ctx context.Context, store InvitationReader, s secret.String
 
 // AcceptStore is what accepting an invitation needs.
 type AcceptStore interface {
+	AuthSettingsSharer
 	InvitationReader
 	InvitationStore
 	// LockMember returns the member, locked until the unit of work ends;
@@ -481,7 +482,7 @@ func (h *AcceptInvitation) accept(ctx context.Context, cmd AcceptInvitationComma
 	now := h.d.Clock.Now()
 	var res SignInResult
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		res, err = h.join(ctx, cmd, opened, hash, settings, reserved, now)
+		res, err = h.join(ctx, cmd, opened, hash, reserved, now)
 		return err
 	})
 	if err != nil {
@@ -497,9 +498,17 @@ func (h *AcceptInvitation) accept(ctx context.Context, cmd AcceptInvitationComma
 // invitation, the order deactivating them and reissuing their link take, so
 // none of them waits on another in a deadlock.
 func (h *AcceptInvitation) join(ctx context.Context, cmd AcceptInvitationCommand, opened access.Invitation, hash string,
-	settings access.AuthSettings, reserved access.Reservation, now time.Time,
+	reserved access.Reservation, now time.Time,
 ) (SignInResult, error) {
-	if _, _, err := h.d.Store.LockMember(ctx, opened.Member); err != nil {
+	// The settings are read where the session is stored, held against a
+	// change: one that closed local login or enforced the member's domain
+	// meanwhile refuses the acceptance, which leaves the invitation open for
+	// its provider.
+	settings, err := h.d.Store.ShareAuthSettings(ctx)
+	if err != nil {
+		return SignInResult{}, err
+	}
+	if _, _, err = h.d.Store.LockMember(ctx, opened.Member); err != nil {
 		return SignInResult{}, err
 	}
 	inv, m, err := h.d.Store.LockInvitationByHash(ctx, opened.Hash)
@@ -509,6 +518,9 @@ func (h *AcceptInvitation) join(ctx context.Context, cmd AcceptInvitationCommand
 	if err != nil || !inv.Open(now, m) {
 		// Accepted, replaced or consumed since it was read.
 		return SignInResult{}, access.ErrInvitationGone
+	}
+	if err = settings.PasswordRefusal(m.Email); err != nil {
+		return SignInResult{}, err
 	}
 	joined := m.Joined()
 	if err := h.d.Store.SaveMember(ctx, joined, now); err != nil {

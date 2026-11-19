@@ -29,6 +29,7 @@ type PasswordVerifier interface {
 // SignInStore is what signing in needs of the stored members and sessions.
 type SignInStore interface {
 	passwordStore
+	AuthSettingsSharer
 	// LockMemberPassword returns member with their password hash ("" for
 	// none), locked until the unit of work ends, so no password change
 	// commits between the check and the session it opens; ErrNotFound when
@@ -291,24 +292,33 @@ func (h *SignIn) succeed(ctx context.Context, cmd SignInCommand, a passwordAttem
 			return SignInResult{}, err
 		}
 	}
-	settings, err := h.d.Settings.AuthSettings(ctx)
-	if err != nil {
-		return SignInResult{}, err
-	}
 	member := a.member
 	now := h.d.Clock.Now()
-	session, cookie := access.NewSession(id.New[access.Session](h.d.IDs), access.NewSessionInput{
-		Member: member.ID, Method: access.SignInLocal, ClientIP: cmd.ClientIP, UserAgent: cmd.UserAgent,
-		Timeouts: settings.SessionTimeouts(), Now: now,
-	}, h.d.Random, h.d.Key)
-	entry, err := governance.NewEntry(id.New[governance.Entry](h.d.IDs), now, governance.Request{
-		Actor: memberActor(member), ID: cmd.RequestID,
-	}, authRecord("auth.signed_in", member, nil))
-	if err != nil {
-		return SignInResult{}, err
-	}
+	var session access.Session
+	var cookie secret.String
 	if err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		if err := h.stillHolds(ctx, member, a.hash); err != nil {
+		// The settings are read where the session is stored, held against
+		// a change: one that closed local login while the password was
+		// verified refuses this sign-in, and one that comes after sees the
+		// session and ends it.
+		settings, err := h.d.Store.ShareAuthSettings(ctx)
+		if err != nil {
+			return err
+		}
+		if err = settings.PasswordRefusal(member.Email); err != nil {
+			return err
+		}
+		if err = h.stillHolds(ctx, member, a.hash); err != nil {
+			return err
+		}
+		session, cookie = access.NewSession(id.New[access.Session](h.d.IDs), access.NewSessionInput{
+			Member: member.ID, Method: access.SignInLocal, ClientIP: cmd.ClientIP, UserAgent: cmd.UserAgent,
+			Timeouts: settings.SessionTimeouts(), Now: now,
+		}, h.d.Random, h.d.Key)
+		entry, err := governance.NewEntry(id.New[governance.Entry](h.d.IDs), now, governance.Request{
+			Actor: memberActor(member), ID: cmd.RequestID,
+		}, authRecord("auth.signed_in", member, nil))
+		if err != nil {
 			return err
 		}
 		if err := h.d.Store.ClearAttempt(ctx, a.reserved); err != nil {

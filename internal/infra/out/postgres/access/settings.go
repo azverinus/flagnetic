@@ -32,6 +32,14 @@ func (s *Store) LockAuthSettings(ctx context.Context) (access.AuthSettings, erro
 	return s.readAuthSettings(ctx, `SELECT `+authSettingsColumns+` FROM auth_settings FOR UPDATE`)
 }
 
+// ShareAuthSettings returns the auth settings and holds them shared until
+// the transaction ends, so a change of them waits for the session being
+// opened to commit, where its sweep of refused sessions sees it, or is seen
+// by it.
+func (s *Store) ShareAuthSettings(ctx context.Context) (access.AuthSettings, error) {
+	return s.readAuthSettings(ctx, `SELECT `+authSettingsColumns+` FROM auth_settings FOR SHARE`)
+}
+
 func (s *Store) readAuthSettings(ctx context.Context, query string) (access.AuthSettings, error) {
 	var (
 		idle, absolute, lifetime int64

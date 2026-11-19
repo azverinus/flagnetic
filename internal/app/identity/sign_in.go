@@ -71,21 +71,21 @@ func (f *SignInFailure) Unwrap() error { return f.Cause }
 
 func fail(code FailureCode, cause error) error { return &SignInFailure{Code: code, Cause: cause} }
 
-// requireSSO refuses a sign-in or link of an email whose domain is enforced
+// RequireSSO refuses a sign-in or link of an email whose domain is enforced
 // to another provider, naming that one.
-func requireSSO(provider string) error {
+func RequireSSO(provider string) error {
 	return &SignInFailure{Code: CodeSSORequired, Provider: provider,
 		Cause: errors.New("the email's domain is enforced to the auth provider " + provider)}
 }
 
-// refuseEnforced returns requireSSO when email's domain is enforced to a
+// refuseEnforced returns RequireSSO when email's domain is enforced to a
 // provider other than p; nil otherwise.
 func refuseEnforced(ctx context.Context, members Members, p identity.Provider, email string) error {
 	enforced, err := members.EnforcedProvider(ctx, email)
 	if err != nil || enforced == "" || enforced == p.Slug {
 		return err
 	}
-	return requireSSO(enforced)
+	return RequireSSO(enforced)
 }
 
 // inKind names kind as the protocol of the sign-in err ends, if err is a

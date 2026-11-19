@@ -28,6 +28,7 @@ type SSOStore interface {
 	// LockMember returns the member, locked until the unit of work ends, and
 	// whether they hold a password; ErrNotFound when none has the identifier.
 	LockMember(ctx context.Context, member access.MemberID) (access.Member, bool, error)
+	AuthSettingsSharer
 	// LockInstanceAdmins serializes, until the unit of work ends, every
 	// change that could leave the instance without an active instance admin.
 	LockInstanceAdmins(ctx context.Context) error
@@ -199,7 +200,11 @@ type SSOSignIn struct {
 // session revocation and live again when they are reactivated, so a member
 // no longer active is refused ErrSessionExpired.
 func (s *SSO) OpenSession(ctx context.Context, in SSOSignIn) (secret.String, error) {
-	settings, err := s.settings.AuthSettings(ctx)
+	// The settings are read where the session is stored, held against a
+	// change: one that enforced the member's domain to another provider
+	// meanwhile refuses the sign-in, and one that comes after sees the
+	// session and ends it.
+	settings, err := s.store.ShareAuthSettings(ctx)
 	if err != nil {
 		return secret.String{}, err
 	}
@@ -208,6 +213,9 @@ func (s *SSO) OpenSession(ctx context.Context, in SSOSignIn) (secret.String, err
 		return secret.String{}, access.ErrSessionExpired
 	}
 	if err != nil {
+		return secret.String{}, err
+	}
+	if err = settings.SessionRefusal(in.Method, in.Provider, current.Email); err != nil {
 		return secret.String{}, err
 	}
 	now := s.clock.Now()
