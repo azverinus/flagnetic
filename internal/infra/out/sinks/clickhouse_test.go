@@ -100,7 +100,7 @@ func TestAnInsertCarriesTheDeliveryIDTheSettingsAndTheCredentialsInHeadersOnly(t
 	rows := domain.SampleRows(domain.EventExposure, "shop", time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC))[:2]
 
 	f := newClickHouse().Deliver(t.Context(), clickhouseCall(srv.URL, true, false, domain.EventExposure),
-		appsinks.Delivery{ID: "dlv_abc", Kind: domain.EventExposure, Rows: rows})
+		appsinks.BatchToSend{ID: "dlv_abc", Kind: domain.EventExposure, Rows: rows})
 	if f != nil {
 		t.Fatalf("Deliver = %v, want an acknowledgement", f)
 	}
@@ -112,7 +112,7 @@ func TestAnInsertCarriesTheDeliveryIDTheSettingsAndTheCredentialsInHeadersOnly(t
 	insert, body := srv.requests[1], srv.bodies[1]
 	q := insert.URL.Query()
 	for k, v := range map[string]string{
-		"query_id": "dlv_abc", "async_insert": "0", "date_time_input_format": "best_effort", "max_threads": "2",
+		"query_id": "dlv_abc", "async_insert": "0", "wait_end_of_query": "1", "send_progress_in_http_headers": "0", "date_time_input_format": "best_effort", "max_threads": "2",
 		"query": "INSERT INTO `db`.`fl_exposures` (schema_version, event_id, project_key, environment_key, experiment_key, unit_id, received_at) FORMAT JSONEachRow",
 	} {
 		if q.Get(k) != v {
@@ -133,7 +133,7 @@ func TestADeliveryCreatesAMissingTableOnlyWhenTheSinkMayAndAnEmptyOneCallsNothin
 	c := newClickHouse()
 	rows := domain.SampleRows(domain.EventAlias, "shop", time.Now())
 
-	f := c.Deliver(t.Context(), clickhouseCall(srv.URL, true, false, domain.EventAlias), appsinks.Delivery{ID: "dlv_1", Kind: domain.EventAlias, Rows: rows})
+	f := c.Deliver(t.Context(), clickhouseCall(srv.URL, true, false, domain.EventAlias), appsinks.BatchToSend{ID: "dlv_1", Kind: domain.EventAlias, Rows: rows})
 	if f == nil || f.Class != domain.ClassRejected || f.Code != "60 UNKNOWN_TABLE" {
 		t.Errorf("a missing table without create_tables: %v, want rejected 60 UNKNOWN_TABLE", f)
 	}
@@ -142,7 +142,7 @@ func TestADeliveryCreatesAMissingTableOnlyWhenTheSinkMayAndAnEmptyOneCallsNothin
 	}
 
 	// With create_tables the table is created and the whole schema inserted.
-	if f := c.Deliver(t.Context(), clickhouseCall(srv.URL, true, true, domain.EventAlias), appsinks.Delivery{ID: "dlv_2", Kind: domain.EventAlias, Rows: rows}); f != nil {
+	if f := c.Deliver(t.Context(), clickhouseCall(srv.URL, true, true, domain.EventAlias), appsinks.BatchToSend{ID: "dlv_2", Kind: domain.EventAlias, Rows: rows}); f != nil {
 		t.Fatalf("a missing table with create_tables: %v", f)
 	}
 	if n := len(srv.bodies); n != 4 || !strings.HasPrefix(srv.bodies[2], "CREATE TABLE IF NOT EXISTS `db`.`fl_aliases`") {
@@ -150,10 +150,10 @@ func TestADeliveryCreatesAMissingTableOnlyWhenTheSinkMayAndAnEmptyOneCallsNothin
 	}
 
 	before := len(srv.requests)
-	if f := c.Deliver(t.Context(), clickhouseCall(srv.URL, true, true, domain.EventAlias), appsinks.Delivery{ID: "dlv_3", Kind: domain.EventAlias}); f != nil {
+	if f := c.Deliver(t.Context(), clickhouseCall(srv.URL, true, true, domain.EventAlias), appsinks.BatchToSend{ID: "dlv_3", Kind: domain.EventAlias}); f != nil {
 		t.Errorf("an empty batch: %v, want an acknowledgement", f)
 	}
-	if f := c.Deliver(t.Context(), clickhouseCall(srv.URL, true, true), appsinks.Delivery{ID: "dlv_4", Kind: "audit", Rows: rows}); f == nil || f.Class != domain.ClassRejected {
+	if f := c.Deliver(t.Context(), clickhouseCall(srv.URL, true, true), appsinks.BatchToSend{ID: "dlv_4", Kind: "audit", Rows: rows}); f == nil || f.Class != domain.ClassRejected {
 		t.Errorf("a kind with no table: %v, want a rejection", f)
 	}
 	if len(srv.requests) != before {
@@ -164,7 +164,7 @@ func TestADeliveryCreatesAMissingTableOnlyWhenTheSinkMayAndAnEmptyOneCallsNothin
 func TestAnInsertIntoATableLackingARequiredColumnIsRejectedWithoutInserting(t *testing.T) {
 	srv := startClickHouseServer(t, map[string]func(http.ResponseWriter){"DESCRIBE": describes("schema_version", "project_key")})
 	f := newClickHouse().Deliver(t.Context(), clickhouseCall(srv.URL, true, false, domain.EventAlias),
-		appsinks.Delivery{ID: "dlv_1", Kind: domain.EventAlias, Rows: domain.SampleRows(domain.EventAlias, "shop", time.Now())})
+		appsinks.BatchToSend{ID: "dlv_1", Kind: domain.EventAlias, Rows: domain.SampleRows(domain.EventAlias, "shop", time.Now())})
 	if f == nil || f.Class != domain.ClassRejected || f.Code != "16 NO_SUCH_COLUMN_IN_TABLE" || len(srv.requests) != 1 {
 		t.Errorf("Deliver = %v after %d requests, want rejected 16 NO_SUCH_COLUMN_IN_TABLE after the DESCRIBE alone", f, len(srv.requests))
 	}
@@ -191,7 +191,7 @@ func TestWhatClickHouseAnswersIsClassifiedAndNeverKept(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			srv := startClickHouseServer(t, map[string]func(http.ResponseWriter){"DESCRIBE": describes(all...), "INSERT": tc.insert})
-			f := newClickHouse().Deliver(t.Context(), clickhouseCall(srv.URL, true, false, domain.EventAlias), appsinks.Delivery{ID: "dlv_1", Kind: domain.EventAlias, Rows: rows})
+			f := newClickHouse().Deliver(t.Context(), clickhouseCall(srv.URL, true, false, domain.EventAlias), appsinks.BatchToSend{ID: "dlv_1", Kind: domain.EventAlias, Rows: rows})
 			if f == nil || f.Class != tc.class || f.Status != tc.status || f.Code != tc.code {
 				t.Errorf("Deliver = %v, want %s %d %q", f, tc.class, tc.status, tc.code)
 			}
@@ -275,13 +275,33 @@ func TestAProbeFailsWhenATableCannotBeCreatedAndAnInsertWhenItsTableCannotBeDesc
 		t.Errorf("a probe that may not create = %+v, want 497 ACCESS_DENIED", got)
 	}
 	rows := domain.SampleRows(domain.EventAlias, "shop", time.Now())
-	if f := c.Deliver(t.Context(), clickhouseCall(srv.URL, true, true, domain.EventAlias), appsinks.Delivery{ID: "dlv_1", Kind: domain.EventAlias, Rows: rows}); f == nil ||
+	if f := c.Deliver(t.Context(), clickhouseCall(srv.URL, true, true, domain.EventAlias), appsinks.BatchToSend{ID: "dlv_1", Kind: domain.EventAlias, Rows: rows}); f == nil ||
 		f.Code != "497 ACCESS_DENIED" {
 		t.Errorf("a delivery whose table cannot be created = %v, want 497 ACCESS_DENIED", f)
 	}
 	down := startClickHouseServer(t, map[string]func(http.ResponseWriter){"DESCRIBE": exception(503, "")})
-	if f := c.Deliver(t.Context(), clickhouseCall(down.URL, true, true, domain.EventAlias), appsinks.Delivery{ID: "dlv_1", Kind: domain.EventAlias, Rows: rows}); f == nil ||
+	if f := c.Deliver(t.Context(), clickhouseCall(down.URL, true, true, domain.EventAlias), appsinks.BatchToSend{ID: "dlv_1", Kind: domain.EventAlias, Rows: rows}); f == nil ||
 		f.Class != domain.ClassStatus {
 		t.Errorf("a delivery whose table cannot be described = %v, want class status", f)
+	}
+}
+
+// An insert ClickHouse answers with a 200 and an exception at the end of the
+// body, as it does when it sent its status before the insert finished, is a
+// failure: the rows were not stored.
+func TestAnInsertWhoseAnswerEndsInAnExceptionFails(t *testing.T) {
+	rows := domain.SampleRows(domain.EventAlias, "shop", time.Now())
+	all := []string{"schema_version", "event_id", "project_key", "environment_key", "received_at"}
+	late := func(w http.ResponseWriter) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "Code: 252. DB::Exception: words that are never kept")
+	}
+	srv := startClickHouseServer(t, map[string]func(http.ResponseWriter){"DESCRIBE": describes(all...), "INSERT": late})
+	f := newClickHouse().Deliver(t.Context(), clickhouseCall(srv.URL, true, false, domain.EventAlias), appsinks.BatchToSend{ID: "dlv_1", Kind: domain.EventAlias, Rows: rows})
+	if f == nil || f.Class != domain.ClassStatus || f.Code != "252 TOO_MANY_PARTS" {
+		t.Fatalf("Deliver = %v, want a transient failure 252 TOO_MANY_PARTS", f)
+	}
+	if strings.Contains(f.Error(), "words that are never kept") {
+		t.Errorf("the failure %q holds ClickHouse's own words", f)
 	}
 }

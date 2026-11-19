@@ -21,7 +21,7 @@ func TestCreatingPartitionsGivesUpWhileAnotherReplicaHoldsTheLock(t *testing.T) 
 		t.Fatal(err)
 	}
 	defer func() { _ = holder.Rollback(t.Context()) }()
-	if _, err = holder.Exec(t.Context(), `SELECT pg_advisory_xact_lock(hashtextextended('event_partitions', 0))`); err != nil {
+	if _, err = holder.Exec(t.Context(), `SELECT pg_advisory_xact_lock(hashtextextended('event_partitions@' || current_schema(), 0))`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -31,5 +31,26 @@ func TestCreatingPartitionsGivesUpWhileAnotherReplicaHoldsTheLock(t *testing.T) 
 	}
 	if waited := time.Since(start); waited > 3*time.Second {
 		t.Errorf("waited %s for the lock, want it bounded by the lock timeout", waited)
+	}
+}
+
+// Partition creation of one instance does not wait for the lock another
+// instance holds in a schema of its own: the lock is scoped by schema.
+func TestCreatingPartitionsIgnoresTheLockOfAnotherSchema(t *testing.T) {
+	pool := testkit.FreshPool(t)
+	defer pgevents.SetPartitionLockTimeout(300 * time.Millisecond)()
+	store := pgevents.NewStore(pool)
+
+	holder, err := pool.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = holder.Rollback(t.Context()) }()
+	if _, err = holder.Exec(t.Context(), `SELECT pg_advisory_xact_lock(hashtextextended('event_partitions@another_instance', 0))`); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = store.CreateEventPartitions(t.Context(), time.Date(2031, 1, 2, 0, 0, 0, 0, time.UTC), 0); err != nil {
+		t.Errorf("creating partitions while another schema holds its lock: %v", err)
 	}
 }

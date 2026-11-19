@@ -6,7 +6,6 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
-	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -23,7 +22,7 @@ func aliasOf(n int, at time.Time, fromType, fromID, toType, toID string) map[str
 // aliasLinks reads the alias links of environment.
 func aliasLinks(t *testing.T, p project, environment string) []events.AliasLink {
 	t.Helper()
-	links, err := pgevents.NewStore(testkit.Pool(t)).AliasLinks(t.Context(), p.environmentID(t, environment))
+	links, err := testkit.StoredAliasLinks(t.Context(), testkit.Pool(t), p.environmentID(t, environment))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +105,7 @@ func TestAnAliasLinksItsPairOnceKeepingTheEarliestTime(t *testing.T) {
 		t.Fatalf("staging alias = %+v", res)
 	}
 
-	aliases, err := pgevents.NewStore(testkit.Pool(t)).Aliases(t.Context(), p.environmentID(t, "production"))
+	aliases, err := testkit.StoredAliases(t.Context(), testkit.Pool(t), p.environmentID(t, "production"))
 	if err != nil || len(aliases) != 5 {
 		t.Fatalf("raw aliases = %d, %v, want every one of the 5 stored", len(aliases), err)
 	}

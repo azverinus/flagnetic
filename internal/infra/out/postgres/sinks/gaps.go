@@ -114,7 +114,7 @@ func (s *Store) FirstStored(ctx context.Context, kind sinks.EventKind, scope sin
 
 // RecordGap saves gap as the gap of sink's stream of kind and moves the
 // stream past it: the live position to gap.Moved, which is the cursor, or, while a
-// bounded replay runs, the position the replay returns to; the batch in
+// replay runs, the position the replay returns to; the batch in
 // flight and the lease are dropped, so that a send under way records nothing
 // over the move and the next batch is chosen anew under a new delivery ID.
 func (s *Store) RecordGap(ctx context.Context, sink sinks.ID, kind sinks.EventKind, replaying bool, gap events.Gap) error {
@@ -162,6 +162,19 @@ func (s *Store) ExpireDeadLetters(ctx context.Context, kind sinks.EventKind, bef
 		        AND (d.received_floor IS NULL OR r.received_at >= d.received_floor))`, string(kind), before)
 	if err != nil {
 		return fmt.Errorf("expiring dead letters: %w", err)
+	}
+	return nil
+}
+
+// PurgeDeadLetters deletes the dead letters of kind that are settled:
+// redelivered before redelivered, or expired and created before expired.
+func (s *Store) PurgeDeadLetters(ctx context.Context, kind sinks.EventKind, redelivered, expired time.Time) error {
+	if _, err := s.db(ctx).Exec(ctx, `
+		DELETE FROM sink_dead_letters
+		WHERE event_kind = $1
+		  AND ((status = 'redelivered' AND redelivered_at < $2) OR (status = 'expired' AND created_at < $3))`,
+		string(kind), redelivered, expired); err != nil {
+		return fmt.Errorf("purging dead letters: %w", err)
 	}
 	return nil
 }

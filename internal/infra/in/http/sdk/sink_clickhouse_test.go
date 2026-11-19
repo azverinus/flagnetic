@@ -4,9 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"net/http/httputil"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -383,5 +387,56 @@ func TestAClickHouseBatchTheTableCannotTakeIsRejectedAndCounted(t *testing.T) {
 	}
 	if got := chCount(t, ch, db, "flagnetic_exposures", false); got != 0 {
 		t.Errorf("%d rows stored, want none", got)
+	}
+}
+
+// A test of a stored sink edited while its target was being probed stores
+// none of what the probe found: the warnings belong to the configuration it
+// called, and the edited sink keeps the ones its edit left.
+func TestATestOfASinkEditedWhileItsTargetIsProbedStoresNoWarnings(t *testing.T) {
+	ch := testkit.StartClickHouse(t)
+	db := ch.NewDatabase(t)
+	f := startDelivering(t)
+	ch.Exec(t, fmt.Sprintf(`CREATE TABLE %s.flagnetic_exposures (
+		schema_version UInt16, event_id String, project_key String, environment_key String,
+		experiment_key String, unit_id String, variation_key String, received_at DateTime64(3, 'UTC')
+	) ENGINE = MergeTree ORDER BY event_id`, db))
+
+	// The probe's first call to ClickHouse waits until the sink is edited.
+	target, err := url.Parse(ch.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	reached, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	held := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		once.Do(func() {
+			close(reached)
+			<-release
+		})
+		proxy.ServeHTTP(w, r)
+	}))
+	t.Cleanup(held.Close)
+	body := clickhouse(ch, db, false, "exposure")
+	body.Clickhouse.Url = ptr(held.URL)
+	created, _ := f.create(t, body)
+
+	tested := make(chan management.SinkTestResult, 1)
+	go func() { tested <- f.testSink(t, created) }()
+	select {
+	case <-reached:
+	case <-time.After(10 * time.Second):
+		close(release)
+		t.Fatal("the target was never probed")
+	}
+	f.patch(t, created, management.SinkPatch{Name: ptr("Edited")})
+	close(release)
+
+	if probe := <-tested; !containsText(probe.Warnings, "app_version") {
+		t.Fatalf("test warnings %v, want app_version among them", probe.Warnings)
+	}
+	if s := f.sink(t, created); containsText(s.Warnings, "app_version") {
+		t.Errorf("sink warnings %v, want none of the probe's: the sink was edited while it ran", s.Warnings)
 	}
 }

@@ -5512,6 +5512,9 @@ type PreconditionRequired = Problem
 // RequestTooLarge A problem document (RFC 9457). Code-specific values are further members.
 type RequestTooLarge = Problem
 
+// SinkChanged A problem document (RFC 9457). Code-specific values are further members.
+type SinkChanged = Problem
+
 // TooManyAttempts A problem document (RFC 9457). Code-specific values are further members.
 type TooManyAttempts = Problem
 
@@ -11401,7 +11404,9 @@ type ClientInterface interface {
 	// already has keeps its place, so enabling a sink again continues where
 	// it stopped. A sink that is already enabled is answered as it is, with
 	// nothing probed or recorded. Enabling a stopped sink leaves it stopped
-	// until it is resumed. It takes no `If-Match`.
+	// until it is resumed. A sink edited while its target is probed is
+	// probed again, up to three times, then refused with `sink_changed`. It
+	// takes no `If-Match`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11421,7 +11426,9 @@ type ClientInterface interface {
 	// already has keeps its place, so enabling a sink again continues where
 	// it stopped. A sink that is already enabled is answered as it is, with
 	// nothing probed or recorded. Enabling a stopped sink leaves it stopped
-	// until it is resumed. It takes no `If-Match`.
+	// until it is resumed. A sink edited while its target is probed is
+	// probed again, up to three times, then refused with `sink_changed`. It
+	// takes no `If-Match`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11460,9 +11467,10 @@ type ClientInterface interface {
 	// `to` must not be before `from` (`invalid_replay_range`). A replay is
 	// applied by the delivery worker before the stream's next batch, which a
 	// disabled or stopped sink starts once it runs again; the batch in flight
-	// is dropped. A replay sent while another bounded one runs still returns
-	// to the position that one would have. Audited as `sink.replayed`. It
-	// takes no `If-Match`.
+	// is dropped. A replay sent while another one runs still returns
+	// to the position that one would have. A sink edited while the starts are
+	// searched for is searched again, up to three times, then refused with
+	// `sink_changed`. Audited as `sink.replayed`. It takes no `If-Match`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11482,9 +11490,10 @@ type ClientInterface interface {
 	// `to` must not be before `from` (`invalid_replay_range`). A replay is
 	// applied by the delivery worker before the stream's next batch, which a
 	// disabled or stopped sink starts once it runs again; the batch in flight
-	// is dropped. A replay sent while another bounded one runs still returns
-	// to the position that one would have. Audited as `sink.replayed`. It
-	// takes no `If-Match`.
+	// is dropped. A replay sent while another one runs still returns
+	// to the position that one would have. A sink edited while the starts are
+	// searched for is searched again, up to three times, then refused with
+	// `sink_changed`. Audited as `sink.replayed`. It takes no `If-Match`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -17777,7 +17786,9 @@ func (c *Client) RedeliverSinkDeadLetter(ctx context.Context, project ProjectKey
 // already has keeps its place, so enabling a sink again continues where
 // it stopped. A sink that is already enabled is answered as it is, with
 // nothing probed or recorded. Enabling a stopped sink leaves it stopped
-// until it is resumed. It takes no `If-Match`.
+// until it is resumed. A sink edited while its target is probed is
+// probed again, up to three times, then refused with `sink_changed`. It
+// takes no `If-Match`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -17807,7 +17818,9 @@ func (c *Client) EnableSinkWithBody(ctx context.Context, project ProjectKey, sin
 // already has keeps its place, so enabling a sink again continues where
 // it stopped. A sink that is already enabled is answered as it is, with
 // nothing probed or recorded. Enabling a stopped sink leaves it stopped
-// until it is resumed. It takes no `If-Match`.
+// until it is resumed. A sink edited while its target is probed is
+// probed again, up to three times, then refused with `sink_changed`. It
+// takes no `If-Match`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -17876,9 +17889,10 @@ func (c *Client) DismissSinkGap(ctx context.Context, project ProjectKey, sink Si
 // `to` must not be before `from` (`invalid_replay_range`). A replay is
 // applied by the delivery worker before the stream's next batch, which a
 // disabled or stopped sink starts once it runs again; the batch in flight
-// is dropped. A replay sent while another bounded one runs still returns
-// to the position that one would have. Audited as `sink.replayed`. It
-// takes no `If-Match`.
+// is dropped. A replay sent while another one runs still returns
+// to the position that one would have. A sink edited while the starts are
+// searched for is searched again, up to three times, then refused with
+// `sink_changed`. Audited as `sink.replayed`. It takes no `If-Match`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -17908,9 +17922,10 @@ func (c *Client) ReplaySinkWithBody(ctx context.Context, project ProjectKey, sin
 // `to` must not be before `from` (`invalid_replay_range`). A replay is
 // applied by the delivery worker before the stream's next batch, which a
 // disabled or stopped sink starts once it runs again; the batch in flight
-// is dropped. A replay sent while another bounded one runs still returns
-// to the position that one would have. Audited as `sink.replayed`. It
-// takes no `If-Match`.
+// is dropped. A replay sent while another one runs still returns
+// to the position that one would have. A sink edited while the starts are
+// searched for is searched again, up to three times, then refused with
+// `sink_changed`. Audited as `sink.replayed`. It takes no `If-Match`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -33585,7 +33600,9 @@ type ClientWithResponsesInterface interface {
 	// already has keeps its place, so enabling a sink again continues where
 	// it stopped. A sink that is already enabled is answered as it is, with
 	// nothing probed or recorded. Enabling a stopped sink leaves it stopped
-	// until it is resumed. It takes no `If-Match`.
+	// until it is resumed. A sink edited while its target is probed is
+	// probed again, up to three times, then refused with `sink_changed`. It
+	// takes no `If-Match`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -33605,7 +33622,9 @@ type ClientWithResponsesInterface interface {
 	// already has keeps its place, so enabling a sink again continues where
 	// it stopped. A sink that is already enabled is answered as it is, with
 	// nothing probed or recorded. Enabling a stopped sink leaves it stopped
-	// until it is resumed. It takes no `If-Match`.
+	// until it is resumed. A sink edited while its target is probed is
+	// probed again, up to three times, then refused with `sink_changed`. It
+	// takes no `If-Match`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -33648,9 +33667,10 @@ type ClientWithResponsesInterface interface {
 	// `to` must not be before `from` (`invalid_replay_range`). A replay is
 	// applied by the delivery worker before the stream's next batch, which a
 	// disabled or stopped sink starts once it runs again; the batch in flight
-	// is dropped. A replay sent while another bounded one runs still returns
-	// to the position that one would have. Audited as `sink.replayed`. It
-	// takes no `If-Match`.
+	// is dropped. A replay sent while another one runs still returns
+	// to the position that one would have. A sink edited while the starts are
+	// searched for is searched again, up to three times, then refused with
+	// `sink_changed`. Audited as `sink.replayed`. It takes no `If-Match`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -33670,9 +33690,10 @@ type ClientWithResponsesInterface interface {
 	// `to` must not be before `from` (`invalid_replay_range`). A replay is
 	// applied by the delivery worker before the stream's next batch, which a
 	// disabled or stopped sink starts once it runs again; the batch in flight
-	// is dropped. A replay sent while another bounded one runs still returns
-	// to the position that one would have. Audited as `sink.replayed`. It
-	// takes no `If-Match`.
+	// is dropped. A replay sent while another one runs still returns
+	// to the position that one would have. A sink edited while the starts are
+	// searched for is searched again, up to three times, then refused with
+	// `sink_changed`. Audited as `sink.replayed`. It takes no `If-Match`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -47693,6 +47714,8 @@ type EnableSinkResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *SinkChanged
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *Invalid
 	// Headers200 the parsed response headers for an HTTP 200 response
@@ -47724,6 +47747,11 @@ func (r EnableSinkResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r EnableSinkResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r EnableSinkResponse) GetApplicationproblemJSON412() *SinkChanged {
+	return r.ApplicationproblemJSON412
 }
 
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
@@ -47921,6 +47949,8 @@ type ReplaySinkResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *SinkChanged
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *Invalid
 	// Headers200 the parsed response headers for an HTTP 200 response
@@ -47952,6 +47982,11 @@ func (r ReplaySinkResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r ReplaySinkResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r ReplaySinkResponse) GetApplicationproblemJSON412() *SinkChanged {
+	return r.ApplicationproblemJSON412
 }
 
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
@@ -56063,7 +56098,9 @@ func (c *ClientWithResponses) RedeliverSinkDeadLetterWithResponse(ctx context.Co
 // already has keeps its place, so enabling a sink again continues where
 // it stopped. A sink that is already enabled is answered as it is, with
 // nothing probed or recorded. Enabling a stopped sink leaves it stopped
-// until it is resumed. It takes no `If-Match`.
+// until it is resumed. A sink edited while its target is probed is
+// probed again, up to three times, then refused with `sink_changed`. It
+// takes no `If-Match`.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -56089,7 +56126,9 @@ func (c *ClientWithResponses) EnableSinkWithBodyWithResponse(ctx context.Context
 // already has keeps its place, so enabling a sink again continues where
 // it stopped. A sink that is already enabled is answered as it is, with
 // nothing probed or recorded. Enabling a stopped sink leaves it stopped
-// until it is resumed. It takes no `If-Match`.
+// until it is resumed. A sink edited while its target is probed is
+// probed again, up to three times, then refused with `sink_changed`. It
+// takes no `If-Match`.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -56150,9 +56189,10 @@ func (c *ClientWithResponses) DismissSinkGapWithResponse(ctx context.Context, pr
 // `to` must not be before `from` (`invalid_replay_range`). A replay is
 // applied by the delivery worker before the stream's next batch, which a
 // disabled or stopped sink starts once it runs again; the batch in flight
-// is dropped. A replay sent while another bounded one runs still returns
-// to the position that one would have. Audited as `sink.replayed`. It
-// takes no `If-Match`.
+// is dropped. A replay sent while another one runs still returns
+// to the position that one would have. A sink edited while the starts are
+// searched for is searched again, up to three times, then refused with
+// `sink_changed`. Audited as `sink.replayed`. It takes no `If-Match`.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -56178,9 +56218,10 @@ func (c *ClientWithResponses) ReplaySinkWithBodyWithResponse(ctx context.Context
 // `to` must not be before `from` (`invalid_replay_range`). A replay is
 // applied by the delivery worker before the stream's next batch, which a
 // disabled or stopped sink starts once it runs again; the batch in flight
-// is dropped. A replay sent while another bounded one runs still returns
-// to the position that one would have. Audited as `sink.replayed`. It
-// takes no `If-Match`.
+// is dropped. A replay sent while another one runs still returns
+// to the position that one would have. A sink edited while the starts are
+// searched for is searched again, up to three times, then refused with
+// `sink_changed`. Audited as `sink.replayed`. It takes no `If-Match`.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -69398,6 +69439,13 @@ func ParseEnableSinkResponse(rsp *http.Response) (*EnableSinkResponse, error) {
 		}
 		response.ApplicationproblemJSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest SinkChanged
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest Invalid
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -69601,6 +69649,13 @@ func ParseReplaySinkResponse(rsp *http.Response) (*ReplaySinkResponse, error) {
 			return nil, err
 		}
 		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest SinkChanged
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest Invalid
@@ -81961,6 +82016,8 @@ type PasswordResetGoneApplicationProblemPlusJSONResponse Problem
 type PreconditionRequiredApplicationProblemPlusJSONResponse Problem
 
 type RequestTooLargeApplicationProblemPlusJSONResponse Problem
+
+type SinkChangedApplicationProblemPlusJSONResponse Problem
 
 type TooManyAttemptsResponseHeaders struct {
 	RetryAfter *int
@@ -98924,6 +98981,22 @@ func (response EnableSink404ApplicationProblemPlusJSONResponse) VisitEnableSinkR
 	return err
 }
 
+type EnableSink412ApplicationProblemPlusJSONResponse struct {
+	SinkChangedApplicationProblemPlusJSONResponse
+}
+
+func (response EnableSink412ApplicationProblemPlusJSONResponse) VisitEnableSinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type EnableSink422ApplicationProblemPlusJSONResponse struct {
 	InvalidApplicationProblemPlusJSONResponse
 }
@@ -99186,6 +99259,22 @@ func (response ReplaySink404ApplicationProblemPlusJSONResponse) VisitReplaySinkR
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplaySink412ApplicationProblemPlusJSONResponse struct {
+	SinkChangedApplicationProblemPlusJSONResponse
+}
+
+func (response ReplaySink412ApplicationProblemPlusJSONResponse) VisitReplaySinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
 	_, err := buf.WriteTo(w)
 	return err
 }

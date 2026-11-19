@@ -186,7 +186,7 @@ func TestASummaryRowOfAVariationItsFlagLacksIsDropped(t *testing.T) {
 	if got.Accepted != 1 || got.DroppedRows != 2 || len(got.Rejected) != 0 {
 		t.Errorf("answer = %+v, want the summary accepted and 2 rows dropped", got)
 	}
-	summaries, err := pgevents.NewStore(testkit.Pool(t)).EvaluationSummaries(t.Context(), p.environmentID(t, "production"))
+	summaries, err := testkit.StoredEvaluationSummaries(t.Context(), testkit.Pool(t), p.environmentID(t, "production"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,9 +220,9 @@ func TestAcceptedSummariesAndAliasesAreStoredOnce(t *testing.T) {
 		t.Errorf("the same batch again = %+v, want 2 duplicates", again)
 	}
 
-	store := pgevents.NewStore(testkit.Pool(t))
+	pool := testkit.Pool(t)
 	production := p.environmentID(t, "production")
-	summaries, err := store.EvaluationSummaries(t.Context(), production)
+	summaries, err := testkit.StoredEvaluationSummaries(t.Context(), pool, production)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +241,7 @@ func TestAcceptedSummariesAndAliasesAreStoredOnce(t *testing.T) {
 	if r := summaries[1]; r.Row.Flag != "banner_text" || r.Row.Variation != "" || r.Row.Reason != "fallback" || r.Row.Count != 2 {
 		t.Errorf("second row = %+v", r.Row)
 	}
-	aliases, err := store.Aliases(t.Context(), production)
+	aliases, err := testkit.StoredAliases(t.Context(), pool, production)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +307,7 @@ func TestConcurrentRetriesOnTwoReplicasStoreEachEventOnce(t *testing.T) {
 	if accepted != 50 {
 		t.Errorf("accepted across replicas = %d, want each of 50 events once", accepted)
 	}
-	aliases, err := pgevents.NewStore(testkit.Pool(t)).Aliases(t.Context(), p.environmentID(t, "production"))
+	aliases, err := testkit.StoredAliases(t.Context(), testkit.Pool(t), p.environmentID(t, "production"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -442,7 +442,7 @@ func TestThePartitionWorkerKeepsPartitionsAheadOfTheClock(t *testing.T) {
 	if res := batchResult(t, srv, value, batch(aliasEvent(eventID(c.Now(), 1)))); res.Accepted != 1 {
 		t.Errorf("an event 3 days after the round = %+v", res)
 	}
-	aliases, err := pgevents.NewStore(testkit.Pool(t)).Aliases(t.Context(), p.environmentID(t, "production"))
+	aliases, err := testkit.StoredAliases(t.Context(), testkit.Pool(t), p.environmentID(t, "production"))
 	if err != nil || len(aliases) != 1 {
 		t.Errorf("aliases = %+v, %v", aliases, err)
 	}

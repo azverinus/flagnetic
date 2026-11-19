@@ -16562,6 +16562,10 @@ export type EnableSinkErrors = {
    */
   404: Problem;
   /**
+   * `sink_changed`: the sink was edited again and again while the request probed its target or searched for where its streams start; the request may be sent again.
+   */
+  412: Problem;
+  /**
    * The request is well formed but breaks a rule; `errors` names each field to fix.
    */
   422: Problem;
@@ -16750,6 +16754,10 @@ export type ReplaySinkErrors = {
    * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
    */
   404: Problem;
+  /**
+   * `sink_changed`: the sink was edited again and again while the request probed its target or searched for where its streams start; the request may be sent again.
+   */
+  412: Problem;
   /**
    * The request is well formed but breaks a rule; `errors` names each field to fix.
    */

@@ -6373,7 +6373,9 @@ export const updateSink = <ThrowOnError extends boolean = false>(
  * already has keeps its place, so enabling a sink again continues where
  * it stopped. A sink that is already enabled is answered as it is, with
  * nothing probed or recorded. Enabling a stopped sink leaves it stopped
- * until it is resumed. It takes no `If-Match`.
+ * until it is resumed. A sink edited while its target is probed is
+ * probed again, up to three times, then refused with `sink_changed`. It
+ * takes no `If-Match`.
  *
  */
 export const enableSink = <ThrowOnError extends boolean = false>(
@@ -6480,9 +6482,10 @@ export const sampleSink = <ThrowOnError extends boolean = false>(
  * `to` must not be before `from` (`invalid_replay_range`). A replay is
  * applied by the delivery worker before the stream's next batch, which a
  * disabled or stopped sink starts once it runs again; the batch in flight
- * is dropped. A replay sent while another bounded one runs still returns
- * to the position that one would have. Audited as `sink.replayed`. It
- * takes no `If-Match`.
+ * is dropped. A replay sent while another one runs still returns
+ * to the position that one would have. A sink edited while the starts are
+ * searched for is searched again, up to three times, then refused with
+ * `sink_changed`. Audited as `sink.replayed`. It takes no `If-Match`.
  *
  */
 export const replaySink = <ThrowOnError extends boolean = false>(

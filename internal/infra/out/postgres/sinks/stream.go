@@ -101,6 +101,7 @@ func (s *Store) Before(ctx context.Context, kind sinks.EventKind, scope sinks.Sc
 	if err != nil {
 		return events.Cursor{}, false, err
 	}
+	s.fault.holdSearch(ctx)
 	return pgevents.Before(ctx, s.db(ctx), table, pgScope(scope), from)
 }
 

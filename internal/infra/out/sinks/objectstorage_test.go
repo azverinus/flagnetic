@@ -78,7 +78,7 @@ func TestEachFormatIsWrittenAsOneObjectUnderTheKeyAndReadsBackAsTheRows(t *testi
 			c := objectStorageSink(store, store.Endpoint, bucket, func(c *domain.ObjectStorage) {
 				c.Prefix, c.Format, c.Compression = "lake", tc.format, tc.compression
 			})
-			if f := objectStorage().Deliver(t.Context(), c, appsinks.Delivery{ID: "dlv_abc", Kind: domain.EventExposure, Rows: rows, Now: received}); f != nil {
+			if f := objectStorage().Deliver(t.Context(), c, appsinks.BatchToSend{ID: "dlv_abc", Kind: domain.EventExposure, Rows: rows, Now: received}); f != nil {
 				t.Fatalf("Deliver = %v", f)
 			}
 			if got := store.Keys(t, bucket); len(got) != 1 || got[0] != tc.key {
@@ -138,7 +138,7 @@ func TestAParquetFileHoldsTheRowsInRowGroupsOfAHundredThousandWithTheDocumentedT
 	bucket := store.NewBucket(t)
 	rows := exposures(100_001)
 	c := objectStorageSink(store, store.Endpoint, bucket, func(c *domain.ObjectStorage) { c.Format, c.Compression = "parquet", "zstd" })
-	if f := objectStorage().Deliver(t.Context(), c, appsinks.Delivery{ID: "dlv_abc", Kind: domain.EventExposure, Rows: rows, Now: received}); f != nil {
+	if f := objectStorage().Deliver(t.Context(), c, appsinks.BatchToSend{ID: "dlv_abc", Kind: domain.EventExposure, Rows: rows, Now: received}); f != nil {
 		t.Fatalf("Deliver = %v", f)
 	}
 	keys := store.Keys(t, bucket)
@@ -185,7 +185,7 @@ func TestAnEmptyBatchIsAcknowledgedWithoutAFile(t *testing.T) {
 	store := testkit.StartObjectStorage(t)
 	bucket := store.NewBucket(t)
 	c := objectStorageSink(store, store.Endpoint, bucket, nil)
-	if f := objectStorage().Deliver(t.Context(), c, appsinks.Delivery{ID: "dlv_abc", Kind: domain.EventExposure, Now: received}); f != nil {
+	if f := objectStorage().Deliver(t.Context(), c, appsinks.BatchToSend{ID: "dlv_abc", Kind: domain.EventExposure, Now: received}); f != nil {
 		t.Fatalf("Deliver = %v", f)
 	}
 	if keys := store.Keys(t, bucket); len(keys) != 0 {
@@ -198,7 +198,7 @@ func TestASampleIsWrittenBesideTheBatchesUnderAMarkedName(t *testing.T) {
 	bucket := store.NewBucket(t)
 	c := objectStorageSink(store, store.Endpoint, bucket, nil)
 	rows := domain.SampleRows(domain.EventAlias, "shop", received)
-	if f := objectStorage().Deliver(t.Context(), c, appsinks.Delivery{ID: "sample_1", Kind: domain.EventAlias, Rows: rows, Sample: true, Now: received}); f != nil {
+	if f := objectStorage().Deliver(t.Context(), c, appsinks.BatchToSend{ID: "sample_1", Kind: domain.EventAlias, Rows: rows, Sample: true, Now: received}); f != nil {
 		t.Fatalf("Deliver = %v", f)
 	}
 	keys := store.Keys(t, bucket)
@@ -263,7 +263,7 @@ func TestWhatTheServiceAnswersIsReducedToAClassStatusAndCode(t *testing.T) {
 	bucket := store.NewBucket(t)
 	rows := exposures(1)
 	deliver := func(c appsinks.Call) *domain.Failure {
-		return objectStorage().Deliver(t.Context(), c, appsinks.Delivery{ID: "dlv_abc", Kind: domain.EventExposure, Rows: rows, Now: received})
+		return objectStorage().Deliver(t.Context(), c, appsinks.BatchToSend{ID: "dlv_abc", Kind: domain.EventExposure, Rows: rows, Now: received})
 	}
 	for name, tc := range map[string]struct {
 		call func() appsinks.Call
@@ -308,7 +308,7 @@ func TestACallThatTakesLongerThanTheLimitIsATimeout(t *testing.T) {
 	c := objectStorageSink(store, store.Endpoint, bucket, nil)
 	ctx, cancel := context.WithTimeout(t.Context(), time.Nanosecond)
 	defer cancel()
-	got := objectStorage().Deliver(ctx, c, appsinks.Delivery{ID: "dlv_abc", Kind: domain.EventExposure, Rows: exposures(1), Now: received})
+	got := objectStorage().Deliver(ctx, c, appsinks.BatchToSend{ID: "dlv_abc", Kind: domain.EventExposure, Rows: exposures(1), Now: received})
 	if got == nil || got.Class != domain.ClassTimeout {
 		t.Errorf("Deliver = %v, want a timeout", got)
 	}
@@ -335,7 +335,7 @@ func TestEveryEventKindReadsBackInEveryFormat(t *testing.T) {
 						rows[i] = r
 					}
 				}
-				if f := objectStorage().Deliver(t.Context(), c, appsinks.Delivery{ID: "dlv_abc", Kind: kind, Rows: rows, Now: received}); f != nil {
+				if f := objectStorage().Deliver(t.Context(), c, appsinks.BatchToSend{ID: "dlv_abc", Kind: kind, Rows: rows, Now: received}); f != nil {
 					t.Fatalf("Deliver = %v", f)
 				}
 				keys := store.Keys(t, bucket)
@@ -374,7 +374,7 @@ func TestAServiceThatRedirectsIsNotFollowed(t *testing.T) {
 	defer redirecting.Close()
 	store := testkit.StartObjectStorage(t)
 	c := objectStorageSink(store, redirecting.URL, "lake", nil)
-	got := objectStorage().Deliver(t.Context(), c, appsinks.Delivery{ID: "dlv_abc", Kind: domain.EventExposure, Rows: exposures(1), Now: received})
+	got := objectStorage().Deliver(t.Context(), c, appsinks.BatchToSend{ID: "dlv_abc", Kind: domain.EventExposure, Rows: exposures(1), Now: received})
 	if got == nil || got.Class != domain.ClassRedirect || got.Status != http.StatusTemporaryRedirect {
 		t.Errorf("Deliver = %v, want class redirect with status 307", got)
 	}

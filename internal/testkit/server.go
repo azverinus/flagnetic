@@ -64,6 +64,13 @@ func (s *Server) HoldNextSinkGapRecording() (reached <-chan struct{}, release fu
 	return s.sinkFault.HoldNextGapRecording()
 }
 
+// HoldNextSinkSearch holds the next search for where a replay or an enable of
+// a sink starts, before it reads the raw tables: reached is closed once the
+// search is under way and release lets it read.
+func (s *Server) HoldNextSinkSearch() (reached <-chan struct{}, release func()) {
+	return s.sinkFault.HoldNextSearch()
+}
+
 // CloseBackground ends the work the replica's use cases started on their
 // own, such as ruleset loads nobody waits for, as stopping the replica
 // does.
@@ -126,6 +133,12 @@ func (s *Server) AwaitListening(t testing.TB, channel string) {
 func (s *Server) Tick(t testing.TB, name string) error {
 	t.Helper()
 	return s.runner.Tick(t.Context(), name)
+}
+
+// TickWith is Tick under ctx, which a test cancels to end a round as a
+// shutdown would.
+func (s *Server) TickWith(ctx context.Context, name string) error {
+	return s.runner.Tick(ctx, name)
 }
 
 // Scrape returns the server's metrics in the Prometheus text format, as the

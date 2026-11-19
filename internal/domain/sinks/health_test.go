@@ -18,7 +18,7 @@ func TestASinkIsDisabledBeforeItIsAnythingElse(t *testing.T) {
 		"an enabled sink":                  {sinks.Sink{Input: sinks.Input{Enabled: true}}, sinks.HealthHealthy},
 		"a stopped sink":                   {sinks.Sink{Input: sinks.Input{Enabled: true}, StoppedAt: &stopped}, sinks.HealthStopped},
 	} {
-		if got := tc.sink.Health(15 * time.Minute); got != tc.want {
+		if got := tc.sink.JudgeHealth(15 * time.Minute); got != tc.want {
 			t.Errorf("%s: health = %s, want %s", name, got, tc.want)
 		}
 	}
@@ -47,7 +47,7 @@ func TestAnEnabledSinkIsJudgedFromItsStreamsDeadLettersAndLag(t *testing.T) {
 		"a disabled sink that failed": {sinks.Sink{Streams: failing}, sinks.HealthDisabled},
 		"streams that all delivered":  {enabled(func(s *sinks.Sink) { s.Streams = failing[:1] }), sinks.HealthHealthy},
 	} {
-		if got := tc.sink.Health(15 * time.Minute); got != tc.want {
+		if got := tc.sink.JudgeHealth(15 * time.Minute); got != tc.want {
 			t.Errorf("%s: health = %s, want %s", name, got, tc.want)
 		}
 	}

@@ -20,6 +20,11 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
+// errSinkChanged refuses a request whose sink was edited between what it read
+// outside the unit of work and the lock it then took.
+var errSinkChanged = apperrors.PreconditionFailed("sink_changed",
+	"the sink was edited while the request was running; try again")
+
 // ErrNotFound is what a store answers for a row it does not have.
 var ErrNotFound = errors.New("sinks: not found")
 
@@ -69,7 +74,7 @@ type Store interface {
 	LockStream(ctx context.Context, sink sinks.ID, kind sinks.EventKind) (sinks.Stream, error)
 	// Replay puts the stream of kind of sink as plan has it: the position it
 	// reads on from, applied by the delivery worker before the stream's next
-	// batch, and where a bounded replay stops and returns to. It drops the
+	// batch, and where the replay stops and returns to. It drops the
 	// batch in flight and the lease and makes the stream due at now.
 	Replay(ctx context.Context, sink sinks.ID, kind sinks.EventKind, plan sinks.ReplayPlan, now time.Time) error
 	// SaveWarnings stores what the last check of sink's target found wrong.

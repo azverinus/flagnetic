@@ -24,10 +24,10 @@ const (
 	HealthHealthy Health = "healthy"
 )
 
-// Health returns how s stands, judged from the state the store read with it:
+// JudgeHealth returns how s stands, judged from the state the store read with it:
 // disabled or stopped, a stream that failed its last call, a dead letter
 // waiting, the oldest undelivered row older than lagWarning, or none of these.
-func (s Sink) Health(lagWarning time.Duration) Health {
+func (s Sink) JudgeHealth(lagWarning time.Duration) Health {
 	switch {
 	case !s.Enabled:
 		return HealthDisabled

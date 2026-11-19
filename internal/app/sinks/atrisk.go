@@ -9,6 +9,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/sinks"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
@@ -19,6 +20,9 @@ const AtRiskEvery = time.Minute
 
 // AtRiskStore keeps which sinks are at risk.
 type AtRiskStore interface {
+	// LockProject locks project's row for the unit of work, or answers
+	// ErrNotFound when there is none; it comes before the sink's own rows.
+	LockProject(ctx context.Context, project workspace.ProjectID) error
 	// Tracked returns every sink that has a stream or is marked at risk,
 	// with its streams, whatever its state: a disabled or stopped sink loses
 	// rows to retention too.
@@ -138,6 +142,17 @@ func (h *EvaluateAtRisk) judge(ctx context.Context, now time.Time, s sinks.Sink)
 	switch {
 	case risk && s.AtRiskSince == nil:
 		return h.d.Tx.Within(ctx, func(ctx context.Context) error {
+			// The project comes first, as in every other write of its sinks:
+			// marking the sink and then recording the audit entry, whose
+			// outbox row refers to the project, is the reverse order, and a
+			// project delete or a replay holding the project would deadlock
+			// with it.
+			if err := h.d.Store.LockProject(ctx, s.Project); errors.Is(err, ErrNotFound) {
+				// The project and its sinks are gone.
+				return nil
+			} else if err != nil {
+				return err
+			}
 			entered, err := h.d.Store.EnterAtRisk(ctx, s.ID, now)
 			if err != nil || !entered {
 				return err

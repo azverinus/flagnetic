@@ -33,13 +33,17 @@ type GapStore interface {
 	// GapStreams returns every stream of kind with its sink.
 	GapStreams(ctx context.Context, kind sinks.EventKind) ([]GapStream, error)
 	// RecordGap saves gap as the gap of sink's stream of kind and moves the
-	// stream's live position, the position a bounded replay returns to when
+	// stream's live position, the position a replay returns to when
 	// replaying is set and the cursor when not, to gap.Moved, dropping its
 	// batch in flight and its lease.
 	RecordGap(ctx context.Context, sink sinks.ID, kind sinks.EventKind, replaying bool, gap events.Gap) error
 	// ExpireDeadLetters expires the pending dead letters of kind none of
 	// whose rows is stored at or after before.
 	ExpireDeadLetters(ctx context.Context, kind sinks.EventKind, before time.Time) error
+	// PurgeDeadLetters deletes the dead letters of kind that are settled:
+	// redelivered before redelivered, or expired and created before expired.
+	// A pending one is never deleted.
+	PurgeDeadLetters(ctx context.Context, kind sinks.EventKind, redelivered, expired time.Time) error
 	// Gaps returns sink's gaps, the oldest first.
 	Gaps(ctx context.Context, sink sinks.ID) ([]sinks.Gap, error)
 	// Dismiss marks sink's gap dismissed at now, keeping the first time of
@@ -66,6 +70,9 @@ type RetentionDeps struct {
 	Rows  GapRows
 	Audit AuditLog
 	IDs   *id.Source
+	// Retention is how long raw events are kept, which settled dead letters
+	// stay listed for as well.
+	Retention time.Duration
 }
 
 // Retention is the sinks' side of retention dropping a partition: the events
@@ -88,7 +95,7 @@ func (r *Retention) LockStreams(ctx context.Context, typ events.EventType) error
 // that the stream had not delivered: a gap, the stream's live position moved
 // to just before the first row still stored (never past the horizon), its
 // batch in flight and lease dropped, and sink.data_lost. Measured from the
-// position a bounded replay returns to while one runs, since the replay's own
+// position a replay returns to while one runs, since the replay's own
 // cursor is behind rows already delivered. The pending dead letters with no
 // row left are expired. It returns the gaps recorded.
 func (r *Retention) RecordGaps(ctx context.Context, typ events.EventType, days []time.Time, horizon uint64, now time.Time) ([]events.Gap, error) {
@@ -109,6 +116,14 @@ func (r *Retention) RecordGaps(ctx context.Context, typ events.EventType, days [
 	}
 	end := slices.MaxFunc(days, time.Time.Compare).AddDate(0, 0, 1)
 	if err = r.d.Store.ExpireDeadLetters(ctx, kind, end); err != nil {
+		return nil, err
+	}
+	// A dead letter settled stays listed for as long as events are kept, so
+	// that what became of it can be read, and then goes: a target that rejects
+	// some batches but never enough in a row to stop would otherwise grow the
+	// list without bound. A letter expires about one retention after it was
+	// set aside, when its rows go, so it stays one more.
+	if err = r.d.Store.PurgeDeadLetters(ctx, kind, now.Add(-r.d.Retention), now.Add(-2*r.d.Retention)); err != nil {
 		return nil, err
 	}
 	return recorded, nil

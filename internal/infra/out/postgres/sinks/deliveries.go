@@ -219,30 +219,57 @@ func (s *Store) SaveWarnings(ctx context.Context, sink sinks.ID, warnings []stri
 	return nil
 }
 
-// Claim leases to token, until until, the streams due by now of sinks that are
-// enabled or still have a batch in flight and are not stopped, leaving out the
-// sinks busy, the longest due first. A sink disabled with a batch in flight
+// Claim leases to token, until until, the streams due by now of at most
+// limit.Sinks sinks that are enabled or still have a batch in flight and are
+// not stopped, leaving out the sinks busy and those another replica holds a
+// stream of, the longest due first. All the due streams of a sink are leased
+// together, so that one sink's streams are never attempted on two replicas at
+// once, and a project's sinks are leased only while the replica holds fewer
+// than limit.PerProject of them. A sink disabled with a batch in flight
 // finishes it and starts nothing else.
-func (s *Store) Claim(ctx context.Context, token appsinks.LeaseToken, now, until time.Time, limit int, busy []sinks.ID) ([]appsinks.ClaimedSink, error) {
+func (s *Store) Claim(ctx context.Context, token appsinks.LeaseToken, now, until time.Time, limit appsinks.ClaimLimit, busy []sinks.ID) ([]appsinks.ClaimedSink, error) {
 	busyIDs := make([][16]byte, len(busy))
 	for i, b := range busy {
 		busyIDs[i] = b.Bytes()
 	}
+	// picked is decided without locks, then the sinks and streams are locked
+	// with SKIP LOCKED: a sink another claim is leasing is left to it. A sink
+	// is locked before its streams, as every other write of them does.
 	rows, err := s.db(ctx).Query(ctx, `
-		WITH due AS (
-		    SELECT ss.sink_id, ss.event_kind FROM sink_streams ss JOIN sinks s ON s.id = ss.sink_id
+		WITH candidates AS (
+		    SELECT s.id AS sink_id, s.project_id, min(ss.next_attempt_at) AS first_due
+		    FROM sink_streams ss JOIN sinks s ON s.id = ss.sink_id
 		    WHERE (s.enabled OR ss.inflight_xid IS NOT NULL) AND s.stopped_at IS NULL
 		      AND ss.next_attempt_at <= $1 AND (ss.lease_until IS NULL OR ss.lease_until <= $1)
 		      AND NOT (s.id = ANY($4::uuid[]))
-		    ORDER BY ss.next_attempt_at, ss.sink_id, ss.event_kind
+		      AND NOT EXISTS (SELECT 1 FROM sink_streams o WHERE o.sink_id = s.id AND o.lease_until > $1)
+		    GROUP BY s.id, s.project_id
+		), held AS (
+		    SELECT project_id, count(*) AS n FROM sinks WHERE id = ANY($4::uuid[]) GROUP BY project_id
+		), picked AS (
+		    SELECT c.sink_id FROM (
+		        SELECT c.*, row_number() OVER (PARTITION BY c.project_id ORDER BY c.first_due, c.sink_id) AS rank
+		        FROM candidates c
+		    ) c LEFT JOIN held h ON h.project_id = c.project_id
+		    WHERE c.rank + coalesce(h.n, 0) <= $6
+		    ORDER BY c.first_due, c.sink_id
 		    LIMIT $2
+		), locked AS (
+		    SELECT s.id FROM sinks s WHERE s.id IN (SELECT sink_id FROM picked)
+		    FOR NO KEY UPDATE OF s SKIP LOCKED
+		), due AS (
+		    SELECT ss.sink_id, ss.event_kind FROM sink_streams ss JOIN sinks s ON s.id = ss.sink_id
+		    WHERE ss.sink_id IN (SELECT id FROM locked)
+		      AND (s.enabled OR ss.inflight_xid IS NOT NULL) AND s.stopped_at IS NULL
+		      AND ss.next_attempt_at <= $1 AND (ss.lease_until IS NULL OR ss.lease_until <= $1)
+		    ORDER BY ss.next_attempt_at, ss.sink_id, ss.event_kind
 		    FOR UPDATE OF ss SKIP LOCKED
 		)
 		UPDATE sink_streams ss SET lease_token = $5, lease_until = $3,
 		    cursor_xid = coalesce(ss.pending_cursor_xid, ss.cursor_xid), cursor_seq = coalesce(ss.pending_cursor_seq, ss.cursor_seq),
 		    pending_cursor_xid = NULL, pending_cursor_seq = NULL
 		FROM due WHERE ss.sink_id = due.sink_id AND ss.event_kind = due.event_kind
-		RETURNING `+streamColumns, now, limit, until, busyIDs, token.String())
+		RETURNING `+streamColumns, now, limit.Sinks, until, busyIDs, token.String(), limit.PerProject)
 	if err != nil {
 		return nil, fmt.Errorf("claiming streams: %w", err)
 	}
@@ -385,7 +412,7 @@ func (s *Store) Ack(ctx context.Context, stream appsinks.StreamRef, token appsin
 	if delivered > 0 && s.fault.loses() {
 		return true, nil
 	}
-	// A bounded replay that the batch reaches the end of is over: the cursor
+	// A replay that the batch reaches the end of is over: the cursor
 	// goes back to where the replay was to return to, not to the batch's end.
 	tag, err := s.db(ctx).Exec(ctx, `
 		WITH s AS (

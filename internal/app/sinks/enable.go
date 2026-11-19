@@ -2,6 +2,7 @@ package sinks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -75,6 +76,18 @@ func NewEnable(d Deps) *Enable { return &Enable{d: d} }
 // streams this creates start at StartFrom; one the sink already has keeps its
 // cursor, so enabling a sink again continues where it stopped.
 func (h *Enable) Handle(ctx context.Context, cmd EnableCommand) (sinks.Sink, error) {
+	for attempt := 1; ; attempt++ {
+		out, err := h.handle(ctx, cmd)
+		// A sink edited after it was probed is probed again: enabling it
+		// would otherwise enable a target nobody checked.
+		if errors.Is(err, errSinkChanged) && attempt < maxSearches {
+			continue
+		}
+		return out, err
+	}
+}
+
+func (h *Enable) handle(ctx context.Context, cmd EnableCommand) (sinks.Sink, error) {
 	seen, err := sinkOf(ctx, h.d.Store, cmd.Project, cmd.Sink)
 	if err != nil {
 		return seen, err
@@ -94,16 +107,23 @@ func (h *Enable) Handle(ctx context.Context, cmd EnableCommand) (sinks.Sink, err
 		return seen, notReady(*probed.Failure)
 	}
 	now := h.d.now()
+	// Where the new streams start is searched for outside the unit of work:
+	// the search scans the raw tables back to StartFrom, and the project's
+	// lock, taken below, holds up every write of the project meanwhile.
+	starts, err := h.d.searchStarts(ctx, seen, cmd.StartFrom, now)
+	if err != nil {
+		return seen, err
+	}
 	var out sinks.Sink
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		var txErr error
-		out, txErr = h.enable(ctx, cmd, probed.Warnings, now)
+		out, txErr = h.enable(ctx, cmd, seen.Version, probed.Warnings, starts, now)
 		return txErr
 	})
 	return out, err
 }
 
-func (h *Enable) enable(ctx context.Context, cmd EnableCommand, warnings []string, now time.Time) (sinks.Sink, error) {
+func (h *Enable) enable(ctx context.Context, cmd EnableCommand, probed int64, warnings []string, starts map[sinks.EventKind]events.Cursor, now time.Time) (sinks.Sink, error) {
 	if err := h.d.lockProject(ctx, cmd.Project); err != nil {
 		return sinks.Sink{}, err
 	}
@@ -114,7 +134,10 @@ func (h *Enable) enable(ctx context.Context, cmd EnableCommand, warnings []strin
 	if before.Enabled {
 		return h.d.judged(ctx, before)
 	}
-	if err = h.d.syncStreams(ctx, before, before.EventKinds, cmd.StartFrom, now); err != nil {
+	if before.Version != probed {
+		return before, errSinkChanged
+	}
+	if err = h.d.syncStreams(ctx, before, before.EventKinds, cmd.StartFrom, starts, now); err != nil {
 		return before, err
 	}
 	after, err := rebind(h.d.Sealer, before)
@@ -132,11 +155,42 @@ func (h *Enable) enable(ctx context.Context, cmd EnableCommand, warnings []strin
 	return h.d.read(ctx, cmd.Project, cmd.Sink)
 }
 
+// searchStarts finds where the streams s lacks start, when from asks for a
+// position: just before the first row received at or after it. It reads only
+// committed rows and takes no lock. Nothing is searched for when from is nil,
+// which starts at the horizon, read in the unit of work.
+func (d Deps) searchStarts(ctx context.Context, s sinks.Sink, from *time.Time, now time.Time) (map[sinks.EventKind]events.Cursor, error) {
+	if from == nil || sinks.OutOfRetention(*from, now, d.Retention) {
+		return nil, nil
+	}
+	have := map[sinks.EventKind]bool{}
+	for _, st := range s.Streams {
+		have[st.EventKind] = true
+	}
+	scope, named, err := d.Rows.Scope(ctx, s.Project, s.Environments)
+	if err != nil {
+		return nil, err
+	}
+	starts := map[sinks.EventKind]events.Cursor{}
+	for _, k := range (sinks.Input{EventKinds: s.EventKinds}).StreamKinds() {
+		if have[k] {
+			continue
+		}
+		at, startErr := d.start(ctx, k, scope, named, from)
+		if startErr != nil {
+			return nil, startErr
+		}
+		starts[k] = at
+	}
+	return starts, nil
+}
+
 // syncStreams makes the streams of s those of the event kinds it exports
 // (kinds, all of them when none): a stream it lacks starts at the position
 // from asks for, or at the horizon when it is nil, and one it has no longer
-// is dropped. s carries the streams it has.
-func (d Deps) syncStreams(ctx context.Context, s sinks.Sink, kinds []sinks.EventKind, from *time.Time, now time.Time) error {
+// is dropped. s carries the streams it has. starts holds the positions already
+// searched for, which are used instead of searching again.
+func (d Deps) syncStreams(ctx context.Context, s sinks.Sink, kinds []sinks.EventKind, from *time.Time, starts map[sinks.EventKind]events.Cursor, now time.Time) error {
 	want := sinks.Input{EventKinds: kinds}.StreamKinds()
 	have := map[sinks.EventKind]bool{}
 	for _, st := range s.Streams {
@@ -154,18 +208,20 @@ func (d Deps) syncStreams(ctx context.Context, s sinks.Sink, kinds []sinks.Event
 		if from != nil && sinks.OutOfRetention(*from, now, d.Retention) {
 			return errOutOfRetention
 		}
-		if !resolved {
+		at, searched := starts[k]
+		if !searched {
 			var err error
-			if scope, named, err = d.Rows.Scope(ctx, s.Project, s.Environments); err != nil {
+			if !resolved {
+				if scope, named, err = d.Rows.Scope(ctx, s.Project, s.Environments); err != nil {
+					return err
+				}
+				resolved = true
+			}
+			if at, err = d.start(ctx, k, scope, named, from); err != nil {
 				return err
 			}
-			resolved = true
 		}
-		at, err := d.start(ctx, k, scope, named, from)
-		if err != nil {
-			return err
-		}
-		if err = d.Store.CreateStream(ctx, s.ID, k, at, floorOf(from), now); err != nil {
+		if err := d.Store.CreateStream(ctx, s.ID, k, at, floorOf(from), now); err != nil {
 			return err
 		}
 	}

@@ -197,7 +197,7 @@ func (h *Update) update(ctx context.Context, cmd UpdateCommand, sealed string, n
 	// loses one removed all the same, so that a batch it still has in flight
 	// of a kind no longer exported is not resent.
 	if after.Enabled {
-		err = h.d.syncStreams(ctx, before, after.EventKinds, nil, now)
+		err = h.d.syncStreams(ctx, before, after.EventKinds, nil, nil, now)
 	} else {
 		err = h.d.dropStreams(ctx, before, after.EventKinds)
 	}

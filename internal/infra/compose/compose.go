@@ -264,7 +264,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	}
 	// Retention drops the partitions sinks read, recording the rows a stream
 	// had not delivered as a gap in the drop's own unit of work.
-	sinkRetention := appsinks.NewRetention(appsinks.RetentionDeps{Store: sinkStore, Rows: sinkStore, Audit: audit, IDs: d.IDs})
+	sinkRetention := appsinks.NewRetention(appsinks.RetentionDeps{Store: sinkStore, Rows: sinkStore, Audit: audit, IDs: d.IDs, Retention: o.EventsRetention})
 	sinkMetrics := worker.NewSinkMetrics(reg, sinkStore, sinkStore)
 	sinks.Observer = sinkMetrics
 	sinkDelivery := appsinks.NewDeliver(appsinks.DeliverDeps{

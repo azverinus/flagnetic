@@ -63,14 +63,14 @@ func NewWebhook(client *http.Client) *Webhook { return &Webhook{client: client} 
 // receiver refusing a stale timestamp accepts it. A webhook receiver has
 // nothing to prepare.
 func (w *Webhook) Probe(ctx context.Context, c appsinks.Call, now time.Time, _ bool) appsinks.Probed {
-	return appsinks.Probed{Failure: w.Deliver(ctx, c, appsinks.Delivery{ID: "test_" + uuid.NewString(), Test: true, Now: now})}
+	return appsinks.Probed{Failure: w.Deliver(ctx, c, appsinks.BatchToSend{ID: "test_" + uuid.NewString(), Test: true, Now: now})}
 }
 
 // Deliver posts the batch, signed, and answers why the receiver did not
 // acknowledge it with a 2xx: a request timeout, too many requests and a server
 // error are a status, which a retry may cure; any other answer is a rejection.
 // What the receiver wrote is never read.
-func (w *Webhook) Deliver(ctx context.Context, c appsinks.Call, d appsinks.Delivery) *sinks.Failure {
+func (w *Webhook) Deliver(ctx context.Context, c appsinks.Call, d appsinks.BatchToSend) *sinks.Failure {
 	kind := string(d.Kind)
 	if d.Test {
 		kind = "test"

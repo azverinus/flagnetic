@@ -372,26 +372,16 @@ func TestRetentionWaitsForASinkBeingChangedBeforeTakingItsStreams(t *testing.T) 
 
 	// A transaction taking the sink's row and then its streams, as resuming
 	// or deleting the sink does, holds the row while retention starts.
-	pool := testkit.Pool(t)
-	tx, err := pool.Begin(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = tx.Rollback(t.Context()) }()
-	var pid int
-	if err = tx.QueryRow(t.Context(), `SELECT pg_backend_pid() FROM sinks WHERE id = $1 FOR UPDATE`, created.Id.String()).Scan(&pid); err != nil {
-		t.Fatal(err)
-	}
+	held := holdSink(t, created)
 	done := make(chan error, 1)
 	go func() { done <- f.srv.Tick(t, worker.EventRetentionName) }()
-	awaitLockWait(t, pid)
+	awaitLockWait(t, held.pid)
 
-	if _, err = tx.Exec(t.Context(), `SELECT 1 FROM sink_streams WHERE sink_id = $1 FOR UPDATE`, created.Id.String()); err != nil {
+	if err := held.lockStream(t, created, "exposure"); err != nil {
 		t.Fatalf("taking the sink's streams while retention waits: %v", err)
 	}
-	if err = tx.Commit(t.Context()); err != nil {
-		t.Fatal(err)
-	}
+	held.release(t)
+	var err error
 	if err = <-done; err != nil {
 		t.Fatalf("retention: %v", err)
 	}

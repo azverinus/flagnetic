@@ -1,6 +1,7 @@
 package sdk_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
+	appsinks "github.com/azverinus/flagnetic/internal/app/sinks"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
@@ -1098,46 +1100,235 @@ func TestRecordingASinkFailureTakesTheProjectBeforeTheSink(t *testing.T) {
 	}
 
 	// A writer of the project holds it while the failure is recorded.
-	pool := testkit.Pool(t)
-	holder, err := pool.Begin(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = holder.Rollback(t.Context()) }()
-	if _, err = holder.Exec(t.Context(), `SELECT 1 FROM projects WHERE key = $1 FOR NO KEY UPDATE`, f.p.key); err != nil {
-		t.Fatal(err)
-	}
-	var holderPID int
-	if err = holder.QueryRow(t.Context(), `SELECT pg_backend_pid()`).Scan(&holderPID); err != nil {
-		t.Fatal(err)
-	}
+	held := holdProject(t, f.p.projectID(t))
 	close(release)
 
-	// Once the failure waits for the project, the sink must still be free.
+	// Once the failure waits for the project, the sink's stream must still be
+	// free.
+	pool := testkit.Pool(t)
 	for waiting := false; !waiting; time.Sleep(10 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			t.Fatal("the failure never waited for the project")
 		}
-		if err = pool.QueryRow(t.Context(), `SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid)))`, holderPID).Scan(&waiting); err != nil {
+		if err := pool.QueryRow(t.Context(), `SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid)))`, held.pid).Scan(&waiting); err != nil {
 			t.Fatal(err)
 		}
 	}
-	probe, err := pool.Begin(t.Context())
-	if err != nil {
-		t.Fatal(err)
+	if !streamFreeWhileHeld(t, created, "exposure") {
+		t.Error("the sink's stream is locked while the failure waits for the project")
 	}
-	defer func() { _ = probe.Rollback(t.Context()) }()
-	if _, err = probe.Exec(t.Context(), `SELECT 1 FROM sinks WHERE id = $1 FOR NO KEY UPDATE NOWAIT`, created.Id); err != nil {
-		t.Errorf("the sink is locked while the failure waits for the project: %v", err)
-	}
-	_ = probe.Rollback(t.Context())
-	if err = holder.Commit(t.Context()); err != nil {
-		t.Fatal(err)
-	}
+	held.release(t)
+	var err error
 	if err = <-round; err != nil {
 		t.Fatalf("sink delivery round: %v", err)
 	}
 	if s := f.sink(t, created); s.Health != management.SinkHealthFailing {
 		t.Errorf("health = %s, want failing", s.Health)
+	}
+}
+
+// One replica attempts at most a project's share of sinks at once and leaves
+// the rest of the project's due sinks unclaimed, so that another replica
+// attempts them beside it instead of the project's sinks queueing behind one.
+func TestOneProjectsSinksAreAttemptedByTwoReplicasAtOnce(t *testing.T) {
+	f := startDelivering(t)
+	release := make(chan struct{})
+	const sinksOfProject = 8
+	// Enabling a sink calls the target once, which it answers at once.
+	replies := make([]testkit.Reply, sinksOfProject, sinksOfProject+1)
+	r := testkit.StartReceiver(t, append(replies, testkit.Reply{Release: release})...)
+	for i := range sinksOfProject {
+		body := webhook(r, "exposure")
+		body.Name = fmt.Sprintf("Warehouse %d", i)
+		f.enabled(t, body)
+	}
+	f.post(t, f.exposure("u-1", "true", f.clock.Now()))
+	f.srv.AwaitHorizon(t)
+	other := testkit.StartServer(t, testkit.WithClock(f.clock), sinkTargets)
+
+	rounds := make(chan error, 2)
+	go func() { rounds <- f.srv.Tick(t, worker.SinkDeliveryName) }()
+	waitForCalls := func(want int) int {
+		deadline := time.Now().Add(10 * time.Second)
+		for len(batchCalls(r)) < want && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+		return len(batchCalls(r))
+	}
+	if got := waitForCalls(4); got != 4 {
+		t.Fatalf("the first replica attempted %d sinks, want its share of 4", got)
+	}
+	// The first replica holds its share and leaves the other sinks alone.
+	time.Sleep(300 * time.Millisecond)
+	if got := len(batchCalls(r)); got != 4 {
+		t.Errorf("the first replica attempted %d sinks of one project at once, want 4", got)
+	}
+
+	go func() { rounds <- other.Tick(t, worker.SinkDeliveryName) }()
+	if got := waitForCalls(sinksOfProject); got != sinksOfProject {
+		t.Errorf("%d sinks attempted with two replicas, want all %d", got, sinksOfProject)
+	}
+	close(release)
+	for range 2 {
+		if err := <-rounds; err != nil {
+			t.Fatalf("sink delivery round: %v", err)
+		}
+	}
+}
+
+// A sink's streams are never attempted on two replicas at once: a replica that
+// holds one of them leaves the others to it, so that a stop it commits is
+// seen by the next attempt of every stream instead of after one more batch is
+// sent to the stopped sink.
+func TestASinksStreamsAreNotAttemptedOnTwoReplicasAtOnce(t *testing.T) {
+	f := startDelivering(t)
+	release := make(chan struct{})
+	r := testkit.StartReceiver(t, script([]testkit.Reply{{}}, []testkit.Reply{{Release: release}})...)
+	f.enabled(t, small(r, "exposure", "alias"))
+	other := testkit.StartServer(t, testkit.WithClock(f.clock), sinkTargets)
+
+	// Both streams rest once they have nothing to send, and fall due again
+	// together.
+	tick(t, f.srv)
+	f.clock.Advance(time.Minute)
+	f.post(t, f.exposure("u-1", "true", f.clock.Now()), f.exposure("u-2", "true", f.clock.Now()))
+	f.srv.AwaitHorizon(t)
+
+	// The first replica sends the first exposure batch and holds the second,
+	// its alias stream resting meanwhile.
+	rounds := make(chan error, 2)
+	go func() { rounds <- f.srv.Tick(t, worker.SinkDeliveryName) }()
+	callsWithin := func(want int, wait time.Duration) int {
+		deadline := time.Now().Add(wait)
+		for len(batchCalls(r)) < want && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+		return len(batchCalls(r))
+	}
+	if got := callsWithin(2, 10*time.Second); got != 2 {
+		t.Fatalf("the first replica made %d calls, want 2", got)
+	}
+
+	// The alias stream falls due while the first replica holds the exposure
+	// stream: the other replica leaves the sink alone.
+	f.clock.Advance(time.Minute)
+	f.post(t, f.alias(1))
+	f.srv.AwaitHorizon(t)
+	go func() { rounds <- other.Tick(t, worker.SinkDeliveryName) }()
+	if got := callsWithin(3, 2*time.Second); got != 2 {
+		t.Errorf("%d calls with a second replica, want 2: it attempted a stream of a sink the first replica holds", got)
+	}
+	close(release)
+	for range 2 {
+		if err := <-rounds; err != nil {
+			t.Fatalf("sink delivery round: %v", err)
+		}
+	}
+}
+
+// A sink edited while its target is being probed for the enable is probed
+// again, so that the target enabled is the one that was checked.
+func TestASinkEditedWhileItsTargetIsProbedIsProbedAgainBeforeItIsEnabled(t *testing.T) {
+	f := startDelivering(t)
+	release := make(chan struct{})
+	first := testkit.StartReceiver(t, testkit.Reply{Release: release})
+	second := testkit.StartReceiver(t)
+	created, _ := f.create(t, webhook(first, "exposure"))
+	f.srv.AwaitHorizon(t)
+
+	enabled := make(chan *management.EnableSinkResponse, 1)
+	go func() {
+		enabled <- do(f.p.admin.EnableSinkWithResponse(t.Context(), f.p.key, created.Id, management.SinkEnable{}))
+	}()
+	for deadline := time.Now().Add(10 * time.Second); len(first.Calls()) == 0; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the target was never probed")
+		}
+	}
+	f.patch(t, created, management.SinkPatch{Webhook: &management.SinkWebhookInput{Url: ptr(second.URL)}})
+	close(release)
+
+	res := <-enabled
+	if res.JSON200 == nil {
+		t.Fatalf("POST enable = %d: %s", res.StatusCode(), res.Body)
+	}
+	if n := len(second.Calls()); n != 1 {
+		t.Errorf("the edited target was probed %d times, want once before the sink was enabled", n)
+	}
+}
+
+// An attempt whose lease another replica took records nothing, and is not
+// counted: the replica that recorded its own attempt counts the batch.
+func TestABatchWhoseLeaseWasLostIsNotCounted(t *testing.T) {
+	f := startDelivering(t)
+	release := make(chan struct{})
+	r := testkit.StartReceiver(t, script([]testkit.Reply{{Release: release}}, []testkit.Reply{{}})...)
+	created, _ := f.enabled(t, webhook(r, "exposure"))
+	other := testkit.StartServer(t, testkit.WithClock(f.clock), sinkTargets)
+	f.post(t, f.exposure("u-1", "true", f.clock.Now()))
+	f.srv.AwaitHorizon(t)
+
+	slow := make(chan error, 1)
+	go func() { slow <- f.srv.Tick(t, worker.SinkDeliveryName) }()
+	for deadline := time.Now().Add(10 * time.Second); len(batchCalls(r)) == 0; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the batch never reached the receiver")
+		}
+	}
+	// The first replica waits on the target past its lease, and the other
+	// takes the stream and records the batch.
+	f.clock.Advance(appsinks.LeaseDuration + time.Minute)
+	tick(t, other)
+	close(release)
+	if err := <-slow; err != nil {
+		t.Fatalf("sink delivery round: %v", err)
+	}
+
+	series := `flagnetic_sink_batches_total{event_kind="exposure",result="ack",sink="` + created.Id.String() + `"}`
+	if got := testkit.Metric(t, f.srv.Scrape(t), series); got > 0 {
+		t.Errorf("the replica that lost its lease counted %v batches acknowledged, want none", got)
+	}
+	if got := testkit.Metric(t, other.Scrape(t), series); got != 1 {
+		t.Errorf("the replica that recorded the batch counted %v acknowledged, want 1", got)
+	}
+}
+
+// A round cut short by a shutdown gives back the leases of the streams it was
+// attempting and had not started, so that another replica delivers the sink at
+// once instead of after the leases run out.
+func TestAShutdownMidAttemptGivesTheSinksLeasesBackToOtherReplicas(t *testing.T) {
+	f := startDelivering(t)
+	release := make(chan struct{})
+	r := testkit.StartReceiver(t, script([]testkit.Reply{{Release: release}}, []testkit.Reply{{}})...)
+	f.enabled(t, small(r, "exposure", "alias"))
+	other := testkit.StartServer(t, testkit.WithClock(f.clock), sinkTargets)
+	f.post(t, f.exposure("u-1", "true", f.clock.Now()), f.alias(1))
+	f.srv.AwaitHorizon(t)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() { done <- f.srv.TickWith(ctx, worker.SinkDeliveryName) }()
+	for deadline := time.Now().Add(10 * time.Second); len(batchCalls(r)) == 0; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the first batch never reached the receiver")
+		}
+	}
+	cancel()
+	<-done
+	close(release)
+
+	// The lease would run for minutes: the other replica delivers both streams
+	// within this round.
+	tick(t, other)
+	kinds := map[string]bool{}
+	for _, c := range batchCalls(r) {
+		var b struct {
+			EventKind string `json:"event_kind"`
+		}
+		_ = json.Unmarshal(c.Body, &b)
+		kinds[b.EventKind] = true
+	}
+	if !kinds["exposure"] || !kinds["alias"] {
+		t.Errorf("batches of %v reached the receiver, want both streams delivered by the other replica", kinds)
 	}
 }

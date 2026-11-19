@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -119,7 +120,7 @@ func (c *ClickHouse) Probe(ctx context.Context, call appsinks.Call, _ time.Time,
 // tables. The delivery's ID is the query's ID, and an insert is synchronous, so
 // a 200 means the rows are stored. A retry of the same rows is folded into the
 // ones already stored by the table's sorting key.
-func (c *ClickHouse) Deliver(ctx context.Context, call appsinks.Call, d appsinks.Delivery) *sinks.Failure {
+func (c *ClickHouse) Deliver(ctx context.Context, call appsinks.Call, d appsinks.BatchToSend) *sinks.Failure {
 	ch := c.call(call)
 	t, ok := sinks.ClickHouseTableOf(d.Kind)
 	if !ok {
@@ -162,6 +163,10 @@ func (c *ClickHouse) Deliver(ctx context.Context, call appsinks.Call, d appsinks
 	params.Set("query", t.InsertStatement(ch.cfg.Database, ch.cfg.TablePrefix, columns))
 	params.Set("query_id", d.ID)
 	params.Set("async_insert", "0")
+	// ClickHouse buffers the answer until the insert is done and sends its real
+	// status, instead of a 200 ahead of an exception that follows in the body.
+	params.Set("wait_end_of_query", "1")
+	params.Set("send_progress_in_http_headers", "0")
 	params.Set("date_time_input_format", "best_effort")
 	_, _, f = ch.do(ctx, params, "", body.Bytes())
 	return f
@@ -248,5 +253,27 @@ func (c chCall) do(ctx context.Context, params url.Values, statement string, gzi
 		f := ClassifyError(err)
 		return nil, "", &f
 	}
+	if gzipped != nil {
+		// An insert answers with nothing; an exception in what it answers is
+		// one raised after the status was sent, so the rows were not stored.
+		// The body is read to classify and dropped.
+		if f, failed := exceptionInBody(body); failed {
+			return nil, "", &f
+		}
+	}
 	return body, "", nil
+}
+
+// bodyException matches the exception ClickHouse appends to an answer whose
+// status it had already sent.
+var bodyException = regexp.MustCompile(`Code: (\d+)\. DB::Exception`)
+
+// exceptionInBody classifies a 200 whose body ends in a ClickHouse exception
+// as the failure the exception's code names, as if it had come with a 500.
+func exceptionInBody(body []byte) (sinks.Failure, bool) {
+	m := bodyException.FindSubmatch(body)
+	if m == nil {
+		return sinks.Failure{}, false
+	}
+	return sinks.ClickHouseFailure(http.StatusInternalServerError, string(m[1]))
 }

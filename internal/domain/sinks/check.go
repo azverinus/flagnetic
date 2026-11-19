@@ -41,6 +41,9 @@ const DefaultTablePrefix = "flagnetic"
 // which a sink's settings may not name.
 var reservedClickHouseSettings = []string{
 	"query", "query_id", "database", "user", "password", "async_insert", "date_time_input_format",
+	// An insert waits for its outcome before ClickHouse answers, so that a
+	// failure arrives as a status; progress headers would send a 200 first.
+	"wait_end_of_query", "send_progress_in_http_headers",
 }
 
 // identifier is what a table prefix may be: a name needing no quoting, so

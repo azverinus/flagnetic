@@ -86,9 +86,9 @@ func TestPlanReplay(t *testing.T) {
 		moves bool
 	}{
 		{
-			name:  "an open ended replay goes back and runs on into the live stream",
+			name:  "an open ended replay goes back as a window up to the live stream and returns to it",
 			in:    sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true},
-			want:  sinks.ReplayPlan{Cursor: c(40)},
+			want:  sinks.ReplayPlan{Cursor: c(40), Stop: ptr(live), Resume: ptr(live)},
 			moves: true,
 		},
 		{
@@ -100,13 +100,13 @@ func TestPlanReplay(t *testing.T) {
 		{
 			name:  "a bound at the live position is an open ended replay",
 			in:    sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, Bounded: true, Stop: live, StopFound: true},
-			want:  sinks.ReplayPlan{Cursor: c(40)},
+			want:  sinks.ReplayPlan{Cursor: c(40), Stop: ptr(live), Resume: ptr(live)},
 			moves: true,
 		},
 		{
 			name:  "a bound past the live position is an open ended replay",
 			in:    sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, Bounded: true, Stop: c(150), StopFound: true},
-			want:  sinks.ReplayPlan{Cursor: c(40)},
+			want:  sinks.ReplayPlan{Cursor: c(40), Stop: ptr(live), Resume: ptr(live)},
 			moves: true,
 		},
 		{
@@ -186,25 +186,28 @@ func TestAReplayCarriesItsOwnFloorAtItsStart(t *testing.T) {
 		wantReplay *time.Time
 	}{
 		{
-			name: "an open ended replay from before the floor lowers it to its start",
-			in:   sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, From: earlier, Floor: &floor},
-			want: &earlier,
+			name:       "an open ended replay from before the floor leaves it, and reads with its own",
+			in:         sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, From: earlier, Floor: &floor},
+			want:       &floor,
+			wantReplay: &earlier,
 		},
 		{
-			name: "an open ended replay from after the floor raises it to its start",
-			in:   sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, From: later, Floor: &floor},
-			want: &later,
+			name:       "an open ended replay from after the floor leaves it, and reads with its own",
+			in:         sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, From: later, Floor: &floor},
+			want:       &floor,
+			wantReplay: &later,
 		},
 		{
-			name: "an open ended replay on a stream with no floor sets one",
-			in:   sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, From: earlier},
-			want: &earlier,
+			name:       "an open ended replay on a stream with no floor leaves it so",
+			in:         sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, From: earlier},
+			wantReplay: &earlier,
 		},
 		{
-			name: "a bound past the live position runs on, and sets it",
+			name: "a bound past the live position runs on as a window and leaves the floor",
 			in: sinks.ReplayAsk{Live: live, Start: c(40), StartFound: true, Bounded: true, Stop: c(150), StopFound: true,
 				From: later, Floor: &floor},
-			want: &later,
+			want:       &floor,
+			wantReplay: &later,
 		},
 		{
 			name: "a bounded replay keeps the stream's for the live stream it returns to and reads with its own",

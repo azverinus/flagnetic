@@ -42,7 +42,7 @@ func (f *summaryFixture) retain(t *testing.T) {
 
 func (f *summaryFixture) storedSummaries(t *testing.T) int {
 	t.Helper()
-	rows, err := pgevents.NewStore(testkit.Pool(t)).EvaluationSummaries(t.Context(), f.p.environmentID(t, "production"))
+	rows, err := testkit.StoredEvaluationSummaries(t.Context(), testkit.Pool(t), f.p.environmentID(t, "production"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func (f *summaryFixture) storedSummaries(t *testing.T) int {
 
 func (f *summaryFixture) storedAliases(t *testing.T) int {
 	t.Helper()
-	rows, err := pgevents.NewStore(testkit.Pool(t)).Aliases(t.Context(), f.p.environmentID(t, "production"))
+	rows, err := testkit.StoredAliases(t.Context(), testkit.Pool(t), f.p.environmentID(t, "production"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,5 +328,67 @@ func TestTwoReplicasDropOnceAndRecordOneGap(t *testing.T) {
 	}
 	if n := f.storedSummaries(t); n != 0 {
 		t.Errorf("%d summary rows, want the partition dropped", n)
+	}
+}
+
+// A drop of rows a rollup had not read, while a transaction writing another raw
+// table is still open: the open transaction holds the snapshot horizon back,
+// so what the drop counts as lost and where the stream goes on from are
+// bounded by it. The rows lost are the three the drop took and nothing else;
+// the rows the open transaction wrote are not lost but counted once it commits.
+func TestADropWhileATransactionOnAnotherTableIsOpenCountsOnlyTheRowsItTook(t *testing.T) {
+	f := startRetention(t)
+	day1 := f.clock.Now()
+	f.post(t, f.summary(day1.Add(-time.Minute), counted("checkout", "true", "rule", 10), counted("banner", "true", "rule", 1)))
+	f.clock.Advance(time.Hour)
+	f.post(t, f.summary(f.clock.Now().Add(-time.Minute), counted("checkout", "false", "fallthrough", 4)))
+	f.clock.Advance(48 * time.Hour)
+	kept := f.clock.Now().Add(-time.Minute)
+	f.post(t, f.summary(kept, counted("checkout", "true", "rule", 7)))
+
+	// An alias batch is being written: its transaction is open while retention
+	// drops the summaries.
+	written, release := f.srv.HoldNextIngest(t)
+	done := make(chan sdk.EventBatchResult, 1)
+	body := f.envelope(t, aliasEvent(eventID(f.clock.Now(), 902)))
+	go func() { done <- batchResult(t, f.srv, f.server, body) }()
+	<-written
+	before := gaps(t)
+
+	// The round gives up on the table the open transaction writes, as it does
+	// when it would take a partition from under it; the other tables still
+	// drop.
+	f.clock.Advance(retention - 24*time.Hour)
+	if err := f.srv.Tick(t, worker.EventRetentionName); err == nil {
+		t.Error("retention dropped a partition a transaction still writes")
+	}
+
+	got := gapsSince(t, before)
+	if len(got) != 1 {
+		t.Fatalf("gaps = %+v, want one", got)
+	}
+	if g := got[0]; g.Stream != events.StreamEvaluationSummaries || g.Rows != 3 || !g.PeriodStart.Equal(day1) || !g.PeriodEnd.Equal(day1.Add(time.Hour)) {
+		t.Errorf("gap = %+v, want the 3 summary rows received from %s to an hour later", g, day1)
+	}
+	if n := testkit.Metric(t, f.srv.Scrape(t), gapRows); n != 3 {
+		t.Errorf("%s = %v, want 3", gapRows, n)
+	}
+
+	release()
+	if res := <-done; res.Accepted != 1 {
+		t.Fatalf("held batch = %+v", res)
+	}
+	f.rollUp(t)
+	if links := aliasLinks(t, f.p, "production"); len(links) != 1 {
+		t.Errorf("alias links = %+v, want the held alias counted once it committed", links)
+	}
+	from := day1.Add(-24 * time.Hour)
+	to := kept
+	want := []string{kept.Format(time.DateOnly) + " sdk true rule 7"}
+	if got := rows(f.evaluations(t, "checkout", &from, &to)); !slices.Equal(got, want) {
+		t.Errorf("evaluations = %v, want only the row still stored, %v", got, want)
+	}
+	if after := gapsSince(t, before); len(after) != 1 {
+		t.Errorf("gaps after the rollup = %+v, want still the one", after)
 	}
 }

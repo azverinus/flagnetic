@@ -26,7 +26,11 @@ type heldSinks struct {
 	started chan workspace.ProjectID
 }
 
-func (h *heldSinks) Claim(context.Context, []sinks.ID) (appsinks.Claim, error) {
+func (h *heldSinks) Abandon(context.Context, appsinks.LeaseToken, appsinks.ClaimedSink) error {
+	return nil
+}
+
+func (h *heldSinks) Claim(context.Context, []sinks.ID, appsinks.ClaimLimit) (appsinks.Claim, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.claimed {
@@ -98,40 +102,57 @@ func TestOneProjectsSinksCannotTakeEveryAttemptOfAReplica(t *testing.T) {
 }
 
 // endlessSinks has a new batch of one project's sinks due at every claim until
-// stopped, and holds every attempt until released.
+// stopped, as many as the claim allows, and holds every attempt until
+// released. It records what the claims were allowed and what they leased, and
+// which claimed sinks were given back unstarted.
 type endlessSinks struct {
 	ids     *id.Source
 	project workspace.ProjectID
 	mu      sync.Mutex
 	stopped bool
 	claimed int
+	limits  []appsinks.ClaimLimit
+	given   int
+	started int
 	release chan struct{}
 }
 
-func (e *endlessSinks) Claim(context.Context, []sinks.ID) (appsinks.Claim, error) {
+func (e *endlessSinks) Claim(_ context.Context, _ []sinks.ID, limit appsinks.ClaimLimit) (appsinks.Claim, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	e.limits = append(e.limits, limit)
 	if e.stopped {
 		return appsinks.Claim{}, nil
 	}
 	var c appsinks.Claim
-	for range 50 {
+	for range limit.Sinks {
 		c.Sinks = append(c.Sinks, appsinks.ClaimedSink{Sink: sinks.Sink{ID: id.New[sinks.Sink](e.ids), Project: e.project}})
 	}
 	e.claimed += len(c.Sinks)
 	return c, nil
 }
 
+func (e *endlessSinks) Abandon(context.Context, appsinks.LeaseToken, appsinks.ClaimedSink) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.given++
+	return nil
+}
+
 func (e *endlessSinks) AttemptSink(context.Context, appsinks.LeaseToken, appsinks.ClaimedSink,
 ) (map[sinks.EventKind]appsinks.Result, error) {
+	e.mu.Lock()
+	e.started++
+	e.mu.Unlock()
 	<-e.release
 	return nil, nil
 }
 
-// A replica whose sinks all wait for a slot claims no more: every sink it
-// claimed and cannot start yet is leased away from the other replicas, which
-// would otherwise find nothing left to claim.
-func TestAReplicaClaimsNoMoreSinksWhileItCannotStartThose(t *testing.T) {
+// A replica claims no more sinks than it has free slots, and no more of one
+// project than a project may run: every sink it claimed and cannot start yet
+// is leased away from the other replicas, which would otherwise find nothing
+// left to claim.
+func TestAReplicaClaimsNoMoreSinksThanItHasFreeSlots(t *testing.T) {
 	ids := testkit.IDs(testkit.Clock())
 	e := &endlessSinks{ids: ids, project: id.New[workspace.Project](ids), release: make(chan struct{})}
 	w := worker.SinkDelivery(e, noRisk{}, time.Minute, testkit.NewLogSink().Logger())
@@ -140,14 +161,44 @@ func TestAReplicaClaimsNoMoreSinksWhileItCannotStartThose(t *testing.T) {
 	go func() { done <- w.Round(t.Context()) }()
 	time.Sleep(300 * time.Millisecond)
 	e.mu.Lock()
-	claimed := e.claimed
+	claimed, limits := e.claimed, append([]appsinks.ClaimLimit(nil), e.limits...)
 	e.stopped = true
 	e.mu.Unlock()
 	close(e.release)
 	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
-	if claimed > 50 {
-		t.Errorf("%d sinks claimed while none could start beyond the first claim, want at most 50", claimed)
+	if claimed > 16 {
+		t.Errorf("%d sinks claimed while the replica attempts 16 at once", claimed)
+	}
+	for _, l := range limits {
+		if l.PerProject != 4 {
+			t.Errorf("claim allowed %d sinks of one project, want 4", l.PerProject)
+		}
+	}
+}
+
+// A claimed sink that was waiting for a slot when the round was cancelled
+// gives its leases back instead of keeping them until they run out.
+func TestSinksClaimedButNeverStartedGiveBackTheirLeasesOnCancel(t *testing.T) {
+	ids := testkit.IDs(testkit.Clock())
+	e := &endlessSinks{ids: ids, project: id.New[workspace.Project](ids), release: make(chan struct{})}
+	w := worker.SinkDelivery(e, noRisk{}, time.Minute, testkit.NewLogSink().Logger())
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() { done <- w.Round(ctx) }()
+	time.Sleep(300 * time.Millisecond)
+	cancel()
+	close(e.release)
+	<-done
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.claimed == 0 || e.started == 0 {
+		t.Fatalf("claimed %d, started %d: the round did nothing", e.claimed, e.started)
+	}
+	if got, want := e.given, e.claimed-e.started; got != want {
+		t.Errorf("%d claimed sinks given back, want %d (claimed %d, started %d)", got, want, e.claimed, e.started)
 	}
 }
