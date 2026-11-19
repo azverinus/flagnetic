@@ -1,6 +1,7 @@
 package management
 
 import (
+	"encoding/json"
 	"slices"
 	"testing"
 
@@ -45,5 +46,23 @@ func TestABodyHoldingEverythingRequiredIsLeftAlone(t *testing.T) {
 	}
 	if err := refuseMissingMembers([]byte(`{}`), operations.Entry{}); err != nil {
 		t.Errorf("an operation with no body to check refused {}: %v", err)
+	}
+}
+
+// A value of another type than its shape says, or no JSON at all, is the
+// decoder's to refuse; what is the shape's is judged at every depth.
+func TestAValueOfAnotherTypeThanItsShapeIsLeftToTheDecoder(t *testing.T) {
+	got := func(shape operations.Shape, body string) []string {
+		var out []string
+		checkShape(json.RawMessage(body), shape, "", func(pointer, _ string) { out = append(out, pointer) })
+		return out
+	}
+	table := operations.Table["PUT /projects/{project}/flags/{flag}/environments/{environment}"]
+	root := operations.Shapes[table.Body]
+	if len(got(root, `[1, 2]`)) != 0 || len(got(root, `"text"`)) != 0 || len(got(root, `{`)) != 0 {
+		t.Error("a value of another type than the shape's, or no JSON, was judged here")
+	}
+	if got := got(root, `{"on": true, "off_variation": "a", "fallthrough": "b", "overrides": [{}]}`); len(got) == 0 {
+		t.Errorf("an override lacking its members passed: %v", got)
 	}
 }
