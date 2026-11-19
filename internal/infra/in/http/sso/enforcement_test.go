@@ -1,13 +1,19 @@
 package sso_test
 
 import (
+	"context"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
+	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
+	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -626,5 +632,55 @@ func TestDisablingAProviderEndsTheSessionsItOpened(t *testing.T) {
 		if res.StatusCode() != want {
 			t.Errorf("GET /me = %d, want %d", res.StatusCode(), want)
 		}
+	}
+}
+
+// TestASignInCompletedWhileItsDomainIsEnforcedToAnotherProviderIsRefusedSSORequired
+// completes a sign-in through one provider while a change, held open,
+// enforces the email's domain to another: the sign-in waits for it and is
+// refused as one enforced when it began, naming the provider to use.
+func TestASignInCompletedWhileItsDomainIsEnforcedToAnotherProviderIsRefusedSSORequired(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := startIsolated(t)
+	corp := e.forged(t, idp, noFallback("corp.example"))
+	other := e.forged(t, idp, func(p *provider) { p.domains, p.autoProvision, p.linkByEmail = []string{"corp.example"}, true, true })
+	idp.NextClaims(map[string]any{"sub": "sub-late", "email": "late@corp.example", "email_verified": true})
+	b := testkit.NewBrowser(t, e.srv.URL)
+	o := e.opts()
+	o.Stop = func(u *url.URL) bool { return strings.HasPrefix(u.Path, "/sso/complete/") }
+	held := e.signIn(t, b, other, "", o)
+	if !strings.HasPrefix(held.URL.Path, "/sso/complete/") {
+		t.Fatalf("the sign-in reached %s before completing", held.URL)
+	}
+
+	store := pgaccess.NewStore(e.pool)
+	var (
+		wg   sync.WaitGroup
+		done testkit.Visit
+	)
+	err := postgres.NewTransactor(e.pool).Within(t.Context(), func(ctx context.Context) error {
+		s, err := store.LockAuthSettings(ctx)
+		if err != nil {
+			return err
+		}
+		s.SSOEnforcedDomains = []access.EnforcedDomain{{Domain: "corp.example", Provider: corp}}
+		if err = store.SaveAuthSettings(ctx, s); err != nil {
+			return err
+		}
+		wg.Go(func() { done = b.Visit(t, held.URL.String(), e.opts()) })
+		// The sign-in reaches the settings, and waits, before the change commits.
+		time.Sleep(300 * time.Millisecond)
+		return nil
+	})
+	wg.Wait()
+	if err != nil {
+		t.Fatalf("enforcing the domain: %v", err)
+	}
+	wantError(t, done, b, "sso_required")
+	if done.Query("provider") != corp {
+		t.Errorf("the refusal names %q, want %s", done.Query("provider"), corp)
+	}
+	if n := e.memberCount(t, "late@corp.example"); n != 0 {
+		t.Errorf("the refused sign-in provisioned %d members", n)
 	}
 }
