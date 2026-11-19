@@ -3,7 +3,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "flagnetic.fullname" . }}-migrate
+  name: {{ include "flagnetic.shortname" . }}-migrate
   labels:
     {{- include "flagnetic.labels" . | nindent 4 }}
     app.kubernetes.io/component: migrate
@@ -22,10 +22,23 @@ spec:
       labels:
         {{- include "flagnetic.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: migrate
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       restartPolicy: Never
-      # The ServiceAccount is not there yet on a first install, and the
-      # migration never uses the Kubernetes API.
+      # A ServiceAccount the chart creates is not there yet on a first
+      # install, so the Job runs under the namespace's default one; an
+      # existing one the values name is there, and carries what the cluster
+      # attaches to it, such as pull secrets.
+      {{- if and (not .Values.serviceAccount.create) .Values.serviceAccount.name }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- end }}
+      # The migration never uses the Kubernetes API.
       automountServiceAccountToken: false
       securityContext:
         {{- include "flagnetic.podSecurityContext" . | nindent 8 }}
@@ -39,10 +52,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ["migrate"]
           env:
-            {{- include "flagnetic.databaseEnv" . | nindent 12 }}
-            {{- with .Values.extraEnv }}
-            {{- toYaml . | nindent 12 }}
-            {{- end }}
+            {{- include "flagnetic.migrationEnv" . | nindent 12 }}
           {{- with .Values.extraEnvFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}
@@ -55,6 +65,10 @@ spec:
           {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- with .Values.tolerations }}

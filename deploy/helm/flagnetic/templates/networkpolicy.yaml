@@ -21,6 +21,12 @@ spec:
       {{- with .Values.networkPolicy.ingress.http.from }}
       from:
         {{- toYaml . | nindent 8 }}
+        # The helm test Pod asks the Service for /readyz; it is not selected
+        # by this policy, but its request is ingress to the server's pods.
+        - podSelector:
+            matchLabels:
+              {{- include "flagnetic.selectorLabels" $ | nindent 14 }}
+              app.kubernetes.io/component: test
       {{- end }}
     # Metrics name the instance's routes and environments: no source is
     # admitted until the scraper is named.

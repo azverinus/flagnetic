@@ -50,9 +50,6 @@ tests:
           path: spec.selector.matchLabels["app.kubernetes.io/component"]
           value: server
         template: templates/poddisruptionbudget.yaml
-      - notExists:
-          path: metadata.labels["app.kubernetes.io/component"]
-        template: templates/tests/test-ready.yaml
   - it: keeps at most one replica unavailable
     template: templates/poddisruptionbudget.yaml
     asserts:

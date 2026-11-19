@@ -1,0 +1,31 @@
+suite: probe timeouts
+templates:
+  - templates/deployment.yaml
+set:
+  secrets.existingSecret: mine
+tests:
+  # /readyz pings PostgreSQL for up to 2 s, waiting for a pool connection; a
+  # probe that gives up at the default 1 s empties the Service under load.
+  - it: gives readiness and startup more time than the readiness ping
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.timeoutSeconds
+          value: 3
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.timeoutSeconds
+          value: 3
+  - it: lets the timeouts be set
+    set:
+      probes.readiness.timeoutSeconds: 5
+      probes.startup.timeoutSeconds: 4
+      probes.liveness.timeoutSeconds: 2
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.timeoutSeconds
+          value: 5
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.timeoutSeconds
+          value: 4
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.timeoutSeconds
+          value: 2

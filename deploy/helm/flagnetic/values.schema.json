@@ -24,7 +24,7 @@
         "databaseUrlKey": { "type": "string", "minLength": 1 },
         "secretKeyKey": { "type": "string", "minLength": 1 },
         "databaseUrl": { "type": "string" },
-        "secretKey": { "type": "string" }
+        "secretKey": { "type": "string", "pattern": "^(.{32,})?$" }
       }
     },
     "config": {
@@ -205,7 +205,8 @@
           "additionalProperties": false,
           "properties": {
             "repository": { "type": "string", "minLength": 1 },
-            "tag": { "type": "string", "minLength": 1 }
+            "tag": { "type": "string", "minLength": 1 },
+            "digest": { "type": "string", "pattern": "^(sha256:[0-9a-f]{64})?$" }
           }
         },
         "resources": { "type": "object" }
@@ -218,6 +219,7 @@
       "additionalProperties": false,
       "properties": {
         "periodSeconds": { "type": "integer", "minimum": 1 },
+        "timeoutSeconds": { "type": "integer", "minimum": 1 },
         "failureThreshold": { "type": "integer", "minimum": 1 }
       }
     }

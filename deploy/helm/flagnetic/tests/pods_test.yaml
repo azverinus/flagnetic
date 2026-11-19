@@ -1,0 +1,129 @@
+suite: pod settings of the migration Job and the test Pod
+templates:
+  - templates/migrate-job.yaml
+  - templates/tests/test-ready.yaml
+  - templates/deployment.yaml
+set:
+  secrets.existingSecret: mine
+tests:
+  - it: runs the migration Job under an existing ServiceAccount
+    template: templates/migrate-job.yaml
+    set:
+      serviceAccount:
+        create: false
+        name: pull-secrets
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: pull-secrets
+  # A ServiceAccount the chart creates is not there yet in a pre-install hook.
+  - it: leaves the account of the migration Job alone when the chart creates it
+    template: templates/migrate-job.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.serviceAccountName
+  - it: leaves the account of the migration Job alone when none is named
+    template: templates/migrate-job.yaml
+    set:
+      serviceAccount.create: false
+    asserts:
+      - notExists:
+          path: spec.template.spec.serviceAccountName
+  - it: carries affinity, annotations and labels to the migration Job
+    template: templates/migrate-job.yaml
+    set:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - {key: pool, operator: In, values: [apps]}
+      podAnnotations:
+        sidecar.istio.io/inject: "false"
+      podLabels:
+        team: flags
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
+          value: pool
+      - equal:
+          path: spec.template.metadata.annotations["sidecar.istio.io/inject"]
+          value: "false"
+      - equal:
+          path: spec.template.metadata.labels.team
+          value: flags
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/component"]
+          value: migrate
+  - it: carries the node selector, tolerations and pull secrets to the test Pod
+    template: templates/tests/test-ready.yaml
+    set:
+      nodeSelector: {pool: apps}
+      tolerations:
+        - {key: dedicated, operator: Equal, value: flags, effect: NoSchedule}
+      imagePullSecrets:
+        - name: regcred
+    asserts:
+      - equal:
+          path: spec.nodeSelector.pool
+          value: apps
+      - equal:
+          path: spec.tolerations[0].key
+          value: dedicated
+      - equal:
+          path: spec.imagePullSecrets[0].name
+          value: regcred
+  - it: pins the test image by digest
+    template: templates/tests/test-ready.yaml
+    asserts:
+      - matchRegex:
+          path: spec.containers[0].image
+          pattern: "^busybox:1\\.37\\.0@sha256:[0-9a-f]{64}$"
+  - it: leaves the digest off when it is emptied
+    template: templates/tests/test-ready.yaml
+    set:
+      test.image.digest: ""
+    asserts:
+      - equal:
+          path: spec.containers[0].image
+          value: busybox:1.37.0
+  - it: labels the test Pod as a test
+    template: templates/tests/test-ready.yaml
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: test
+  # A budget does not pace a rollout; the Deployment's strategy does.
+  - it: rolls one pod at a time without losing capacity
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.strategy
+          value:
+            type: RollingUpdate
+            rollingUpdate:
+              maxSurge: 1
+              maxUnavailable: 0
+  - it: applies the settings to the migration of every mode
+    template: templates/deployment.yaml
+    set:
+      migrations.mode: initContainer
+      config:
+        log_level: debug
+        db_max_conns: 4
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: {name: FLAGNETIC_LOG_LEVEL, value: "debug"}
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: {name: FLAGNETIC_DB_MAX_CONNS, value: "4"}
+  - it: applies the settings to the migration Job
+    template: templates/migrate-job.yaml
+    set:
+      config:
+        log_format: json
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: FLAGNETIC_LOG_FORMAT, value: "json"}

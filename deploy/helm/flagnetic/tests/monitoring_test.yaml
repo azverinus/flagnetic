@@ -68,7 +68,7 @@ tests:
           value: FlagneticRulesetPropagationSlow
       - equal:
           path: spec.groups[0].rules[2].alert
-          value: FlagneticSinkStopped
+          value: FlagneticSinkDeadLetters
       - equal:
           path: spec.groups[0].rules[3].alert
           value: FlagneticWebhookDeliveriesFailing

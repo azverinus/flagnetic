@@ -1,0 +1,56 @@
+suite: notes
+templates:
+  - templates/NOTES.txt
+set:
+  secrets.existingSecret: mine
+tests:
+  - it: warns about trusted proxies when the Ingress is on and none are set
+    set:
+      ingress:
+        enabled: true
+        hosts: [flags.example.com]
+    asserts:
+      - matchRegexRaw:
+          pattern: "config.trusted_proxies is not set"
+      - matchRegexRaw:
+          pattern: "externalTrafficPolicy"
+  - it: warns about trusted proxies when the HTTPRoute is on and none are set
+    set:
+      httpRoute:
+        enabled: true
+        parentRefs:
+          - name: public
+    asserts:
+      - matchRegexRaw:
+          pattern: "config.trusted_proxies is not set"
+  - it: stays quiet about trusted proxies once they are set
+    set:
+      ingress:
+        enabled: true
+        hosts: [flags.example.com]
+      config:
+        trusted_proxies: 10.0.0.0/8
+    asserts:
+      - notMatchRegexRaw:
+          pattern: "trusted_proxies"
+  - it: stays quiet about trusted proxies without an Ingress or an HTTPRoute
+    asserts:
+      - notMatchRegexRaw:
+          pattern: "trusted_proxies"
+  - it: warns when auto migration outlives the startup probe
+    set:
+      migrations.mode: auto
+    asserts:
+      - matchRegexRaw:
+          pattern: "probes.startup.failureThreshold"
+  - it: stays quiet about the startup probe when it outlasts the migration lock
+    set:
+      migrations.mode: auto
+      probes.startup.failureThreshold: 400
+    asserts:
+      - notMatchRegexRaw:
+          pattern: "probes.startup"
+  - it: stays quiet about the startup probe outside auto mode
+    asserts:
+      - notMatchRegexRaw:
+          pattern: "probes.startup"

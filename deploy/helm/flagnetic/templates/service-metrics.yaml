@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "flagnetic.fullname" . }}-metrics
+  name: {{ include "flagnetic.shortname" . }}-metrics
   labels:
     {{- include "flagnetic.labels" . | nindent 4 }}
     app.kubernetes.io/component: metrics
