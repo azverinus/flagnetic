@@ -12355,7 +12355,9 @@ components:
           description: When a call last succeeded; null before the first.
         consecutive_failures:
           type: integer
-          description: The calls that failed since the last success or the last enable.
+          description: |
+            The calls that failed since the last success or the last time the
+            subscription was enabled, by the enable operation or by an edit.
         previous_secret_expires_at:
           type: string
           format: date-time

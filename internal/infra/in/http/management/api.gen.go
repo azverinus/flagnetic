@@ -5181,7 +5181,8 @@ type WaitingChangeRequests struct {
 
 // Webhook defines model for Webhook.
 type Webhook struct {
-	// ConsecutiveFailures The calls that failed since the last success or the last enable.
+	// ConsecutiveFailures The calls that failed since the last success or the last time the
+	// subscription was enabled, by the enable operation or by an edit.
 	ConsecutiveFailures int             `json:"consecutive_failures"`
 	CreatedAt           time.Time       `json:"created_at"`
 	CreatedBy           *WebhookCreator `json:"created_by"`
@@ -5325,7 +5326,8 @@ type WebhookPatch struct {
 
 // WebhookWithSecret defines model for WebhookWithSecret.
 type WebhookWithSecret struct {
-	// ConsecutiveFailures The calls that failed since the last success or the last enable.
+	// ConsecutiveFailures The calls that failed since the last success or the last time the
+	// subscription was enabled, by the enable operation or by an edit.
 	ConsecutiveFailures int             `json:"consecutive_failures"`
 	CreatedAt           time.Time       `json:"created_at"`
 	CreatedBy           *WebhookCreator `json:"created_by"`

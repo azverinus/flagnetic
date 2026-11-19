@@ -229,6 +229,45 @@ func TestAMemberDisabledSubscriptionIsRotatedAndEnabledWithItsWindowStartingAgai
 	}
 }
 
+// Enabling a subscription by an edit starts its failures afresh, as the
+// enable operation does: the failures of before it do not count towards
+// disabling it again.
+func TestEnablingASubscriptionByAnEditStartsItsFailuresAfresh(t *testing.T) {
+	c := clock.NewFake(time.Now().UTC())
+	srv := testkit.StartServer(t, reachable, testkit.WithClock(c))
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	r := testkit.StartReceiver(t, testkit.Reply{Status: http.StatusBadRequest})
+	created := receiving(t, admin, p.Key, r)
+	pings(t, admin, p.Key, created.Id, 3)
+	deliverAll(t, srv, r, 3)
+
+	patch := func(version int64, enabled bool) management.Webhook {
+		res := do(admin.UpdateWebhookWithResponse(t.Context(), p.Key, created.Id,
+			&management.UpdateWebhookParams{IfMatch: ifMatch(version)}, management.WebhookPatch{Enabled: &enabled}))
+		if res.JSON200 == nil {
+			t.Fatalf("PATCH enabled %v = %d: %s", enabled, res.StatusCode(), res.Body)
+		}
+		return *res.JSON200
+	}
+	off := patch(1, false)
+	if off.ConsecutiveFailures != 3 {
+		t.Fatalf("disabling by an edit left %d failures, want the 3 it had", off.ConsecutiveFailures)
+	}
+	// The streak is a day old when the subscription is switched on again.
+	c.Advance(25 * time.Hour)
+	on := patch(off.Version, true)
+	if !on.Enabled || on.ConsecutiveFailures != 0 {
+		t.Fatalf("enabling by an edit answered %+v, want enabled with no failures", on)
+	}
+
+	pings(t, admin, p.Key, created.Id, 25)
+	deliverAll(t, srv, r, 28)
+	if w := subscription(t, admin, p.Key, created.Id); !w.Enabled || w.ConsecutiveFailures != 25 {
+		t.Errorf("twenty-five failures right after the edit left the subscription %+v, want enabled", w)
+	}
+}
+
 // Twenty-five failures alone disable nothing: they must have gone on for a
 // day since the first of them, however many attempts failed meanwhile.
 func TestASubscriptionIsNotDisabledWithinADayOfItsFirstFailure(t *testing.T) {

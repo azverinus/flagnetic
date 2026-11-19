@@ -3370,7 +3370,9 @@ export type Webhook = {
    */
   last_success_at: string | null;
   /**
-   * The calls that failed since the last success or the last enable.
+   * The calls that failed since the last success or the last time the
+   * subscription was enabled, by the enable operation or by an edit.
+   *
    */
   consecutive_failures: number;
   /**
