@@ -110,19 +110,27 @@ type ReplayPlan struct {
 // must not be skipped to. A replay ending at or past the live position is
 // one that runs on into it, since returning to the live position would send
 // the rows between again.
+//
+// A replay that runs on is planned as a window up to the live position, read
+// with a floor of its own at its start, and the stream returns to the live
+// position keeping its own floor. Raising the stream's floor to the start of
+// the replay instead would hold back for good a row received just before it
+// that commits after the live position: a row is stamped before its
+// transaction has an ID, so one stamped earlier can be committed later.
 func PlanReplay(a ReplayAsk) (ReplayPlan, bool) {
 	from := a.From
 	if !a.StartFound || !cursorBefore(a.Start, a.Live) {
 		return ReplayPlan{}, false
 	}
+	live := a.Live
 	if !a.Bounded {
-		return ReplayPlan{Cursor: a.Start, Floor: &from}, true
+		return ReplayPlan{Cursor: a.Start, Stop: &live, Resume: &live, Floor: a.Floor, ReplayFloor: &from}, true
 	}
 	if !a.StopFound || !cursorBefore(a.Start, a.Stop) {
 		return ReplayPlan{}, false
 	}
 	if !cursorBefore(a.Stop, a.Live) {
-		return ReplayPlan{Cursor: a.Start, Floor: &from}, true
+		return ReplayPlan{Cursor: a.Start, Stop: &live, Resume: &live, Floor: a.Floor, ReplayFloor: &from}, true
 	}
 	stop, resume := a.Stop, a.Live
 	return ReplayPlan{Cursor: a.Start, Stop: &stop, Resume: &resume, Floor: a.Floor, ReplayFloor: &from}, true

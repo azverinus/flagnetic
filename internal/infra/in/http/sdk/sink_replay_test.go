@@ -695,3 +695,29 @@ func TestAnEnablesSearchOfTheEventsDoesNotHoldUpWritesToItsProject(t *testing.T)
 		t.Fatalf("POST enable = %d: %s", res.StatusCode(), res.Body)
 	}
 }
+
+// A replay that runs on into the live stream does not raise the stream's own
+// floor: a row stamped just before the replay's start can commit after the
+// live position, and must still be exported.
+func TestAReplayThatRunsOnLeavesTheLiveStreamsFloorAlone(t *testing.T) {
+	f := startDelivering(t)
+	r := testkit.StartReceiver(t)
+	sink, secret := f.enabled(t, webhook(r, "exposure"))
+	_, at := f.timeline(t, "u-1", "u-2")
+	tick(t, f.srv)
+	f.replay(t, sink, management.SinkReplay{From: at[1]})
+	tick(t, f.srv)
+	n := len(batchCalls(r))
+
+	// A row stamped before the replay's start, committed after the live
+	// position, as one that took its time stamp before its transaction began.
+	now := f.clock.Now()
+	late := f.exposure("u-3", "true", at[1].Add(-time.Minute))
+	f.clock.Set(at[1].Add(-time.Minute))
+	f.post(t, late)
+	f.clock.Set(now.Add(time.Hour))
+	tick(t, f.srv)
+	if got, _ := delivered(t, r, secret, n); !slices.Equal(got, ids(late)) {
+		t.Errorf("delivered %v after the replay, want the row stamped before its start", got)
+	}
+}
