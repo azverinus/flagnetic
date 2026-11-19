@@ -501,7 +501,7 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
     SchemaVersionUnsupported:
-      description: "`schema_version_unsupported`: `Flagnetic-Schema-Version` below 1 or not an integer."
+      description: "`schema_version_unsupported`: `Flagnetic-Schema-Version` below 1, not an integer, or sent more than once."
       content:
         application/problem+json:
           schema:
@@ -513,7 +513,11 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
     UnsupportedMediaType:
-      description: "`unsupported_media_type`: the body is not `application/json`."
+      description: |
+        `unsupported_media_type`: the body is not `application/json` (the
+        events endpoint also takes `text/plain`, which a browser sends without
+        a preflight), or it arrives in a `Content-Encoding` other than `gzip`
+        or `identity`.
       content:
         application/problem+json:
           schema:
@@ -599,8 +603,12 @@ components:
       type: object
       description: |
         The complete evaluable configuration of one environment at one
-        moment. An SDK ignores members it does not know, at any level. Every
-        list is ordered by key.
+        moment. An SDK ignores members it does not know, at any level.
+        `unit_types`, `attributes`, `segments` and `flags` are ordered by key.
+        Every other list keeps the order it has, which carries meaning: a
+        flag's `prerequisites`, `overrides` and `rules`, a rule's `conditions`
+        and an experiment's `weights` are evaluated or laid out in that order,
+        so an SDK never sorts them.
       required: [schema_version, version, scope, unit_types, attributes, segments, flags]
       properties:
         schema_version:
@@ -882,7 +890,11 @@ components:
           $ref: "#/components/schemas/ExperimentDetail"
         error_code:
           type: string
-          description: "For `error`: `flag_not_found`, `prerequisite_cycle` or `inconsistent_ruleset`."
+          description: |
+            For `error`: `prerequisite_cycle` or `inconsistent_ruleset`.
+            `flag_not_found` is the code of an SDK's local evaluator for a flag
+            the ruleset does not hold; `/evaluate` never answers it, as it
+            leaves unknown flags out.
     ExperimentDetail:
       type: object
       description: The running experiment the value comes from, which an exposure carries.
