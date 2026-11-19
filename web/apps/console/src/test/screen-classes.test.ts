@@ -13,7 +13,7 @@ async function messages(source: string, file: string) {
   const [result] = await eslint.lintText(source, {
     filePath: `${web}/apps/console/src/${file}`,
   });
-  return result.messages.filter((m) => m.ruleId === "no-restricted-syntax");
+  return (result?.messages ?? []).filter((m) => m.ruleId === "no-restricted-syntax");
 }
 
 const failing = `
