@@ -274,9 +274,15 @@ func (a *api) CopyChangeRequest(ctx context.Context, req CopyChangeRequestReques
 
 // proposedIn reads in as the document t calls for: a configuration, a
 // flag's definition or a segment's, or an experiment's transition. A target calling for none proposes
-// nothing, which the change request refuses as it refuses the target.
+// nothing, which the change request refuses as it refuses the target. What
+// the document requires is checked first, as a direct write checks its body:
+// decoded without it, a missing `on` would read as false and applying the
+// change request would switch the flag off.
 func proposedIn(t appgovernance.Target, in ProposedInput) (appgovernance.Proposed, error) {
 	var out appgovernance.Proposed
+	if err := refuseProposedLacking(t, in); err != nil {
+		return out, err
+	}
 	switch {
 	case t.Kind == governance.KindFlagConfiguration:
 		c, err := in.AsFlagConfigurationPut()
@@ -447,4 +453,28 @@ func changeRequestOut(cr governance.ChangeRequest) (ChangeRequest, error) {
 		return out, err
 	}
 	return out, json.Unmarshal(b, &out.Proposed)
+}
+
+// refuseProposedLacking refuses in when it lacks a member the document t
+// calls for requires, by its pointer under /proposed.
+func refuseProposedLacking(t appgovernance.Target, in ProposedInput) error {
+	var schema string
+	switch {
+	case t.Kind == governance.KindFlagConfiguration:
+		schema = "FlagConfigurationPut"
+	case t.Kind == governance.KindDefinition && t.Segment != "":
+		schema = "SegmentDefinitionPut"
+	case t.Kind == governance.KindDefinition:
+		schema = "FlagDefinitionPut"
+	case t.Kind == governance.KindExperiment:
+		schema = "ExperimentTransition"
+	default:
+		return nil
+	}
+	// A value that is no JSON is refused by the decoder after this, in its
+	// own words.
+	if raw, err := in.MarshalJSON(); err == nil {
+		return refuseAlternativeLacking(raw, schema, "/proposed")
+	}
+	return nil
 }

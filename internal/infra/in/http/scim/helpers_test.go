@@ -62,7 +62,7 @@ func (e env) provider(t *testing.T, domains ...string) string {
 	secret := "client-secret-" + rand.Text()
 	testkit.RecordSecret(secret)
 	slug := "p" + random()
-	res, err := e.admin.CreateAuthProviderWithResponse(t.Context(), management.AuthProviderCreate{
+	res, err := e.browser.CreateAuthProviderWithResponse(t.Context(), management.AuthProviderCreate{
 		Slug: slug, Kind: management.AuthProviderKindOidc, DisplayName: "Corporate SSO", Domains: domains,
 		Issuer: ptr("https://idp.example.com/realms/" + slug), ClientId: ptr("flagnetic"), ClientSecret: &secret,
 	})

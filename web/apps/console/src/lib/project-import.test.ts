@@ -280,47 +280,53 @@ describe("keeping the session across a reload", () => {
   };
 
   it("starts at the upload when nothing was kept", () => {
-    expect(loadImportSession("checkout")).toEqual({ step: "upload" });
+    expect(loadImportSession("ada", "checkout")).toEqual({ step: "upload" });
   });
 
   it("returns the step and document that were kept", () => {
-    saveImportSession("checkout", { step: "review", document });
-    expect(loadImportSession("checkout")).toEqual({ step: "review", document });
-    expect(loadImportSession("other")).toEqual({ step: "upload" });
+    saveImportSession("ada", "checkout", { step: "review", document });
+    expect(loadImportSession("ada", "checkout")).toEqual({ step: "review", document });
+    expect(loadImportSession("ada", "other")).toEqual({ step: "upload" });
   });
 
   it("returns to the upload when the review lost its document", () => {
-    window.sessionStorage.setItem("flagnetic.import.checkout", JSON.stringify({ step: "review" }));
-    expect(loadImportSession("checkout")).toEqual({ step: "upload" });
+    window.sessionStorage.setItem(
+      "flagnetic.import.ada.checkout",
+      JSON.stringify({ step: "review" }),
+    );
+    expect(loadImportSession("ada", "checkout")).toEqual({ step: "upload" });
   });
 
   it("starts over when what was kept is not a session", () => {
-    window.sessionStorage.setItem("flagnetic.import.checkout", "{not json");
-    expect(loadImportSession("checkout")).toEqual({ step: "upload" });
-    window.sessionStorage.setItem("flagnetic.import.checkout", JSON.stringify({ step: "done" }));
-    expect(loadImportSession("checkout")).toEqual({ step: "upload" });
+    window.sessionStorage.setItem("flagnetic.import.ada.checkout", "{not json");
+    expect(loadImportSession("ada", "checkout")).toEqual({ step: "upload" });
+    window.sessionStorage.setItem(
+      "flagnetic.import.ada.checkout",
+      JSON.stringify({ step: "done" }),
+    );
+    expect(loadImportSession("ada", "checkout")).toEqual({ step: "upload" });
   });
 
   it("drops what an earlier step kept when the browser cannot keep the new document", () => {
-    saveImportSession("checkout", { step: "review", document });
+    saveImportSession("ada", "checkout", { step: "review", document });
     const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new DOMException("full", "QuotaExceededError");
     });
     try {
-      saveImportSession("checkout", {
+      saveImportSession("ada", "checkout", {
         step: "review",
         document: { ...document, name: "larger.json" },
       });
     } finally {
       setItem.mockRestore();
     }
-    expect(loadImportSession("checkout")).toEqual({ step: "upload" });
+    expect(loadImportSession("ada", "checkout")).toEqual({ step: "upload" });
   });
 
   it("forgets the session once it is back at the start", () => {
-    saveImportSession("checkout", { step: "review", document });
-    saveImportSession("checkout", { step: "upload" });
-    expect(window.sessionStorage.getItem("flagnetic.import.checkout")).toBeNull();
+    saveImportSession("ada", "checkout", { step: "review", document });
+    saveImportSession("ada", "checkout", { step: "upload" });
+    expect(window.sessionStorage.getItem("flagnetic.import.ada.checkout")).toBeNull();
   });
 });
 

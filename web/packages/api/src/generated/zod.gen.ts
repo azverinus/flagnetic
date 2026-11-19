@@ -3082,7 +3082,11 @@ export const zAuditChangeRequest = z.uuid();
  * dry run or an export answered it. Optional: without it the import
  * applies to the project as it is. With it, an import is refused
  * `412 version_mismatch` when the project has changed since, judged
- * under the project's lock before anything is written.
+ * under the project's lock before anything is written. Read as RFC 9110
+ * reads If-Match: `*` matches the project, a list matches when it holds
+ * its current state, and a weak tag (`W/"x"`) matches nothing. A header
+ * that is neither `*` nor a list of entity tags is refused
+ * `400 invalid_request`.
  *
  */
 export const zImportIfMatch = z.string();
@@ -3164,10 +3168,14 @@ export const zSegmentKey = z.string();
 
 /**
  * The version of the entity this write is based on, as its `ETag`
- * answered it (`"7"`, or `7`). Required: without it the write is
- * refused `428 precondition_required`, and with any other version than
- * the current one `412 version_mismatch`, both judged after the request
- * is validated.
+ * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+ * matches any current version, and a list (`"6", "7"`) matches when it
+ * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+ * comparison is strong. Required: without it the write is refused
+ * `428 precondition_required`, and with no tag that is the current
+ * version `412 version_mismatch`, both judged after the request is
+ * validated. A header that is neither `*` nor a list of entity tags is
+ * refused `400 invalid_request`.
  *
  */
 export const zIfMatch = z.string();

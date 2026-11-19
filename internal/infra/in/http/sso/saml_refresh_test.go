@@ -217,7 +217,7 @@ func TestACertificateSetSharingNothingTrustedIsRefusedLoggedAndAuditedEveryRound
 	}
 
 	// The admin settles it by editing the provider with the metadata.
-	if resp, err := e.admin.UpdateAuthProviderWithResponse(t.Context(), p.Slug, &management.UpdateAuthProviderParams{IfMatch: ptr(fmt.Sprintf(`"%d"`, p.Version))},
+	if resp, err := e.session(t).UpdateAuthProviderWithResponse(t.Context(), p.Slug, &management.UpdateAuthProviderParams{IfMatch: ptr(fmt.Sprintf(`"%d"`, p.Version))},
 		management.AuthProviderPatch{IdpMetadataUrl: ptr(*p.IdpMetadataUrl)}); err != nil || resp.JSON200 == nil {
 		t.Fatalf("editing the provider: %v, %v", resp.StatusCode(), err)
 	}

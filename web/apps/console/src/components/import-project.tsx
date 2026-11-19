@@ -1,7 +1,7 @@
 import type { ImportKindChanges, ImportResult, ImportUpdate } from "@flagnetic/api";
 import { msg } from "@lingui/core/macro";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { CircleAlertIcon, TriangleAlertIcon } from "lucide-react";
 import { type ChangeEvent, type ReactNode, useState } from "react";
 
@@ -30,7 +30,7 @@ import {
   saveImportSession,
   warningMessage,
 } from "@/lib/project-import";
-import { environmentsQuery } from "@/lib/queries";
+import { environmentsQuery, meQuery } from "@/lib/queries";
 
 const kindNames: Record<ChangeKind, ReturnType<typeof msg>> = {
   environments: msg`Environments`,
@@ -50,7 +50,10 @@ const kindNames: Record<ChangeKind, ReturnType<typeof msg>> = {
  * the browser could not keep returns the flow to the upload.
  */
 export function ImportProject({ project }: { project: string }) {
-  const [session, setSession] = useState<ImportSession>(() => loadImportSession(project));
+  const { data: me } = useSuspenseQuery(meQuery);
+  // A draft is the signed-in member's own: another member never finds it.
+  const member = me.member?.id ?? "";
+  const [session, setSession] = useState<ImportSession>(() => loadImportSession(member, project));
   // Names a document chosen, so a dry run of an earlier choice is never taken for this one.
   const [generation, setGeneration] = useState(0);
   const [applied, setApplied] = useState<ImportResult | undefined>();
@@ -58,7 +61,7 @@ export function ImportProject({ project }: { project: string }) {
 
   const move = (next: ImportSession) => {
     setSession(next);
-    saveImportSession(project, next);
+    saveImportSession(member, project, next);
   };
 
   if (applied) {

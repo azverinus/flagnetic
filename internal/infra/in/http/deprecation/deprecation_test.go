@@ -194,6 +194,21 @@ func TestAPathParameterAndAMethodDecideWhichOperationIsDeprecated(t *testing.T) 
 	}
 }
 
+// A literal route beside a deprecated wildcard one is its own operation: the
+// API's mux answers it, so the middleware's must as well.
+func TestALiteralRouteBesideADeprecatedWildcardIsNotAnnounced(t *testing.T) {
+	table := deprecation.Table{"GET /flags/{flag}": {Since: time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC)}}
+	h := deprecation.Middleware("/api/v1", table, "GET /flags/{flag}", "GET /flags/export", "POST /flags")(
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	for path, want := range map[string]bool{"/api/v1/flags/abc": true, "/api/v1/flags/export": false} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if got := rec.Header().Get("Deprecation") != ""; got != want {
+			t.Errorf("GET %s: announced %t, want %t", path, got, want)
+		}
+	}
+}
+
 func TestAnEmptyTableLeavesTheHandlerAlone(t *testing.T) {
 	inner := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 	rec := httptest.NewRecorder()

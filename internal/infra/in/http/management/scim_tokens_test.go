@@ -43,7 +43,7 @@ func TestAScimTokenIsBoundToOneProviderAndShownOnce(t *testing.T) {
 	c := testkit.Clock()
 	srv := testkit.StartServer(t, testkit.WithClock(c), testkit.WithBaseURL(providerBaseURL))
 	admin := scimAdmin(t, srv)
-	provider := createProvider(t, testkit.Client(t, srv, testkit.InstanceAdminToken(t)), corporate(providerSlug()))
+	provider := createProvider(t, testkit.InstanceAdminSession(t, srv), corporate(providerSlug()))
 	expiry := c.Now().Add(30 * 24 * time.Hour)
 
 	created := mustCreateScimToken(t, admin, management.ScimTokenCreate{Provider: provider.Slug, ExpiresAt: &expiry})
@@ -73,7 +73,7 @@ func TestAScimTokenIsBoundToOneProviderAndShownOnce(t *testing.T) {
 
 func TestOnlyAnInstanceAdminsSessionCreatesAScimToken(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
-	provider := createProvider(t, testkit.Client(t, srv, testkit.InstanceAdminToken(t)), corporate(providerSlug()))
+	provider := createProvider(t, testkit.InstanceAdminSession(t, srv), corporate(providerSlug()))
 	body := management.ScimTokenCreate{Provider: provider.Slug}
 
 	res := do(testkit.Client(t, srv, testkit.InstanceAdminToken(t)).CreateScimTokenWithResponse(t.Context(), body))
@@ -91,7 +91,7 @@ func TestAScimTokenNamesAnExistingProviderAndAFutureExpiry(t *testing.T) {
 	c := testkit.Clock()
 	srv := testkit.StartServer(t, testkit.WithClock(c), testkit.WithBaseURL(providerBaseURL))
 	admin := scimAdmin(t, srv)
-	provider := createProvider(t, testkit.Client(t, srv, testkit.InstanceAdminToken(t)), corporate(providerSlug()))
+	provider := createProvider(t, testkit.InstanceAdminSession(t, srv), corporate(providerSlug()))
 	past := c.Now().Add(-time.Hour)
 
 	for name, body := range map[string]struct {
@@ -112,7 +112,7 @@ func TestAScimTokenNamesAnExistingProviderAndAFutureExpiry(t *testing.T) {
 func TestRevokingAScimTokenIsAuditedAndFinal(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
 	admin := scimAdmin(t, srv)
-	provider := createProvider(t, testkit.Client(t, srv, testkit.InstanceAdminToken(t)), corporate(providerSlug()))
+	provider := createProvider(t, testkit.InstanceAdminSession(t, srv), corporate(providerSlug()))
 	created := mustCreateScimToken(t, admin, management.ScimTokenCreate{Provider: provider.Slug})
 
 	if res := do(admin.RevokeScimTokenWithResponse(t.Context(), created.Token.Id.String())); res.StatusCode() != http.StatusNoContent {

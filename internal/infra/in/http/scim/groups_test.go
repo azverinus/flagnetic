@@ -96,7 +96,7 @@ func adminMapping(group string) management.GroupMapping {
 // mapGroups replaces the group mappings of provider.
 func (e env) mapGroups(t *testing.T, provider string, items ...management.GroupMapping) management.GroupMappingsRun {
 	t.Helper()
-	res, err := e.admin.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), provider, &management.ReplaceAuthProviderGroupMappingsParams{IfMatch: e.mappingsVersion(t, provider)}, management.GroupMappings{Items: items})
+	res, err := e.browser.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), provider, &management.ReplaceAuthProviderGroupMappingsParams{IfMatch: e.mappingsVersion(t, provider)}, management.GroupMappings{Items: items})
 	if err != nil || res.JSON200 == nil {
 		t.Fatalf("replacing the group mappings of %s: %v, %d: %s", provider, err, res.StatusCode(), res.Body)
 	}

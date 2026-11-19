@@ -7,7 +7,6 @@ import (
 	"mime"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/google/uuid"
 
@@ -196,8 +195,11 @@ func (a *api) importProject(r *http.Request, params ImportProjectParams) (Import
 		Caller: callerMember(ctx), Request: requestOf(ctx),
 	}
 	if params.IfMatch != nil {
-		tag := strings.Trim(strings.TrimSpace(*params.IfMatch), `"`)
-		cmd.IfMatch = &tag
+		tags, tagErr := ifMatchTags(*params.IfMatch)
+		if tagErr != nil {
+			return nil, tagErr
+		}
+		cmd.IfMatch = &tags
 	}
 	res, err := a.h.ImportIntoProject.Handle(ctx, cmd)
 	if err != nil {
@@ -282,8 +284,11 @@ func (a *api) importFirebaseTemplate(r *http.Request, params ImportFirebaseTempl
 		cmd.UnitType = *params.UnitType
 	}
 	if params.IfMatch != nil {
-		tag := strings.Trim(strings.TrimSpace(*params.IfMatch), `"`)
-		cmd.IfMatch = &tag
+		tags, tagErr := ifMatchTags(*params.IfMatch)
+		if tagErr != nil {
+			return nil, tagErr
+		}
+		cmd.IfMatch = &tags
 	}
 	res, err := a.h.ImportFirebaseTemplate.Handle(ctx, cmd)
 	if err != nil {

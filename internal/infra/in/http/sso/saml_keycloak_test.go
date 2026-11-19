@@ -29,7 +29,7 @@ func (e env) createSAMLAt(t *testing.T, metadataURL string, change func(*managem
 	if change != nil {
 		change(&body)
 	}
-	res, err := e.admin.CreateAuthProviderWithResponse(t.Context(), body)
+	res, err := e.session(t).CreateAuthProviderWithResponse(t.Context(), body)
 	if err != nil || res.JSON201 == nil {
 		t.Fatalf("creating the SAML provider: %v, %d: %s", err, res.StatusCode(), res.Body)
 	}

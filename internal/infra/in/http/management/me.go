@@ -47,14 +47,38 @@ func (a *api) meOf(ctx context.Context, c access.Caller) (Me, error) {
 	if err != nil {
 		return Me{}, err
 	}
-	// The instance always bounds a token's lifetime today; the field is
-	// nullable so that an instance without a bound can say so.
-	lifetime := int64(settings.TokenMaxLifetime / time.Second)
+	return meWith(ctx, c, &settings), nil
+}
+
+// meAfterWrite is meOf for the answer to a request that has just committed
+// (signing in, accepting an invitation, completing a password reset, editing
+// one's own profile). The token policy is not what the write is for: were the
+// settings not read (the pool is exhausted, the query timed out), the answer
+// leaves the policy out and says so in the log, since failing here would
+// answer 500 for a write that is done, with a secret consumed and a session
+// open that no cookie was ever set for. Whoever creates a token reads GET /me
+// first, which fails honestly.
+func (a *api) meAfterWrite(ctx context.Context, c access.Caller) Me {
+	settings, err := a.h.GetAuthSettings.Handle(ctx)
+	if err != nil {
+		a.edge.Logger().ErrorContext(ctx, "reading the auth settings for the answer to a committed write", "error", err.Error())
+		return meWith(ctx, c, nil)
+	}
+	return meWith(ctx, c, &settings)
+}
+
+// meWith describes c, with the instance's token policy when settings are known.
+func meWith(ctx context.Context, c access.Caller, settings *access.AuthSettings) Me {
 	me := Me{
-		ClientIp:                flaghttp.ClientOf(ctx).IP.String(),
-		Credential:              Credential{Method: CredentialMethod(c.Method)},
-		MaxTokenLifetimeSeconds: &lifetime,
-		RequireTokenExpiry:      settings.TokenExpiryRequired,
+		ClientIp:   flaghttp.ClientOf(ctx).IP.String(),
+		Credential: Credential{Method: CredentialMethod(c.Method)},
+	}
+	if settings != nil {
+		// The instance always bounds a token's lifetime today; the field is
+		// nullable so that an instance without a bound can say so.
+		lifetime := int64(settings.TokenMaxLifetime / time.Second)
+		me.MaxTokenLifetimeSeconds = &lifetime
+		me.RequireTokenExpiry = settings.TokenExpiryRequired
 	}
 	if c.Token != nil {
 		tokenID, name := openapi_types.UUID(c.Token.ID.Bytes()), c.Token.Name
@@ -70,7 +94,7 @@ func (a *api) meOf(ctx context.Context, c access.Caller) (Me, error) {
 			me.Member.Locale = &locale
 		}
 	}
-	return me, nil
+	return me
 }
 
 // UpdateMe renames the caller or changes their console language, and
@@ -88,11 +112,7 @@ func (a *api) UpdateMe(ctx context.Context, req UpdateMeRequestObject) (UpdateMe
 		return nil, err
 	}
 	c.Member = &v.Member
-	me, err := a.meOf(ctx, c)
-	if err != nil {
-		return nil, err
-	}
-	return UpdateMe200JSONResponse(me), nil
+	return UpdateMe200JSONResponse(a.meAfterWrite(ctx, c)), nil
 }
 
 // ChangeMyPassword sets the caller's new password once the current one is

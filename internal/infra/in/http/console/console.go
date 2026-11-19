@@ -170,7 +170,21 @@ func unavailable(w http.ResponseWriter) {
 	http.Error(w, "the console is not available", http.StatusInternalServerError)
 }
 
+// oneTimeLinkPrefixes are where the pages that open a one-time link live: an
+// invitation and a password reset carry their secret in the path, so the page
+// and what it loads are asked for with the secret in the Referer unless the
+// page says otherwise. A reverse proxy logging the Referer would keep it, and
+// whoever reads that log could accept the invitation or set the password.
+var oneTimeLinkPrefixes = []string{"/invitations/", "/password-reset/"}
+
 func (h *handler) serveDocument(w http.ResponseWriter, r *http.Request) {
+	for _, prefix := range oneTimeLinkPrefixes {
+		if strings.HasPrefix(r.URL.Path, prefix) {
+			// Set on the page itself, so it holds behind any proxy: the page's
+			// own requests, the API calls among them, send no Referer.
+			w.Header().Set("Referrer-Policy", "no-referrer")
+		}
+	}
 	w.Header().Set("Cache-Control", cacheNever)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	http.ServeContent(w, r, entryDocument, time.Time{}, bytes.NewReader(h.doc))

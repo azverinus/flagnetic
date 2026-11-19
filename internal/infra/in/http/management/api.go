@@ -280,11 +280,31 @@ func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer, opts Op
 	edge.SecretPath(invitationLinkPath + "{secret}")
 	edge.SecretPath(passwordResetLinkPath + "{secret}")
 	// A deprecated operation is announced whatever its handler answers.
-	edge.Wrap(BaseURL+"/", deprecation.Middleware(BaseURL, Deprecated))
+	routes := make([]string, 0, len(operations.Table))
+	for pattern := range operations.Table {
+		routes = append(routes, pattern)
+	}
+	// Every answer is about one caller's session or instance and may hold
+	// what only they may read (who they are, the full ruleset, a one-time
+	// secret), so no shared cache may store one, 404s and refusals included. A
+	// handler that must be cacheable sets its own Cache-Control, and is listed
+	// in TestOnlyListedHandlersSetTheirOwnCacheControl (the change stream, whose
+	// document says no-cache).
+	edge.Wrap(BaseURL+"/", noStore)
+	edge.Wrap(BaseURL+"/", deprecation.Middleware(BaseURL, Deprecated, routes...))
 	HandlerWithOptions(rawBodies{ServerInterface: strict, a: a}, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
 		BaseRouter:       router{a},
 		ErrorHandlerFunc: invalidRequest,
+	})
+}
+
+// noStore marks every answer of the API as one no cache may keep, before any
+// handler runs, so the handlers added later are covered too.
+func noStore(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
 	})
 }
 
@@ -432,7 +452,7 @@ func (a *api) seam(op operations.Entry, next http.Handler) http.Handler {
 			err = errNotJSON
 		}
 		if err == nil {
-			err = refuseControlCharacters(r)
+			err = refuseBody(r, op)
 		}
 		if err != nil {
 			a.refuse(w, r, op.Operation, err)
@@ -554,17 +574,18 @@ func (a *api) refuse(w http.ResponseWriter, r *http.Request, op access.Operation
 	a.edge.WriteError(w, r, err)
 }
 
-// refuseControlCharacters refuses a request whose path or query holds a
-// control character (400, as for any other value that is no value of the
-// parameter) or whose JSON body does (422, a violation per text by its
-// pointer), and leaves the body to be read again. PostgreSQL stores no
-// U+0000, so a text that reached it would be a 500 raised by any member at
-// will; checking here, once, covers every text of every operation, those
-// added later too. The body is checked whatever media type it claims: an
-// operation that is not JSON-only decodes its body as JSON under any
-// Content-Type, and a body that is no JSON (a YAML document) yields nothing
-// here and meets the same rule in its own decoder.
-func refuseControlCharacters(r *http.Request) error {
+// refuseBody refuses a request whose path or query holds a control character
+// (400, as for any other value that is no value of the parameter), whose JSON
+// body does (422, a violation per text by its pointer), or whose JSON body
+// leaves out what its operation requires (422, a violation per member), and
+// leaves the body to be read again. PostgreSQL stores no U+0000, so a text
+// that reached it would be a 500 raised by any member at will; checking here,
+// once, covers every text of every operation, those added later too, as it
+// does the members a client may leave out. The body is checked whatever media
+// type it claims: an operation that is not JSON-only decodes its body as JSON
+// under any Content-Type, and a body that is no JSON (a YAML document) yields
+// nothing here and meets the same rule in its own decoder.
+func refuseBody(r *http.Request, op operations.Entry) error {
 	if !text.AllowedURL(r.URL) {
 		return flaghttp.InvalidRequest("the path and query must not contain control characters")
 	}
@@ -576,5 +597,8 @@ func refuseControlCharacters(r *http.Request) error {
 		return err
 	}
 	r.Body = io.NopCloser(bytes.NewReader(body))
-	return text.Error(text.InJSON(body))
+	if err := text.Error(text.InJSON(body)); err != nil {
+		return err
+	}
+	return refuseMissingMembers(body, op)
 }

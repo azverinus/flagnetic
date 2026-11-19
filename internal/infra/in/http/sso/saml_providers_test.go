@@ -215,7 +215,7 @@ func TestASAMLProviderIsRefusedForEachRuleItsMetadataBreaks(t *testing.T) {
 			}
 			tc.change(&body)
 
-			res, err := e.admin.CreateAuthProviderWithResponse(t.Context(), body)
+			res, err := e.session(t).CreateAuthProviderWithResponse(t.Context(), body)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -246,7 +246,7 @@ func TestAnOIDCProviderRefusesTheFieldsOfASAMLOne(t *testing.T) {
 		t.Fatalf("GET provider = %v, %v", before.StatusCode(), err)
 	}
 
-	res, err := e.admin.UpdateAuthProviderWithResponse(t.Context(), slug, &management.UpdateAuthProviderParams{IfMatch: ptr(`"1"`)},
+	res, err := e.session(t).UpdateAuthProviderWithResponse(t.Context(), slug, &management.UpdateAuthProviderParams{IfMatch: ptr(`"1"`)},
 		management.AuthProviderPatch{SignRequests: ptr(false), IdpMetadataUrl: ptr("https://idp.example.com/metadata")})
 	if err != nil {
 		t.Fatal(err)
@@ -264,7 +264,7 @@ func TestEditingASAMLProviderReadsItsMetadataAgainAndChangesWhatItSigns(t *testi
 	p := e.createSAML(t, idp, nil)
 	update := func(version string, patch management.AuthProviderPatch) *management.UpdateAuthProviderResponse {
 		t.Helper()
-		res, err := e.admin.UpdateAuthProviderWithResponse(t.Context(), p.Slug, &management.UpdateAuthProviderParams{IfMatch: &version}, patch)
+		res, err := e.session(t).UpdateAuthProviderWithResponse(t.Context(), p.Slug, &management.UpdateAuthProviderParams{IfMatch: &version}, patch)
 		if err != nil {
 			t.Fatal(err)
 		}

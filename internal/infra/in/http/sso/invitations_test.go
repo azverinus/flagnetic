@@ -194,7 +194,7 @@ func TestAnInvitedMemberLinkedAtAProviderIsActivatedSigningInThroughIt(t *testin
 		link := *r.JSON200.Invitation.Url
 		testkit.RecordSecret(link[strings.LastIndex(link, "/")+1:])
 	}
-	if en, err := e.admin.EnableAuthProviderWithResponse(t.Context(), slug); err != nil || en.StatusCode() != http.StatusOK {
+	if en, err := e.session(t).EnableAuthProviderWithResponse(t.Context(), slug); err != nil || en.StatusCode() != http.StatusOK {
 		t.Fatalf("enabling the provider: %v, %d: %s", err, en.StatusCode(), en.Body)
 	}
 
@@ -253,7 +253,7 @@ func TestAnInvitationAnswersTheProvidersThatMayAcceptIt(t *testing.T) {
 		t.Errorf("an invitation to a domain no provider holds offers %v", got)
 	}
 
-	enforce(t, e.admin, "corp.example", corp)
+	enforce(t, e.session(t), "corp.example", corp)
 	if got := providersOf(carol); !slices.Equal(got, []string{corp}) {
 		t.Errorf("an invitation to an enforced domain offers %v, want only %s", got, corp)
 	}

@@ -5619,20 +5619,28 @@ type GetAuthMethodsParams struct {
 // UpdateAuthProviderParams defines parameters for UpdateAuthProvider.
 type UpdateAuthProviderParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // ReplaceAuthProviderGroupMappingsParams defines parameters for ReplaceAuthProviderGroupMappings.
 type ReplaceAuthProviderGroupMappingsParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
@@ -5669,40 +5677,56 @@ type ImportNewProjectParams struct {
 // DeleteProjectParams defines parameters for DeleteProject.
 type DeleteProjectParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // UpdateProjectParams defines parameters for UpdateProject.
 type UpdateProjectParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // DeleteAttributeParams defines parameters for DeleteAttribute.
 type DeleteAttributeParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // UpdateAttributeParams defines parameters for UpdateAttribute.
 type UpdateAttributeParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
@@ -5824,100 +5848,140 @@ type ListChangeRequestsParams struct {
 // UpdateChangeRequestParams defines parameters for UpdateChangeRequest.
 type UpdateChangeRequestParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // ApplyChangeRequestParams defines parameters for ApplyChangeRequest.
 type ApplyChangeRequestParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // ApproveChangeRequestParams defines parameters for ApproveChangeRequest.
 type ApproveChangeRequestParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // CancelChangeRequestParams defines parameters for CancelChangeRequest.
 type CancelChangeRequestParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // OpenChangeRequestParams defines parameters for OpenChangeRequest.
 type OpenChangeRequestParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // RebaseChangeRequestParams defines parameters for RebaseChangeRequest.
 type RebaseChangeRequestParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // RejectChangeRequestParams defines parameters for RejectChangeRequest.
 type RejectChangeRequestParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // DeleteEnvironmentParams defines parameters for DeleteEnvironment.
 type DeleteEnvironmentParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // UpdateEnvironmentParams defines parameters for UpdateEnvironment.
 type UpdateEnvironmentParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // SetEnvironmentProtectionParams defines parameters for SetEnvironmentProtection.
 type SetEnvironmentProtectionParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
@@ -5969,20 +6033,28 @@ type ListExperimentsParams struct {
 // DeleteExperimentParams defines parameters for DeleteExperiment.
 type DeleteExperimentParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // UpdateExperimentParams defines parameters for UpdateExperiment.
 type UpdateExperimentParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
@@ -5995,10 +6067,14 @@ type ListExperimentAlertsParams struct {
 // ArchiveExperimentParams defines parameters for ArchiveExperiment.
 type ArchiveExperimentParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
@@ -6017,10 +6093,14 @@ type GetExperimentConflictsParams struct {
 // SetExperimentDecisionNoteParams defines parameters for SetExperimentDecisionNote.
 type SetExperimentDecisionNoteParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
@@ -6045,30 +6125,42 @@ type GetExperimentExposureTimelineParams struct {
 // RegenerateExperimentSaltsParams defines parameters for RegenerateExperimentSalts.
 type RegenerateExperimentSaltsParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // StartExperimentParams defines parameters for StartExperiment.
 type StartExperimentParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // StopExperimentParams defines parameters for StopExperiment.
 type StopExperimentParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
@@ -6136,50 +6228,70 @@ type ListFlagsParamsSort string
 // DeleteFlagParams defines parameters for DeleteFlag.
 type DeleteFlagParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // UpdateFlagParams defines parameters for UpdateFlag.
 type UpdateFlagParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // ArchiveFlagParams defines parameters for ArchiveFlag.
 type ArchiveFlagParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // PutFlagConfigurationParams defines parameters for PutFlagConfiguration.
 type PutFlagConfigurationParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // CopyFlagConfigurationParams defines parameters for CopyFlagConfiguration.
 type CopyFlagConfigurationParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
@@ -6195,30 +6307,42 @@ type GetFlagEvaluationsParams struct {
 // RevertFlagConfigurationParams defines parameters for RevertFlagConfiguration.
 type RevertFlagConfigurationParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // RegenerateRolloutSaltParams defines parameters for RegenerateRolloutSalt.
 type RegenerateRolloutSaltParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // RestoreFlagParams defines parameters for RestoreFlag.
 type RestoreFlagParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
@@ -6237,7 +6361,11 @@ type ImportProjectParams struct {
 	// dry run or an export answered it. Optional: without it the import
 	// applies to the project as it is. With it, an import is refused
 	// `412 version_mismatch` when the project has changed since, judged
-	// under the project's lock before anything is written.
+	// under the project's lock before anything is written. Read as RFC 9110
+	// reads If-Match: `*` matches the project, a list matches when it holds
+	// its current state, and a weak tag (`W/"x"`) matches nothing. A header
+	// that is neither `*` nor a list of entity tags is refused
+	// `400 invalid_request`.
 	IfMatch *ImportIfMatch `json:"If-Match,omitempty"`
 }
 
@@ -6262,47 +6390,67 @@ type ImportFirebaseTemplateParams struct {
 	// dry run or an export answered it. Optional: without it the import
 	// applies to the project as it is. With it, an import is refused
 	// `412 version_mismatch` when the project has changed since, judged
-	// under the project's lock before anything is written.
+	// under the project's lock before anything is written. Read as RFC 9110
+	// reads If-Match: `*` matches the project, a list matches when it holds
+	// its current state, and a weak tag (`W/"x"`) matches nothing. A header
+	// that is neither `*` nor a list of entity tags is refused
+	// `400 invalid_request`.
 	IfMatch *ImportIfMatch `json:"If-Match,omitempty"`
 }
 
 // DeleteSegmentParams defines parameters for DeleteSegment.
 type DeleteSegmentParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // UpdateSegmentParams defines parameters for UpdateSegment.
 type UpdateSegmentParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // DeleteSinkParams defines parameters for DeleteSink.
 type DeleteSinkParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // UpdateSinkParams defines parameters for UpdateSink.
 type UpdateSinkParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
@@ -6327,30 +6475,42 @@ type StreamProjectChangesParams struct {
 // DeleteUnitTypeParams defines parameters for DeleteUnitType.
 type DeleteUnitTypeParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // UpdateUnitTypeParams defines parameters for UpdateUnitType.
 type UpdateUnitTypeParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // UpdateWebhookParams defines parameters for UpdateWebhook.
 type UpdateWebhookParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
@@ -6377,10 +6537,14 @@ type ListWebhookDeliveriesParams struct {
 // UpdateInstanceWebhookParams defines parameters for UpdateInstanceWebhook.
 type UpdateInstanceWebhookParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
-	// answered it (`"7"`, or `7`). Required: without it the write is
-	// refused `428 precondition_required`, and with any other version than
-	// the current one `412 version_mismatch`, both judged after the request
-	// is validated.
+	// answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+	// matches any current version, and a list (`"6", "7"`) matches when it
+	// holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+	// comparison is strong. Required: without it the write is refused
+	// `428 precondition_required`, and with no tag that is the current
+	// version `412 version_mismatch`, both judged after the request is
+	// validated. A header that is neither `*` nor a list of entity tags is
+	// refused `400 invalid_request`.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 

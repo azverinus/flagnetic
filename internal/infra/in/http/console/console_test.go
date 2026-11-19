@@ -249,3 +249,20 @@ func TestConsoleOpensAnInvitationLinkWithoutLoggingItsSecret(t *testing.T) {
 		t.Errorf("no request record with the path /invitations/{secret}: %v", h.Logs.Records())
 	}
 }
+
+// The page that opens a one-time link, and so every request it makes, must
+// send no Referer: a proxy logging it would keep the secret in the path.
+func TestThePagesOpeningAOneTimeLinkSendNoReferrer(t *testing.T) {
+	h := start(t)
+	for path, want := range map[string]string{
+		"/invitations/some-secret":    "no-referrer",
+		"/password-reset/some-secret": "no-referrer",
+		"/":                           "same-origin",
+		"/sign-in":                    "same-origin",
+	} {
+		res := getDocument(t, h.URL, path)
+		if got := res.Header.Get("Referrer-Policy"); got != want {
+			t.Errorf("GET %s: Referrer-Policy = %q, want %q", path, got, want)
+		}
+	}
+}

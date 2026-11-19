@@ -65,6 +65,12 @@ const sessionOnly = [
   /^PATCH \/api\/v1\/members\/[^/]+$/,
   /^POST \/api\/v1\/members\/[^/]+\/(invitation|reactivate|password-reset)$/,
   /^POST \/api\/v1\/projects\/[^/]+\/(grants|invitations)$/,
+  // What decides who signs in, and with which access.
+  /^POST \/api\/v1\/instance\/auth-providers$/,
+  /^PATCH \/api\/v1\/instance\/auth-providers\/[^/]+$/,
+  /^POST \/api\/v1\/instance\/auth-providers\/[^/]+\/(enable|rotate-certificate\/complete)$/,
+  /^PUT \/api\/v1\/instance\/auth-providers\/[^/]+\/group-mappings$/,
+  /^PUT \/api\/v1\/instance\/auth-settings$/,
 ];
 
 /**

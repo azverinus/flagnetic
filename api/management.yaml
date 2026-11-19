@@ -25,7 +25,18 @@ info:
     the cookie, a read included, is refused `cross_origin` when the browser
     says it comes from another origin.
 
-    Errors are problem documents (RFC 9457) with a stable `code`.
+    Errors are problem documents (RFC 9457) with a stable `code`. Every
+    answer of this API carries `Cache-Control: no-store` (the change stream
+    `no-cache`), whatever its status, since what it holds belongs to one
+    caller and no shared cache may serve it to another. The SDK API's ruleset
+    is another document, with its own `ETag` and `If-None-Match`.
+
+    A JSON request body that is not an object, or leaves out a member its
+    schema lists as `required` (or sets one to `null` that may not be), is
+    refused `422 invalid` with a violation of code `required` for each such
+    member, by its pointer, before anything is read or changed: a missing
+    boolean or list is never taken for `false` or empty. Members the schema
+    does not name are accepted and ignored.
 
     Every versioned entity (project, environment, unit type, attribute,
     flag definition, flag configuration and segment) carries a `version`,
@@ -5667,6 +5678,7 @@ paths:
         enables it again from the server's side. Audited
         `auth_settings.updated`.
       x-permission: instance_admin
+      x-session-required: true
       tags: [instance]
       requestBody:
         required: true
@@ -5726,6 +5738,7 @@ paths:
         loopback address; private networks are allowed. A slug already in use is
         409 `already_exists`. Audited `auth_provider.created`.
       x-permission: instance_admin
+      x-session-required: true
       tags: [instance]
       requestBody:
         required: true
@@ -5798,6 +5811,7 @@ paths:
         created. Audited `auth_provider.updated`; an edit that changes nothing
         is not.
       x-permission: instance_admin
+      x-session-required: true
       tags: [instance]
       parameters:
         - $ref: "#/components/parameters/IfMatch"
@@ -5869,6 +5883,7 @@ paths:
         `base_url_required` as a creation is. An enabled provider is answered
         as it is. Audited `auth_provider.enabled`.
       x-permission: instance_admin
+      x-session-required: true
       tags: [instance]
       responses:
         "200":
@@ -5973,6 +5988,7 @@ paths:
         when none was started and `422 not_saml` for an OIDC provider. Audited
         `auth_provider.certificate_rotation_completed`.
       x-permission: instance_admin
+      x-session-required: true
       tags: [instance]
       responses:
         "200":
@@ -6046,6 +6062,7 @@ paths:
         was just granted. The version moves on with each replacement that
         changes the list, and is apart from the version of the provider.
       x-permission: instance_admin
+      x-session-required: true
       tags: [instance]
       parameters:
         - $ref: "#/components/parameters/IfMatch"
@@ -7869,7 +7886,11 @@ components:
         dry run or an export answered it. Optional: without it the import
         applies to the project as it is. With it, an import is refused
         `412 version_mismatch` when the project has changed since, judged
-        under the project's lock before anything is written.
+        under the project's lock before anything is written. Read as RFC 9110
+        reads If-Match: `*` matches the project, a list matches when it holds
+        its current state, and a weak tag (`W/"x"`) matches nothing. A header
+        that is neither `*` nor a list of entity tags is refused
+        `400 invalid_request`.
       schema:
         type: string
     ImportDryRun:
@@ -7989,10 +8010,14 @@ components:
       in: header
       description: |
         The version of the entity this write is based on, as its `ETag`
-        answered it (`"7"`, or `7`). Required: without it the write is
-        refused `428 precondition_required`, and with any other version than
-        the current one `412 version_mismatch`, both judged after the request
-        is validated.
+        answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+        matches any current version, and a list (`"6", "7"`) matches when it
+        holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+        comparison is strong. Required: without it the write is refused
+        `428 precondition_required`, and with no tag that is the current
+        version `412 version_mismatch`, both judged after the request is
+        validated. A header that is neither `*` nor a list of entity tags is
+        refused `400 invalid_request`.
       schema:
         type: string
     ExposureEnvironment:

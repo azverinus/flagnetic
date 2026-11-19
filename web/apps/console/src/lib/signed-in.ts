@@ -3,7 +3,9 @@ import type { QueryClient } from "@tanstack/react-query";
 import { redirect } from "@tanstack/react-router";
 
 import { ApiError } from "./errors";
+import { forgetImportDrafts } from "./import-drafts";
 import { meQuery } from "./queries";
+import { forgetRecentContexts } from "./tester";
 import { locationOf, safeReturnTo } from "./return-to";
 
 /** The search parameters of the sign-in page. */
@@ -104,9 +106,21 @@ export function onSessionEnded(
     if (queryClient.getQueryData(meQuery.queryKey) === undefined) return;
     const here = where();
     queryClient.clear();
+    forgetMemberData();
     if (here.pathname === signInPath) return;
     navigate(signInSearch(here, true));
   };
+}
+
+/**
+ * Forgets what the browser kept of the member who was signed in: the contexts
+ * they looked up and the import drafts they left, which hold what only they
+ * may see. It runs wherever the console drops their data from memory, so the
+ * next person to sign in on this device finds none of it.
+ */
+export function forgetMemberData(): void {
+  forgetRecentContexts();
+  forgetImportDrafts();
 }
 
 /** What one tab tells the others about the session they share. */
@@ -172,6 +186,7 @@ export function onSessionChangedElsewhere(
     }
     if (queryClient.getQueryData(meQuery.queryKey) === undefined) return;
     queryClient.clear();
+    forgetMemberData();
     reload();
   };
 }

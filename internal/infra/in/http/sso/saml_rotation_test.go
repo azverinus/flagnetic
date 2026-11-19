@@ -58,7 +58,7 @@ func (e env) rotate(t *testing.T, slug string) *management.RotateAuthProviderCer
 
 func (e env) completeRotation(t *testing.T, slug string) *management.CompleteAuthProviderCertificateRotationResponse {
 	t.Helper()
-	res, err := e.admin.CompleteAuthProviderCertificateRotationWithResponse(t.Context(), slug)
+	res, err := e.session(t).CompleteAuthProviderCertificateRotationWithResponse(t.Context(), slug)
 	if err != nil {
 		t.Fatalf("POST …/rotate-certificate/complete: %v", err)
 	}
@@ -268,7 +268,7 @@ func TestEditingAProviderWhileItRotatesLeavesTheRotationPending(t *testing.T) {
 		t.Fatalf("POST …/rotate-certificate = %d: %s", rotating.StatusCode(), rotating.Body)
 	}
 
-	res, err := e.admin.UpdateAuthProviderWithResponse(t.Context(), created.Slug,
+	res, err := e.session(t).UpdateAuthProviderWithResponse(t.Context(), created.Slug,
 		&management.UpdateAuthProviderParams{IfMatch: ptr(fmt.Sprintf(`"%d"`, rotating.JSON200.Version))},
 		management.AuthProviderPatch{DisplayName: ptr("Renamed")})
 

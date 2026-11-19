@@ -464,7 +464,7 @@ func TestFlagDefinitionWritesNeedTheCurrentVersionInIfMatch(t *testing.T) {
 	invalid := do(admin.UpdateFlagWithResponse(t.Context(), p.Key, "f", nil, management.FlagPatch{Name: ptr(" ")}))
 	violationsOf(t, "an invalid change without If-Match", invalid.StatusCode(), invalid.Body, "invalid_flag")
 	malformed := do(admin.UpdateFlagWithResponse(t.Context(), p.Key, "f", &management.UpdateFlagParams{IfMatch: ptr(`W/"1"`)}, management.FlagPatch{Name: ptr("G")}))
-	assertProblem(t, "a weak tag", malformed.StatusCode(), malformed.Body, http.StatusBadRequest, "invalid_request")
+	assertProblem(t, "a weak tag", malformed.StatusCode(), malformed.Body, http.StatusPreconditionFailed, "version_mismatch")
 
 	bare := do(admin.UpdateFlagWithResponse(t.Context(), p.Key, "f", &management.UpdateFlagParams{IfMatch: ptr("1")}, management.FlagPatch{Name: ptr("G")}))
 	if bare.JSON200 == nil || bare.JSON200.Version != 2 || bare.HTTPResponse.Header.Get("ETag") != `"2"` {

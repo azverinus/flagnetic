@@ -208,9 +208,24 @@ func ifMatch(header *IfMatch) (precondition.Version, error) {
 	}
 	v, err := precondition.Parse(*header)
 	if err != nil {
-		return v, flaghttp.InvalidRequest("If-Match names a version this API answered as an ETag, such as \"7\"")
+		return v, errIfMatch
 	}
 	return v, nil
+}
+
+// errIfMatch answers an If-Match that is neither `*` nor a list of entity
+// tags: a request that cannot be read. A tag that is well formed but names no
+// version the entity has is another matter, the precondition failing, 412.
+var errIfMatch = flaghttp.InvalidRequest(`If-Match is "*" or a list of entity tags, such as the "7" an ETag answered`)
+
+// ifMatchTags reads the If-Match of a write guarded by the opaque tag of a
+// state, such as an import's, as ifMatch reads a version's.
+func ifMatchTags(header string) (precondition.Tags, error) {
+	tags, err := precondition.ParseTags(header)
+	if err != nil {
+		return tags, errIfMatch
+	}
+	return tags, nil
 }
 
 // etag returns version v as the ETag a response carries.

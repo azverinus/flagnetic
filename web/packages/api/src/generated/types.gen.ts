@@ -4498,7 +4498,11 @@ export type AuditChangeRequest = string;
  * dry run or an export answered it. Optional: without it the import
  * applies to the project as it is. With it, an import is refused
  * `412 version_mismatch` when the project has changed since, judged
- * under the project's lock before anything is written.
+ * under the project's lock before anything is written. Read as RFC 9110
+ * reads If-Match: `*` matches the project, a list matches when it holds
+ * its current state, and a weak tag (`W/"x"`) matches nothing. A header
+ * that is neither `*` nor a list of entity tags is refused
+ * `400 invalid_request`.
  *
  */
 export type ImportIfMatch = string;
@@ -4580,10 +4584,14 @@ export type SegmentKey = string;
 
 /**
  * The version of the entity this write is based on, as its `ETag`
- * answered it (`"7"`, or `7`). Required: without it the write is
- * refused `428 precondition_required`, and with any other version than
- * the current one `412 version_mismatch`, both judged after the request
- * is validated.
+ * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+ * matches any current version, and a list (`"6", "7"`) matches when it
+ * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+ * comparison is strong. Required: without it the write is refused
+ * `428 precondition_required`, and with no tag that is the current
+ * version `412 version_mismatch`, both judged after the request is
+ * validated. A header that is neither `*` nor a list of entity tags is
+ * refused `400 invalid_request`.
  *
  */
 export type IfMatch = string;
@@ -5943,10 +5951,14 @@ export type DeleteProjectData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -6068,10 +6080,14 @@ export type UpdateProjectData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -6265,7 +6281,11 @@ export type ImportProjectData = {
      * dry run or an export answered it. Optional: without it the import
      * applies to the project as it is. With it, an import is refused
      * `412 version_mismatch` when the project has changed since, judged
-     * under the project's lock before anything is written.
+     * under the project's lock before anything is written. Read as RFC 9110
+     * reads If-Match: `*` matches the project, a list matches when it holds
+     * its current state, and a weak tag (`W/"x"`) matches nothing. A header
+     * that is neither `*` nor a list of entity tags is refused
+     * `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -6363,7 +6383,11 @@ export type ImportFirebaseTemplateData = {
      * dry run or an export answered it. Optional: without it the import
      * applies to the project as it is. With it, an import is refused
      * `412 version_mismatch` when the project has changed since, judged
-     * under the project's lock before anything is written.
+     * under the project's lock before anything is written. Read as RFC 9110
+     * reads If-Match: `*` matches the project, a list matches when it holds
+     * its current state, and a weak tag (`W/"x"`) matches nothing. A header
+     * that is neither `*` nor a list of entity tags is refused
+     * `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -6572,10 +6596,14 @@ export type DeleteEnvironmentData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -6710,10 +6738,14 @@ export type UpdateEnvironmentData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -6793,10 +6825,14 @@ export type SetEnvironmentProtectionData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -7487,10 +7523,14 @@ export type DeleteUnitTypeData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -7624,10 +7664,14 @@ export type UpdateUnitTypeData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -7995,10 +8039,14 @@ export type DeleteAttributeData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -8132,10 +8180,14 @@ export type UpdateAttributeData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -8386,10 +8438,14 @@ export type DeleteFlagData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -8523,10 +8579,14 @@ export type UpdateFlagData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -8609,10 +8669,14 @@ export type ArchiveFlagData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -8687,10 +8751,14 @@ export type RestoreFlagData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -8826,10 +8894,14 @@ export type PutFlagConfigurationData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -8985,10 +9057,14 @@ export type RevertFlagConfigurationData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -9077,10 +9153,14 @@ export type CopyFlagConfigurationData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -9315,10 +9395,14 @@ export type RegenerateRolloutSaltData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -9703,10 +9787,14 @@ export type DeleteExperimentData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -9840,10 +9928,14 @@ export type UpdateExperimentData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -9926,10 +10018,14 @@ export type RegenerateExperimentSaltsData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -10010,10 +10106,14 @@ export type StartExperimentData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -10096,10 +10196,14 @@ export type StopExperimentData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -10182,10 +10286,14 @@ export type SetExperimentDecisionNoteData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -10270,10 +10378,14 @@ export type ArchiveExperimentData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -11224,10 +11336,14 @@ export type UpdateChangeRequestData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -11311,10 +11427,14 @@ export type OpenChangeRequestData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -11390,10 +11510,14 @@ export type RebaseChangeRequestData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -11473,10 +11597,14 @@ export type CancelChangeRequestData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -11616,10 +11744,14 @@ export type ApproveChangeRequestData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -11700,10 +11832,14 @@ export type RejectChangeRequestData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -11783,10 +11919,14 @@ export type ApplyChangeRequestData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -11976,10 +12116,14 @@ export type DeleteSegmentData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -12113,10 +12257,14 @@ export type UpdateSegmentData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -14144,10 +14292,14 @@ export type UpdateAuthProviderData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -14514,10 +14666,14 @@ export type ReplaceAuthProviderGroupMappingsData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -15508,10 +15664,14 @@ export type UpdateWebhookData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -16141,10 +16301,14 @@ export type DeleteSinkData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -16270,10 +16434,14 @@ export type UpdateSinkData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;
@@ -17215,10 +17383,14 @@ export type UpdateInstanceWebhookData = {
   headers?: {
     /**
      * The version of the entity this write is based on, as its `ETag`
-     * answered it (`"7"`, or `7`). Required: without it the write is
-     * refused `428 precondition_required`, and with any other version than
-     * the current one `412 version_mismatch`, both judged after the request
-     * is validated.
+     * answered it (`"7"`, or `7`), read as RFC 9110 reads If-Match: `*`
+     * matches any current version, and a list (`"6", "7"`) matches when it
+     * holds the current one. A weak tag (`W/"7"`) matches nothing, as the
+     * comparison is strong. Required: without it the write is refused
+     * `428 precondition_required`, and with no tag that is the current
+     * version `412 version_mismatch`, both judged after the request is
+     * validated. A header that is neither `*` nor a list of entity tags is
+     * refused `400 invalid_request`.
      *
      */
     "If-Match"?: string;

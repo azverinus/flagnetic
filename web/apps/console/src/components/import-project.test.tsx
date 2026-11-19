@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { fakeServer, problem } from "@/test/fake-server";
-import { activateForTests, renderWithProviders } from "@/test/render";
+import { activateForTests, renderWithProviders, signedInClient } from "@/test/render";
 
 import { ImportProject } from "./import-project";
 
@@ -79,7 +79,7 @@ describe("importing a project document", () => {
       "GET /projects/checkout/environments": environments,
       [path]: { status: 200, body: changed, headers: { ETag: '"entry-7"' } },
     });
-    renderWithProviders(<ImportProject project="checkout" />);
+    renderWithProviders(<ImportProject project="checkout" />, signedInClient());
 
     await chooseAndCheck("checkout.yaml", "schema_version: 1\nproject: {}\n");
 
@@ -97,7 +97,7 @@ describe("importing a project document", () => {
       "GET /projects/checkout/environments": environments,
       [path]: { status: 200, body: changed, headers: { ETag: '"entry-7"' } },
     });
-    renderWithProviders(<ImportProject project="checkout" />);
+    renderWithProviders(<ImportProject project="checkout" />, signedInClient());
 
     await chooseAndCheck();
 
@@ -116,7 +116,7 @@ describe("importing a project document", () => {
       "GET /projects/checkout/environments": environments,
       [path]: { status: 200, body: changed, headers: { ETag: '"entry-7"' } },
     });
-    renderWithProviders(<ImportProject project="checkout" />);
+    renderWithProviders(<ImportProject project="checkout" />, signedInClient());
 
     await chooseAndCheck();
 
@@ -132,7 +132,7 @@ describe("importing a project document", () => {
         }),
       [path]: { status: 200, body: changed, headers: { ETag: '"entry-7"' } },
     });
-    renderWithProviders(<ImportProject project="checkout" />);
+    renderWithProviders(<ImportProject project="checkout" />, signedInClient());
 
     await chooseAndCheck();
     await waitFor(() => expect(server.requests.some((r) => r.method === "POST")).toBe(true));
@@ -160,7 +160,7 @@ describe("importing a project document", () => {
         ]),
       },
     });
-    renderWithProviders(<ImportProject project="checkout" />);
+    renderWithProviders(<ImportProject project="checkout" />, signedInClient());
 
     await chooseAndCheck();
 
@@ -176,7 +176,7 @@ describe("importing a project document", () => {
       "GET /projects/checkout/environments": environments,
       [path]: { status: 200, body: answer(), headers: { ETag: '"entry-7"' } },
     });
-    renderWithProviders(<ImportProject project="checkout" />);
+    renderWithProviders(<ImportProject project="checkout" />, signedInClient());
 
     await chooseAndCheck();
 
@@ -192,7 +192,7 @@ describe("importing a project document", () => {
           ? { status: 200, body: changed, headers: { ETag: '"entry-7"' } }
           : { status: 200, body: { ...changed, dry_run: false } },
     });
-    renderWithProviders(<ImportProject project="checkout" />);
+    renderWithProviders(<ImportProject project="checkout" />, signedInClient());
     await chooseAndCheck();
 
     await userEvent.click(await screen.findByRole("button", { name: "Apply" }));
@@ -202,7 +202,7 @@ describe("importing a project document", () => {
     expect(new URL(posts[1]!.url).searchParams.get("dry_run")).toBe("false");
     expect(posts[1]!.headers.get("If-Match")).toBe('"entry-7"');
     // Nothing is held for a reload once the document is applied.
-    expect(window.sessionStorage.getItem("flagnetic.import.checkout")).toBeNull();
+    expect(window.sessionStorage.getItem("flagnetic.import.ada.checkout")).toBeNull();
   });
 
   it("explains a 412 and offers a new dry run whose ETag the next apply sends", async () => {
@@ -219,7 +219,7 @@ describe("importing a project document", () => {
           : { status: 200, body: { ...changed, dry_run: false } };
       },
     });
-    renderWithProviders(<ImportProject project="checkout" />);
+    renderWithProviders(<ImportProject project="checkout" />, signedInClient());
     await chooseAndCheck();
 
     await userEvent.click(await screen.findByRole("button", { name: "Apply" }));
@@ -245,7 +245,7 @@ describe("importing a project document", () => {
         ],
       }),
     });
-    renderWithProviders(<ImportProject project="checkout" />);
+    renderWithProviders(<ImportProject project="checkout" />, signedInClient());
 
     await chooseAndCheck();
 
@@ -257,7 +257,7 @@ describe("importing a project document", () => {
 
   it("refuses a file that is neither JSON nor YAML before sending anything", async () => {
     const server = fakeServer({ "GET /projects/checkout/environments": environments });
-    renderWithProviders(<ImportProject project="checkout" />);
+    renderWithProviders(<ImportProject project="checkout" />, signedInClient());
 
     await userEvent.upload(screen.getByLabelText("Project document"), file("notes.txt", "hi"), {
       applyAccept: false,
@@ -273,12 +273,12 @@ describe("importing a project document", () => {
       "GET /projects/checkout/environments": environments,
       [path]: { status: 200, body: changed, headers: { ETag: '"entry-7"' } },
     });
-    const first = renderWithProviders(<ImportProject project="checkout" />);
+    const first = renderWithProviders(<ImportProject project="checkout" />, signedInClient());
     await chooseAndCheck("checkout.json", '{"schema_version":1}');
     await screen.findByRole("region", { name: "Flags" });
     first.unmount();
 
-    renderWithProviders(<ImportProject project="checkout" />);
+    renderWithProviders(<ImportProject project="checkout" />, signedInClient());
 
     await screen.findByRole("region", { name: "Flags" });
     const posts = server.requests.filter((r) => r.method === "POST");
@@ -288,9 +288,12 @@ describe("importing a project document", () => {
   });
 
   it("starts at the upload when the document was lost", async () => {
-    window.sessionStorage.setItem("flagnetic.import.checkout", JSON.stringify({ step: "review" }));
+    window.sessionStorage.setItem(
+      "flagnetic.import.ada.checkout",
+      JSON.stringify({ step: "review" }),
+    );
     fakeServer({ "GET /projects/checkout/environments": environments });
-    renderWithProviders(<ImportProject project="checkout" />);
+    renderWithProviders(<ImportProject project="checkout" />, signedInClient());
 
     expect(screen.getByLabelText("Project document")).toBeInTheDocument();
     await waitFor(() =>
@@ -311,7 +314,7 @@ describe("importing a project document", () => {
         headers: { ETag: '"entry-7"' },
       },
     });
-    const first = renderWithProviders(<ImportProject project="checkout" />);
+    const first = renderWithProviders(<ImportProject project="checkout" />, signedInClient());
     await userEvent.click(screen.getByRole("combobox", { name: "Mode" }));
     await userEvent.click(await screen.findByRole("option", { name: "Replace" }));
     await chooseAndCheck();
@@ -323,7 +326,7 @@ describe("importing a project document", () => {
     expect(screen.getByRole("button", { name: "Apply" })).toBeEnabled();
     first.unmount();
 
-    renderWithProviders(<ImportProject project="checkout" />);
+    renderWithProviders(<ImportProject project="checkout" />, signedInClient());
     await screen.findByRole("alert");
     const posts = server.requests.filter((r) => r.method === "POST");
     expect(new URL(posts[1]!.url).searchParams.get("mode")).toBe("replace");
@@ -340,7 +343,7 @@ describe("importing a project document", () => {
         ],
       }),
     });
-    renderWithProviders(<ImportProject project="checkout" />);
+    renderWithProviders(<ImportProject project="checkout" />, signedInClient());
     await userEvent.click(screen.getByRole("combobox", { name: "Mode" }));
     await userEvent.click(await screen.findByRole("option", { name: "Replace" }));
 

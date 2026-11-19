@@ -81,7 +81,7 @@ func TestADisabledProvidersTokenIsRefusedUntilItIsEnabledAgain(t *testing.T) {
 	}
 	disable()
 	assertScimError(t, "a disabled provider's token", e.call(t, token, http.MethodGet, "/Users", ""), http.StatusUnauthorized, "invalidCredentials")
-	if res, err := e.admin.EnableAuthProviderWithResponse(t.Context(), slug); err != nil || res.JSON200 == nil {
+	if res, err := e.browser.EnableAuthProviderWithResponse(t.Context(), slug); err != nil || res.JSON200 == nil {
 		t.Fatalf("enabling: %v, %d: %s", err, res.StatusCode(), res.Body)
 	}
 	if r := e.call(t, token, http.MethodGet, "/Users", ""); r.status != http.StatusOK {

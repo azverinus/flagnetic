@@ -36,10 +36,7 @@ func (a *api) PutFlagConfiguration(ctx context.Context, req PutFlagConfiguration
 	if err != nil {
 		return nil, err
 	}
-	body, err := a.configurationWithWaiting(ctx, ec)
-	if err != nil {
-		return nil, err
-	}
+	body := a.writtenConfiguration(ctx, ec)
 	return PutFlagConfiguration200JSONResponse{
 		Body: body, Headers: PutFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
 	}, nil
@@ -59,10 +56,7 @@ func (a *api) KillFlag(ctx context.Context, req KillFlagRequestObject) (KillFlag
 	if err != nil {
 		return nil, err
 	}
-	body, err := a.configurationWithWaiting(ctx, ec)
-	if err != nil {
-		return nil, err
-	}
+	body := a.writtenConfiguration(ctx, ec)
 	return KillFlag200JSONResponse{
 		Body:    KillResult{Changed: killed, Configuration: body},
 		Headers: KillFlag200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
@@ -81,10 +75,7 @@ func (a *api) PutOverride(ctx context.Context, req PutOverrideRequestObject) (Pu
 	if err != nil {
 		return nil, err
 	}
-	body, err := a.configurationWithWaiting(ctx, ec)
-	if err != nil {
-		return nil, err
-	}
+	body := a.writtenConfiguration(ctx, ec)
 	return PutOverride200JSONResponse{
 		Body: body, Headers: PutOverride200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
 	}, nil
@@ -100,10 +91,7 @@ func (a *api) DeleteOverride(ctx context.Context, req DeleteOverrideRequestObjec
 	if err != nil {
 		return nil, err
 	}
-	body, err := a.configurationWithWaiting(ctx, ec)
-	if err != nil {
-		return nil, err
-	}
+	body := a.writtenConfiguration(ctx, ec)
 	return DeleteOverride200JSONResponse{
 		Body: body, Headers: DeleteOverride200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
 	}, nil
@@ -124,10 +112,7 @@ func (a *api) RegenerateRolloutSalt(ctx context.Context, req RegenerateRolloutSa
 	if err != nil {
 		return nil, err
 	}
-	body, err := a.configurationWithWaiting(ctx, ec)
-	if err != nil {
-		return nil, err
-	}
+	body := a.writtenConfiguration(ctx, ec)
 	return RegenerateRolloutSalt200JSONResponse{
 		Body: body, Headers: RegenerateRolloutSalt200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
 	}, nil
@@ -144,10 +129,7 @@ func (a *api) RevertFlagConfiguration(ctx context.Context, req RevertFlagConfigu
 	if err != nil {
 		return nil, err
 	}
-	body, err := a.configurationWithWaiting(ctx, ec)
-	if err != nil {
-		return nil, err
-	}
+	body := a.writtenConfiguration(ctx, ec)
 	return RevertFlagConfiguration200JSONResponse{
 		Body: body, Headers: RevertFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
 	}, nil
@@ -166,10 +148,7 @@ func (a *api) CopyFlagConfiguration(ctx context.Context, req CopyFlagConfigurati
 	if err != nil {
 		return nil, err
 	}
-	body, err := a.configurationWithWaiting(ctx, ec)
-	if err != nil {
-		return nil, err
-	}
+	body := a.writtenConfiguration(ctx, ec)
 	return CopyFlagConfiguration200JSONResponse{
 		Body: body, Headers: CopyFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
 	}, nil
@@ -228,6 +207,19 @@ func (a *api) configurationWithWaiting(ctx context.Context, ec flags.Environment
 	}
 	out.ChangeRequests = &WaitingChangeRequests{Open: w.Open, Approved: w.Approved, NextApplyAt: w.NextApplyAt}
 	return out, nil
+}
+
+// writtenConfiguration returns ec, which a write has just committed, as that
+// write answers it. The change requests waiting on it are a courtesy: were
+// they not counted (the pool is exhausted, the query timed out), the answer
+// leaves them out and says so in the log, rather than refusing a write that
+// is done, which a client would retry with a version no longer current.
+func (a *api) writtenConfiguration(ctx context.Context, ec flags.EnvironmentConfiguration) FlagConfiguration {
+	out, err := a.configurationWithWaiting(ctx, ec)
+	if err != nil {
+		a.edge.Logger().ErrorContext(ctx, "counting the change requests waiting on a written configuration", "error", err.Error())
+	}
+	return out
 }
 
 func configurationOut(ec flags.EnvironmentConfiguration) FlagConfiguration {

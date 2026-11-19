@@ -1,7 +1,7 @@
 import type { FirebaseImportResult } from "@flagnetic/api";
 import { msg } from "@lingui/core/macro";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon, TriangleAlertIcon } from "lucide-react";
 import { type ChangeEvent, type ReactNode, useState } from "react";
@@ -33,7 +33,7 @@ import {
 import { flagTypeName } from "@/lib/flags";
 import { formatNumber } from "@/i18n/format";
 import { protectedEnvironmentsTouched } from "@/lib/project-import";
-import { environmentsQuery, unitTypesQuery } from "@/lib/queries";
+import { environmentsQuery, meQuery, unitTypesQuery } from "@/lib/queries";
 
 const stepNames: Record<FirebaseStep, ReturnType<typeof msg>> = {
   upload: msg`Upload`,
@@ -54,7 +54,12 @@ const defaultUnitType = "anonymous";
  * the browser could not keep returns the flow to the upload.
  */
 export function FirebaseWizard({ project }: { project: string }) {
-  const [session, setSession] = useState<FirebaseSession>(() => loadFirebaseSession(project));
+  const { data: me } = useSuspenseQuery(meQuery);
+  // A draft is the signed-in member's own: another member never finds it.
+  const member = me.member?.id ?? "";
+  const [session, setSession] = useState<FirebaseSession>(() =>
+    loadFirebaseSession(member, project),
+  );
   // Names a template chosen, so a dry run of an earlier file is never taken for this one.
   const [generation, setGeneration] = useState(0);
   const [applied, setApplied] = useState<{
@@ -66,7 +71,7 @@ export function FirebaseWizard({ project }: { project: string }) {
 
   const move = (next: FirebaseSession) => {
     setSession(next);
-    saveFirebaseSession(project, next);
+    saveFirebaseSession(member, project, next);
   };
 
   const read = session.text === undefined ? undefined : parseTemplate(session.text);

@@ -80,6 +80,19 @@ describe("a request refused as not signed in", () => {
     expect(queryClient.getQueryData(meQuery.queryKey)).toBeUndefined();
   });
 
+  it("forgets what the member left in this browser, import drafts and looked-up contexts", () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(meQuery.queryKey, me as never, { updatedAt: 0 });
+    window.sessionStorage.setItem("flagnetic.import.ada.checkout", "{}");
+    window.sessionStorage.setItem("flagnetic.import-firebase.ada.mobile", "{}");
+    window.localStorage.setItem("flagnetic.recent-contexts.checkout", "[]");
+
+    onSessionEnded(queryClient, () => ({ pathname: "/projects/checkout" }), vi.fn())();
+
+    expect(window.sessionStorage.length).toBe(0);
+    expect(window.localStorage.getItem("flagnetic.recent-contexts.checkout")).toBeNull();
+  });
+
   it("does not navigate again once the console is on its way to sign-in", () => {
     // A stale caller refetched while the guard already redirects to
     // sign-in: that redirect carries where the member was, and a second
