@@ -34,7 +34,7 @@ While a replica cannot build a ruleset for two seconds (the database slow or unr
 
 ## Compression
 
-An SDK sending `Accept-Encoding: gzip` receives the ruleset in gzip. Every answer of the SDK API is compressed the same way, problems included, and every answer varies by `Accept-Encoding`. A request body may be sent in gzip with `Content-Encoding: gzip`; every size limit counts the body after decompression, a body that is not valid gzip is `400 invalid_request`, and any other coding `415 unsupported_media_type`.
+An SDK sending `Accept-Encoding: gzip` receives the ruleset in gzip. Every answer of the SDK API is compressed the same way, problems included, except the [ruleset stream](stream.md), which is never compressed, and every answer varies by `Accept-Encoding`. A request body may be sent in gzip with `Content-Encoding: gzip`; every size limit counts the body after decompression, a body that is not valid gzip is `400 invalid_request`, and any other coding `415 unsupported_media_type`.
 
 ## Schema versions
 

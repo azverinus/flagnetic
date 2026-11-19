@@ -79,6 +79,10 @@ type rulesetEntry struct {
 	doc    *appdelivery.Ruleset
 	// loading is the materialization in flight, nil when none is.
 	loading *rulesetLoad
+	// next is the materialization queued behind loading, which starts when
+	// loading ends: every request that arrived while loading ran waits for
+	// it, so an environment has at most two materializations at a time.
+	next *rulesetLoad
 	// pending are the versions announced whose propagation is still to be
 	// observed, the oldest first.
 	pending []pendingVersion
@@ -92,7 +96,8 @@ type pendingVersion struct {
 }
 
 type rulesetLoad struct {
-	// seq numbers the load among those the cache started.
+	// seq numbers the load among those the cache started; 0 while it is
+	// queued.
 	seq  uint64
 	done chan struct{}
 	rs   appdelivery.Ruleset
@@ -244,12 +249,21 @@ func (c *RulesetCache) ruleset(ctx context.Context, environment workspace.Enviro
 			return rs, nil
 		}
 		l := e.loading
-		// While the listener is down no notification tells of a write
-		// another replica committed, so a load started before this request
-		// may have read the database before that write: only a load started
-		// since is joined.
-		if l == nil || (!c.listening && l.seq <= arrived) {
-			l = c.start(environment, e)
+		switch {
+		case l == nil:
+			l = c.start(environment, e, nil)
+		case !c.listening && l.seq <= arrived:
+			// While the listener is down no notification tells of a write
+			// another replica committed, so a load started before this
+			// request may have read the database before that write: only a
+			// load started since is joined. That is the one queued behind
+			// the running load, shared by every request that arrived while
+			// it ran.
+			if e.next == nil {
+				e.next = &rulesetLoad{done: make(chan struct{})}
+			}
+			l = e.next
+			c.fault.queue()
 		}
 		want := e.latest
 		c.mu.Unlock()
@@ -287,10 +301,14 @@ func (c *RulesetCache) ruleset(ctx context.Context, environment workspace.Enviro
 }
 
 // start begins the materialization of environment, shared by every request
-// asking for it until it ends. c.mu is held.
-func (c *RulesetCache) start(environment workspace.EnvironmentID, e *rulesetEntry) *rulesetLoad {
+// asking for it until it ends: l, a queued one, or a new one when l is nil.
+// c.mu is held.
+func (c *RulesetCache) start(environment workspace.EnvironmentID, e *rulesetEntry, l *rulesetLoad) *rulesetLoad {
 	c.started++
-	l := &rulesetLoad{seq: c.started, done: make(chan struct{})}
+	if l == nil {
+		l = &rulesetLoad{done: make(chan struct{})}
+	}
+	l.seq = c.started
 	e.loading = l
 	generation := c.generation
 	c.loads.Add(1)
@@ -323,6 +341,17 @@ func (c *RulesetCache) finish(environment workspace.EnvironmentID, e *rulesetEnt
 	defer c.mu.Unlock()
 	if e.loading == l {
 		e.loading = nil
+	}
+	// The queued load starts even when l's result is not kept: its requests
+	// arrived while l ran, and only a load started since may answer them.
+	if next := e.next; next != nil {
+		e.next = nil
+		if c.closed {
+			next.err = appdelivery.ErrRulesetUnavailable
+			close(next.done)
+		} else {
+			c.start(environment, e, next)
+		}
 	}
 	if l.err != nil || !c.listening || c.generation != generation || c.entries[environment] != e || l.rs.Version < e.latest {
 		return
@@ -445,6 +474,7 @@ type RulesetLoadFault struct {
 	stalled  int
 	failing  bool
 	failed   int
+	queued   int
 }
 
 // errRulesetLoadFault is the failure of a materialization the fault fails.
@@ -482,6 +512,23 @@ func (f *RulesetLoadFault) Release() {
 		close(f.released)
 		f.released = nil
 	}
+}
+
+// Queued counts the requests that have waited for a materialization queued
+// behind a running one, so a test knows every request it sent has arrived.
+func (f *RulesetLoadFault) Queued() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.queued
+}
+
+func (f *RulesetLoadFault) queue() {
+	if f == nil {
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.queued++
 }
 
 // Stalled counts the materializations held now.
