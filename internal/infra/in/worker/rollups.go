@@ -78,13 +78,15 @@ func RollupStream(name string, stream events.Stream, r Rollup, m *RollupMetrics)
 			// measured while a stream far behind is still catching up, which
 			// is when the gauge is needed. Reaching that stop is the round's
 			// plan, not a failure: the batches it committed moved the cursor.
+			// The error a statement cut off at that stop returns need not
+			// wrap the context's (the database reports a cancelled
+			// statement), so the stop itself decides.
 			handleCtx, stop := context.WithTimeout(ctx, rollupTimeout-lagReserve)
 			_, err := r.Handle(handleCtx)
-			handleStopped := handleCtx.Err() != nil && ctx.Err() == nil
-			stop()
-			if handleStopped && errors.Is(err, context.DeadlineExceeded) {
+			if handleCtx.Err() != nil && ctx.Err() == nil {
 				err = nil
 			}
+			stop()
 			// The lag is measured on a context of its own: the round's may
 			// be cancelled by a stopping runner, which must not leave the
 			// gauge stale.
