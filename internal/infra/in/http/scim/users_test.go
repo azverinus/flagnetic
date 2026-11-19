@@ -513,6 +513,40 @@ func TestADirectoryChangingAMembersEmailEndsTheirPasswordAndResets(t *testing.T)
 	}
 }
 
+// Emails are one address when they differ only in the case of ASCII letters.
+// An address that only Unicode folding equates with the member's (U+212A
+// KELVIN SIGN folds to k) is another address: moving the member there ends
+// their password, and its domain is judged like any other.
+func TestADirectoryMovingAMemberToAnAddressOnlyUnicodeFoldingEquatesIsAMove(t *testing.T) {
+	e := start(t)
+	slug := e.provider(t, "kelvin.example")
+	token := e.createToken(t, management.ScimTokenCreate{Provider: slug}).Value
+	local := "k" + random()
+	existing := testkit.NewMember(t, testkit.Pool(t), testkit.WithEmail(local+"@kelvin.example"))
+	member := e.mustCreate(t, token, userBody(existing.Email, nil))
+	if member != existing.ID.String() {
+		t.Fatalf("POST /Users = %s, want the member %s adopted", member, existing.ID)
+	}
+
+	r := e.call(t, token, http.MethodPatch, "/Users/"+member, marshal(t, patch(op("replace", "userName", local+"@Kelvin.example"))))
+	if r.status != http.StatusBadRequest {
+		t.Errorf("PATCH userName to a domain the provider does not list = %d: %s, want 400", r.status, r.body)
+	}
+
+	moved := "K" + local[1:] + "@kelvin.example"
+	r = e.call(t, token, http.MethodPatch, "/Users/"+member, marshal(t, patch(op("replace", "userName", moved))))
+	if r.status != http.StatusOK || r.json(t)["userName"] != moved {
+		t.Fatalf("PATCH userName = %d: %s", r.status, r.body)
+	}
+	updated := e.audited(t, "member.updated", member)
+	if len(updated) == 0 {
+		t.Fatal("no member.updated entry")
+	}
+	if is, _ := updated[0].After.(map[string]any); is["password_removed"] != true {
+		t.Errorf("member.updated after = %v, want the password removed", updated[0].After)
+	}
+}
+
 func TestDeactivatingAUserEndsItsTokensAndResetsAndReactivatingRestoresIt(t *testing.T) {
 	e := start(t)
 	token := e.token(t, e.provider(t))

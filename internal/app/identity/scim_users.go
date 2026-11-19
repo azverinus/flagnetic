@@ -3,7 +3,6 @@ package identity
 import (
 	"context"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -396,7 +395,7 @@ func (d SCIMUserDeps) vouchedChange(ctx context.Context, caller SCIMCaller, cmd 
 	if err != nil {
 		return err
 	}
-	if strings.EqualFold(current.Email, *cmd.Email) {
+	if identity.SameEmail(current.Email, *cmd.Email) {
 		return nil
 	}
 	return d.vouchedEmail(ctx, caller, *cmd.Email)

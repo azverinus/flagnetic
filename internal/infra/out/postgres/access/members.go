@@ -10,7 +10,6 @@ import (
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	"github.com/azverinus/flagnetic/internal/domain/access"
-	"github.com/azverinus/flagnetic/internal/domain/identity"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
@@ -65,7 +64,7 @@ func (s *Store) MemberByEmail(ctx context.Context, email string) (access.Member,
 		return access.Member{}, "", fmt.Errorf("reading a member by email: %w", err)
 	}
 	found := member()
-	if !identity.SameEmail(found.Email, email) {
+	if !access.SameEmail(found.Email, email) {
 		return access.Member{}, "", appaccess.ErrNotFound
 	}
 	if hash == nil {

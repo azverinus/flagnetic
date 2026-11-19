@@ -200,6 +200,29 @@ func checkEmail(email string) (string, error) {
 	return local, nil
 }
 
+// SameEmail reports whether a and b are one address, ignoring the case of
+// ASCII letters only. Unicode folding maps U+212A KELVIN SIGN to k, so an
+// address written with it would be taken for the ASCII one and its holder
+// for another member.
+func SameEmail(a, b string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range len(a) {
+		x, y := a[i], b[i]
+		if 'A' <= x && x <= 'Z' {
+			x += 'a' - 'A'
+		}
+		if 'A' <= y && y <= 'Z' {
+			y += 'a' - 'A'
+		}
+		if x != y {
+			return false
+		}
+	}
+	return true
+}
+
 // checkDisplayName accepts a trimmed display name of 1 to 200 characters.
 func checkDisplayName(name string) error {
 	switch {

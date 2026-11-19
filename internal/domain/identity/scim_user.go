@@ -53,7 +53,8 @@ type UserFilter struct {
 // adapter writes into the error document.
 type ScimError struct {
 	// Type is the RFC 7644 scimType: invalidFilter, invalidPath,
-	// invalidSyntax, invalidValue, mutability, uniqueness or noTarget.
+	// invalidSyntax, invalidValue, mutability, uniqueness, noTarget or
+	// tooMany.
 	Type   string
 	Detail string
 }
