@@ -390,11 +390,7 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 			return BatchResult{}, err
 		}
 	}
-	refused, err := h.firstRefusals(ctx, key, refusals, now)
-	if err != nil {
-		return BatchResult{}, err
-	}
-	if err := h.countRejections(ctx, key, refused, now); err != nil {
+	if err := h.countFirstRefusals(ctx, key, refusals, now); err != nil {
 		return BatchResult{}, err
 	}
 	return res, nil
@@ -513,6 +509,16 @@ type typedID struct {
 type refusal struct {
 	key rejectionKey
 	id  delivery.EventID
+}
+
+// countFirstRefusals counts the refusals of a batch, leaving out those of
+// exposures refused before.
+func (h *IngestEvents) countFirstRefusals(ctx context.Context, key delivery.SDKKey, refusals []refusal, at time.Time) error {
+	refused, err := h.firstRefusals(ctx, key, refusals, at)
+	if err != nil {
+		return err
+	}
+	return h.countRejections(ctx, key, refused, at)
 }
 
 // firstRefusals returns the refusals of a batch by experiment and reason,
