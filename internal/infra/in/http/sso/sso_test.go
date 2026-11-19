@@ -21,6 +21,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pgidentity "github.com/azverinus/flagnetic/internal/infra/out/postgres/identity"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -942,5 +943,28 @@ func TestAnEmailThatOnlyUnicodeFoldingEquatesLinksNoMember(t *testing.T) {
 	b = testkit.NewBrowser(t, e.srv.URL)
 	if v := e.signIn(t, b, slug, "", e.opts()); v.URL.Path != "/" {
 		t.Errorf("the sign-in with the address in another case ended at %s", v.URL)
+	}
+}
+
+// Every instant the server reasons about is the application clock's. A token
+// the wall clock still holds valid is expired when the application clock
+// reads two hours later, as SAML assertions already are.
+func TestAnIDTokenExpiredByTheApplicationClockIsRefused(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	// The identity provider signs tokens valid for an hour from the wall clock.
+	c := clock.NewFake(time.Now().Add(2 * time.Hour))
+	e := start(t, testkit.WithClock(c))
+	slug := e.forged(t, idp, nil)
+
+	idp.NextClaims(map[string]any{"email": uniqueEmail()})
+	b := testkit.NewBrowser(t, e.srv.URL)
+	wantError(t, e.signIn(t, b, slug, "", e.opts()), b, "sso_failed")
+
+	// A token valid at the application clock's time signs in.
+	address := uniqueEmail()
+	idp.NextClaims(map[string]any{"email": address, "iat": c.Now().Unix(), "exp": c.Now().Add(time.Hour).Unix()})
+	b = testkit.NewBrowser(t, e.srv.URL)
+	if v := e.signIn(t, b, slug, "", e.opts()); v.URL.Path != "/" {
+		t.Errorf("a token valid by the application clock ended at %s", v.URL)
 	}
 }

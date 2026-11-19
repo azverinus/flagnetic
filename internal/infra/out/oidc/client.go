@@ -16,6 +16,7 @@ import (
 	appidentity "github.com/azverinus/flagnetic/internal/app/identity"
 	"github.com/azverinus/flagnetic/internal/domain/identity"
 	"github.com/azverinus/flagnetic/internal/infra/out/idphttp"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
 )
 
 const (
@@ -38,7 +39,9 @@ const (
 // golang.org/x/oauth2.
 type Client struct {
 	http *http.Client
-	now  func() time.Time
+	// clock is the application clock: the instants of ID token checks and of
+	// the cache lifetimes are the ones the rest of the server reasons about.
+	clock clock.Clock
 
 	mu     sync.Mutex
 	cache  map[string]discovered
@@ -62,9 +65,9 @@ type failure struct {
 var _ appidentity.OIDCClient = (*Client)(nil)
 
 // NewClient returns a client that makes its requests to providers as
-// idphttp's client does.
-func NewClient() *Client {
-	return &Client{http: idphttp.NewClient(), now: time.Now, cache: map[string]discovered{}, failed: map[string]failure{}}
+// idphttp's client does and judges tokens and cache lifetimes by clk.
+func NewClient(clk clock.Clock) *Client {
+	return &Client{http: idphttp.NewClient(), clock: clk, cache: map[string]discovered{}, failed: map[string]failure{}}
 }
 
 // provider returns the discovered provider of issuer, from the replica's
@@ -76,10 +79,10 @@ func (c *Client) provider(ctx context.Context, issuer string) (*gooidc.Provider,
 	d, ok := c.cache[issuer]
 	f, failed := c.failed[issuer]
 	c.mu.Unlock()
-	if ok && c.now().Sub(d.fetched) < discoveryTTL {
+	if ok && c.clock.Now().Sub(d.fetched) < discoveryTTL {
 		return d.provider, nil
 	}
-	if failed && c.now().Sub(f.at) < failureTTL {
+	if failed && c.clock.Now().Sub(f.at) < failureTTL {
 		return nil, f.err
 	}
 	// The fetch is shared, so it must not end with the request that happened
@@ -100,11 +103,11 @@ func (c *Client) discover(ctx context.Context, issuer string) (*gooidc.Provider,
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if err != nil {
-		c.failed[issuer] = failure{err: err, at: c.now()}
+		c.failed[issuer] = failure{err: err, at: c.clock.Now()}
 		return nil, err
 	}
 	delete(c.failed, issuer)
-	c.cache[issuer] = discovered{provider: p, fetched: c.now()}
+	c.cache[issuer] = discovered{provider: p, fetched: c.clock.Now()}
 	return p, nil
 }
 
@@ -184,7 +187,7 @@ func (c *Client) Exchange(ctx context.Context, cfg appidentity.OIDCConfig, code,
 	if raw == "" {
 		return identity.VerifiedClaims{}, errors.New("the token response holds no ID token")
 	}
-	verifier := p.Verifier(&gooidc.Config{ClientID: cfg.ClientID, Now: func() time.Time { return c.now().Add(-clockSkew) }})
+	verifier := p.Verifier(&gooidc.Config{ClientID: cfg.ClientID, Now: func() time.Time { return c.clock.Now().Add(-clockSkew) }})
 	idToken, err := verifier.Verify(ctx, raw)
 	if err != nil {
 		return identity.VerifiedClaims{}, fmt.Errorf("verifying the ID token: %w", err)
