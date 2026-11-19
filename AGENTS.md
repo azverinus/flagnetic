@@ -32,6 +32,7 @@ Requires Go (the toolchain in `go.mod` is fetched automatically), Docker for Pos
 - **Tests go through the highest seam that shows the behaviour**: domain unit tests for rules, real PostgreSQL for repositories and handlers, the generated client for HTTP. Never fake a repository; never read tables in a test.
 - **Exposure is an explicit call.** Evaluation never records one.
 - **A client SDK key learns served values only**: values, variations and experiment blocks, never which rule, segment or reason finer than `targeting_match` produced them.
+- **Console screens are composed from the kit.** A route renders through `Page`, `Card` and the context panel, and sets no width, centring, page padding or uppercase of its own (ESLint fails it); `web/README.md` says which primitive holds what.
 - **Comments state the reason**, in full, where the code is. Do not point at external documents, tickets or chat history.
 - **Vocabulary**: use the terms in `docs/glossary.md` verbatim in identifiers, messages, docs and tests.
 - **Commits and pull requests**: every change lands through a pull request, squash-merged, whose title is a Conventional Commit subject with a context or SDK scope (`feat(flags): ...`, `fix(sdk-js): ...`); every commit signed off (`git commit -s`). Split large work into a stack of small pull requests. One fix applied to several SDKs is one pull request with the scope `sdks`: each SDK's checks run for it, and each SDK it touches gets the entry in its changelog. English only. Never edit `CHANGELOG.md`; release-please generates it.

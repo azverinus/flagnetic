@@ -498,6 +498,22 @@ _Avoid_: event (a webhook subscription's), notification (PostgreSQL's NOTIFY tha
 One event sent to one subscription, carrying a status and every attempt made at it with its time, status code, latency and response snippet. A delivery keeps its id across its attempts; a redelivery is a new delivery of the same event, same event id and body, under a new id. A sink's own signed HTTP call reuses the same wire header (`X-Flagnetic-Delivery`) and the same at-least-once shape, for the same batch across retries, but it is a stream's in-flight batch, not this entry.
 _Avoid_: send, call, dispatch, webhook (that is the subscription)
 
+## Console
+
+**Context panel**:
+The console's second column, between the sidebar and the page, that a screen fills with every choice changing what the whole page shows: the screens of a settings area, the environments of a flag or experiment, a list's views and its facets. A screen without such choices has none, and the page takes its width. Tabs stay inside the page only for two to four views of one object's content.
+_Avoid_: secondary sidebar, sub-navigation, filter panel, drawer (the sidebar's form on a phone), sheet (the panel's form on a narrow screen)
+_Russian_: контекстная панель
+
+**State lamp**:
+The console's one mark for whether a flag serves in an environment: a filled dot when on, a hollow one when off, always followed by the word. It is shown wherever an environment's serving state is named and nowhere else; protection is a lock beside the environment's name, never the lamp.
+_Avoid_: status dot, indicator, badge (lifecycle words such as Draft or Running), light
+
+**View**:
+One saved slice of a console list, chosen in the context panel: all flags, stale flags or archived ones; the change requests awaiting the member's decision, the member's own, or all. A view is fixed by the console; facets narrow whatever view is open. Never an exposure.
+_Avoid_: preset, tab, saved search, filter (a facet's choice), impression
+_Russian_: представление (never «вид», which is kind)
+
 ## Releases and compatibility
 
 **External surface**:
