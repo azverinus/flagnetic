@@ -120,7 +120,7 @@ func (c *ClickHouse) Probe(ctx context.Context, call appsinks.Call, _ time.Time,
 // tables. The delivery's ID is the query's ID, and an insert is synchronous, so
 // a 200 means the rows are stored. A retry of the same rows is folded into the
 // ones already stored by the table's sorting key.
-func (c *ClickHouse) Deliver(ctx context.Context, call appsinks.Call, d appsinks.Delivery) *sinks.Failure {
+func (c *ClickHouse) Deliver(ctx context.Context, call appsinks.Call, d appsinks.BatchToSend) *sinks.Failure {
 	ch := c.call(call)
 	t, ok := sinks.ClickHouseTableOf(d.Kind)
 	if !ok {

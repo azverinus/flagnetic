@@ -51,7 +51,7 @@ func (d Deps) read(ctx context.Context, project workspace.ProjectID, sink sinks.
 // judged sets how far behind s is and how it stands.
 func (d Deps) judged(ctx context.Context, s sinks.Sink) (sinks.Sink, error) {
 	s, err := d.withLag(ctx, s)
-	s.Status = s.Health(d.LagWarning)
+	s.Health = s.JudgeHealth(d.LagWarning)
 	return s, err
 }
 

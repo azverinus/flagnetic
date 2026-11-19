@@ -68,7 +68,7 @@ func (h *Sample) Handle(ctx context.Context, cmd SampleCommand) ([]Sampled, erro
 		if idErr != nil {
 			return nil, fmt.Errorf("drawing a delivery ID: %w", idErr)
 		}
-		failure := target.Deliver(ctx, call, Delivery{
+		failure := target.Deliver(ctx, call, BatchToSend{
 			ID: "sample_" + delivery.String(), Kind: k, Rows: sinks.SampleRows(k, projectKey, now), Sample: true, Now: now,
 		})
 		out = append(out, Sampled{EventKind: k, Failure: failure})

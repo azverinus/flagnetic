@@ -200,8 +200,8 @@ type Call struct {
 	Secrets []string
 }
 
-// Delivery is one batch to send.
-type Delivery struct {
+// BatchToSend is one batch to send to a target: the rows of a batch in flight, a sample or a test call. Not a delivery, which is a webhook subscription's.
+type BatchToSend struct {
 	// ID is the delivery's identity to the target, the same on every resend.
 	ID   string
 	Kind sinks.EventKind
@@ -229,7 +229,7 @@ type Target interface {
 	Probe(ctx context.Context, c Call, now time.Time, prepare bool) Probed
 	// Deliver sends d and returns why it failed; nil when the target
 	// acknowledged it.
-	Deliver(ctx context.Context, c Call, d Delivery) *sinks.Failure
+	Deliver(ctx context.Context, c Call, d BatchToSend) *sinks.Failure
 }
 
 // Targets returns the target of each kind of sink.
@@ -482,7 +482,7 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 		return h.release(ctx, ref, token)
 	}
 	now := h.now()
-	failure := target.Deliver(ctx, Call{Sink: c.Sink, ProjectKey: c.ProjectKey, Secrets: secrets}, Delivery{
+	failure := target.Deliver(ctx, Call{Sink: c.Sink, ProjectKey: c.ProjectKey, Secrets: secrets}, BatchToSend{
 		ID:   sinks.DeliveryID(c.Sink.ID, ref.Kind, batch.From, batch.To, sinks.RowIDs(page.Rows)),
 		Kind: ref.Kind, Rows: page.Rows, Now: now,
 	})

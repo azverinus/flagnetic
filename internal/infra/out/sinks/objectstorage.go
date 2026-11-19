@@ -49,7 +49,7 @@ func (o *ObjectStorage) Probe(ctx context.Context, c appsinks.Call, _ time.Time,
 // prefix, in its format, and answers why the service did not take it. A batch
 // with no rows is acknowledged without a file: retention can have dropped
 // every row of it between attempts.
-func (o *ObjectStorage) Deliver(ctx context.Context, c appsinks.Call, d appsinks.Delivery) *sinks.Failure {
+func (o *ObjectStorage) Deliver(ctx context.Context, c appsinks.Call, d appsinks.BatchToSend) *sinks.Failure {
 	if len(d.Rows) == 0 {
 		return nil
 	}

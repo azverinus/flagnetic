@@ -324,7 +324,7 @@ func sinkOut(s sinks.Sink) Sink {
 		Id: openapi_types.UUID(s.ID.Bytes()), Name: s.Name, Kind: SinkKind(s.Kind),
 		EventKinds: make([]SinkEventKind, len(s.EventKinds)), Environments: nonNilStrings(s.Environments),
 		BatchSize: s.BatchSize, FlushInterval: int(s.FlushInterval / time.Second), Enabled: s.Enabled,
-		Health: SinkHealth(s.Status), AtRisk: s.AtRiskSince != nil, StoppedAt: s.StoppedAt,
+		Health: SinkHealth(s.Health), AtRisk: s.AtRiskSince != nil, StoppedAt: s.StoppedAt,
 		DeadLetters: s.DeadLetters, Gaps: s.Gaps, Warnings: nonNilStrings(s.Warnings), Streams: make([]SinkStream, len(s.Streams)),
 		CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt, Version: s.Version,
 	}

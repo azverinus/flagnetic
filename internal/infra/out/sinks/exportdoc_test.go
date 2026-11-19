@@ -31,7 +31,7 @@ func TestParquetFilesHoldTheDocumentedColumnsAndTypes(t *testing.T) {
 			bucket := store.NewBucket(t)
 			c := objectStorageSink(store, store.Endpoint, bucket, func(c *domain.ObjectStorage) { c.Format, c.Compression = "parquet", "zstd" })
 			rows := domain.SampleRows(kind, "shop", received)
-			if f := objectStorage().Deliver(t.Context(), c, appsinks.Delivery{ID: "dlv_abc", Kind: kind, Rows: rows, Now: received}); f != nil {
+			if f := objectStorage().Deliver(t.Context(), c, appsinks.BatchToSend{ID: "dlv_abc", Kind: kind, Rows: rows, Now: received}); f != nil {
 				t.Fatalf("Deliver = %v", f)
 			}
 			keys := store.Keys(t, bucket)

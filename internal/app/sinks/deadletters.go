@@ -217,7 +217,7 @@ func (h *RedeliverDeadLetter) Handle(ctx context.Context, cmd DeadLetterCommand)
 	if err != nil {
 		return dl, err
 	}
-	failure := target.Deliver(ctx, Call{Sink: s, ProjectKey: projectKey, Secrets: secrets}, Delivery{
+	failure := target.Deliver(ctx, Call{Sink: s, ProjectKey: projectKey, Secrets: secrets}, BatchToSend{
 		ID: sinks.RedeliveryID(dl.ID, dl.Attempts), Kind: dl.EventKind, Rows: page.Rows, Now: h.d.now(),
 	})
 	now := h.d.now()

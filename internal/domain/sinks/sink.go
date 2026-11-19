@@ -125,9 +125,9 @@ type Sink struct {
 	// Lag is the age of the oldest row a stream has not delivered; nil while
 	// the sink is disabled.
 	Lag *time.Duration
-	// Status is how the sink stands, judged from the above by the use case
+	// Health is how the sink stands, judged from the above by the use case
 	// that read it, with the operator's tolerance of lag.
-	Status Health
+	Health Health
 }
 
 // Input is what a member chooses of a sink.
