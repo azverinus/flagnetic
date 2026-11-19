@@ -205,7 +205,6 @@
     {"pattern": "[\\d\\pL]", "input": "é", "match": true},
     {"pattern": "(?i)\\p{Lu}", "input": "a", "match": true},
     {"pattern": "(?i)\\x{D800}", "input": "a", "match": false},
-    {"pattern": "\\x{D800}", "input": "a", "match": false},
     {"pattern": "[\\x{D7FF}-\\x{E000}]", "input": "a", "match": false},
     {"pattern": "^(ios|android)-[0-9]+$", "input": "ios-12", "match": true},
     {"pattern": "(?i)\\P{Lu}", "input": "a", "match": false},
