@@ -247,8 +247,9 @@ func (s *Store) CreateEventPartitions(ctx context.Context, from time.Time, ahead
 	}
 	// The advisory lock comes after the timeout, so that a replica holding
 	// it for long makes the others give up too instead of holding their
-	// connections while they wait.
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('event_partitions', 0))`); err != nil {
+	// connections while they wait. It is scoped by schema, as the other locks
+	// of the area are: instances in separate schemas never wait on each other.
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('event_partitions@' || current_schema(), 0))`); err != nil {
 		return fmt.Errorf("creating event partitions: %w", err)
 	}
 	var days []string

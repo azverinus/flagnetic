@@ -457,3 +457,55 @@ func TestARedeliveryOfASinkStartedFromATimeSendsNothingReceivedBeforeTheStart(t 
 		t.Errorf("redelivered %v, want %v: the rows the batch left out stay out", got, want)
 	}
 }
+
+// Setting the batch aside that stops the sink takes the project's row before
+// the sink's and its stream's, as every other write of a project's sinks does:
+// taking the sink first and the project last, through the outbox's foreign key,
+// deadlocks with a replay, an update or a project delete holding the project.
+func TestSettingAsideTheBatchThatStopsASinkTakesTheProjectBeforeTheSink(t *testing.T) {
+	f := startDelivering(t)
+	release := make(chan struct{})
+	r := testkit.StartReceiver(t, script(times(14, rejected), []testkit.Reply{{Status: http.StatusUnprocessableEntity, Release: release}})...)
+	created, _ := f.enabled(t, small(r, "exposure"))
+	f.post(t, f.exposure("u-1", "true", f.clock.Now()), f.exposure("u-2", "true", f.clock.Now()), f.exposure("u-3", "true", f.clock.Now()))
+	for n := 0; len(batchCalls(r)) < 14 && n < 20; n++ {
+		f.rounds(t, 1)
+	}
+	if n := len(batchCalls(r)); n != 14 {
+		t.Fatalf("the receiver got %d batches, want 14 before the one that stops the sink", n)
+	}
+	f.srv.AwaitHorizon(t)
+
+	round := make(chan error, 1)
+	go func() { round <- f.srv.Tick(t, worker.SinkDeliveryName) }()
+	deadline := time.Now().Add(10 * time.Second)
+	for len(batchCalls(r)) < 15 {
+		if time.Now().After(deadline) {
+			t.Fatal("the last batch never reached the receiver")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// A writer of the project holds it while the dead letter is recorded.
+	held := holdProject(t, f.p.projectID(t))
+	close(release)
+	pool := testkit.Pool(t)
+	for waiting := false; !waiting; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("setting the batch aside never waited for the project")
+		}
+		if err := pool.QueryRow(t.Context(), `SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid)))`, held.pid).Scan(&waiting); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !streamFreeWhileHeld(t, created, "exposure") {
+		t.Error("the sink's stream is locked while setting the batch aside waits for the project")
+	}
+	held.release(t)
+	if err := <-round; err != nil {
+		t.Fatalf("sink delivery round: %v", err)
+	}
+	if s := f.sink(t, created); s.Health != management.SinkHealthStopped {
+		t.Errorf("health = %s, want stopped", s.Health)
+	}
+}

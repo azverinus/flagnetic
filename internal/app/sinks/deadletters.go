@@ -57,6 +57,17 @@ func (h *Deliver) setAside(ctx context.Context, ref StreamRef, token LeaseToken,
 	var res SetAsideResult
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		var err error
+		// The project comes first, as in every other write of its sinks: the
+		// sink's row, then its stream's, then the outbox's foreign key to the
+		// project is the reverse order, and a project delete or a replay
+		// holding the project would deadlock with it.
+		if err = h.d.Store.LockProject(ctx, c.Sink.Project); errors.Is(err, ErrNotFound) {
+			// The project and its sinks are gone; so is the lease.
+			res = SetAsideResult{}
+			return nil
+		} else if err != nil {
+			return err
+		}
 		if res, err = h.d.Store.SetAside(ctx, ref, token, dl, h.d.StopAfterDeadLetters, now); err != nil || !res.Held {
 			return err
 		}

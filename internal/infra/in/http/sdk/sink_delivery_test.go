@@ -1098,42 +1098,25 @@ func TestRecordingASinkFailureTakesTheProjectBeforeTheSink(t *testing.T) {
 	}
 
 	// A writer of the project holds it while the failure is recorded.
-	pool := testkit.Pool(t)
-	holder, err := pool.Begin(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = holder.Rollback(t.Context()) }()
-	if _, err = holder.Exec(t.Context(), `SELECT 1 FROM projects WHERE key = $1 FOR NO KEY UPDATE`, f.p.key); err != nil {
-		t.Fatal(err)
-	}
-	var holderPID int
-	if err = holder.QueryRow(t.Context(), `SELECT pg_backend_pid()`).Scan(&holderPID); err != nil {
-		t.Fatal(err)
-	}
+	held := holdProject(t, f.p.projectID(t))
 	close(release)
 
-	// Once the failure waits for the project, the sink must still be free.
+	// Once the failure waits for the project, the sink's stream must still be
+	// free.
+	pool := testkit.Pool(t)
 	for waiting := false; !waiting; time.Sleep(10 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			t.Fatal("the failure never waited for the project")
 		}
-		if err = pool.QueryRow(t.Context(), `SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid)))`, holderPID).Scan(&waiting); err != nil {
+		if err := pool.QueryRow(t.Context(), `SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid)))`, held.pid).Scan(&waiting); err != nil {
 			t.Fatal(err)
 		}
 	}
-	probe, err := pool.Begin(t.Context())
-	if err != nil {
-		t.Fatal(err)
+	if !streamFreeWhileHeld(t, created, "exposure") {
+		t.Error("the sink's stream is locked while the failure waits for the project")
 	}
-	defer func() { _ = probe.Rollback(t.Context()) }()
-	if _, err = probe.Exec(t.Context(), `SELECT 1 FROM sinks WHERE id = $1 FOR NO KEY UPDATE NOWAIT`, created.Id); err != nil {
-		t.Errorf("the sink is locked while the failure waits for the project: %v", err)
-	}
-	_ = probe.Rollback(t.Context())
-	if err = holder.Commit(t.Context()); err != nil {
-		t.Fatal(err)
-	}
+	held.release(t)
+	var err error
 	if err = <-round; err != nil {
 		t.Fatalf("sink delivery round: %v", err)
 	}
@@ -1182,6 +1165,56 @@ func TestOneProjectsSinksAreAttemptedByTwoReplicasAtOnce(t *testing.T) {
 	go func() { rounds <- other.Tick(t, worker.SinkDeliveryName) }()
 	if got := waitForCalls(sinksOfProject); got != sinksOfProject {
 		t.Errorf("%d sinks attempted with two replicas, want all %d", got, sinksOfProject)
+	}
+	close(release)
+	for range 2 {
+		if err := <-rounds; err != nil {
+			t.Fatalf("sink delivery round: %v", err)
+		}
+	}
+}
+
+// A sink's streams are never attempted on two replicas at once: a replica that
+// holds one of them leaves the others to it, so that a stop it commits is
+// seen by the next attempt of every stream instead of after one more batch is
+// sent to the stopped sink.
+func TestASinksStreamsAreNotAttemptedOnTwoReplicasAtOnce(t *testing.T) {
+	f := startDelivering(t)
+	release := make(chan struct{})
+	r := testkit.StartReceiver(t, script([]testkit.Reply{{}}, []testkit.Reply{{Release: release}})...)
+	f.enabled(t, small(r, "exposure", "alias"))
+	other := testkit.StartServer(t, testkit.WithClock(f.clock), sinkTargets)
+
+	// Both streams rest once they have nothing to send, and fall due again
+	// together.
+	tick(t, f.srv)
+	f.clock.Advance(time.Minute)
+	f.post(t, f.exposure("u-1", "true", f.clock.Now()), f.exposure("u-2", "true", f.clock.Now()))
+	f.srv.AwaitHorizon(t)
+
+	// The first replica sends the first exposure batch and holds the second,
+	// its alias stream resting meanwhile.
+	rounds := make(chan error, 2)
+	go func() { rounds <- f.srv.Tick(t, worker.SinkDeliveryName) }()
+	callsWithin := func(want int, wait time.Duration) int {
+		deadline := time.Now().Add(wait)
+		for len(batchCalls(r)) < want && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+		return len(batchCalls(r))
+	}
+	if got := callsWithin(2, 10*time.Second); got != 2 {
+		t.Fatalf("the first replica made %d calls, want 2", got)
+	}
+
+	// The alias stream falls due while the first replica holds the exposure
+	// stream: the other replica leaves the sink alone.
+	f.clock.Advance(time.Minute)
+	f.post(t, f.alias(1))
+	f.srv.AwaitHorizon(t)
+	go func() { rounds <- other.Tick(t, worker.SinkDeliveryName) }()
+	if got := callsWithin(3, 2*time.Second); got != 2 {
+		t.Errorf("%d calls with a second replica, want 2: it attempted a stream of a sink the first replica holds", got)
 	}
 	close(release)
 	for range 2 {
