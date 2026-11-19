@@ -89,13 +89,6 @@ func (i Invitation) IssuedBy(inviter MemberID, grant *InvitationGrant) Invitatio
 	return i
 }
 
-// WithoutGrant returns i with its grant dropped: it still activates its
-// member, and grants nothing.
-func (i Invitation) WithoutGrant() Invitation {
-	i.Grant = nil
-	return i
-}
-
 // GrantDropReason is why an invitation's grant was dropped.
 type GrantDropReason string
 

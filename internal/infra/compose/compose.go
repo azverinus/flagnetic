@@ -371,7 +371,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	}
 	backgroundDropped := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: metrics.Namespace, Subsystem: "background", Name: "dropped_total",
-		Help: "Background jobs (mails, password reset requests) dropped because the replica was already running its limit, by kind.",
+		Help: "Background work (mails, password reset requests, records of failed sign-ins) dropped because the replica was already running its limit, by kind.",
 	}, []string{"kind"})
 	reg.MustRegister(backgroundDropped)
 	background := appaccess.NewBackground(edge.Logger(), appaccess.WithDroppedCounter(func(name string) {

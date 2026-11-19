@@ -134,6 +134,17 @@ func TestEverySlotHeldAnswersBusyAndRefusedAttemptsTakeNoSlot(t *testing.T) {
 		return codeOf(err), time.Since(start)
 	}
 
+	// An email locked and a source throttled by failures counted while the
+	// slots were free, as an attacker's would be.
+	locked := "nobody-" + m.Email
+	for range 5 {
+		attempt(locked, "not-the-password-9", from)
+	}
+	throttled := anAddress()
+	for i := range access.SourceFailureLimit {
+		attempt("spray-"+string(rune('a'+i%26))+m.Email, "not-the-password-9", throttled)
+	}
+
 	// The test holds every slot, as hashes running for other sign-ins would.
 	if err := slots.Acquire(t.Context(), 2); err != nil {
 		t.Fatal(err)
@@ -143,19 +154,13 @@ func TestEverySlotHeldAnswersBusyAndRefusedAttemptsTakeNoSlot(t *testing.T) {
 			t.Fatalf("with every slot held: %s after %v, want busy after the wait", code, took)
 		}
 	}
-	if code, took := attempt(m.Email, strings.Repeat("x", 129), from); code != "invalid_credentials" || took >= wait {
-		t.Errorf("an oversized password with every slot held: %s after %v, want invalid_credentials at once", code, took)
-	}
-	locked := "nobody-" + m.Email
-	for range 5 {
-		attempt(locked, strings.Repeat("x", 129), from)
+	// An oversized password is verified as a placeholder, so it takes a slot
+	// as any other does, and is as slow to refuse.
+	if code, took := attempt(m.Email, strings.Repeat("x", 129), from); code != "busy" || took < wait {
+		t.Errorf("an oversized password with every slot held: %s after %v, want busy after the wait", code, took)
 	}
 	if code, took := attempt(locked, "not-the-password-9", from); code != "locked" || took >= wait {
 		t.Errorf("a locked email with every slot held: %s after %v, want locked at once", code, took)
-	}
-	throttled := anAddress()
-	for i := range access.SourceFailureLimit {
-		attempt("spray-"+string(rune('a'+i%26))+m.Email, strings.Repeat("x", 129), throttled)
 	}
 	if code, took := attempt(m.Email, m.Password, throttled); code != "rate_limited" || took >= wait {
 		t.Errorf("a throttled source with every slot held: %s after %v, want rate_limited at once", code, took)

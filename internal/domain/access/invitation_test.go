@@ -130,20 +130,6 @@ func TestAnInvitationCarriesOneGrantOfABuiltInRole(t *testing.T) {
 	}
 }
 
-func TestAnInvitationWithoutItsGrantStillActivatesItsMember(t *testing.T) {
-	project := id.New[workspace.Project](newIDs())
-	grant, _ := access.NewInvitationGrant(project, access.RoleViewer, "/role")
-	inviter := id.New[access.Member](newIDs())
-	inv, _ := access.NewInvitation(id.New[access.Invitation](newIDs()), id.New[access.Member](newIDs()), now, rand.Reader)
-	dropped := inv.IssuedBy(inviter, &grant).WithoutGrant()
-	if dropped.Grant != nil || dropped.InvitedBy != inviter {
-		t.Errorf("dropped = %+v, want no grant and the inviter still named", dropped)
-	}
-	if !dropped.Open(now, access.Member{Status: access.MemberInvited}) {
-		t.Error("an invitation whose grant was dropped is no longer open")
-	}
-}
-
 func TestAnInvitationsGrantIsDroppedWhenItsInviterLosesTheRightToGrantIt(t *testing.T) {
 	project := id.New[workspace.Project](newIDs())
 	grantOf := func(role access.RoleName) access.Grant {

@@ -234,13 +234,13 @@ func (h *UpdateAuthSettings) requireIdentity(ctx context.Context, caller access.
 	return nil
 }
 
-// authSettingsRecord is s as audit entries show it, in the API's terms.
 // tightens reports whether after closes a way in before left open: local
 // login switched off, or the enforced domains changed.
 func tightens(before, after access.AuthSettings) bool {
 	return (before.LocalLoginEnabled && !after.LocalLoginEnabled) || !slices.Equal(before.SSOEnforcedDomains, after.SSOEnforcedDomains)
 }
 
+// authSettingsRecord is s as audit entries show it, in the API's terms.
 func authSettingsRecord(s access.AuthSettings) map[string]any {
 	return map[string]any{
 		"session_idle_timeout_seconds":     int64(s.SessionIdleTimeout / time.Second),
