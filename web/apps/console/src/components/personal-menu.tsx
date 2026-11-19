@@ -20,8 +20,7 @@ import { cn } from "@/lib/cn";
 import { unwrap } from "@/lib/errors";
 import { chosenLocale, followBrowser, followMemberLocale, localeChoice } from "@/lib/member-locale";
 import { meQuery } from "@/lib/queries";
-import { announceSessionChange } from "@/lib/signed-in";
-import { forgetRecentContexts } from "@/lib/tester";
+import { announceSessionChange, forgetMemberData } from "@/lib/signed-in";
 import { isTheme } from "@/lib/theme";
 import { useTheme } from "@/lib/use-theme";
 
@@ -57,7 +56,7 @@ export function PersonalMenu({ collapsed = false }: { collapsed?: boolean }) {
     meta: { readsAuditAgain: false },
     onSuccess: () => {
       queryClient.clear();
-      forgetRecentContexts();
+      forgetMemberData();
       announceSessionChange("signed-out");
       void navigate({ to: "/sign-in" });
     },

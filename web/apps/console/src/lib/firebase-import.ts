@@ -7,6 +7,7 @@ import {
 } from "@flagnetic/api";
 
 import { unwrap } from "./errors";
+import { draftKey, forgetImportDraftsOfOthers } from "./import-drafts";
 
 /** The step the wizard is on. */
 export type FirebaseStep = "upload" | "parameters" | "target" | "preview";
@@ -277,8 +278,6 @@ export type FirebaseSession = {
   unitType?: string;
 };
 
-const sessionKey = (project: string) => `flagnetic.import-firebase.${project}`;
-
 function isSession(value: unknown): value is FirebaseSession {
   if (typeof value !== "object" || value === null) return false;
   const held = value as Partial<FirebaseSession>;
@@ -298,10 +297,12 @@ function isSession(value: unknown): value is FirebaseSession {
  * The session kept for the project. A step past the upload whose
  * template was lost, or no longer reads, returns to the upload.
  */
-export function loadFirebaseSession(project: string): FirebaseSession {
+export function loadFirebaseSession(member: string, project: string): FirebaseSession {
   const fresh: FirebaseSession = { step: "upload" };
   try {
-    const raw = window.sessionStorage.getItem(sessionKey(project));
+    // A draft of another member, left in this tab, is gone before anyone reads it.
+    forgetImportDraftsOfOthers(member);
+    const raw = window.sessionStorage.getItem(draftKey("firebase", member, project));
     if (raw === null) return fresh;
     const parsed: unknown = JSON.parse(raw);
     if (!isSession(parsed)) return fresh;
@@ -318,18 +319,23 @@ export function loadFirebaseSession(project: string): FirebaseSession {
 }
 
 /** Keeps the session, or forgets it when it is back at the start. */
-export function saveFirebaseSession(project: string, session: FirebaseSession): void {
+export function saveFirebaseSession(
+  member: string,
+  project: string,
+  session: FirebaseSession,
+): void {
+  const key = draftKey("firebase", member, project);
   try {
     if (session.step === "upload" && session.text === undefined) {
-      window.sessionStorage.removeItem(sessionKey(project));
+      window.sessionStorage.removeItem(key);
     } else {
-      window.sessionStorage.setItem(sessionKey(project), JSON.stringify(session));
+      window.sessionStorage.setItem(key, JSON.stringify(session));
     }
   } catch {
     // Storage may be full or blocked. What an earlier step kept is dropped,
     // so a reload returns to the upload instead of resuming an older template.
     try {
-      window.sessionStorage.removeItem(sessionKey(project));
+      window.sessionStorage.removeItem(key);
     } catch {
       // Blocked storage keeps nothing to drop.
     }

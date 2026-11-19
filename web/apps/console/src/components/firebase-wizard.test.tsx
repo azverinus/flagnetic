@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { fakeServer, problem } from "@/test/fake-server";
-import { activateForTests, renderWithRouter } from "@/test/render";
+import { activateForTests, renderWithRouter, signedInClient } from "@/test/render";
 
 import { FirebaseWizard } from "./firebase-wizard";
 
@@ -138,7 +138,7 @@ describe("the Firebase wizard", () => {
         headers: { ETag: '"e1"' },
       },
     });
-    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />, "/", signedInClient());
 
     await upload();
 
@@ -157,7 +157,7 @@ describe("the Firebase wizard", () => {
       ...routes(),
       [path]: { status: 200, body: answer(true, ["new_matching"]), headers: { ETag: '"e1"' } },
     });
-    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />, "/", signedInClient());
 
     await upload();
     await screen.findByRole("list", { name: "Condition mapping" });
@@ -180,7 +180,7 @@ describe("the Firebase wizard", () => {
         };
       },
     });
-    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />, "/", signedInClient());
 
     await upload();
     await userEvent.click(await screen.findByLabelText("Include banner_text"));
@@ -219,7 +219,7 @@ describe("the Firebase wizard", () => {
         return { status: 200, body: answer(dryRun, ["new_matching"]), headers: { ETag: '"e1"' } };
       },
     });
-    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />, "/", signedInClient());
     await upload();
     await userEvent.click(await screen.findByRole("button", { name: /^Continue with/ }));
     await userEvent.click(screen.getByRole("button", { name: "Preview the import" }));
@@ -249,7 +249,7 @@ describe("the Firebase wizard", () => {
           : { status: 200, body: answer(false, ["banner_text"]) };
       },
     });
-    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />, "/", signedInClient());
     await upload();
     await userEvent.click(await screen.findByRole("button", { name: /^Continue with/ }));
     await userEvent.click(screen.getByRole("button", { name: "Preview the import" }));
@@ -278,7 +278,7 @@ describe("the Firebase wizard", () => {
             })
           : { status: 200, body: answer(true, ["banner_text"]), headers: { ETag: '"e1"' } },
     });
-    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />, "/", signedInClient());
 
     await upload();
 
@@ -298,7 +298,7 @@ describe("the Firebase wizard", () => {
       "GET /projects/mobile/environments": problem(500, "internal"),
       "GET /projects/mobile/unit-types": unitTypes,
     });
-    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />, "/", signedInClient());
 
     await upload();
 
@@ -311,7 +311,7 @@ describe("the Firebase wizard", () => {
       ...routes(),
       "GET /projects/mobile/unit-types": { status: 200, body: { items: [] } },
     });
-    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />, "/", signedInClient());
 
     await upload();
 
@@ -326,7 +326,7 @@ describe("the Firebase wizard", () => {
       [path]: { status: 200, body: answer(true, ["new_matching"]), headers: { ETag: '"e1"' } },
     });
     window.sessionStorage.setItem(
-      "flagnetic.import-firebase.mobile",
+      "flagnetic.import-firebase.ada.mobile",
       JSON.stringify({
         step: "parameters",
         fileName: "remoteconfig.json",
@@ -336,7 +336,7 @@ describe("the Firebase wizard", () => {
       }),
     );
 
-    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />, "/", signedInClient());
     await screen.findByRole("list", { name: "Condition mapping" });
 
     const url = new URL(server.requests.find((r) => r.method === "POST")!.url);
@@ -346,7 +346,7 @@ describe("the Firebase wizard", () => {
 
   it("refuses a file that is not a template before going on", async () => {
     fakeServer(routes());
-    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />, "/", signedInClient());
 
     await userEvent.upload(
       screen.getByLabelText("Remote Config template"),
@@ -359,7 +359,7 @@ describe("the Firebase wizard", () => {
 
   it("says so when the browser cannot read the chosen file", async () => {
     fakeServer(routes());
-    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />, "/", signedInClient());
     const file = new File(["{}"], "t.json");
     file.text = () => Promise.reject(new Error("gone"));
 
@@ -375,7 +375,7 @@ describe("the Firebase wizard", () => {
       [path]: { status: 200, body: answer(true, ["new_matching"]), headers: { ETag: '"e1"' } },
     });
     window.sessionStorage.setItem(
-      "flagnetic.import-firebase.mobile",
+      "flagnetic.import-firebase.ada.mobile",
       JSON.stringify({
         step: "parameters",
         fileName: "remoteconfig.json",
@@ -384,7 +384,7 @@ describe("the Firebase wizard", () => {
       }),
     );
 
-    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />, "/", signedInClient());
 
     expect(await screen.findByLabelText("Include banner_text")).not.toBeChecked();
     expect(screen.getByLabelText("Include new_matching")).toBeChecked();
@@ -393,11 +393,11 @@ describe("the Firebase wizard", () => {
   it("returns to the upload when the template was lost", async () => {
     fakeServer(routes());
     window.sessionStorage.setItem(
-      "flagnetic.import-firebase.mobile",
+      "flagnetic.import-firebase.ada.mobile",
       JSON.stringify({ step: "preview" }),
     );
 
-    await renderWithRouter(() => <FirebaseWizard project="mobile" />);
+    await renderWithRouter(() => <FirebaseWizard project="mobile" />, "/", signedInClient());
 
     expect(screen.getByLabelText("Remote Config template")).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole("button", { name: "Apply" })).toBeNull());

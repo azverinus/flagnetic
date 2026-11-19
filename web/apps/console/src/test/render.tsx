@@ -11,7 +11,10 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { render, type RenderResult } from "@testing-library/react";
+import type { Me } from "@flagnetic/api";
 import type { ReactNode } from "react";
+
+import { meQuery } from "@/lib/queries";
 
 import { messages as en } from "@/locales/en/messages.po";
 import { messages as pseudo } from "@/locales/pseudo/messages.po";
@@ -29,6 +32,30 @@ export function testQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+}
+
+/**
+ * A query client for a test of a screen that knows who is signed in: the
+ * caller is the member with the given id, as the console's own guard has
+ * already answered before it renders anything.
+ */
+export function signedInClient(member = "ada"): QueryClient {
+  const client = testQueryClient();
+  client.setQueryData(meQuery.queryKey, {
+    client_ip: "127.0.0.1",
+    credential: { method: "session" },
+    member: {
+      id: member,
+      email: `${member}@example.com`,
+      display_name: member,
+      status: "active",
+      instance_admin: false,
+      locale: null,
+    },
+    max_token_lifetime_seconds: null,
+    require_token_expiry: false,
+  } satisfies Me);
+  return client;
 }
 
 /** Renders ui with the catalogs and a fresh query client. */
@@ -52,6 +79,7 @@ export function renderWithProviders(
 export async function renderWithRouter(
   ui: () => ReactNode,
   path = "/",
+  queryClient: QueryClient = testQueryClient(),
 ): Promise<RenderResult & { router: AnyRouter; queryClient: QueryClient }> {
   const root = createRootRoute({ component: Outlet });
   const page = createRoute({ getParentRoute: () => root, path: "/", component: () => <>{ui()}</> });
@@ -65,6 +93,6 @@ export async function renderWithRouter(
     history: createMemoryHistory({ initialEntries: [path] }),
   });
   await router.load();
-  const result = renderWithProviders(<RouterProvider router={router} />);
+  const result = renderWithProviders(<RouterProvider router={router} />, queryClient);
   return { ...result, router };
 }

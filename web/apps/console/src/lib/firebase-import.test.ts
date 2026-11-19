@@ -243,7 +243,7 @@ describe("the wizard's session", () => {
   const text = JSON.stringify(template);
 
   it("keeps the step, the template and the choices across a reload", () => {
-    saveFirebaseSession("mobile", {
+    saveFirebaseSession("ada", "mobile", {
       step: "target",
       fileName: "remoteconfig.json",
       text,
@@ -251,7 +251,7 @@ describe("the wizard's session", () => {
       environment: "production",
       unitType: "user",
     });
-    expect(loadFirebaseSession("mobile")).toEqual({
+    expect(loadFirebaseSession("ada", "mobile")).toEqual({
       step: "target",
       fileName: "remoteconfig.json",
       text,
@@ -259,35 +259,35 @@ describe("the wizard's session", () => {
       environment: "production",
       unitType: "user",
     });
-    expect(loadFirebaseSession("other")).toEqual({ step: "upload" });
+    expect(loadFirebaseSession("ada", "other")).toEqual({ step: "upload" });
   });
 
   it("returns to the upload when the template was lost or no longer reads", () => {
     window.sessionStorage.setItem(
-      "flagnetic.import-firebase.mobile",
+      "flagnetic.import-firebase.ada.mobile",
       JSON.stringify({ step: "preview" }),
     );
-    expect(loadFirebaseSession("mobile").step).toBe("upload");
+    expect(loadFirebaseSession("ada", "mobile").step).toBe("upload");
     window.sessionStorage.setItem(
-      "flagnetic.import-firebase.mobile",
+      "flagnetic.import-firebase.ada.mobile",
       JSON.stringify({ step: "preview", text: "not json" }),
     );
-    expect(loadFirebaseSession("mobile").step).toBe("upload");
+    expect(loadFirebaseSession("ada", "mobile").step).toBe("upload");
   });
 
   it("starts over on a stored value that is not a session", () => {
-    window.sessionStorage.setItem("flagnetic.import-firebase.mobile", "{");
-    expect(loadFirebaseSession("mobile")).toEqual({ step: "upload" });
+    window.sessionStorage.setItem("flagnetic.import-firebase.ada.mobile", "{");
+    expect(loadFirebaseSession("ada", "mobile")).toEqual({ step: "upload" });
     window.sessionStorage.setItem(
-      "flagnetic.import-firebase.mobile",
+      "flagnetic.import-firebase.ada.mobile",
       JSON.stringify({ step: "nowhere" }),
     );
-    expect(loadFirebaseSession("mobile")).toEqual({ step: "upload" });
+    expect(loadFirebaseSession("ada", "mobile")).toEqual({ step: "upload" });
   });
 
   it("forgets the session once it is back at the start", () => {
-    saveFirebaseSession("mobile", { step: "parameters", fileName: "t.json", text });
-    saveFirebaseSession("mobile", { step: "upload" });
-    expect(window.sessionStorage.getItem("flagnetic.import-firebase.mobile")).toBeNull();
+    saveFirebaseSession("ada", "mobile", { step: "parameters", fileName: "t.json", text });
+    saveFirebaseSession("ada", "mobile", { step: "upload" });
+    expect(window.sessionStorage.getItem("flagnetic.import-firebase.ada.mobile")).toBeNull();
   });
 });

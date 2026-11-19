@@ -12,6 +12,7 @@ import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
 import { unwrap } from "./errors";
+import { draftKey, forgetImportDraftsOfOthers } from "./import-drafts";
 import { stringifyLossless } from "./lossless-json";
 
 /** How the document is applied to the project it is imported into. */
@@ -370,8 +371,6 @@ export type ImportSession = {
   document?: HeldDocument;
 };
 
-const sessionKey = (project: string) => `flagnetic.import.${project}`;
-
 function isImportSession(value: unknown): value is ImportSession {
   if (typeof value !== "object" || value === null) return false;
   const held = value as Partial<ImportSession>;
@@ -393,10 +392,12 @@ function isImportSession(value: unknown): value is ImportSession {
  * has lost it, such as a document too large for the browser to keep,
  * returns to the upload.
  */
-export function loadImportSession(project: string): ImportSession {
+export function loadImportSession(member: string, project: string): ImportSession {
   const fresh: ImportSession = { step: "upload" };
   try {
-    const raw = window.sessionStorage.getItem(sessionKey(project));
+    // A draft of another member, left in this tab, is gone before anyone reads it.
+    forgetImportDraftsOfOthers(member);
+    const raw = window.sessionStorage.getItem(draftKey("project", member, project));
     if (raw === null) return fresh;
     const parsed: unknown = JSON.parse(raw);
     if (!isImportSession(parsed)) return fresh;
@@ -409,18 +410,19 @@ export function loadImportSession(project: string): ImportSession {
 }
 
 /** Keeps the session, or forgets it when it is back at the start. */
-export function saveImportSession(project: string, session: ImportSession): void {
+export function saveImportSession(member: string, project: string, session: ImportSession): void {
+  const key = draftKey("project", member, project);
   try {
     if (session.step === "upload" && session.document === undefined && session.mode !== "replace") {
-      window.sessionStorage.removeItem(sessionKey(project));
+      window.sessionStorage.removeItem(key);
     } else {
-      window.sessionStorage.setItem(sessionKey(project), JSON.stringify(session));
+      window.sessionStorage.setItem(key, JSON.stringify(session));
     }
   } catch {
     // Storage may be full or blocked. What an earlier step kept is dropped,
     // so a reload returns to the upload instead of reviewing an older document.
     try {
-      window.sessionStorage.removeItem(sessionKey(project));
+      window.sessionStorage.removeItem(key);
     } catch {
       // Blocked storage keeps nothing to drop.
     }
