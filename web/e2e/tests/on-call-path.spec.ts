@@ -43,6 +43,7 @@ test.describe("the on-call path at 390 px", () => {
     await writeConfiguration(project, "payments_v2", "production", () => ({ on: true }));
 
     await page.goto("/sign-in");
+    await expect(page.getByLabel("Email")).toBeVisible();
     await expectFitsAPhone(page, "sign-in");
     await signIn(page);
     await expectFitsAPhone(page, "projects");
@@ -68,7 +69,9 @@ test.describe("the on-call path at 390 px", () => {
 
     await page.getByRole("link", { name: "payments_v2" }).first().click();
     await expect(page.getByRole("heading", { level: 1, name: /payments_v2/ })).toBeVisible();
-    await page.goto(`/projects/${project}/flags/payments_v2?environment=production`);
+    // The context panel is a sheet here, so the environment is chosen beside the title.
+    await page.getByRole("combobox", { name: "Environment" }).click();
+    await page.getByRole("option", { name: /Production/ }).click();
     await expect(page.getByRole("button", { name: "Kill switch" })).toBeVisible();
     await expectFitsAPhone(page, "the flag");
 
@@ -117,7 +120,11 @@ test.describe("the on-call path at 390 px", () => {
     await expect(page.getByRole("table", { name: "Change requests" })).toBeVisible();
     await expectFitsAPhone(page, "the change requests list");
 
-    await page.goto(`/projects/${project}/change-requests/${request.id}`);
+    await page
+      .getByRole("link", { name: /Serve the new copy/ })
+      .first()
+      .click();
+    await expect(page).toHaveURL(new RegExp(`/change-requests/${request.id}`));
     const approve = page.getByRole("button", { name: "Approve", exact: true });
     await expect(approve).toBeVisible();
     await expectFitsAPhone(page, "the change request");

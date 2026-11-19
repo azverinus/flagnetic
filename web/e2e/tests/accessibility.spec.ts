@@ -284,7 +284,11 @@ async function seed(): Promise<Seeded> {
     );
   }
   const invited = await seedInvitation("sweep", longName.slice(0, 200));
-  const active = await seedMember("sweep-reset", "Sweep Member", "harness-sweep-reset-6172");
+  const active = await seedMember(
+    "sweep-reset",
+    longName.slice(0, 200),
+    "harness-sweep-reset-6172",
+  );
   const reset = must(
     "issuing a password reset",
     await issuePasswordReset({ client: managementClient(), path: { member: active.id } }),
