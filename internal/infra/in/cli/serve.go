@@ -143,9 +143,9 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		if cancelStep.IsZero() {
 			cancelStep = time.Now()
 		}
-		ctx, cancel := context.WithDeadline(context.Background(), cancelStep.Add(cancelBound-poolCloseBound))
+		mailCtx, cancel := context.WithDeadline(context.Background(), cancelStep.Add(cancelBound-poolCloseBound))
 		defer cancel()
-		background.Close(ctx)
+		background.Close(mailCtx)
 	}()
 	for _, w := range background.Workers {
 		if err = runner.Register(w); err != nil {

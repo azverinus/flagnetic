@@ -77,11 +77,11 @@ func TestAReplicaStoppedWithAMailStuckOnASilentServerStillWritesItsCountsWithinT
 	}
 
 	proj := management.ProjectCreate{Key: "shop", Name: "Shop"}
-	if res, err := admin.CreateProjectWithResponse(t.Context(), proj); err != nil || res.JSON201 == nil {
-		t.Fatalf("create project: %v %v", err, res)
+	if res, perr := admin.CreateProjectWithResponse(t.Context(), proj); perr != nil || res.JSON201 == nil {
+		t.Fatalf("create project: %v %v", perr, res)
 	}
-	if res, err := admin.CreateFlagWithResponse(t.Context(), "shop", management.FlagCreate{Key: "checkout", Name: "Checkout", Type: "boolean"}); err != nil || res.JSON201 == nil {
-		t.Fatalf("create flag: %v %v", err, res)
+	if res, ferr := admin.CreateFlagWithResponse(t.Context(), "shop", management.FlagCreate{Key: "checkout", Name: "Checkout", Type: "boolean"}); ferr != nil || res.JSON201 == nil {
+		t.Fatalf("create flag: %v %v", ferr, res)
 	}
 	key, err := admin.CreateSdkKeyWithResponse(t.Context(), "shop", "production", management.SdkKeyCreate{Kind: string(management.SdkKeyKindClient), Name: "web"})
 	if err != nil || key.JSON201 == nil {
@@ -95,10 +95,10 @@ func TestAReplicaStoppedWithAMailStuckOnASilentServerStillWritesItsCountsWithinT
 	smtp, connections := silentSMTP(t)
 	host, port, _ := net.SplitHostPort(smtp.String())
 	portNumber, _ := net.LookupPort("tcp", port)
-	if res, err := admin.UpdateMailSettingsWithResponse(t.Context(), management.SmtpSettingsUpdate{
+	if res, merr := admin.UpdateMailSettingsWithResponse(t.Context(), management.SmtpSettingsUpdate{
 		Host: host, Port: portNumber, Security: management.SmtpSecurityNone, From: "flags@example.com",
-	}); err != nil || res.JSON200 == nil {
-		t.Fatalf("configure SMTP: %v %v", err, res)
+	}); merr != nil || res.JSON200 == nil {
+		t.Fatalf("configure SMTP: %v %v", merr, res)
 	}
 
 	// A remote evaluation counted in memory, and a password reset whose mail
@@ -107,12 +107,12 @@ func TestAReplicaStoppedWithAMailStuckOnASilentServerStillWritesItsCountsWithinT
 		bytes.NewReader([]byte(`{"context":{"units":{"user":"u-1"}},"flags":["checkout"]}`)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+key.JSON201.Value)
-	if res, err := http.DefaultClient.Do(req); err != nil || res.StatusCode != http.StatusOK {
-		t.Fatalf("evaluate: %v %v", err, res)
+	if res, eerr := http.DefaultClient.Do(req); eerr != nil || res.StatusCode != http.StatusOK {
+		t.Fatalf("evaluate: %v %v", eerr, res)
 	}
 	anon, _ := management.NewClientWithResponses(r.baseURL + management.BaseURL)
-	if res, err := anon.RequestPasswordResetWithResponse(t.Context(), management.PasswordResetRequest{Email: "first@example.com"}); err != nil || res.StatusCode() != http.StatusAccepted {
-		t.Fatalf("password reset: %v %v", err, res)
+	if res, rerr := anon.RequestPasswordResetWithResponse(t.Context(), management.PasswordResetRequest{Email: "first@example.com"}); rerr != nil || res.StatusCode() != http.StatusAccepted {
+		t.Fatalf("password reset: %v %v", rerr, res)
 	}
 	if !waitFor(func() bool { return connections.Load() > 0 }) {
 		t.Fatalf("the mail never reached the SMTP server:\n%s", r.stderr.String())
