@@ -27,8 +27,9 @@ secrets:
   secretKey: ""
 
 # Settings as FLAGNETIC_* environment variables: each key is the setting's file
-# key in docs/configuration.md (log_level becomes FLAGNETIC_LOG_LEVEL). The
-# listeners and auto_migrate are the chart's own.
+# key in docs/configuration.md (log_level becomes FLAGNETIC_LOG_LEVEL), and a
+# key that is no setting is refused. The listeners and auto_migrate are the
+# chart's own. Write a rate limit that is off as "off", quoted.
 config: {}
 
 # Environment variables and sources for them, as in a container spec.
@@ -54,6 +55,8 @@ serviceAccount:
 podAnnotations: {}
 podLabels: {}
 
+# At least config.shutdown_drain + config.shutdown_grace + 10 seconds, which the
+# chart checks.
 terminationGracePeriodSeconds: 30
 
 probes:

@@ -112,12 +112,12 @@ tests:
           content:
             name: FLAGNETIC_BASE_URL
             value: "https://flags.example.com"
-  - it: refuses settings the chart owns
+  - it: refuses settings the chart owns, which the schema leaves out of the keys of config
     set:
       config.auto_migrate: "true"
     asserts:
       - failedTemplate:
-          errorPattern: config.auto_migrate is managed by the chart
+          errorPattern: invalid propertyName .auto_migrate.
   - it: adds extra environment, sources, scheduling and resources
     set:
       extraEnv:
